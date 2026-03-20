@@ -165,91 +165,112 @@ export const ProvisionSparkline = memo(function ProvisionSparkline({
       <Tooltip>
         <TooltipTrigger asChild>
           <div
-            className={cn("flex items-center gap-1 cursor-pointer", className)}
+            className={cn("flex flex-col items-center gap-0.5 cursor-pointer", className)}
             onClick={() => setModalOpen(true)}
           >
-            <svg
-              width={w}
-              height={h}
-              className="shrink-0"
-              viewBox={`0 0 ${w} ${h}`}
-            >
-              <defs>
-                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={strokeColor} stopOpacity={0.25} />
-                  <stop offset="100%" stopColor={strokeColor} stopOpacity={0.02} />
-                </linearGradient>
-              </defs>
+            <div className="flex items-center gap-1">
+              <svg
+                width={w}
+                height={h}
+                className="shrink-0"
+                viewBox={`0 0 ${w} ${h}`}
+              >
+                <defs>
+                  <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={strokeColor} stopOpacity={0.2} />
+                    <stop offset="100%" stopColor={strokeColor} stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
 
-              {/* Gradient fill area */}
-              <polygon
-                points={polygonPoints}
-                fill={`url(#${gradientId})`}
-              />
+                {/* Gradient fill area */}
+                <path d={areaPath} fill={`url(#${gradientId})`} />
 
-              {/* Division average dashed line */}
-              {avgPointsStr && (
-                <polyline
-                  points={avgPointsStr}
+                {/* Division average dashed line */}
+                {avgPath && (
+                  <path
+                    d={avgPath}
+                    fill="none"
+                    stroke="hsl(var(--muted-foreground))"
+                    strokeWidth={1}
+                    strokeDasharray="3 2"
+                    strokeLinecap="round"
+                    opacity={0.35}
+                  />
+                )}
+
+                {/* Main smooth line with draw animation */}
+                <path
+                  d={smoothPath}
                   fill="none"
-                  stroke="hsl(var(--muted-foreground))"
-                  strokeWidth={1}
-                  strokeDasharray="3 2"
+                  stroke={strokeColor}
+                  strokeWidth={strokeW}
                   strokeLinecap="round"
-                  opacity={0.4}
+                  strokeLinejoin="round"
+                  className="sparkline-draw"
+                  style={{
+                    strokeDasharray: pathLength * 1.5,
+                    strokeDashoffset: pathLength * 1.5,
+                    animationDuration: "0.8s",
+                    "--sparkline-path-length": pathLength * 1.5,
+                  } as React.CSSProperties}
                 />
-              )}
 
-              {/* Main line with draw animation */}
-              <polyline
-                points={pointsStr}
-                fill="none"
-                stroke={strokeColor}
-                strokeWidth={strokeW}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="sparkline-draw"
-                style={{
-                  strokeDasharray: pathLength,
-                  strokeDashoffset: pathLength,
-                  animationDuration: "0.8s",
-                  // @ts-ignore CSS custom property
-                  "--sparkline-path-length": pathLength,
-                } as React.CSSProperties}
-              />
+                {/* Min marker */}
+                {isMd && minIdx !== maxIdx && (
+                  <circle
+                    cx={points[minIdx].x}
+                    cy={points[minIdx].y}
+                    r={2}
+                    fill="hsl(var(--muted-foreground))"
+                    opacity={0.5}
+                  />
+                )}
 
-              {/* Min marker */}
-              {isMd && minIdx !== maxIdx && (
+                {/* Max marker */}
+                {isMd && minIdx !== maxIdx && (
+                  <circle
+                    cx={points[maxIdx].x}
+                    cy={points[maxIdx].y}
+                    r={2.5}
+                    fill={strokeColor}
+                    opacity={0.7}
+                  />
+                )}
+
+                {/* Invisible hit areas for hover */}
+                {isMd && points.map((p, i) => (
+                  <circle
+                    key={i}
+                    cx={p.x}
+                    cy={p.y}
+                    r={8}
+                    fill="transparent"
+                    className="hover:fill-current opacity-0 hover:opacity-10"
+                  >
+                    <title>{`${dayLabels[i]}: ${data[i].toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr`}</title>
+                  </circle>
+                ))}
+
+                {/* Pulsating endpoint */}
                 <circle
-                  cx={points[minIdx].x}
-                  cy={points[minIdx].y}
-                  r={2}
-                  fill="hsl(var(--muted-foreground))"
-                  opacity={0.5}
-                />
-              )}
-
-              {/* Max marker */}
-              {isMd && minIdx !== maxIdx && (
-                <circle
-                  cx={points[maxIdx].x}
-                  cy={points[maxIdx].y}
-                  r={2}
+                  cx={lastPoint.x}
+                  cy={lastPoint.y}
+                  r={isMd ? 3 : 2}
                   fill={strokeColor}
-                  opacity={0.7}
+                  className="sparkline-pulse-dot"
                 />
-              )}
-
-              {/* Pulsating endpoint */}
-              <circle
-                cx={lastPoint.x}
-                cy={lastPoint.y}
-                r={isMd ? 3 : 2}
-                fill={strokeColor}
-                className="sparkline-pulse-dot"
-              />
-            </svg>
-            <MomentumIcon className={cn("h-3 w-3 shrink-0", momentumColor)} />
+              </svg>
+              <MomentumIcon className={cn("h-3 w-3 shrink-0", momentumColor)} />
+            </div>
+            {/* Performance vs division avg */}
+            {isMd && perfLabel && (
+              <span className={cn(
+                "text-[9px] font-medium leading-none",
+                perfLabel.above ? "text-emerald-400" : "text-rose-400"
+              )}>
+                {perfLabel.above ? "↑" : "↓"}{Math.abs(perfLabel.pct)}% {perfLabel.above ? "over" : "under"} gns.
+              </span>
+            )}
           </div>
         </TooltipTrigger>
         <TooltipContent side="top" className="text-xs whitespace-pre font-mono">
