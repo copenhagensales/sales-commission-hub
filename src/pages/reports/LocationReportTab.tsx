@@ -314,6 +314,8 @@ export function LocationReportTab() {
                     <TableCell className="font-medium">{loc.name}</TableCell>
                     <TableCell>{loc.type ?? "–"}</TableCell>
                     <TableCell>{loc.region ?? "–"}</TableCell>
+                    <TableCell>{loc.address_street ?? "–"}</TableCell>
+                    <TableCell>{loc.address_postal_code ?? "–"}</TableCell>
                     <TableCell>{loc.address_city ?? "–"}</TableCell>
                     <TableCell className="text-right">
                       {loc.daily_rate ? loc.daily_rate.toLocaleString("da-DK") : "–"}
