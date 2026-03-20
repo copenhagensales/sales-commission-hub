@@ -157,11 +157,13 @@ export function LocationReportTab() {
         Navn: loc.name,
         Type: loc.type ?? "",
         Region: loc.region ?? "",
+        Adresse: loc.address_street ?? "",
+        Postnr: loc.address_postal_code ?? "",
         By: loc.address_city ?? "",
         "Dagspris (DKK)": loc.daily_rate ?? "",
       }));
       const ws = XLSX.utils.json_to_sheet(rows);
-      ws["!cols"] = [{ wch: 30 }, { wch: 22 }, { wch: 18 }, { wch: 18 }, { wch: 14 }];
+      ws["!cols"] = [{ wch: 30 }, { wch: 22 }, { wch: 18 }, { wch: 30 }, { wch: 8 }, { wch: 18 }, { wch: 14 }];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Lokationer");
       XLSX.writeFile(wb, `lokationer-alle-${periodStart}.xlsx`);
