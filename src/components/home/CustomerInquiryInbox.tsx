@@ -61,6 +61,23 @@ export const CustomerInquiryInbox = () => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["customer-inquiries"] }),
   });
 
+  const deleteInquiry = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("customer_inquiries")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["customer-inquiries"] });
+      toast.success("Henvendelse slettet");
+    },
+    onError: () => {
+      toast.error("Kunne ikke slette henvendelsen");
+    },
+  });
+
   const unreadCount = inquiries.filter((i) => !i.is_read).length;
   const hasUnread = unreadCount > 0;
 
