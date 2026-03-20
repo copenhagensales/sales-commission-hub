@@ -356,59 +356,59 @@ function SceneMovements({
   topLastHour: { name: string; provision: number; sales: number }[];
 }) {
   return (
-    <div className="h-full flex flex-col gap-6">
+    <div className="h-full flex flex-col gap-3 2xl:gap-6 overflow-y-auto">
       <div>
-        <h2 className="text-3xl font-black text-white mb-4">Dagens bevægelser</h2>
-        <div className="grid grid-cols-2 gap-4">
+        <h2 className="text-xl 2xl:text-3xl font-black text-white mb-2 2xl:mb-4">Dagens bevægelser</h2>
+        <div className="grid grid-cols-2 gap-2 2xl:gap-4">
           <div>
-            <h3 className="text-sm font-medium text-emerald-400 mb-3 flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" /> Største spring op
+            <h3 className="text-xs 2xl:text-sm font-medium text-emerald-400 mb-2 2xl:mb-3 flex items-center gap-2">
+              <TrendingUp className="h-3 w-3 2xl:h-4 2xl:w-4" /> Største spring op
             </h3>
-            <div className="space-y-2">
+            <div className="space-y-1.5 2xl:space-y-2">
               {movements.risers.slice(0, 3).map((m, i) => (
                 <motion.div
                   key={i}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: i * 0.1 }}
-                  className="flex items-center gap-3 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20"
+                  className="flex items-center gap-2 2xl:gap-3 px-2 2xl:px-3 py-1.5 2xl:py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20"
                 >
-                  <span className="text-emerald-400 font-black text-lg">🚀</span>
+                  <span className="text-emerald-400 font-black text-sm 2xl:text-lg">🚀</span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-white font-medium truncate text-sm">{m.name}</p>
-                    <p className="text-emerald-400 text-xs">+{m.change} pladser</p>
+                    <p className="text-white font-medium truncate text-xs 2xl:text-sm">{m.name}</p>
+                    <p className="text-emerald-400 text-[10px] 2xl:text-xs">+{m.change} pladser</p>
                   </div>
-                  <span className="text-slate-400 text-xs">#{m.currentRank}</span>
+                  <span className="text-slate-400 text-[10px] 2xl:text-xs">#{m.currentRank}</span>
                 </motion.div>
               ))}
               {movements.risers.length === 0 && (
-                <p className="text-slate-600 text-sm italic">Ingen bevægelser endnu</p>
+                <p className="text-slate-600 text-xs 2xl:text-sm italic">Ingen bevægelser endnu</p>
               )}
             </div>
           </div>
           <div>
-            <h3 className="text-sm font-medium text-red-400 mb-3 flex items-center gap-2">
-              <TrendingDown className="h-4 w-4" /> Største fald
+            <h3 className="text-xs 2xl:text-sm font-medium text-red-400 mb-2 2xl:mb-3 flex items-center gap-2">
+              <TrendingDown className="h-3 w-3 2xl:h-4 2xl:w-4" /> Største fald
             </h3>
-            <div className="space-y-2">
+            <div className="space-y-1.5 2xl:space-y-2">
               {movements.fallers.slice(0, 3).map((m, i) => (
                 <motion.div
                   key={i}
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: i * 0.1 }}
-                  className="flex items-center gap-3 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20"
+                  className="flex items-center gap-2 2xl:gap-3 px-2 2xl:px-3 py-1.5 2xl:py-2 rounded-lg bg-red-500/10 border border-red-500/20"
                 >
-                  <span className="text-red-400 font-black text-lg">📉</span>
+                  <span className="text-red-400 font-black text-sm 2xl:text-lg">📉</span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-white font-medium truncate text-sm">{m.name}</p>
-                    <p className="text-red-400 text-xs">{m.change} pladser</p>
+                    <p className="text-white font-medium truncate text-xs 2xl:text-sm">{m.name}</p>
+                    <p className="text-red-400 text-[10px] 2xl:text-xs">{m.change} pladser</p>
                   </div>
-                  <span className="text-slate-400 text-xs">#{m.currentRank}</span>
+                  <span className="text-slate-400 text-[10px] 2xl:text-xs">#{m.currentRank}</span>
                 </motion.div>
               ))}
               {movements.fallers.length === 0 && (
-                <p className="text-slate-600 text-sm italic">Ingen bevægelser endnu</p>
+                <p className="text-slate-600 text-xs 2xl:text-sm italic">Ingen bevægelser endnu</p>
               )}
             </div>
           </div>
@@ -416,28 +416,28 @@ function SceneMovements({
       </div>
 
       <div>
-        <h3 className="text-sm font-medium text-amber-400 mb-3 flex items-center gap-2">
-          <Zap className="h-4 w-4" /> Mest tjent sidste time
+        <h3 className="text-xs 2xl:text-sm font-medium text-amber-400 mb-2 2xl:mb-3 flex items-center gap-2">
+          <Zap className="h-3 w-3 2xl:h-4 2xl:w-4" /> Mest tjent sidste time
         </h3>
-        <div className="space-y-2">
+        <div className="space-y-1.5 2xl:space-y-2">
           {topLastHour.map((e, i) => (
             <motion.div
               key={i}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.1 }}
-              className="flex items-center gap-3 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20"
+              className="flex items-center gap-2 2xl:gap-3 px-2 2xl:px-3 py-1.5 2xl:py-2 rounded-lg bg-amber-500/10 border border-amber-500/20"
             >
-              <span className="text-lg">{i === 0 ? "⚡" : i === 1 ? "🔥" : "💫"}</span>
+              <span className="text-sm 2xl:text-lg">{i === 0 ? "⚡" : i === 1 ? "🔥" : "💫"}</span>
               <div className="flex-1 min-w-0">
-                <p className="text-white font-medium truncate text-sm">{e.name}</p>
-                <p className="text-amber-400/70 text-xs">{e.sales} salg</p>
+                <p className="text-white font-medium truncate text-xs 2xl:text-sm">{e.name}</p>
+                <p className="text-amber-400/70 text-[10px] 2xl:text-xs">{e.sales} salg</p>
               </div>
-              <span className="text-amber-400 font-bold tabular-nums text-sm">{formatKr(e.provision)}</span>
+              <span className="text-amber-400 font-bold tabular-nums text-xs 2xl:text-sm">{formatKr(e.provision)}</span>
             </motion.div>
           ))}
           {topLastHour.length === 0 && (
-            <p className="text-slate-600 text-sm italic">Ingen salg den seneste time</p>
+            <p className="text-slate-600 text-xs 2xl:text-sm italic">Ingen salg den seneste time</p>
           )}
         </div>
       </div>
