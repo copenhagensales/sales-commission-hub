@@ -37,7 +37,7 @@ export const ProvisionSparkline = memo(function ProvisionSparkline({
   className,
 }: ProvisionSparklineProps) {
   const [modalOpen, setModalOpen] = useState(false);
-
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
   if (!data || data.length === 0) return null;
 
   const isMd = size === "md";
@@ -141,11 +141,7 @@ export const ProvisionSparkline = memo(function ProvisionSparkline({
     pathLength += Math.sqrt(dx * dx + dy * dy);
   }
 
-  // Tooltip content
   const dayLabels = getDayLabels();
-  const tooltipText = data
-    .map((v, i) => `${dayLabels[i]}: ${v.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr`)
-    .join("\n");
 
   // Performance vs division average
   const perfLabel = useMemo(() => {
@@ -237,18 +233,17 @@ export const ProvisionSparkline = memo(function ProvisionSparkline({
                   />
                 )}
 
-                {/* Invisible hit areas for hover */}
+                {/* Interactive hit areas */}
                 {isMd && points.map((p, i) => (
                   <circle
                     key={i}
                     cx={p.x}
                     cy={p.y}
-                    r={8}
+                    r={10}
                     fill="transparent"
-                    className="hover:fill-current opacity-0 hover:opacity-10"
-                  >
-                    <title>{`${dayLabels[i]}: ${data[i].toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr`}</title>
-                  </circle>
+                    onMouseEnter={() => setHoveredIdx(i)}
+                    onMouseLeave={() => setHoveredIdx(null)}
+                  />
                 ))}
 
                 {/* Pulsating endpoint */}
@@ -264,8 +259,11 @@ export const ProvisionSparkline = memo(function ProvisionSparkline({
             </div>
           </div>
         </TooltipTrigger>
-        <TooltipContent side="top" className="text-xs whitespace-pre font-mono">
-          {tooltipText}
+        <TooltipContent side="top" className="text-xs font-mono">
+          {hoveredIdx !== null
+            ? `${dayLabels[hoveredIdx]}: ${data[hoveredIdx].toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr`
+            : `${dayLabels[data.length - 1]}: ${data[data.length - 1].toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr`
+          }
         </TooltipContent>
       </Tooltip>
 
