@@ -37,7 +37,7 @@ export const ProvisionSparkline = memo(function ProvisionSparkline({
   className,
 }: ProvisionSparklineProps) {
   const [modalOpen, setModalOpen] = useState(false);
-
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
   if (!data || data.length === 0) return null;
 
   const isMd = size === "md";
