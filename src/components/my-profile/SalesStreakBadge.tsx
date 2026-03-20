@@ -47,7 +47,7 @@ export function SalesStreakBadge({
             isLegendaryStreak && "animate-bounce",
             isBurningStreak && !isLegendaryStreak && "animate-pulse"
           )} />
-          <span>{currentStreak} {currentStreak === 1 ? "dag" : "dages"} streak</span>
+          <span>{currentStreak} {currentStreak === 1 ? "dag" : "dage"} i træk</span>
           {isLegendaryStreak && " 👑"}
           {isBurningStreak && !isLegendaryStreak && " 🔥"}
         </>
