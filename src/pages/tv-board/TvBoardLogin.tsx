@@ -29,7 +29,7 @@ export default function TvBoardLogin() {
         .single();
 
       if (queryError || !data) {
-        setError("Ugyldig adgangskode");
+        setError("Ugyldig eller deaktiveret adgangskode. Tjek koden eller kontakt en administrator.");
         setLoading(false);
         return;
       }
