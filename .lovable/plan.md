@@ -1,69 +1,56 @@
 
 
-# 4 UI-forbedringer til Superligaen
+# Implementer TV League Dashboard i dashboard-miljøet
 
-## 1. Animated rank transitions (framer-motion)
-Wrap hver `PlayerRow` / `SeasonPlayerRow` i en `motion.div` med `layoutId` baseret på `employee_id`, så spillere glider op/ned ved rangopdatering i stedet for at re-rendere instant.
+## Overblik
+Opret et nyt "Superliga Live" TV-dashboard med statisk venstre zone (Top 3 + salgs-ticker) og roterende højre zone (division highlights, bevægelser, records). Registrer det i dashboard-miljøet (sidebar, routes, TV board maps).
 
-**Filer:**
-- `src/components/league/QualificationBoard.tsx` — import `motion` fra framer-motion, wrap `PlayerRow` output
-- `src/components/league/ActiveSeasonBoard.tsx` — samme tilgang for `SeasonPlayerRow`
-- `package.json` — tilføj `framer-motion` (allerede i projektet via shadcn)
+## Ændringer
 
-**Detaljer:**
-- Tilføj `<motion.div layout layoutId={standing.employee_id} transition={{ type: "spring", damping: 25, stiffness: 200 }}>` rundt om hver spillerrække
-- Wrap hele listen i `<AnimatePresence>` for enter/exit
-- Bevar eksisterende `memo` logik — framer-motion håndterer layout-animationen uafhængigt
+### 1. Ny edge function: `supabase/functions/tv-league-data/index.ts`
+- Service role client (bypasser RLS)
+- Finder aktiv sæson (`league_seasons` med status `qualification` eller `active`)
+- Henter standings fra `league_qualification_standings` + `employee_master_data` (navn, team)
+- Beregner og returnerer ét JSON payload:
+  - `top3` — de 3 med lavest `overall_rank`
+  - `divisions` — grupperet per `projected_division`, top 5 per division, med promotion/relegation zone-markering
+  - `movements` — spillere med størst forskel `previous_overall_rank - overall_rank` (op og ned)
+  - `topLastHour` — top 3 sælgere med mest provision den seneste time (via `sale_items` aggregeret på `sold_datetime`)
+  - `recentEarners` — sælgere med provision > 300 kr siden seneste 15-min vindue
+  - `records` — højeste `current_provision` i sæsonen, gennemsnit per division
+- In-memory cache (30 sek TTL) som eksisterende `tv-dashboard-data`
 
----
+### 2. Ny side: `src/pages/tv-board/TvLeagueDashboard.tsx`
+- Split-layout: 40% statisk venstre, 60% roterende højre
+- **Venstre (statisk):**
+  - Top 3 podium med glow-effekt, navn, provision, division
+  - Salgs-ticker: scrollende feed med sælgere der har tjent 300+ kr siden sidste 15-min opdatering
+- **Højre (roterer ~15 sek med `AnimatePresence`):**
+  - Scene A: Division Highlights (én division ad gangen, top 5, zoner)
+  - Scene B: Dagens Bevægelser (rank-spring 🚀/📉 + top 3 mest tjent sidste time)
+  - Scene C: Records (højeste enkeltdag, division-gennemsnit bar chart)
+- Dark theme, store fonte, 1920×1080 optimeret
+- Auto-refresh hvert 30 sek via edge function
 
-## 2. Provision gap-indikator
-Vis afstand til spilleren over og under i subtil tekst, f.eks. "↑ 1.250 kr" og "↓ 820 kr".
+### 3. Lazy page export: `src/routes/pages.ts`
+- Tilføj `export const TvLeagueDashboard = lazyPage(() => import("@/pages/tv-board/TvLeagueDashboard"))`
 
-**Filer:**
-- `src/components/league/QualificationBoard.tsx` — beregn gap i `PlayerRow`, vis under provision
-- `src/components/league/ActiveSeasonBoard.tsx` — samme for `SeasonPlayerRow`
+### 4. Route registrering: `src/routes/config.tsx`
+- Tilføj `{ path: "/dashboards/commission-league", component: TvLeagueDashboard, access: "protected" }` i dashboard-gruppen
 
-**Detaljer:**
-- Send `prevProvision` og `nextProvision` som nye props til row-komponenten
-- Vis i `text-[9px]` under provision-tallet:
-  - `↑ X kr til #N` (afstand til spilleren foran)
-  - Kun vis gap-indikatoren for den aktuelle bruger (`isCurrentUser`) for at undgå clutter
+### 5. Dashboard config: `src/config/dashboards.ts`
+- Tilføj `{ slug: "commission-league", name: "Superliga Live", path: "/dashboards/commission-league", description: "Live liga-overblik med top performers og division highlights", permissionKey: "menu_dashboard_commission_league" }`
 
----
+### 6. TV Board maps: `TvBoardDirect.tsx` + `TvBoardView.tsx`
+- Tilføj `"commission-league": TvLeagueDashboard` til `dashboardComponents` i begge filer
 
-## 3. Hover-highlight hele rækken
-Tilføj en synlig hover-effekt på hele rækken.
-
-**Filer:**
-- `src/components/league/QualificationBoard.tsx` — tilføj hover-klasser til row div
-- `src/components/league/ActiveSeasonBoard.tsx` — samme
-
-**Detaljer:**
-- Tilføj `hover:bg-muted/30 cursor-default` til den ydre `div` i PlayerRow
-- Tilføj `group` klasse og brug `group-hover:` til subtil border-glow:
-  ```
-  "hover:bg-muted/30 hover:shadow-[inset_0_0_0_1px_hsl(var(--border)/0.5)] transition-all duration-200"
-  ```
-
----
-
-## 4. Ret sparkline-alignment (forskudt grafer)
-Sparklines er placeret i en `flex-1` container, men navnelængden skubber dem ud af alignment. Løsning: giv navn-kolonnen fast bredde.
-
-**Filer:**
-- `src/components/league/QualificationBoard.tsx` — ændr navn-kolonne fra `max-w-[180px]` til fast `w-[180px]`
-- `src/components/league/ActiveSeasonBoard.tsx` — samme
-
-**Detaljer:**
-- Ændr `min-w-0 max-w-[180px] sm:max-w-[220px]` til `w-[180px] sm:w-[220px] shrink-0` på navn-div'en
-- Dette sikrer at sparkline-containeren (`flex-1`) altid starter på samme x-position uanset navnelængde
-- Sparklines vil herefter stå perfekt på linje
-
----
-
-| Fil | Ændring |
+| Fil | Handling |
 |-----|---------|
-| `QualificationBoard.tsx` | Alle 4 forbedringer |
-| `ActiveSeasonBoard.tsx` | Alle 4 forbedringer |
+| `supabase/functions/tv-league-data/index.ts` | Ny edge function |
+| `src/pages/tv-board/TvLeagueDashboard.tsx` | Ny side med split-layout |
+| `src/routes/pages.ts` | Lazy page export |
+| `src/routes/config.tsx` | Route registrering |
+| `src/config/dashboards.ts` | Dashboard config entry |
+| `src/pages/tv-board/TvBoardDirect.tsx` | TV component map |
+| `src/pages/tv-board/TvBoardView.tsx` | TV component map |
 
