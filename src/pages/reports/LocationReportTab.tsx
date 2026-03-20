@@ -48,6 +48,8 @@ interface LocationRow {
   name: string;
   type: string | null;
   region: string | null;
+  address_street: string | null;
+  address_postal_code: string | null;
   address_city: string | null;
   daily_rate: number | null;
 }
