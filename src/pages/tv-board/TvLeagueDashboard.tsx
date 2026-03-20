@@ -80,8 +80,7 @@ function formatPt(value: number): string {
 }
 
 const DIVISION_DISPLAY_DURATION = 15_000;
-const MOVEMENTS_DURATION = 20_000;
-const RECORDS_DURATION = 20_000;
+const LEFT_SCENE_DURATIONS = [15_000, 20_000, 20_000]; // overview, movements, records
 const REFRESH_INTERVAL = 30_000;
 
 // ─── Fetch Hook ───────────────────────────────────────────────
