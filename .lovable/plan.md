@@ -1,36 +1,33 @@
 
 
-# Tilføj playoff-zone + korrekte zone-regler til TV Dashboard
+# Gør præmie-kort live under kvalifikation i TV Dashboard
 
 ## Problem
-Edge function bruger kun 2 zoner (top 2 = promotion, bund 2 = relegation). De reelle regler har 4 zoner:
-- **Top 3** (#1-3): Oprykningszone (grøn) — ikke i øverste division
-- **#4-5**: Playoff op (orange) — ikke i øverste division
-- **#10-11** (playersPerDivision - 4, -3): Playoff ned (orange)
-- **#13-14** (playersPerDivision - 2, -1): Nedrykningszone (rød) — ikke i nederste division
+Under kvalifikation er alle 3 præmie-kort låste med "Afgøres når sæsonen starter". Aftalen er at **Bedste Runde** og **Comeback** skal vise data allerede under kvalifikation (provision-baseret), mens **Talent** viser "Afgøres efter runde 1".
+
+## Tilgang
+Under kvalifikation har vi ikke runder/point, så vi bruger tilgængelige data:
+- **Bedste Runde** → Spilleren med højeste `current_provision` (= top performer i kval)
+- **Comeback** → Største `previous_overall_rank - overall_rank` forbedring (allerede i `league_qualification_standings`)
+- **Talent** → Locked med "Afgøres efter runde 1"
 
 ## Ændringer
 
 ### 1. `supabase/functions/tv-league-data/index.ts`
-- Udvid zone-beregning fra 2 til 4 zoner + tilføj `isTopDivision`/`isBottomDivision` kontekst:
-  - `"promotion"` → rank 1-3 (ikke top division)
-  - `"top"` → rank 1-3 i division 1
-  - `"playoff"` → rank 4-5 ELLER rank playersPerDivision-4/playersPerDivision-3
-  - `"relegation"` → rank ≥ playersPerDivision-1 (ikke bund division)
-  - `"safe"` → resten
-- Send `totalDivisions` med i hvert division-objekt (allerede i payload)
+- Flyt `prizeLeaders` beregning ud af `if (isActive)` blokken
+- Tilføj kvalifikations-logik:
+  - **bestRound (kval)**: Find spilleren med højest `current_provision` fra enriched standings, vis label som "X kr (provision)"
+  - **comeback (kval)**: Find spilleren med størst positiv `previous_overall_rank - overall_rank` fra qualification standings, vis label som "+X pladser"
+  - **talent**: Altid `null` under kvalifikation (kræver point)
+- Bevar eksisterende aktiv-sæson logik uændret
 
 ### 2. `src/pages/tv-board/TvLeagueDashboard.tsx`
-- Udvid `PlayerEntry.zone` type med `"top"` og `"playoff"`
-- Opdater `SceneDivisions` border/tekst-farver:
-  - Top 3 medals (guld/sølv/bronze) bevares for rank 1-3
-  - Playoff: orange border (`border-l-orange-400`) + orange navnefarve
-  - Relegation: rød border + rød navnefarve
-  - Promotion: grøn border + grøn navnefarve (rang 1-3 beholder medal-farver)
-- Opdater zone-legend i bunden med alle 4 zoner (oprykningn, playoff, nedrykning, top 3)
+- Fjern `locked={isQualification}` fra Bedste Runde og Comeback kort
+- Ændr locked-betingelse til kun at locke når der ikke er data: `locked={!prizeLeaders?.bestRound}`
+- Talent: `locked={!prizeLeaders?.talent}` med lockedText "Afgøres efter runde 1"
 
 | Fil | Handling |
 |-----|---------|
-| `supabase/functions/tv-league-data/index.ts` | Ret zone-logik til 4 zoner |
-| `src/pages/tv-board/TvLeagueDashboard.tsx` | Vis alle zoner med korrekte farver + legend |
+| `supabase/functions/tv-league-data/index.ts` | Beregn prizeLeaders under kval med provision-data |
+| `src/pages/tv-board/TvLeagueDashboard.tsx` | Opdater locked-betingelser til data-drevet |
 
