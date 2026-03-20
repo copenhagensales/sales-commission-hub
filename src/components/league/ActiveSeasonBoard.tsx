@@ -133,21 +133,33 @@ export function ActiveSeasonBoard({
 
             <CardContent className="p-0">
               <div className="divide-y divide-border/50">
-                {group.players.map((standing, idx) => (
-                  <SeasonPlayerRow
-                    key={standing.id}
-                    standing={standing}
-                    isCurrentUser={standing.employee_id === currentEmployeeId}
-                    playersPerDivision={playersPerDivision}
-                    isTopDivision={isTopDivision}
-                    isBottomDivision={isBottomDivision}
-                    totalDivisions={totalDivisions}
-                    idx={idx}
-                    todayProvision={todayProvisionMap[standing.employee_id] || 0}
-                    todayDailyRank={todayTop3[standing.employee_id] || null}
-                    weeklyData={weeklyProvisionMap[standing.employee_id]}
-                  />
-                ))}
+                {(() => {
+                  const divWeeklyArrays = group.players
+                    .map(s => weeklyProvisionMap[s.employee_id])
+                    .filter((a): a is number[] => !!a && a.length === 7);
+                  const divisionAvg = divWeeklyArrays.length > 0
+                    ? Array.from({ length: 7 }, (_, dayIdx) =>
+                        divWeeklyArrays.reduce((sum, arr) => sum + arr[dayIdx], 0) / divWeeklyArrays.length
+                      )
+                    : undefined;
+
+                  return group.players.map((standing, idx) => (
+                    <SeasonPlayerRow
+                      key={standing.id}
+                      standing={standing}
+                      isCurrentUser={standing.employee_id === currentEmployeeId}
+                      playersPerDivision={playersPerDivision}
+                      isTopDivision={isTopDivision}
+                      isBottomDivision={isBottomDivision}
+                      totalDivisions={totalDivisions}
+                      idx={idx}
+                      todayProvision={todayProvisionMap[standing.employee_id] || 0}
+                      todayDailyRank={todayTop3[standing.employee_id] || null}
+                      weeklyData={weeklyProvisionMap[standing.employee_id]}
+                      divisionAvg={divisionAvg}
+                    />
+                  ));
+                })()}
               </div>
             </CardContent>
           </Card>
@@ -180,6 +192,7 @@ interface SeasonPlayerRowProps {
   todayProvision: number;
   todayDailyRank: 1 | 2 | 3 | null;
   weeklyData?: number[];
+  divisionAvg?: number[];
 }
 
 const SeasonPlayerRow = memo(function SeasonPlayerRow({
@@ -192,6 +205,7 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
   todayProvision,
   todayDailyRank,
   weeklyData,
+  divisionAvg,
 }: SeasonPlayerRowProps) {
   const rank = standing.division_rank;
   const divChanged = standing.previous_division !== null && standing.previous_division !== standing.current_division;
@@ -248,7 +262,7 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
         </div>
 
         {/* Name + movement */}
-        <div className="flex-1 min-w-0">
+        <div className="min-w-0 max-w-[180px] sm:max-w-[220px]">
           <div className="flex items-center gap-1.5 flex-wrap">
             {/* Live pulse dot */}
             {todayProvision > 0 && (
@@ -291,6 +305,17 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
           </div>
         </div>
 
+        {/* Sparkline — centrally placed */}
+        {weeklyData && weeklyData.length > 0 && (
+          <div className="hidden sm:flex flex-1 justify-center items-center min-w-[90px]">
+            <ProvisionSparkline
+              data={weeklyData}
+              divisionAvg={divisionAvg}
+              playerName={formatPlayerName(standing.employee)}
+            />
+          </div>
+        )}
+
         {/* Points + provision */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <div className="text-right">
@@ -298,9 +323,6 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
               <div className="font-mono text-sm sm:text-[15px] font-semibold whitespace-nowrap">
                 {Number(standing.total_points).toLocaleString("da-DK", { maximumFractionDigits: 0 })} pt
               </div>
-              {weeklyData && weeklyData.length > 0 && (
-                <ProvisionSparkline data={weeklyData} className="hidden sm:flex" />
-              )}
             </div>
             <div className="text-[10px] text-muted-foreground">
               {Number(standing.total_provision).toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr

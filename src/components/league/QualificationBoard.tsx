@@ -142,23 +142,36 @@ export function QualificationBoard({
             </CardHeader>
             <CardContent className="p-0">
               <div className="divide-y divide-border/50">
-                {group.players.map((standing, idx) => (
-                  <PlayerRow
-                    key={standing.id}
-                    standing={standing}
-                    isCurrentUser={standing.employee_id === currentEmployeeId}
-                    playersPerDivision={playersPerDivision}
-                    isTopDivision={isTopDivision}
-                    isBottomDivision={isBottomDivision}
-                    idx={idx}
-                    maxProvision={computedMaxProvision}
-                    todayProvision={todayProvisionMap[standing.employee_id] || 0}
-                    todayDailyRank={todayTop3[standing.employee_id] || null}
-                    weeklyData={weeklyProvisionMap[standing.employee_id]}
-                    division={standing.projected_division}
-                    zoneTarget={zoneTarget}
-                  />
-                ))}
+                {(() => {
+                  // Compute division average weekly provision
+                  const divWeeklyArrays = group.players
+                    .map(s => weeklyProvisionMap[s.employee_id])
+                    .filter((a): a is number[] => !!a && a.length === 7);
+                  const divisionAvg = divWeeklyArrays.length > 0
+                    ? Array.from({ length: 7 }, (_, dayIdx) =>
+                        divWeeklyArrays.reduce((sum, arr) => sum + arr[dayIdx], 0) / divWeeklyArrays.length
+                      )
+                    : undefined;
+
+                  return group.players.map((standing, idx) => (
+                    <PlayerRow
+                      key={standing.id}
+                      standing={standing}
+                      isCurrentUser={standing.employee_id === currentEmployeeId}
+                      playersPerDivision={playersPerDivision}
+                      isTopDivision={isTopDivision}
+                      isBottomDivision={isBottomDivision}
+                      idx={idx}
+                      maxProvision={computedMaxProvision}
+                      todayProvision={todayProvisionMap[standing.employee_id] || 0}
+                      todayDailyRank={todayTop3[standing.employee_id] || null}
+                      weeklyData={weeklyProvisionMap[standing.employee_id]}
+                      divisionAvg={divisionAvg}
+                      division={standing.projected_division}
+                      zoneTarget={zoneTarget}
+                    />
+                  ));
+                })()}
               </div>
             </CardContent>
           </Card>
@@ -191,6 +204,7 @@ interface PlayerRowProps {
   todayProvision: number;
   todayDailyRank: 1 | 2 | 3 | null;
   weeklyData?: number[];
+  divisionAvg?: number[];
   division: number;
   zoneTarget: number | null;
 }
@@ -206,6 +220,7 @@ const PlayerRow = memo(function PlayerRow({
   todayProvision,
   todayDailyRank,
   weeklyData,
+  divisionAvg,
   division,
   zoneTarget,
 }: PlayerRowProps) {
@@ -262,7 +277,7 @@ const PlayerRow = memo(function PlayerRow({
           )}
         </div>
 
-        <div className="flex-1 min-w-0">
+        <div className="min-w-0 max-w-[180px] sm:max-w-[220px]">
           <div className="flex items-center gap-1.5 flex-wrap">
             {/* Live pulse dot */}
             {todayProvision > 0 && (
@@ -300,15 +315,23 @@ const PlayerRow = memo(function PlayerRow({
           </div>
         </div>
 
+        {/* Sparkline — centrally placed */}
+        {weeklyData && weeklyData.length > 0 && (
+          <div className="hidden sm:flex flex-1 justify-center items-center min-w-[90px]">
+            <ProvisionSparkline
+              data={weeklyData}
+              divisionAvg={divisionAvg}
+              playerName={formatPlayerName(standing.employee)}
+            />
+          </div>
+        )}
+
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <div className="text-right">
             <div className="flex items-center gap-1.5 justify-end">
               <div className="font-mono text-sm sm:text-[15px] font-semibold whitespace-nowrap">
                 {standing.current_provision.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
               </div>
-              {weeklyData && weeklyData.length > 0 && (
-                <ProvisionSparkline data={weeklyData} className="hidden sm:flex" />
-              )}
             </div>
             {todayProvision > 0 && (
               <div className="text-[10px] text-emerald-400 font-medium flex items-center gap-1">
