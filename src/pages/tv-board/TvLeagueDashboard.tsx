@@ -189,7 +189,7 @@ function TickerFeed({ earners }: { earners: { name: string; provision: number }[
   }
 
   return (
-    <div className="space-y-2 overflow-hidden max-h-[220px]">
+    <div className="space-y-1.5 2xl:space-y-2 overflow-hidden max-h-[140px] 2xl:max-h-[220px]">
       <AnimatePresence mode="popLayout">
         {earners.map((e, i) => (
           <motion.div
