@@ -54,8 +54,9 @@ function formatKr(value: number): string {
   return new Intl.NumberFormat("da-DK", { style: "currency", currency: "DKK", maximumFractionDigits: 0, minimumFractionDigits: 0 }).format(value);
 }
 
-const SCENE_DURATION = 15_000; // 15 seconds per scene
-const DIVISION_DISPLAY_DURATION = 10_000; // 10 seconds per division in Scene A
+const DIVISION_DISPLAY_DURATION = 15_000; // 15 seconds per division in Scene A
+const MOVEMENTS_DURATION = 20_000;
+const RECORDS_DURATION = 20_000;
 const REFRESH_INTERVAL = 30_000; // 30 seconds
 
 // ─── Fetch Hook ───────────────────────────────────────────────
