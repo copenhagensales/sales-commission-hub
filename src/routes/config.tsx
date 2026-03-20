@@ -243,6 +243,7 @@ export const routes: RouteConfig[] = [
     access: "role",
     positionPermission: "menu_career_wishes_overview",
   },
+  { path: "/customer-inquiries", component: CustomerInquiries, access: "role", positionPermission: "menu_customer_inquiries" },
   { path: "/car-quiz-admin", component: CarQuizAdmin, access: "role", positionPermission: "menu_car_quiz_admin" },
   {
     path: "/code-of-conduct-admin",
