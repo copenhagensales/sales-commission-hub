@@ -233,18 +233,17 @@ export const ProvisionSparkline = memo(function ProvisionSparkline({
                   />
                 )}
 
-                {/* Invisible hit areas for hover */}
+                {/* Interactive hit areas */}
                 {isMd && points.map((p, i) => (
                   <circle
                     key={i}
                     cx={p.x}
                     cy={p.y}
-                    r={8}
+                    r={10}
                     fill="transparent"
-                    className="hover:fill-current opacity-0 hover:opacity-10"
-                  >
-                    <title>{`${dayLabels[i]}: ${data[i].toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr`}</title>
-                  </circle>
+                    onMouseEnter={() => setHoveredIdx(i)}
+                    onMouseLeave={() => setHoveredIdx(null)}
+                  />
                 ))}
 
                 {/* Pulsating endpoint */}
