@@ -441,6 +441,7 @@ function SceneRecords({ records }: { records: LeaguePayload["records"] }) {
 export default function TvLeagueDashboard() {
   const { data, isLoading, error } = useLeagueTvData();
   const [sceneIndex, setSceneIndex] = useState(0);
+  const tvMode = isTvMode();
 
   // Scene rotation
   useEffect(() => {
@@ -458,17 +459,21 @@ export default function TvLeagueDashboard() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <Loader2 className="h-12 w-12 animate-spin text-yellow-400" />
-      </div>
+      <DashboardShell>
+        <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+          <Loader2 className="h-12 w-12 animate-spin text-yellow-400" />
+        </div>
+      </DashboardShell>
     );
   }
 
   if (error || !data) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <p className="text-red-400">Kunne ikke hente liga-data</p>
-      </div>
+      <DashboardShell>
+        <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+          <p className="text-red-400">Kunne ikke hente liga-data</p>
+        </div>
+      </DashboardShell>
     );
   }
 
@@ -478,111 +483,121 @@ export default function TvLeagueDashboard() {
   const prizeLeaders = data.prizeLeaders;
 
   return (
-    <div className="min-h-screen h-screen bg-slate-900 text-white overflow-hidden flex">
-      {/* ─── LEFT ZONE (40%) ─── */}
-      <div className="w-[40%] border-r border-slate-800 p-6 flex flex-col">
-        {/* Header */}
-        <div className="mb-4">
-          <h1 className="text-2xl font-black tracking-tight">
-            <span className="text-yellow-400">⚽</span> Superliga Live
-          </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            {data.totalPlayers} spillere · {data.totalDivisions} divisioner
-          </p>
-        </div>
+    <DashboardShell>
+      {!tvMode && (
+        <DashboardHeader
+          title="⚽ Superliga Live"
+          subtitle={`${data.totalPlayers} spillere · ${data.totalDivisions} divisioner`}
+        />
+      )}
+      <div className={`bg-slate-900 text-white overflow-hidden flex ${tvMode ? "min-h-screen h-screen" : "h-[calc(100vh-120px)] rounded-xl"}`}>
+        {/* ─── LEFT ZONE (40%) ─── */}
+        <div className="w-[40%] border-r border-slate-800 p-6 flex flex-col">
+          {/* Header (only in TV mode since DashboardHeader handles it otherwise) */}
+          {tvMode && (
+            <div className="mb-4">
+              <h1 className="text-2xl font-black tracking-tight">
+                <span className="text-yellow-400">⚽</span> Superliga Live
+              </h1>
+              <p className="text-xs text-slate-500 mt-1">
+                {data.totalPlayers} spillere · {data.totalDivisions} divisioner
+              </p>
+            </div>
+          )}
 
-        {/* Top 3 Podium */}
-        <div className="mb-4">
-          <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">
-            🏆 Top 3 {isActive ? "(point)" : "(provision)"}
-          </h3>
-          <div className="space-y-2">
-            {data.top3.map((p, i) => (
-              <PodiumCard key={p.employeeId || i} player={p} rank={i + 1} isPoints={isActive} />
-            ))}
-            {data.top3.length === 0 && (
-              <p className="text-slate-600 text-sm italic">Ingen data endnu</p>
-            )}
+          {/* Top 3 Podium */}
+          <div className="mb-4">
+            <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">
+              🏆 Top 3 {isActive ? "(point)" : "(provision)"}
+            </h3>
+            <div className="space-y-2">
+              {data.top3.map((p, i) => (
+                <PodiumCard key={p.employeeId || i} player={p} rank={i + 1} isPoints={isActive} />
+              ))}
+              {data.top3.length === 0 && (
+                <p className="text-slate-600 text-sm italic">Ingen data endnu</p>
+              )}
+            </div>
+          </div>
+
+          {/* Prize Cards */}
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            <PrizeCard
+              emoji="🔥"
+              title="Bedste Runde"
+              leader={prizeLeaders?.bestRound ?? null}
+              locked={isQualification}
+              lockedText="Afgøres når sæsonen starter"
+              borderClass="border-red-500/40"
+              gradientClass="from-red-500/5 to-transparent"
+            />
+            <PrizeCard
+              emoji="⭐"
+              title="Sæsonens Talent"
+              leader={prizeLeaders?.talent ?? null}
+              locked={isQualification || (isActive && !prizeLeaders?.talent)}
+              lockedText={isQualification ? "Afgøres når sæsonen starter" : "Afgøres efter runde 1"}
+              borderClass="border-purple-500/40"
+              gradientClass="from-purple-500/5 to-transparent"
+            />
+            <PrizeCard
+              emoji="🚀"
+              title="Sæsonens Comeback"
+              leader={prizeLeaders?.comeback ?? null}
+              locked={isQualification}
+              lockedText="Afgøres når sæsonen starter"
+              borderClass="border-emerald-500/40"
+              gradientClass="from-emerald-500/5 to-transparent"
+            />
+          </div>
+
+          {/* Sales Ticker */}
+          <div className="flex-1 min-h-0">
+            <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">
+              🔥 Seneste indtjening (300+ kr samlet)
+            </h3>
+            <TickerFeed earners={data.recentEarners} />
+          </div>
+
+          {/* Timestamp */}
+          <div className="mt-4 pt-3 border-t border-slate-800">
+            <p className="text-[10px] text-slate-600">
+              Opdateret: {data.updatedAt ? new Date(data.updatedAt).toLocaleTimeString("da-DK") : "–"}
+            </p>
           </div>
         </div>
 
-        {/* Prize Cards */}
-        <div className="grid grid-cols-3 gap-2 mb-4">
-          <PrizeCard
-            emoji="🔥"
-            title="Bedste Runde"
-            leader={prizeLeaders?.bestRound ?? null}
-            locked={isQualification}
-            lockedText="Afgøres når sæsonen starter"
-            borderClass="border-red-500/40"
-            gradientClass="from-red-500/5 to-transparent"
-          />
-          <PrizeCard
-            emoji="⭐"
-            title="Sæsonens Talent"
-            leader={prizeLeaders?.talent ?? null}
-            locked={isQualification || (isActive && !prizeLeaders?.talent)}
-            lockedText={isQualification ? "Afgøres når sæsonen starter" : "Afgøres efter runde 1"}
-            borderClass="border-purple-500/40"
-            gradientClass="from-purple-500/5 to-transparent"
-          />
-          <PrizeCard
-            emoji="🚀"
-            title="Sæsonens Comeback"
-            leader={prizeLeaders?.comeback ?? null}
-            locked={isQualification}
-            lockedText="Afgøres når sæsonen starter"
-            borderClass="border-emerald-500/40"
-            gradientClass="from-emerald-500/5 to-transparent"
-          />
-        </div>
+        {/* ─── RIGHT ZONE (60%) ─── */}
+        <div className="w-[60%] p-6 relative">
+          <div className="absolute top-6 right-6 flex gap-1.5">
+            {SCENES.map((s, i) => (
+              <div
+                key={s}
+                className={`w-8 h-1 rounded-full transition-colors duration-300 ${
+                  i === sceneIndex ? "bg-white" : "bg-slate-700"
+                }`}
+              />
+            ))}
+          </div>
 
-        {/* Sales Ticker */}
-        <div className="flex-1 min-h-0">
-          <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">
-            🔥 Seneste indtjening (300+ kr samlet)
-          </h3>
-          <TickerFeed earners={data.recentEarners} />
-        </div>
-
-        {/* Timestamp */}
-        <div className="mt-4 pt-3 border-t border-slate-800">
-          <p className="text-[10px] text-slate-600">
-            Opdateret: {data.updatedAt ? new Date(data.updatedAt).toLocaleTimeString("da-DK") : "–"}
-          </p>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentScene}
+              initial={{ opacity: 0, y: 20, filter: "blur(4px)" }}
+              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              exit={{ opacity: 0, y: -20, filter: "blur(4px)" }}
+              transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+              className="h-full"
+            >
+              {currentScene === "divisions" && <SceneDivisions divisions={data.divisions} />}
+              {currentScene === "movements" && (
+                <SceneMovements movements={data.movements} topLastHour={data.topLastHour} />
+              )}
+              {currentScene === "records" && <SceneRecords records={data.records} />}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </div>
-
-      {/* ─── RIGHT ZONE (60%) ─── */}
-      <div className="w-[60%] p-6 relative">
-        <div className="absolute top-6 right-6 flex gap-1.5">
-          {SCENES.map((s, i) => (
-            <div
-              key={s}
-              className={`w-8 h-1 rounded-full transition-colors duration-300 ${
-                i === sceneIndex ? "bg-white" : "bg-slate-700"
-              }`}
-            />
-          ))}
-        </div>
-
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentScene}
-            initial={{ opacity: 0, y: 20, filter: "blur(4px)" }}
-            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-            exit={{ opacity: 0, y: -20, filter: "blur(4px)" }}
-            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-            className="h-full"
-          >
-            {currentScene === "divisions" && <SceneDivisions divisions={data.divisions} />}
-            {currentScene === "movements" && (
-              <SceneMovements movements={data.movements} topLastHour={data.topLastHour} />
-            )}
-            {currentScene === "records" && <SceneRecords records={data.records} />}
-          </motion.div>
-        </AnimatePresence>
-      </div>
-    </div>
+    </DashboardShell>
   );
 }
