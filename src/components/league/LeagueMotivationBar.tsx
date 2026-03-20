@@ -177,8 +177,8 @@ export function LeagueMotivationBar({
         icon: <Flame className="h-4 w-4 text-amber-400" />,
         message: (
           <span>
-            <span className="text-amber-400 font-semibold">🔥 {currentStreak}. dag i træk!</span>
-            {" Keep going — en streak bygges dag for dag"}
+            <span className="text-amber-400 font-semibold">🔥 {currentStreak}. dag med stigning!</span>
+            {" Keep going — overgå i morgen også"}
           </span>
         ),
         color: "amber",
