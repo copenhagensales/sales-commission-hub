@@ -127,7 +127,7 @@ function PodiumCard({ player, rank, isPoints }: { player: PlayerEntry; rank: num
       <span className={c.size}>{c.emoji}</span>
       <div className="flex-1 min-w-0">
         <p className="text-white font-bold text-xl truncate">{player.name}</p>
-        <p className="text-slate-400 text-sm">Division {player.division} · {player.teamName}</p>
+        <p className="text-slate-400 text-sm">{getDivisionName(player.division || 1)} · {player.teamName}</p>
       </div>
       <div className="text-right">
         <p className="text-2xl font-black text-white tabular-nums">
