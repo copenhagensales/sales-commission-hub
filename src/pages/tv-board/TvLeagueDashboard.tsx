@@ -114,7 +114,7 @@ function TickerFeed({ earners }: { earners: { name: string; provision: number }[
   if (earners.length === 0) {
     return (
       <div className="text-slate-500 text-center py-4 text-sm italic">
-        Ingen salg over 300 kr de sidste 15 min
+        Ingen sælgere med 300+ kr siden sidste opdatering
       </div>
     );
   }
