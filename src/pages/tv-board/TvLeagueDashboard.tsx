@@ -567,7 +567,7 @@ export default function TvLeagueDashboard() {
               gradientClass="from-red-500/5 to-transparent"
             />
             <PrizeCard
-              icon="⭐"
+              emoji="⭐"
               title="Sæsonens Talent"
               leader={prizeLeaders?.talent ?? null}
               locked={!prizeLeaders?.talent}
