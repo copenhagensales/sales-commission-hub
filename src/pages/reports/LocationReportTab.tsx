@@ -88,7 +88,7 @@ export function LocationReportTab() {
     queryFn: async () => {
       let query = supabase
         .from("location")
-        .select("id, name, type, region, address_city, daily_rate, bookable_client_ids")
+        .select("id, name, type, region, address_street, address_postal_code, address_city, daily_rate, bookable_client_ids")
         .order("name");
 
       if (locationType !== "Alle typer") {
