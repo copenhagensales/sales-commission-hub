@@ -66,6 +66,11 @@ interface LeaguePayload {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────
+function getDivisionName(divNum: number): string {
+  if (divNum === 1) return "Superligaen";
+  return `${divNum - 1}. Division`;
+}
+
 function formatKr(value: number): string {
   return new Intl.NumberFormat("da-DK", { style: "currency", currency: "DKK", maximumFractionDigits: 0, minimumFractionDigits: 0 }).format(value);
 }
