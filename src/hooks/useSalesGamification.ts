@@ -332,11 +332,14 @@ export function useSalesGamification({
   const bestWeekRecord = records?.find(r => r.record_type === "best_week");
   const bestMonthRecord = records?.find(r => r.record_type === "best_month");
 
-  // Check if today hit daily target
-  const hitDailyGoal = dailyTarget > 0 && todayTotal >= dailyTarget;
+  // Streak condition: beat yesterday's provision (new definition)
+  const beatYesterday = todayTotal > 0 && todayTotal > yesterdayTotal;
+  
+  // Legacy alias for backward compatibility in streak mutation
+  const hitDailyGoal = beatYesterday;
 
-  // Streak status
-  const streakAtRisk = currentStreak > 0 && !hitDailyGoal;
+  // Streak status: at risk if you have a streak but haven't beaten yesterday yet
+  const streakAtRisk = currentStreak > 0 && !beatYesterday;
 
   // Auto-initialize records if they don't exist and we have data
   const hasInitializedRecordsRef = useRef(false);
