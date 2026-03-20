@@ -335,6 +335,9 @@ export function LocationReportTab() {
                   <TableHead>Lokation</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Region</TableHead>
+                  <TableHead>Adresse</TableHead>
+                  <TableHead>Postnr</TableHead>
+                  <TableHead>By</TableHead>
                   <TableHead>Kunde</TableHead>
                   <TableHead>Start</TableHead>
                   <TableHead>Slut</TableHead>
@@ -350,6 +353,9 @@ export function LocationReportTab() {
                     <TableCell className="font-medium">{b.location?.name ?? "–"}</TableCell>
                     <TableCell>{b.location?.type ?? "–"}</TableCell>
                     <TableCell>{b.location?.region ?? "–"}</TableCell>
+                    <TableCell>{b.location?.address_street ?? "–"}</TableCell>
+                    <TableCell>{b.location?.address_postal_code ?? "–"}</TableCell>
+                    <TableCell>{b.location?.address_city ?? "–"}</TableCell>
                     <TableCell>{clientLabel(b.client_id ?? "")}</TableCell>
                     <TableCell>{b.start_date}</TableCell>
                     <TableCell>{b.end_date}</TableCell>
