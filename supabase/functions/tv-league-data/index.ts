@@ -159,7 +159,7 @@ Deno.serve(async (req) => {
             let zone = "safe";
             if (rank <= 3) {
               zone = isTopDivision ? "top" : "promotion";
-            } else if (rank <= 5 && !isTopDivision) {
+            } else if (rank >= 4 && rank <= 5 && !isTopDivision) {
               zone = "playoff";
             } else if (rank >= playersPerDivision - 3 && rank <= playersPerDivision - 2) {
               zone = "playoff";
