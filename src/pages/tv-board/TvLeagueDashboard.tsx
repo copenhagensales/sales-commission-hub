@@ -261,10 +261,16 @@ function SceneDivisions({ divisions }: { divisions: DivisionData[] }) {
               <div
                 key={i}
                 className={`flex items-center gap-3 px-3 py-2 rounded-xl bg-slate-800/50 border border-slate-700/50 ${
-                  p.zone === "promotion" ? "border-l-2 border-l-emerald-500" : p.zone === "relegation" ? "border-l-2 border-l-red-500" : ""
+                  p.rank === 1 ? "border-l-2 border-l-yellow-400" :
+                  p.rank === 2 ? "border-l-2 border-l-slate-300" :
+                  p.rank === 3 ? "border-l-2 border-l-orange-400" :
+                  p.zone === "promotion" ? "border-l-2 border-l-emerald-500" :
+                  p.zone === "relegation" ? "border-l-2 border-l-red-500" : ""
                 }`}
               >
-                <span className="text-lg font-black text-slate-500 w-7 text-center tabular-nums shrink-0">
+                <span className={`text-lg font-black w-7 text-center tabular-nums shrink-0 ${
+                  p.rank === 1 ? "text-yellow-400" : p.rank === 2 ? "text-slate-300" : p.rank === 3 ? "text-orange-400" : "text-slate-500"
+                }`}>
                   {p.rank}
                 </span>
                 <div className="flex-1 min-w-0">
