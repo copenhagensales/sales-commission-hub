@@ -27,6 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Download, FileSpreadsheet, Loader2 } from "lucide-react";
 import { CLIENT_IDS } from "@/utils/clientIds";
 import { RawSalesTable } from "./RawSalesTable";
+import { LocationReportTab } from "./LocationReportTab";
 
 const CLIENT_OPTIONS = Object.entries(CLIENT_IDS).filter(
   ([name]) => name !== "Eesy"
@@ -115,7 +116,6 @@ export default function ReportsManagement() {
     enabled: !!clientId && !!periodStart && !!periodEnd,
   });
 
-  // Aggregate: group by employee, collect product quantities
   const { employees, productNames } = useMemo(() => {
     if (!rawData?.length) return { employees: [] as EmployeeRow[], productNames: [] as string[] };
 
@@ -158,7 +158,6 @@ export default function ReportsManagement() {
   const handleExport = () => {
     if (!employees.length) return;
 
-    // === Fane 1: Opsummering ===
     const summaryRows = employees.map((emp) => {
       const row: Record<string, string | number> = {
         Medarbejder: emp.name,
@@ -187,7 +186,6 @@ export default function ReportsManagement() {
     const colCount = 2 + productNames.length + 2;
     wsSummary["!cols"] = Array.from({ length: colCount }, (_, i) => ({ wch: i === 0 ? 30 : 14 }));
 
-    // === Fane 2: Rådata ===
     const rawRows = (rawSalesData ?? []).map((r) => ({
       Dato: r.sale_datetime ? new Date(r.sale_datetime).toLocaleString("da-DK") : "",
       Medarbejder: r.employee_name ?? "",
@@ -222,140 +220,151 @@ export default function ReportsManagement() {
           <p className="text-muted-foreground">Ledelsesrapporter og nøgletal</p>
         </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <FileSpreadsheet className="h-5 w-5" />
-              Salgsudtræk per medarbejder
-            </CardTitle>
-            <Button
-              onClick={handleExport}
-              disabled={!employees.length || isLoading || isLoadingRaw || isFetchingRaw}
-              size="sm"
-            >
-              {(isLoading || isLoadingRaw || isFetchingRaw) ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                  Henter data...
-                </>
-              ) : (
-                <>
-                  <Download className="h-4 w-4 mr-1" />
-                  Download Excel{rawSalesData?.length ? ` (${rawSalesData.length.toLocaleString("da-DK")} rækker)` : ""}
-                </>
-              )}
-            </Button>
-          </CardHeader>
+        <Tabs defaultValue="salgsrapport">
+          <TabsList>
+            <TabsTrigger value="salgsrapport">Salgsrapport</TabsTrigger>
+            <TabsTrigger value="lokationsrapport">Lokationsrapport</TabsTrigger>
+          </TabsList>
 
-          <CardContent className="space-y-4">
-            {/* Filters */}
-            <div className="flex flex-wrap items-end gap-4">
-              <div className="space-y-1 min-w-[180px]">
-                <Label>Klient</Label>
-                <Select value={clientId} onValueChange={setClientId}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CLIENT_OPTIONS.map(([name, id]) => (
-                      <SelectItem key={id} value={id}>
-                        {name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label>Fra</Label>
-                <Input
-                  type="date"
-                  value={periodStart}
-                  onChange={(e) => setPeriodStart(e.target.value)}
-                  className="w-[160px]"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label>Til</Label>
-                <Input
-                  type="date"
-                  value={periodEnd}
-                  onChange={(e) => setPeriodEnd(e.target.value)}
-                  className="w-[160px]"
-                />
-              </div>
-            </div>
+          <TabsContent value="salgsrapport">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <FileSpreadsheet className="h-5 w-5" />
+                  Salgsudtræk per medarbejder
+                </CardTitle>
+                <Button
+                  onClick={handleExport}
+                  disabled={!employees.length || isLoading || isLoadingRaw || isFetchingRaw}
+                  size="sm"
+                >
+                  {(isLoading || isLoadingRaw || isFetchingRaw) ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                      Henter data...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4 mr-1" />
+                      Download Excel{rawSalesData?.length ? ` (${rawSalesData.length.toLocaleString("da-DK")} rækker)` : ""}
+                    </>
+                  )}
+                </Button>
+              </CardHeader>
 
-            {/* Tabs: Opsummering + Rådata */}
-            <Tabs defaultValue="opsummering">
-              <TabsList>
-                <TabsTrigger value="opsummering">Opsummering</TabsTrigger>
-                <TabsTrigger value="raadata">Rådata ({rawSalesData?.length ?? 0})</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="opsummering">
-                {isLoading ? (
-                  <div className="flex justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                  </div>
-                ) : !employees.length ? (
-                  <p className="text-sm text-muted-foreground py-4">
-                    Ingen salgsdata fundet for den valgte periode.
-                  </p>
-                ) : (
-                  <div className="rounded-md border overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="sticky left-0 bg-background z-10">Medarbejder</TableHead>
-                          <TableHead className="text-right">Antal salg</TableHead>
-                          {productNames.map((pn) => (
-                            <TableHead key={pn} className="text-right whitespace-nowrap">{pn}</TableHead>
-                          ))}
-                          <TableHead className="text-right">Provision (DKK)</TableHead>
-                          <TableHead className="text-right">Revenue (DKK)</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {employees.map((emp) => (
-                          <TableRow key={emp.name}>
-                            <TableCell className="font-medium sticky left-0 bg-background z-10">{emp.name}</TableCell>
-                            <TableCell className="text-right">{emp.salesCount}</TableCell>
-                            {productNames.map((pn) => (
-                              <TableCell key={pn} className="text-right">{emp.products[pn] || 0}</TableCell>
-                            ))}
-                            <TableCell className="text-right">
-                              {Math.round(emp.commission).toLocaleString("da-DK")}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {Math.round(emp.revenue).toLocaleString("da-DK")}
-                            </TableCell>
-                          </TableRow>
+              <CardContent className="space-y-4">
+                <div className="flex flex-wrap items-end gap-4">
+                  <div className="space-y-1 min-w-[180px]">
+                    <Label>Klient</Label>
+                    <Select value={clientId} onValueChange={setClientId}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CLIENT_OPTIONS.map(([name, id]) => (
+                          <SelectItem key={id} value={id}>
+                            {name}
+                          </SelectItem>
                         ))}
-                        <TableRow className="font-bold border-t-2">
-                          <TableCell className="sticky left-0 bg-background z-10">TOTAL</TableCell>
-                          <TableCell className="text-right">{totals.salesCount}</TableCell>
-                          {productNames.map((pn) => (
-                            <TableCell key={pn} className="text-right">{totals.products[pn] || 0}</TableCell>
-                          ))}
-                          <TableCell className="text-right">
-                            {Math.round(totals.commission).toLocaleString("da-DK")}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {Math.round(totals.revenue).toLocaleString("da-DK")}
-                          </TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
+                      </SelectContent>
+                    </Select>
                   </div>
-                )}
-              </TabsContent>
+                  <div className="space-y-1">
+                    <Label>Fra</Label>
+                    <Input
+                      type="date"
+                      value={periodStart}
+                      onChange={(e) => setPeriodStart(e.target.value)}
+                      className="w-[160px]"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Til</Label>
+                    <Input
+                      type="date"
+                      value={periodEnd}
+                      onChange={(e) => setPeriodEnd(e.target.value)}
+                      className="w-[160px]"
+                    />
+                  </div>
+                </div>
 
-              <TabsContent value="raadata">
-                <RawSalesTable data={rawSalesData} isLoading={isLoading} />
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
+                <Tabs defaultValue="opsummering">
+                  <TabsList>
+                    <TabsTrigger value="opsummering">Opsummering</TabsTrigger>
+                    <TabsTrigger value="raadata">Rådata ({rawSalesData?.length ?? 0})</TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="opsummering">
+                    {isLoading ? (
+                      <div className="flex justify-center py-8">
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : !employees.length ? (
+                      <p className="text-sm text-muted-foreground py-4">
+                        Ingen salgsdata fundet for den valgte periode.
+                      </p>
+                    ) : (
+                      <div className="rounded-md border overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="sticky left-0 bg-background z-10">Medarbejder</TableHead>
+                              <TableHead className="text-right">Antal salg</TableHead>
+                              {productNames.map((pn) => (
+                                <TableHead key={pn} className="text-right whitespace-nowrap">{pn}</TableHead>
+                              ))}
+                              <TableHead className="text-right">Provision (DKK)</TableHead>
+                              <TableHead className="text-right">Revenue (DKK)</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {employees.map((emp) => (
+                              <TableRow key={emp.name}>
+                                <TableCell className="font-medium sticky left-0 bg-background z-10">{emp.name}</TableCell>
+                                <TableCell className="text-right">{emp.salesCount}</TableCell>
+                                {productNames.map((pn) => (
+                                  <TableCell key={pn} className="text-right">{emp.products[pn] || 0}</TableCell>
+                                ))}
+                                <TableCell className="text-right">
+                                  {Math.round(emp.commission).toLocaleString("da-DK")}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {Math.round(emp.revenue).toLocaleString("da-DK")}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            <TableRow className="font-bold border-t-2">
+                              <TableCell className="sticky left-0 bg-background z-10">TOTAL</TableCell>
+                              <TableCell className="text-right">{totals.salesCount}</TableCell>
+                              {productNames.map((pn) => (
+                                <TableCell key={pn} className="text-right">{totals.products[pn] || 0}</TableCell>
+                              ))}
+                              <TableCell className="text-right">
+                                {Math.round(totals.commission).toLocaleString("da-DK")}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {Math.round(totals.revenue).toLocaleString("da-DK")}
+                              </TableCell>
+                            </TableRow>
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="raadata">
+                    <RawSalesTable data={rawSalesData} isLoading={isLoading} />
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="lokationsrapport">
+            <LocationReportTab />
+          </TabsContent>
+        </Tabs>
       </div>
     </MainLayout>
   );
