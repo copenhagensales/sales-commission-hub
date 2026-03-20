@@ -1,29 +1,36 @@
 
 
-# Tilføj "Tilmeld mig"-knap til begivenheder
+# Duplikat-håndtering: Genkend tilbagevendende ansøgere
 
 ## Hvad bygges
-En ny mulighed ved oprettelse/redigering af events: "Kræver tilmelding". Når aktiveret, vises en tydelig "Tilmeld"-knap på eventet i stedet for (eller ved siden af) thumbs up/down. Brugere kan tilmelde/afmelde sig, og antallet af tilmeldte vises.
+Når en ansøgning kommer ind via webhook med en email der allerede findes i `candidates`-tabellen, skal den **ikke** oprette en ny kandidat. I stedet:
+1. Den eksisterende kandidat opdateres: status sættes til `new`, noter tilføjes med "Har søgt igen", og `applied_position` opdateres hvis ændret
+2. En ny kolonne `application_count` tracker antal ansøgninger
+3. Et `is_returning_applicant`-flag sættes til `true`
+4. CandidateCard viser en tydelig badge: **"HAR SØGT FØR"**
 
 ## Database-ændring
-Tilføj kolonne `requires_registration` (boolean, default false) til `company_events`-tabellen.
+Tilføj to kolonner til `candidates`:
+- `application_count` (integer, default 1) — antal gange personen har søgt
+- `is_returning_applicant` (boolean, default false) — flag for genganger
 
-## UI-ændringer
+## Webhook-ændring (`supabase/functions/zapier-webhook/index.ts`)
+Før insert: check om email allerede findes i `candidates`-tabellen.
+- **Hvis ja**: Opdater eksisterende kandidat:
+  - `status` → `'new'` (så den dukker op som ny ansøgning igen)
+  - `application_count` → increment med 1
+  - `is_returning_applicant` → `true`
+  - `applied_position` → opdater til ny rolle hvis ændret
+  - `notes` → prepend "Søgte igen [dato] som [rolle]. Tidligere noter: ..."
+  - `updated_at` → `now()`
+  - `fbclid` → opdater hvis ny fbclid
+- **Hvis nej**: Insert som normalt med `application_count: 1`
 
-### Ved oprettelse/redigering af event
-- Ny Switch "Kræver tilmelding" i både oprettelses-dialogen (`Home.tsx`) og `EditEventDialog.tsx`
-
-### I event-listen (Kommende begivenheder)
-- Hvis `requires_registration = true`: Vis en "Tilmeld"-knap (grøn, med `UserPlus`-ikon) i stedet for ThumbsUp. ThumbsDown erstattes af en "Afmeld"-knap
-- Hvis `requires_registration = false`: Behold nuværende ThumbsUp/ThumbsDown som i dag
-- Genbruger den eksisterende `event_attendees`-tabel og `toggleAttendanceMutation` — ingen ny tabel nødvendig
-
-### I EventDetailDialog
-- Vis tilmeldingsknap i detaljevisningen også, når `requires_registration = true`
+## UI-ændring (`CandidateCard.tsx`)
+Vis en tydelig orange/amber badge **"HAR SØGT FØR (×2)"** ved siden af "NY ANSØGNING"-badgen, når `is_returning_applicant` er `true`. Badgen viser `application_count` så rekruttering kan se hvor mange gange personen har søgt.
 
 ## Filer der ændres
-1. **Database migration** — tilføj `requires_registration` kolonne
-2. **`src/pages/Home.tsx`** — ny switch i oprettelses-dialog + betinget knap-visning i event-listen
-3. **`src/components/home/EditEventDialog.tsx`** — ny switch i redigerings-dialog
-4. **`src/components/home/EventDetailDialog.tsx`** — betinget tilmeldingsknap
+1. **Database migration** — tilføj `application_count` og `is_returning_applicant` kolonner
+2. **`supabase/functions/zapier-webhook/index.ts`** — duplikat-check på email, upsert-logik
+3. **`src/components/recruitment/CandidateCard.tsx`** — vis "Har søgt før"-badge
 
