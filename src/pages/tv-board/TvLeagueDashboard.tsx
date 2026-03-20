@@ -233,7 +233,7 @@ function SceneDivisions({ divisions }: { divisions: DivisionData[] }) {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-3xl font-black text-white">Division {div.division}</h2>
           <p className="text-slate-400 text-sm">{div.totalPlayers} spillere</p>
@@ -247,7 +247,7 @@ function SceneDivisions({ divisions }: { divisions: DivisionData[] }) {
           ))}
         </div>
       </div>
-      <div className="flex-1 space-y-3">
+      <div className="flex-1 min-h-0 overflow-hidden">
         <AnimatePresence mode="wait">
           <motion.div
             key={divIndex}
@@ -255,31 +255,49 @@ function SceneDivisions({ divisions }: { divisions: DivisionData[] }) {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -40 }}
             transition={{ duration: 0.4 }}
-            className="space-y-3"
+            className="space-y-1.5 h-full overflow-y-auto pr-1"
           >
             {div.players.map((p, i) => (
               <div
                 key={i}
-                className={`flex items-center gap-4 px-4 py-3 rounded-xl bg-slate-800/50 border border-slate-700/50 ${
+                className={`flex items-center gap-3 px-3 py-2 rounded-xl bg-slate-800/50 border border-slate-700/50 ${
                   p.zone === "promotion" ? "border-l-2 border-l-emerald-500" : p.zone === "relegation" ? "border-l-2 border-l-red-500" : ""
                 }`}
               >
-                <span className="text-2xl font-black text-slate-500 w-8 text-center tabular-nums">
+                <span className="text-lg font-black text-slate-500 w-7 text-center tabular-nums shrink-0">
                   {p.rank}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <p className={`font-bold text-lg truncate ${zoneColors[p.zone || "safe"]}`}>{p.name}</p>
+                  <p className={`font-bold truncate ${zoneColors[p.zone || "safe"]}`}>{p.name}</p>
                 </div>
-                <div className="text-right">
-                  <p className="text-lg font-bold text-white tabular-nums">{formatKr(p.provision)}</p>
-                  <p className="text-xs text-slate-500">{p.deals} deals</p>
+                {/* Rank change */}
+                <div className="w-16 text-center shrink-0">
+                  {p.rankChange != null && p.rankChange !== 0 ? (
+                    <span className={`text-xs font-bold ${p.rankChange > 0 ? "text-emerald-400" : "text-red-400"}`}>
+                      {p.rankChange > 0 ? (
+                        <span className="flex items-center justify-center gap-0.5">
+                          <TrendingUp className="h-3 w-3" /> +{p.rankChange}
+                        </span>
+                      ) : (
+                        <span className="flex items-center justify-center gap-0.5">
+                          <TrendingDown className="h-3 w-3" /> {p.rankChange}
+                        </span>
+                      )}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-slate-600">–</span>
+                  )}
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-sm font-bold text-white tabular-nums">{formatKr(p.provision)}</p>
+                  <p className="text-[10px] text-slate-500">{p.deals} deals</p>
                 </div>
               </div>
             ))}
           </motion.div>
         </AnimatePresence>
       </div>
-      <div className="mt-4 flex gap-4 text-xs text-slate-500">
+      <div className="mt-3 flex gap-4 text-xs text-slate-500">
         <span className="flex items-center gap-1">
           <span className="w-2 h-2 rounded-full bg-emerald-500" /> Opryknings-zone
         </span>
