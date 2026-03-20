@@ -142,28 +142,39 @@ Deno.serve(async (req) => {
       divisionMap.get(s.projected_division)!.push(s);
     }
 
+    const totalDivisionsCount = divisionMap.size;
     const divisions = Array.from(divisionMap.entries())
       .sort(([a], [b]) => a - b)
       .map(([divNum, players]) => {
         const sorted = players.sort(
           (a, b) => (a.projected_rank || 0) - (b.projected_rank || 0)
         );
+        const isTopDivision = divNum === 1;
+        const isBottomDivision = divNum === totalDivisionsCount;
         return {
           division: divNum,
           totalPlayers: sorted.length,
-          players: sorted.map((p) => ({
-            rank: p.projected_rank,
-            name: p.name,
-            provision: p.current_provision || 0,
-            deals: p.deals_count || 0,
-            rankChange: p.previous_overall_rank != null ? p.previous_overall_rank - p.overall_rank : 0,
-            zone:
-              p.projected_rank <= 2
-                ? "promotion"
-                : p.projected_rank >= playersPerDivision - 1
-                ? "relegation"
-                : "safe",
-          })),
+          players: sorted.map((p) => {
+            const rank = p.projected_rank;
+            let zone = "safe";
+            if (rank <= 3) {
+              zone = isTopDivision ? "top" : "promotion";
+            } else if (rank <= 5 && !isTopDivision) {
+              zone = "playoff";
+            } else if (rank >= playersPerDivision - 3 && rank <= playersPerDivision - 2) {
+              zone = "playoff";
+            } else if (rank >= playersPerDivision - 1 && !isBottomDivision) {
+              zone = "relegation";
+            }
+            return {
+              rank,
+              name: p.name,
+              provision: p.current_provision || 0,
+              deals: p.deals_count || 0,
+              rankChange: p.previous_overall_rank != null ? p.previous_overall_rank - p.overall_rank : 0,
+              zone,
+            };
+          }),
         };
       });
 

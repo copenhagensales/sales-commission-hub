@@ -16,7 +16,7 @@ interface PlayerEntry {
   employeeId?: string;
   deals?: number;
   rankChange?: number;
-  zone?: "promotion" | "relegation" | "safe";
+  zone?: "promotion" | "relegation" | "safe" | "top" | "playoff";
 }
 
 interface Movement {
@@ -227,6 +227,8 @@ function SceneDivisions({ divisions }: { divisions: DivisionData[] }) {
 
   const zoneColors: Record<string, string> = {
     promotion: "text-emerald-400",
+    top: "text-yellow-300",
+    playoff: "text-orange-400",
     relegation: "text-red-400",
     safe: "text-slate-300",
   };
@@ -265,7 +267,9 @@ function SceneDivisions({ divisions }: { divisions: DivisionData[] }) {
                   p.rank === 2 ? "border-l-2 border-l-slate-300" :
                   p.rank === 3 ? "border-l-2 border-l-orange-400" :
                   p.zone === "promotion" ? "border-l-2 border-l-emerald-500" :
-                  p.zone === "relegation" ? "border-l-2 border-l-red-500" : ""
+                  p.zone === "playoff" ? "border-l-2 border-l-orange-500" :
+                  p.zone === "relegation" ? "border-l-2 border-l-red-500" :
+                  p.zone === "top" ? "border-l-2 border-l-yellow-500" : ""
                 }`}
               >
                 <span className={`text-lg font-black w-7 text-center tabular-nums shrink-0 ${
@@ -303,12 +307,18 @@ function SceneDivisions({ divisions }: { divisions: DivisionData[] }) {
           </motion.div>
         </AnimatePresence>
       </div>
-      <div className="mt-3 flex gap-4 text-xs text-slate-500">
+      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
         <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-emerald-500" /> Opryknings-zone
+          <span className="w-2 h-2 rounded-full bg-yellow-500" /> Top 3 samlet
         </span>
         <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-red-500" /> Nedrykning-zone
+          <span className="w-2 h-2 rounded-full bg-emerald-500" /> Oprykningszone (1-3)
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-2 h-2 rounded-full bg-orange-500" /> Playoff (4-5 / 10-11)
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-2 h-2 rounded-full bg-red-500" /> Nedrykningszone (13-14)
         </span>
       </div>
     </div>
