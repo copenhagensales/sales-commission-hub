@@ -3,7 +3,20 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Inbox, Mail, MailOpen, Building2, Phone, Clock } from "lucide-react";
+import { Inbox, Mail, MailOpen, Building2, Phone, Clock, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -46,6 +59,23 @@ export const CustomerInquiryInbox = () => {
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["customer-inquiries"] }),
+  });
+
+  const deleteInquiry = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("customer_inquiries")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["customer-inquiries"] });
+      toast.success("Henvendelse slettet");
+    },
+    onError: () => {
+      toast.error("Kunne ikke slette henvendelsen");
+    },
   });
 
   const unreadCount = inquiries.filter((i) => !i.is_read).length;
