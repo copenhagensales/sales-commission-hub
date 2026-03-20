@@ -1,32 +1,48 @@
 
 
-# Flyt Movements & Records til venstre side — Divisioner altid i højre
+# Omdefinér Streak: "Overgå dagen før i indtjening"
 
-## Nuværende layout
-- **Venstre (40%)**: Top 3 podium, Prize Cards, Ticker (statisk)
-- **Højre (60%)**: Roterer mellem Divisions → Movements → Records
+## Ny definition
+En streak-dag tæller når dagens provision er **højere end gårsdagens**. Streaken brydes hvis du tjener **mindre end eller lig med** dagen før. Weekender/fridage ignoreres (sammenlign med seneste arbejdsdag).
 
-## Nyt layout
-- **Venstre (40%)**: Roterer mellem 3 scener:
-  1. Top 3 podium + Prize Cards + Ticker (nuværende indhold)
-  2. Movements (Dagens bevægelser + Top sidste time)
-  3. Records (Statistik & Records)
-- **Højre (60%)**: Kun divisioner (altid synligt, roterer internt mellem divisioner)
+## Påvirkede områder
 
-Begge sider bliver dynamiske — venstre roterer scener, højre roterer divisioner.
+### 1. Streak-logik i `src/hooks/useSalesGamification.ts`
+- Ændr `hitDailyGoal`-beregningen fra `todayTotal >= dailyTarget` til en sammenligning med gårsdagens provision
+- Tilføj `yesterdayTotal` som ny prop (eller hent den internt via `get_personal_daily_commission`)
+- Streak tæller op hvis `todayTotal > yesterdayTotal` (og `todayTotal > 0`)
+- `streakAtRisk` ændres til: du har en streak, men har endnu ikke overgået gårsdagen
 
-## Ændringer i `src/pages/tv-board/TvLeagueDashboard.tsx`
+### 2. Datakilde: Gårsdagens provision
+- Tilføj en `useQuery` i `useSalesGamification` der henter de sidste 2 arbejdsdages provision via `get_personal_daily_commission` RPC (allerede eksisterer)
+- Alternativt: Udvid props med `yesterdayTotal` fra den kaldende komponent
 
-1. **Fjern scene-rotation fra højre side** — højre viser kun `SceneDivisions` permanent
-2. **Tilføj scene-rotation til venstre side** med 3 left-scenes:
-   - `"overview"` → Top 3 + Prize Cards + Ticker (15 sek)
-   - `"movements"` → SceneMovements (20 sek)
-   - `"records"` → SceneRecords (20 sek)
-3. **Flyt scene-indikator dots** (de 3 streger i toppen) til venstre side
-4. **Bevar header + timestamp** i venstre side (udenfor rotation)
-5. **Fjern den ydre `SCENES` rotation** — erstat med en `leftSceneIndex` state
+### 3. UI-tekster der skal opdateres
+- **`src/components/my-profile/SalesRecords.tsx`** og **`CompactSalesRecords.tsx`**: Ændr "dags streak" beskrivelse og `streakAtRisk`-tekst fra "Nå dit dagsmål" til "Overgå gårsdagen"
+- **`src/components/my-profile/SalesStreakBadge.tsx`**: Opdater tooltip/beskrivelse
+- **`src/lib/gamification-achievements.ts`**: Ændr achievement-beskrivelser fra "Sælg noget X dage i træk" til "Overgå dagen før X dage i træk"
+
+### 4. Streak-mutation logik
+- `updateStreakMutation` i `useSalesGamification.ts`: Behold eksisterende incrementering, men ændr betingelsen fra `hitDailyGoal` til `todayTotal > yesterdayTotal`
+- Tabellen `employee_sales_streaks` behøver ingen skemaændringer
+
+### 5. TV Dashboard (den godkendte plan)
+- I den kommende udvidelse: Brug den nye streak-definition som KPI i stedet for "aktive dage" eller "mest konsistent"
+- Vis f.eks. "Længste streak" (flest dage i træk med stigende provision) som erstatning
+
+### 6. League Motivation Bar (`src/components/league/LeagueMotivationBar.tsx`)
+- Opdater streak-relaterede motivationsbudskaber til at referere til "overgå gårsdagen"
+
+## Ændringer
 
 | Fil | Handling |
 |-----|---------|
-| `src/pages/tv-board/TvLeagueDashboard.tsx` | Omstrukturér layout: venstre roterer 3 scener, højre kun divisioner |
+| `src/hooks/useSalesGamification.ts` | Hent gårsdagens provision, ændr streak-betingelse til `today > yesterday` |
+| `src/components/my-profile/SalesRecords.tsx` | Opdater streak-tekster til ny definition |
+| `src/components/my-profile/CompactSalesRecords.tsx` | Opdater streak-tekster |
+| `src/components/my-profile/SalesStreakBadge.tsx` | Opdater beskrivelse |
+| `src/lib/gamification-achievements.ts` | Ændr streak-achievement beskrivelser |
+| `src/components/league/LeagueMotivationBar.tsx` | Opdater streak-motivationstekster |
+
+Ingen databaseændringer nødvendige — tabellen `employee_sales_streaks` forbliver uændret.
 
