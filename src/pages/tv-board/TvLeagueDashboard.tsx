@@ -1,8 +1,7 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { supabase } from "@/integrations/supabase/client";
-import { Loader2, TrendingUp, TrendingDown, Trophy, Flame, Zap, BarChart3 } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown, Trophy, Flame, Zap, BarChart3, Lock } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────
 interface PlayerEntry {
@@ -31,6 +30,14 @@ interface DivisionData {
   players: PlayerEntry[];
 }
 
+interface PrizeLeader {
+  name: string;
+  employeeId: string;
+  label: string;
+  points?: number;
+  improvement?: number;
+}
+
 interface LeaguePayload {
   seasonId: string;
   seasonStatus: string;
@@ -46,6 +53,11 @@ interface LeaguePayload {
     highestProvisionName: string;
     divisionAverages: { division: number; average: number; playerCount: number }[];
   };
+  prizeLeaders: {
+    bestRound: PrizeLeader | null;
+    talent: PrizeLeader | null;
+    comeback: PrizeLeader | null;
+  } | null;
   updatedAt: string;
 }
 
@@ -54,10 +66,14 @@ function formatKr(value: number): string {
   return new Intl.NumberFormat("da-DK", { style: "currency", currency: "DKK", maximumFractionDigits: 0, minimumFractionDigits: 0 }).format(value);
 }
 
-const DIVISION_DISPLAY_DURATION = 15_000; // 15 seconds per division in Scene A
+function formatPt(value: number): string {
+  return `${Math.round(value)} pt`;
+}
+
+const DIVISION_DISPLAY_DURATION = 15_000;
 const MOVEMENTS_DURATION = 20_000;
 const RECORDS_DURATION = 20_000;
-const REFRESH_INTERVAL = 30_000; // 30 seconds
+const REFRESH_INTERVAL = 30_000;
 
 // ─── Fetch Hook ───────────────────────────────────────────────
 function useLeagueTvData() {
@@ -84,7 +100,7 @@ const SCENES: SceneType[] = ["divisions", "movements", "records"];
 
 // ─── Sub-components ───────────────────────────────────────────
 
-function PodiumCard({ player, rank }: { player: PlayerEntry; rank: number }) {
+function PodiumCard({ player, rank, isPoints }: { player: PlayerEntry; rank: number; isPoints: boolean }) {
   const config: Record<number, { emoji: string; glow: string; size: string; border: string }> = {
     1: { emoji: "🥇", glow: "shadow-[0_0_40px_rgba(234,179,8,0.4)]", size: "text-5xl", border: "border-yellow-500/40" },
     2: { emoji: "🥈", glow: "shadow-[0_0_30px_rgba(148,163,184,0.3)]", size: "text-4xl", border: "border-slate-400/40" },
@@ -105,9 +121,53 @@ function PodiumCard({ player, rank }: { player: PlayerEntry; rank: number }) {
         <p className="text-slate-400 text-sm">Division {player.division} · {player.teamName}</p>
       </div>
       <div className="text-right">
-        <p className="text-2xl font-black text-white tabular-nums">{formatKr(player.provision)}</p>
+        <p className="text-2xl font-black text-white tabular-nums">
+          {isPoints ? formatPt(player.provision) : formatKr(player.provision)}
+        </p>
       </div>
     </motion.div>
+  );
+}
+
+function PrizeCard({
+  emoji,
+  title,
+  leader,
+  locked,
+  lockedText,
+  borderClass,
+  gradientClass,
+}: {
+  emoji: string;
+  title: string;
+  leader: PrizeLeader | null;
+  locked: boolean;
+  lockedText: string;
+  borderClass: string;
+  gradientClass: string;
+}) {
+  return (
+    <div
+      className={`relative rounded-xl p-3 border-2 text-center space-y-1 bg-gradient-to-b ${gradientClass} bg-slate-800/80 ${borderClass}`}
+    >
+      {locked && (
+        <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-slate-900/40 backdrop-blur-[1px] z-10">
+          <Lock className="h-4 w-4 text-slate-500" />
+        </div>
+      )}
+      <span className="text-2xl">{emoji}</span>
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{title}</p>
+      {locked ? (
+        <p className="text-xs text-slate-500">{lockedText}</p>
+      ) : leader ? (
+        <>
+          <p className="text-sm font-bold text-white truncate">{leader.name}</p>
+          <p className="text-xs text-slate-400">{leader.label}</p>
+        </>
+      ) : (
+        <p className="text-xs text-slate-500">Ingen data endnu</p>
+      )}
+    </div>
   );
 }
 
@@ -121,7 +181,7 @@ function TickerFeed({ earners }: { earners: { name: string; provision: number }[
   }
 
   return (
-    <div className="space-y-2 overflow-hidden max-h-[350px]">
+    <div className="space-y-2 overflow-hidden max-h-[220px]">
       <AnimatePresence mode="popLayout">
         {earners.map((e, i) => (
           <motion.div
@@ -240,7 +300,6 @@ function SceneMovements({
       <div>
         <h2 className="text-3xl font-black text-white mb-4">Dagens bevægelser</h2>
         <div className="grid grid-cols-2 gap-4">
-          {/* Risers */}
           <div>
             <h3 className="text-sm font-medium text-emerald-400 mb-3 flex items-center gap-2">
               <TrendingUp className="h-4 w-4" /> Største spring op
@@ -267,7 +326,6 @@ function SceneMovements({
               )}
             </div>
           </div>
-          {/* Fallers */}
           <div>
             <h3 className="text-sm font-medium text-red-400 mb-3 flex items-center gap-2">
               <TrendingDown className="h-4 w-4" /> Største fald
@@ -297,7 +355,6 @@ function SceneMovements({
         </div>
       </div>
 
-      {/* Top last hour */}
       <div>
         <h3 className="text-sm font-medium text-amber-400 mb-3 flex items-center gap-2">
           <Zap className="h-4 w-4" /> Mest tjent sidste time
@@ -329,18 +386,13 @@ function SceneMovements({
 }
 
 // Scene C: Records
-function SceneRecords({
-  records,
-}: {
-  records: LeaguePayload["records"];
-}) {
+function SceneRecords({ records }: { records: LeaguePayload["records"] }) {
   const maxAvg = Math.max(...records.divisionAverages.map((d) => d.average), 1);
 
   return (
     <div className="h-full flex flex-col gap-6">
       <h2 className="text-3xl font-black text-white">Statistik & Records</h2>
 
-      {/* Highest provision */}
       <div className="p-5 rounded-2xl bg-gradient-to-br from-yellow-500/10 to-amber-500/5 border border-yellow-500/20">
         <div className="flex items-center gap-3 mb-2">
           <Trophy className="h-6 w-6 text-yellow-400" />
@@ -350,7 +402,6 @@ function SceneRecords({
         <p className="text-slate-400 text-sm mt-1">{records.highestProvisionName}</p>
       </div>
 
-      {/* Division averages bar chart */}
       <div>
         <h3 className="text-sm font-medium text-slate-400 mb-4 flex items-center gap-2">
           <BarChart3 className="h-4 w-4" /> Gennemsnit per division
@@ -419,13 +470,16 @@ export default function TvLeagueDashboard() {
   }
 
   const currentScene = SCENES[sceneIndex];
+  const isActive = data.seasonStatus === "active";
+  const isQualification = data.seasonStatus === "qualification";
+  const prizeLeaders = data.prizeLeaders;
 
   return (
     <div className="min-h-screen h-screen bg-slate-900 text-white overflow-hidden flex">
       {/* ─── LEFT ZONE (40%) ─── */}
       <div className="w-[40%] border-r border-slate-800 p-6 flex flex-col">
         {/* Header */}
-        <div className="mb-6">
+        <div className="mb-4">
           <h1 className="text-2xl font-black tracking-tight">
             <span className="text-yellow-400">⚽</span> Superliga Live
           </h1>
@@ -435,18 +489,49 @@ export default function TvLeagueDashboard() {
         </div>
 
         {/* Top 3 Podium */}
-        <div className="mb-6">
+        <div className="mb-4">
           <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">
-            🏆 Top 3
+            🏆 Top 3 {isActive ? "(point)" : "(provision)"}
           </h3>
-          <div className="space-y-3">
+          <div className="space-y-2">
             {data.top3.map((p, i) => (
-              <PodiumCard key={p.employeeId || i} player={p} rank={i + 1} />
+              <PodiumCard key={p.employeeId || i} player={p} rank={i + 1} isPoints={isActive} />
             ))}
             {data.top3.length === 0 && (
               <p className="text-slate-600 text-sm italic">Ingen data endnu</p>
             )}
           </div>
+        </div>
+
+        {/* Prize Cards */}
+        <div className="grid grid-cols-3 gap-2 mb-4">
+          <PrizeCard
+            emoji="🔥"
+            title="Bedste Runde"
+            leader={prizeLeaders?.bestRound ?? null}
+            locked={isQualification}
+            lockedText="Afgøres når sæsonen starter"
+            borderClass="border-red-500/40"
+            gradientClass="from-red-500/5 to-transparent"
+          />
+          <PrizeCard
+            emoji="⭐"
+            title="Sæsonens Talent"
+            leader={prizeLeaders?.talent ?? null}
+            locked={isQualification || (isActive && !prizeLeaders?.talent)}
+            lockedText={isQualification ? "Afgøres når sæsonen starter" : "Afgøres efter runde 1"}
+            borderClass="border-purple-500/40"
+            gradientClass="from-purple-500/5 to-transparent"
+          />
+          <PrizeCard
+            emoji="🚀"
+            title="Sæsonens Comeback"
+            leader={prizeLeaders?.comeback ?? null}
+            locked={isQualification}
+            lockedText="Afgøres når sæsonen starter"
+            borderClass="border-emerald-500/40"
+            gradientClass="from-emerald-500/5 to-transparent"
+          />
         </div>
 
         {/* Sales Ticker */}
@@ -467,7 +552,6 @@ export default function TvLeagueDashboard() {
 
       {/* ─── RIGHT ZONE (60%) ─── */}
       <div className="w-[60%] p-6 relative">
-        {/* Scene indicator */}
         <div className="absolute top-6 right-6 flex gap-1.5">
           {SCENES.map((s, i) => (
             <div

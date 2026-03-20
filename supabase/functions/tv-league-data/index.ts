@@ -38,23 +38,24 @@ Deno.serve(async (req) => {
     // 1. Find active season
     const { data: season } = await supabase
       .from("league_seasons")
-      .select("id, status, config, qualification_source_start, qualification_source_end")
+      .select("id, status, config, qualification_source_start, qualification_source_end, start_date")
       .in("status", ["qualification", "active"])
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
     if (!season) {
-      const empty = { top3: [], divisions: [], movements: [], topLastHour: [], recentEarners: [], records: { highestProvision: 0, highestProvisionName: "", divisionAverages: [] } };
+      const empty = { top3: [], divisions: [], movements: [], topLastHour: [], recentEarners: [], records: { highestProvision: 0, highestProvisionName: "", divisionAverages: [] }, prizeLeaders: null, seasonStatus: "none" };
       cached = { data: empty, ts: Date.now() };
       return new Response(JSON.stringify(empty), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
+    const isActive = season.status === "active";
     const playersPerDivision = season.config?.players_per_division || 14;
 
-    // 2. Fetch all standings with employee info
+    // 2. Fetch qualification standings (always needed for divisions/movements)
     const { data: standings } = await supabase
       .from("league_qualification_standings")
       .select("employee_id, overall_rank, previous_overall_rank, projected_division, projected_rank, current_provision, deals_count")
@@ -62,7 +63,7 @@ Deno.serve(async (req) => {
       .order("overall_rank", { ascending: true });
 
     if (!standings || standings.length === 0) {
-      const empty = { top3: [], divisions: [], movements: [], topLastHour: [], recentEarners: [], records: { highestProvision: 0, highestProvisionName: "", divisionAverages: [] } };
+      const empty = { top3: [], divisions: [], movements: [], topLastHour: [], recentEarners: [], records: { highestProvision: 0, highestProvisionName: "", divisionAverages: [] }, prizeLeaders: null, seasonStatus: season.status };
       cached = { data: empty, ts: Date.now() };
       return new Response(JSON.stringify(empty), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -74,7 +75,7 @@ Deno.serve(async (req) => {
     // 3. Fetch employee names + team info
     const { data: employees } = await supabase
       .from("employee_master_data")
-      .select("id, first_name, last_name, team_id")
+      .select("id, first_name, last_name, team_id, employment_start_date")
       .in("id", employeeIds);
 
     const empMap = new Map(
@@ -98,15 +99,39 @@ Deno.serve(async (req) => {
       };
     });
 
-    // === TOP 3 ===
-    const top3 = enriched.slice(0, 3).map((s) => ({
-      rank: s.overall_rank,
-      name: s.name,
-      provision: s.current_provision || 0,
-      division: s.projected_division,
-      teamName: s.teamName,
-      employeeId: s.employee_id,
-    }));
+    // === TOP 3 (season-aware) ===
+    let top3: any[];
+    if (isActive) {
+      // Fetch from league_season_standings sorted by total_points
+      const { data: seasonStandings } = await supabase
+        .from("league_season_standings")
+        .select("employee_id, total_points, current_division, overall_rank")
+        .eq("season_id", season.id)
+        .order("overall_rank", { ascending: true })
+        .limit(3);
+
+      top3 = (seasonStandings || []).map((s, i) => {
+        const emp = empMap.get(s.employee_id);
+        return {
+          rank: i + 1,
+          name: emp ? formatName(emp.first_name, emp.last_name) : "Ukendt",
+          provision: s.total_points || 0,
+          division: s.current_division,
+          teamName: emp?.team_id ? teamMap.get(emp.team_id) || "" : "",
+          employeeId: s.employee_id,
+        };
+      });
+    } else {
+      // Qualification: top 3 by current_provision
+      top3 = enriched.slice(0, 3).map((s) => ({
+        rank: s.overall_rank,
+        name: s.name,
+        provision: s.current_provision || 0,
+        division: s.projected_division,
+        teamName: s.teamName,
+        employeeId: s.employee_id,
+      }));
+    }
 
     // === DIVISIONS (top 5 per division) ===
     const divisionMap = new Map<number, typeof enriched>();
@@ -164,7 +189,6 @@ Deno.serve(async (req) => {
     };
 
     // === TOP LAST HOUR ===
-    // Use get_sales_aggregates_v2 for last 60 minutes, grouped by employee
     const now = new Date();
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
 
@@ -174,7 +198,6 @@ Deno.serve(async (req) => {
       p_group_by: "employee",
     });
 
-    // Filter to only enrolled players and sort by commission
     const enrolledSet = new Set(employeeIds);
     const topLastHour = (hourlyData || [])
       .filter((r: any) => enrolledSet.has(r.group_key))
@@ -231,6 +254,128 @@ Deno.serve(async (req) => {
       divisionAverages,
     };
 
+    // === PRIZE LEADERS (only for active season) ===
+    let prizeLeaders: any = null;
+
+    if (isActive) {
+      // Best Round: top player by points_earned across all rounds
+      const { data: bestRoundData } = await supabase
+        .from("league_round_standings")
+        .select("employee_id, points_earned, round_id")
+        .eq("season_id", season.id)
+        .order("points_earned", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      let bestRound: any = null;
+      if (bestRoundData) {
+        const emp = empMap.get(bestRoundData.employee_id);
+        // Get round number
+        const { data: roundInfo } = await supabase
+          .from("league_rounds")
+          .select("round_number")
+          .eq("id", bestRoundData.round_id)
+          .maybeSingle();
+        bestRound = {
+          name: emp ? formatName(emp.first_name, emp.last_name) : "Ukendt",
+          employeeId: bestRoundData.employee_id,
+          points: bestRoundData.points_earned,
+          label: roundInfo ? `${Math.round(bestRoundData.points_earned)} pt i runde ${roundInfo.round_number}` : `${Math.round(bestRoundData.points_earned)} pt`,
+        };
+      }
+
+      // Talent: employee with employment_start_date < 90 days before season start, with highest total_points
+      let talent: any = null;
+      const seasonStartDate = season.start_date;
+      if (seasonStartDate) {
+        const seasonStart = new Date(seasonStartDate);
+        const talentCutoff = new Date(seasonStart.getTime() - 90 * 24 * 60 * 60 * 1000);
+
+        // Get all season standings with points > 0
+        const { data: seasonStandingsAll } = await supabase
+          .from("league_season_standings")
+          .select("employee_id, total_points, overall_rank")
+          .eq("season_id", season.id)
+          .gt("total_points", 0)
+          .order("total_points", { ascending: false });
+
+        if (seasonStandingsAll) {
+          for (const ss of seasonStandingsAll) {
+            const emp = empMap.get(ss.employee_id);
+            if (emp?.employment_start_date) {
+              const startDate = new Date(emp.employment_start_date);
+              if (startDate > talentCutoff) {
+                talent = {
+                  name: formatName(emp.first_name, emp.last_name),
+                  employeeId: ss.employee_id,
+                  points: ss.total_points,
+                  label: `${Math.round(ss.total_points)} pt · #${ss.overall_rank}`,
+                };
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      // Comeback: biggest improvement from round 1 rank to current overall_rank
+      let comeback: any = null;
+      const { data: round1 } = await supabase
+        .from("league_rounds")
+        .select("id")
+        .eq("season_id", season.id)
+        .eq("round_number", 1)
+        .maybeSingle();
+
+      if (round1) {
+        const { data: round1Standings } = await supabase
+          .from("league_round_standings")
+          .select("employee_id, rank_in_division, division")
+          .eq("round_id", round1.id);
+
+        const { data: currentSeasonStandings } = await supabase
+          .from("league_season_standings")
+          .select("employee_id, overall_rank")
+          .eq("season_id", season.id);
+
+        if (round1Standings && currentSeasonStandings) {
+          // Calculate overall rank for round 1 (division * playersPerDiv + rank_in_division)
+          const r1Map = new Map(
+            round1Standings.map((r) => [r.employee_id, (r.division - 1) * playersPerDivision + r.rank_in_division])
+          );
+          const currentMap = new Map(
+            currentSeasonStandings.map((r) => [r.employee_id, r.overall_rank])
+          );
+
+          let bestImprovement = 0;
+          let bestEmployee: any = null;
+
+          for (const [empId, r1Rank] of r1Map) {
+            const currentRank = currentMap.get(empId);
+            if (currentRank != null) {
+              const improvement = r1Rank - currentRank;
+              if (improvement > bestImprovement) {
+                bestImprovement = improvement;
+                bestEmployee = empId;
+              }
+            }
+          }
+
+          if (bestEmployee && bestImprovement > 0) {
+            const emp = empMap.get(bestEmployee);
+            comeback = {
+              name: emp ? formatName(emp.first_name, emp.last_name) : "Ukendt",
+              employeeId: bestEmployee,
+              improvement: bestImprovement,
+              label: `+${bestImprovement} pladser`,
+            };
+          }
+        }
+      }
+
+      prizeLeaders = { bestRound, talent, comeback };
+    }
+
     const payload = {
       seasonId: season.id,
       seasonStatus: season.status,
@@ -242,6 +387,7 @@ Deno.serve(async (req) => {
       topLastHour,
       recentEarners,
       records,
+      prizeLeaders,
       updatedAt: now.toISOString(),
     };
 
