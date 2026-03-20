@@ -118,7 +118,7 @@ export function LocationReportTab() {
     queryFn: async () => {
       let query = supabase
         .from("booking")
-        .select("id, location_id, client_id, start_date, end_date, booked_days, daily_rate_override, total_price, status, location!inner(name, type, region, address_city, daily_rate)")
+        .select("id, location_id, client_id, start_date, end_date, booked_days, daily_rate_override, total_price, status, location!inner(name, type, region, address_street, address_postal_code, address_city, daily_rate)")
         .gte("end_date", periodStart)
         .lte("start_date", periodEnd)
         .order("start_date", { ascending: false });
