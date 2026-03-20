@@ -242,7 +242,10 @@ function SceneDivisions({ divisions }: { divisions: DivisionData[] }) {
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-3xl font-black text-white">Division {div.division}</h2>
+          <h2 className="text-3xl font-black text-white flex items-center gap-2">
+            {div.division === 1 && <Trophy className="h-7 w-7 text-yellow-400" />}
+            {getDivisionName(div.division)}
+          </h2>
           <p className="text-slate-400 text-sm">{div.totalPlayers} spillere</p>
         </div>
         <div className="flex gap-1">
