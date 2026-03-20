@@ -113,8 +113,8 @@ export function LeagueMotivationBar({
         icon: <Flame className="h-4 w-4 text-red-400" />,
         message: (
           <span>
-            <span className="text-red-400 font-semibold">🔥 {currentStreak} dages streak</span>
-            {" — 1 salg mere holder den i live!"}
+            <span className="text-red-400 font-semibold">🔥 {currentStreak} dage i træk</span>
+            {" — overgå gårsdagen for at holde den i live!"}
           </span>
         ),
         color: "red",
