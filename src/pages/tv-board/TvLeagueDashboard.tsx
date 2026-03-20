@@ -227,6 +227,8 @@ function SceneDivisions({ divisions }: { divisions: DivisionData[] }) {
 
   const zoneColors: Record<string, string> = {
     promotion: "text-emerald-400",
+    top: "text-yellow-300",
+    playoff: "text-orange-400",
     relegation: "text-red-400",
     safe: "text-slate-300",
   };
