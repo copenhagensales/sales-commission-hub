@@ -306,9 +306,24 @@ function SceneDivisions({ divisions }: { divisions: DivisionData[] }) {
                     <span className="text-xs text-slate-600">–</span>
                   )}
                 </div>
-                <div className="text-right shrink-0">
-                  <p className="text-sm font-bold text-white tabular-nums">{formatKr(p.provision)}</p>
-                  <p className="text-[10px] text-slate-500">{p.deals} deals</p>
+                <div className="text-right shrink-0 flex items-center gap-2">
+                  <div>
+                    <p className="text-sm font-bold text-white tabular-nums">{formatKr(p.provision)}</p>
+                    <p className="text-[10px] text-slate-500">{p.deals} deals</p>
+                  </div>
+                  {p.zone && p.zone !== "safe" && (
+                    <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                      p.zone === "top" ? "bg-yellow-500/20 text-yellow-300" :
+                      p.zone === "promotion" ? "bg-emerald-500/20 text-emerald-400" :
+                      p.zone === "playoff" ? "bg-orange-500/20 text-orange-400" :
+                      p.zone === "relegation" ? "bg-red-500/20 text-red-400" : ""
+                    }`}>
+                      {p.zone === "top" ? "Top 3" :
+                       p.zone === "promotion" ? "Oprykker" :
+                       p.zone === "playoff" ? "Playoff" :
+                       p.zone === "relegation" ? "Nedrykker" : ""}
+                    </span>
+                  )}
                 </div>
               </div>
             ))}
