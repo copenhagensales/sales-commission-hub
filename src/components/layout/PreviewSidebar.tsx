@@ -48,6 +48,7 @@ const MANAGEMENT_ITEMS = {
   menu_contracts: { name: "Kontrakter", href: "/contracts", icon: FileText },
   menu_permissions: { name: "Rettigheder", href: "/permissions", icon: Shield },
   menu_career_wishes_overview: { name: "Karriereønsker", href: "/career-wishes-overview", icon: Sparkles },
+  menu_customer_inquiries: { name: "Kundehenvendelser", href: "/customer-inquiries", icon: Inbox },
 };
 
 const TEST_ITEMS = {

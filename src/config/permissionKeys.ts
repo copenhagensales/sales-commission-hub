@@ -118,6 +118,7 @@ export const PERMISSION_KEYS = {
   menu_career_wishes_overview: { label: 'Karriereønsker overblik', section: 'ledelse', parent: 'menu_section_ledelse' },
   menu_email_templates_ledelse: { label: 'E-mail skabeloner (Ledelse)', section: 'ledelse', parent: 'menu_section_ledelse' },
   menu_security_dashboard: { label: 'Sikkerhedsoversigt', section: 'ledelse', parent: 'menu_section_ledelse' },
+  menu_customer_inquiries: { label: 'Kundehenvendelser', section: 'ledelse', parent: 'menu_section_ledelse' },
 
   // Contracts Tabs
   tab_contracts_all: { label: 'Fane: Alle kontrakter', section: 'ledelse', parent: 'menu_contracts' },

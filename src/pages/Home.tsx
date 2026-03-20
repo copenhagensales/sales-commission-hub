@@ -423,12 +423,6 @@ const Home = () => {
         teamId={employee?.team_id} 
       />
 
-      {/* Customer Inquiry Inbox - Only for mg@ and km@ */}
-      {(user?.email === "mg@copenhagensales.dk" || user?.email === "km@copenhagensales.dk") && (
-        <div className="mb-6">
-          <CustomerInquiryInbox />
-        </div>
-      )}
       
       {/* Event Detail Dialog */}
       <EventDetailDialog
