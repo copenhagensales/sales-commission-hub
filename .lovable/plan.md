@@ -1,35 +1,36 @@
 
 
-# Tilføj præmie-titler til TV Dashboard med sæson-aware logik
+# Tilføj playoff-zone + korrekte zone-regler til TV Dashboard
 
-## Overblik
-Tilføj de 3 præmiekort (Bedste Runde, Sæsonens Talent, Sæsonens Comeback) under Top 3 podiet i venstre zone. Top 3 og præmierne skal fungere kontekstuelt:
-
-- **Kvalifikation**: Top 3 baseret på `current_provision`. Bedste Runde og Comeback viser "Afgøres når sæsonen starter". Talent viser "Afgøres efter runde 1".
-- **Aktiv sæson**: Top 3 baseret på `total_points` fra `league_season_standings`. Bedste Runde og Comeback er live med det samme (efter kval). Talent kræver mindst 1 runde med point (fordi den måler point).
+## Problem
+Edge function bruger kun 2 zoner (top 2 = promotion, bund 2 = relegation). De reelle regler har 4 zoner:
+- **Top 3** (#1-3): Oprykningszone (grøn) — ikke i øverste division
+- **#4-5**: Playoff op (orange) — ikke i øverste division
+- **#10-11** (playersPerDivision - 4, -3): Playoff ned (orange)
+- **#13-14** (playersPerDivision - 2, -1): Nedrykningszone (rød) — ikke i nederste division
 
 ## Ændringer
 
 ### 1. `supabase/functions/tv-league-data/index.ts`
-- Når `status === "active"`: hent Top 3 fra `league_season_standings` (sorteret by `total_points`) i stedet for `league_qualification_standings`
-- Tilføj `prizeLeaders` til payload med:
-  - **bestRound**: Hent fra `league_round_standings` (top 1 by `points_earned`) — live fra runde 1
-  - **talent**: Hent fra `league_season_standings` filtreret på `employment_start_date` < 90 dage fra sæsonstart — kræver point > 0
-  - **comeback**: Hent runde 1 standings vs nuværende `overall_rank`, beregn forbedring — live fra runde 1
-- Inkluder `seasonStartDate` i payload for talent-beregning
+- Udvid zone-beregning fra 2 til 4 zoner + tilføj `isTopDivision`/`isBottomDivision` kontekst:
+  - `"promotion"` → rank 1-3 (ikke top division)
+  - `"top"` → rank 1-3 i division 1
+  - `"playoff"` → rank 4-5 ELLER rank playersPerDivision-4/playersPerDivision-3
+  - `"relegation"` → rank ≥ playersPerDivision-1 (ikke bund division)
+  - `"safe"` → resten
+- Send `totalDivisions` med i hvert division-objekt (allerede i payload)
 
 ### 2. `src/pages/tv-board/TvLeagueDashboard.tsx`
-- Udvid `LeaguePayload` med `prizeLeaders` type
-- Opdater `PodiumCard` til at vise "pt" i stedet for "kr" når `seasonStatus === "active"`
-- Tilføj 3 præmie-kort under podiet (grid cols-3):
-  - 🔥 Bedste Runde (rød border) — locked under kval, viser leder under aktiv
-  - ⭐ Sæsonens Talent (lilla border) — locked under kval + runde 1 uden point, viser leder når point > 0
-  - 🚀 Sæsonens Comeback (grøn border) — locked under kval, viser leder under aktiv
-- Lock-state: Lock-ikon + "Afgøres når sæsonen starter" (kval) eller "Afgøres efter runde 1" (talent uden data)
-- Reducér TickerFeed max-height for at gøre plads til præmie-kortene
+- Udvid `PlayerEntry.zone` type med `"top"` og `"playoff"`
+- Opdater `SceneDivisions` border/tekst-farver:
+  - Top 3 medals (guld/sølv/bronze) bevares for rank 1-3
+  - Playoff: orange border (`border-l-orange-400`) + orange navnefarve
+  - Relegation: rød border + rød navnefarve
+  - Promotion: grøn border + grøn navnefarve (rang 1-3 beholder medal-farver)
+- Opdater zone-legend i bunden med alle 4 zoner (oprykningn, playoff, nedrykning, top 3)
 
 | Fil | Handling |
 |-----|---------|
-| `supabase/functions/tv-league-data/index.ts` | Tilføj prizeLeaders + sæson-aware top 3 |
-| `src/pages/tv-board/TvLeagueDashboard.tsx` | Tilføj præmie-kort + betinget top 3 visning |
+| `supabase/functions/tv-league-data/index.ts` | Ret zone-logik til 4 zoner |
+| `src/pages/tv-board/TvLeagueDashboard.tsx` | Vis alle zoner med korrekte farver + legend |
 
