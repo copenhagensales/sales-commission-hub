@@ -337,7 +337,7 @@ const PlayerRow = memo(function PlayerRow({
         </div>
 
         {/* Sparkline — centrally placed */}
-        <div className="hidden sm:flex flex-1 justify-center items-center min-w-[120px]">
+        <div className="hidden sm:flex flex-1 items-center min-w-[120px]">
           {weeklyData && weeklyData.length > 0 && (
             <ProvisionSparkline
               data={weeklyData}
