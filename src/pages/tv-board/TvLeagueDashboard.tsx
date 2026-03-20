@@ -390,11 +390,17 @@ export default function TvLeagueDashboard() {
 
   // Scene rotation
   useEffect(() => {
-    const timer = setInterval(() => {
+    if (!data) return;
+    const scene = SCENES[sceneIndex];
+    const duration =
+      scene === "divisions" ? DIVISION_DISPLAY_DURATION * (data.divisions.length || 1) :
+      scene === "movements" ? MOVEMENTS_DURATION :
+      RECORDS_DURATION;
+    const timer = setTimeout(() => {
       setSceneIndex((prev) => (prev + 1) % SCENES.length);
-    }, SCENE_DURATION);
-    return () => clearInterval(timer);
-  }, []);
+    }, duration);
+    return () => clearTimeout(timer);
+  }, [sceneIndex, data]);
 
   if (isLoading) {
     return (
