@@ -48,6 +48,8 @@ interface LocationRow {
   name: string;
   type: string | null;
   region: string | null;
+  address_street: string | null;
+  address_postal_code: string | null;
   address_city: string | null;
   daily_rate: number | null;
 }
@@ -66,6 +68,8 @@ interface BookingRow {
     name: string;
     type: string | null;
     region: string | null;
+    address_street: string | null;
+    address_postal_code: string | null;
     address_city: string | null;
     daily_rate: number | null;
   };
@@ -84,7 +88,7 @@ export function LocationReportTab() {
     queryFn: async () => {
       let query = supabase
         .from("location")
-        .select("id, name, type, region, address_city, daily_rate, bookable_client_ids")
+        .select("id, name, type, region, address_street, address_postal_code, address_city, daily_rate, bookable_client_ids")
         .order("name");
 
       if (locationType !== "Alle typer") {
@@ -114,7 +118,7 @@ export function LocationReportTab() {
     queryFn: async () => {
       let query = supabase
         .from("booking")
-        .select("id, location_id, client_id, start_date, end_date, booked_days, daily_rate_override, total_price, status, location!inner(name, type, region, address_city, daily_rate)")
+        .select("id, location_id, client_id, start_date, end_date, booked_days, daily_rate_override, total_price, status, location!inner(name, type, region, address_street, address_postal_code, address_city, daily_rate)")
         .gte("end_date", periodStart)
         .lte("start_date", periodEnd)
         .order("start_date", { ascending: false });
@@ -153,11 +157,13 @@ export function LocationReportTab() {
         Navn: loc.name,
         Type: loc.type ?? "",
         Region: loc.region ?? "",
+        Adresse: loc.address_street ?? "",
+        Postnr: loc.address_postal_code ?? "",
         By: loc.address_city ?? "",
         "Dagspris (DKK)": loc.daily_rate ?? "",
       }));
       const ws = XLSX.utils.json_to_sheet(rows);
-      ws["!cols"] = [{ wch: 30 }, { wch: 22 }, { wch: 18 }, { wch: 18 }, { wch: 14 }];
+      ws["!cols"] = [{ wch: 30 }, { wch: 22 }, { wch: 18 }, { wch: 30 }, { wch: 8 }, { wch: 18 }, { wch: 14 }];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Lokationer");
       XLSX.writeFile(wb, `lokationer-alle-${periodStart}.xlsx`);
@@ -168,6 +174,8 @@ export function LocationReportTab() {
         Lokation: b.location?.name ?? "",
         Type: b.location?.type ?? "",
         Region: b.location?.region ?? "",
+        Adresse: b.location?.address_street ?? "",
+        Postnr: b.location?.address_postal_code ?? "",
         By: b.location?.address_city ?? "",
         Kunde: clientLabel(b.client_id ?? ""),
         "Start dato": b.start_date,
@@ -179,7 +187,7 @@ export function LocationReportTab() {
       }));
       const ws = XLSX.utils.json_to_sheet(rows);
       ws["!cols"] = [
-        { wch: 30 }, { wch: 22 }, { wch: 18 }, { wch: 18 }, { wch: 16 },
+        { wch: 30 }, { wch: 22 }, { wch: 18 }, { wch: 30 }, { wch: 8 }, { wch: 18 }, { wch: 16 },
         { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 12 },
       ];
       const wb = XLSX.utils.book_new();
@@ -296,6 +304,8 @@ export function LocationReportTab() {
                   <TableHead>Navn</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Region</TableHead>
+                  <TableHead>Adresse</TableHead>
+                  <TableHead>Postnr</TableHead>
                   <TableHead>By</TableHead>
                   <TableHead className="text-right">Dagspris (DKK)</TableHead>
                 </TableRow>
@@ -306,6 +316,8 @@ export function LocationReportTab() {
                     <TableCell className="font-medium">{loc.name}</TableCell>
                     <TableCell>{loc.type ?? "–"}</TableCell>
                     <TableCell>{loc.region ?? "–"}</TableCell>
+                    <TableCell>{loc.address_street ?? "–"}</TableCell>
+                    <TableCell>{loc.address_postal_code ?? "–"}</TableCell>
                     <TableCell>{loc.address_city ?? "–"}</TableCell>
                     <TableCell className="text-right">
                       {loc.daily_rate ? loc.daily_rate.toLocaleString("da-DK") : "–"}
@@ -323,6 +335,9 @@ export function LocationReportTab() {
                   <TableHead>Lokation</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Region</TableHead>
+                  <TableHead>Adresse</TableHead>
+                  <TableHead>Postnr</TableHead>
+                  <TableHead>By</TableHead>
                   <TableHead>Kunde</TableHead>
                   <TableHead>Start</TableHead>
                   <TableHead>Slut</TableHead>
@@ -338,6 +353,9 @@ export function LocationReportTab() {
                     <TableCell className="font-medium">{b.location?.name ?? "–"}</TableCell>
                     <TableCell>{b.location?.type ?? "–"}</TableCell>
                     <TableCell>{b.location?.region ?? "–"}</TableCell>
+                    <TableCell>{b.location?.address_street ?? "–"}</TableCell>
+                    <TableCell>{b.location?.address_postal_code ?? "–"}</TableCell>
+                    <TableCell>{b.location?.address_city ?? "–"}</TableCell>
                     <TableCell>{clientLabel(b.client_id ?? "")}</TableCell>
                     <TableCell>{b.start_date}</TableCell>
                     <TableCell>{b.end_date}</TableCell>
