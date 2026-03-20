@@ -13,6 +13,7 @@ import RelatelDashboard from "@/pages/RelatelDashboard";
 import CsTop20Dashboard from "@/pages/CsTop20Dashboard";
 import UnitedDashboard from "@/pages/UnitedDashboard";
 import SalesOverviewAll from "@/pages/dashboards/SalesOverviewAll";
+import TvLeagueDashboard from "@/pages/tv-board/TvLeagueDashboard";
 
 const dashboardComponents: Record<string, React.ComponentType> = {
   "cph-sales": CphSalesDashboard,
@@ -23,6 +24,7 @@ const dashboardComponents: Record<string, React.ComponentType> = {
   "united": UnitedDashboard,
   "cs-top-20": CsTop20Dashboard,
   "sales-overview-all": SalesOverviewAll,
+  "commission-league": TvLeagueDashboard,
 };
 
 export default function TvBoardView() {
