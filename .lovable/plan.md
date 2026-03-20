@@ -1,18 +1,35 @@
 
 
-# Ret ticker-tekst og tydeliggør 300 kr-grænsen
+# Tilføj præmie-titler til TV Dashboard med sæson-aware logik
 
-## Problem
-Teksten "Seneste salg (300+ kr)" og "Ingen salg over 300 kr de sidste 15 min" antyder at det er per salg. Men grænsen er per sælger (samlet provision over 15 min). En sælger med 3 × 100 kr = 300 kr skal også fremgå — og det gør de allerede i koden, men teksten er misvisende.
+## Overblik
+Tilføj de 3 præmiekort (Bedste Runde, Sæsonens Talent, Sæsonens Comeback) under Top 3 podiet i venstre zone. Top 3 og præmierne skal fungere kontekstuelt:
 
-## Ændringer i `src/pages/tv-board/TvLeagueDashboard.tsx`
+- **Kvalifikation**: Top 3 baseret på `current_provision`. Bedste Runde og Comeback viser "Afgøres når sæsonen starter". Talent viser "Afgøres efter runde 1".
+- **Aktiv sæson**: Top 3 baseret på `total_points` fra `league_season_standings`. Bedste Runde og Comeback er live med det samme (efter kval). Talent kræver mindst 1 runde med point (fordi den måler point).
 
-1. **Header-tekst** (linje 448): Ændr fra `🔥 Seneste salg (300+ kr)` til `🔥 Seneste indtjening (300+ kr samlet)`
-2. **Tomtilstand** (linje 117): Ændr fra `Ingen salg over 300 kr de sidste 15 min` til `Ingen sælgere med 300+ kr siden sidste opdatering`
+## Ændringer
 
-Ingen ændringer i edge function — logikken er allerede korrekt (aggregerer per sælger).
+### 1. `supabase/functions/tv-league-data/index.ts`
+- Når `status === "active"`: hent Top 3 fra `league_season_standings` (sorteret by `total_points`) i stedet for `league_qualification_standings`
+- Tilføj `prizeLeaders` til payload med:
+  - **bestRound**: Hent fra `league_round_standings` (top 1 by `points_earned`) — live fra runde 1
+  - **talent**: Hent fra `league_season_standings` filtreret på `employment_start_date` < 90 dage fra sæsonstart — kræver point > 0
+  - **comeback**: Hent runde 1 standings vs nuværende `overall_rank`, beregn forbedring — live fra runde 1
+- Inkluder `seasonStartDate` i payload for talent-beregning
 
-| Fil | Ændring |
+### 2. `src/pages/tv-board/TvLeagueDashboard.tsx`
+- Udvid `LeaguePayload` med `prizeLeaders` type
+- Opdater `PodiumCard` til at vise "pt" i stedet for "kr" når `seasonStatus === "active"`
+- Tilføj 3 præmie-kort under podiet (grid cols-3):
+  - 🔥 Bedste Runde (rød border) — locked under kval, viser leder under aktiv
+  - ⭐ Sæsonens Talent (lilla border) — locked under kval + runde 1 uden point, viser leder når point > 0
+  - 🚀 Sæsonens Comeback (grøn border) — locked under kval, viser leder under aktiv
+- Lock-state: Lock-ikon + "Afgøres når sæsonen starter" (kval) eller "Afgøres efter runde 1" (talent uden data)
+- Reducér TickerFeed max-height for at gøre plads til præmie-kortene
+
+| Fil | Handling |
 |-----|---------|
-| `src/pages/tv-board/TvLeagueDashboard.tsx` | Opdater 2 tekst-strenge |
+| `supabase/functions/tv-league-data/index.ts` | Tilføj prizeLeaders + sæson-aware top 3 |
+| `src/pages/tv-board/TvLeagueDashboard.tsx` | Tilføj præmie-kort + betinget top 3 visning |
 
