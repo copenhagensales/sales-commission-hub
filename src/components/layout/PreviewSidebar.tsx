@@ -8,7 +8,7 @@ import {
   Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight,
   Car, Clock, UserCheck, Receipt, Database, ListChecks, Timer, 
   FileText, Crown, User, Sparkles, BarChart3, Video, Phone, FlaskConical,
-  Home
+  Home, Inbox
 } from "lucide-react";
 import { useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
