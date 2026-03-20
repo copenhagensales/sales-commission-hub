@@ -472,7 +472,7 @@ function SceneRecords({ records }: { records: LeaguePayload["records"] }) {
             const pct = (d.average / maxAvg) * 100;
             return (
               <div key={d.division} className="flex items-center gap-3">
-                <span className="text-sm text-slate-500 w-16 shrink-0">Div {d.division}</span>
+                <span className="text-sm text-slate-500 w-24 shrink-0">{getDivisionName(d.division)}</span>
                 <div className="flex-1 bg-slate-800 rounded-full h-6 overflow-hidden">
                   <motion.div
                     initial={{ width: 0 }}
