@@ -62,7 +62,7 @@ export function PrizeShowcase({ standings, prizeLeaders, seasonStatus, isActive 
   ];
 
   const handleOpen = (type: DialogType) => {
-    if (isActive) setOpenDialog(type);
+    setOpenDialog(type);
   };
 
   return (
