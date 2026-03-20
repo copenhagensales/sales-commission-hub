@@ -1,57 +1,44 @@
 
 
-# Fix Sparkline alignment, størrelse og UI-forbedringer
-
-## Problemer fra screenshot
-1. **Forskudte grafer** — Sparklines er ikke justeret fordi de er wrappet i en conditional (`weeklyData && ...`) med `flex-1`, så rækker uden data mangler elementet og hele layoutet rykker.
-2. **For små** — SVG er kun 80×28px, fylder lidt i det store mellemrum.
-3. **Gennemsnit er generelt** — `divisionAvg` beregnes allerede korrekt per division (linje 137-144 i ActiveSeasonBoard), men det ser ud til at det er det der bruges. Dobbelttjek at QualificationBoard gør det samme.
+# Flyt Kundehenvendelser til Ledelse-menuen
 
 ## Ændringer
 
-### 1. `ProvisionSparkline.tsx` — Gør større
-- Øg `md` størrelse fra 80×28 til **140×36** (næsten dobbelt bredde)
-- Øg `sm` fra 48×16 til **100×28**
-- Behold proportionel strokeWidth
+### 1. Ny side: `src/pages/CustomerInquiries.tsx`
+- Wrapper-side med `MainLayout` der renderer `CustomerInquiryInbox` komponenten
+- Simpel side med titel
 
-### 2. `ActiveSeasonBoard.tsx` + `QualificationBoard.tsx` — Fix alignment
-- **Fjern conditional rendering** af sparkline-wrapperen. Vis ALTID flex-1 div'en, men vis kun grafen indeni hvis data findes. Dette sikrer at alle rækker har samme layout-struktur og intet forskyder sig.
-- Ændr fra:
-  ```tsx
-  {weeklyData && weeklyData.length > 0 && (
-    <div className="hidden sm:flex flex-1 ...">
-      <ProvisionSparkline ... />
-    </div>
-  )}
+### 2. `src/components/layout/PreviewSidebar.tsx`
+- Tilføj `menu_customer_inquiries` til `MANAGEMENT_ITEMS`:
   ```
-  Til:
-  ```tsx
-  <div className="hidden sm:flex flex-1 justify-center items-center min-w-[120px]">
-    {weeklyData && weeklyData.length > 0 && (
-      <ProvisionSparkline ... />
-    )}
-  </div>
+  menu_customer_inquiries: { name: "Kundehenvendelser", href: "/customer-inquiries", icon: Inbox }
   ```
-- Øg `min-w` fra 90px til 120px
 
-### 3. Divisionsgennemsnit — allerede korrekt
-Koden beregner allerede gennemsnit per division (kun spillerne i gruppen). Ingen ændring nødvendig her.
+### 3. `src/config/permissionKeys.ts`
+- Tilføj ny permission key under Ledelse-sektionen:
+  ```
+  menu_customer_inquiries: { label: 'Kundehenvendelser', section: 'ledelse', parent: 'menu_section_ledelse' }
+  ```
 
-### 4. Yderligere UI-forbedringer
+### 4. `src/routes/pages.ts`
+- Tilføj lazy import for `CustomerInquiries`
 
-**a) Smooth path i stedet for kantet polyline**
-- Erstat `<polyline>` med en `<path>` der bruger cubic bezier curves (catmull-rom interpolation) for en blødere, mere professionel kurve.
+### 5. `src/routes/config.tsx`
+- Tilføj route: `{ path: "/customer-inquiries", component: CustomerInquiries, access: "role", positionPermission: "menu_customer_inquiries" }`
 
-**b) Hover-highlight af individuelle datapunkter**
-- Tilføj usynlige hit-areas (større cirkler) på hvert datapunkt der viser en tooltip med den specifikke dags værdi ved hover, i stedet for at vise alle 7 dage på én gang.
+### 6. `src/pages/Home.tsx`
+- Fjern `CustomerInquiryInbox` og den hardcodede email-check fra home-siden
 
-**c) Relativ performance-indikator**
-- Vis en lille tekst-label under grafen ("↑12% over gns." eller "↓8% under gns.") der sammenligner spillerens ugetotal med divisionens gennemsnit. Giver hurtigt overblik uden at klikke.
+### 7. Database migration
+- Seed `menu_customer_inquiries` permission for ejer-rollen med `can_view: true`
 
-## Filer der ændres
-| Fil | Ændring |
+| Fil | Handling |
 |-----|---------|
-| `ProvisionSparkline.tsx` | Større SVG, smooth bezier path, hover-highlights per punkt, performance-label |
-| `ActiveSeasonBoard.tsx` | Fix alignment (altid render flex-1 wrapper) |
-| `QualificationBoard.tsx` | Fix alignment (altid render flex-1 wrapper) |
+| `src/pages/CustomerInquiries.tsx` | Ny side |
+| `src/components/layout/PreviewSidebar.tsx` | Tilføj menupunkt |
+| `src/config/permissionKeys.ts` | Tilføj permission key |
+| `src/routes/pages.ts` | Lazy import |
+| `src/routes/config.tsx` | Tilføj route |
+| `src/pages/Home.tsx` | Fjern inbox derfra |
+| DB migration | Seed permission |
 
