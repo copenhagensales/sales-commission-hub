@@ -110,8 +110,8 @@ export function createAchievementConfigs(targets: AchievementTargets = DEFAULT_T
     {
       id: "consistent",
       name: "Konsistent",
-      description: `${targets.consistent} dages streak`,
-      requirement: `Sælg noget ${targets.consistent} dage i træk`,
+      description: `Overgå dagen før ${targets.consistent} dage i træk`,
+      requirement: `Overgå gårsdagens indtjening ${targets.consistent} dage i træk`,
       icon: Shield,
       color: "text-emerald-400 bg-emerald-400/20",
       category: "streaks",
