@@ -1,48 +1,47 @@
 
 
-# Omdefinér Streak: "Overgå dagen før i indtjening"
+# Fyld TV League Dashboard — Nye data-elementer
 
-## Ny definition
-En streak-dag tæller når dagens provision er **højere end gårsdagens**. Streaken brydes hvis du tjener **mindre end eller lig med** dagen før. Weekender/fridage ignoreres (sammenlign med seneste arbejdsdag).
+## Nuværende tomme områder
+- **SceneMovements**: Plads under "Mest tjent sidste time" (3 rækker + tom bund)
+- **SceneRecords**: Kun 2 sektioner (højeste provision + 3 division-gennemsnit)
+- Generelt: Scenerne fylder ~60% af venstre kolonne
 
-## Påvirkede områder
+## Nye data-elementer
 
-### 1. Streak-logik i `src/hooks/useSalesGamification.ts`
-- Ændr `hitDailyGoal`-beregningen fra `todayTotal >= dailyTarget` til en sammenligning med gårsdagens provision
-- Tilføj `yesterdayTotal` som ny prop (eller hent den internt via `get_personal_daily_commission`)
-- Streak tæller op hvis `todayTotal > yesterdayTotal` (og `todayTotal > 0`)
-- `streakAtRisk` ændres til: du har en streak, men har endnu ikke overgået gårsdagen
+### Backend: `supabase/functions/tv-league-data/index.ts`
 
-### 2. Datakilde: Gårsdagens provision
-- Tilføj en `useQuery` i `useSalesGamification` der henter de sidste 2 arbejdsdages provision via `get_personal_daily_commission` RPC (allerede eksisterer)
-- Alternativt: Udvid props med `yesterdayTotal` fra den kaldende komponent
+| Nyt felt | Beskrivelse | Datakilde |
+|----------|-------------|-----------|
+| `todayTopEarners` | Top 5 daglige indtjenere (hele dagen) | `get_sales_aggregates_v2` med dagens dato |
+| `teamRankings` | Top 3 teams by aggregeret provision | Aggregér `enriched` standings per `team_id` |
+| `todayLeagueTotal` | Samlet provision for alle liga-spillere i dag | Sum fra `todayTopEarners` data |
+| `longestStreak` | Spilleren med længste aktive streak (overgår forrige dag) | `employee_sales_streaks` tabel → `current_streak` |
+| `raceToTop` | Top 5 spillere med gap til #1 | Fra `enriched` standings |
+| `activeLast15Min` | Antal spillere med salg i sidste 15 min | `recentEarners.length` (allerede tilgængeligt) |
 
-### 3. UI-tekster der skal opdateres
-- **`src/components/my-profile/SalesRecords.tsx`** og **`CompactSalesRecords.tsx`**: Ændr "dags streak" beskrivelse og `streakAtRisk`-tekst fra "Nå dit dagsmål" til "Overgå gårsdagen"
-- **`src/components/my-profile/SalesStreakBadge.tsx`**: Opdater tooltip/beskrivelse
-- **`src/lib/gamification-achievements.ts`**: Ændr achievement-beskrivelser fra "Sælg noget X dage i træk" til "Overgå dagen før X dage i træk"
+### Frontend: `src/pages/tv-board/TvLeagueDashboard.tsx`
 
-### 4. Streak-mutation logik
-- `updateStreakMutation` i `useSalesGamification.ts`: Behold eksisterende incrementering, men ændr betingelsen fra `hitDailyGoal` til `todayTotal > yesterdayTotal`
-- Tabellen `employee_sales_streaks` behøver ingen skemaændringer
+**SceneMovements (udvid)**:
+- Tilføj **"Dagens Top 5"** sektion (hele dagens top-indtjenere under "Mest tjent sidste time")
+- Tilføj **"Aktive nu"** pill-badge (antal spillere med salg sidste 15 min)
 
-### 5. TV Dashboard (den godkendte plan)
-- I den kommende udvidelse: Brug den nye streak-definition som KPI i stedet for "aktive dage" eller "mest konsistent"
-- Vis f.eks. "Længste streak" (flest dage i træk med stigende provision) som erstatning
+**SceneRecords (udvid)**:
+- Tilføj **"Længste streak 🔥"** kort (spilleren der har overgået forrige dag flest dage i træk)
+- Tilføj **"Team Ranking"** — top 3 teams med horisontale barer
+- Tilføj **"Dagens liga-total"** — samlet provision i dag som stort tal
 
-### 6. League Motivation Bar (`src/components/league/LeagueMotivationBar.tsx`)
-- Opdater streak-relaterede motivationsbudskaber til at referere til "overgå gårsdagen"
+**Ny scene 4: "Ligaoverblik"**:
+- **"Race to #1"** — horisontale barer for top 5 spillere med gap til #1
+- **"Divisionskamp"** — samlet provision per division (head-to-head)
+- **"Liga i tal"** — antal spillere, divisioner, samlet provision, aktive i dag
 
-## Ændringer
+**Rotation**: 4 scener med `[15_000, 20_000, 20_000, 20_000]` ms
+
+### Ændringer
 
 | Fil | Handling |
 |-----|---------|
-| `src/hooks/useSalesGamification.ts` | Hent gårsdagens provision, ændr streak-betingelse til `today > yesterday` |
-| `src/components/my-profile/SalesRecords.tsx` | Opdater streak-tekster til ny definition |
-| `src/components/my-profile/CompactSalesRecords.tsx` | Opdater streak-tekster |
-| `src/components/my-profile/SalesStreakBadge.tsx` | Opdater beskrivelse |
-| `src/lib/gamification-achievements.ts` | Ændr streak-achievement beskrivelser |
-| `src/components/league/LeagueMotivationBar.tsx` | Opdater streak-motivationstekster |
-
-Ingen databaseændringer nødvendige — tabellen `employee_sales_streaks` forbliver uændret.
+| `supabase/functions/tv-league-data/index.ts` | Tilføj `todayTopEarners`, `teamRankings`, `todayLeagueTotal`, `longestStreak`, `raceToTop` |
+| `src/pages/tv-board/TvLeagueDashboard.tsx` | Udvid Movements + Records, tilføj ny "Ligaoverblik" scene |
 
