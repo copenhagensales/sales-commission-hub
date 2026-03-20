@@ -110,9 +110,9 @@ const LEFT_SCENES: LeftScene[] = ["overview", "movements", "records"];
 
 function PodiumCard({ player, rank, isPoints }: { player: PlayerEntry; rank: number; isPoints: boolean }) {
   const config: Record<number, { emoji: string; glow: string; size: string; border: string }> = {
-    1: { emoji: "🥇", glow: "shadow-[0_0_40px_rgba(234,179,8,0.4)]", size: "text-5xl", border: "border-yellow-500/40" },
-    2: { emoji: "🥈", glow: "shadow-[0_0_30px_rgba(148,163,184,0.3)]", size: "text-4xl", border: "border-slate-400/40" },
-    3: { emoji: "🥉", glow: "shadow-[0_0_30px_rgba(234,88,12,0.3)]", size: "text-4xl", border: "border-orange-500/40" },
+    1: { emoji: "🥇", glow: "shadow-[0_0_40px_rgba(234,179,8,0.4)]", size: "text-3xl 2xl:text-5xl", border: "border-yellow-500/40" },
+    2: { emoji: "🥈", glow: "shadow-[0_0_30px_rgba(148,163,184,0.3)]", size: "text-2xl 2xl:text-4xl", border: "border-slate-400/40" },
+    3: { emoji: "🥉", glow: "shadow-[0_0_30px_rgba(234,88,12,0.3)]", size: "text-2xl 2xl:text-4xl", border: "border-orange-500/40" },
   };
   const c = config[rank] || config[3];
 
@@ -121,15 +121,15 @@ function PodiumCard({ player, rank, isPoints }: { player: PlayerEntry; rank: num
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: rank * 0.15, duration: 0.5 }}
-      className={`flex items-center gap-4 p-4 rounded-2xl bg-slate-800/60 border ${c.border} ${c.glow} backdrop-blur-sm`}
+      className={`flex items-center gap-2 2xl:gap-4 p-2 2xl:p-4 rounded-2xl bg-slate-800/60 border ${c.border} ${c.glow} backdrop-blur-sm`}
     >
       <span className={c.size}>{c.emoji}</span>
       <div className="flex-1 min-w-0">
-        <p className="text-white font-bold text-xl truncate">{player.name}</p>
-        <p className="text-slate-400 text-sm">{getDivisionName(player.division || 1)} · {player.teamName}</p>
+        <p className="text-white font-bold text-sm 2xl:text-xl truncate">{player.name}</p>
+        <p className="text-slate-400 text-xs 2xl:text-sm truncate">{getDivisionName(player.division || 1)} · {player.teamName}</p>
       </div>
-      <div className="text-right">
-        <p className="text-2xl font-black text-white tabular-nums">
+      <div className="text-right shrink-0">
+        <p className="text-base 2xl:text-2xl font-black text-white tabular-nums">
           {isPoints ? formatPt(player.provision) : formatKr(player.provision)}
         </p>
       </div>
