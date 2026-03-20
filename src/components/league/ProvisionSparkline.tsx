@@ -147,6 +147,17 @@ export const ProvisionSparkline = memo(function ProvisionSparkline({
     .map((v, i) => `${dayLabels[i]}: ${v.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr`)
     .join("\n");
 
+  // Performance vs division average
+  const perfLabel = useMemo(() => {
+    if (!divisionAvg) return null;
+    const playerTotal = data.reduce((a, b) => a + b, 0);
+    const avgTotal = divisionAvg.reduce((a, b) => a + b, 0);
+    if (avgTotal === 0) return null;
+    const pctDiff = ((playerTotal - avgTotal) / avgTotal) * 100;
+    if (Math.abs(pctDiff) < 2) return null;
+    return { pct: Math.round(pctDiff), above: pctDiff > 0 };
+  }, [data, divisionAvg]);
+
   const gradientId = `spark-grad-${isRising ? "up" : isFalling ? "down" : "flat"}`;
 
   return (
