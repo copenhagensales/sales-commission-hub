@@ -1600,6 +1600,7 @@ export type Database = {
       }
       candidates: {
         Row: {
+          application_count: number
           applied_position: string | null
           assigned_to: string | null
           available_from: string | null
@@ -1611,6 +1612,7 @@ export type Database = {
           heard_about_us: string | null
           id: string
           interview_date: string | null
+          is_returning_applicant: boolean
           last_name: string
           notes: string | null
           phone: string | null
@@ -1624,6 +1626,7 @@ export type Database = {
           winback_contact_date: string | null
         }
         Insert: {
+          application_count?: number
           applied_position?: string | null
           assigned_to?: string | null
           available_from?: string | null
@@ -1635,6 +1638,7 @@ export type Database = {
           heard_about_us?: string | null
           id?: string
           interview_date?: string | null
+          is_returning_applicant?: boolean
           last_name: string
           notes?: string | null
           phone?: string | null
@@ -1648,6 +1652,7 @@ export type Database = {
           winback_contact_date?: string | null
         }
         Update: {
+          application_count?: number
           applied_position?: string | null
           assigned_to?: string | null
           available_from?: string | null
@@ -1659,6 +1664,7 @@ export type Database = {
           heard_about_us?: string | null
           id?: string
           interview_date?: string | null
+          is_returning_applicant?: boolean
           last_name?: string
           notes?: string | null
           phone?: string | null

@@ -309,9 +309,14 @@ export function CandidateCard({ candidate, applications = [], onUpdate }: Candid
 
                   {/* Right side - Badges */}
                   <div className="flex flex-col items-end gap-1.5 md:gap-2">
-                    {(candidate.status === 'new' || candidate.status === 'ny_ansoegning') && (
+                  {(candidate.status === 'new' || candidate.status === 'ny_ansoegning') && (
                       <Badge className="bg-red-500 text-white whitespace-nowrap text-xs font-semibold">
                         NY ANSØGNING
+                      </Badge>
+                    )}
+                    {(candidate as any).is_returning_applicant && (
+                      <Badge className="bg-amber-500 text-white whitespace-nowrap text-xs font-semibold">
+                        HAR SØGT FØR (×{(candidate as any).application_count || 2})
                       </Badge>
                     )}
                     {applications.length > 0 && (
