@@ -1,39 +1,46 @@
 
+## Diagnose
+Jeg har verificeret 3 ting i det nuværende setup:
 
-# Ret divisionsnavne og zone-regler på TV Dashboard
+1. `commission-league` er allerede korrekt registreret i kodebasen:
+- `TvBoardDirect.tsx`
+- `TvBoardView.tsx`
+- `src/config/dashboards.ts`
+- `src/routes/config.tsx`
 
-## Problemer
-1. **Forkerte divisionsnavne**: TV dashboard viser "Division 1", "Division 2" osv. De korrekte navne (som brugt i resten af systemet) er:
-   - Division 1 → **Superligaen**
-   - Division 2 → **1. Division**
-   - Division 3 → **2. Division** (osv: `division - 1`. Division)
+2. Adgangskoden `XKVP` findes stadig i backend, men den er **deaktiveret** (`is_active = false`).
 
-2. **Forkerte zone-grænser**: Edge function bruger `playersPerDivision - 3` / `playersPerDivision - 1` for playoff/relegation. De korrekte regler (fra QualificationBoard/ActiveSeasonBoard) er:
-   - Playoff ned: rank = `playersPerDivision - 3` eller `playersPerDivision - 4` (altså plads 11-12 ved 14 spillere)
-   - Relegation: rank ≥ `playersPerDivision - 2` (altså plads 13-14 ved 14 spillere) — kun hvis **ikke** bund-division
+3. Preview, published URL og custom domain returnerer nu ikke “Dashboard ikke fundet”, men **“Adgang nægtet / Ugyldig eller inaktiv adgangskode”**. Det peger på, at problemet nu er **link-status**, ikke manglende dashboard-mapning.
 
-3. **Manglende zone-badges**: Nuværende TV dashboard viser kun farvet border, men ikke tekst-badges ("Oprykker", "Playoff", "Nedrykker") som det eksisterende setup har.
+## Plan for opdatering
 
-## Ændringer
+### 1. Få linket til at virke igen
+- Hvis I vil beholde samme URL, reaktiverer vi `XKVP`.
+- Hvis linket bevidst skulle lukkes, opretter vi et nyt aktivt TV-link til `commission-league`.
+- Efter det tester vi samme `/t/XKVP`-flow i både preview og public/custom domain.
 
-### 1. `supabase/functions/tv-league-data/index.ts`
-- Ret zone-beregning til at matche de eksisterende boards:
-  - `playoff`: rank 4-5 (ikke top div) ELLER rank `playersPerDivision - 4` / `playersPerDivision - 3`
-  - `relegation`: rank ≥ `playersPerDivision - 2` (ikke bund div)
+### 2. Fjerne den misvisende fejl fremadrettet
+- Flyt TV-link validering over i en backend-funktion, så vi kan skelne tydeligt mellem:
+  - ugyldig kode
+  - deaktiveret link
+  - udløbet link
+  - gyldigt link
+- Opdater `useTvBoardConfig` og TV-login-flowet til at vise præcis fejltekst i stedet for en generisk fallback.
 
-### 2. `src/pages/tv-board/TvLeagueDashboard.tsx`
-- **Divisionsnavne**: Erstat "Division {n}" med korrekt navngivning:
-  - Division 1 → "Superligaen" (med Trophy-ikon)
-  - Division 2+ → "{n-1}. Division"
-- **Zone-badges**: Tilføj tekst-badges i højre side af hver spiller-række:
-  - Grøn "Oprykker" badge (promotion zone, ikke top div)
-  - Gul "Top 3" badge (top zone, kun top div)
-  - Orange "Playoff" badge (playoff zone)
-  - Rød "Nedrykker" badge (relegation zone)
-- Match styling fra eksisterende boards (halvgennemsigtige baggrunde, farvede tekst)
+### 3. Forbedre TV-link administration
+- Udvid TV-link settings/admin så man kan se både **aktive og deaktiverede** links.
+- Tilføj en **“Reaktiver”** handling på deaktiverede links.
+- Vis tydelig status-badge på hvert link, så det er nemt at se hvorfor et link ikke virker.
 
-| Fil | Handling |
-|-----|---------|
-| `supabase/functions/tv-league-data/index.ts` | Ret playoff zone-grænser |
-| `src/pages/tv-board/TvLeagueDashboard.tsx` | Ret divisionsnavne + tilføj zone-badges |
+### 4. Beskytte mod gamle cached TV-visninger
+- Tilføj tydeligere recovery-flow, så gamle TV-faner ikke hænger fast i en gammel tilstand.
+- Ved fejl kan siden vise en mere handlingsorienteret besked, fx at linket er deaktiveret og at man skal bruge et nyt/aktivt link.
 
+## Tekniske noter
+- Den nuværende backend-politik for `tv_board_access` skjuler deaktiverede links for offentlige opslag. Derfor kan klienten ikke sikkert kende forskel på “ugyldig” og “deaktiveret” uden en backend-funktion.
+- Selve dashboard-komponenten for `commission-league` er allerede wired korrekt ind. Derfor er næste rigtige opdatering ikke route-mapning, men **link-validering og reaktivering/admin-flow**.
+
+## Resultat efter implementering
+- `/t/XKVP` virker igen, hvis linket reaktiveres.
+- Brugerne får korrekt fejlbesked, hvis et TV-link er deaktiveret eller udløbet.
+- I kan selv genaktivere links i dashboard-miljøet uden at skulle oprette alt på ny.
