@@ -1,36 +1,33 @@
 
 
-# Duplikat-håndtering: Genkend tilbagevendende ansøgere
+# Indbakke til kundehenvendelser på Hjem-siden
 
 ## Hvad bygges
-Når en ansøgning kommer ind via webhook med en email der allerede findes i `candidates`-tabellen, skal den **ikke** oprette en ny kandidat. I stedet:
-1. Den eksisterende kandidat opdateres: status sættes til `new`, noter tilføjes med "Har søgt igen", og `applied_position` opdateres hvis ændret
-2. En ny kolonne `application_count` tracker antal ansøgninger
-3. Et `is_returning_applicant`-flag sættes til `true`
-4. CandidateCard viser en tydelig badge: **"HAR SØGT FØR"**
+En ny "Kundehenvendelser"-sektion på Home-siden, kun synlig for `mg@copenhagensales.dk` og `km@copenhagensales.dk`. Sektionen viser indkomne kontaktformularer fra hjemmesiden og lyser rødt når der er ulæste henvendelser.
 
-## Database-ændring
-Tilføj to kolonner til `candidates`:
-- `application_count` (integer, default 1) — antal gange personen har søgt
-- `is_returning_applicant` (boolean, default false) — flag for genganger
+## Database
+Ny tabel `customer_inquiries` med kolonner:
+- `id` (uuid, PK)
+- `name`, `company`, `email`, `phone`, `message` (text)
+- `is_read` (boolean, default false)
+- `created_at` (timestamptz)
 
-## Webhook-ændring (`supabase/functions/zapier-webhook/index.ts`)
-Før insert: check om email allerede findes i `candidates`-tabellen.
-- **Hvis ja**: Opdater eksisterende kandidat:
-  - `status` → `'new'` (så den dukker op som ny ansøgning igen)
-  - `application_count` → increment med 1
-  - `is_returning_applicant` → `true`
-  - `applied_position` → opdater til ny rolle hvis ændret
-  - `notes` → prepend "Søgte igen [dato] som [rolle]. Tidligere noter: ..."
-  - `updated_at` → `now()`
-  - `fbclid` → opdater hvis ny fbclid
-- **Hvis nej**: Insert som normalt med `application_count: 1`
+RLS: Kun authenticated brugere kan SELECT/UPDATE (adgangskontrol sker via email-check i frontend + webhook bruger service role key).
 
-## UI-ændring (`CandidateCard.tsx`)
-Vis en tydelig orange/amber badge **"HAR SØGT FØR (×2)"** ved siden af "NY ANSØGNING"-badgen, når `is_returning_applicant` er `true`. Badgen viser `application_count` så rekruttering kan se hvor mange gange personen har søgt.
+## Webhook
+Ny edge function `customer-inquiry-webhook` der modtager formulardata (navn, firma, email, telefon, besked) og inserter i `customer_inquiries`. Offentligt tilgængeligt endpoint til hjemmesiden.
 
-## Filer der ændres
-1. **Database migration** — tilføj `application_count` og `is_returning_applicant` kolonner
-2. **`supabase/functions/zapier-webhook/index.ts`** — duplikat-check på email, upsert-logik
-3. **`src/components/recruitment/CandidateCard.tsx`** — vis "Har søgt før"-badge
+## UI på Home-siden
+- Ny komponent `CustomerInquiryInbox` renderet øverst på Home-siden
+- Kun vist hvis `user.email` er `mg@copenhagensales.dk` eller `km@copenhagensales.dk`
+- Card med rød pulserende border/glow når der er ulæste henvendelser (`is_read = false`)
+- Liste af henvendelser med navn, firma, email, telefon, besked, tidspunkt
+- Klik på en henvendelse markerer den som læst
+- Badge med antal ulæste
+
+## Filer
+1. **Database migration** — opret `customer_inquiries` tabel + RLS
+2. **`supabase/functions/customer-inquiry-webhook/index.ts`** — modtag formular fra hjemmeside
+3. **`src/components/home/CustomerInquiryInbox.tsx`** — inbox-komponent med rød glow
+4. **`src/pages/Home.tsx`** — import og vis inbox for de to emails
 
