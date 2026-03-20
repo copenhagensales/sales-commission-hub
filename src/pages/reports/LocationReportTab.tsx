@@ -302,6 +302,8 @@ export function LocationReportTab() {
                   <TableHead>Navn</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Region</TableHead>
+                  <TableHead>Adresse</TableHead>
+                  <TableHead>Postnr</TableHead>
                   <TableHead>By</TableHead>
                   <TableHead className="text-right">Dagspris (DKK)</TableHead>
                 </TableRow>
