@@ -16,7 +16,7 @@ interface PlayerEntry {
   employeeId?: string;
   deals?: number;
   rankChange?: number;
-  zone?: "promotion" | "relegation" | "safe";
+  zone?: "promotion" | "relegation" | "safe" | "top" | "playoff";
 }
 
 interface Movement {
