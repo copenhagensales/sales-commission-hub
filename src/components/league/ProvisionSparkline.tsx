@@ -41,9 +41,9 @@ export const ProvisionSparkline = memo(function ProvisionSparkline({
   if (!data || data.length === 0) return null;
 
   const isMd = size === "md";
-  const w = isMd ? 80 : 48;
-  const h = isMd ? 28 : 16;
-  const padding = 2;
+  const w = isMd ? 140 : 100;
+  const h = isMd ? 36 : 28;
+  const padding = 3;
   const strokeW = isMd ? 2 : 1.5;
 
   const allValues = [...data, ...(divisionAvg || [])];
