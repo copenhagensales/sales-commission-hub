@@ -59,7 +59,7 @@ export function CompactSalesRecords({
             {currentStreak}
           </span>
           <span className="text-xs text-muted-foreground">
-            {currentStreak === 1 ? "dags streak" : "dages streak"}
+            {currentStreak === 1 ? "dag i træk" : "dage i træk"}
           </span>
           {streakBadge.badge && (
             <span className={cn(
@@ -122,7 +122,7 @@ export function CompactSalesRecords({
       {/* Streak motivation */}
       {streakAtRisk && (
         <p className="text-xs text-warning bg-warning/10 rounded px-2 py-1.5 text-center">
-          Hold momentum! Luk dagens mål og forlæng din streak 💪
+          Hold momentum! Overgå gårsdagen og forlæng din streak 💪
         </p>
       )}
     </div>

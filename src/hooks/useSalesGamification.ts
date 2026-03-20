@@ -4,7 +4,7 @@ import { useMemo, useEffect, useRef, useState } from "react";
 import { checkAchievements, type AchievementCheckData } from "@/lib/gamification-achievements";
 import { getProgressToNextLevel } from "@/lib/gamification-levels";
 import { getPerformanceStatus, getRandomQuote } from "@/lib/gamification-quotes";
-import { format, startOfWeek } from "date-fns";
+import { format, startOfWeek, subDays, isWeekend } from "date-fns";
 
 export type RecordType = "best_day" | "best_week" | null;
 
@@ -40,6 +40,29 @@ export function useSalesGamification({
   // Track new records for celebration
   const [newRecordType, setNewRecordType] = useState<RecordType>(null);
   const clearNewRecord = () => setNewRecordType(null);
+
+  // Fetch yesterday's provision (last working day)
+  const { data: yesterdayTotal = 0 } = useQuery({
+    queryKey: ["yesterday-provision", employeeId],
+    queryFn: async () => {
+      // Find the last working day (skip weekends)
+      let checkDate = subDays(new Date(), 1);
+      while (isWeekend(checkDate)) {
+        checkDate = subDays(checkDate, 1);
+      }
+      const startDate = format(checkDate, "yyyy-MM-dd");
+      
+      const { data, error } = await supabase.rpc("get_personal_daily_commission", {
+        p_employee_id: employeeId,
+        p_start_date: startDate,
+        p_end_date: startDate,
+      });
+      
+      if (error) throw error;
+      return data?.[0]?.commission ?? 0;
+    },
+    enabled: !!employeeId,
+  });
 
   // Fetch streak data
   const { data: streakData } = useQuery({
@@ -309,11 +332,14 @@ export function useSalesGamification({
   const bestWeekRecord = records?.find(r => r.record_type === "best_week");
   const bestMonthRecord = records?.find(r => r.record_type === "best_month");
 
-  // Check if today hit daily target
-  const hitDailyGoal = dailyTarget > 0 && todayTotal >= dailyTarget;
+  // Streak condition: beat yesterday's provision (new definition)
+  const beatYesterday = todayTotal > 0 && todayTotal > yesterdayTotal;
+  
+  // Legacy alias for backward compatibility in streak mutation
+  const hitDailyGoal = beatYesterday;
 
-  // Streak status
-  const streakAtRisk = currentStreak > 0 && !hitDailyGoal;
+  // Streak status: at risk if you have a streak but haven't beaten yesterday yet
+  const streakAtRisk = currentStreak > 0 && !beatYesterday;
 
   // Auto-initialize records if they don't exist and we have data
   const hasInitializedRecordsRef = useRef(false);
@@ -411,6 +437,8 @@ export function useSalesGamification({
     longestStreak,
     totalStreakDays: streakData?.total_streak_days || 0,
     hitDailyGoal,
+    beatYesterday,
+    yesterdayTotal,
     streakAtRisk,
     updateStreak: updateStreakMutation.mutate,
 

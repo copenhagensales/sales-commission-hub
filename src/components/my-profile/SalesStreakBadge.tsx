@@ -38,7 +38,7 @@ export function SalesStreakBadge({
       {streakAtRisk ? (
         <>
           <Zap className="h-4 w-4 animate-pulse" />
-          <span>Hold momentum! 💪</span>
+          <span>Overgå gårsdagen! 💪</span>
         </>
       ) : (
         <>
@@ -47,7 +47,7 @@ export function SalesStreakBadge({
             isLegendaryStreak && "animate-bounce",
             isBurningStreak && !isLegendaryStreak && "animate-pulse"
           )} />
-          <span>{currentStreak} {currentStreak === 1 ? "dag" : "dages"} streak</span>
+          <span>{currentStreak} {currentStreak === 1 ? "dag" : "dage"} i træk</span>
           {isLegendaryStreak && " 👑"}
           {isBurningStreak && !isLegendaryStreak && " 🔥"}
         </>

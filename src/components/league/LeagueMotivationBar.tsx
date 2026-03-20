@@ -113,8 +113,8 @@ export function LeagueMotivationBar({
         icon: <Flame className="h-4 w-4 text-red-400" />,
         message: (
           <span>
-            <span className="text-red-400 font-semibold">🔥 {currentStreak} dages streak</span>
-            {" — 1 salg mere holder den i live!"}
+            <span className="text-red-400 font-semibold">🔥 {currentStreak} dage i træk</span>
+            {" — overgå gårsdagen for at holde den i live!"}
           </span>
         ),
         color: "red",
@@ -162,7 +162,7 @@ export function LeagueMotivationBar({
         icon: <Flame className="h-4 w-4 text-amber-400" />,
         message: (
           <span>
-            <span className="text-amber-400 font-semibold">🔥 {currentStreak} dages streak!</span>
+            <span className="text-amber-400 font-semibold">🔥 {currentStreak} dage i træk!</span>
             {" Hold tempoet de næste timer"}
           </span>
         ),
@@ -177,8 +177,8 @@ export function LeagueMotivationBar({
         icon: <Flame className="h-4 w-4 text-amber-400" />,
         message: (
           <span>
-            <span className="text-amber-400 font-semibold">🔥 {currentStreak}. dag i træk!</span>
-            {" Keep going — en streak bygges dag for dag"}
+            <span className="text-amber-400 font-semibold">🔥 {currentStreak}. dag med stigning!</span>
+            {" Keep going — overgå i morgen også"}
           </span>
         ),
         color: "amber",
@@ -355,26 +355,26 @@ export function LeagueMotivationBar({
         {
           msg: (
             <span>
-              {"Start en ny streak i dag — dit "}
-              <span className="text-amber-400 font-semibold">første salg</span>
-              {" tæller! 🚀"}
+              {"Start en ny streak — "}
+              <span className="text-amber-400 font-semibold">overgå gårsdagen</span>
+              {" og sæt gang i væksten! 🚀"}
             </span>
           ),
         },
         {
           msg: (
             <span>
-              {"En god dag starter med "}
-              <span className="text-amber-400 font-semibold">ét salg</span>
-              {" — tag det første skridt! 💪"}
+              {"Tjen mere end i går og "}
+              <span className="text-amber-400 font-semibold">start en streak</span>
+              {" — dag for dag! 💪"}
             </span>
           ),
         },
         {
           msg: (
             <span>
-              <span className="text-amber-400 font-semibold">Første salg</span>
-              {" er det sværeste — resten følger! 🚀"}
+              <span className="text-amber-400 font-semibold">Beat yesterday</span>
+              {" — overgå gårsdagen og byg momentum! 🚀"}
             </span>
           ),
         },

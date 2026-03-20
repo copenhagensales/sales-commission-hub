@@ -99,8 +99,8 @@ export function createAchievementConfigs(targets: AchievementTargets = DEFAULT_T
     {
       id: "week_warrior",
       name: "Uge Kriger",
-      description: `Opnå ${targets.weekWarrior} dages streak`,
-      requirement: `Sælg noget ${targets.weekWarrior} dage i træk`,
+      description: `Overgå dagen før ${targets.weekWarrior} dage i træk`,
+      requirement: `Overgå gårsdagens indtjening ${targets.weekWarrior} dage i træk`,
       icon: Flame,
       color: "text-orange-400 bg-orange-400/20",
       category: "streaks",
@@ -110,8 +110,8 @@ export function createAchievementConfigs(targets: AchievementTargets = DEFAULT_T
     {
       id: "consistent",
       name: "Konsistent",
-      description: `${targets.consistent} dages streak`,
-      requirement: `Sælg noget ${targets.consistent} dage i træk`,
+      description: `Overgå dagen før ${targets.consistent} dage i træk`,
+      requirement: `Overgå gårsdagens indtjening ${targets.consistent} dage i træk`,
       icon: Shield,
       color: "text-emerald-400 bg-emerald-400/20",
       category: "streaks",
@@ -121,8 +121,8 @@ export function createAchievementConfigs(targets: AchievementTargets = DEFAULT_T
     {
       id: "streak_legend",
       name: "Streak Legend",
-      description: `Opnå ${targets.streakLegend} dages streak`,
-      requirement: `Sælg noget ${targets.streakLegend} dage i træk`,
+      description: `Overgå dagen før ${targets.streakLegend} dage i træk`,
+      requirement: `Overgå gårsdagens indtjening ${targets.streakLegend} dage i træk`,
       icon: Medal,
       color: "text-pink-400 bg-pink-400/20",
       category: "streaks",
@@ -132,8 +132,8 @@ export function createAchievementConfigs(targets: AchievementTargets = DEFAULT_T
     {
       id: "unstoppable",
       name: "Ustoppelig",
-      description: `${targets.unstoppable} dages streak`,
-      requirement: `Sælg noget ${targets.unstoppable} dage i træk`,
+      description: `Overgå dagen før ${targets.unstoppable} dage i træk`,
+      requirement: `Overgå gårsdagens indtjening ${targets.unstoppable} dage i træk`,
       icon: Crown,
       color: "text-yellow-500 bg-yellow-500/20",
       category: "streaks",
