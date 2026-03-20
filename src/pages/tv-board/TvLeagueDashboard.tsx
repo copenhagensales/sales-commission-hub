@@ -307,12 +307,18 @@ function SceneDivisions({ divisions }: { divisions: DivisionData[] }) {
           </motion.div>
         </AnimatePresence>
       </div>
-      <div className="mt-3 flex gap-4 text-xs text-slate-500">
+      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
         <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-emerald-500" /> Opryknings-zone
+          <span className="w-2 h-2 rounded-full bg-yellow-500" /> Top 3 samlet
         </span>
         <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-red-500" /> Nedrykning-zone
+          <span className="w-2 h-2 rounded-full bg-emerald-500" /> Oprykningszone (1-3)
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-2 h-2 rounded-full bg-orange-500" /> Playoff (4-5 / 10-11)
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-2 h-2 rounded-full bg-red-500" /> Nedrykningszone (13-14)
         </span>
       </div>
     </div>
