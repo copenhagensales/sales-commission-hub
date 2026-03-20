@@ -132,6 +132,7 @@ import {
   AmoAuditLog,
   AmoSettings,
   CustomerInquiries,
+  TvLeagueDashboard,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
