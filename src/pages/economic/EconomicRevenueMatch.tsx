@@ -236,8 +236,7 @@ export default function EconomicRevenueMatch() {
   // Match preview for new pattern
   const matchPreview = useMemo(() => {
     if (!newPattern || !posteringer) return null;
-    const lower = newPattern.toLowerCase();
-    const matched = posteringer.filter(p => p.tekst && p.tekst.toLowerCase().includes(lower));
+    const matched = posteringer.filter(p => p.tekst && wordsMatch(p.tekst, newPattern));
     const months = new Set(matched.map(p => p.maaned));
     const totalAmount = matched.reduce((s, p) => s + Math.abs(p.beloeb_dkk), 0);
     const examples = [...new Set(matched.map(p => p.tekst).filter(Boolean))].slice(0, 5);
