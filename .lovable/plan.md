@@ -1,80 +1,55 @@
 
 
-# Ny fane: Salgsvalidering (fakturerbar + annulleringskontrol)
+# Simplificér Salgsvalidering: Copy-paste i stedet for Excel-upload
 
 ## Koncept
-En ny fane på `/economic/revenue-match` (eller som separat side) hvor du hver måned uploader kundens liste med:
-- **Fakturerbare salg** (telefonnumre der kan faktureres)
-- **Annullerede salg** (telefonnumre der skal trækkes)
+Erstat Excel-upload flowet med to tekstfelter hvor brugeren kan copy-paste telefonnumre direkte:
+1. Vælg kunde + måned (som nu)
+2. Paste godkendte/fakturerbare telefonnumre i ét felt
+3. Paste annullerede telefonnumre i et andet felt
+4. Klik "Validér" → samme matching-logik som nu
 
-Systemet matcher automatisk mod jeres interne salgsdata og producerer tre kategorier:
+Systemet parser automatisk telefonnumre (ét per linje, ignorerer tomme linjer og whitespace), normaliserer dem, og matcher mod salgsdata.
 
-### Kategori 1: Matchede annulleringer → sælger identificeret
-Annulleret telefonnummer fundet i jeres salg → viser sælgernavn, salgsdato, produkt. Klar til at markere som "trækkes fra sælger".
+## Ændringer i `src/pages/economic/SalesValidation.tsx`
 
-### Kategori 2: Umatchede annulleringer → advarsel
-Annulleret telefonnummer findes IKKE i jeres salg → markeres med advarsel. Kan skyldes at salget er registreret med andet nummer, eller at det ikke er jeres.
+### Fjernes
+- Excel upload/dropzone (hele `onDrop`, `useDropzone`, kolonne-mapping dialog)
+- States: `showColumnMapping`, `uploadedRows`, `uploadedHeaders`, `fileName`, `phoneCol`, `statusCol`, `billableValue`, `cancelledValue`
 
-### Kategori 3: Uverificerede salg → potentiel fejl
-Jeres registrerede salg hvor telefonnummeret IKKE findes i kundens fakturerbare liste → markeres som "ikke bekræftet". Kan afsløre fiktive/fejlregistrerede salg.
+### Tilføjes
+- **To `<Textarea>`-felter**: "Godkendte salg (telefonnumre)" og "Annullerede salg (telefonnumre)"
+- States: `billableText` og `cancelledText` (strings)
+- **Parser-funktion**: Splitter tekst på newlines, trimmer, normaliserer hvert nummer
+- **Tæller**: Viser live antal parsede numre under hvert felt ("23 numre registreret")
 
-## Smartere features
-- **Telefonnummer-normalisering**: Bruger eksisterende `normalizePhoneNumber()` så `+45 52 51 28 53`, `52512853` og `004552512853` alle matcher
-- **Historik**: Gemmer hver upload med resultater, så man kan se udvikling over tid
-- **Opsummeringsvisning**: Dashboard med "X annulleringer matchet, Y umatchede, Z uverificerede salg"
-- **Batch-handling**: Godkend alle matchede annulleringer på én gang (sætter `validation_status = 'cancelled'`)
-- **Excel-export**: Download resultat som Excel med alle tre kategorier
+### Matching-logik
+Uændret — bare med input fra textarea i stedet for Excel-rækker. `processMatching()` refaktoreres til at læse fra de to tekstfelter.
 
-## Teknisk plan
+### UI-layout
+```
+[Kunde ▾]  [Måned ▾]
 
-### 1. Ny DB-tabel: `sales_validation_uploads`
-Gemmer upload-historik:
-- `id`, `created_at`, `client_id`, `period_month` (YYYY-MM), `file_name`
-- `total_billable`, `total_cancelled`, `matched_cancellations`, `unmatched_cancellations`, `unverified_sales`
-- `uploaded_by` (employee_id), `status`, `results_json` (detaljeret match-data)
+┌─────────────────────────┐  ┌─────────────────────────┐
+│ Godkendte salg (tlf)    │  │ Annullerede salg (tlf)  │
+│ 52512853                │  │ 40302010                │
+│ 22334455                │  │ 11223344                │
+│ ...                     │  │ ...                     │
+│ 23 numre                │  │ 4 numre                 │
+└─────────────────────────┘  └─────────────────────────┘
 
-### 2. Ny komponent: `SalesValidationTab.tsx`
-**Upload-flow:**
-1. Vælg kunde + periode (måned)
-2. Upload Excel-fil
-3. Map kolonner: telefonnummer-kolonne, status-kolonne (fakturerbar/annulleret), evt. firma-kolonne
-4. Systemet normaliserer alle telefonnumre og matcher mod `sales`-tabellen for den valgte kunde+periode
-5. Vis resultater i tre sektioner med farve-kodning
+        [ Validér salg ]
 
-**Matching-logik:**
-```text
-For hver annullering i filen:
-  → Normaliser telefonnummer
-  → Søg i sales WHERE customer_phone normaliseret = nummer 
-    AND client matches AND periode matches
-  → Fund? → Kategori 1 (sælger identificeret)
-  → Ikke fundet? → Kategori 2 (uplacerbar annullering)
-
-For hvert internt salg i perioden:
-  → Er telefonnummer i kundens fakturerbare liste? 
-  → Nej? → Kategori 3 (uverificeret salg)
+── Resultater ──────────────
+(samme 4 kategorier som nu)
 ```
 
-### 3. Tilføj fane i EconomicLayout
-Ny nav-item: `{ path: "/economic/sales-validation", label: "Salgsvalidering", icon: ShieldCheck }`
+### Excel-upload beholdes som sekundær option
+En lille "Eller upload Excel-fil" knap under tekstfelterne, som åbner den eksisterende upload-flow for dem der foretrækker det.
 
-### 4. Route + permissions
-Tilføj route i `config.tsx` med samme permission som revenue-match.
+## Fil
 
-## Filer der oprettes/ændres
-
-| Fil | Handling |
-|-----|----------|
-| `src/pages/economic/SalesValidation.tsx` | **Ny** — hovedkomponent med upload, mapping, matching, resultatvisning |
-| `src/pages/economic/EconomicLayout.tsx` | Tilføj nav-item |
-| `src/routes/config.tsx` | Tilføj route |
-| `src/routes/pages.ts` | Tilføj lazy import |
-| Migration | Ny tabel `sales_validation_uploads` |
-
-## Resultat
-- Du uploader kundens månedlige fil
-- Ser straks hvilke annulleringer der rammer en sælger
-- Ser hvilke annulleringer der ikke kan placeres
-- Ser hvilke af jeres salg der IKKE er bekræftet af kunden
-- Kan batch-godkende annulleringer og eksportere resultater
+| Fil | Ændring |
+|-----|---------|
+| `src/pages/economic/SalesValidation.tsx` | Tilføj textarea-baseret input som primært flow, behold Excel som alternativ |
 
