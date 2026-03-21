@@ -74,7 +74,8 @@ async function healAdversus(
   supabase: any,
   sales: any[],
   credentials: any,
-  log: (msg: string) => void
+  log: (msg: string) => void,
+  turboMode = false
 ): Promise<{ healed: number; failed: number; skipped: number }> {
   let healed = 0, failed = 0, skipped = 0;
 
