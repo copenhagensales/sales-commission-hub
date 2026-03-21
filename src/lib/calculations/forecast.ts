@@ -138,9 +138,9 @@ export function forecastEstablishedEmployee(emp: EmployeePerformance, teamChurnR
     plannedHours: emp.plannedHours,
     expectedSph: ewmaSph,
     attendanceFactor: emp.personalAttendanceFactor,
-    forecastSales: Math.round(expected - churnLoss),
-    forecastSalesLow: Math.round((expected - churnLoss) * LOW_FACTOR),
-    forecastSalesHigh: Math.round((expected - churnLoss) * HIGH_FACTOR),
+    forecastSales: Math.round(expected),
+    forecastSalesLow: Math.round(expected * LOW_FACTOR),
+    forecastSalesHigh: Math.round(expected * HIGH_FACTOR),
     churnProbability,
     churnLoss: Math.round(churnLoss),
   };
