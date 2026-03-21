@@ -274,6 +274,11 @@ export function useClientForecast(clientId: string, period: "current" | "next" =
         const cur = new Date(rangeStart);
         while (cur <= rangeEnd) {
           const dateStr = format(cur, "yyyy-MM-dd");
+          // Skip holidays — they are never working days
+          if (holidayDates.has(dateStr)) {
+            cur.setDate(cur.getDate() + 1);
+            continue;
+          }
           if (excludeAbsence && absenceDates.has(dateStr)) {
             cur.setDate(cur.getDate() + 1);
             continue;
