@@ -12,6 +12,11 @@ import { ForecastBreakdownTable } from "@/components/forecast/ForecastBreakdownT
 import { ForecastVsActualChart } from "@/components/forecast/ForecastVsActualChart";
 import { ForecastCohortManager } from "@/components/forecast/ForecastCohortManager";
 import { ForecastAssumptions } from "@/components/forecast/ForecastAssumptions";
+import { ForecastSummary } from "@/components/forecast/ForecastSummary";
+import { ForecastProgressBar } from "@/components/forecast/ForecastProgressBar";
+import { ForecastWaterfallChart } from "@/components/forecast/ForecastWaterfallChart";
+import { ForecastInsights } from "@/components/forecast/ForecastInsights";
+import { DataFreshnessBadge } from "@/components/ui/DataFreshnessBadge";
 import { DataFreshnessBadge } from "@/components/ui/DataFreshnessBadge";
 import { MOCK_RAMP_PROFILE, MOCK_SURVIVAL_PROFILE } from "@/lib/calculations/forecast";
 import { useClientForecast } from "@/hooks/useClientForecast";
