@@ -1,34 +1,32 @@
 
 
-# Fix: Medtag helligdage i forecast
+# Vis fuldt månedligt fraværstab i driveren
 
 ## Problem
-`countShifts()` i `useClientForecast.ts` ignorerer danske helligdage. I uge 14 (påske) tælles Skærtorsdag, Langfredag og 2. Påskedag som arbejdsdage, hvilket giver ~3 ekstra dages forecast per medarbejder — en betydelig overvurdering.
-
-`useEmployeeWorkingDays` hooket håndterer allerede helligdage korrekt — forecastet gør ikke.
+For indeværende måned beregnes fraværstabet kun for **resterende dage** (fra i morgen til månedens slutning), fordi `remainingPerformances` kun indeholder timer for resterende dage. Det giver et misvisende lavt tal — fx 14 tabte salg i stedet for det reelle helhedsbillede.
 
 ## Løsning
-Hent danske helligdage og filtrer dem fra i `countShifts()`.
+Beregn fraværstabet separat for **hele måneden** og brug det i driveren, mens forecast-beregningen stadig kun bruger resterende dage til at forudsige fremtidige salg.
 
 ### `src/hooks/useClientForecast.ts`
 
-1. **Importér `useDanishHolidays`** (eller hent direkte fra `danish_holidays`-tabellen i den eksisterende query)
-2. **Byg et `holidayDates: Set<string>`** fra helligdagene i forecast-perioden (inkl. EWMA-vinduet)
-3. **Tilføj holiday-check i `countShifts()`**:
-   ```
-   if (holidayDates.has(dateStr)) {
-     cur.setDate(cur.getDate() + 1);
-     continue;
-   }
-   ```
-   Placeres INDEN absence-checket og shift-hierarkiet. Helligdage tæller aldrig som vagter, uanset om der er individuelle vagter registreret.
+I current-period blokken (efter linje ~534):
 
-### Effekt
-- Uge 14 reduceres fra 5 → 2 arbejdsdage (3 helligdage fjernet)
-- EWMA SPH beregnes også korrekt (historiske uger med helligdage justeres)
-- Både gross og net shifts påvirkes korrekt
+1. Beregn et **full-month absence loss** ved at bruge de originale `employeePerformances` (hele måneden):
+   - `fullMonthKnownAbsenceLoss`: `(grossPlannedHours - plannedHours) × SPH` for hele måneden
+   - `fullMonthPredictedAbsenceLoss`: `plannedHours × (1 - attendanceFactor) × SPH` for hele måneden
+
+2. Erstat fraværs-driveren i `combinedForecast.drivers` med den fulde månedsberegning inkl. breakdown:
+   - "Planlagt fravær (ferie/fridage): X salg"
+   - "Forventet uforudset sygdom (~Y%): Z salg"
+   - "Total fraværseffekt hele måneden: W salg"
+
+3. Opdater `combinedForecast.absenceLoss` til det fulde tal.
+
+### Ingen ændringer i `forecast.ts`
+Selve `calculateFullForecast` forbliver uændret — den beregner korrekt for de data den får. Ændringen er i hooket, der overrider driveren med hele-måneds-data.
 
 | Fil | Ændring |
 |-----|---------|
-| `src/hooks/useClientForecast.ts` | Hent helligdage, tilføj holiday-filter i `countShifts()` |
+| `src/hooks/useClientForecast.ts` | Beregn full-month absence loss, erstat driver med breakdown |
 
