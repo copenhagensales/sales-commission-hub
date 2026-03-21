@@ -2247,6 +2247,140 @@ export type Database = {
           },
         ]
       }
+      client_forecast_cohorts: {
+        Row: {
+          client_campaign_id: string | null
+          client_id: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          note: string | null
+          planned_headcount: number
+          ramp_profile_id: string | null
+          start_date: string
+          survival_profile_id: string | null
+        }
+        Insert: {
+          client_campaign_id?: string | null
+          client_id: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          planned_headcount?: number
+          ramp_profile_id?: string | null
+          start_date: string
+          survival_profile_id?: string | null
+        }
+        Update: {
+          client_campaign_id?: string | null
+          client_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          planned_headcount?: number
+          ramp_profile_id?: string | null
+          start_date?: string
+          survival_profile_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_forecast_cohorts_client_campaign_id_fkey"
+            columns: ["client_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_forecast_cohorts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_forecast_cohorts_ramp_profile_id_fkey"
+            columns: ["ramp_profile_id"]
+            isOneToOne: false
+            referencedRelation: "forecast_ramp_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_forecast_cohorts_survival_profile_id_fkey"
+            columns: ["survival_profile_id"]
+            isOneToOne: false
+            referencedRelation: "forecast_survival_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_forecasts: {
+        Row: {
+          absence_loss: number | null
+          calculated_at: string | null
+          churn_loss: number | null
+          client_campaign_id: string | null
+          client_id: string
+          drivers_json: Json | null
+          forecast_heads: number | null
+          forecast_hours: number | null
+          forecast_sales_expected: number | null
+          forecast_sales_high: number | null
+          forecast_sales_low: number | null
+          id: string
+          period_end: string
+          period_start: string
+        }
+        Insert: {
+          absence_loss?: number | null
+          calculated_at?: string | null
+          churn_loss?: number | null
+          client_campaign_id?: string | null
+          client_id: string
+          drivers_json?: Json | null
+          forecast_heads?: number | null
+          forecast_hours?: number | null
+          forecast_sales_expected?: number | null
+          forecast_sales_high?: number | null
+          forecast_sales_low?: number | null
+          id?: string
+          period_end: string
+          period_start: string
+        }
+        Update: {
+          absence_loss?: number | null
+          calculated_at?: string | null
+          churn_loss?: number | null
+          client_campaign_id?: string | null
+          client_id?: string
+          drivers_json?: Json | null
+          forecast_heads?: number | null
+          forecast_hours?: number | null
+          forecast_sales_expected?: number | null
+          forecast_sales_high?: number | null
+          forecast_sales_low?: number | null
+          id?: string
+          period_end?: string
+          period_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_forecasts_client_campaign_id_fkey"
+            columns: ["client_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_forecasts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_monthly_goals: {
         Row: {
           client_id: string
@@ -5943,6 +6077,91 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      forecast_ramp_profiles: {
+        Row: {
+          client_campaign_id: string | null
+          created_at: string | null
+          day_1_7_factor: number | null
+          day_15_30_factor: number | null
+          day_31_60_factor: number | null
+          day_8_14_factor: number | null
+          id: string
+          name: string
+          steady_state_factor: number | null
+        }
+        Insert: {
+          client_campaign_id?: string | null
+          created_at?: string | null
+          day_1_7_factor?: number | null
+          day_15_30_factor?: number | null
+          day_31_60_factor?: number | null
+          day_8_14_factor?: number | null
+          id?: string
+          name: string
+          steady_state_factor?: number | null
+        }
+        Update: {
+          client_campaign_id?: string | null
+          created_at?: string | null
+          day_1_7_factor?: number | null
+          day_15_30_factor?: number | null
+          day_31_60_factor?: number | null
+          day_8_14_factor?: number | null
+          id?: string
+          name?: string
+          steady_state_factor?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forecast_ramp_profiles_client_campaign_id_fkey"
+            columns: ["client_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      forecast_survival_profiles: {
+        Row: {
+          client_campaign_id: string | null
+          created_at: string | null
+          id: string
+          name: string
+          survival_day_14: number | null
+          survival_day_30: number | null
+          survival_day_60: number | null
+          survival_day_7: number | null
+        }
+        Insert: {
+          client_campaign_id?: string | null
+          created_at?: string | null
+          id?: string
+          name: string
+          survival_day_14?: number | null
+          survival_day_30?: number | null
+          survival_day_60?: number | null
+          survival_day_7?: number | null
+        }
+        Update: {
+          client_campaign_id?: string | null
+          created_at?: string | null
+          id?: string
+          name?: string
+          survival_day_14?: number | null
+          survival_day_30?: number | null
+          survival_day_60?: number | null
+          survival_day_7?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forecast_survival_profiles_client_campaign_id_fkey"
+            columns: ["client_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       gdpr_consents: {
         Row: {
