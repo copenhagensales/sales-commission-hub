@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,7 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { ShieldCheck, AlertTriangle, CheckCircle2, XCircle, Download, Search, Upload } from "lucide-react";
+import { ShieldCheck, AlertTriangle, CheckCircle2, XCircle, Download, Search, Upload, Trash2 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { normalizePhoneNumber } from "@/lib/phone-utils";
 import { useCurrentEmployeeId } from "@/hooks/useOnboarding";
 import { useDropzone } from "react-dropzone";
@@ -732,8 +733,40 @@ export default function SalesValidation() {
                       <TableCell>{u.matched_cancellations}</TableCell>
                       <TableCell>{u.unmatched_cancellations}</TableCell>
                       <TableCell>{u.unverified_sales}</TableCell>
-                      <TableCell>
+                      <TableCell className="flex gap-1">
                         <Button size="sm" variant="ghost" onClick={() => loadPreviousResult(u)}>Vis</Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Slet validering?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Dette sletter valideringen fra {new Date(u.created_at).toLocaleDateString("da-DK")} permanent. Handlingen kan ikke fortrydes.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Annuller</AlertDialogCancel>
+                              <AlertDialogAction
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                onClick={async () => {
+                                  const { error } = await supabase.from("sales_validation_uploads").delete().eq("id", u.id);
+                                  if (error) {
+                                    toast.error("Kunne ikke slette valideringen");
+                                  } else {
+                                    toast.success("Validering slettet");
+                                    refetchUploads();
+                                  }
+                                }}
+                              >
+                                Slet
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </TableCell>
                     </TableRow>
                   ))}
