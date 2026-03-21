@@ -17,7 +17,6 @@ import { ForecastProgressBar } from "@/components/forecast/ForecastProgressBar";
 import { ForecastWaterfallChart } from "@/components/forecast/ForecastWaterfallChart";
 import { ForecastInsights } from "@/components/forecast/ForecastInsights";
 import { DataFreshnessBadge } from "@/components/ui/DataFreshnessBadge";
-import { DataFreshnessBadge } from "@/components/ui/DataFreshnessBadge";
 import { MOCK_RAMP_PROFILE, MOCK_SURVIVAL_PROFILE } from "@/lib/calculations/forecast";
 import { useClientForecast } from "@/hooks/useClientForecast";
 import { useForecastVsActual } from "@/hooks/useForecastVsActual";
