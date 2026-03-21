@@ -187,7 +187,14 @@ export function calculateFullForecast(
     ? employees.reduce((sum, e) => sum + e.personalAttendanceFactor, 0) / employees.length
     : 0.92;
   
-  const absenceLoss = totalExpected * (1 - avgAttendance);
+  // Absence loss = lost sales from known absences (vacation, sick, no-show)
+  // Calculated as (gross hours - net hours) × individual SPH
+  const absenceLoss = employeeResults.reduce((sum, empResult, i) => {
+    const emp = employees[i];
+    const lostHours = (emp.grossPlannedHours || emp.plannedHours) - emp.plannedHours;
+    return sum + lostHours * empResult.expectedSph;
+  }, 0);
+  
   const churnLoss = cohortResults.reduce((sum, c) => 
     sum + (c.plannedHeadcount - c.effectiveHeads) * (c.forecastSales / Math.max(c.effectiveHeads, 0.1)), 0
   );
@@ -211,15 +218,15 @@ export function calculateFullForecast(
       label: 'Lav fremmøde',
       impact: 'negative',
       value: `${Math.round(avgAttendance * 100)}%`,
-      description: `Gennemsnitlig fremmøde er ${Math.round(avgAttendance * 100)}%, hvilket reducerer effektive timer.`,
+      description: `Gennemsnitlig fremmøde er ${Math.round(avgAttendance * 100)}%. Fravær (ferie, sygdom) koster ~${Math.round(absenceLoss)} salg.`,
     });
   } else {
     drivers.push({
       key: 'attendance',
-      label: 'Fremmødefaktor',
-      impact: 'neutral',
-      value: `${Math.round(avgAttendance * 100)}%`,
-      description: `Gennemsnitlig fremmøde er ${Math.round(avgAttendance * 100)}%.`,
+      label: 'Fraværseffekt',
+      impact: absenceLoss > 20 ? 'negative' : 'neutral',
+      value: `-${Math.round(absenceLoss)} salg`,
+      description: `Gennemsnitlig fremmøde er ${Math.round(avgAttendance * 100)}%. Planlagt fravær (ferie, sygdom) koster ~${Math.round(absenceLoss)} salg.`,
     });
   }
   
@@ -299,17 +306,22 @@ export function generateMockEmployees(): EmployeePerformance[] {
     'Christian T.', 'Mathilde A.',
   ];
   
-  return names.map((name, i) => ({
+  return names.map((name, i) => {
+    const plannedHours = 140 + Math.floor(Math.random() * 40);
+    const grossPlannedHours = plannedHours + Math.floor(Math.random() * 20);
+    return {
     employeeId: `emp-${i}`,
     employeeName: name,
     teamName: i < 6 ? 'Team Alpha' : 'Team Beta',
     avatarUrl: null,
     weeklySalesPerHour: Array.from({ length: 8 }, () => 0.3 + Math.random() * 0.6),
-    plannedHours: 140 + Math.floor(Math.random() * 40),
+    grossPlannedHours,
+    plannedHours,
     personalAttendanceFactor: 0.88 + Math.random() * 0.10,
     isEstablished: true,
     daysSinceStart: 90 + Math.floor(Math.random() * 300),
-  }));
+  };
+  });
 }
 
 export function generateMockCohorts(): CohortForecastInput[] {
