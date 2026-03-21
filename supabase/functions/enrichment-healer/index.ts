@@ -361,7 +361,7 @@ serve(async (req) => {
       if (creds.integration.provider === "adversus") {
         result = await healAdversus(supabase, sales, creds.credentials, log, turboMode);
       } else if (creds.integration.provider === "enreach") {
-        result = await healEnreach(supabase, sales, creds.credentials, creds.integration, log);
+        result = await healEnreach(supabase, sales, creds.credentials, creds.integration, log, turboMode);
       } else {
         log(`Unknown provider "${creds.integration.provider}" for source "${source}", skipping`);
         totalSkipped += sales.length;
