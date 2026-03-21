@@ -303,7 +303,7 @@ serve(async (req) => {
       salesQuery = salesQuery.eq("adversus_external_id", saleExternalId);
     } else {
       salesQuery = salesQuery
-        .in("enrichment_status", ["pending", "failed"])
+        .or("enrichment_status.in.(pending,failed),and(enrichment_status.eq.complete,or(customer_phone.is.null,customer_phone.eq.))")
         .lt("enrichment_attempts", 5);
     }
 
