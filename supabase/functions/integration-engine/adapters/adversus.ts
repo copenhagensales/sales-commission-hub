@@ -619,7 +619,8 @@ export class AdversusAdapter implements DialerAdapter {
           }
         }
 
-        leadIdToData.set(leadId, { opp, resultData, resultFields });
+        const phone = leadData.phone || leadData.contactPhone || leadData.mobile || null;
+        leadIdToData.set(leadId, { opp, resultData, resultFields, phone });
         fetchSuccess++;
       }
 
