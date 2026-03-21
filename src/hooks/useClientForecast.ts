@@ -313,7 +313,9 @@ export function useClientForecast(clientId: string) {
           weeklySph.push(sph);
         }
 
-        // Planned hours for forecast month
+        // Planned hours for forecast month (gross = full capacity, net = minus absences)
+        const grossShifts = countShifts(emp.id, forecastStart, forecastEnd, false);
+        const grossPlannedHours = grossShifts * HOURS_PER_SHIFT;
         const forecastShifts = countShifts(emp.id, forecastStart, forecastEnd, true);
         const plannedHours = forecastShifts * HOURS_PER_SHIFT;
 
