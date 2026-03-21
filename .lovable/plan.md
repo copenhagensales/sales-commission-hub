@@ -1,26 +1,31 @@
 
 
-# Vis faktiske + forventede salg per medarbejder i breakdown
+# Adskil churn fra individuelle forecasts
 
 ## Problem
-For indeværende måned viser breakdown-tabellen kun forecast for resterende dage (fx Hans = 39), men hans faktiske salg (102) er gemt i totalen. Det er forvirrende — man tror Hans kun laver 39 salg hele måneden.
+Churn trækkes fra **hver medarbejders** forecast (linje 141: `expected - churnLoss`). Det gør at William, der måske har 45% churn-risiko, kun viser 1 salg — selvom hans reelle forventede produktion er højere. Churn er en statistisk risiko på holdniveau, ikke en individuel nedjustering.
 
 ## Løsning
-Tilføj en "Faktiske salg" kolonne i breakdown-tabellen for indeværende måned, plus en "Total" kolonne.
+Vis **fuld forecast per medarbejder** (uden churn-fradrag). Churn trækkes kun fra **totalen** som en samlet risiko-justering.
 
-### Ændringer
+### `src/lib/calculations/forecast.ts`
 
-**`src/hooks/useClientForecast.ts`**
-- For `period === "current"`: beregn faktiske salg **per medarbejder** (ikke kun samlet total)
-- Tilføj `actualSales` til hvert `EmployeeForecastResult` objekt via en ny map
+**`forecastEstablishedEmployee`**: Beregn `forecastSales = expected` (uden `- churnLoss`). Behold `churnProbability` og `churnLoss` som informationsfelter, men lad dem ikke reducere individuelle tal.
 
-**`src/types/forecast.ts`**
-- Tilføj `actualSales?: number` til `EmployeeForecastResult`
+```
+forecastSales: Math.round(expected),          // FØR: expected - churnLoss
+forecastSalesLow: Math.round(expected * LOW_FACTOR),
+forecastSalesHigh: Math.round(expected * HIGH_FACTOR),
+```
 
-**`src/components/forecast/ForecastBreakdownTable.tsx`**
-- For indeværende måned: vis kolonnerne "Faktiske salg", "Forventet rest", "Total"
-- Total = actualSales + forecastSales
+**`calculateFullForecast`**: `totalEstablishedChurnLoss` beregnes stadig som summen af alle individuelle `churnLoss` — men trækkes kun fra **totalen**, ikke per person.
 
-### Datahentning
-Faktiske salg per medarbejder hentes allerede — vi skal bare gruppere `actualSalesData` per agent_email og mappe tilbage til employee via `employee_agent_mapping`.
+### UI-effekt (automatisk)
+- William viser fx 18 salg (hans reelle kapacitet) i stedet for 1
+- Totalen viser: "Forventet: 1.250 — heraf churn-risiko: -85 salg"
+- Drivers-panelet viser stadig "Etableret churn: -X salg" som samlet justering
+
+| Fil | Ændring |
+|-----|---------|
+| `src/lib/calculations/forecast.ts` | Fjern `- churnLoss` fra individuel forecast, behold på total-niveau |
 
