@@ -110,7 +110,7 @@ export default function SalesValidation() {
         .select("id")
         .eq("client_id", clientId);
       const campaignIds = (campaigns || []).map((c) => c.id);
-      if (campaignIds.length === 0) return { totalSales: 0, totalRevenue: 0, totalCommission: 0 };
+      if (campaignIds.length === 0) return { totalSales: 0, totalRevenue: 0, totalCommission: 0, withPhone: 0, withoutPhone: 0 };
 
       const { data } = await supabase
         .from("sale_items")
@@ -121,10 +121,35 @@ export default function SalesValidation() {
         .neq("sales.validation_status", "rejected");
 
       const items = data || [];
+
+      // Count sales with/without phone
+      const { count: totalSalesCount } = await supabase
+        .from("sales")
+        .select("id", { count: "exact", head: true })
+        .in("client_campaign_id", campaignIds)
+        .gte("sale_datetime", startDate)
+        .lt("sale_datetime", endDate)
+        .neq("validation_status", "rejected");
+
+      const { count: withPhoneCount } = await supabase
+        .from("sales")
+        .select("id", { count: "exact", head: true })
+        .in("client_campaign_id", campaignIds)
+        .gte("sale_datetime", startDate)
+        .lt("sale_datetime", endDate)
+        .neq("validation_status", "rejected")
+        .not("customer_phone", "is", null)
+        .neq("customer_phone", "");
+
+      const withPhone = withPhoneCount || 0;
+      const withoutPhone = (totalSalesCount || 0) - withPhone;
+
       return {
         totalSales: items.reduce((sum, i) => sum + (i.quantity || 1), 0),
         totalRevenue: items.reduce((sum, i) => sum + (i.mapped_revenue || 0), 0),
         totalCommission: items.reduce((sum, i) => sum + (i.mapped_commission || 0), 0),
+        withPhone,
+        withoutPhone,
       };
     },
     enabled: !!clientId && !!periodMonth,
