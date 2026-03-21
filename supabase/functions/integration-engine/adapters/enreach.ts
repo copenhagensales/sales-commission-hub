@@ -768,7 +768,11 @@ export class EnreachAdapter implements DialerAdapter {
         customerName = this.getStr(dataObj, ["Navn", "Name", "Company", "Firma"]);
       }
 
-      customerPhone = this.getStr(dataObj, ["Telefon1", "Telefon", "Phone", "Mobile"]);
+      customerPhone = this.getStr(dataObj, [
+        "Telefon1", "Telefon", "Phone", "Mobile",
+        "contact_number", "SUBSCRIBER_ID", "Telefon Abo1",
+        "phoneNumber", "PhoneNumber", "Mobilnummer"
+      ]);
     }
 
     const products = this.extractProducts(lead, dataObj, campaignId, campaignCode);
