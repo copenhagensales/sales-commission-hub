@@ -1,29 +1,31 @@
 
 
-# Fix: Undtagelse kun for faktura 940
+# Fix: Kreditnotaer (positive beløb) skal modregnes i faktureret omsætning
 
 ## Problem
-Den nuværende logik trækker altid 1 måned fra alle fakturadatoer. Faktura 940 (ASE, 395.900 DKK, dato 2026-01-31) skal **ikke** have trukket en måned fra — den tilhører januar.
+Linje 281 i `EconomicRevenueMatch.tsx` bruger `Math.abs(p.beloeb_dkk)` til at summere faktureret omsætning. Det betyder at kreditnota 960 (+135.625 DKK) tælles som positiv omsætning i stedet for at blive trukket fra.
+
+**Faktura 956**: -135.625 → `abs` = 135.625 (korrekt)
+**Faktura 960**: +135.625 → `abs` = 135.625 (FORKERT — det er en kreditnota, skal trækkes fra)
+**Faktura 961**: -131.600 → `abs` = 131.600 (korrekt)
+
+**Nu**: 135.625 + 135.625 + 131.600 = **402.850**
+**Korrekt**: 135.625 - 135.625 + 131.600 = **131.600**
 
 ## Løsning
-Tilføj en simpel undtagelse: hvis `faktura_nr` er `"940"`, spring -1 måned over.
+Omsætningsposteringer på konto 1010 er negative (kredit = indtægt). Kreditnotaer er positive. Så den korrekte beregning er at bruge `-p.beloeb_dkk` (vend fortegn) i stedet for `Math.abs()`. Det giver:
+- Normal faktura (-135.625) → +135.625
+- Kreditnota (+135.625) → -135.625
 
 ## Ændring
 
-| Fil | Hvad |
-|-----|------|
-| `src/pages/economic/EconomicRevenueMatch.tsx` (linje ~89-93) | Tilføj check: kun -1 måned hvis faktura_nr !== "940" |
+| Fil | Linje | Hvad |
+|-----|-------|------|
+| `src/pages/economic/EconomicRevenueMatch.tsx` | 281 | Erstat `Math.abs(p.beloeb_dkk)` med `-p.beloeb_dkk` (eller `p.beloeb_dkk * -1`) |
 
-**Logik:**
-```typescript
-const d = new Date(r.dato + "T00:00:00");
-if (String(r.faktura_nr) !== "940") {
-  d.setMonth(d.getMonth() - 1);
-}
-const adjustedMonth = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
-```
+Same fix skal også tjekkes i umappede-beregningen (linje ~640) og match-preview (linje ~247) hvor `Math.abs` bruges.
 
 ## Resultat
-- Faktura 940 → **januar 2026** ✓
-- Alle andre fakturaer → forrige måned som hidtil ✓
+- Business DK februar: **131.600 kr** (korrekt)
+- Kreditnotaer modregnes automatisk overalt
 
