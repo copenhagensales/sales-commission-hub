@@ -484,7 +484,7 @@ export class AdversusAdapter implements DialerAdapter {
         agentEmail,
         agentName,
         customerName: s.lead?.company || s.lead?.name || "",
-        customerPhone: s.lead?.phone || "",
+        customerPhone: s.lead?.phone || leadData?.phone || "",
         campaignId,
         campaignName: s.campaign?.name || undefined,
         externalReference,
