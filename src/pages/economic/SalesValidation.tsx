@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { ShieldCheck, AlertTriangle, CheckCircle2, XCircle, Download, Search, Upload, Trash2, TrendingUp, Package, DollarSign, Ban } from "lucide-react";
+import { ShieldCheck, AlertTriangle, CheckCircle2, XCircle, Download, Search, Upload, Trash2, TrendingUp, Package, DollarSign, Ban, PhoneOff, BarChart3 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { normalizePhoneNumber } from "@/lib/phone-utils";
 import { useCurrentEmployeeId } from "@/hooks/useOnboarding";
@@ -110,7 +110,7 @@ export default function SalesValidation() {
         .select("id")
         .eq("client_id", clientId);
       const campaignIds = (campaigns || []).map((c) => c.id);
-      if (campaignIds.length === 0) return { totalSales: 0, totalRevenue: 0, totalCommission: 0 };
+      if (campaignIds.length === 0) return { totalSales: 0, totalRevenue: 0, totalCommission: 0, withPhone: 0, withoutPhone: 0 };
 
       const { data } = await supabase
         .from("sale_items")
@@ -121,10 +121,35 @@ export default function SalesValidation() {
         .neq("sales.validation_status", "rejected");
 
       const items = data || [];
+
+      // Count sales with/without phone
+      const { count: totalSalesCount } = await supabase
+        .from("sales")
+        .select("id", { count: "exact", head: true })
+        .in("client_campaign_id", campaignIds)
+        .gte("sale_datetime", startDate)
+        .lt("sale_datetime", endDate)
+        .neq("validation_status", "rejected");
+
+      const { count: withPhoneCount } = await supabase
+        .from("sales")
+        .select("id", { count: "exact", head: true })
+        .in("client_campaign_id", campaignIds)
+        .gte("sale_datetime", startDate)
+        .lt("sale_datetime", endDate)
+        .neq("validation_status", "rejected")
+        .not("customer_phone", "is", null)
+        .neq("customer_phone", "");
+
+      const withPhone = withPhoneCount || 0;
+      const withoutPhone = (totalSalesCount || 0) - withPhone;
+
       return {
         totalSales: items.reduce((sum, i) => sum + (i.quantity || 1), 0),
         totalRevenue: items.reduce((sum, i) => sum + (i.mapped_revenue || 0), 0),
         totalCommission: items.reduce((sum, i) => sum + (i.mapped_commission || 0), 0),
+        withPhone,
+        withoutPhone,
       };
     },
     enabled: !!clientId && !!periodMonth,
@@ -453,7 +478,7 @@ export default function SalesValidation() {
 
         {/* KPI Cards */}
         {clientId && (
-          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3">
             {/* Always visible: base stats */}
             <Card className="p-4">
               <div className="flex items-center gap-2 mb-1">
@@ -461,6 +486,11 @@ export default function SalesValidation() {
                 <span className="text-xs font-medium text-muted-foreground">Registrerede salg</span>
               </div>
               <p className="text-2xl font-bold">{salesStats?.totalSales?.toLocaleString("da-DK") ?? "–"}</p>
+              {salesStats && salesStats.withPhone > 0 && (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {salesStats.withPhone} m/tlf · {salesStats.withoutPhone} uden
+                </p>
+              )}
             </Card>
             <Card className="p-4">
               <div className="flex items-center gap-2 mb-1">
@@ -475,6 +505,14 @@ export default function SalesValidation() {
                 <span className="text-xs font-medium text-muted-foreground">Provision</span>
               </div>
               <p className="text-2xl font-bold">{salesStats ? `${Math.round(salesStats.totalCommission).toLocaleString("da-DK")} kr` : "–"}</p>
+            </Card>
+            <Card className="p-4 border-amber-200 dark:border-amber-800">
+              <div className="flex items-center gap-2 mb-1">
+                <PhoneOff className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                <span className="text-xs font-medium text-muted-foreground">Uden telefonnr.</span>
+              </div>
+              <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{salesStats?.withoutPhone?.toLocaleString("da-DK") ?? "–"}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Kan ikke auto-valideres</p>
             </Card>
 
             {/* Post-validation stats */}
