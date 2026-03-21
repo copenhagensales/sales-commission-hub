@@ -187,7 +187,14 @@ export function calculateFullForecast(
     ? employees.reduce((sum, e) => sum + e.personalAttendanceFactor, 0) / employees.length
     : 0.92;
   
-  const absenceLoss = totalExpected * (1 - avgAttendance);
+  // Absence loss = lost sales from known absences (vacation, sick, no-show)
+  // Calculated as (gross hours - net hours) × individual SPH
+  const absenceLoss = employeeResults.reduce((sum, empResult, i) => {
+    const emp = employees[i];
+    const lostHours = (emp.grossPlannedHours || emp.plannedHours) - emp.plannedHours;
+    return sum + lostHours * empResult.expectedSph;
+  }, 0);
+  
   const churnLoss = cohortResults.reduce((sum, c) => 
     sum + (c.plannedHeadcount - c.effectiveHeads) * (c.forecastSales / Math.max(c.effectiveHeads, 0.1)), 0
   );
