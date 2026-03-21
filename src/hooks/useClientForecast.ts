@@ -460,6 +460,7 @@ function emptyForecast(periodStart: string, periodEnd: string, clientId: string)
     totalHeads: 0,
     churnLoss: 0,
     absenceLoss: 0,
+    establishedChurnLoss: 0,
     establishedEmployees: [],
     cohorts: [],
     drivers: [],
