@@ -306,13 +306,17 @@ export function generateMockEmployees(): EmployeePerformance[] {
     'Christian T.', 'Mathilde A.',
   ];
   
-  return names.map((name, i) => ({
+  return names.map((name, i) => {
+    const plannedHours = 140 + Math.floor(Math.random() * 40);
+    const grossPlannedHours = plannedHours + Math.floor(Math.random() * 20);
+    return {
     employeeId: `emp-${i}`,
     employeeName: name,
     teamName: i < 6 ? 'Team Alpha' : 'Team Beta',
     avatarUrl: null,
     weeklySalesPerHour: Array.from({ length: 8 }, () => 0.3 + Math.random() * 0.6),
-    plannedHours: 140 + Math.floor(Math.random() * 40),
+    grossPlannedHours,
+    plannedHours,
     personalAttendanceFactor: 0.88 + Math.random() * 0.10,
     isEstablished: true,
     daysSinceStart: 90 + Math.floor(Math.random() * 300),
