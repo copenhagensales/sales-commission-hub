@@ -516,7 +516,7 @@ export default function EconomicRevenueMatch() {
                     <TableBody>
                       {mappings.map((m: any) => {
                         const hitCount = posteringer
-                          ? posteringer.filter(p => p.tekst && p.tekst.toLowerCase().includes(m.match_pattern.toLowerCase())).length
+                          ? posteringer.filter(p => p.tekst && wordsMatch(p.tekst, m.match_pattern)).length
                           : 0;
                         return (
                           <TableRow key={m.id}>
