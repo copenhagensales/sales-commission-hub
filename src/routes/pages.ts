@@ -202,3 +202,4 @@ export const AmoAuditLog = lazyPage(() => import("@/pages/amo/AmoAuditLog"));
 export const AmoSettings = lazyPage(() => import("@/pages/amo/AmoSettings"));
 
 export const CustomerInquiries = lazyPage(() => import("@/pages/CustomerInquiries"));
+export const Forecast = lazyPage(() => import("@/pages/Forecast"));
