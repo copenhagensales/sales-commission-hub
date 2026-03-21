@@ -173,6 +173,7 @@ export const EconomicExpenses = lazyPage(() => import("@/pages/economic/Economic
 export const EconomicPosteringer = lazyPage(() => import("@/pages/economic/EconomicPosteringer"));
 export const EconomicBudget = lazyPage(() => import("@/pages/economic/EconomicBudget"));
 export const EconomicMapping = lazyPage(() => import("@/pages/economic/EconomicMapping"));
+export const EconomicRevenueMatch = lazyPage(() => import("@/pages/economic/EconomicRevenueMatch"));
 
 export const ImmediatePaymentASE = lazyPage(() => import("@/pages/ImmediatePaymentASE"));
 
