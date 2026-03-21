@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { ShieldCheck, AlertTriangle, CheckCircle2, XCircle, Download, Search, Upload, Trash2 } from "lucide-react";
+import { ShieldCheck, AlertTriangle, CheckCircle2, XCircle, Download, Search, Upload, Trash2, TrendingUp, Package, DollarSign, Ban } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { normalizePhoneNumber } from "@/lib/phone-utils";
 import { useCurrentEmployeeId } from "@/hooks/useOnboarding";
@@ -91,6 +91,43 @@ export default function SalesValidation() {
       return data || [];
     },
     enabled: !!clientId,
+  });
+
+  // Aggregated sales stats for selected client + period
+  const { data: salesStats } = useQuery({
+    queryKey: ["sales-validation-stats", clientId, periodMonth],
+    queryFn: async () => {
+      const [yearStr, monthStr] = periodMonth.split("-");
+      const startDate = `${yearStr}-${monthStr}-01`;
+      const endMonth = parseInt(monthStr);
+      const endYear = parseInt(yearStr);
+      const nextMonth = endMonth === 12 ? 1 : endMonth + 1;
+      const nextYear = endMonth === 12 ? endYear + 1 : endYear;
+      const endDate = `${nextYear}-${String(nextMonth).padStart(2, "0")}-01`;
+
+      const { data: campaigns } = await supabase
+        .from("client_campaigns")
+        .select("id")
+        .eq("client_id", clientId);
+      const campaignIds = (campaigns || []).map((c) => c.id);
+      if (campaignIds.length === 0) return { totalSales: 0, totalRevenue: 0, totalCommission: 0 };
+
+      const { data } = await supabase
+        .from("sale_items")
+        .select("quantity, mapped_revenue, mapped_commission, sale_id, sales!inner(sale_datetime, client_campaign_id, validation_status)")
+        .in("sales.client_campaign_id", campaignIds)
+        .gte("sales.sale_datetime", startDate)
+        .lt("sales.sale_datetime", endDate)
+        .neq("sales.validation_status", "rejected");
+
+      const items = data || [];
+      return {
+        totalSales: items.reduce((sum, i) => sum + (i.quantity || 1), 0),
+        totalRevenue: items.reduce((sum, i) => sum + (i.mapped_revenue || 0), 0),
+        totalCommission: items.reduce((sum, i) => sum + (i.mapped_commission || 0), 0),
+      };
+    },
+    enabled: !!clientId && !!periodMonth,
   });
 
   const monthOptions = useMemo(() => {
@@ -411,6 +448,66 @@ export default function SalesValidation() {
             </Select>
           </div>
         </div>
+
+        {/* KPI Cards */}
+        {clientId && (
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+            {/* Always visible: base stats */}
+            <Card className="p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <Package className="h-4 w-4 text-primary" />
+                <span className="text-xs font-medium text-muted-foreground">Registrerede salg</span>
+              </div>
+              <p className="text-2xl font-bold">{salesStats?.totalSales?.toLocaleString("da-DK") ?? "–"}</p>
+            </Card>
+            <Card className="p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <DollarSign className="h-4 w-4 text-primary" />
+                <span className="text-xs font-medium text-muted-foreground">Omsætning</span>
+              </div>
+              <p className="text-2xl font-bold">{salesStats ? `${Math.round(salesStats.totalRevenue).toLocaleString("da-DK")} kr` : "–"}</p>
+            </Card>
+            <Card className="p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <TrendingUp className="h-4 w-4 text-primary" />
+                <span className="text-xs font-medium text-muted-foreground">Provision</span>
+              </div>
+              <p className="text-2xl font-bold">{salesStats ? `${Math.round(salesStats.totalCommission).toLocaleString("da-DK")} kr` : "–"}</p>
+            </Card>
+
+            {/* Post-validation stats */}
+            {results && (
+              <>
+                <Card className="p-4 border-green-200 dark:border-green-800">
+                  <div className="flex items-center gap-2 mb-1">
+                    <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                    <span className="text-xs font-medium text-muted-foreground">Verificerede</span>
+                  </div>
+                  <p className="text-2xl font-bold text-green-600 dark:text-green-400">{verifiedSales.length}</p>
+                </Card>
+                <Card className="p-4 border-orange-200 dark:border-orange-800">
+                  <div className="flex items-center gap-2 mb-1">
+                    <AlertTriangle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                    <span className="text-xs font-medium text-muted-foreground">Uverificerede</span>
+                  </div>
+                  <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{unverifiedSales.length}</p>
+                </Card>
+                <Card className="p-4 border-destructive/30">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Ban className="h-4 w-4 text-destructive" />
+                    <span className="text-xs font-medium text-muted-foreground">Annulleringer</span>
+                  </div>
+                  <p className="text-2xl font-bold text-destructive">
+                    {matchedCancellations.length + unmatchedCancellations.length}
+                    <span className="text-sm font-normal text-muted-foreground ml-1">
+                      ({matchedCancellations.length} matchet)
+                    </span>
+                  </p>
+                </Card>
+              </>
+            )}
+          </div>
+        )}
 
         {/* Textarea input */}
         {clientId && (
