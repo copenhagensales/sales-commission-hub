@@ -565,7 +565,50 @@ export function useClientForecast(clientId: string, period: "current" | "next" =
           daysRemaining,
         };
         
-        // Add actual sales driver
+        // Calculate full-month absence loss for drivers
+        let fullMonthKnownAbsenceLoss = 0;
+        let fullMonthPredictedAbsenceLoss = 0;
+        let avgAttendancePct = 0;
+        let attendanceCount = 0;
+        
+        for (const ep of employeePerformances) {
+          const ewmaSph = ep.weeklySalesPerHour.length > 0
+            ? ep.weeklySalesPerHour.reduce((s, v, i) => {
+                const w = Math.pow(0.85, i);
+                return { sum: s.sum + v * w, wt: s.wt + w };
+              }, { sum: 0, wt: 0 })
+            : { sum: 0, wt: 1 };
+          const sph = ewmaSph.sum / ewmaSph.wt;
+          
+          const knownLostHours = ep.grossPlannedHours - ep.plannedHours;
+          fullMonthKnownAbsenceLoss += knownLostHours * sph;
+          
+          const predictedLostHours = ep.plannedHours * (1 - ep.personalAttendanceFactor);
+          fullMonthPredictedAbsenceLoss += predictedLostHours * sph;
+          
+          avgAttendancePct += ep.personalAttendanceFactor;
+          attendanceCount++;
+        }
+        
+        fullMonthKnownAbsenceLoss = Math.round(fullMonthKnownAbsenceLoss);
+        fullMonthPredictedAbsenceLoss = Math.round(fullMonthPredictedAbsenceLoss);
+        const totalAbsenceLoss = fullMonthKnownAbsenceLoss + fullMonthPredictedAbsenceLoss;
+        const avgAtt = attendanceCount > 0 ? Math.round((avgAttendancePct / attendanceCount) * 100) : 95;
+        
+        combinedForecast.absenceLoss = totalAbsenceLoss;
+        
+        // Build drivers with full-month absence breakdown
+        const absenceDriver = {
+          key: 'absence_loss',
+          label: 'Fraværseffekt (hele måneden)',
+          impact: 'negative' as const,
+          value: `-${totalAbsenceLoss} salg`,
+          description: `Planlagt fravær (ferie/fridage): -${fullMonthKnownAbsenceLoss} salg. Forventet uforudset sygdom (~${100 - avgAtt}%): -${fullMonthPredictedAbsenceLoss} salg. Total fraværseffekt: -${totalAbsenceLoss} salg.`,
+        };
+        
+        // Replace existing absence driver with full-month version
+        const driversWithoutAbsence = remainingForecast.drivers.filter(d => d.key !== 'absence_loss');
+        
         combinedForecast.drivers = [
           {
             key: 'actual_sales',
@@ -574,7 +617,8 @@ export function useClientForecast(clientId: string, period: "current" | "next" =
             value: `${actualSalesToDate} salg`,
             description: `${actualSalesToDate} salg registreret i de første ${daysElapsed} arbejdsdage. ${daysRemaining} arbejdsdage tilbage.`,
           },
-          ...remainingForecast.drivers,
+          absenceDriver,
+          ...driversWithoutAbsence,
         ];
         
         return {
