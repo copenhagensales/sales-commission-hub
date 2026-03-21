@@ -85,10 +85,13 @@ function useRevenuePosteringer(year: number) {
         .lte("dato", `${year}-12-31`)
         .order("dato", { ascending: false });
       if (error) throw error;
-      return (data || []).map((r) => ({
-        ...r,
-        maaned: r.dato ? r.dato.substring(0, 7) : "",
-      })) as Postering[];
+      // Faktura for fx januar sendes d. 1/2 — tilhører foregående måned
+      return (data || []).map((r) => {
+        const d = new Date(r.dato + "T00:00:00");
+        d.setMonth(d.getMonth() - 1);
+        const adjustedMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        return { ...r, maaned: adjustedMonth };
+      }) as Postering[];
     },
   });
 }
