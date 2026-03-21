@@ -270,6 +270,7 @@ export default function EconomicRevenueMatch() {
     if (!posteringer || !systemRevenue || !mappings) return [];
     const clientMap = new Map((clients || []).map(c => [c.id, c.name]));
     const invoicedByClientMonth: Record<string, Record<string, number>> = {};
+    const invoicesByClientMonth: Record<string, Record<string, Set<string>>> = {};
 
     posteringer.forEach(p => {
       if (!p.tekst) return;
@@ -279,6 +280,9 @@ export default function EconomicRevenueMatch() {
       const cid = match.mapping.client_id;
       if (!invoicedByClientMonth[cid]) invoicedByClientMonth[cid] = {};
       invoicedByClientMonth[cid][month] = (invoicedByClientMonth[cid][month] || 0) + (-p.beloeb_dkk);
+      if (!invoicesByClientMonth[cid]) invoicesByClientMonth[cid] = {};
+      if (!invoicesByClientMonth[cid][month]) invoicesByClientMonth[cid][month] = new Set();
+      if (p.faktura_nr) invoicesByClientMonth[cid][month].add(String(p.faktura_nr));
     });
 
     const allClientIds = new Set<string>([
