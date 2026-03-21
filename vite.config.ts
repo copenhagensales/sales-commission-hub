@@ -32,7 +32,7 @@ export default defineConfig(({ mode }) => ({
             '@tiptap/extension-text-align',
             '@tiptap/extension-underline',
           ],
-          'vendor-xlsx': ['xlsx'],
+          'vendor-xlsx': ['exceljs'],
           'vendor-dnd': ['@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities'],
         },
       },

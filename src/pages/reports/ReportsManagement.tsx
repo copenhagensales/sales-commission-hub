@@ -182,9 +182,8 @@ export default function ReportsManagement() {
     totalRow["Revenue (DKK)"] = Math.round(totals.revenue);
     summaryRows.push(totalRow);
 
-    const wsSummary = XLSX.utils.json_to_sheet(summaryRows);
     const colCount = 2 + productNames.length + 2;
-    wsSummary["!cols"] = Array.from({ length: colCount }, (_, i) => ({ wch: i === 0 ? 30 : 14 }));
+    const summaryWidths = Array.from({ length: colCount }, (_, i) => (i === 0 ? 30 : 14));
 
     const rawRows = (rawSalesData ?? []).map((r) => ({
       Dato: r.sale_datetime ? new Date(r.sale_datetime).toLocaleString("da-DK") : "",
@@ -199,17 +198,13 @@ export default function ReportsManagement() {
       Reference: r.internal_reference ?? "",
     }));
 
-    const wsRaw = XLSX.utils.json_to_sheet(rawRows);
-    wsRaw["!cols"] = [
-      { wch: 20 }, { wch: 25 }, { wch: 20 }, { wch: 8 },
-      { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 20 },
-      { wch: 12 }, { wch: 18 },
-    ];
-
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, wsSummary, "Opsummering");
-    XLSX.utils.book_append_sheet(wb, wsRaw, "Rådata");
-    XLSX.writeFile(wb, `${clientLabel.toLowerCase().replace(/\s+/g, "-")}-salg-${periodLabel}.xlsx`);
+    await downloadExcel(
+      `${clientLabel.toLowerCase().replace(/\s+/g, "-")}-salg-${periodLabel}.xlsx`,
+      [
+        { name: "Opsummering", rows: summaryRows, columnWidths: summaryWidths },
+        { name: "Rådata", rows: rawRows, columnWidths: [20, 25, 20, 8, 14, 14, 14, 20, 12, 18] },
+      ]
+    );
   };
 
   return (

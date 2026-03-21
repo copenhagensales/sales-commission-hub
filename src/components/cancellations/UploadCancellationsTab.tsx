@@ -92,13 +92,10 @@ export function UploadCancellationsTab() {
     setFile(uploadedFile);
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
-        const data = e.target?.result;
-        const workbook = XLSX.read(data, { type: "binary" });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" }) as Record<string, unknown>[];
+        const buffer = e.target?.result as ArrayBuffer;
+        const { rows: jsonData, columns: cols } = await parseExcelFile(buffer, { defval: "" });
 
         if (jsonData.length === 0) {
           toast({
@@ -109,7 +106,6 @@ export function UploadCancellationsTab() {
           return;
         }
 
-        const cols = Object.keys(jsonData[0]);
         setColumns(cols);
         setParsedData(jsonData.map(row => ({ originalRow: row })));
         setStep("mapping");

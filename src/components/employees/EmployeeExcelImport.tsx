@@ -88,23 +88,18 @@ export function EmployeeExcelImport() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const parseExcelFile = (file: File) => {
+  const handleParseExcel = (file: File) => {
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: "array" });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet);
+        const buffer = e.target?.result as ArrayBuffer;
+        const { rows: jsonData, columns: cols } = await parseExcelFile(buffer);
 
         if (jsonData.length === 0) {
           toast({ title: "Tom fil", description: "Excel-filen indeholder ingen data", variant: "destructive" });
           return;
         }
 
-        // Extract column names from first row
-        const cols = Object.keys(jsonData[0]);
         setColumns(cols);
         setRawData(jsonData);
         setFileName(file.name);

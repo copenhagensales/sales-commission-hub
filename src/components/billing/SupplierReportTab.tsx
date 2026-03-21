@@ -953,26 +953,15 @@ export function SupplierReportTab() {
                 }
 
                 const allData = [...metaRows, headers, ...rows, totalRow];
-                const ws = XLSX.utils.aoa_to_sheet(allData);
-                ws["!cols"] = [
-                  { wch: 25 }, { wch: 10 }, { wch: 15 }, { wch: 40 }, { wch: 8 }, { wch: 12 },
-                  ...(hasDiscount ? [{ wch: 10 }, { wch: 12 }, { wch: 12 }] : []),
-                ];
-
-                // Bold styling
+                const colWidths = [25, 10, 15, 40, 8, 12, ...(hasDiscount ? [10, 12, 12] : [])];
                 const boldRowIdxs = [0, 1, 3, allData.length - 1];
-                for (const r of boldRowIdxs) {
-                  for (let c = 0; c < headers.length; c++) {
-                    const ref = XLSX.utils.encode_cell({ r, c });
-                    if (ws[ref]) {
-                      ws[ref].s = { font: { bold: true } };
-                    }
-                  }
-                }
-
-                const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, "Leverandørrapport");
-                XLSX.writeFile(wb, `Leverandorrapport_${selectedLocationType}_${filePeriod}.xlsx`);
+                await downloadExcelAoa(
+                  `Leverandorrapport_${selectedLocationType}_${filePeriod}.xlsx`,
+                  "Leverandørrapport",
+                  allData,
+                  colWidths,
+                  boldRowIdxs
+                );
               }}
               disabled={locationDiscounts.length === 0}
             >
