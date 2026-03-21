@@ -70,6 +70,24 @@ export default function Forecast() {
     },
   });
 
+  // Delete cohort mutation
+  const deleteCohort = useMutation({
+    mutationFn: async (cohortId: string) => {
+      const { error } = await supabase
+        .from("client_forecast_cohorts")
+        .delete()
+        .eq("id", cohortId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["client-forecast"] });
+      toast.success("Opstartshold slettet");
+    },
+    onError: () => {
+      toast.error("Kunne ikke slette opstartshold");
+    },
+  });
+
   const periodLabel = useMemo(() => {
     const now = new Date();
     const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
@@ -153,6 +171,7 @@ export default function Forecast() {
                       client_id: selectedClient === "all" ? clients[0]?.id || "" : selectedClient,
                     });
                   }}
+                  onDelete={(id) => deleteCohort.mutate(id)}
                 />
                 <ForecastAssumptions
                   rampProfile={MOCK_RAMP_PROFILE}

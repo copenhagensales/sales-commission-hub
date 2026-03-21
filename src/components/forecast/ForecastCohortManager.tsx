@@ -2,16 +2,17 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { UserPlus, Plus, Calendar, Users } from "lucide-react";
+import { UserPlus, Plus, Calendar, Users, Trash2 } from "lucide-react";
 import { CreateCohortDialog } from "./CreateCohortDialog";
 import type { ClientForecastCohort } from "@/types/forecast";
 
 interface Props {
   cohorts: ClientForecastCohort[];
   onAdd: (cohort: Omit<ClientForecastCohort, 'id' | 'created_at' | 'created_by'>) => void;
+  onDelete?: (cohortId: string) => void;
 }
 
-export function ForecastCohortManager({ cohorts, onAdd }: Props) {
+export function ForecastCohortManager({ cohorts, onAdd, onDelete }: Props) {
   const [dialogOpen, setDialogOpen] = useState(false);
 
   return (
@@ -57,6 +58,16 @@ export function ForecastCohortManager({ cohorts, onAdd }: Props) {
                       )}
                     </div>
                   </div>
+                  {onDelete && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      onClick={() => onDelete(cohort.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>
