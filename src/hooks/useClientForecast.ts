@@ -5,6 +5,8 @@ import {
   calculateFullForecast,
   MOCK_RAMP_PROFILE,
   MOCK_SURVIVAL_PROFILE,
+  LOW_FACTOR,
+  HIGH_FACTOR,
 } from "@/lib/calculations/forecast";
 import type {
   EmployeePerformance,
