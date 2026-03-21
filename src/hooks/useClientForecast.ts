@@ -184,6 +184,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" =
         teamStandardShiftsRes,
         shiftDaysRes,
         absencesRes,
+        holidaysRes,
       ] = await Promise.all([
         supabase
           .from("shift")
@@ -208,7 +209,17 @@ export function useClientForecast(clientId: string, period: "current" | "next" =
           .in("type", ["sick", "vacation", "no_show", "day_off"])
           .lte("start_date", forecastEndStr)
           .gte("end_date", ninetyDaysAgo),
+        supabase
+          .from("danish_holidays")
+          .select("date")
+          .gte("date", ninetyDaysAgo)
+          .lte("date", forecastEndStr),
       ]);
+
+      // Build holiday set
+      const holidayDates = new Set<string>(
+        (holidaysRes.data || []).map((h: any) => h.date)
+      );
 
       // Build shift maps (same pattern as useTeamGoalForecast)
       const shiftDays = shiftDaysRes.data || [];
