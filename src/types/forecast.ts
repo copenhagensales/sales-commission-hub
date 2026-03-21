@@ -43,9 +43,6 @@ export interface ClientForecastCohort {
   note: string | null;
   created_by: string | null;
   created_at: string;
-  source?: 'manual' | 'onboarding';
-  name?: string;
-  actual_members?: number;
 }
 
 export interface ClientForecast {

@@ -341,78 +341,13 @@ export function useClientForecast(clientId: string) {
         });
       }
 
-      // 7. Fetch manual cohorts from DB
+      // 7. Fetch cohorts from DB
       let cohortQuery = supabase.from("client_forecast_cohorts").select("*");
       if (clientId !== "all") {
         cohortQuery = cohortQuery.eq("client_id", clientId);
       }
       const { data: dbCohorts } = await cohortQuery;
-      const manualCohorts: ClientForecastCohort[] = (dbCohorts || []).map((c: any) => ({
-        ...c,
-        source: 'manual' as const,
-      }));
-
-      // 7b. Auto-fetch onboarding cohorts (planned/in_progress, started within 60 days of forecast)
-      const sixtyDaysBefore = format(new Date(forecastStart.getTime() - 60 * 24 * 60 * 60 * 1000), "yyyy-MM-dd");
-      const { data: onboardingCohorts } = await supabase
-        .from("onboarding_cohorts")
-        .select("id, name, start_date, max_capacity, daily_bonus_client_id, team_id, status")
-        .in("status", ["planned", "in_progress"])
-        .gte("start_date", sixtyDaysBefore)
-        .lte("start_date", forecastEndStr);
-
-      // Get member counts for onboarding cohorts
-      const onbIds = (onboardingCohorts || []).map((c: any) => c.id);
-      let memberCounts = new Map<string, number>();
-      if (onbIds.length > 0) {
-        const { data: members } = await supabase
-          .from("cohort_members")
-          .select("cohort_id")
-          .in("cohort_id", onbIds);
-        (members || []).forEach((m: any) => {
-          memberCounts.set(m.cohort_id, (memberCounts.get(m.cohort_id) || 0) + 1);
-        });
-      }
-
-      // Resolve client_id for onboarding cohorts via daily_bonus_client_id or team_clients
-      const { data: teamClientsForOnb } = await supabase
-        .from("team_clients")
-        .select("team_id, client_id");
-      const teamClientMap = new Map<string, string>();
-      (teamClientsForOnb || []).forEach((tc: any) => {
-        // Use first client for the team as fallback
-        if (!teamClientMap.has(tc.team_id)) teamClientMap.set(tc.team_id, tc.client_id);
-      });
-
-      const onboardingAsCohorts: ClientForecastCohort[] = (onboardingCohorts || [])
-        .map((oc: any) => {
-          const resolvedClientId = oc.daily_bonus_client_id || teamClientMap.get(oc.team_id) || null;
-          if (!resolvedClientId) return null;
-          if (clientId !== "all" && resolvedClientId !== clientId) return null;
-          return {
-            id: oc.id,
-            client_id: resolvedClientId,
-            client_campaign_id: null,
-            start_date: oc.start_date,
-            planned_headcount: oc.max_capacity || memberCounts.get(oc.id) || 1,
-            ramp_profile_id: null,
-            survival_profile_id: null,
-            note: null,
-            created_by: null,
-            created_at: '',
-            source: 'onboarding' as const,
-            name: oc.name,
-            actual_members: memberCounts.get(oc.id) || 0,
-          } as ClientForecastCohort;
-        })
-        .filter((c): c is ClientForecastCohort => c !== null);
-
-      // Merge: manual first, then onboarding (avoid duplicates by id)
-      const manualIds = new Set(manualCohorts.map(c => c.id));
-      const cohorts: ClientForecastCohort[] = [
-        ...manualCohorts,
-        ...onboardingAsCohorts.filter(c => !manualIds.has(c.id)),
-      ];
+      const cohorts: ClientForecastCohort[] = (dbCohorts || []) as ClientForecastCohort[];
 
       // Build CohortForecastInput
       const avgAttendance = employeePerformances.length > 0
