@@ -129,12 +129,17 @@ function useSystemRevenue(year: number) {
   });
 }
 
+function wordsMatch(text: string, pattern: string): boolean {
+  const textLower = text.toLowerCase();
+  const words = pattern.toLowerCase().split(/\s+/).filter(Boolean);
+  return words.every(word => textLower.includes(word));
+}
+
 function matchPostering(p: Postering, mappings: any[]): { mapping: any; matchType: string } | null {
   if (!p.tekst) return null;
-  const lower = p.tekst.toLowerCase();
   for (const m of mappings) {
-    if (lower.includes(m.match_pattern.toLowerCase())) {
-      return { mapping: m, matchType: "contains" };
+    if (wordsMatch(p.tekst, m.match_pattern)) {
+      return { mapping: m, matchType: "words" };
     }
   }
   return null;
