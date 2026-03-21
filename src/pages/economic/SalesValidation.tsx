@@ -53,7 +53,7 @@ export default function SalesValidation() {
   const [billableValue, setBillableValue] = useState("fakturerbar");
   const [cancelledValue, setCancelledValue] = useState("annulleret");
 
-  const { employeeId } = useEmployeeData();
+  const { data: employeeId } = useCurrentEmployeeId();
 
   // Fetch clients
   const { data: clients } = useQuery({
