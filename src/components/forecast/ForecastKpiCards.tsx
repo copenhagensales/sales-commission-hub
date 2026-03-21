@@ -13,6 +13,8 @@ interface Props {
 }
 
 export function ForecastKpiCards({ forecast }: Props) {
+  const hasActualData = forecast.actualSalesToDate !== undefined && forecast.actualSalesToDate > 0;
+
   const cards = [
     {
       label: "Forventet salg",
@@ -21,8 +23,16 @@ export function ForecastKpiCards({ forecast }: Props) {
       high: forecast.totalSalesHigh,
       unit: "salg",
       icon: ShoppingCart,
-      tooltip: "Samlet forecast baseret på individuel performance, nye hold, churn og fravær.",
+      tooltip: hasActualData
+        ? `${forecast.actualSalesToDate} faktiske salg + ${forecast.remainingForecast} forventet i resterende ${forecast.daysRemaining} arbejdsdage.`
+        : "Samlet forecast baseret på individuel performance, nye hold, churn og fravær.",
       color: "text-primary",
+      actualBreakdown: hasActualData ? {
+        actual: forecast.actualSalesToDate!,
+        remaining: forecast.remainingForecast!,
+        daysElapsed: forecast.daysElapsed!,
+        daysRemaining: forecast.daysRemaining!,
+      } : undefined,
     },
     {
       label: "Aktive sælgere",
@@ -88,12 +98,22 @@ export function ForecastKpiCards({ forecast }: Props) {
                           <ForecastIntervalBadge interval="high" value={card.high!} />
                         </div>
                       ) : (
-                        <p className="text-2xl font-bold tracking-tight">
-                          {card.value.toLocaleString('da-DK')}
-                          <span className="text-sm font-normal text-muted-foreground ml-1">{card.unit}</span>
-                        </p>
+                        <>
+                          <p className="text-2xl font-bold tracking-tight">
+                            {card.value.toLocaleString('da-DK')}
+                            <span className="text-sm font-normal text-muted-foreground ml-1">{card.unit}</span>
+                          </p>
+                          {card.actualBreakdown && (
+                            <p className="text-xs text-muted-foreground">
+                              <span className="font-medium text-emerald-600">{card.actualBreakdown.actual.toLocaleString('da-DK')} faktiske</span>
+                              {' + '}
+                              <span className="font-medium">{card.actualBreakdown.remaining.toLocaleString('da-DK')} forventet</span>
+                              <span className="ml-1">({card.actualBreakdown.daysRemaining} dage tilbage)</span>
+                            </p>
+                          )}
+                        </>
                       )}
-                      {!card.isInterval && card.low !== undefined && (
+                      {!card.isInterval && card.low !== undefined && !card.actualBreakdown && (
                         <div className="flex gap-1.5 pt-0.5">
                           <ForecastIntervalBadge interval="low" value={card.low} />
                           <ForecastIntervalBadge interval="high" value={card.high!} />
