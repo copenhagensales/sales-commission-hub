@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { ShieldCheck, AlertTriangle, CheckCircle2, XCircle, Download, Search, Upload, Trash2, TrendingUp, Package, DollarSign, Ban, PhoneOff, BarChart3 } from "lucide-react";
+import { ShieldCheck, AlertTriangle, CheckCircle2, XCircle, Download, Search, Upload, Trash2, TrendingUp, Package, DollarSign, Ban, PhoneOff, BarChart3, Users } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { normalizePhoneNumber } from "@/lib/phone-utils";
 import { useCurrentEmployeeId } from "@/hooks/useOnboarding";
