@@ -144,6 +144,7 @@ export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = f
                   <td className="pt-2 text-right tabular-nums">{employees.reduce((s, e) => s + e.plannedHours, 0)}</td>
                   <td className="pt-2 text-right">—</td>
                   <td className="pt-2 text-right">—</td>
+                  <td className="pt-2 text-right">—</td>
                   {hasActuals ? (
                     <>
                       <td className="pt-2 text-right tabular-nums">{employees.reduce((s, e) => s + (e.actualSales || 0), 0)}</td>
