@@ -42,10 +42,10 @@ export function ForecastKpiCards({ forecast }: Props) {
     },
     {
       label: "Churn-effekt",
-      value: forecast.churnLoss,
+      value: forecast.churnLoss + (forecast.establishedChurnLoss || 0),
       unit: "tabte salg",
       icon: UserMinus,
-      tooltip: "Forventede tabte salg pga. churn blandt nye medarbejdere.",
+      tooltip: "Forventede tabte salg pga. churn (nye hold + etablerede medarbejdere baseret på anciennitet og team-historik).",
       color: "text-destructive",
     },
     {
