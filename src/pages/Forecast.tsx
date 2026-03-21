@@ -170,6 +170,7 @@ export default function Forecast() {
                       client_id: selectedClient === "all" ? clients[0]?.id || "" : selectedClient,
                     });
                   }}
+                  onDelete={(id) => deleteCohort.mutate(id)}
                 />
                 <ForecastAssumptions
                   rampProfile={MOCK_RAMP_PROFILE}
