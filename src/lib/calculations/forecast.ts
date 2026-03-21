@@ -213,12 +213,20 @@ export function calculateFullForecast(
     ? employees.reduce((sum, e) => sum + e.personalAttendanceFactor, 0) / employees.length
     : 0.92;
   
-  // Absence loss = lost sales from known absences (vacation, sick, no-show)
-  const absenceLoss = employeeResults.reduce((sum, empResult, i) => {
+  // Absence loss = known absences + predicted future sickness
+  const knownAbsenceLoss = employeeResults.reduce((sum, empResult, i) => {
     const emp = employees[i];
     const lostHours = (emp.grossPlannedHours || emp.plannedHours) - emp.plannedHours;
     return sum + lostHours * empResult.expectedSph;
   }, 0);
+  
+  const predictedAbsenceLoss = employeeResults.reduce((sum, empResult, i) => {
+    const emp = employees[i];
+    const predictedLostHours = emp.plannedHours * (1 - emp.personalAttendanceFactor);
+    return sum + predictedLostHours * empResult.expectedSph;
+  }, 0);
+  
+  const absenceLoss = knownAbsenceLoss + predictedAbsenceLoss;
   
   const cohortChurnLoss = cohortResults.reduce((sum, c) => 
     sum + (c.plannedHeadcount - c.effectiveHeads) * (c.forecastSales / Math.max(c.effectiveHeads, 0.1)), 0
@@ -237,13 +245,17 @@ export function calculateFullForecast(
     });
   }
   
+  const knownPart = Math.round(knownAbsenceLoss) > 0 ? `Planlagt fravær (ferie/sygdom): ${Math.round(knownAbsenceLoss)} salg. ` : '';
+  const predictedPart = `Forventet uforudset sygdom (~${Math.round((1 - avgAttendance) * 100)}%): ${Math.round(predictedAbsenceLoss)} salg.`;
+  const absenceDesc = `${knownPart}${predictedPart} Total fraværseffekt: ${Math.round(absenceLoss)} salg.`;
+  
   if (avgAttendance < 0.90) {
     drivers.push({
       key: 'low_attendance',
       label: 'Lav fremmøde',
       impact: 'negative',
-      value: `${Math.round(avgAttendance * 100)}%`,
-      description: `Gennemsnitlig fremmøde er ${Math.round(avgAttendance * 100)}%. Fravær (ferie, sygdom) koster ~${Math.round(absenceLoss)} salg.`,
+      value: `-${Math.round(absenceLoss)} salg`,
+      description: `Gennemsnitlig fremmøde er ${Math.round(avgAttendance * 100)}%. ${absenceDesc}`,
     });
   } else {
     drivers.push({
@@ -251,7 +263,7 @@ export function calculateFullForecast(
       label: 'Fraværseffekt',
       impact: absenceLoss > 20 ? 'negative' : 'neutral',
       value: `-${Math.round(absenceLoss)} salg`,
-      description: `Gennemsnitlig fremmøde er ${Math.round(avgAttendance * 100)}%. Planlagt fravær (ferie, sygdom) koster ~${Math.round(absenceLoss)} salg.`,
+      description: `Gennemsnitlig fremmøde er ${Math.round(avgAttendance * 100)}%. ${absenceDesc}`,
     });
   }
   
