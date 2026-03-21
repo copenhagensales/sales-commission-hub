@@ -92,9 +92,11 @@ export default function Forecast() {
 
   const periodLabel = useMemo(() => {
     const now = new Date();
-    const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    return next.toLocaleDateString('da-DK', { month: 'long', year: 'numeric' });
-  }, []);
+    const target = period === "current"
+      ? now
+      : new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    return target.toLocaleDateString('da-DK', { month: 'long', year: 'numeric' });
+  }, [period]);
 
   const avgAttendance = forecast && forecast.establishedEmployees.length > 0
     ? forecast.establishedEmployees.reduce((s, e) => s + e.attendanceFactor, 0) / forecast.establishedEmployees.length
