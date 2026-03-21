@@ -637,7 +637,7 @@ export default function EconomicRevenueMatch() {
                 ? posteringer.filter(p => selectedMonths.includes(p.maaned))
                 : posteringer;
               const unmapped = filtered.filter(p => !matchPostering(p, mappings));
-              const unmappedTotal = unmapped.reduce((s, p) => s + Math.abs(p.beloeb_dkk), 0);
+              const unmappedTotal = unmapped.reduce((s, p) => s + (-p.beloeb_dkk), 0);
               const uniqueTexts = [...new Set(unmapped.map(p => p.tekst).filter(Boolean))].sort();
               if (unmapped.length === 0) return null;
               return (
