@@ -270,6 +270,7 @@ export default function EconomicRevenueMatch() {
     if (!posteringer || !systemRevenue || !mappings) return [];
     const clientMap = new Map((clients || []).map(c => [c.id, c.name]));
     const invoicedByClientMonth: Record<string, Record<string, number>> = {};
+    const invoicesByClientMonth: Record<string, Record<string, Set<string>>> = {};
 
     posteringer.forEach(p => {
       if (!p.tekst) return;
@@ -279,6 +280,9 @@ export default function EconomicRevenueMatch() {
       const cid = match.mapping.client_id;
       if (!invoicedByClientMonth[cid]) invoicedByClientMonth[cid] = {};
       invoicedByClientMonth[cid][month] = (invoicedByClientMonth[cid][month] || 0) + (-p.beloeb_dkk);
+      if (!invoicesByClientMonth[cid]) invoicesByClientMonth[cid] = {};
+      if (!invoicesByClientMonth[cid][month]) invoicesByClientMonth[cid][month] = new Set();
+      if (p.faktura_nr) invoicesByClientMonth[cid][month].add(String(p.faktura_nr));
     });
 
     const allClientIds = new Set<string>([
@@ -289,6 +293,7 @@ export default function EconomicRevenueMatch() {
     const rows: Array<{
       clientId: string; clientName: string; month: string;
       invoiced: number; system: number; deviation: number; deviationPct: number;
+      invoiceNrs: string[];
     }> = [];
 
     allClientIds.forEach(cid => {
@@ -303,7 +308,8 @@ export default function EconomicRevenueMatch() {
         if (invoiced === 0 && system === 0) return;
         const deviation = invoiced - system;
         const deviationPct = system > 0 ? ((invoiced - system) / system) * 100 : invoiced > 0 ? 100 : 0;
-        rows.push({ clientId: cid, clientName: clientMap.get(cid) || "Ukendt", month, invoiced, system, deviation, deviationPct });
+        const invoiceNrs = Array.from(invoicesByClientMonth[cid]?.[month] || []).sort();
+        rows.push({ clientId: cid, clientName: clientMap.get(cid) || "Ukendt", month, invoiced, system, deviation, deviationPct, invoiceNrs });
       });
     });
 
@@ -688,6 +694,7 @@ export default function EconomicRevenueMatch() {
                         <TableRow>
                           <TableHead>Måned</TableHead>
                           <TableHead>Kunde</TableHead>
+                          <TableHead>Fakturanr.</TableHead>
                           <TableHead className="text-right">Faktureret</TableHead>
                           <TableHead className="text-right">System</TableHead>
                           <TableHead className="text-right">Afvigelse</TableHead>
@@ -700,6 +707,7 @@ export default function EconomicRevenueMatch() {
                           <TableRow key={`${row.clientId}-${row.month}-${i}`}>
                             <TableCell className="font-mono text-sm">{row.month}</TableCell>
                             <TableCell className="font-medium">{row.clientName}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{row.invoiceNrs.join(", ") || "—"}</TableCell>
                             <TableCell className="text-right tabular-nums">{formatDKK(row.invoiced)}</TableCell>
                             <TableCell className="text-right tabular-nums">{formatDKK(row.system)}</TableCell>
                             <TableCell className={cn("text-right tabular-nums font-medium", getDeviationColor(row.deviationPct))}>
@@ -712,7 +720,7 @@ export default function EconomicRevenueMatch() {
                           </TableRow>
                         ))}
                         <TableRow className="font-bold border-t-2">
-                          <TableCell colSpan={2}>Total</TableCell>
+                          <TableCell colSpan={3}>Total</TableCell>
                           <TableCell className="text-right tabular-nums">{formatDKK(totals.invoiced)}</TableCell>
                           <TableCell className="text-right tabular-nums">{formatDKK(totals.system)}</TableCell>
                           <TableCell className={cn("text-right tabular-nums", getDeviationColor(totals.deviationPct))}>
