@@ -284,16 +284,16 @@ export default function EconomicRevenueMatch() {
 
   const getDeviationColor = (pct: number) => {
     const absPct = Math.abs(pct);
-    if (absPct < 5) return "text-green-600";
-    if (absPct < 15) return "text-yellow-600";
-    return "text-red-600";
+    if (absPct < 5) return "text-emerald-600 dark:text-emerald-400";
+    if (absPct < 15) return "text-amber-600 dark:text-amber-400";
+    return "text-destructive";
   };
 
   const getDeviationIcon = (pct: number) => {
     const absPct = Math.abs(pct);
-    if (absPct < 5) return <CheckCircle2 className="h-4 w-4 text-green-600" />;
-    if (absPct < 15) return <AlertCircle className="h-4 w-4 text-yellow-600" />;
-    return <AlertTriangle className="h-4 w-4 text-red-600" />;
+    if (absPct < 5) return <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />;
+    if (absPct < 15) return <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />;
+    return <AlertTriangle className="h-4 w-4 text-destructive" />;
   };
 
   const isLoading = mappingsLoading || postLoading || sysLoading;
