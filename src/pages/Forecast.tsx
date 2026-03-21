@@ -70,6 +70,23 @@ export default function Forecast() {
     },
   });
 
+  // Delete cohort mutation
+  const deleteCohort = useMutation({
+    mutationFn: async (cohortId: string) => {
+      const { error } = await supabase
+        .from("client_forecast_cohorts")
+        .delete()
+        .eq("id", cohortId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["client-forecast"] });
+      toast.success("Opstartshold slettet");
+    },
+    onError: () => {
+      toast.error("Kunne ikke slette opstartshold");
+    },
+
   const periodLabel = useMemo(() => {
     const now = new Date();
     const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
