@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { ShieldCheck, AlertTriangle, CheckCircle2, XCircle, Download, Search, Upload, Trash2, TrendingUp, Package, DollarSign, Ban, PhoneOff, BarChart3 } from "lucide-react";
+import { ShieldCheck, AlertTriangle, CheckCircle2, XCircle, Download, Search, Upload, Trash2, TrendingUp, Package, DollarSign, Ban, PhoneOff, BarChart3, Users } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { normalizePhoneNumber } from "@/lib/phone-utils";
 import { useCurrentEmployeeId } from "@/hooks/useOnboarding";
@@ -430,6 +431,39 @@ export default function SalesValidation() {
   const unverifiedSales = filteredResults?.filter((r) => r.category === "unverified_sale") || [];
   const verifiedSales = filteredResults?.filter((r) => r.category === "verified_sale") || [];
 
+  // Seller stats aggregation
+  const sellerStats = useMemo(() => {
+    if (!results) return [];
+    const map = new Map<string, { name: string; verified: number; unverified: number; cancellations: number }>();
+    for (const r of results) {
+      const name = r.matched?.agentName || "Ukendt";
+      if (!map.has(name)) map.set(name, { name, verified: 0, unverified: 0, cancellations: 0 });
+      const s = map.get(name)!;
+      if (r.category === "verified_sale") s.verified++;
+      else if (r.category === "unverified_sale") s.unverified++;
+      else if (r.category === "matched_cancellation") s.cancellations++;
+    }
+    return Array.from(map.values())
+      .map((s) => ({
+        ...s,
+        total: s.verified + s.unverified + s.cancellations,
+        rate: s.verified + s.unverified > 0 ? Math.round((s.verified / (s.verified + s.unverified)) * 100) : 0,
+      }))
+      .sort((a, b) => b.total - a.total);
+  }, [results]);
+
+  const sellerTotals = useMemo(() => {
+    if (sellerStats.length === 0) return null;
+    const t = { total: 0, verified: 0, unverified: 0, cancellations: 0 };
+    for (const s of sellerStats) {
+      t.total += s.total;
+      t.verified += s.verified;
+      t.unverified += s.unverified;
+      t.cancellations += s.cancellations;
+    }
+    const rate = t.verified + t.unverified > 0 ? Math.round((t.verified / (t.verified + t.unverified)) * 100) : 0;
+    return { ...t, rate };
+  }, [sellerStats]);
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -549,368 +583,389 @@ export default function SalesValidation() {
           </div>
         )}
 
-        {/* Textarea input */}
+        {/* Tabs for Validation vs Seller overview */}
         {clientId && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-green-500" />
-                  Godkendte/fakturerbare salg (telefonnumre)
-                </Label>
-                <Textarea
-                  value={billableText}
-                  onChange={(e) => setBillableText(e.target.value)}
-                  placeholder={"52512853\n22334455\n40302010\n..."}
-                  className="min-h-[200px] font-mono text-sm"
-                />
-                <p className="text-xs text-muted-foreground">
-                  {billableCount > 0 ? `${billableCount} numre registreret` : "Ét nummer per linje"}
-                </p>
-              </div>
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <XCircle className="h-4 w-4 text-destructive" />
-                  Annullerede salg (telefonnumre)
-                </Label>
-                <Textarea
-                  value={cancelledText}
-                  onChange={(e) => setCancelledText(e.target.value)}
-                  placeholder={"40302010\n11223344\n..."}
-                  className="min-h-[200px] font-mono text-sm"
-                />
-                <p className="text-xs text-muted-foreground">
-                  {cancelledCount > 0 ? `${cancelledCount} numre registreret` : "Ét nummer per linje"}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <Button onClick={processFromTextarea} disabled={isProcessing || (billableCount === 0 && cancelledCount === 0)} className="gap-2">
+          <Tabs defaultValue="validation" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="validation" className="gap-2">
                 <ShieldCheck className="h-4 w-4" />
-                {isProcessing ? "Behandler..." : "Validér salg"}
-              </Button>
-              <Button variant="ghost" size="sm" className="text-muted-foreground gap-1" onClick={() => setShowExcelUpload(!showExcelUpload)}>
-                <Upload className="h-3 w-3" />
-                {showExcelUpload ? "Skjul Excel-upload" : "Eller upload Excel-fil"}
-              </Button>
-            </div>
+                Validering
+              </TabsTrigger>
+              <TabsTrigger value="sellers" className="gap-2">
+                <Users className="h-4 w-4" />
+                Sælgeroversigt
+              </TabsTrigger>
+            </TabsList>
 
-            {/* Excel upload fallback */}
-            {showExcelUpload && (
-              <div
-                {...getRootProps()}
-                className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
-                  isDragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"
-                }`}
-              >
-                <input {...getInputProps()} />
-                <Upload className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />
-                <p className="text-sm font-medium">Træk en Excel-fil hertil eller klik for at vælge</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Filen skal indeholde telefonnumre og evt. en status-kolonne
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Column mapping dialog (for Excel) */}
-        <Dialog open={showColumnMapping} onOpenChange={setShowColumnMapping}>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Kolonne-mapping — {fileName}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                {uploadedRows.length} rækker fundet. Vælg hvilke kolonner der indeholder telefonnumre og status.
-              </p>
-              <div className="space-y-2">
-                <Label>Telefonnummer-kolonne *</Label>
-                <Select value={phoneCol} onValueChange={setPhoneCol}>
-                  <SelectTrigger><SelectValue placeholder="Vælg kolonne" /></SelectTrigger>
-                  <SelectContent>
-                    {uploadedHeaders.map((h) => (<SelectItem key={h} value={h}>{h}</SelectItem>))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Status-kolonne (valgfri)</Label>
-                <Select value={statusCol} onValueChange={setStatusCol}>
-                  <SelectTrigger><SelectValue placeholder="Ingen — alle er fakturerbare" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Ingen</SelectItem>
-                    {uploadedHeaders.map((h) => (<SelectItem key={h} value={h}>{h}</SelectItem>))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {statusCol && uniqueStatusValues.length > 0 && (
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">Fundne statusværdier: {uniqueStatusValues.join(", ")}</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label className="text-xs">Fakturerbar værdi</Label>
-                      <Input value={billableValue} onChange={(e) => setBillableValue(e.target.value)} placeholder="fx fakturerbar" />
-                    </div>
-                    <div>
-                      <Label className="text-xs">Annulleret værdi</Label>
-                      <Input value={cancelledValue} onChange={(e) => setCancelledValue(e.target.value)} placeholder="fx annulleret" />
-                    </div>
+            <TabsContent value="validation" className="space-y-6">
+              {/* Textarea input */}
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      Godkendte/fakturerbare salg (telefonnumre)
+                    </Label>
+                    <Textarea
+                      value={billableText}
+                      onChange={(e) => setBillableText(e.target.value)}
+                      placeholder={"52512853\n22334455\n40302010\n..."}
+                      className="min-h-[200px] font-mono text-sm"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {billableCount > 0 ? `${billableCount} numre registreret` : "Ét nummer per linje"}
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <XCircle className="h-4 w-4 text-destructive" />
+                      Annullerede salg (telefonnumre)
+                    </Label>
+                    <Textarea
+                      value={cancelledText}
+                      onChange={(e) => setCancelledText(e.target.value)}
+                      placeholder={"40302010\n11223344\n..."}
+                      className="min-h-[200px] font-mono text-sm"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {cancelledCount > 0 ? `${cancelledCount} numre registreret` : "Ét nummer per linje"}
+                    </p>
                   </div>
                 </div>
-              )}
-              <div className="bg-muted rounded-md p-3">
-                <p className="text-xs font-medium mb-1">Preview (første 3 rækker)</p>
-                <div className="text-xs space-y-1">
-                  {uploadedRows.slice(0, 3).map((row, i) => (
-                    <div key={i} className="flex gap-4">
-                      <span>📞 {row[phoneCol] || "—"}</span>
-                      {statusCol && <span>📋 {row[statusCol] || "—"}</span>}
-                    </div>
-                  ))}
+
+                <div className="flex items-center gap-4">
+                  <Button onClick={processFromTextarea} disabled={isProcessing || (billableCount === 0 && cancelledCount === 0)} className="gap-2">
+                    <ShieldCheck className="h-4 w-4" />
+                    {isProcessing ? "Behandler..." : "Validér salg"}
+                  </Button>
+                  <Button variant="ghost" size="sm" className="text-muted-foreground gap-1" onClick={() => setShowExcelUpload(!showExcelUpload)}>
+                    <Upload className="h-3 w-3" />
+                    {showExcelUpload ? "Skjul Excel-upload" : "Eller upload Excel-fil"}
+                  </Button>
                 </div>
+
+                {/* Excel upload fallback */}
+                {showExcelUpload && (
+                  <div
+                    {...getRootProps()}
+                    className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+                      isDragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"
+                    }`}
+                  >
+                    <input {...getInputProps()} />
+                    <Upload className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />
+                    <p className="text-sm font-medium">Træk en Excel-fil hertil eller klik for at vælge</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Filen skal indeholde telefonnumre og evt. en status-kolonne
+                    </p>
+                  </div>
+                )}
               </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowColumnMapping(false)}>Annuller</Button>
-              <Button onClick={processFromExcel} disabled={!phoneCol || isProcessing}>
-                {isProcessing ? "Behandler..." : "Start validering"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
 
-        {/* Summary cards */}
-        {results && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="pt-4 pb-3">
-                <div className="flex items-center gap-2 mb-1">
-                  <XCircle className="h-4 w-4 text-destructive" />
-                  <span className="text-sm font-medium">Matchede annulleringer</span>
+              {/* Summary cards */}
+              {results && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <Card>
+                    <CardContent className="pt-4 pb-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <XCircle className="h-4 w-4 text-destructive" />
+                        <span className="text-sm font-medium">Matchede annulleringer</span>
+                      </div>
+                      <p className="text-2xl font-bold">{matchedCancellations.length}</p>
+                      <p className="text-xs text-muted-foreground">Sælger identificeret — kan trækkes</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-4 pb-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <AlertTriangle className="h-4 w-4 text-orange-500" />
+                        <span className="text-sm font-medium">Umatchede annulleringer</span>
+                      </div>
+                      <p className="text-2xl font-bold">{unmatchedCancellations.length}</p>
+                      <p className="text-xs text-muted-foreground">Kan ikke placeres på en sælger</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-4 pb-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                        <span className="text-sm font-medium">Uverificerede salg</span>
+                      </div>
+                      <p className="text-2xl font-bold">{unverifiedSales.length}</p>
+                      <p className="text-xs text-muted-foreground">Ikke bekræftet af kunden</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-4 pb-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                        <span className="text-sm font-medium">Verificerede salg</span>
+                      </div>
+                      <p className="text-2xl font-bold">{verifiedSales.length}</p>
+                      <p className="text-xs text-muted-foreground">Bekræftet fakturerbare</p>
+                    </CardContent>
+                  </Card>
                 </div>
-                <p className="text-2xl font-bold">{matchedCancellations.length}</p>
-                <p className="text-xs text-muted-foreground">Sælger identificeret — kan trækkes</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-4 pb-3">
-                <div className="flex items-center gap-2 mb-1">
-                  <AlertTriangle className="h-4 w-4 text-orange-500" />
-                  <span className="text-sm font-medium">Umatchede annulleringer</span>
+              )}
+
+              {/* Search */}
+              {results && (
+                <div className="relative max-w-sm">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Søg telefon, sælger, produkt..." className="pl-9" />
                 </div>
-                <p className="text-2xl font-bold">{unmatchedCancellations.length}</p>
-                <p className="text-xs text-muted-foreground">Kan ikke placeres på en sælger</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-4 pb-3">
-                <div className="flex items-center gap-2 mb-1">
-                  <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                  <span className="text-sm font-medium">Uverificerede salg</span>
-                </div>
-                <p className="text-2xl font-bold">{unverifiedSales.length}</p>
-                <p className="text-xs text-muted-foreground">Ikke bekræftet af kunden</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-4 pb-3">
-                <div className="flex items-center gap-2 mb-1">
-                  <CheckCircle2 className="h-4 w-4 text-green-500" />
-                  <span className="text-sm font-medium">Verificerede salg</span>
-                </div>
-                <p className="text-2xl font-bold">{verifiedSales.length}</p>
-                <p className="text-xs text-muted-foreground">Bekræftet fakturerbare</p>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+              )}
 
-        {/* Search */}
-        {results && (
-          <div className="relative max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Søg telefon, sælger, produkt..." className="pl-9" />
-          </div>
-        )}
+              {/* Results tables */}
+              {matchedCancellations.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <XCircle className="h-4 w-4 text-destructive" />
+                      Matchede annulleringer — sælger identificeret ({matchedCancellations.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Telefon</TableHead>
+                          <TableHead>Sælger</TableHead>
+                          <TableHead>Salgsdato</TableHead>
+                          <TableHead>Produkt</TableHead>
+                          <TableHead>Firma</TableHead>
+                          <TableHead>Ref.</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {matchedCancellations.map((r, i) => (
+                          <TableRow key={i}>
+                            <TableCell className="font-mono text-sm">{r.phone}</TableCell>
+                            <TableCell className="font-medium">{r.matched?.agentName}</TableCell>
+                            <TableCell>{r.matched?.saleDate ? new Date(r.matched.saleDate).toLocaleDateString("da-DK") : ""}</TableCell>
+                            <TableCell>{r.matched?.product}</TableCell>
+                            <TableCell>{r.matched?.customerCompany}</TableCell>
+                            <TableCell className="text-xs text-muted-foreground">{r.matched?.internalReference}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              )}
 
-        {/* Results tables */}
-        {matchedCancellations.length > 0 && (
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <XCircle className="h-4 w-4 text-destructive" />
-                Matchede annulleringer — sælger identificeret ({matchedCancellations.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Telefon</TableHead>
-                    <TableHead>Sælger</TableHead>
-                    <TableHead>Salgsdato</TableHead>
-                    <TableHead>Produkt</TableHead>
-                    <TableHead>Firma</TableHead>
-                    <TableHead>Ref.</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {matchedCancellations.map((r, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="font-mono text-sm">{r.phone}</TableCell>
-                      <TableCell className="font-medium">{r.matched?.agentName}</TableCell>
-                      <TableCell>{r.matched?.saleDate ? new Date(r.matched.saleDate).toLocaleDateString("da-DK") : ""}</TableCell>
-                      <TableCell>{r.matched?.product}</TableCell>
-                      <TableCell>{r.matched?.customerCompany}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{r.matched?.internalReference}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        )}
+              {unmatchedCancellations.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-orange-500" />
+                      Umatchede annulleringer — kan ikke placeres ({unmatchedCancellations.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Telefon</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {unmatchedCancellations.map((r, i) => (
+                          <TableRow key={i}>
+                            <TableCell className="font-mono text-sm">{r.phone}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-orange-600 border-orange-300">Ingen match i jeres salg</Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              )}
 
-        {unmatchedCancellations.length > 0 && (
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-orange-500" />
-                Umatchede annulleringer — kan ikke placeres ({unmatchedCancellations.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Telefon</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {unmatchedCancellations.map((r, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="font-mono text-sm">{r.phone}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-orange-600 border-orange-300">Ingen match i jeres salg</Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        )}
+              {unverifiedSales.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                      Uverificerede salg — ikke bekræftet af kunden ({unverifiedSales.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Telefon</TableHead>
+                          <TableHead>Sælger</TableHead>
+                          <TableHead>Salgsdato</TableHead>
+                          <TableHead>Produkt</TableHead>
+                          <TableHead>Firma</TableHead>
+                          <TableHead>Ref.</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {unverifiedSales.map((r, i) => (
+                          <TableRow key={i}>
+                            <TableCell className="font-mono text-sm">{r.phone}</TableCell>
+                            <TableCell className="font-medium">{r.matched?.agentName}</TableCell>
+                            <TableCell>{r.matched?.saleDate ? new Date(r.matched.saleDate).toLocaleDateString("da-DK") : ""}</TableCell>
+                            <TableCell>{r.matched?.product}</TableCell>
+                            <TableCell>{r.matched?.customerCompany}</TableCell>
+                            <TableCell className="text-xs text-muted-foreground">{r.matched?.internalReference}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              )}
 
-        {unverifiedSales.length > 0 && (
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                Uverificerede salg — ikke bekræftet af kunden ({unverifiedSales.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Telefon</TableHead>
-                    <TableHead>Sælger</TableHead>
-                    <TableHead>Salgsdato</TableHead>
-                    <TableHead>Produkt</TableHead>
-                    <TableHead>Firma</TableHead>
-                    <TableHead>Ref.</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {unverifiedSales.map((r, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="font-mono text-sm">{r.phone}</TableCell>
-                      <TableCell className="font-medium">{r.matched?.agentName}</TableCell>
-                      <TableCell>{r.matched?.saleDate ? new Date(r.matched.saleDate).toLocaleDateString("da-DK") : ""}</TableCell>
-                      <TableCell>{r.matched?.product}</TableCell>
-                      <TableCell>{r.matched?.customerCompany}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{r.matched?.internalReference}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        )}
+              {/* Previous uploads */}
+              {previousUploads && previousUploads.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Tidligere valideringer</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Dato</TableHead>
+                          <TableHead>Kilde</TableHead>
+                          <TableHead>Fakturerbare</TableHead>
+                          <TableHead>Annullerede</TableHead>
+                          <TableHead>Matchede</TableHead>
+                          <TableHead>Umatchede</TableHead>
+                          <TableHead>Uverificerede</TableHead>
+                          <TableHead></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {previousUploads.map((u: any) => (
+                          <TableRow key={u.id}>
+                            <TableCell>{new Date(u.created_at).toLocaleDateString("da-DK")}</TableCell>
+                            <TableCell className="text-sm">{u.file_name}</TableCell>
+                            <TableCell>{u.total_billable}</TableCell>
+                            <TableCell>{u.total_cancelled}</TableCell>
+                            <TableCell>{u.matched_cancellations}</TableCell>
+                            <TableCell>{u.unmatched_cancellations}</TableCell>
+                            <TableCell>{u.unverified_sales}</TableCell>
+                            <TableCell className="flex gap-1">
+                              <Button size="sm" variant="ghost" onClick={() => loadPreviousResult(u)}>Vis</Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive">
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Slet validering?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Dette sletter valideringen fra {new Date(u.created_at).toLocaleDateString("da-DK")} permanent. Handlingen kan ikke fortrydes.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Annuller</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                      onClick={async () => {
+                                        const { error } = await supabase.from("sales_validation_uploads").delete().eq("id", u.id);
+                                        if (error) {
+                                          toast.error("Kunne ikke slette valideringen");
+                                        } else {
+                                          toast.success("Validering slettet");
+                                          refetchUploads();
+                                        }
+                                      }}
+                                    >
+                                      Slet
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
 
-        {/* Previous uploads */}
-        {previousUploads && previousUploads.length > 0 && (
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Tidligere valideringer</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Dato</TableHead>
-                    <TableHead>Kilde</TableHead>
-                    <TableHead>Fakturerbare</TableHead>
-                    <TableHead>Annullerede</TableHead>
-                    <TableHead>Matchede</TableHead>
-                    <TableHead>Umatchede</TableHead>
-                    <TableHead>Uverificerede</TableHead>
-                    <TableHead></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {previousUploads.map((u: any) => (
-                    <TableRow key={u.id}>
-                      <TableCell>{new Date(u.created_at).toLocaleDateString("da-DK")}</TableCell>
-                      <TableCell className="text-sm">{u.file_name}</TableCell>
-                      <TableCell>{u.total_billable}</TableCell>
-                      <TableCell>{u.total_cancelled}</TableCell>
-                      <TableCell>{u.matched_cancellations}</TableCell>
-                      <TableCell>{u.unmatched_cancellations}</TableCell>
-                      <TableCell>{u.unverified_sales}</TableCell>
-                      <TableCell className="flex gap-1">
-                        <Button size="sm" variant="ghost" onClick={() => loadPreviousResult(u)}>Vis</Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Slet validering?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Dette sletter valideringen fra {new Date(u.created_at).toLocaleDateString("da-DK")} permanent. Handlingen kan ikke fortrydes.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Annuller</AlertDialogCancel>
-                              <AlertDialogAction
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                onClick={async () => {
-                                  const { error } = await supabase.from("sales_validation_uploads").delete().eq("id", u.id);
-                                  if (error) {
-                                    toast.error("Kunne ikke slette valideringen");
-                                  } else {
-                                    toast.success("Validering slettet");
-                                    refetchUploads();
-                                  }
-                                }}
+            <TabsContent value="sellers" className="space-y-4">
+              {!results ? (
+                <Card className="p-8 text-center">
+                  <Users className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+                  <p className="text-lg font-medium">Ingen valideringsdata</p>
+                  <p className="text-sm text-muted-foreground mt-1">Kør en validering eller indlæs en tidligere for at se sælgeroversigten</p>
+                </Card>
+              ) : (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      Sælgeroversigt ({sellerStats.length} sælgere)
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Sælger</TableHead>
+                          <TableHead className="text-right">Totale salg</TableHead>
+                          <TableHead className="text-right">Verificerede</TableHead>
+                          <TableHead className="text-right">Uverificerede</TableHead>
+                          <TableHead className="text-right">Annulleringer</TableHead>
+                          <TableHead className="text-right">Verificeringsrate</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {sellerStats.map((s) => (
+                          <TableRow key={s.name}>
+                            <TableCell className="font-medium">{s.name}</TableCell>
+                            <TableCell className="text-right">{s.total}</TableCell>
+                            <TableCell className="text-right text-green-600 dark:text-green-400">{s.verified}</TableCell>
+                            <TableCell className="text-right text-orange-600 dark:text-orange-400">{s.unverified}</TableCell>
+                            <TableCell className="text-right text-destructive">{s.cancellations}</TableCell>
+                            <TableCell className="text-right">
+                              <Badge
+                                variant="outline"
+                                className={
+                                  s.rate > 80
+                                    ? "border-green-300 text-green-600 dark:border-green-700 dark:text-green-400"
+                                    : s.rate >= 50
+                                    ? "border-amber-300 text-amber-600 dark:border-amber-700 dark:text-amber-400"
+                                    : "border-destructive/50 text-destructive"
+                                }
                               >
-                                Slet
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                                {s.rate}%
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        {sellerTotals && (
+                          <TableRow className="font-bold border-t-2">
+                            <TableCell>Total</TableCell>
+                            <TableCell className="text-right">{sellerTotals.total}</TableCell>
+                            <TableCell className="text-right text-green-600 dark:text-green-400">{sellerTotals.verified}</TableCell>
+                            <TableCell className="text-right text-orange-600 dark:text-orange-400">{sellerTotals.unverified}</TableCell>
+                            <TableCell className="text-right text-destructive">{sellerTotals.cancellations}</TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="outline">{sellerTotals.rate}%</Badge>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+          </Tabs>
         )}
       </div>
     </MainLayout>
