@@ -155,7 +155,7 @@ export default function ReportsManagement() {
 
   const periodLabel = `${periodStart}_${periodEnd}`;
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (!employees.length) return;
 
     const summaryRows = employees.map((emp) => {
