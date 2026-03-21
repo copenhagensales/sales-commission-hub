@@ -12,6 +12,10 @@ import { ForecastBreakdownTable } from "@/components/forecast/ForecastBreakdownT
 import { ForecastVsActualChart } from "@/components/forecast/ForecastVsActualChart";
 import { ForecastCohortManager } from "@/components/forecast/ForecastCohortManager";
 import { ForecastAssumptions } from "@/components/forecast/ForecastAssumptions";
+import { ForecastSummary } from "@/components/forecast/ForecastSummary";
+import { ForecastProgressBar } from "@/components/forecast/ForecastProgressBar";
+import { ForecastWaterfallChart } from "@/components/forecast/ForecastWaterfallChart";
+import { ForecastInsights } from "@/components/forecast/ForecastInsights";
 import { DataFreshnessBadge } from "@/components/ui/DataFreshnessBadge";
 import { MOCK_RAMP_PROFILE, MOCK_SURVIVAL_PROFILE } from "@/lib/calculations/forecast";
 import { useClientForecast } from "@/hooks/useClientForecast";
@@ -169,14 +173,28 @@ export default function Forecast() {
         {/* Content */}
         {!isLoading && forecast && (
           <>
+            {/* Executive Summary */}
+            <ForecastSummary
+              forecast={forecast}
+              periodLabel={periodLabel}
+              isCurrentPeriod={period === "current"}
+            />
+
+            {/* Progress bar (current period only) */}
+            {period === "current" && <ForecastProgressBar forecast={forecast} />}
+
             {/* KPI Cards */}
             <ForecastKpiCards forecast={forecast} />
 
+            {/* Waterfall chart */}
+            <ForecastWaterfallChart forecast={forecast} />
+
             {/* Main content grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Left column: Drivers + Cohorts + Assumptions */}
+              {/* Left column: Drivers + Insights + Cohorts + Assumptions */}
               <div className="space-y-4">
                 <ForecastDriversPanel drivers={forecast.drivers} />
+                <ForecastInsights forecast={forecast} />
                 <ForecastCohortManager
                   cohorts={cohorts}
                   onAdd={(data) => {
