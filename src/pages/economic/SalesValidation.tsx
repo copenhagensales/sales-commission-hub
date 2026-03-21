@@ -431,7 +431,39 @@ export default function SalesValidation() {
   const unverifiedSales = filteredResults?.filter((r) => r.category === "unverified_sale") || [];
   const verifiedSales = filteredResults?.filter((r) => r.category === "verified_sale") || [];
 
-  return (
+  // Seller stats aggregation
+  const sellerStats = useMemo(() => {
+    if (!results) return [];
+    const map = new Map<string, { name: string; verified: number; unverified: number; cancellations: number }>();
+    for (const r of results) {
+      const name = r.matched?.agentName || "Ukendt";
+      if (!map.has(name)) map.set(name, { name, verified: 0, unverified: 0, cancellations: 0 });
+      const s = map.get(name)!;
+      if (r.category === "verified_sale") s.verified++;
+      else if (r.category === "unverified_sale") s.unverified++;
+      else if (r.category === "matched_cancellation") s.cancellations++;
+    }
+    return Array.from(map.values())
+      .map((s) => ({
+        ...s,
+        total: s.verified + s.unverified + s.cancellations,
+        rate: s.verified + s.unverified > 0 ? Math.round((s.verified / (s.verified + s.unverified)) * 100) : 0,
+      }))
+      .sort((a, b) => b.total - a.total);
+  }, [results]);
+
+  const sellerTotals = useMemo(() => {
+    if (sellerStats.length === 0) return null;
+    const t = { total: 0, verified: 0, unverified: 0, cancellations: 0 };
+    for (const s of sellerStats) {
+      t.total += s.total;
+      t.verified += s.verified;
+      t.unverified += s.unverified;
+      t.cancellations += s.cancellations;
+    }
+    const rate = t.verified + t.unverified > 0 ? Math.round((t.verified / (t.verified + t.unverified)) * 100) : 0;
+    return { ...t, rate };
+  }, [sellerStats]);
     <MainLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
