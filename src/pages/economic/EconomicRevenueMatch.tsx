@@ -88,7 +88,10 @@ function useRevenuePosteringer(year: number) {
       // Faktura for fx januar sendes d. 1/2 — tilhører foregående måned
       return (data || []).map((r) => {
         const d = new Date(r.dato + "T00:00:00");
-        d.setMonth(d.getMonth() - 1);
+        // Undtagelse: faktura 940 tilhører sin egen måned (ikke -1)
+        if (String(r.faktura_nr) !== "940") {
+          d.setMonth(d.getMonth() - 1);
+        }
         const adjustedMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
         return { ...r, maaned: adjustedMonth };
       }) as Postering[];
