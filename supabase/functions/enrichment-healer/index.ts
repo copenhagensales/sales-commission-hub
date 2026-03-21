@@ -359,7 +359,7 @@ serve(async (req) => {
 
       let result: { healed: number; failed: number; skipped: number };
       if (creds.integration.provider === "adversus") {
-        result = await healAdversus(supabase, sales, creds.credentials, log);
+        result = await healAdversus(supabase, sales, creds.credentials, log, turboMode);
       } else if (creds.integration.provider === "enreach") {
         result = await healEnreach(supabase, sales, creds.credentials, creds.integration, log);
       } else {
