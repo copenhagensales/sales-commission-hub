@@ -97,16 +97,37 @@ export function getSurvivalFactor(daysSinceStart: number, profile: ForecastSurvi
 }
 
 // ============================================================================
+// ESTABLISHED CHURN RATE
+// ============================================================================
+
+/**
+ * Get monthly churn probability for an established employee based on tenure and team history.
+ */
+export function getEstablishedChurnRate(daysSinceStart: number, teamName: string | null, teamChurnRates?: TeamChurnRates): number {
+  if (!teamChurnRates || !teamName) return 0.02; // fallback 2%/month
+  
+  const rates = teamChurnRates.get(teamName);
+  if (!rates) return 0.02;
+  
+  if (daysSinceStart <= 60) return rates.bucket0_60;
+  if (daysSinceStart <= 180) return rates.bucket61_180;
+  return rates.bucket180plus;
+}
+
+// ============================================================================
 // EMPLOYEE FORECAST
 // ============================================================================
 
 /**
  * Calculate forecast for a single established employee.
  */
-export function forecastEstablishedEmployee(emp: EmployeePerformance): EmployeeForecastResult {
+export function forecastEstablishedEmployee(emp: EmployeePerformance, teamChurnRates?: TeamChurnRates): EmployeeForecastResult {
   const ewmaSph = calculateEwmaSph(emp.weeklySalesPerHour);
   const effectiveHours = emp.plannedHours * emp.personalAttendanceFactor;
   const expected = effectiveHours * ewmaSph;
+  
+  const churnProbability = getEstablishedChurnRate(emp.daysSinceStart, emp.teamName, teamChurnRates);
+  const churnLoss = expected * churnProbability;
   
   return {
     employeeId: emp.employeeId,
@@ -117,9 +138,11 @@ export function forecastEstablishedEmployee(emp: EmployeePerformance): EmployeeF
     plannedHours: emp.plannedHours,
     expectedSph: ewmaSph,
     attendanceFactor: emp.personalAttendanceFactor,
-    forecastSales: Math.round(expected),
-    forecastSalesLow: Math.round(expected * LOW_FACTOR),
-    forecastSalesHigh: Math.round(expected * HIGH_FACTOR),
+    forecastSales: Math.round(expected - churnLoss),
+    forecastSalesLow: Math.round((expected - churnLoss) * LOW_FACTOR),
+    forecastSalesHigh: Math.round((expected - churnLoss) * HIGH_FACTOR),
+    churnProbability,
+    churnLoss: Math.round(churnLoss),
   };
 }
 
