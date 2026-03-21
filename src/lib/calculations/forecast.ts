@@ -15,6 +15,7 @@ import type {
   ForecastRampProfile,
   ForecastSurvivalProfile,
   ForecastVsActual,
+  TeamChurnRates,
 } from "@/types/forecast";
 
 // ============================================================================
