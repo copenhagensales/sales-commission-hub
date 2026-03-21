@@ -555,6 +555,7 @@ export class AdversusAdapter implements DialerAdapter {
     opp: string | null = null;
     resultData: Array<{ id: number; name?: string; label?: string; type?: string; value: any }> = [];
     resultFields: Record<string, any> = {};
+    phone: string | null = null;
   };
 
   // Build lead data map by fetching only the leads referenced in sales (individually via fetchLeadById)
