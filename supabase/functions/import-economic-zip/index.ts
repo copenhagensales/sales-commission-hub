@@ -221,7 +221,7 @@ Deno.serve(async (req) => {
     // Check if Excel or ZIP
     if (isExcelFile(storagePath)) {
       const buffer = await fileData.arrayBuffer();
-      const result = parseExcel(buffer);
+      const result = await parseExcel(buffer);
       kontoPlanData = result.kontoPlanData;
       posteringData = result.posteringData;
       filesFound.push(...result.sheetsFound.map(s => `${s} (sheet)`));
