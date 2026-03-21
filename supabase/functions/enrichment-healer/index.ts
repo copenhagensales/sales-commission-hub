@@ -14,11 +14,11 @@ function getSupabase() {
 }
 
 /**
- * Provider budget limits for healer (15% of hourly capacity)
+ * Provider budget limits for healer (normal vs turbo)
  */
-const HEALER_BUDGETS: Record<string, number> = {
-  adversus: 150,
-  enreach: 1500,
+const HEALER_BUDGETS: Record<string, { normal: number; turbo: number }> = {
+  adversus: { normal: 150, turbo: 800 },
+  enreach: { normal: 1500, turbo: 5000 },
 };
 
 /**
@@ -74,7 +74,8 @@ async function healAdversus(
   supabase: any,
   sales: any[],
   credentials: any,
-  log: (msg: string) => void
+  log: (msg: string) => void,
+  turboMode = false
 ): Promise<{ healed: number; failed: number; skipped: number }> {
   let healed = 0, failed = 0, skipped = 0;
 
@@ -147,7 +148,7 @@ async function healAdversus(
       healed++;
       log(`Healed Adversus sale ${sale.adversus_external_id} (lead ${leadId})`);
 
-      await new Promise(r => setTimeout(r, 1500));
+      await new Promise(r => setTimeout(r, turboMode ? 1200 : 1500));
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
       await supabase.from("sales").update({
@@ -172,7 +173,8 @@ async function healEnreach(
   sales: any[],
   credentials: any,
   integration: any,
-  log: (msg: string) => void
+  log: (msg: string) => void,
+  turboMode = false
 ): Promise<{ healed: number; failed: number; skipped: number }> {
   let healed = 0, failed = 0, skipped = 0;
 
@@ -249,7 +251,7 @@ async function healEnreach(
       healed++;
       log(`Healed Enreach sale ${externalId}`);
 
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, turboMode ? 300 : 500));
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
       await supabase.from("sales").update({
@@ -271,7 +273,8 @@ serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const maxBatch = body.maxBatch || 20;
+    const turboMode = body.turboMode === true;
+    const maxBatch = body.maxBatch || (turboMode ? 80 : 20);
     const saleExternalId = typeof body.saleExternalId === "string" ? body.saleExternalId.trim() : "";
     const providerFilter = typeof body.provider === "string" ? body.provider.trim() : "";
     const integrationIdFilter = typeof body.integrationId === "string" ? body.integrationId.trim() : "";
@@ -282,7 +285,7 @@ serve(async (req) => {
       logs.push(msg);
     };
 
-    log(`Starting enrichment healer (maxBatch=${maxBatch}, saleExternalId=${saleExternalId || "none"})`);
+    log(`Starting enrichment healer (maxBatch=${maxBatch}, turbo=${turboMode}, saleExternalId=${saleExternalId || "none"})`);
 
     // Fetch sales needing healing — include source for grouping by integration
     let salesQuery = supabase
@@ -332,12 +335,13 @@ serve(async (req) => {
       const provider = integType.toLowerCase();
 
       // Check budget for provider
-      const budget = HEALER_BUDGETS[provider];
-      if (budget) {
+      const budgetConfig = HEALER_BUDGETS[provider];
+      if (budgetConfig) {
+        const budget = turboMode ? budgetConfig.turbo : budgetConfig.normal;
         const usage = await getProviderUsage(supabase, provider);
         const maxCapacity = provider === "adversus" ? 1000 : 10000;
         if (usage >= (maxCapacity - budget)) {
-          log(`${provider} budget exhausted (${usage}/${maxCapacity}), skipping ${sales.length} ${source} sales`);
+          log(`${provider} budget exhausted (${usage}/${maxCapacity}, budget=${budget}), skipping ${sales.length} ${source} sales`);
           totalSkipped += sales.length;
           continue;
         }
@@ -355,9 +359,9 @@ serve(async (req) => {
 
       let result: { healed: number; failed: number; skipped: number };
       if (creds.integration.provider === "adversus") {
-        result = await healAdversus(supabase, sales, creds.credentials, log);
+        result = await healAdversus(supabase, sales, creds.credentials, log, turboMode);
       } else if (creds.integration.provider === "enreach") {
-        result = await healEnreach(supabase, sales, creds.credentials, creds.integration, log);
+        result = await healEnreach(supabase, sales, creds.credentials, creds.integration, log, turboMode);
       } else {
         log(`Unknown provider "${creds.integration.provider}" for source "${source}", skipping`);
         totalSkipped += sales.length;
