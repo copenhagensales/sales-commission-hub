@@ -256,6 +256,8 @@ export default function SalesValidation() {
       });
 
       refetchUploads();
+      setBillableText("");
+      setCancelledText("");
       toast.success(`Validering fuldført: ${matched} matchede annulleringer, ${unmatched} umatchede, ${unverified} uverificerede salg`);
     } catch (e) {
       console.error(e);
