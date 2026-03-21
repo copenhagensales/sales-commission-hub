@@ -218,15 +218,15 @@ export function calculateFullForecast(
       label: 'Lav fremmøde',
       impact: 'negative',
       value: `${Math.round(avgAttendance * 100)}%`,
-      description: `Gennemsnitlig fremmøde er ${Math.round(avgAttendance * 100)}%, hvilket reducerer effektive timer.`,
+      description: `Gennemsnitlig fremmøde er ${Math.round(avgAttendance * 100)}%. Fravær (ferie, sygdom) koster ~${Math.round(absenceLoss)} salg.`,
     });
   } else {
     drivers.push({
       key: 'attendance',
-      label: 'Fremmødefaktor',
-      impact: 'neutral',
-      value: `${Math.round(avgAttendance * 100)}%`,
-      description: `Gennemsnitlig fremmøde er ${Math.round(avgAttendance * 100)}%.`,
+      label: 'Fraværseffekt',
+      impact: absenceLoss > 20 ? 'negative' : 'neutral',
+      value: `-${Math.round(absenceLoss)} salg`,
+      description: `Gennemsnitlig fremmøde er ${Math.round(avgAttendance * 100)}%. Planlagt fravær (ferie, sygdom) koster ~${Math.round(absenceLoss)} salg.`,
     });
   }
   
