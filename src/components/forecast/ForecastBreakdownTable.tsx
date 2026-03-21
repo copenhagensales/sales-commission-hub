@@ -85,6 +85,17 @@ export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = f
                 {sortedEmployees.map((emp) => {
                   const actual = emp.actualSales || 0;
                   const total = actual + emp.forecastSales;
+
+                  // Risk badge logic
+                  let riskBadge: { label: string; className: string } | null = null;
+                  if (emp.churnProbability > 0.3) {
+                    riskBadge = { label: "Churn-risiko", className: "bg-destructive/10 text-destructive border-destructive/20" };
+                  } else if (emp.expectedSph > 0 && emp.expectedSph < avgSph * 0.5) {
+                    riskBadge = { label: "Lav SPH", className: "bg-amber-100 text-amber-700 border-amber-200" };
+                  } else if (emp.expectedSph >= avgSph * 1.2) {
+                    riskBadge = { label: "Top", className: "bg-emerald-100 text-emerald-700 border-emerald-200" };
+                  }
+
                   return (
                     <tr key={emp.employeeId} className="border-b last:border-0 hover:bg-muted/30">
                       <td className="py-2.5">
@@ -98,6 +109,13 @@ export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = f
                       <td className="py-2.5 text-right tabular-nums">{emp.plannedHours}</td>
                       <td className="py-2.5 text-right tabular-nums">{emp.expectedSph.toFixed(2)}</td>
                       <td className="py-2.5 text-right tabular-nums">{Math.round(emp.attendanceFactor * 100)}%</td>
+                      <td className="py-2.5 text-right">
+                        {riskBadge ? (
+                          <Badge variant="outline" className={`text-xs ${riskBadge.className}`}>{riskBadge.label}</Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </td>
                       {hasActuals ? (
                         <>
                           <td className="py-2.5 text-right tabular-nums font-medium">{actual}</td>
