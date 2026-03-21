@@ -72,6 +72,7 @@ export interface EmployeePerformance {
   teamName: string | null;
   avatarUrl: string | null;
   weeklySalesPerHour: number[]; // Most recent first
+  grossPlannedHours: number;
   plannedHours: number;
   personalAttendanceFactor: number;
   isEstablished: boolean;

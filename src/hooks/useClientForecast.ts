@@ -336,6 +336,7 @@ export function useClientForecast(clientId: string) {
           teamName,
           avatarUrl: emp.avatar_url || null,
           weeklySalesPerHour: weeklySph,
+          grossPlannedHours,
           plannedHours,
           personalAttendanceFactor: attendanceFactor,
           isEstablished,

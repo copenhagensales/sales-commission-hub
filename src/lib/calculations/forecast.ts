@@ -320,7 +320,8 @@ export function generateMockEmployees(): EmployeePerformance[] {
     personalAttendanceFactor: 0.88 + Math.random() * 0.10,
     isEstablished: true,
     daysSinceStart: 90 + Math.floor(Math.random() * 300),
-  }));
+  };
+  });
 }
 
 export function generateMockCohorts(): CohortForecastInput[] {
