@@ -200,6 +200,7 @@ export default function Forecast() {
                 <ForecastBreakdownTable
                   employees={forecast.establishedEmployees}
                   cohorts={forecast.cohorts}
+                  isCurrentPeriod={period === "current"}
                 />
                 <ForecastVsActualChart data={vsActual} />
               </div>

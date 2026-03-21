@@ -527,8 +527,15 @@ export function useClientForecast(clientId: string, period: "current" | "next" =
         // Combine: actual + remaining
         const totalExpected = actualSalesToDate + remainingForecast.totalSalesExpected;
         
+        // Enrich established employees with actual sales
+        const enrichedEmployees = remainingForecast.establishedEmployees.map(emp => ({
+          ...emp,
+          actualSales: actualSalesPerEmployee.get(emp.employeeId) || 0,
+        }));
+        
         const combinedForecast: ForecastResult = {
           ...remainingForecast,
+          establishedEmployees: enrichedEmployees,
           periodStart: forecastStartStr,
           totalSalesExpected: totalExpected,
           totalSalesLow: Math.round(actualSalesToDate + remainingForecast.totalSalesExpected * LOW_FACTOR),
