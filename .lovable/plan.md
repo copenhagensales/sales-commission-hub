@@ -1,45 +1,30 @@
 
 
-# Fix: Telefonnumre for alle integrationer fremadrettet
+# Backfill telefonnumre for eksisterende Eesy TM-salg
 
-## Problem
-Enreach-adapteren (`mapLeadToSale`) søger kun telefonnummer i 4 felter: `Telefon1`, `Telefon`, `Phone`, `Mobile`. Men forskellige kunder bruger forskellige feltnavne:
-
-| Klient | Felt med telefonnr. | Nuværende match? |
-|--------|---------------------|------------------|
-| Tryg | `Telefon1` | ✅ Ja |
-| Eesy | `contact_number`, `SUBSCRIBER_ID`, `Telefon Abo1` | ❌ Nej |
-| ASE | Sandsynligvis samme som Eesy | ❌ Nej |
-
-Adversus er allerede fixet (henter phone fra lead-data via `buildLeadDataMap`).
+## Status
+- **Eesy FM**: ✅ Alle 4.231 har telefonnummer — ingen aktion nødvendig
+- **Eesy TM**: ❌ 2.529 salg mangler telefonnummer (importeret før fix)
+- **Fremtidige Eesy TM**: ✅ Fixet er allerede deployet og virker
 
 ## Løsning
+Én SQL-migration der henter telefonnummeret direkte fra `raw_payload->'data'` (det ligger allerede der som `contact_number`, `SUBSCRIBER_ID` eller `Telefon Abo1`):
 
-### `supabase/functions/integration-engine/adapters/enreach.ts` — `mapLeadToSale` (~linje 771)
-
-Udvid listen af telefon-feltnavne der søges i:
-
-```typescript
-// Nuværende:
-customerPhone = this.getStr(dataObj, ["Telefon1", "Telefon", "Phone", "Mobile"]);
-
-// Nyt:
-customerPhone = this.getStr(dataObj, [
-  "Telefon1", "Telefon", "Phone", "Mobile",
-  "contact_number", "SUBSCRIBER_ID", "Telefon Abo1",
-  "phoneNumber", "PhoneNumber", "Mobilnummer"
-]);
+```sql
+UPDATE sales
+SET customer_phone = COALESCE(
+  NULLIF(raw_payload->'data'->>'contact_number', ''),
+  NULLIF(raw_payload->'data'->>'SUBSCRIBER_ID', ''),
+  NULLIF(raw_payload->'data'->>'Telefon Abo1', '')
+)
+WHERE source = 'Eesy'
+  AND (customer_phone IS NULL OR customer_phone = '')
+  AND raw_payload->'data' IS NOT NULL;
 ```
 
-Det er hele ændringen — én linje udvides med flere feltnavne. Dækker alle kendte Enreach-klienter (Tryg, Eesy, ASE).
+Ingen kodeændringer — kun én database-migration.
 
-### Resultat
-- Alle fremtidige Enreach-salg (Eesy, ASE) får telefonnummer ved import
-- Tryg fungerer allerede
-- Adversus er allerede fixet
-- Ingen ekstra API-kald
-
-| Fil | Ændring |
-|-----|---------|
-| `supabase/functions/integration-engine/adapters/enreach.ts` | Udvid telefon-feltnavne i `mapLeadToSale` |
+## Resultat
+- De 2.529 eksisterende Eesy TM-salg får telefonnumre udfyldt med det samme
+- Salgsvalideringen kan herefter matche Eesy-salg mod kundens telefonnumre
 
