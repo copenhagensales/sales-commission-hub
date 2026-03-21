@@ -1,43 +1,49 @@
 
 
-# Fix: Enrichment-healer bruger forkerte credentials (403 Forbidden)
+# Enrichment Catch-Up: Hent telefonnumre for ~2.340 feb-salg
 
-## Problem
-Enrichment-healeren henter credentials fra den **første** aktive integration for en given provider (f.eks. "adversus"). Det betyder at alle Adversus-salg heales med Lovablecph's API-nøgle — også Relatel-salg. Og alle Enreach-salg heales med én tilfældig Enreach-integrations credentials. Det giver **HTTP 403 Forbidden** fordi API-nøglerne ikke har adgang på tværs af konti.
+## Situationen
+- **2.340 pending** Adversus-salg fra februar mangler telefonnummer (1.983 Lovablecph + 357 Relatel)
+- Adversus API-limit: **1.000 kald/time per konto** (60/min)
+- Nuværende healer: 20 batch, 150/hr budget, kører hvert 15. min = **~80/time** → ville tage **29 timer**
+- Lovablecph og Relatel er **separate Adversus-konti** med hver deres limit
 
-**Berørte salg:** 100 salg med 403-fejl (76 Lovablecph, 23 Eesy, 10 ASE, 1 Relatel).
+## Plan: Turbo-mode i 2 timer
 
-## Løsning
-Ændre enrichment-healer til at gruppere salg efter `source` (= integrationsnavn) i stedet for `integration_type` (= provider), og hente credentials for den korrekte integration.
+Midlertidigt øg healer-kapaciteten og kør begge konti parallelt:
 
-### Ændringer i `supabase/functions/enrichment-healer/index.ts`
+| Parameter | Nu | Turbo |
+|-----------|-----|-------|
+| maxBatch | 20 | 80 |
+| Adversus budget | 150/hr | 800/hr |
+| Cron-interval | 15 min | 5 min |
+| Delay per sale | 1500ms | 1200ms |
 
-1. **Ny funktion `getCredentialsByName`** — erstatter `getProviderCredentials`. Slår op i `dialer_integrations` via `name` i stedet for `provider`, så den altid finder den rigtige konto.
+**Throughput**: ~80 sales × 12 runs/hr = **~960/hr per konto**. Med 2 konti parallelt: ~1.920/hr.  
+**Estimat**: ~1,5 timer for alle 2.340 salg.
 
-2. **Gruppér salg efter `source`** i stedet for `integration_type`:
-   - Nuværende: `adversusSales = filter(integration_type === "adversus")` → én credential-lookup
-   - Nyt: Gruppér efter `source` (f.eks. "Lovablecph", "Relatel_CPHSALES", "Eesy", "ase", "tryg") → én credential-lookup per source
+### Ændringer
 
-3. **Dispatch til rette heal-funktion** baseret på `integration_type` fra den matchede integration (adversus → `healAdversus`, enreach → `healEnreach`).
+**1. `enrichment-healer/index.ts`** — Tilføj `turboMode` parameter:
+- Når `turboMode: true`: batch=80, budget=800, delay=1200ms
+- Når false/default: eksisterende værdier (ingen breaking change)
 
-4. **Reset enrichment_attempts** for de 100 fejlede salg via en SQL migration, så de bliver hentet op igen med de korrekte credentials.
+**2. Midlertidig cron-opdatering** (SQL insert):
+- Skift cron fra `3,18,33,48 * * * *` til `*/5 * * * *` med `maxBatch: 80`
+- **Vigtigt**: Kører kun i 2 timer, derefter sætter vi cron tilbage
 
-### SQL data-fix
-```sql
-UPDATE sales 
-SET enrichment_status = 'pending', 
-    enrichment_attempts = 0, 
-    enrichment_error = NULL 
-WHERE enrichment_error = 'HTTP 403: Forbidden';
-```
+**3. Efter catch-up** — Gendan normal cron:
+- Sæt cron tilbage til `3,18,33,48 * * * *` med `maxBatch: 20`
+- Turbo-koden forbliver i healeren som opt-in, ingen skade
+
+### Sikkerhed
+- Adversus limit er 1.000/hr — vi bruger 800 og efterlader 200 til normal sync
+- Regular syncs bruger pt. kun ~16 kald/time (Lovablecph) og ~12 (Relatel)
+- Circuit breaker og 429-retry er stadig aktive
+- Kører i arbejdstid hvor vi kan monitorere
 
 ### Resultat
-- Hver integration bruger sine egne credentials til lead-opslag
-- De 100 fejlede salg bliver re-queued og healet korrekt
-- Fremtidige salg heales med korrekt konto fra start
-
-| Fil | Ændring |
-|-----|---------|
-| `supabase/functions/enrichment-healer/index.ts` | Gruppér efter `source`, hent credentials per integration-navn |
-| SQL migration | Reset 100 fejlede 403-salg til `pending` |
+- ~2.340 Tryg/TDC/Finansforbundet/Codan-salg fra februar får telefonnummer
+- Sales Validation-tallet falder fra 1.012 til tæt på 0
+- Normal drift genoptages efter ~2 timer
 
