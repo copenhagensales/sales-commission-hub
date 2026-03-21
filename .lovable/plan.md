@@ -1,47 +1,87 @@
 
 
-# Fyld TV League Dashboard — Nye data-elementer
+# Migrér fra sårbar `xlsx` pakke til `exceljs`
 
-## Nuværende tomme områder
-- **SceneMovements**: Plads under "Mest tjent sidste time" (3 rækker + tom bund)
-- **SceneRecords**: Kun 2 sektioner (højeste provision + 3 division-gennemsnit)
-- Generelt: Scenerne fylder ~60% af venstre kolonne
+## Problem
+`xlsx` (SheetJS Community Edition) v0.18.5 har to kendte high-severity sårbarheder:
+- **Prototype Pollution** (GHSA-4r6h-8v6p-xvw6)
+- **ReDoS** (GHSA-5pgg-2g8v-p4x9)
 
-## Nye data-elementer
+Pakken vedligeholdes ikke længere — der er ingen patch tilgængelig. Eneste løsning er at migrere til et andet bibliotek.
 
-### Backend: `supabase/functions/tv-league-data/index.ts`
+## Løsning
+Erstat `xlsx` med **`exceljs`** — et aktivt vedligeholdt bibliotek med lignende API til læsning og skrivning af Excel-filer.
 
-| Nyt felt | Beskrivelse | Datakilde |
-|----------|-------------|-----------|
-| `todayTopEarners` | Top 5 daglige indtjenere (hele dagen) | `get_sales_aggregates_v2` med dagens dato |
-| `teamRankings` | Top 3 teams by aggregeret provision | Aggregér `enriched` standings per `team_id` |
-| `todayLeagueTotal` | Samlet provision for alle liga-spillere i dag | Sum fra `todayTopEarners` data |
-| `longestStreak` | Spilleren med længste aktive streak (overgår forrige dag) | `employee_sales_streaks` tabel → `current_streak` |
-| `raceToTop` | Top 5 spillere med gap til #1 | Fra `enriched` standings |
-| `activeLast15Min` | Antal spillere med salg i sidste 15 min | `recentEarners.length` (allerede tilgængeligt) |
+## Berørte filer (6 frontend + 1 edge function)
 
-### Frontend: `src/pages/tv-board/TvLeagueDashboard.tsx`
+### Kun export (lavere risiko, men skal stadig migreres)
+| Fil | Brug |
+|-----|------|
+| `src/pages/reports/ReportsManagement.tsx` | Eksport af salgsrapport |
+| `src/pages/reports/LocationReportTab.tsx` | Eksport af lokationsrapport |
+| `src/components/billing/SupplierReportTab.tsx` | Eksport af leverandørrapport |
 
-**SceneMovements (udvid)**:
-- Tilføj **"Dagens Top 5"** sektion (hele dagens top-indtjenere under "Mest tjent sidste time")
-- Tilføj **"Aktive nu"** pill-badge (antal spillere med salg sidste 15 min)
+### Import/parsing (højere risiko — parser bruger-uploadede filer)
+| Fil | Brug |
+|-----|------|
+| `src/components/employees/EmployeeExcelImport.tsx` | Parsing af medarbejder-Excel |
+| `src/components/cancellations/UploadCancellationsTab.tsx` | Parsing af annullerings-Excel |
+| `src/pages/ExcelFieldMatcher.tsx` | Parsing af felt-match Excel |
 
-**SceneRecords (udvid)**:
-- Tilføj **"Længste streak 🔥"** kort (spilleren der har overgået forrige dag flest dage i træk)
-- Tilføj **"Team Ranking"** — top 3 teams med horisontale barer
-- Tilføj **"Dagens liga-total"** — samlet provision i dag som stort tal
+### Edge function
+| Fil | Brug |
+|-----|------|
+| `supabase/functions/import-economic-zip/index.ts` | Parsing af e-conomic Excel/ZIP (bruger esm.sh import) |
 
-**Ny scene 4: "Ligaoverblik"**:
-- **"Race to #1"** — horisontale barer for top 5 spillere med gap til #1
-- **"Divisionskamp"** — samlet provision per division (head-to-head)
-- **"Liga i tal"** — antal spillere, divisioner, samlet provision, aktive i dag
+## Migreringsplan
 
-**Rotation**: 4 scener med `[15_000, 20_000, 20_000, 20_000]` ms
+### 1. Installér `exceljs`, fjern `xlsx`
+- Tilføj `exceljs` som dependency
+- Fjern `xlsx` fra package.json
+- Opdatér `vite.config.ts` manualChunks: erstat `'vendor-xlsx': ['xlsx']` med `'vendor-xlsx': ['exceljs']`
 
-### Ændringer
+### 2. Migrér export-filer (3 filer)
+Erstat XLSX-write pattern:
+```
+// Før (xlsx)
+const ws = XLSX.utils.json_to_sheet(rows);
+const wb = XLSX.utils.book_new();
+XLSX.utils.book_append_sheet(wb, ws, "Sheet");
+XLSX.writeFile(wb, "file.xlsx");
 
-| Fil | Handling |
-|-----|---------|
-| `supabase/functions/tv-league-data/index.ts` | Tilføj `todayTopEarners`, `teamRankings`, `todayLeagueTotal`, `longestStreak`, `raceToTop` |
-| `src/pages/tv-board/TvLeagueDashboard.tsx` | Udvid Movements + Records, tilføj ny "Ligaoverblik" scene |
+// Efter (exceljs)
+const wb = new ExcelJS.Workbook();
+const ws = wb.addWorksheet("Sheet");
+ws.columns = [...];
+ws.addRows(rows);
+const buffer = await wb.xlsx.writeBuffer();
+saveAs(new Blob([buffer]), "file.xlsx");
+```
+
+### 3. Migrér import-filer (3 filer)
+Erstat XLSX-read pattern:
+```
+// Før (xlsx)
+const wb = XLSX.read(data, { type: "array" });
+const ws = wb.Sheets[wb.SheetNames[0]];
+const rows = XLSX.utils.sheet_to_json(ws);
+
+// Efter (exceljs)
+const wb = new ExcelJS.Workbook();
+await wb.xlsx.load(data);
+const ws = wb.getWorksheet(1);
+// Iterér rækker manuelt
+```
+
+### 4. Migrér edge function
+- Erstat `https://esm.sh/xlsx@0.18.5` med `https://esm.sh/exceljs` i `import-economic-zip/index.ts`
+- Tilpas `parseExcel()` funktionen til exceljs API
+
+### 5. Tilføj `file-saver` som dependency
+ExcelJS skriver til buffer — brug `file-saver` (eller en simpel blob-download helper) til at trigge fildownload i browseren.
+
+## Tekniske noter
+- ExcelJS er ~200KB larger end xlsx, men understøtter streaming og har aktiv vedligeholdelse
+- Alle eksisterende kolonnebredder og formatering bevares via exceljs column-config
+- Edge function bruger ESM-import og skal testes separat efter migrering
 
