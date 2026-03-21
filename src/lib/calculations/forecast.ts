@@ -454,6 +454,8 @@ export function generateMockCohorts(): CohortForecastInput[] {
       campaignBaselineSph: 0.45,
       weeklyHoursPerHead: DEFAULT_WEEKLY_HOURS,
       attendanceFactor: 0.90,
+      periodStart,
+      periodEnd,
     },
   ];
 }
