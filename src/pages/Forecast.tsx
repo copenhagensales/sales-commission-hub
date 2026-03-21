@@ -4,6 +4,7 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { BarChart3, RefreshCcw, Loader2 } from "lucide-react";
 import { ForecastKpiCards } from "@/components/forecast/ForecastKpiCards";
 import { ForecastDriversPanel } from "@/components/forecast/ForecastDriversPanel";
@@ -21,6 +22,7 @@ import type { ClientForecastCohort } from "@/types/forecast";
 
 export default function Forecast() {
   const [selectedClient, setSelectedClient] = useState("all");
+  const [period, setPeriod] = useState<"current" | "next">("next");
   const queryClient = useQueryClient();
 
   // Fetch real clients for dropdown
