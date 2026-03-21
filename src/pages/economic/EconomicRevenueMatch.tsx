@@ -129,12 +129,17 @@ function useSystemRevenue(year: number) {
   });
 }
 
+function wordsMatch(text: string, pattern: string): boolean {
+  const textLower = text.toLowerCase();
+  const words = pattern.toLowerCase().split(/\s+/).filter(Boolean);
+  return words.every(word => textLower.includes(word));
+}
+
 function matchPostering(p: Postering, mappings: any[]): { mapping: any; matchType: string } | null {
   if (!p.tekst) return null;
-  const lower = p.tekst.toLowerCase();
   for (const m of mappings) {
-    if (lower.includes(m.match_pattern.toLowerCase())) {
-      return { mapping: m, matchType: "contains" };
+    if (wordsMatch(p.tekst, m.match_pattern)) {
+      return { mapping: m, matchType: "words" };
     }
   }
   return null;
@@ -231,8 +236,7 @@ export default function EconomicRevenueMatch() {
   // Match preview for new pattern
   const matchPreview = useMemo(() => {
     if (!newPattern || !posteringer) return null;
-    const lower = newPattern.toLowerCase();
-    const matched = posteringer.filter(p => p.tekst && p.tekst.toLowerCase().includes(lower));
+    const matched = posteringer.filter(p => p.tekst && wordsMatch(p.tekst, newPattern));
     const months = new Set(matched.map(p => p.maaned));
     const totalAmount = matched.reduce((s, p) => s + Math.abs(p.beloeb_dkk), 0);
     const examples = [...new Set(matched.map(p => p.tekst).filter(Boolean))].slice(0, 5);
@@ -512,7 +516,7 @@ export default function EconomicRevenueMatch() {
                     <TableBody>
                       {mappings.map((m: any) => {
                         const hitCount = posteringer
-                          ? posteringer.filter(p => p.tekst && p.tekst.toLowerCase().includes(m.match_pattern.toLowerCase())).length
+                          ? posteringer.filter(p => p.tekst && wordsMatch(p.tekst, m.match_pattern)).length
                           : 0;
                         return (
                           <TableRow key={m.id}>
@@ -620,7 +624,43 @@ export default function EconomicRevenueMatch() {
           </TabsContent>
 
           {/* Tab 2: Deviation Report */}
-          <TabsContent value="afvigelse">
+          <TabsContent value="afvigelse" className="space-y-4">
+            {/* Unmapped summary */}
+            {!isLoading && posteringer && mappings && (() => {
+              const filtered = selectedMonths.length > 0
+                ? posteringer.filter(p => selectedMonths.includes(p.maaned))
+                : posteringer;
+              const unmapped = filtered.filter(p => !matchPostering(p, mappings));
+              const unmappedTotal = unmapped.reduce((s, p) => s + Math.abs(p.beloeb_dkk), 0);
+              const uniqueTexts = [...new Set(unmapped.map(p => p.tekst).filter(Boolean))].sort();
+              if (unmapped.length === 0) return null;
+              return (
+                <Card className="border-amber-300 dark:border-amber-700 bg-amber-50/50 dark:bg-amber-950/20">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base flex items-center gap-2 text-amber-700 dark:text-amber-400">
+                      <AlertTriangle className="h-5 w-5" />
+                      {unmapped.length} umappede posteringer ({formatDKK(unmappedTotal)})
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      {unmapped.length} af {filtered.length} posteringer er ikke koblet til en kunde
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                      {uniqueTexts.slice(0, 30).map((txt, i) => (
+                        <Badge key={i} variant="outline" className="text-xs font-mono">
+                          {txt}
+                        </Badge>
+                      ))}
+                      {uniqueTexts.length > 30 && (
+                        <Badge variant="outline" className="text-xs">+{uniqueTexts.length - 30} mere</Badge>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })()}
+
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Afvigelsesrapport</CardTitle>
