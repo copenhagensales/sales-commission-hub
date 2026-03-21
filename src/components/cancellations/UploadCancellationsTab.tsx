@@ -122,7 +122,7 @@ export function UploadCancellationsTab() {
         });
       }
     };
-    reader.readAsBinaryString(uploadedFile);
+    reader.readAsArrayBuffer(uploadedFile);
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
