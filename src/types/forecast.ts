@@ -100,7 +100,21 @@ export interface EmployeeForecastResult {
   forecastSales: number;
   forecastSalesLow: number;
   forecastSalesHigh: number;
+  churnProbability: number;
+  churnLoss: number;
 }
+
+// ============================================================================
+// TEAM CHURN RATES
+// ============================================================================
+
+export interface TenureBucketRates {
+  bucket0_60: number;   // monthly churn rate for 0-60 days tenure
+  bucket61_180: number; // monthly churn rate for 61-180 days tenure
+  bucket180plus: number; // monthly churn rate for 180+ days tenure
+}
+
+export type TeamChurnRates = Map<string, TenureBucketRates>;
 
 export interface CohortForecastResult {
   cohortId: string;
