@@ -1,40 +1,55 @@
 
 
-# KPI-kort på Salgsvalidering
+# Fix: Telefonnumre mangler fra Adversus-salg
 
-## Koncept
-Når en kunde + periode er valgt, hentes automatisk salgsdata for den valgte periode og vises som KPI-kort øverst — uafhængigt af om der er kørt en validering endnu. Efter validering opdateres kortene med match-status.
+## Årsag
+Adversus API'ens `/results` endpoint returnerer salgsobjekter **uden lead-kontaktdata** — der er intet `lead.phone` felt. Adapteren sætter `customerPhone: s.lead?.phone || ""` som altid er tom.
 
-## KPI-kort (altid synlige når kunde+periode er valgt)
+Enrichment-healeren henter efterfølgende lead-data fra `/leads/{leadId}` og får telefonnummeret, men **gemmer det ikke** — den opdaterer kun `raw_payload.leadResultFields` (custom fields) og sætter aldrig `customer_phone`.
 
-| KPI | Kilde | Beskrivelse |
-|-----|-------|-------------|
-| **Registrerede salg** | `sales` query | Antal interne salg i perioden |
-| **Samlet omsætning** | `sale_items.mapped_revenue` | Sum af omsætning for perioden |
-| **Verificerede salg** | Efter validering | Salg matchet mod kundens fakturerbare liste |
-| **Uverificerede salg** | Efter validering | Salg der IKKE er på kundens liste |
-| **Matchede annulleringer** | Efter validering | Annulleringer med identificeret sælger |
-| **Umatchede annulleringer** | Efter validering | Annulleringer uden internt match |
+**Resultat**: 1.012 ud af 1.522 Tryg-salg i februar har `customer_phone = NULL`.
 
-## Teknisk
+## Løsning
+Ret enrichment-healeren til også at ekstrahere og gemme telefonnummeret fra lead-data.
 
-### `src/pages/economic/SalesValidation.tsx`
+## Teknisk ændring
 
-1. **Ny query**: Når `clientId` og `periodMonth` er sat, hent aggregerede tal via `sale_items` join `sales` (antal salg via `SUM(quantity)`, omsætning via `SUM(mapped_revenue)`, provision via `SUM(mapped_commission)`) for den valgte kunde+periode.
+### `supabase/functions/enrichment-healer/index.ts` (~linje 114-146)
 
-2. **KPI-kort sektion**: Indsæt en grid med 4-6 `Card`-komponenter mellem kunde/periode-vælger og tekstfelterne. De første 2-3 kort (registrerede salg, omsætning, provision) vises altid. De resterende (verificerede, uverificerede, annulleringer) vises kun efter en validering er kørt — baseret på `results` state.
+I `healAdversus`-funktionen, efter `const leadData = await response.json()`:
 
-3. **Beregning fra results**: Udled fra eksisterende `results`-array:
-   - Verificerede = `category === "verified_sale"`
-   - Uverificerede = `category === "unverified_sale"`  
-   - Matchede annulleringer = `category === "matched_cancellation"`
-   - For omsætning på uverificerede: sumér `mapped_revenue` fra de matchede sale_items
+1. Ekstraher telefonnummer: `const phone = leadData.phone || leadData.contactPhone || null`
+2. Tilføj `customer_phone: phone` til `supabase.from("sales").update({...})` kaldet (linje 140-146), så telefonnummeret gemmes direkte i kolonnen
 
-4. **Farve-kodning**: Grøn for verificerede, rød/orange for uverificerede og annulleringer, blå for totaler.
+```typescript
+// Eksisterende: gemmer kun leadResultFields
+await supabase.from("sales").update({
+  raw_payload: updatedPayload,
+  enrichment_status: "healed",
+  ...
+}).eq("id", sale.id);
 
-### Fil
+// Nyt: gemmer også telefonnummer
+const phone = leadData.phone || leadData.contactPhone || null;
+await supabase.from("sales").update({
+  raw_payload: updatedPayload,
+  enrichment_status: "healed",
+  ...(phone && !sale.customer_phone ? { customer_phone: phone } : {}),
+  ...
+}).eq("id", sale.id);
+```
+
+### Backfill af eksisterende data
+Kør en one-time opdatering: For alle salg med `enrichment_status = 'healed'` og `customer_phone IS NULL`, re-kør enrichment-healeren. Alternativt kan vi lave en simpel migration der sætter `enrichment_status = 'pending'` for disse salg, så den eksisterende cron-job re-healer dem.
+
+## Filer
 
 | Fil | Ændring |
 |-----|---------|
-| `src/pages/economic/SalesValidation.tsx` | Tilføj salgs-aggregat query + KPI-kort grid |
+| `supabase/functions/enrichment-healer/index.ts` | Tilføj `customer_phone` til update-kaldet i `healAdversus` |
+
+## Resultat
+- Nye salg fra Adversus får automatisk telefonnummer ved enrichment
+- Eksisterende salg kan re-heales for at udfylde telefonnumre
+- Salgsvalidering vil kunne matche langt flere salg (1.500+ i stedet for 510)
 
