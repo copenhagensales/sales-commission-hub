@@ -7,10 +7,20 @@ import { ForecastIntervalBadge } from "./ForecastIntervalBadge";
 interface Props {
   employees: EmployeeForecastResult[];
   cohorts: CohortForecastResult[];
+  isCurrentPeriod?: boolean;
 }
 
-export function ForecastBreakdownTable({ employees, cohorts }: Props) {
-  const sortedEmployees = [...employees].sort((a, b) => b.forecastSales - a.forecastSales);
+export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = false }: Props) {
+  const sortedEmployees = [...employees].sort((a, b) => {
+    if (isCurrentPeriod) {
+      const totalA = (a.actualSales || 0) + a.forecastSales;
+      const totalB = (b.actualSales || 0) + b.forecastSales;
+      return totalB - totalA;
+    }
+    return b.forecastSales - a.forecastSales;
+  });
+
+  const hasActuals = isCurrentPeriod && sortedEmployees.some(e => (e.actualSales || 0) > 0);
 
   return (
     <div className="space-y-4">
@@ -31,33 +41,55 @@ export function ForecastBreakdownTable({ employees, cohorts }: Props) {
                   <th className="pb-2 font-medium text-muted-foreground text-right">Timer</th>
                   <th className="pb-2 font-medium text-muted-foreground text-right">Salg/time</th>
                   <th className="pb-2 font-medium text-muted-foreground text-right">Fremmøde</th>
-                  <th className="pb-2 font-medium text-muted-foreground text-right">Forecast</th>
+                  {hasActuals ? (
+                    <>
+                      <th className="pb-2 font-medium text-muted-foreground text-right">Faktisk</th>
+                      <th className="pb-2 font-medium text-muted-foreground text-right">Rest</th>
+                      <th className="pb-2 font-medium text-muted-foreground text-right">Total</th>
+                    </>
+                  ) : (
+                    <th className="pb-2 font-medium text-muted-foreground text-right">Forecast</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
-                {sortedEmployees.map((emp) => (
-                  <tr key={emp.employeeId} className="border-b last:border-0 hover:bg-muted/30">
-                    <td className="py-2.5">
-                      <div>
-                        <p className="font-medium">{emp.employeeName}</p>
-                        {emp.teamName && (
-                          <p className="text-xs text-muted-foreground">{emp.teamName}</p>
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-2.5 text-right tabular-nums">{emp.plannedHours}</td>
-                    <td className="py-2.5 text-right tabular-nums">{emp.expectedSph.toFixed(2)}</td>
-                    <td className="py-2.5 text-right tabular-nums">{Math.round(emp.attendanceFactor * 100)}%</td>
-                    <td className="py-2.5 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <span className="font-semibold tabular-nums">{emp.forecastSales}</span>
-                        <span className="text-xs text-muted-foreground">
-                          ({emp.forecastSalesLow}-{emp.forecastSalesHigh})
-                        </span>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {sortedEmployees.map((emp) => {
+                  const actual = emp.actualSales || 0;
+                  const total = actual + emp.forecastSales;
+                  return (
+                    <tr key={emp.employeeId} className="border-b last:border-0 hover:bg-muted/30">
+                      <td className="py-2.5">
+                        <div>
+                          <p className="font-medium">{emp.employeeName}</p>
+                          {emp.teamName && (
+                            <p className="text-xs text-muted-foreground">{emp.teamName}</p>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-2.5 text-right tabular-nums">{emp.plannedHours}</td>
+                      <td className="py-2.5 text-right tabular-nums">{emp.expectedSph.toFixed(2)}</td>
+                      <td className="py-2.5 text-right tabular-nums">{Math.round(emp.attendanceFactor * 100)}%</td>
+                      {hasActuals ? (
+                        <>
+                          <td className="py-2.5 text-right tabular-nums font-medium">{actual}</td>
+                          <td className="py-2.5 text-right tabular-nums text-muted-foreground">{emp.forecastSales}</td>
+                          <td className="py-2.5 text-right">
+                            <span className="font-semibold tabular-nums">{total}</span>
+                          </td>
+                        </>
+                      ) : (
+                        <td className="py-2.5 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <span className="font-semibold tabular-nums">{emp.forecastSales}</span>
+                            <span className="text-xs text-muted-foreground">
+                              ({emp.forecastSalesLow}-{emp.forecastSalesHigh})
+                            </span>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
               </tbody>
               <tfoot>
                 <tr className="border-t font-semibold">
@@ -65,7 +97,15 @@ export function ForecastBreakdownTable({ employees, cohorts }: Props) {
                   <td className="pt-2 text-right tabular-nums">{employees.reduce((s, e) => s + e.plannedHours, 0)}</td>
                   <td className="pt-2 text-right">—</td>
                   <td className="pt-2 text-right">—</td>
-                  <td className="pt-2 text-right tabular-nums">{employees.reduce((s, e) => s + e.forecastSales, 0)}</td>
+                  {hasActuals ? (
+                    <>
+                      <td className="pt-2 text-right tabular-nums">{employees.reduce((s, e) => s + (e.actualSales || 0), 0)}</td>
+                      <td className="pt-2 text-right tabular-nums">{employees.reduce((s, e) => s + e.forecastSales, 0)}</td>
+                      <td className="pt-2 text-right tabular-nums">{employees.reduce((s, e) => s + (e.actualSales || 0) + e.forecastSales, 0)}</td>
+                    </>
+                  ) : (
+                    <td className="pt-2 text-right tabular-nums">{employees.reduce((s, e) => s + e.forecastSales, 0)}</td>
+                  )}
                 </tr>
               </tfoot>
             </table>

@@ -102,6 +102,7 @@ export interface EmployeeForecastResult {
   forecastSales: number;
   forecastSalesLow: number;
   forecastSalesHigh: number;
+  actualSales?: number;
   churnProbability: number;
   churnLoss: number;
 }
