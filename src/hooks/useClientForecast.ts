@@ -462,15 +462,16 @@ export function useClientForecast(clientId: string, period: "current" | "next" =
       if (period === "current") {
         const todayStr = format(now, "yyyy-MM-dd");
         
-        // Count working days elapsed and remaining
-        const cur = new Date(forecastStart);
-        while (cur <= forecastEnd) {
-          const dow = cur.getDay();
-          if (dow !== 0 && dow !== 6) { // weekdays only
-            if (cur <= now) daysElapsed++;
+        // Count working days elapsed and remaining (exclude weekends + holidays)
+        const cur2 = new Date(forecastStart);
+        while (cur2 <= forecastEnd) {
+          const dow = cur2.getDay();
+          const ds = format(cur2, "yyyy-MM-dd");
+          if (dow !== 0 && dow !== 6 && !holidayDates.has(ds)) {
+            if (cur2 <= now) daysElapsed++;
             else daysRemaining++;
           }
-          cur.setDate(cur.getDate() + 1);
+          cur2.setDate(cur2.getDate() + 1);
         }
         
         // Fetch actual sales this month — per agent email
