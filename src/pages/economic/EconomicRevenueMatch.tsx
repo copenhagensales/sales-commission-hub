@@ -278,7 +278,7 @@ export default function EconomicRevenueMatch() {
       if (!match || !match.mapping.client_id) return;
       const cid = match.mapping.client_id;
       if (!invoicedByClientMonth[cid]) invoicedByClientMonth[cid] = {};
-      invoicedByClientMonth[cid][month] = (invoicedByClientMonth[cid][month] || 0) + Math.abs(p.beloeb_dkk);
+      invoicedByClientMonth[cid][month] = (invoicedByClientMonth[cid][month] || 0) + (-p.beloeb_dkk);
     });
 
     const allClientIds = new Set<string>([
