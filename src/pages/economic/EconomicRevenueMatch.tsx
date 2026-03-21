@@ -293,6 +293,7 @@ export default function EconomicRevenueMatch() {
     const rows: Array<{
       clientId: string; clientName: string; month: string;
       invoiced: number; system: number; deviation: number; deviationPct: number;
+      invoiceNrs: string[];
     }> = [];
 
     allClientIds.forEach(cid => {
@@ -307,7 +308,8 @@ export default function EconomicRevenueMatch() {
         if (invoiced === 0 && system === 0) return;
         const deviation = invoiced - system;
         const deviationPct = system > 0 ? ((invoiced - system) / system) * 100 : invoiced > 0 ? 100 : 0;
-        rows.push({ clientId: cid, clientName: clientMap.get(cid) || "Ukendt", month, invoiced, system, deviation, deviationPct });
+        const invoiceNrs = Array.from(invoicesByClientMonth[cid]?.[month] || []).sort();
+        rows.push({ clientId: cid, clientName: clientMap.get(cid) || "Ukendt", month, invoiced, system, deviation, deviationPct, invoiceNrs });
       });
     });
 
