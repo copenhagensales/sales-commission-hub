@@ -1,31 +1,46 @@
 
 
-# Tilføj "Salg uden telefonnr." KPI + total-kontekst
+# Ny fane: Sælgeroversigt på Salgsvalidering
 
-## Problem
-"Registrerede salg" viser 1.522, men valideringsresultaterne (verificerede + uverificerede + annulleringer) summerer kun til ~510 — fordi 1.012 salg uden telefonnummer springes over i matchingen. Der mangler en KPI der viser dette gap.
+## Koncept
+En ny Tabs-baseret visning på SalesValidation-siden med to faner:
+1. **Validering** (eksisterende) — input, matching, resultater
+2. **Sælgeroversigt** (ny) — aggregeret per-sælger tabel baseret på valideringsresultater
 
-## Ændringer i `src/pages/economic/SalesValidation.tsx`
+Når der er valgt en kunde + periode og der er kørt en validering (eller indlæst en tidligere), viser fane 2 en tabel med:
 
-### 1. Udvid salesStats query til at tælle salg med/uden telefonnummer
-Tilføj en ekstra query (eller udvid den eksisterende) der henter antal salg med `customer_phone IS NOT NULL` vs total antal salg. Brug `sales`-tabellen direkte med `count` for begge kategorier.
+| Sælger | Totale salg | Verificerede | Uverificerede | Annulleringer | Verificeringsrate |
+|--------|------------|--------------|---------------|---------------|-------------------|
+| Kasper M | 45 | 32 | 10 | 3 | 71% |
 
-### 2. Tilføj KPI-kort "Uden telefonnr." (altid synligt)
-Mellem "Provision" og de post-validerings KPI'er, tilføj et gult/orange kort der viser antal salg uden telefonnummer. Disse kan ikke auto-valideres.
+## Data
+Bruger den eksisterende `results` state (array af `MatchResult[]`), som allerede indeholder `matched.agentName` og `category`. Aggregerer client-side med `useMemo` — ingen ny query nødvendig.
 
-### 3. Tilføj KPI "Valideret dækning" efter validering
-Vis en procentsats: `(verificerede + matchede annulleringer) / totalSales` — så brugeren kan se hvor stor en andel af alle salg der er dækket.
+Beregninger per sælger:
+- **Totale salg**: `verified_sale` + `unverified_sale` + `matched_cancellation` (alle med denne sælger)
+- **Verificerede**: `category === "verified_sale"`
+- **Uverificerede**: `category === "unverified_sale"`
+- **Annulleringer**: `category === "matched_cancellation"`
+- **Verificeringsrate**: `verificerede / (verificerede + uverificerede)` i procent
 
-### 4. Opdatér "Registrerede salg" med undertekst
-Vis fx `1.522 total` med en lille `text-xs` linje under: `510 med tlf · 1.012 uden`.
+Sorteret efter totale salg, faldende.
 
-### Layout
-```
-[Registrerede salg]  [Omsætning]  [Provision]  [Uden tlf.nr]
-     1.522              304.400kr     114.150kr     1.012
-  510 m/tlf                                      Kan ikke valideres
+## Teknisk
 
---- efter validering ---
-[Verificerede]  [Uverificerede]  [Annulleringer]
-```
+### `src/pages/economic/SalesValidation.tsx`
+
+1. **Import** `Tabs, TabsContent, TabsList, TabsTrigger` fra `@/components/ui/tabs`
+2. **Ny `useMemo`**: `sellerStats` der grupperer `results` per `agentName` og beregner de 5 kolonner
+3. **Wrap** eksisterende indhold i `<TabsContent value="validation">` og tilføj `<TabsContent value="sellers">` med tabellen
+4. `Tabs` placeres lige efter kunde/periode-vælgeren og KPI-kortene, så begge faner deler dem
+
+### UI for sælger-fanen
+- Tabel med kolonner: Sælger, Total, Verificerede, Uverificerede, Annulleringer, Rate
+- Farve-kodning: grøn badge for høj rate (>80%), gul for middel (50-80%), rød for lav (<50%)
+- Vis "Kør en validering først" besked hvis `results` er null
+- Totalrække i bunden
+
+| Fil | Ændring |
+|-----|---------|
+| `src/pages/economic/SalesValidation.tsx` | Tilføj Tabs + sælgeroversigt fane |
 
