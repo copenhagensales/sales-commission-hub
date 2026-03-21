@@ -410,6 +410,9 @@ export function generateMockCohorts(): CohortForecastInput[] {
   const nextMonth = new Date();
   nextMonth.setMonth(nextMonth.getMonth() + 1);
   nextMonth.setDate(1);
+  const endOfNextMonth = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0);
+  const periodStart = nextMonth.toISOString().split('T')[0];
+  const periodEnd = endOfNextMonth.toISOString().split('T')[0];
   
   return [
     {
