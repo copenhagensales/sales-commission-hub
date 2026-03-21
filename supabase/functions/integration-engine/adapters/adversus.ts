@@ -316,7 +316,7 @@ export class AdversusAdapter implements DialerAdapter {
         agentName: agentName,
 
         customerName: s.lead?.company || s.lead?.name || "",
-        customerPhone: s.lead?.phone || "",
+        customerPhone: s.lead?.phone || leadData?.phone || "",
 
         campaignId: campaignId,
         campaignName: s.campaign?.name || undefined,
