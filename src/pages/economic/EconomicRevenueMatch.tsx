@@ -244,7 +244,7 @@ export default function EconomicRevenueMatch() {
     if (!newPattern || !posteringer) return null;
     const matched = posteringer.filter(p => p.tekst && wordsMatch(p.tekst, newPattern));
     const months = new Set(matched.map(p => p.maaned));
-    const totalAmount = matched.reduce((s, p) => s + Math.abs(p.beloeb_dkk), 0);
+    const totalAmount = matched.reduce((s, p) => s + (-p.beloeb_dkk), 0);
     const examples = [...new Set(matched.map(p => p.tekst).filter(Boolean))].slice(0, 5);
     return {
       count: matched.length,
