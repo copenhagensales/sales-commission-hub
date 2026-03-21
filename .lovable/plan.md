@@ -1,41 +1,45 @@
 
 
-# Sikr telefonnumre ved import fremadrettet
+# Fix: Telefonnumre for alle integrationer fremadrettet
 
 ## Problem
-Adversus `/results` endpoint returnerer salg **uden** `lead.phone`. Adapteren sætter `customerPhone: s.lead?.phone || ""` som altid er tom.
+Enreach-adapteren (`mapLeadToSale`) søger kun telefonnummer i 4 felter: `Telefon1`, `Telefon`, `Phone`, `Mobile`. Men forskellige kunder bruger forskellige feltnavne:
 
-`buildLeadDataMap` henter allerede lead-data via `/leads/{leadId}` for at finde OPP-numre, men **gemmer ikke telefonnummeret** fra lead-svaret — kun `opp`, `resultData` og `resultFields`.
+| Klient | Felt med telefonnr. | Nuværende match? |
+|--------|---------------------|------------------|
+| Tryg | `Telefon1` | ✅ Ja |
+| Eesy | `contact_number`, `SUBSCRIBER_ID`, `Telefon Abo1` | ❌ Nej |
+| ASE | Sandsynligvis samme som Eesy | ❌ Nej |
+
+Adversus er allerede fixet (henter phone fra lead-data via `buildLeadDataMap`).
 
 ## Løsning
-Udvid `buildLeadDataMap` til også at gemme `phone` fra lead-data, og brug det i sale-objektet.
 
-## Ændringer
+### `supabase/functions/integration-engine/adapters/enreach.ts` — `mapLeadToSale` (~linje 771)
 
-### 1. `supabase/functions/integration-engine/adapters/adversus.ts`
+Udvid listen af telefon-feltnavne der søges i:
 
-**Udvid return-typen for `leadIdToData`** (linje 565-566):
-- Tilføj `phone: string | null` til map-værdien, så den også indeholder telefonnummeret
+```typescript
+// Nuværende:
+customerPhone = this.getStr(dataObj, ["Telefon1", "Telefon", "Phone", "Mobile"]);
 
-**I `buildLeadDataMap`** (linje 598-621):
-- Ekstraher `phone` fra `leadData`: `const phone = leadData.phone || leadData.contactPhone || leadData.mobile || null`
-- Gem det i map'et: `leadIdToData.set(leadId, { opp, resultData, resultFields, phone })`
+// Nyt:
+customerPhone = this.getStr(dataObj, [
+  "Telefon1", "Telefon", "Phone", "Mobile",
+  "contact_number", "SUBSCRIBER_ID", "Telefon Abo1",
+  "phoneNumber", "PhoneNumber", "Mobilnummer"
+]);
+```
 
-**I `fetchSales`** (linje 297-319):
-- Brug `leadData?.phone` som fallback for `customerPhone`:
-  ```
-  customerPhone: s.lead?.phone || leadData?.phone || ""
-  ```
-
-**I `fetchSalesRange`** (linje 471-487):
-- Samme ændring: brug `leadData?.phone` som fallback
+Det er hele ændringen — én linje udvides med flere feltnavne. Dækker alle kendte Enreach-klienter (Tryg, Eesy, ASE).
 
 ### Resultat
-- Alle fremtidige Adversus-salg får telefonnummer direkte ved import
-- Ingen ekstra API-kald — data hentes allerede i `buildLeadDataMap`
-- Enrichment-healeren behøver ikke længere udfylde telefonnumre for nye salg
+- Alle fremtidige Enreach-salg (Eesy, ASE) får telefonnummer ved import
+- Tryg fungerer allerede
+- Adversus er allerede fixet
+- Ingen ekstra API-kald
 
 | Fil | Ændring |
 |-----|---------|
-| `supabase/functions/integration-engine/adapters/adversus.ts` | Tilføj `phone` til `buildLeadDataMap` og brug det i `fetchSales`/`fetchSalesRange` |
+| `supabase/functions/integration-engine/adapters/enreach.ts` | Udvid telefon-feltnavne i `mapLeadToSale` |
 
