@@ -23,8 +23,8 @@ import type {
 // ============================================================================
 
 const EWMA_DECAY = 0.85;
-const LOW_FACTOR = 0.85;
-const HIGH_FACTOR = 1.12;
+export const LOW_FACTOR = 0.85;
+export const HIGH_FACTOR = 1.12;
 const DEFAULT_WEEKLY_HOURS = 37;
 
 // ============================================================================

@@ -5,6 +5,8 @@ import {
   calculateFullForecast,
   MOCK_RAMP_PROFILE,
   MOCK_SURVIVAL_PROFILE,
+  LOW_FACTOR,
+  HIGH_FACTOR,
 } from "@/lib/calculations/forecast";
 import type {
   EmployeePerformance,
@@ -304,7 +306,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" =
           const we = endOfWeek(ws, { weekStartsOn: 1 });
           const shiftsInWeek = countShifts(emp.id, ws, we, true); // exclude absences
           
-          // Skip weeks with 0 effective shifts (full vacation/sick) — not low performance
+          // Skip weeks with 0 effective shifts (full vacation/sick)
           if (shiftsInWeek === 0) continue;
           
           const hoursInWeek = shiftsInWeek * HOURS_PER_SHIFT;
@@ -316,6 +318,9 @@ export function useClientForecast(clientId: string, period: "current" | "next" =
               salesInWeek += weekMap.get(ws.getTime()) || 0;
             }
           }
+
+          // Skip weeks with 0 sales and very few shifts (likely unrecorded absence)
+          if (salesInWeek === 0 && shiftsInWeek <= 2) continue;
 
           const sph = hoursInWeek > 0 ? salesInWeek / hoursInWeek : 0;
           weeklySph.push(sph);
@@ -431,7 +436,113 @@ export function useClientForecast(clientId: string, period: "current" | "next" =
         attendanceFactor: avgAttendance,
       }));
 
-      // 8. Calculate full forecast
+      // 8. For current period: fetch actual sales to date
+      let actualSalesToDate = 0;
+      let daysElapsed = 0;
+      let daysRemaining = 0;
+      
+      if (period === "current") {
+        const todayStr = format(now, "yyyy-MM-dd");
+        
+        // Count working days elapsed and remaining
+        const cur = new Date(forecastStart);
+        while (cur <= forecastEnd) {
+          const dow = cur.getDay();
+          if (dow !== 0 && dow !== 6) { // weekdays only
+            if (cur <= now) daysElapsed++;
+            else daysRemaining++;
+          }
+          cur.setDate(cur.getDate() + 1);
+        }
+        
+        // Fetch actual sales this month
+        if (allEmails.length > 0 && campaignIds.length > 0) {
+          const emailChunks2 = chunk(allEmails, 200);
+          const campaignChunks2 = chunk(campaignIds, 200);
+          for (const emailBatch of emailChunks2) {
+            for (const campaignBatch of campaignChunks2) {
+              const { data: actualSalesData } = await supabase
+                .from("sales")
+                .select("sale_items!inner(quantity, products(counts_as_sale))")
+                .gte("sale_datetime", forecastStartStr)
+                .lte("sale_datetime", todayStr + "T23:59:59")
+                .in("agent_email", emailBatch)
+                .in("client_campaign_id", campaignBatch);
+              
+              (actualSalesData || []).forEach((s: any) => {
+                (s.sale_items || []).forEach((si: any) => {
+                  if (si.products?.counts_as_sale !== false) {
+                    actualSalesToDate += (si.quantity || 1);
+                  }
+                });
+              });
+            }
+          }
+        }
+        
+        // Recalculate forecast for REMAINING days only
+        // Adjust planned hours to only count from tomorrow onwards
+        const tomorrow = new Date(now);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(0, 0, 0, 0);
+        
+        const remainingPerformances: EmployeePerformance[] = employeePerformances.map(ep => {
+          const remainingGross = countShifts(ep.employeeId, tomorrow, forecastEnd, false);
+          const remainingNet = countShifts(ep.employeeId, tomorrow, forecastEnd, true);
+          return {
+            ...ep,
+            grossPlannedHours: remainingGross * HOURS_PER_SHIFT,
+            plannedHours: remainingNet * HOURS_PER_SHIFT,
+          };
+        });
+        
+        const remainingForecast = calculateFullForecast(
+          remainingPerformances,
+          cohortInputs,
+          format(tomorrow, "yyyy-MM-dd"),
+          forecastEndStr,
+          clientId,
+          null,
+          teamChurnRates,
+        );
+        
+        // Combine: actual + remaining
+        const totalExpected = actualSalesToDate + remainingForecast.totalSalesExpected;
+        
+        const combinedForecast: ForecastResult = {
+          ...remainingForecast,
+          periodStart: forecastStartStr,
+          totalSalesExpected: totalExpected,
+          totalSalesLow: Math.round(actualSalesToDate + remainingForecast.totalSalesExpected * LOW_FACTOR),
+          totalSalesHigh: Math.round(actualSalesToDate + remainingForecast.totalSalesExpected * HIGH_FACTOR),
+          totalHours: employeePerformances.reduce((s, e) => s + e.plannedHours, 0) + remainingForecast.cohorts.reduce((s, c) => s + c.forecastHours, 0),
+          totalHeads: employees.length + remainingForecast.cohorts.reduce((s, c) => s + c.effectiveHeads, 0),
+          actualSalesToDate,
+          remainingForecast: remainingForecast.totalSalesExpected,
+          daysElapsed,
+          daysRemaining,
+        };
+        
+        // Add actual sales driver
+        combinedForecast.drivers = [
+          {
+            key: 'actual_sales',
+            label: 'Faktiske salg til dato',
+            impact: 'positive' as const,
+            value: `${actualSalesToDate} salg`,
+            description: `${actualSalesToDate} salg registreret i de første ${daysElapsed} arbejdsdage. ${daysRemaining} arbejdsdage tilbage.`,
+          },
+          ...remainingForecast.drivers,
+        ];
+        
+        return {
+          forecast: combinedForecast,
+          cohorts,
+          calculatedAt: now.toISOString(),
+        };
+      }
+
+      // 8b. Calculate full forecast (next month - original logic)
       const forecast = calculateFullForecast(
         employeePerformances,
         cohortInputs,

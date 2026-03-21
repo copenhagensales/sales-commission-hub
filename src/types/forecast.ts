@@ -146,6 +146,12 @@ export interface ForecastResult {
   absenceLoss: number;
   establishedChurnLoss: number;
 
+  // Actual + remaining (for current period)
+  actualSalesToDate?: number;
+  remainingForecast?: number;
+  daysElapsed?: number;
+  daysRemaining?: number;
+
   // Breakdowns
   establishedEmployees: EmployeeForecastResult[];
   cohorts: CohortForecastResult[];
