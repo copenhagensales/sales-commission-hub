@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import * as XLSX from "xlsx";
+import { downloadExcel } from "@/utils/excel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -151,7 +151,7 @@ export function LocationReportTab() {
   const isLoading = mode === "all" ? isLoadingLocations : isLoadingBookings;
   const rowCount = mode === "all" ? (locations?.length ?? 0) : (bookings?.length ?? 0);
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (mode === "all" && locations?.length) {
       const rows = locations.map((loc) => ({
         Navn: loc.name,
@@ -162,11 +162,9 @@ export function LocationReportTab() {
         By: loc.address_city ?? "",
         "Dagspris (DKK)": loc.daily_rate ?? "",
       }));
-      const ws = XLSX.utils.json_to_sheet(rows);
-      ws["!cols"] = [{ wch: 30 }, { wch: 22 }, { wch: 18 }, { wch: 30 }, { wch: 8 }, { wch: 18 }, { wch: 14 }];
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Lokationer");
-      XLSX.writeFile(wb, `lokationer-alle-${periodStart}.xlsx`);
+      await downloadExcel(`lokationer-alle-${periodStart}.xlsx`, [
+        { name: "Lokationer", rows, columnWidths: [30, 22, 18, 30, 8, 18, 14] },
+      ]);
     }
 
     if (mode === "booked" && bookings?.length) {
@@ -185,14 +183,9 @@ export function LocationReportTab() {
         "Total pris (DKK)": b.total_price ?? "",
         Status: b.status,
       }));
-      const ws = XLSX.utils.json_to_sheet(rows);
-      ws["!cols"] = [
-        { wch: 30 }, { wch: 22 }, { wch: 18 }, { wch: 30 }, { wch: 8 }, { wch: 18 }, { wch: 16 },
-        { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 12 },
-      ];
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Bookede lokationer");
-      XLSX.writeFile(wb, `lokationer-booked-${periodStart}_${periodEnd}.xlsx`);
+      await downloadExcel(`lokationer-booked-${periodStart}_${periodEnd}.xlsx`, [
+        { name: "Bookede lokationer", rows, columnWidths: [30, 22, 18, 30, 8, 18, 16, 12, 12, 14, 14, 14, 12] },
+      ]);
     }
   };
 

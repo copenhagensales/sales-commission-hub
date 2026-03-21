@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Check, X, ArrowRight, Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
-import * as XLSX from "xlsx";
+import { parseExcelFile } from "@/utils/excel";
 import { supabase } from "@/integrations/supabase/client";
 
 // Excel fields based on uploaded file
@@ -83,16 +83,12 @@ export default function ExcelFieldMatcher() {
       try {
         const response = await fetch(`/temp/employee-import.xlsx?t=${Date.now()}`);
         const arrayBuffer = await response.arrayBuffer();
-        const data = new Uint8Array(arrayBuffer);
-        const workbook = XLSX.read(data, { type: "array" });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet);
+        const { rows: jsonData, columns: cols } = await parseExcelFile(arrayBuffer);
 
         if (jsonData.length > 0) {
-          setExcelColumns(Object.keys(jsonData[0]));
-          setSampleData(jsonData.slice(0, 5)); // First 5 rows as sample
-          setAllData(jsonData); // Store all data for import
+          setExcelColumns(cols);
+          setSampleData(jsonData.slice(0, 5));
+          setAllData(jsonData);
         }
         setLoading(false);
       } catch (err) {

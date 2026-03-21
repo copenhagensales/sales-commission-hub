@@ -7,7 +7,7 @@ import { Upload, FileSpreadsheet, Check, AlertCircle, Loader2, ArrowRight } from
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
-import * as XLSX from "xlsx";
+import { parseExcelFile } from "@/utils/excel";
 
 interface ParsedEmployee {
   first_name: string;
@@ -88,23 +88,18 @@ export function EmployeeExcelImport() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const parseExcelFile = (file: File) => {
+  const handleParseExcel = (file: File) => {
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: "array" });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet);
+        const buffer = e.target?.result as ArrayBuffer;
+        const { rows: jsonData, columns: cols } = await parseExcelFile(buffer);
 
         if (jsonData.length === 0) {
           toast({ title: "Tom fil", description: "Excel-filen indeholder ingen data", variant: "destructive" });
           return;
         }
 
-        // Extract column names from first row
-        const cols = Object.keys(jsonData[0]);
         setColumns(cols);
         setRawData(jsonData);
         setFileName(file.name);
@@ -130,7 +125,7 @@ export function EmployeeExcelImport() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      parseExcelFile(file);
+      handleParseExcel(file);
     }
   };
 

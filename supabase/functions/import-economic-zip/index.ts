@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import JSZip from "https://esm.sh/jszip@3.10.1";
-import * as XLSX from "https://esm.sh/xlsx@0.18.5";
+import ExcelJS from "https://esm.sh/exceljs@4.4.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -103,56 +103,68 @@ function decodeContent(buffer: Uint8Array): string {
   }
 }
 
-// Parse Excel file and extract sheets as record arrays
-function parseExcel(buffer: ArrayBuffer): { kontoPlanData: Record<string, string>[]; posteringData: Record<string, string>[]; sheetsFound: string[] } {
-  const workbook = XLSX.read(buffer, { type: "array" });
-  const sheetsFound = workbook.SheetNames;
+// Helper: Convert ExcelJS worksheet to array of record objects
+function worksheetToJson(ws: any): Record<string, string>[] {
+  const headers: string[] = [];
+  const headerRow = ws.getRow(1);
+  headerRow.eachCell({ includeEmpty: true }, (cell: any, colNumber: number) => {
+    headers[colNumber - 1] = String(cell.value ?? "");
+  });
+  const validHeaders = headers.filter((h) => h !== "");
   
+  const rows: Record<string, string>[] = [];
+  ws.eachRow({ includeEmpty: false }, (row: any, rowNumber: number) => {
+    if (rowNumber === 1) return;
+    const obj: Record<string, string> = {};
+    let hasValue = false;
+    validHeaders.forEach((header, i) => {
+      const cell = row.getCell(i + 1);
+      const val = cell.value;
+      if (val !== null && val !== undefined && val !== "") {
+        obj[header] = String(val);
+        hasValue = true;
+      } else {
+        obj[header] = "";
+      }
+    });
+    if (hasValue) rows.push(obj);
+  });
+  return rows;
+}
+
+// Parse Excel file and extract sheets as record arrays
+async function parseExcel(buffer: ArrayBuffer): Promise<{ kontoPlanData: Record<string, string>[]; posteringData: Record<string, string>[]; sheetsFound: string[] }> {
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(buffer);
+  
+  const sheetsFound = wb.worksheets.map((ws: any) => ws.name);
   let kontoPlanData: Record<string, string>[] = [];
   let posteringData: Record<string, string>[] = [];
 
-  for (const sheetName of sheetsFound) {
-    const sheet = workbook.Sheets[sheetName];
-    const rows: Record<string, string>[] = XLSX.utils.sheet_to_json(sheet, { 
-      raw: false, 
-      defval: "" 
-    });
-
-    const lowerName = sheetName.toLowerCase();
+  for (const ws of wb.worksheets) {
+    const rows = worksheetToJson(ws);
+    const lowerName = ws.name.toLowerCase();
     
-    // Match sheet names to data types
     if (lowerName === "konto" || lowerName === "kontoplan" || lowerName.includes("konto")) {
-      if (kontoPlanData.length === 0) {
-        kontoPlanData = rows;
-      }
+      if (kontoPlanData.length === 0) kontoPlanData = rows;
     } else if (lowerName === "postering" || lowerName === "posteringer" || lowerName.includes("postering")) {
-      if (posteringData.length === 0) {
-        posteringData = rows;
-      }
+      if (posteringData.length === 0) posteringData = rows;
     }
   }
 
-  // If no specific matches, try first sheet for posteringer (common single-sheet export)
   if (posteringData.length === 0 && kontoPlanData.length === 0 && sheetsFound.length > 0) {
-    const firstSheet = workbook.Sheets[sheetsFound[0]];
-    const rows: Record<string, string>[] = XLSX.utils.sheet_to_json(firstSheet, { 
-      raw: false, 
-      defval: "" 
-    });
-    
-    // Check if it looks like posteringer based on columns
-    if (rows.length > 0) {
-      const firstRow = rows[0];
-      const columns = Object.keys(firstRow);
-      const hasPostColumns = columns.some(c => 
-        c.toLowerCase().includes("dato") || 
-        c.toLowerCase().includes("beløb") ||
-        c.toLowerCase().includes("beloeb") ||
-        c.toLowerCase().includes("konto")
-      );
-      
-      if (hasPostColumns) {
-        posteringData = rows;
+    const firstWs = wb.getWorksheet(1);
+    if (firstWs) {
+      const rows = worksheetToJson(firstWs);
+      if (rows.length > 0) {
+        const columns = Object.keys(rows[0]);
+        const hasPostColumns = columns.some(c => 
+          c.toLowerCase().includes("dato") || 
+          c.toLowerCase().includes("beløb") ||
+          c.toLowerCase().includes("beloeb") ||
+          c.toLowerCase().includes("konto")
+        );
+        if (hasPostColumns) posteringData = rows;
       }
     }
   }
@@ -209,7 +221,7 @@ Deno.serve(async (req) => {
     // Check if Excel or ZIP
     if (isExcelFile(storagePath)) {
       const buffer = await fileData.arrayBuffer();
-      const result = parseExcel(buffer);
+      const result = await parseExcel(buffer);
       kontoPlanData = result.kontoPlanData;
       posteringData = result.posteringData;
       filesFound.push(...result.sheetsFound.map(s => `${s} (sheet)`));

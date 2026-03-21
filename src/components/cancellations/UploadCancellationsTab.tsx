@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import * as XLSX from "xlsx";
+import { parseExcelFile } from "@/utils/excel";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -92,13 +92,10 @@ export function UploadCancellationsTab() {
     setFile(uploadedFile);
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
-        const data = e.target?.result;
-        const workbook = XLSX.read(data, { type: "binary" });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" }) as Record<string, unknown>[];
+        const buffer = e.target?.result as ArrayBuffer;
+        const { rows: jsonData, columns: cols } = await parseExcelFile(buffer, { defval: "" });
 
         if (jsonData.length === 0) {
           toast({
@@ -109,7 +106,6 @@ export function UploadCancellationsTab() {
           return;
         }
 
-        const cols = Object.keys(jsonData[0]);
         setColumns(cols);
         setParsedData(jsonData.map(row => ({ originalRow: row })));
         setStep("mapping");
@@ -126,7 +122,7 @@ export function UploadCancellationsTab() {
         });
       }
     };
-    reader.readAsBinaryString(uploadedFile);
+    reader.readAsArrayBuffer(uploadedFile);
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
