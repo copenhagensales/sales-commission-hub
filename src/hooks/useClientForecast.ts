@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format, startOfMonth, endOfMonth, subWeeks, startOfWeek, endOfWeek } from "date-fns";
+import { format, startOfMonth, endOfMonth, subWeeks, subMonths, startOfWeek, endOfWeek } from "date-fns";
 import {
   calculateFullForecast,
   MOCK_RAMP_PROFILE,
@@ -11,6 +11,8 @@ import type {
   CohortForecastInput,
   ForecastResult,
   ClientForecastCohort,
+  TeamChurnRates,
+  TenureBucketRates,
 } from "@/types/forecast";
 
 const HOURS_PER_SHIFT = 7.5;
