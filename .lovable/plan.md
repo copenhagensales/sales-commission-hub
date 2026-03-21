@@ -1,31 +1,34 @@
 
 
-# Adskil churn fra individuelle forecasts
+# Fix: Medtag helligdage i forecast
 
 ## Problem
-Churn trækkes fra **hver medarbejders** forecast (linje 141: `expected - churnLoss`). Det gør at William, der måske har 45% churn-risiko, kun viser 1 salg — selvom hans reelle forventede produktion er højere. Churn er en statistisk risiko på holdniveau, ikke en individuel nedjustering.
+`countShifts()` i `useClientForecast.ts` ignorerer danske helligdage. I uge 14 (påske) tælles Skærtorsdag, Langfredag og 2. Påskedag som arbejdsdage, hvilket giver ~3 ekstra dages forecast per medarbejder — en betydelig overvurdering.
+
+`useEmployeeWorkingDays` hooket håndterer allerede helligdage korrekt — forecastet gør ikke.
 
 ## Løsning
-Vis **fuld forecast per medarbejder** (uden churn-fradrag). Churn trækkes kun fra **totalen** som en samlet risiko-justering.
+Hent danske helligdage og filtrer dem fra i `countShifts()`.
 
-### `src/lib/calculations/forecast.ts`
+### `src/hooks/useClientForecast.ts`
 
-**`forecastEstablishedEmployee`**: Beregn `forecastSales = expected` (uden `- churnLoss`). Behold `churnProbability` og `churnLoss` som informationsfelter, men lad dem ikke reducere individuelle tal.
+1. **Importér `useDanishHolidays`** (eller hent direkte fra `danish_holidays`-tabellen i den eksisterende query)
+2. **Byg et `holidayDates: Set<string>`** fra helligdagene i forecast-perioden (inkl. EWMA-vinduet)
+3. **Tilføj holiday-check i `countShifts()`**:
+   ```
+   if (holidayDates.has(dateStr)) {
+     cur.setDate(cur.getDate() + 1);
+     continue;
+   }
+   ```
+   Placeres INDEN absence-checket og shift-hierarkiet. Helligdage tæller aldrig som vagter, uanset om der er individuelle vagter registreret.
 
-```
-forecastSales: Math.round(expected),          // FØR: expected - churnLoss
-forecastSalesLow: Math.round(expected * LOW_FACTOR),
-forecastSalesHigh: Math.round(expected * HIGH_FACTOR),
-```
-
-**`calculateFullForecast`**: `totalEstablishedChurnLoss` beregnes stadig som summen af alle individuelle `churnLoss` — men trækkes kun fra **totalen**, ikke per person.
-
-### UI-effekt (automatisk)
-- William viser fx 18 salg (hans reelle kapacitet) i stedet for 1
-- Totalen viser: "Forventet: 1.250 — heraf churn-risiko: -85 salg"
-- Drivers-panelet viser stadig "Etableret churn: -X salg" som samlet justering
+### Effekt
+- Uge 14 reduceres fra 5 → 2 arbejdsdage (3 helligdage fjernet)
+- EWMA SPH beregnes også korrekt (historiske uger med helligdage justeres)
+- Både gross og net shifts påvirkes korrekt
 
 | Fil | Ændring |
 |-----|---------|
-| `src/lib/calculations/forecast.ts` | Fjern `- churnLoss` fra individuel forecast, behold på total-niveau |
+| `src/hooks/useClientForecast.ts` | Hent helligdage, tilføj holiday-filter i `countShifts()` |
 
