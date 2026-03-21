@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format, startOfMonth, endOfMonth, subWeeks, startOfWeek, endOfWeek } from "date-fns";
+import { format, startOfMonth, endOfMonth, subWeeks, subMonths, startOfWeek, endOfWeek } from "date-fns";
 import {
   calculateFullForecast,
   MOCK_RAMP_PROFILE,
@@ -11,6 +11,8 @@ import type {
   CohortForecastInput,
   ForecastResult,
   ClientForecastCohort,
+  TeamChurnRates,
+  TenureBucketRates,
 } from "@/types/forecast";
 
 const HOURS_PER_SHIFT = 7.5;
@@ -344,6 +346,52 @@ export function useClientForecast(clientId: string) {
         });
       }
 
+      // 6b. Fetch team churn rates from historical_employment (last 12 months)
+      const twelveMonthsAgo = format(subMonths(now, 12), "yyyy-MM-dd");
+      const { data: histData } = await supabase
+        .from("historical_employment")
+        .select("team_name, start_date, end_date")
+        .gte("end_date", twelveMonthsAgo);
+
+      const teamChurnRates: TeamChurnRates = new Map();
+      
+      if (histData && histData.length > 0) {
+        // Group exits by team and tenure bucket
+        const teamExits = new Map<string, { bucket0_60: number; bucket61_180: number; bucket180plus: number }>();
+        
+        for (const h of histData) {
+          if (!h.team_name || !h.start_date || !h.end_date) continue;
+          const tenureDays = Math.floor((new Date(h.end_date).getTime() - new Date(h.start_date).getTime()) / (1000 * 60 * 60 * 24));
+          
+          if (!teamExits.has(h.team_name)) {
+            teamExits.set(h.team_name, { bucket0_60: 0, bucket61_180: 0, bucket180plus: 0 });
+          }
+          const buckets = teamExits.get(h.team_name)!;
+          if (tenureDays <= 60) buckets.bucket0_60++;
+          else if (tenureDays <= 180) buckets.bucket61_180++;
+          else buckets.bucket180plus++;
+        }
+
+        // Estimate avg headcount per team from current employees
+        const teamHeadcounts = new Map<string, number>();
+        for (const emp of employeePerformances) {
+          if (emp.teamName) {
+            teamHeadcounts.set(emp.teamName, (teamHeadcounts.get(emp.teamName) || 0) + 1);
+          }
+        }
+
+        const monthsObserved = 12;
+        for (const [teamName, exits] of teamExits) {
+          const headcount = Math.max(teamHeadcounts.get(teamName) || 10, 3);
+          const rates: TenureBucketRates = {
+            bucket0_60: Math.min(exits.bucket0_60 / (headcount * monthsObserved * 0.3), 0.60),
+            bucket61_180: Math.min(exits.bucket61_180 / (headcount * monthsObserved * 0.3), 0.30),
+            bucket180plus: Math.min(exits.bucket180plus / (headcount * monthsObserved * 0.4), 0.10),
+          };
+          teamChurnRates.set(teamName, rates);
+        }
+      }
+
       // 7. Fetch cohorts from DB
       let cohortQuery = supabase.from("client_forecast_cohorts").select("*");
       if (clientId !== "all") {
@@ -385,6 +433,7 @@ export function useClientForecast(clientId: string) {
         forecastEndStr,
         clientId,
         null,
+        teamChurnRates,
       );
 
       return {
@@ -411,6 +460,7 @@ function emptyForecast(periodStart: string, periodEnd: string, clientId: string)
     totalHeads: 0,
     churnLoss: 0,
     absenceLoss: 0,
+    establishedChurnLoss: 0,
     establishedEmployees: [],
     cohorts: [],
     drivers: [],

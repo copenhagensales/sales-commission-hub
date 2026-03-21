@@ -15,6 +15,7 @@ import type {
   ForecastRampProfile,
   ForecastSurvivalProfile,
   ForecastVsActual,
+  TeamChurnRates,
 } from "@/types/forecast";
 
 // ============================================================================
@@ -96,16 +97,37 @@ export function getSurvivalFactor(daysSinceStart: number, profile: ForecastSurvi
 }
 
 // ============================================================================
+// ESTABLISHED CHURN RATE
+// ============================================================================
+
+/**
+ * Get monthly churn probability for an established employee based on tenure and team history.
+ */
+export function getEstablishedChurnRate(daysSinceStart: number, teamName: string | null, teamChurnRates?: TeamChurnRates): number {
+  if (!teamChurnRates || !teamName) return 0.02; // fallback 2%/month
+  
+  const rates = teamChurnRates.get(teamName);
+  if (!rates) return 0.02;
+  
+  if (daysSinceStart <= 60) return rates.bucket0_60;
+  if (daysSinceStart <= 180) return rates.bucket61_180;
+  return rates.bucket180plus;
+}
+
+// ============================================================================
 // EMPLOYEE FORECAST
 // ============================================================================
 
 /**
  * Calculate forecast for a single established employee.
  */
-export function forecastEstablishedEmployee(emp: EmployeePerformance): EmployeeForecastResult {
+export function forecastEstablishedEmployee(emp: EmployeePerformance, teamChurnRates?: TeamChurnRates): EmployeeForecastResult {
   const ewmaSph = calculateEwmaSph(emp.weeklySalesPerHour);
   const effectiveHours = emp.plannedHours * emp.personalAttendanceFactor;
   const expected = effectiveHours * ewmaSph;
+  
+  const churnProbability = getEstablishedChurnRate(emp.daysSinceStart, emp.teamName, teamChurnRates);
+  const churnLoss = expected * churnProbability;
   
   return {
     employeeId: emp.employeeId,
@@ -116,9 +138,11 @@ export function forecastEstablishedEmployee(emp: EmployeePerformance): EmployeeF
     plannedHours: emp.plannedHours,
     expectedSph: ewmaSph,
     attendanceFactor: emp.personalAttendanceFactor,
-    forecastSales: Math.round(expected),
-    forecastSalesLow: Math.round(expected * LOW_FACTOR),
-    forecastSalesHigh: Math.round(expected * HIGH_FACTOR),
+    forecastSales: Math.round(expected - churnLoss),
+    forecastSalesLow: Math.round((expected - churnLoss) * LOW_FACTOR),
+    forecastSalesHigh: Math.round((expected - churnLoss) * HIGH_FACTOR),
+    churnProbability,
+    churnLoss: Math.round(churnLoss),
   };
 }
 
@@ -172,10 +196,12 @@ export function calculateFullForecast(
   periodEnd: string,
   clientId: string,
   clientCampaignId: string | null,
+  teamChurnRates?: TeamChurnRates,
 ): ForecastResult {
-  const employeeResults = employees.map(forecastEstablishedEmployee);
+  const employeeResults = employees.map(e => forecastEstablishedEmployee(e, teamChurnRates));
   const cohortResults = cohortInputs.map(forecastCohort);
   
+  const totalEstablishedChurnLoss = employeeResults.reduce((sum, e) => sum + e.churnLoss, 0);
   const totalEmployeeSales = employeeResults.reduce((sum, e) => sum + e.forecastSales, 0);
   const totalCohortSales = cohortResults.reduce((sum, c) => sum + c.forecastSales, 0);
   const totalExpected = totalEmployeeSales + totalCohortSales;
@@ -188,14 +214,13 @@ export function calculateFullForecast(
     : 0.92;
   
   // Absence loss = lost sales from known absences (vacation, sick, no-show)
-  // Calculated as (gross hours - net hours) × individual SPH
   const absenceLoss = employeeResults.reduce((sum, empResult, i) => {
     const emp = employees[i];
     const lostHours = (emp.grossPlannedHours || emp.plannedHours) - emp.plannedHours;
     return sum + lostHours * empResult.expectedSph;
   }, 0);
   
-  const churnLoss = cohortResults.reduce((sum, c) => 
+  const cohortChurnLoss = cohortResults.reduce((sum, c) => 
     sum + (c.plannedHeadcount - c.effectiveHeads) * (c.forecastSales / Math.max(c.effectiveHeads, 0.1)), 0
   );
   
@@ -244,13 +269,30 @@ export function calculateFullForecast(
     });
   }
   
-  if (churnLoss > 5) {
+  if (cohortChurnLoss > 5) {
     drivers.push({
-      key: 'churn_risk',
-      label: 'Churn-effekt',
+      key: 'cohort_churn',
+      label: 'Cohort-churn',
       impact: 'negative',
-      value: `-${Math.round(churnLoss)} salg`,
-      description: `Forventet churn blandt nye sælgere reducerer forecast med ~${Math.round(churnLoss)} salg.`,
+      value: `-${Math.round(cohortChurnLoss)} salg`,
+      description: `Forventet churn blandt nye opstartshold reducerer forecast med ~${Math.round(cohortChurnLoss)} salg.`,
+    });
+  }
+
+  // Established employee churn driver
+  if (totalEstablishedChurnLoss > 5) {
+    const highRiskCount = employeeResults.filter(e => e.churnProbability >= 0.15).length;
+    const medRiskCount = employeeResults.filter(e => e.churnProbability >= 0.05 && e.churnProbability < 0.15).length;
+    const riskBreakdown: string[] = [];
+    if (highRiskCount > 0) riskBreakdown.push(`${highRiskCount} med høj risiko (>15%)`);
+    if (medRiskCount > 0) riskBreakdown.push(`${medRiskCount} med middel risiko (5-15%)`);
+    
+    drivers.push({
+      key: 'established_churn',
+      label: 'Etableret churn',
+      impact: 'negative',
+      value: `-${Math.round(totalEstablishedChurnLoss)} salg`,
+      description: `Historisk churn-risiko blandt eksisterende sælgere baseret på anciennitet og team. ${riskBreakdown.join(', ')}.`,
     });
   }
   
@@ -264,8 +306,9 @@ export function calculateFullForecast(
     totalSalesHigh: Math.round(totalExpected * HIGH_FACTOR),
     totalHours: totalEmployeeHours + totalCohortHours,
     totalHeads: employees.length + cohortResults.reduce((s, c) => s + c.effectiveHeads, 0),
-    churnLoss: Math.round(churnLoss),
+    churnLoss: Math.round(cohortChurnLoss),
     absenceLoss: Math.round(absenceLoss),
+    establishedChurnLoss: Math.round(totalEstablishedChurnLoss),
     establishedEmployees: employeeResults,
     cohorts: cohortResults,
     drivers,
