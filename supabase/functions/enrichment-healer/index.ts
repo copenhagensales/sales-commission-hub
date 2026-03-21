@@ -295,7 +295,7 @@ serve(async (req) => {
     // Fetch sales needing healing
     let salesQuery = supabase
       .from("sales")
-      .select("id, adversus_external_id, integration_type, raw_payload, enrichment_status, enrichment_attempts")
+      .select("id, adversus_external_id, integration_type, raw_payload, enrichment_status, enrichment_attempts, customer_phone")
       .order("sale_datetime", { ascending: false })
       .limit(maxBatch);
 
