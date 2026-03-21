@@ -7,7 +7,7 @@ import { Upload, FileSpreadsheet, Check, AlertCircle, Loader2, ArrowRight } from
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
-import * as XLSX from "xlsx";
+import { parseExcelFile } from "@/utils/excel";
 
 interface ParsedEmployee {
   first_name: string;
