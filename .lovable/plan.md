@@ -1,30 +1,30 @@
 
 
-# Backfill telefonnumre for eksisterende Eesy TM-salg
+# Backfill telefonnumre for eksisterende ASE-salg
 
-## Status
-- **Eesy FM**: ✅ Alle 4.231 har telefonnummer — ingen aktion nødvendig
-- **Eesy TM**: ❌ 2.529 salg mangler telefonnummer (importeret før fix)
-- **Fremtidige Eesy TM**: ✅ Fixet er allerede deployet og virker
+## Problem
+~503 ASE-salg har telefonnummer i `raw_payload->'data'->>'Telefon'` men ikke i `customer_phone`. Yderligere ~938 mangler helt telefonnummer i rå-dataen.
 
 ## Løsning
-Én SQL-migration der henter telefonnummeret direkte fra `raw_payload->'data'` (det ligger allerede der som `contact_number`, `SUBSCRIBER_ID` eller `Telefon Abo1`):
+Én SQL data-opdatering der udfylder `customer_phone` fra `raw_payload` for ASE-salg:
 
 ```sql
 UPDATE sales
-SET customer_phone = COALESCE(
-  NULLIF(raw_payload->'data'->>'contact_number', ''),
-  NULLIF(raw_payload->'data'->>'SUBSCRIBER_ID', ''),
-  NULLIF(raw_payload->'data'->>'Telefon Abo1', '')
-)
-WHERE source = 'Eesy'
+SET customer_phone = NULLIF(raw_payload->'data'->>'Telefon', '')
+WHERE source = 'ASE'
   AND (customer_phone IS NULL OR customer_phone = '')
-  AND raw_payload->'data' IS NOT NULL;
+  AND raw_payload->'data'->>'Telefon' IS NOT NULL
+  AND raw_payload->'data'->>'Telefon' != '';
 ```
 
-Ingen kodeændringer — kun én database-migration.
+Ingen kodeændringer — kun én data-opdatering via insert-tool.
 
 ## Resultat
-- De 2.529 eksisterende Eesy TM-salg får telefonnumre udfyldt med det samme
-- Salgsvalideringen kan herefter matche Eesy-salg mod kundens telefonnumre
+- ~503 ASE-salg får telefonnummer udfyldt
+- De resterende ~938 uden telefon i rå-data forbliver uændrede (data eksisterer simpelthen ikke)
+- Fremtidige ASE-salg er allerede dækket af Enreach-adapter fixet
+
+| Handling | Detalje |
+|----------|---------|
+| SQL UPDATE via insert-tool | Udfyld `customer_phone` fra `raw_payload` for ASE |
 
