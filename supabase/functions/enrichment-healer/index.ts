@@ -333,12 +333,13 @@ serve(async (req) => {
       const provider = integType.toLowerCase();
 
       // Check budget for provider
-      const budget = HEALER_BUDGETS[provider];
-      if (budget) {
+      const budgetConfig = HEALER_BUDGETS[provider];
+      if (budgetConfig) {
+        const budget = turboMode ? budgetConfig.turbo : budgetConfig.normal;
         const usage = await getProviderUsage(supabase, provider);
         const maxCapacity = provider === "adversus" ? 1000 : 10000;
         if (usage >= (maxCapacity - budget)) {
-          log(`${provider} budget exhausted (${usage}/${maxCapacity}), skipping ${sales.length} ${source} sales`);
+          log(`${provider} budget exhausted (${usage}/${maxCapacity}, budget=${budget}), skipping ${sales.length} ${source} sales`);
           totalSkipped += sales.length;
           continue;
         }
