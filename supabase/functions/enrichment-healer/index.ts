@@ -130,6 +130,9 @@ async function healAdversus(
         throw new Error("API returned empty lead data");
       }
 
+      // Extract phone number from lead data
+      const phone = leadData.phone || leadData.contactPhone || leadData.mobile || null;
+
       // Update sale with enriched data
       const updatedPayload = {
         ...rawPayload,
@@ -143,6 +146,7 @@ async function healAdversus(
         enrichment_error: null,
         enrichment_attempts: (sale.enrichment_attempts || 0) + 1,
         enrichment_last_attempt: new Date().toISOString(),
+        ...(phone && !sale.customer_phone ? { customer_phone: phone } : {}),
       }).eq("id", sale.id);
 
       healed++;
@@ -291,7 +295,7 @@ serve(async (req) => {
     // Fetch sales needing healing
     let salesQuery = supabase
       .from("sales")
-      .select("id, adversus_external_id, integration_type, raw_payload, enrichment_status, enrichment_attempts")
+      .select("id, adversus_external_id, integration_type, raw_payload, enrichment_status, enrichment_attempts, customer_phone")
       .order("sale_datetime", { ascending: false })
       .limit(maxBatch);
 
