@@ -478,7 +478,7 @@ export default function SalesValidation() {
 
         {/* KPI Cards */}
         {clientId && (
-          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3">
             {/* Always visible: base stats */}
             <Card className="p-4">
               <div className="flex items-center gap-2 mb-1">
@@ -486,6 +486,11 @@ export default function SalesValidation() {
                 <span className="text-xs font-medium text-muted-foreground">Registrerede salg</span>
               </div>
               <p className="text-2xl font-bold">{salesStats?.totalSales?.toLocaleString("da-DK") ?? "–"}</p>
+              {salesStats && salesStats.withPhone > 0 && (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {salesStats.withPhone} m/tlf · {salesStats.withoutPhone} uden
+                </p>
+              )}
             </Card>
             <Card className="p-4">
               <div className="flex items-center gap-2 mb-1">
@@ -500,6 +505,14 @@ export default function SalesValidation() {
                 <span className="text-xs font-medium text-muted-foreground">Provision</span>
               </div>
               <p className="text-2xl font-bold">{salesStats ? `${Math.round(salesStats.totalCommission).toLocaleString("da-DK")} kr` : "–"}</p>
+            </Card>
+            <Card className="p-4 border-amber-200 dark:border-amber-800">
+              <div className="flex items-center gap-2 mb-1">
+                <PhoneOff className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                <span className="text-xs font-medium text-muted-foreground">Uden telefonnr.</span>
+              </div>
+              <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{salesStats?.withoutPhone?.toLocaleString("da-DK") ?? "–"}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Kan ikke auto-valideres</p>
             </Card>
 
             {/* Post-validation stats */}
