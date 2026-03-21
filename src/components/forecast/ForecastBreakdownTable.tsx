@@ -66,16 +66,20 @@ export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = f
                     </th>
                     <th className="pb-2 font-medium text-muted-foreground text-right">Fremmøde</th>
                     <th className="pb-2 font-medium text-muted-foreground text-right">Status</th>
-                  {hasActuals ? (
-                    <>
-                      <th className="pb-2 font-medium text-muted-foreground text-right">Faktisk</th>
-                      <th className="pb-2 font-medium text-muted-foreground text-right">Rest</th>
-                      <th className="pb-2 font-medium text-muted-foreground text-right">Total</th>
-                    </>
-                  ) : (
-                    <th className="pb-2 font-medium text-muted-foreground text-right">Forecast</th>
-                  )}
-                </tr>
+                    {hasActuals ? (
+                      <>
+                        <th className="pb-2 font-medium text-muted-foreground text-right">Faktisk</th>
+                        <th className="pb-2 font-medium text-muted-foreground text-right">Rest</th>
+                        <th className="pb-2 font-medium text-muted-foreground text-right cursor-pointer select-none" onClick={() => toggleSort('total')}>
+                          <span className="flex items-center justify-end gap-1">Total <ArrowUpDown className="h-3 w-3" /></span>
+                        </th>
+                      </>
+                    ) : (
+                      <th className="pb-2 font-medium text-muted-foreground text-right cursor-pointer select-none" onClick={() => toggleSort('forecast')}>
+                        <span className="flex items-center justify-end gap-1">Forecast <ArrowUpDown className="h-3 w-3" /></span>
+                      </th>
+                    )}
+                  </tr>
               </thead>
               <tbody>
                 {sortedEmployees.map((emp) => {
