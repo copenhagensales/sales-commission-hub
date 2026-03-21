@@ -457,7 +457,8 @@ export function useClientForecast(clientId: string, period: "current" | "next" =
           cur.setDate(cur.getDate() + 1);
         }
         
-        // Fetch actual sales this month
+        // Fetch actual sales this month — per agent email
+        const actualSalesPerEmail = new Map<string, number>();
         if (allEmails.length > 0 && campaignIds.length > 0) {
           const emailChunks2 = chunk(allEmails, 200);
           const campaignChunks2 = chunk(campaignIds, 200);
@@ -465,21 +466,36 @@ export function useClientForecast(clientId: string, period: "current" | "next" =
             for (const campaignBatch of campaignChunks2) {
               const { data: actualSalesData } = await supabase
                 .from("sales")
-                .select("sale_items!inner(quantity, products(counts_as_sale))")
+                .select("agent_email, sale_items!inner(quantity, products(counts_as_sale))")
                 .gte("sale_datetime", forecastStartStr)
                 .lte("sale_datetime", todayStr + "T23:59:59")
                 .in("agent_email", emailBatch)
                 .in("client_campaign_id", campaignBatch);
               
               (actualSalesData || []).forEach((s: any) => {
+                const email = s.agent_email?.toLowerCase();
+                if (!email) return;
                 (s.sale_items || []).forEach((si: any) => {
                   if (si.products?.counts_as_sale !== false) {
-                    actualSalesToDate += (si.quantity || 1);
+                    const qty = si.quantity || 1;
+                    actualSalesToDate += qty;
+                    actualSalesPerEmail.set(email, (actualSalesPerEmail.get(email) || 0) + qty);
                   }
                 });
               });
             }
           }
+        }
+        
+        // Map actual sales back to employees
+        const actualSalesPerEmployee = new Map<string, number>();
+        for (const emp of employees) {
+          const emails = empEmailMap.get(emp.id) || [];
+          let empActual = 0;
+          for (const email of emails) {
+            empActual += actualSalesPerEmail.get(email) || 0;
+          }
+          if (empActual > 0) actualSalesPerEmployee.set(emp.id, empActual);
         }
         
         // Recalculate forecast for REMAINING days only
