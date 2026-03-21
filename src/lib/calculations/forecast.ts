@@ -154,20 +154,47 @@ export function forecastEstablishedEmployee(emp: EmployeePerformance, teamChurnR
  * Calculate forecast for a new hire cohort.
  */
 export function forecastCohort(input: CohortForecastInput): CohortForecastResult {
-  const { cohort, rampProfile, survivalProfile, campaignBaselineSph, weeklyHoursPerHead, attendanceFactor } = input;
+  const { cohort, rampProfile, survivalProfile, campaignBaselineSph, weeklyHoursPerHead, attendanceFactor, periodStart, periodEnd } = input;
   
-  const startDate = new Date(cohort.start_date);
+  const cohortStart = new Date(cohort.start_date);
+  const pStart = new Date(periodStart);
+  const pEnd = new Date(periodEnd);
   const now = new Date();
-  const daysSinceStart = Math.max(0, Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
   
-  // Use average day in forecast period for ramp/survival calc
-  const avgDays = daysSinceStart + 15; // ~mid-month projection
+  // Effective start = latest of cohort start and period start
+  const effectiveStart = cohortStart > pStart ? cohortStart : pStart;
+  // Effective end = earliest of period end and now (for current period)
+  const effectiveEnd = pEnd < now ? pEnd : now > pStart ? (now < pEnd ? pEnd : pEnd) : pEnd;
+  
+  // Days the cohort actually works within this period
+  const daysInPeriod = Math.max(0, Math.floor((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)));
+  const weeksInPeriod = daysInPeriod / 7;
+  
+  if (weeksInPeriod <= 0) {
+    return {
+      cohortId: cohort.id,
+      startDate: cohort.start_date,
+      plannedHeadcount: cohort.planned_headcount,
+      effectiveHeads: 0,
+      rampFactor: 0,
+      survivalFactor: 1,
+      forecastHours: 0,
+      forecastSales: 0,
+      forecastSalesLow: 0,
+      forecastSalesHigh: 0,
+      note: cohort.note,
+    };
+  }
+  
+  const daysSinceStart = Math.max(0, Math.floor((now.getTime() - cohortStart.getTime()) / (1000 * 60 * 60 * 24)));
+  // Use mid-point of their active period for ramp/survival
+  const avgDays = daysSinceStart + Math.round(daysInPeriod / 2);
   
   const rampFactor = getRampFactor(avgDays, rampProfile);
   const survivalFactor = getSurvivalFactor(avgDays, survivalProfile);
   
   const effectiveHeads = cohort.planned_headcount * survivalFactor;
-  const forecastHours = effectiveHeads * weeklyHoursPerHead * 4 * attendanceFactor; // ~4 weeks
+  const forecastHours = effectiveHeads * weeklyHoursPerHead * weeksInPeriod * attendanceFactor;
   const expected = forecastHours * campaignBaselineSph * rampFactor;
   
   return {
