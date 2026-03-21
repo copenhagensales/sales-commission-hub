@@ -12,16 +12,35 @@ interface Props {
 }
 
 export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = false }: Props) {
-  const sortedEmployees = [...employees].sort((a, b) => {
-    if (isCurrentPeriod) {
-      const totalA = (a.actualSales || 0) + a.forecastSales;
-      const totalB = (b.actualSales || 0) + b.forecastSales;
-      return totalB - totalA;
-    }
-    return b.forecastSales - a.forecastSales;
-  });
+  const [sortKey, setSortKey] = useState<'name' | 'sph' | 'forecast' | 'total'>('total');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
-  const hasActuals = isCurrentPeriod && sortedEmployees.some(e => (e.actualSales || 0) > 0);
+  const hasActuals = isCurrentPeriod && employees.some(e => (e.actualSales || 0) > 0);
+
+  // Avg SPH for risk badges
+  const avgSph = employees.length > 0
+    ? employees.reduce((s, e) => s + e.expectedSph, 0) / employees.length
+    : 0;
+
+  const toggleSort = (key: typeof sortKey) => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('desc'); }
+  };
+
+  const sortedEmployees = [...employees].sort((a, b) => {
+    const dir = sortDir === 'desc' ? -1 : 1;
+    switch (sortKey) {
+      case 'name': return dir * a.employeeName.localeCompare(b.employeeName) * -1;
+      case 'sph': return dir * (a.expectedSph - b.expectedSph);
+      case 'forecast': return dir * (a.forecastSales - b.forecastSales);
+      case 'total':
+      default: {
+        const totalA = (a.actualSales || 0) + a.forecastSales;
+        const totalB = (b.actualSales || 0) + b.forecastSales;
+        return dir * (totalA - totalB);
+      }
+    }
+  });
 
   return (
     <div className="space-y-4">
