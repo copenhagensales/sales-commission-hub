@@ -244,7 +244,7 @@ export default function EconomicRevenueMatch() {
     if (!newPattern || !posteringer) return null;
     const matched = posteringer.filter(p => p.tekst && wordsMatch(p.tekst, newPattern));
     const months = new Set(matched.map(p => p.maaned));
-    const totalAmount = matched.reduce((s, p) => s + Math.abs(p.beloeb_dkk), 0);
+    const totalAmount = matched.reduce((s, p) => s + (-p.beloeb_dkk), 0);
     const examples = [...new Set(matched.map(p => p.tekst).filter(Boolean))].slice(0, 5);
     return {
       count: matched.length,
@@ -278,7 +278,7 @@ export default function EconomicRevenueMatch() {
       if (!match || !match.mapping.client_id) return;
       const cid = match.mapping.client_id;
       if (!invoicedByClientMonth[cid]) invoicedByClientMonth[cid] = {};
-      invoicedByClientMonth[cid][month] = (invoicedByClientMonth[cid][month] || 0) + Math.abs(p.beloeb_dkk);
+      invoicedByClientMonth[cid][month] = (invoicedByClientMonth[cid][month] || 0) + (-p.beloeb_dkk);
     });
 
     const allClientIds = new Set<string>([
@@ -637,7 +637,7 @@ export default function EconomicRevenueMatch() {
                 ? posteringer.filter(p => selectedMonths.includes(p.maaned))
                 : posteringer;
               const unmapped = filtered.filter(p => !matchPostering(p, mappings));
-              const unmappedTotal = unmapped.reduce((s, p) => s + Math.abs(p.beloeb_dkk), 0);
+              const unmappedTotal = unmapped.reduce((s, p) => s + (-p.beloeb_dkk), 0);
               const uniqueTexts = [...new Set(unmapped.map(p => p.tekst).filter(Boolean))].sort();
               if (unmapped.length === 0) return null;
               return (
