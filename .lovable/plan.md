@@ -1,46 +1,46 @@
 
 
-# Ny fane: Sælgeroversigt på Salgsvalidering
+# Fix: Find og heal de 1.012 salg uden telefonnummer
 
-## Koncept
-En ny Tabs-baseret visning på SalesValidation-siden med to faner:
-1. **Validering** (eksisterende) — input, matching, resultater
-2. **Sælgeroversigt** (ny) — aggregeret per-sælger tabel baseret på valideringsresultater
+## Problem
+1.012 Tryg-salg i februar har `enrichment_status = 'complete'` men `customer_phone = NULL`. Enrichment-healeren springer dem over fordi den kun kigger efter `pending` eller `failed` status.
 
-Når der er valgt en kunde + periode og der er kørt en validering (eller indlæst en tidligere), viser fane 2 en tabel med:
+## Årsag
+Integration-engine markerer salg som `complete` ved import — uanset om telefonnummeret blev hentet. Healeren filtrerer med `.in("enrichment_status", ["pending", "failed"])` og ser aldrig disse salg.
 
-| Sælger | Totale salg | Verificerede | Uverificerede | Annulleringer | Verificeringsrate |
-|--------|------------|--------------|---------------|---------------|-------------------|
-| Kasper M | 45 | 32 | 10 | 3 | 71% |
+## Løsning
 
-## Data
-Bruger den eksisterende `results` state (array af `MatchResult[]`), som allerede indeholder `matched.agentName` og `category`. Aggregerer client-side med `useMemo` — ingen ny query nødvendig.
+### 1. Udvid healerens query (`supabase/functions/enrichment-healer/index.ts`, linje 304-307)
 
-Beregninger per sælger:
-- **Totale salg**: `verified_sale` + `unverified_sale` + `matched_cancellation` (alle med denne sælger)
-- **Verificerede**: `category === "verified_sale"`
-- **Uverificerede**: `category === "unverified_sale"`
-- **Annulleringer**: `category === "matched_cancellation"`
-- **Verificeringsrate**: `verificerede / (verificerede + uverificerede)` i procent
+Tilføj en ekstra betingelse: hent også salg med `enrichment_status = 'complete'` hvor `customer_phone IS NULL` (eller tom). 
 
-Sorteret efter totale salg, faldende.
+Ændring i query-logikken:
+- Nuværende: `.in("enrichment_status", ["pending", "failed"])`
+- Ny: Brug en `.or()` filter der inkluderer:
+  - `enrichment_status.in.(pending,failed)` (eksisterende)
+  - `and(enrichment_status.eq.complete,customer_phone.is.null)` (nyt)
 
-## Teknisk
+### 2. Backfill via migration
 
-### `src/pages/economic/SalesValidation.tsx`
+Kør en SQL-migration der sætter `enrichment_status = 'pending'` for alle salg med `complete` status men uden telefonnummer. Så vil det eksisterende cron-job automatisk heale dem over de næste kørsler.
 
-1. **Import** `Tabs, TabsContent, TabsList, TabsTrigger` fra `@/components/ui/tabs`
-2. **Ny `useMemo`**: `sellerStats` der grupperer `results` per `agentName` og beregner de 5 kolonner
-3. **Wrap** eksisterende indhold i `<TabsContent value="validation">` og tilføj `<TabsContent value="sellers">` med tabellen
-4. `Tabs` placeres lige efter kunde/periode-vælgeren og KPI-kortene, så begge faner deler dem
+```sql
+UPDATE sales 
+SET enrichment_status = 'pending'
+WHERE enrichment_status = 'complete' 
+  AND (customer_phone IS NULL OR customer_phone = '')
+  AND raw_payload->>'leadId' IS NOT NULL;
+```
 
-### UI for sælger-fanen
-- Tabel med kolonner: Sælger, Total, Verificerede, Uverificerede, Annulleringer, Rate
-- Farve-kodning: grøn badge for høj rate (>80%), gul for middel (50-80%), rød for lav (<50%)
-- Vis "Kør en validering først" besked hvis `results` er null
-- Totalrække i bunden
+Dette rammer de 1.004+ salg og lader healeren behandle dem i batches.
+
+### Resultat
+- Healerens cron-job vil automatisk hente telefonnumre fra Adversus API for de 1.012 salg
+- Fremtidige salg importeret uden telefonnummer vil også blive fanget
+- Salgsvalideringen vil herefter kunne matche langt flere salg
 
 | Fil | Ændring |
 |-----|---------|
-| `src/pages/economic/SalesValidation.tsx` | Tilføj Tabs + sælgeroversigt fane |
+| `supabase/functions/enrichment-healer/index.ts` | Udvid query til også at fange `complete` salg uden telefonnummer |
+| SQL migration | Backfill: sæt `pending` på salg uden telefon |
 
