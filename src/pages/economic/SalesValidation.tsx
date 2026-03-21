@@ -464,6 +464,7 @@ export default function SalesValidation() {
     const rate = t.verified + t.unverified > 0 ? Math.round((t.verified / (t.verified + t.unverified)) * 100) : 0;
     return { ...t, rate };
   }, [sellerStats]);
+  return (
     <MainLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
