@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Check, X, ArrowRight, Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
-import * as XLSX from "xlsx";
+import { parseExcelFile } from "@/utils/excel";
 import { supabase } from "@/integrations/supabase/client";
 
 // Excel fields based on uploaded file
