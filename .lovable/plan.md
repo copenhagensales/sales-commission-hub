@@ -1,57 +1,39 @@
 
 
-# Fix: Forecast for indeværende måned skal inkludere faktiske salg
+# Fix: Cohort forecast ignorerer startdato i perioden
 
 ## Problem
-Forecastet for marts viser 801, men der er allerede lavet 896 salg med 7 arbejdsdage tilbage. Forecastet beregner hele måneden fra scratch baseret på EWMA SPH × planlagte timer, men:
+`forecastCohort()` antager altid **4 uger** arbejde (`weeklyHoursPerHead * 4`), uanset hvornår i perioden holdet starter. Et hold der starter 31. marts får kredit for 4 fulde uger — men de har reelt 0-1 arbejdsdag tilbage i marts.
 
-1. **Ingen "actual + remaining"-logik**: For indeværende måned bør forecast = faktiske salg hidtil + forecast for resterende dage
-2. **EWMA trækkes ned af 0-salgs-uger**: Fx Hans har 0 salg i ugen 23-28. feb (på tværs af ALLE kampagner), men 4 registrerede vagter → SPH = 0 den uge, som trækker hans EWMA fra ~1.3 ned til ~0.85
+Beregningen:
+- `daysSinceStart = max(0, now - startDate)` = 0 (de er ikke startet endnu)
+- `avgDays = 0 + 15 = 15` → ramp factor ~35%, survival ~84%
+- `forecastHours = 5 × 0.84 × 37 × 4 × 0.90 = ~560 timer`
+- `forecastSales = 560 × 0.45 × 0.35 = ~88` ... men med fuld 4 uger giver det ~225
 
-## Data-validering
-- Hans: 102 salg i marts, men en hel uge i feb med 0 salg (muligt uregistreret fravær) → SPH=0 tanker EWMA
-- Samme mønster rammer flere medarbejdere
-- 896 faktiske salg ÷ ~15 arbejdsdage = ~60/dag. 7 dage tilbage → naiv projektion ~1.315
+## Løsning
+Beregn faktiske arbejdsdage i forecast-perioden **efter** cohortens startdato, i stedet for fast 4 uger.
 
-## Løsning: To ændringer
+### Ændring i `src/lib/calculations/forecast.ts` — `forecastCohort()`
 
-### 1. `useClientForecast.ts` — Hent faktiske salg for indeværende måned
-Når `period === "current"`:
-- Hent faktiske salg fra `sales` + `sale_items` for perioden `forecastStart` til `now`
-- Beregn resterende arbejdsdage fra `now` til `forecastEnd`
-- For hver medarbejder: beregn forecast KUN for resterende dage (shifts fra i dag til månedens slutning)
-- Samlet forecast = `actualSales + remainingForecast`
-- Tilføj `actualSales` og `remainingDays` til return-data så UI kan vise "896 faktiske + 419 forventet = 1.315"
+Tilføj `periodEnd` til `CohortForecastInput` (eller beregn det). Erstat den faste `* 4`:
 
-### 2. `useClientForecast.ts` — EWMA: Skip uger med 0 salg OG lav aktivitet
-Nuværende logik skipper kun uger med `shiftsInWeek === 0`. Udvid til også at skippe uger hvor medarbejderen har 0 salg men normalt performer over 0.5 SPH (indikerer uregistreret fravær):
 ```
-if (shiftsInWeek === 0) continue;
-if (salesInWeek === 0 && shiftsInWeek <= 2) continue; // Likely unrecorded absence
+daysInPeriod = min(periodEnd, now) - max(periodStart, cohort.start_date)
+weeksInPeriod = max(0, daysInPeriod / 7)
+forecastHours = effectiveHeads × weeklyHoursPerHead × weeksInPeriod × attendanceFactor
 ```
 
-### 3. `forecast.ts` + `types/forecast.ts` — Udvid ForecastResult
-Tilføj felter til ForecastResult:
-- `actualSalesToDate: number` (kun for current period)
-- `remainingForecast: number`
-- `daysElapsed: number`
-- `daysRemaining: number`
+For et hold der starter 31/3 i marts-perioden: `weeksInPeriod ≈ 0.14` (1 dag) → forecast ~5-8 salg i stedet for 225.
 
-### 4. `Forecast.tsx` — Vis actual + remaining i UI
-For indeværende måned, vis KPI-kortet som:
-- "896 faktiske + 419 forventet = **1.315** total"
-- Eller et progress-bar-agtigt element der viser hvor langt vi er
+### Ændringer i types
+Tilføj `periodStart` og `periodEnd` til `CohortForecastInput`.
 
-## Filer
+### Filer
 
 | Fil | Ændring |
 |-----|---------|
-| `src/hooks/useClientForecast.ts` | Hent actual sales for current period, beregn remaining-only forecast, forbedret EWMA skip-logik |
-| `src/lib/calculations/forecast.ts` | Accepter `actualSales` parameter, returnér udvidede felter |
-| `src/types/forecast.ts` | Tilføj `actualSalesToDate`, `remainingForecast`, `daysElapsed`, `daysRemaining` |
-| `src/pages/Forecast.tsx` | Vis actual + remaining for indeværende måned |
-| `src/components/forecast/ForecastKpiCards.tsx` | Tilpas visning med actual/remaining split |
-
-## Forventet resultat
-Marts forecast for Eesy TM: ~896 (actual) + ~400 (7 remaining days) = **~1.300** — langt mere realistisk end 801.
+| `src/types/forecast.ts` | Tilføj `periodStart`, `periodEnd` til `CohortForecastInput` |
+| `src/lib/calculations/forecast.ts` | Beregn faktiske uger i perioden i stedet for fast 4 |
+| `src/hooks/useClientForecast.ts` | Send `periodStart`/`periodEnd` med til cohort inputs |
 
