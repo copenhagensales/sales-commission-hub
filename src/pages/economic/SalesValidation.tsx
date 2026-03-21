@@ -449,6 +449,66 @@ export default function SalesValidation() {
           </div>
         </div>
 
+        {/* KPI Cards */}
+        {clientId && (
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+            {/* Always visible: base stats */}
+            <Card className="p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <Package className="h-4 w-4 text-primary" />
+                <span className="text-xs font-medium text-muted-foreground">Registrerede salg</span>
+              </div>
+              <p className="text-2xl font-bold">{salesStats?.totalSales?.toLocaleString("da-DK") ?? "–"}</p>
+            </Card>
+            <Card className="p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <DollarSign className="h-4 w-4 text-primary" />
+                <span className="text-xs font-medium text-muted-foreground">Omsætning</span>
+              </div>
+              <p className="text-2xl font-bold">{salesStats ? `${Math.round(salesStats.totalRevenue).toLocaleString("da-DK")} kr` : "–"}</p>
+            </Card>
+            <Card className="p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <TrendingUp className="h-4 w-4 text-primary" />
+                <span className="text-xs font-medium text-muted-foreground">Provision</span>
+              </div>
+              <p className="text-2xl font-bold">{salesStats ? `${Math.round(salesStats.totalCommission).toLocaleString("da-DK")} kr` : "–"}</p>
+            </Card>
+
+            {/* Post-validation stats */}
+            {results && (
+              <>
+                <Card className="p-4 border-green-200 dark:border-green-800">
+                  <div className="flex items-center gap-2 mb-1">
+                    <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                    <span className="text-xs font-medium text-muted-foreground">Verificerede</span>
+                  </div>
+                  <p className="text-2xl font-bold text-green-600 dark:text-green-400">{verifiedSales.length}</p>
+                </Card>
+                <Card className="p-4 border-orange-200 dark:border-orange-800">
+                  <div className="flex items-center gap-2 mb-1">
+                    <AlertTriangle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                    <span className="text-xs font-medium text-muted-foreground">Uverificerede</span>
+                  </div>
+                  <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{unverifiedSales.length}</p>
+                </Card>
+                <Card className="p-4 border-destructive/30">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Ban className="h-4 w-4 text-destructive" />
+                    <span className="text-xs font-medium text-muted-foreground">Annulleringer</span>
+                  </div>
+                  <p className="text-2xl font-bold text-destructive">
+                    {matchedCancellations.length + unmatchedCancellations.length}
+                    <span className="text-sm font-normal text-muted-foreground ml-1">
+                      ({matchedCancellations.length} matchet)
+                    </span>
+                  </p>
+                </Card>
+              </>
+            )}
+          </div>
+        )}
+
         {/* Textarea input */}
         {clientId && (
           <div className="space-y-4">
