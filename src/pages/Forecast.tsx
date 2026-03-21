@@ -127,8 +127,18 @@ export default function Forecast() {
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <DataFreshnessBadge calculatedAt={calculatedAt} />
+            <ToggleGroup
+              type="single"
+              value={period}
+              onValueChange={(v) => { if (v) setPeriod(v as "current" | "next"); }}
+              variant="outline"
+              size="sm"
+            >
+              <ToggleGroupItem value="current">Denne måned</ToggleGroupItem>
+              <ToggleGroupItem value="next">Næste måned</ToggleGroupItem>
+            </ToggleGroup>
             <Select value={selectedClient} onValueChange={setSelectedClient}>
               <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="Vælg kunde" />
