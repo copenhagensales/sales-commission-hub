@@ -183,6 +183,6 @@ export default function Forecast() {
           </div>
         )}
       </div>
-    </div>
+    </MainLayout>
   );
 }
