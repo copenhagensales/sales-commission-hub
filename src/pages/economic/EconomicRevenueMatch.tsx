@@ -55,13 +55,17 @@ function useRevenuePosteringer(year: number) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("economic_posteringer")
-        .select("tekst, beloeb_dkk, dato, maaned")
+        .select("tekst, beloeb_dkk, dato")
         .eq("konto_nr", 1010)
         .gte("dato", `${year}-01-01`)
         .lte("dato", `${year}-12-31`)
         .order("dato");
       if (error) throw error;
-      return data;
+      // Derive month from dato
+      return (data || []).map((r) => ({
+        ...r,
+        maaned: r.dato ? r.dato.substring(0, 7) : "",
+      }));
     },
   });
 }
