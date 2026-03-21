@@ -144,6 +144,7 @@ export interface ForecastResult {
   totalHeads: number;
   churnLoss: number;
   absenceLoss: number;
+  establishedChurnLoss: number;
 
   // Breakdowns
   establishedEmployees: EmployeeForecastResult[];
