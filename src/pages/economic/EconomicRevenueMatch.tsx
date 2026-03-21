@@ -624,7 +624,43 @@ export default function EconomicRevenueMatch() {
           </TabsContent>
 
           {/* Tab 2: Deviation Report */}
-          <TabsContent value="afvigelse">
+          <TabsContent value="afvigelse" className="space-y-4">
+            {/* Unmapped summary */}
+            {!isLoading && posteringer && mappings && (() => {
+              const filtered = selectedMonths.length > 0
+                ? posteringer.filter(p => selectedMonths.includes(p.maaned))
+                : posteringer;
+              const unmapped = filtered.filter(p => !matchPostering(p, mappings));
+              const unmappedTotal = unmapped.reduce((s, p) => s + Math.abs(p.beloeb_dkk), 0);
+              const uniqueTexts = [...new Set(unmapped.map(p => p.tekst).filter(Boolean))].sort();
+              if (unmapped.length === 0) return null;
+              return (
+                <Card className="border-amber-300 dark:border-amber-700 bg-amber-50/50 dark:bg-amber-950/20">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base flex items-center gap-2 text-amber-700 dark:text-amber-400">
+                      <AlertTriangle className="h-5 w-5" />
+                      {unmapped.length} umappede posteringer ({formatDKK(unmappedTotal)})
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      {unmapped.length} af {filtered.length} posteringer er ikke koblet til en kunde
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                      {uniqueTexts.slice(0, 30).map((txt, i) => (
+                        <Badge key={i} variant="outline" className="text-xs font-mono">
+                          {txt}
+                        </Badge>
+                      ))}
+                      {uniqueTexts.length > 30 && (
+                        <Badge variant="outline" className="text-xs">+{uniqueTexts.length - 30} mere</Badge>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })()}
+
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Afvigelsesrapport</CardTitle>
