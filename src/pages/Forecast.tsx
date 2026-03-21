@@ -88,6 +88,7 @@ export default function Forecast() {
     },
   });
 
+  const periodLabel = useMemo(() => {
     const now = new Date();
     const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
     return next.toLocaleDateString('da-DK', { month: 'long', year: 'numeric' });
