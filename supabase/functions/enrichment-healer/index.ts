@@ -14,11 +14,11 @@ function getSupabase() {
 }
 
 /**
- * Provider budget limits for healer (15% of hourly capacity)
+ * Provider budget limits for healer (normal vs turbo)
  */
-const HEALER_BUDGETS: Record<string, number> = {
-  adversus: 150,
-  enreach: 1500,
+const HEALER_BUDGETS: Record<string, { normal: number; turbo: number }> = {
+  adversus: { normal: 150, turbo: 800 },
+  enreach: { normal: 1500, turbo: 5000 },
 };
 
 /**
