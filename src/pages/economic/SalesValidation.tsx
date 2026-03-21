@@ -1,0 +1,791 @@
+import { useState, useMemo, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { toast } from "sonner";
+import { Upload, ShieldCheck, AlertTriangle, CheckCircle2, XCircle, Download, Search } from "lucide-react";
+import { normalizePhoneNumber } from "@/lib/phone-utils";
+import { useDropzone } from "react-dropzone";
+import ExcelJS from "exceljs";
+import { useCurrentEmployeeId } from "@/hooks/useOnboarding";
+
+type MatchResult = {
+  phone: string;
+  type: "cancelled" | "billable";
+  // matched sale info
+  matched?: {
+    saleId: string;
+    agentName: string;
+    agentEmail: string;
+    saleDate: string;
+    product: string;
+    customerCompany: string;
+    internalReference: string;
+  };
+  // category
+  category: "matched_cancellation" | "unmatched_cancellation" | "unverified_sale" | "verified_sale";
+};
+
+export default function SalesValidation() {
+  const [clientId, setClientId] = useState<string>("");
+  const [periodMonth, setPeriodMonth] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [results, setResults] = useState<MatchResult[] | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  // Column mapping state
+  const [showColumnMapping, setShowColumnMapping] = useState(false);
+  const [uploadedRows, setUploadedRows] = useState<Record<string, string>[]>([]);
+  const [uploadedHeaders, setUploadedHeaders] = useState<string[]>([]);
+  const [fileName, setFileName] = useState("");
+  const [phoneCol, setPhoneCol] = useState("");
+  const [statusCol, setStatusCol] = useState("");
+  const [billableValue, setBillableValue] = useState("fakturerbar");
+  const [cancelledValue, setCancelledValue] = useState("annulleret");
+
+  const { data: employeeId } = useCurrentEmployeeId();
+
+  // Fetch clients
+  const { data: clients } = useQuery({
+    queryKey: ["clients-for-validation"],
+    queryFn: async () => {
+      const { data } = await supabase.from("clients").select("id, name").order("name");
+      return data || [];
+    },
+  });
+
+  // Fetch previous uploads
+  const { data: previousUploads, refetch: refetchUploads } = useQuery({
+    queryKey: ["sales-validation-uploads", clientId, periodMonth],
+    queryFn: async () => {
+      if (!clientId) return [];
+      const { data } = await supabase
+        .from("sales_validation_uploads")
+        .select("*")
+        .eq("client_id", clientId)
+        .eq("period_month", periodMonth)
+        .order("created_at", { ascending: false });
+      return data || [];
+    },
+    enabled: !!clientId,
+  });
+
+  // Generate month options
+  const monthOptions = useMemo(() => {
+    const opts: { value: string; label: string }[] = [];
+    const now = new Date();
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const val = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const label = d.toLocaleDateString("da-DK", { year: "numeric", month: "long" });
+      opts.push({ value: val, label });
+    }
+    return opts;
+  }, []);
+
+  // File upload handler
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    const file = acceptedFiles[0];
+    if (!file) return;
+
+    setFileName(file.name);
+
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const buffer = await file.arrayBuffer();
+      await workbook.xlsx.load(buffer);
+
+      const sheet = workbook.worksheets[0];
+      if (!sheet) {
+        toast.error("Ingen ark fundet i filen");
+        return;
+      }
+
+      const headers: string[] = [];
+      const rows: Record<string, string>[] = [];
+
+      sheet.eachRow((row, rowNumber) => {
+        if (rowNumber === 1) {
+          row.eachCell((cell, colNumber) => {
+            headers.push(String(cell.value || `Kolonne ${colNumber}`));
+          });
+        } else {
+          const rowData: Record<string, string> = {};
+          row.eachCell((cell, colNumber) => {
+            const header = headers[colNumber - 1] || `col_${colNumber}`;
+            rowData[header] = String(cell.value || "");
+          });
+          rows.push(rowData);
+        }
+      });
+
+      setUploadedHeaders(headers);
+      setUploadedRows(rows);
+
+      // Auto-detect columns
+      const phoneLike = headers.find((h) =>
+        /telefon|phone|tlf|mobil|nummer/i.test(h)
+      );
+      const statusLike = headers.find((h) =>
+        /status|type|kategori|faktu/i.test(h)
+      );
+      if (phoneLike) setPhoneCol(phoneLike);
+      if (statusLike) setStatusCol(statusLike);
+
+      setShowColumnMapping(true);
+    } catch (e) {
+      toast.error("Kunne ikke læse filen");
+    }
+  }, []);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+      "application/vnd.ms-excel": [".xls"],
+      "text/csv": [".csv"],
+    },
+    maxFiles: 1,
+  });
+
+  // Process matching
+  const processMatching = async () => {
+    if (!clientId || !phoneCol) {
+      toast.error("Vælg kunde og telefonnummer-kolonne");
+      return;
+    }
+
+    setIsProcessing(true);
+    setShowColumnMapping(false);
+
+    try {
+      // Parse uploaded data
+      const uploadedPhones: { phone: string; type: "billable" | "cancelled" }[] = [];
+
+      for (const row of uploadedRows) {
+        const rawPhone = row[phoneCol];
+        if (!rawPhone) continue;
+
+        const normalized = normalizePhoneNumber(rawPhone);
+        if (!normalized) continue;
+
+        let type: "billable" | "cancelled" = "billable";
+        if (statusCol && row[statusCol]) {
+          const val = row[statusCol].toLowerCase().trim();
+          if (
+            val.includes(cancelledValue.toLowerCase()) ||
+            val.includes("annuller") ||
+            val.includes("cancel") ||
+            val.includes("afvist")
+          ) {
+            type = "cancelled";
+          }
+        }
+
+        uploadedPhones.push({ phone: normalized, type });
+      }
+
+      // Fetch sales for this client + period
+      const [yearStr, monthStr] = periodMonth.split("-");
+      const startDate = `${yearStr}-${monthStr}-01`;
+      const endMonth = parseInt(monthStr);
+      const endYear = parseInt(yearStr);
+      const nextMonth = endMonth === 12 ? 1 : endMonth + 1;
+      const nextYear = endMonth === 12 ? endYear + 1 : endYear;
+      const endDate = `${nextYear}-${String(nextMonth).padStart(2, "0")}-01`;
+
+      // Get campaigns for this client
+      const { data: campaigns } = await supabase
+        .from("client_campaigns")
+        .select("id")
+        .eq("client_id", clientId);
+
+      const campaignIds = (campaigns || []).map((c) => c.id);
+
+      if (campaignIds.length === 0) {
+        toast.error("Ingen kampagner fundet for denne kunde");
+        setIsProcessing(false);
+        return;
+      }
+
+      // Fetch sales
+      const { data: salesData } = await supabase
+        .from("sales")
+        .select("id, agent_name, agent_email, sale_datetime, customer_phone, customer_company, internal_reference, client_campaign_id, sale_items(id, adversus_product_title, product_id, products(name))")
+        .in("client_campaign_id", campaignIds)
+        .gte("sale_datetime", startDate)
+        .lt("sale_datetime", endDate)
+        .neq("validation_status", "rejected")
+        .order("sale_datetime", { ascending: false })
+        .limit(5000);
+
+      const sales = salesData || [];
+
+      // Build phone→sale lookup
+      const salesByPhone = new Map<string, typeof sales[0][]>();
+      for (const sale of sales) {
+        const norm = normalizePhoneNumber(sale.customer_phone);
+        if (!norm) continue;
+        if (!salesByPhone.has(norm)) salesByPhone.set(norm, []);
+        salesByPhone.get(norm)!.push(sale);
+      }
+
+      // Build sets
+      const billablePhones = new Set(
+        uploadedPhones.filter((p) => p.type === "billable").map((p) => p.phone)
+      );
+      const cancelledPhones = new Set(
+        uploadedPhones.filter((p) => p.type === "cancelled").map((p) => p.phone)
+      );
+
+      const matchResults: MatchResult[] = [];
+
+      // Category 1 & 2: Check cancellations
+      for (const phone of cancelledPhones) {
+        const matchedSales = salesByPhone.get(phone);
+        if (matchedSales && matchedSales.length > 0) {
+          const sale = matchedSales[0];
+          const productName =
+            (sale as any).sale_items?.[0]?.products?.name ||
+            (sale as any).sale_items?.[0]?.adversus_product_title ||
+            "Ukendt";
+          matchResults.push({
+            phone,
+            type: "cancelled",
+            category: "matched_cancellation",
+            matched: {
+              saleId: sale.id,
+              agentName: sale.agent_name || "Ukendt",
+              agentEmail: sale.agent_email || "",
+              saleDate: sale.sale_datetime || "",
+              product: productName,
+              customerCompany: sale.customer_company || "",
+              internalReference: sale.internal_reference || "",
+            },
+          });
+        } else {
+          matchResults.push({
+            phone,
+            type: "cancelled",
+            category: "unmatched_cancellation",
+          });
+        }
+      }
+
+      // Category 3: Unverified sales (our sales not in customer's billable list)
+      for (const [salePhone, saleList] of salesByPhone) {
+        if (!billablePhones.has(salePhone) && !cancelledPhones.has(salePhone)) {
+          for (const sale of saleList) {
+            const productName =
+              (sale as any).sale_items?.[0]?.products?.name ||
+              (sale as any).sale_items?.[0]?.adversus_product_title ||
+              "Ukendt";
+            matchResults.push({
+              phone: salePhone,
+              type: "billable",
+              category: "unverified_sale",
+              matched: {
+                saleId: sale.id,
+                agentName: sale.agent_name || "Ukendt",
+                agentEmail: sale.agent_email || "",
+                saleDate: sale.sale_datetime || "",
+                product: productName,
+                customerCompany: sale.customer_company || "",
+                internalReference: sale.internal_reference || "",
+              },
+            });
+          }
+        }
+      }
+
+      // Verified sales (in both our system and customer's billable list)
+      for (const phone of billablePhones) {
+        const matchedSales = salesByPhone.get(phone);
+        if (matchedSales) {
+          for (const sale of matchedSales) {
+            const productName =
+              (sale as any).sale_items?.[0]?.products?.name ||
+              (sale as any).sale_items?.[0]?.adversus_product_title ||
+              "Ukendt";
+            matchResults.push({
+              phone,
+              type: "billable",
+              category: "verified_sale",
+              matched: {
+                saleId: sale.id,
+                agentName: sale.agent_name || "Ukendt",
+                agentEmail: sale.agent_email || "",
+                saleDate: sale.sale_datetime || "",
+                product: productName,
+                customerCompany: sale.customer_company || "",
+                internalReference: sale.internal_reference || "",
+              },
+            });
+          }
+        }
+      }
+
+      setResults(matchResults);
+
+      // Save upload record
+      const matched = matchResults.filter((r) => r.category === "matched_cancellation").length;
+      const unmatched = matchResults.filter((r) => r.category === "unmatched_cancellation").length;
+      const unverified = matchResults.filter((r) => r.category === "unverified_sale").length;
+
+      await supabase.from("sales_validation_uploads").insert({
+        client_id: clientId,
+        period_month: periodMonth,
+        file_name: fileName,
+        total_billable: billablePhones.size,
+        total_cancelled: cancelledPhones.size,
+        matched_cancellations: matched,
+        unmatched_cancellations: unmatched,
+        unverified_sales: unverified,
+        uploaded_by: employeeId || null,
+        results_json: { results: matchResults },
+      });
+
+      refetchUploads();
+      toast.success(`Validering fuldført: ${matched} matchede annulleringer, ${unmatched} umatchede, ${unverified} uverificerede salg`);
+    } catch (e) {
+      console.error(e);
+      toast.error("Fejl under validering");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Export to Excel
+  const exportResults = async () => {
+    if (!results) return;
+
+    const workbook = new ExcelJS.Workbook();
+
+    const addSheet = (name: string, items: MatchResult[]) => {
+      const sheet = workbook.addWorksheet(name);
+      sheet.addRow(["Telefon", "Kategori", "Sælger", "Salgsdato", "Produkt", "Firma", "Ref."]);
+      sheet.getRow(1).font = { bold: true };
+      for (const r of items) {
+        sheet.addRow([
+          r.phone,
+          r.category,
+          r.matched?.agentName || "",
+          r.matched?.saleDate ? new Date(r.matched.saleDate).toLocaleDateString("da-DK") : "",
+          r.matched?.product || "",
+          r.matched?.customerCompany || "",
+          r.matched?.internalReference || "",
+        ]);
+      }
+      sheet.columns.forEach((col) => {
+        col.width = 20;
+      });
+    };
+
+    addSheet("Matchede annulleringer", results.filter((r) => r.category === "matched_cancellation"));
+    addSheet("Umatchede annulleringer", results.filter((r) => r.category === "unmatched_cancellation"));
+    addSheet("Uverificerede salg", results.filter((r) => r.category === "unverified_sale"));
+    addSheet("Verificerede salg", results.filter((r) => r.category === "verified_sale"));
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `salgsvalidering_${periodMonth}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Load previous results
+  const loadPreviousResult = (upload: any) => {
+    const data = upload.results_json as any;
+    if (data?.results) {
+      setResults(data.results);
+    }
+  };
+
+  // Filter & categorize results
+  const filteredResults = useMemo(() => {
+    if (!results) return null;
+    const term = searchTerm.toLowerCase();
+    return results.filter(
+      (r) =>
+        !term ||
+        r.phone.includes(term) ||
+        r.matched?.agentName?.toLowerCase().includes(term) ||
+        r.matched?.product?.toLowerCase().includes(term) ||
+        r.matched?.customerCompany?.toLowerCase().includes(term)
+    );
+  }, [results, searchTerm]);
+
+  const matchedCancellations = filteredResults?.filter((r) => r.category === "matched_cancellation") || [];
+  const unmatchedCancellations = filteredResults?.filter((r) => r.category === "unmatched_cancellation") || [];
+  const unverifiedSales = filteredResults?.filter((r) => r.category === "unverified_sale") || [];
+  const verifiedSales = filteredResults?.filter((r) => r.category === "verified_sale") || [];
+
+  // Unique status values for column mapping preview
+  const uniqueStatusValues = useMemo(() => {
+    if (!statusCol || uploadedRows.length === 0) return [];
+    const vals = new Set(uploadedRows.map((r) => r[statusCol]).filter(Boolean));
+    return Array.from(vals);
+  }, [statusCol, uploadedRows]);
+
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Salgsvalidering</h1>
+          <p className="text-muted-foreground">Upload kundens salgsliste og valider mod jeres registreringer</p>
+        </div>
+        {results && (
+          <Button onClick={exportResults} variant="outline" className="gap-2">
+            <Download className="h-4 w-4" />
+            Eksportér til Excel
+          </Button>
+        )}
+      </div>
+
+      {/* Controls */}
+      <div className="flex gap-4 items-end flex-wrap">
+        <div className="space-y-1">
+          <Label>Kunde</Label>
+          <Select value={clientId} onValueChange={setClientId}>
+            <SelectTrigger className="w-[220px]">
+              <SelectValue placeholder="Vælg kunde" />
+            </SelectTrigger>
+            <SelectContent>
+              {clients?.map((c) => (
+                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label>Periode</Label>
+          <Select value={periodMonth} onValueChange={setPeriodMonth}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {monthOptions.map((m) => (
+                <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Upload area */}
+      {clientId && (
+        <div
+          {...getRootProps()}
+          className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+            isDragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"
+          }`}
+        >
+          <input {...getInputProps()} />
+          <Upload className="h-8 w-8 mx-auto mb-3 text-muted-foreground" />
+          <p className="font-medium">Træk en Excel-fil hertil eller klik for at vælge</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Filen skal indeholde telefonnumre og evt. en status-kolonne (fakturerbar/annulleret)
+          </p>
+        </div>
+      )}
+
+      {/* Column mapping dialog */}
+      <Dialog open={showColumnMapping} onOpenChange={setShowColumnMapping}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Kolonne-mapping — {fileName}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              {uploadedRows.length} rækker fundet. Vælg hvilke kolonner der indeholder telefonnumre og status.
+            </p>
+            <div className="space-y-2">
+              <Label>Telefonnummer-kolonne *</Label>
+              <Select value={phoneCol} onValueChange={setPhoneCol}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Vælg kolonne" />
+                </SelectTrigger>
+                <SelectContent>
+                  {uploadedHeaders.map((h) => (
+                    <SelectItem key={h} value={h}>{h}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Status-kolonne (valgfri)</Label>
+              <Select value={statusCol} onValueChange={setStatusCol}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Ingen — alle er fakturerbare" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Ingen</SelectItem>
+                  {uploadedHeaders.map((h) => (
+                    <SelectItem key={h} value={h}>{h}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {statusCol && uniqueStatusValues.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">
+                  Fundne statusværdier: {uniqueStatusValues.join(", ")}
+                </Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-xs">Fakturerbar værdi</Label>
+                    <Input value={billableValue} onChange={(e) => setBillableValue(e.target.value)} placeholder="fx fakturerbar" />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Annulleret værdi</Label>
+                    <Input value={cancelledValue} onChange={(e) => setCancelledValue(e.target.value)} placeholder="fx annulleret" />
+                  </div>
+                </div>
+              </div>
+            )}
+            <div className="bg-muted rounded-md p-3">
+              <p className="text-xs font-medium mb-1">Preview (første 3 rækker)</p>
+              <div className="text-xs space-y-1">
+                {uploadedRows.slice(0, 3).map((row, i) => (
+                  <div key={i} className="flex gap-4">
+                    <span>📞 {row[phoneCol] || "—"}</span>
+                    {statusCol && <span>📋 {row[statusCol] || "—"}</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowColumnMapping(false)}>Annuller</Button>
+            <Button onClick={processMatching} disabled={!phoneCol || isProcessing}>
+              {isProcessing ? "Behandler..." : "Start validering"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Summary cards */}
+      {results && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center gap-2 mb-1">
+                <XCircle className="h-4 w-4 text-destructive" />
+                <span className="text-sm font-medium">Matchede annulleringer</span>
+              </div>
+              <p className="text-2xl font-bold">{matchedCancellations.length}</p>
+              <p className="text-xs text-muted-foreground">Sælger identificeret — kan trækkes</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center gap-2 mb-1">
+                <AlertTriangle className="h-4 w-4 text-orange-500" />
+                <span className="text-sm font-medium">Umatchede annulleringer</span>
+              </div>
+              <p className="text-2xl font-bold">{unmatchedCancellations.length}</p>
+              <p className="text-xs text-muted-foreground">Kan ikke placeres på en sælger</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center gap-2 mb-1">
+                <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                <span className="text-sm font-medium">Uverificerede salg</span>
+              </div>
+              <p className="text-2xl font-bold">{unverifiedSales.length}</p>
+              <p className="text-xs text-muted-foreground">Ikke bekræftet af kunden</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center gap-2 mb-1">
+                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                <span className="text-sm font-medium">Verificerede salg</span>
+              </div>
+              <p className="text-2xl font-bold">{verifiedSales.length}</p>
+              <p className="text-xs text-muted-foreground">Bekræftet fakturerbare</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Search */}
+      {results && (
+        <div className="relative max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Søg telefon, sælger, produkt..."
+            className="pl-9"
+          />
+        </div>
+      )}
+
+      {/* Results tables */}
+      {matchedCancellations.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <XCircle className="h-4 w-4 text-destructive" />
+              Matchede annulleringer — sælger identificeret ({matchedCancellations.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Telefon</TableHead>
+                  <TableHead>Sælger</TableHead>
+                  <TableHead>Salgsdato</TableHead>
+                  <TableHead>Produkt</TableHead>
+                  <TableHead>Firma</TableHead>
+                  <TableHead>Ref.</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {matchedCancellations.map((r, i) => (
+                  <TableRow key={i}>
+                    <TableCell className="font-mono text-sm">{r.phone}</TableCell>
+                    <TableCell className="font-medium">{r.matched?.agentName}</TableCell>
+                    <TableCell>{r.matched?.saleDate ? new Date(r.matched.saleDate).toLocaleDateString("da-DK") : ""}</TableCell>
+                    <TableCell>{r.matched?.product}</TableCell>
+                    <TableCell>{r.matched?.customerCompany}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{r.matched?.internalReference}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {unmatchedCancellations.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-orange-500" />
+              Umatchede annulleringer — kan ikke placeres ({unmatchedCancellations.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Telefon</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {unmatchedCancellations.map((r, i) => (
+                  <TableRow key={i}>
+                    <TableCell className="font-mono text-sm">{r.phone}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-orange-600 border-orange-300">
+                        Ingen match i jeres salg
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {unverifiedSales.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-yellow-500" />
+              Uverificerede salg — ikke bekræftet af kunden ({unverifiedSales.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Telefon</TableHead>
+                  <TableHead>Sælger</TableHead>
+                  <TableHead>Salgsdato</TableHead>
+                  <TableHead>Produkt</TableHead>
+                  <TableHead>Firma</TableHead>
+                  <TableHead>Ref.</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {unverifiedSales.map((r, i) => (
+                  <TableRow key={i}>
+                    <TableCell className="font-mono text-sm">{r.phone}</TableCell>
+                    <TableCell className="font-medium">{r.matched?.agentName}</TableCell>
+                    <TableCell>{r.matched?.saleDate ? new Date(r.matched.saleDate).toLocaleDateString("da-DK") : ""}</TableCell>
+                    <TableCell>{r.matched?.product}</TableCell>
+                    <TableCell>{r.matched?.customerCompany}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{r.matched?.internalReference}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Previous uploads */}
+      {previousUploads && previousUploads.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Tidligere uploads</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Dato</TableHead>
+                  <TableHead>Fil</TableHead>
+                  <TableHead>Fakturerbare</TableHead>
+                  <TableHead>Annullerede</TableHead>
+                  <TableHead>Matchede</TableHead>
+                  <TableHead>Umatchede</TableHead>
+                  <TableHead>Uverificerede</TableHead>
+                  <TableHead></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {previousUploads.map((u: any) => (
+                  <TableRow key={u.id}>
+                    <TableCell>{new Date(u.created_at).toLocaleDateString("da-DK")}</TableCell>
+                    <TableCell className="text-sm">{u.file_name}</TableCell>
+                    <TableCell>{u.total_billable}</TableCell>
+                    <TableCell>{u.total_cancelled}</TableCell>
+                    <TableCell>{u.matched_cancellations}</TableCell>
+                    <TableCell>{u.unmatched_cancellations}</TableCell>
+                    <TableCell>{u.unverified_sales}</TableCell>
+                    <TableCell>
+                      <Button size="sm" variant="ghost" onClick={() => loadPreviousResult(u)}>
+                        Vis
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}

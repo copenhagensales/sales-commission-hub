@@ -9571,6 +9571,83 @@ export type Database = {
         }
         Relationships: []
       }
+      sales_validation_uploads: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          file_name: string
+          id: string
+          matched_cancellations: number | null
+          period_month: string
+          results_json: Json | null
+          status: string
+          total_billable: number | null
+          total_cancelled: number | null
+          unmatched_cancellations: number | null
+          unverified_sales: number | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          file_name: string
+          id?: string
+          matched_cancellations?: number | null
+          period_month: string
+          results_json?: Json | null
+          status?: string
+          total_billable?: number | null
+          total_cancelled?: number | null
+          unmatched_cancellations?: number | null
+          unverified_sales?: number | null
+          uploaded_by?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          file_name?: string
+          id?: string
+          matched_cancellations?: number | null
+          period_month?: string
+          results_json?: Json | null
+          status?: string
+          total_billable?: number | null
+          total_cancelled?: number | null
+          unmatched_cancellations?: number | null
+          unverified_sales?: number | null
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_validation_uploads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_validation_uploads_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_validation_uploads_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_validation_uploads_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       scheduled_emails: {
         Row: {
           candidate_id: string | null
