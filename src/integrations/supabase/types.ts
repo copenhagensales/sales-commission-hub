@@ -3999,6 +3999,38 @@ export type Database = {
           },
         ]
       }
+      economic_client_mapping: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          id: string
+          match_pattern: string
+          note: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          match_pattern: string
+          note?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          match_pattern?: string
+          note?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "economic_client_mapping_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       economic_fordelingsregler: {
         Row: {
           active_from: string | null
