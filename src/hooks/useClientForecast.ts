@@ -306,7 +306,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" =
           const we = endOfWeek(ws, { weekStartsOn: 1 });
           const shiftsInWeek = countShifts(emp.id, ws, we, true); // exclude absences
           
-          // Skip weeks with 0 effective shifts (full vacation/sick) — not low performance
+          // Skip weeks with 0 effective shifts (full vacation/sick)
           if (shiftsInWeek === 0) continue;
           
           const hoursInWeek = shiftsInWeek * HOURS_PER_SHIFT;
@@ -318,6 +318,9 @@ export function useClientForecast(clientId: string, period: "current" | "next" =
               salesInWeek += weekMap.get(ws.getTime()) || 0;
             }
           }
+
+          // Skip weeks with 0 sales and very few shifts (likely unrecorded absence)
+          if (salesInWeek === 0 && shiftsInWeek <= 2) continue;
 
           const sph = hoursInWeek > 0 ? salesInWeek / hoursInWeek : 0;
           weeklySph.push(sph);
