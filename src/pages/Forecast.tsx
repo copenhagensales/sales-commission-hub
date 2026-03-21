@@ -4,6 +4,7 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { BarChart3, RefreshCcw, Loader2 } from "lucide-react";
 import { ForecastKpiCards } from "@/components/forecast/ForecastKpiCards";
 import { ForecastDriversPanel } from "@/components/forecast/ForecastDriversPanel";
@@ -21,6 +22,7 @@ import type { ClientForecastCohort } from "@/types/forecast";
 
 export default function Forecast() {
   const [selectedClient, setSelectedClient] = useState("all");
+  const [period, setPeriod] = useState<"current" | "next">("next");
   const queryClient = useQueryClient();
 
   // Fetch real clients for dropdown
@@ -37,7 +39,7 @@ export default function Forecast() {
   });
 
   // Real forecast data
-  const { data: forecastData, isLoading: forecastLoading, refetch } = useClientForecast(selectedClient);
+  const { data: forecastData, isLoading: forecastLoading, refetch } = useClientForecast(selectedClient, period);
   const forecast = forecastData?.forecast;
   const cohorts = forecastData?.cohorts || [];
   const calculatedAt = forecastData?.calculatedAt || null;
@@ -90,9 +92,11 @@ export default function Forecast() {
 
   const periodLabel = useMemo(() => {
     const now = new Date();
-    const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    return next.toLocaleDateString('da-DK', { month: 'long', year: 'numeric' });
-  }, []);
+    const target = period === "current"
+      ? now
+      : new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    return target.toLocaleDateString('da-DK', { month: 'long', year: 'numeric' });
+  }, [period]);
 
   const avgAttendance = forecast && forecast.establishedEmployees.length > 0
     ? forecast.establishedEmployees.reduce((s, e) => s + e.attendanceFactor, 0) / forecast.establishedEmployees.length
@@ -123,8 +127,18 @@ export default function Forecast() {
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <DataFreshnessBadge calculatedAt={calculatedAt} />
+            <ToggleGroup
+              type="single"
+              value={period}
+              onValueChange={(v) => { if (v) setPeriod(v as "current" | "next"); }}
+              variant="outline"
+              size="sm"
+            >
+              <ToggleGroupItem value="current">Denne måned</ToggleGroupItem>
+              <ToggleGroupItem value="next">Næste måned</ToggleGroupItem>
+            </ToggleGroup>
             <Select value={selectedClient} onValueChange={setSelectedClient}>
               <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="Vælg kunde" />

@@ -24,16 +24,18 @@ const DEFAULT_WEEKLY_HOURS = 37;
  * Fetches employees, sales (8 weeks EWMA), shifts, absences from DB.
  * Uses existing pure calculation functions from forecast.ts.
  */
-export function useClientForecast(clientId: string) {
+export function useClientForecast(clientId: string, period: "current" | "next" = "next") {
   return useQuery({
-    queryKey: ["client-forecast", clientId],
+    queryKey: ["client-forecast", clientId, period],
     queryFn: async (): Promise<{
       forecast: ForecastResult;
       cohorts: ClientForecastCohort[];
       calculatedAt: string;
     }> => {
       const now = new Date();
-      const forecastStart = startOfMonth(new Date(now.getFullYear(), now.getMonth() + 1, 1));
+      const forecastStart = period === "current"
+        ? startOfMonth(now)
+        : startOfMonth(new Date(now.getFullYear(), now.getMonth() + 1, 1));
       const forecastEnd = endOfMonth(forecastStart);
       const forecastStartStr = format(forecastStart, "yyyy-MM-dd");
       const forecastEndStr = format(forecastEnd, "yyyy-MM-dd");
