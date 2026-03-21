@@ -17,8 +17,8 @@ function getSupabase() {
  * Provider budget limits for healer (15% of hourly capacity)
  */
 const HEALER_BUDGETS: Record<string, number> = {
-  adversus: 150,  // 15% of 1000
-  enreach: 1500,  // 15% of 10000
+  adversus: 150,
+  enreach: 1500,
 };
 
 /**
@@ -45,15 +45,14 @@ async function getProviderUsage(supabase: any, provider: string): Promise<number
 }
 
 /**
- * Get decrypted credentials for a provider's first active integration
+ * Get credentials for a specific integration by name (source)
  */
-async function getProviderCredentials(supabase: any, provider: string): Promise<{ credentials: any; integration: any } | null> {
+async function getCredentialsByName(supabase: any, name: string): Promise<{ credentials: any; integration: any } | null> {
   const { data: integrations } = await supabase
     .from("dialer_integrations")
     .select("id, name, provider, api_url, config")
-    .eq("provider", provider)
     .eq("is_active", true)
-    .limit(1);
+    .ilike("name", name);
 
   if (!integrations || integrations.length === 0) return null;
 
@@ -114,7 +113,6 @@ async function healAdversus(
       const leadData = await response.json();
       const leadResultData = leadData.resultData || leadData.leadResultData || [];
 
-      // Build leadResultFields from resultData array (same logic as integration-engine adapter)
       const leadResultFields: Record<string, any> = {};
       if (Array.isArray(leadResultData)) {
         for (const field of leadResultData) {
@@ -125,15 +123,12 @@ async function healAdversus(
         }
       }
 
-      // Only mark as healed if we actually got data
       if (leadResultData.length === 0 && Object.keys(leadResultFields).length === 0) {
         throw new Error("API returned empty lead data");
       }
 
-      // Extract phone number from lead data
       const phone = leadData.phone || leadData.contactPhone || leadData.mobile || null;
 
-      // Update sale with enriched data
       const updatedPayload = {
         ...rawPayload,
         leadResultFields,
@@ -152,7 +147,6 @@ async function healAdversus(
       healed++;
       log(`Healed Adversus sale ${sale.adversus_external_id} (lead ${leadId})`);
 
-      // Small delay to respect rate limits
       await new Promise(r => setTimeout(r, 1500));
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
@@ -182,7 +176,6 @@ async function healEnreach(
 ): Promise<{ healed: number; failed: number; skipped: number }> {
   let healed = 0, failed = 0, skipped = 0;
 
-  // Build auth header using same heuristic as EnreachAdapter
   let apiUrl = integration?.api_url || credentials?.api_url || "https://wshero01.herobase.com/api";
   apiUrl = apiUrl.replace(/^(Web|URL|API|Endpoint):\s*/i, '').trim();
   if (!apiUrl.startsWith('http://') && !apiUrl.startsWith('https://')) {
@@ -210,7 +203,6 @@ async function healEnreach(
   for (const sale of sales) {
     const externalId = sale.adversus_external_id || "";
 
-    // Webhook-created sales have no lead ID to look up
     if (externalId.startsWith("enreach-")) {
       await supabase.from("sales").update({
         enrichment_status: "skipped",
@@ -292,10 +284,10 @@ serve(async (req) => {
 
     log(`Starting enrichment healer (maxBatch=${maxBatch}, saleExternalId=${saleExternalId || "none"})`);
 
-    // Fetch sales needing healing
+    // Fetch sales needing healing — include source for grouping by integration
     let salesQuery = supabase
       .from("sales")
-      .select("id, adversus_external_id, integration_type, raw_payload, enrichment_status, enrichment_attempts, customer_phone")
+      .select("id, adversus_external_id, integration_type, source, raw_payload, enrichment_status, enrichment_attempts, customer_phone")
       .order("sale_datetime", { ascending: false })
       .limit(maxBatch);
 
@@ -311,11 +303,6 @@ serve(async (req) => {
       salesQuery = salesQuery.eq("integration_type", providerFilter);
     }
 
-    // integration_id column doesn't exist on sales table; filter by integration_type instead
-    if (integrationIdFilter) {
-      // Skip - integrationId filter not supported (no column)
-    }
-
     const { data: pendingSales, error } = await salesQuery;
 
     if (error) throw error;
@@ -329,57 +316,66 @@ serve(async (req) => {
 
     log(`Found ${pendingSales.length} sales needing healing`);
 
-    // Group by provider
-    const adversusSales = pendingSales.filter((s: any) => s.integration_type === "adversus");
-    const enreachSales = pendingSales.filter((s: any) => s.integration_type === "enreach");
+    // Group sales by source (= integration name) instead of integration_type
+    const salesBySource: Record<string, any[]> = {};
+    for (const sale of pendingSales) {
+      const source = sale.source || sale.integration_type || "unknown";
+      if (!salesBySource[source]) salesBySource[source] = [];
+      salesBySource[source].push(sale);
+    }
 
     let totalHealed = 0, totalFailed = 0, totalSkipped = 0;
 
-    // Heal Adversus sales
-    if (adversusSales.length > 0) {
-      const usage = await getProviderUsage(supabase, "adversus");
-      const healerBudget = HEALER_BUDGETS.adversus;
-      
-      if (usage >= (1000 - healerBudget)) {
-        log(`Adversus budget exhausted (${usage}/1000), skipping ${adversusSales.length} sales`);
-        totalSkipped += adversusSales.length;
-      } else {
-        const creds = await getProviderCredentials(supabase, "adversus");
-        if (creds) {
-          const result = await healAdversus(supabase, adversusSales, creds.credentials, log);
-          totalHealed += result.healed;
-          totalFailed += result.failed;
-          totalSkipped += result.skipped;
+    // Process each source group with its own credentials
+    for (const [source, sales] of Object.entries(salesBySource)) {
+      const integType = sales[0].integration_type || "";
+      const provider = integType.toLowerCase();
+
+      // Check budget for provider
+      const budget = HEALER_BUDGETS[provider];
+      if (budget) {
+        const usage = await getProviderUsage(supabase, provider);
+        const maxCapacity = provider === "adversus" ? 1000 : 10000;
+        if (usage >= (maxCapacity - budget)) {
+          log(`${provider} budget exhausted (${usage}/${maxCapacity}), skipping ${sales.length} ${source} sales`);
+          totalSkipped += sales.length;
+          continue;
         }
       }
-    }
 
-    // Heal Enreach sales
-    if (enreachSales.length > 0) {
-      const usage = await getProviderUsage(supabase, "enreach");
-      const healerBudget = HEALER_BUDGETS.enreach;
-      
-      if (usage >= (10000 - healerBudget)) {
-        log(`Enreach budget exhausted (${usage}/10000), skipping ${enreachSales.length} sales`);
-        totalSkipped += enreachSales.length;
-      } else {
-        const creds = await getProviderCredentials(supabase, "enreach");
-        if (creds) {
-          const result = await healEnreach(supabase, enreachSales, creds.credentials, creds.integration, log);
-          totalHealed += result.healed;
-          totalFailed += result.failed;
-          totalSkipped += result.skipped;
-        }
+      // Fetch credentials for this specific integration by name (source)
+      const creds = await getCredentialsByName(supabase, source);
+      if (!creds) {
+        log(`No active integration found for source "${source}", skipping ${sales.length} sales`);
+        totalSkipped += sales.length;
+        continue;
       }
+
+      log(`Processing ${sales.length} sales from source "${source}" (provider: ${creds.integration.provider})`);
+
+      let result: { healed: number; failed: number; skipped: number };
+      if (creds.integration.provider === "adversus") {
+        result = await healAdversus(supabase, sales, creds.credentials, log);
+      } else if (creds.integration.provider === "enreach") {
+        result = await healEnreach(supabase, sales, creds.credentials, creds.integration, log);
+      } else {
+        log(`Unknown provider "${creds.integration.provider}" for source "${source}", skipping`);
+        totalSkipped += sales.length;
+        continue;
+      }
+
+      totalHealed += result.healed;
+      totalFailed += result.failed;
+      totalSkipped += result.skipped;
     }
 
-    // Log summary to integration_logs
+    // Log summary
     await supabase.from("integration_logs").insert({
       integration_type: "healer",
       integration_name: "enrichment-healer",
       status: totalFailed > 0 ? "partial" : "success",
       message: `Healed: ${totalHealed}, Failed: ${totalFailed}, Skipped: ${totalSkipped}`,
-      details: { totalHealed, totalFailed, totalSkipped, adversus: adversusSales.length, enreach: enreachSales.length },
+      details: { totalHealed, totalFailed, totalSkipped, sources: Object.keys(salesBySource) },
     });
 
     log(`Done: healed=${totalHealed}, failed=${totalFailed}, skipped=${totalSkipped}`);
