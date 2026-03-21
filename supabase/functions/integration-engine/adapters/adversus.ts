@@ -316,7 +316,7 @@ export class AdversusAdapter implements DialerAdapter {
         agentName: agentName,
 
         customerName: s.lead?.company || s.lead?.name || "",
-        customerPhone: s.lead?.phone || "",
+        customerPhone: s.lead?.phone || leadData?.phone || "",
 
         campaignId: campaignId,
         campaignName: s.campaign?.name || undefined,
@@ -484,7 +484,7 @@ export class AdversusAdapter implements DialerAdapter {
         agentEmail,
         agentName,
         customerName: s.lead?.company || s.lead?.name || "",
-        customerPhone: s.lead?.phone || "",
+        customerPhone: s.lead?.phone || leadData?.phone || "",
         campaignId,
         campaignName: s.campaign?.name || undefined,
         externalReference,
@@ -555,6 +555,7 @@ export class AdversusAdapter implements DialerAdapter {
     opp: string | null = null;
     resultData: Array<{ id: number; name?: string; label?: string; type?: string; value: any }> = [];
     resultFields: Record<string, any> = {};
+    phone: string | null = null;
   };
 
   // Build lead data map by fetching only the leads referenced in sales (individually via fetchLeadById)
@@ -562,8 +563,8 @@ export class AdversusAdapter implements DialerAdapter {
     sales: any[],
     campaignConfigMap: Map<string, CampaignMappingConfig>,
     options?: { fast?: boolean }
-  ): Promise<Map<string, { opp: string | null; resultData: Array<{ id: number; name?: string; label?: string; type?: string; value: any }>; resultFields: Record<string, any> }>> {
-    const leadIdToData = new Map<string, { opp: string | null; resultData: Array<{ id: number; name?: string; label?: string; type?: string; value: any }>; resultFields: Record<string, any> }>();
+  ): Promise<Map<string, { opp: string | null; resultData: Array<{ id: number; name?: string; label?: string; type?: string; value: any }>; resultFields: Record<string, any>; phone: string | null }>> {
+    const leadIdToData = new Map<string, { opp: string | null; resultData: Array<{ id: number; name?: string; label?: string; type?: string; value: any }>; resultFields: Record<string, any>; phone: string | null }>();
 
     // 1. Extract unique leadIds from sales
     const uniqueLeadIds = [...new Set(sales.map(s => s.leadId).filter(Boolean).map(String))];
@@ -618,7 +619,8 @@ export class AdversusAdapter implements DialerAdapter {
           }
         }
 
-        leadIdToData.set(leadId, { opp, resultData, resultFields });
+        const phone = leadData.phone || leadData.contactPhone || leadData.mobile || null;
+        leadIdToData.set(leadId, { opp, resultData, resultFields, phone });
         fetchSuccess++;
       }
 
