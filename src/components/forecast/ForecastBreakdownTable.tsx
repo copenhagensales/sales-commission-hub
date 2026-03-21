@@ -57,10 +57,15 @@ export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = f
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-left">
-                  <th className="pb-2 font-medium text-muted-foreground">Sælger</th>
-                  <th className="pb-2 font-medium text-muted-foreground text-right">Timer</th>
-                  <th className="pb-2 font-medium text-muted-foreground text-right">Salg/time</th>
-                  <th className="pb-2 font-medium text-muted-foreground text-right">Fremmøde</th>
+                    <th className="pb-2 font-medium text-muted-foreground cursor-pointer select-none" onClick={() => toggleSort('name')}>
+                      <span className="flex items-center gap-1">Sælger <ArrowUpDown className="h-3 w-3" /></span>
+                    </th>
+                    <th className="pb-2 font-medium text-muted-foreground text-right">Timer</th>
+                    <th className="pb-2 font-medium text-muted-foreground text-right cursor-pointer select-none" onClick={() => toggleSort('sph')}>
+                      <span className="flex items-center justify-end gap-1">Salg/time <ArrowUpDown className="h-3 w-3" /></span>
+                    </th>
+                    <th className="pb-2 font-medium text-muted-foreground text-right">Fremmøde</th>
+                    <th className="pb-2 font-medium text-muted-foreground text-right">Status</th>
                   {hasActuals ? (
                     <>
                       <th className="pb-2 font-medium text-muted-foreground text-right">Faktisk</th>
