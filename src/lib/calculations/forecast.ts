@@ -1,0 +1,384 @@
+/**
+ * Forecast Calculation Library
+ * 
+ * Pure functions for computing sales forecasts.
+ * Uses EWMA for established employees and ramp/survival curves for cohorts.
+ */
+
+import type {
+  EmployeePerformance,
+  EmployeeForecastResult,
+  CohortForecastInput,
+  CohortForecastResult,
+  ForecastResult,
+  ForecastDriver,
+  ForecastRampProfile,
+  ForecastSurvivalProfile,
+  ForecastVsActual,
+} from "@/types/forecast";
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
+const EWMA_DECAY = 0.85;
+const LOW_FACTOR = 0.85;
+const HIGH_FACTOR = 1.12;
+const DEFAULT_WEEKLY_HOURS = 37;
+
+// ============================================================================
+// EWMA CALCULATION
+// ============================================================================
+
+/**
+ * Exponential Weighted Moving Average for sales-per-hour.
+ * Recent weeks are weighted more heavily.
+ * @param weeklySph - Array of weekly sales/hour, index 0 = most recent
+ */
+export function calculateEwmaSph(weeklySph: number[]): number {
+  if (weeklySph.length === 0) return 0;
+  
+  let weightedSum = 0;
+  let weightSum = 0;
+  
+  for (let i = 0; i < weeklySph.length; i++) {
+    const weight = Math.pow(EWMA_DECAY, i);
+    weightedSum += weeklySph[i] * weight;
+    weightSum += weight;
+  }
+  
+  return weightSum > 0 ? weightedSum / weightSum : 0;
+}
+
+// ============================================================================
+// RAMP FACTOR LOOKUP
+// ============================================================================
+
+/**
+ * Get ramp factor for a given number of days since start.
+ */
+export function getRampFactor(daysSinceStart: number, profile: ForecastRampProfile): number {
+  if (daysSinceStart <= 7) return profile.day_1_7_factor;
+  if (daysSinceStart <= 14) return profile.day_8_14_factor;
+  if (daysSinceStart <= 30) return profile.day_15_30_factor;
+  if (daysSinceStart <= 60) return profile.day_31_60_factor;
+  return profile.steady_state_factor;
+}
+
+// ============================================================================
+// SURVIVAL INTERPOLATION
+// ============================================================================
+
+/**
+ * Interpolate survival factor for a given day.
+ */
+export function getSurvivalFactor(daysSinceStart: number, profile: ForecastSurvivalProfile): number {
+  if (daysSinceStart <= 0) return 1.0;
+  
+  const points = [
+    { day: 0, survival: 1.0 },
+    { day: 7, survival: profile.survival_day_7 },
+    { day: 14, survival: profile.survival_day_14 },
+    { day: 30, survival: profile.survival_day_30 },
+    { day: 60, survival: profile.survival_day_60 },
+  ];
+  
+  // Find surrounding points
+  for (let i = 0; i < points.length - 1; i++) {
+    if (daysSinceStart >= points[i].day && daysSinceStart <= points[i + 1].day) {
+      const range = points[i + 1].day - points[i].day;
+      const progress = (daysSinceStart - points[i].day) / range;
+      return points[i].survival + (points[i + 1].survival - points[i].survival) * progress;
+    }
+  }
+  
+  return points[points.length - 1].survival;
+}
+
+// ============================================================================
+// EMPLOYEE FORECAST
+// ============================================================================
+
+/**
+ * Calculate forecast for a single established employee.
+ */
+export function forecastEstablishedEmployee(emp: EmployeePerformance): EmployeeForecastResult {
+  const ewmaSph = calculateEwmaSph(emp.weeklySalesPerHour);
+  const effectiveHours = emp.plannedHours * emp.personalAttendanceFactor;
+  const expected = effectiveHours * ewmaSph;
+  
+  return {
+    employeeId: emp.employeeId,
+    employeeName: emp.employeeName,
+    teamName: emp.teamName,
+    avatarUrl: emp.avatarUrl,
+    isEstablished: true,
+    plannedHours: emp.plannedHours,
+    expectedSph: ewmaSph,
+    attendanceFactor: emp.personalAttendanceFactor,
+    forecastSales: Math.round(expected),
+    forecastSalesLow: Math.round(expected * LOW_FACTOR),
+    forecastSalesHigh: Math.round(expected * HIGH_FACTOR),
+  };
+}
+
+// ============================================================================
+// COHORT FORECAST
+// ============================================================================
+
+/**
+ * Calculate forecast for a new hire cohort.
+ */
+export function forecastCohort(input: CohortForecastInput): CohortForecastResult {
+  const { cohort, rampProfile, survivalProfile, campaignBaselineSph, weeklyHoursPerHead, attendanceFactor } = input;
+  
+  const startDate = new Date(cohort.start_date);
+  const now = new Date();
+  const daysSinceStart = Math.max(0, Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
+  
+  // Use average day in forecast period for ramp/survival calc
+  const avgDays = daysSinceStart + 15; // ~mid-month projection
+  
+  const rampFactor = getRampFactor(avgDays, rampProfile);
+  const survivalFactor = getSurvivalFactor(avgDays, survivalProfile);
+  
+  const effectiveHeads = cohort.planned_headcount * survivalFactor;
+  const forecastHours = effectiveHeads * weeklyHoursPerHead * 4 * attendanceFactor; // ~4 weeks
+  const expected = forecastHours * campaignBaselineSph * rampFactor;
+  
+  return {
+    cohortId: cohort.id,
+    startDate: cohort.start_date,
+    plannedHeadcount: cohort.planned_headcount,
+    effectiveHeads: Math.round(effectiveHeads * 10) / 10,
+    rampFactor,
+    survivalFactor,
+    forecastHours: Math.round(forecastHours),
+    forecastSales: Math.round(expected),
+    forecastSalesLow: Math.round(expected * LOW_FACTOR),
+    forecastSalesHigh: Math.round(expected * HIGH_FACTOR),
+    note: cohort.note,
+  };
+}
+
+// ============================================================================
+// FULL FORECAST
+// ============================================================================
+
+export function calculateFullForecast(
+  employees: EmployeePerformance[],
+  cohortInputs: CohortForecastInput[],
+  periodStart: string,
+  periodEnd: string,
+  clientId: string,
+  clientCampaignId: string | null,
+): ForecastResult {
+  const employeeResults = employees.map(forecastEstablishedEmployee);
+  const cohortResults = cohortInputs.map(forecastCohort);
+  
+  const totalEmployeeSales = employeeResults.reduce((sum, e) => sum + e.forecastSales, 0);
+  const totalCohortSales = cohortResults.reduce((sum, c) => sum + c.forecastSales, 0);
+  const totalExpected = totalEmployeeSales + totalCohortSales;
+  
+  const totalEmployeeHours = employeeResults.reduce((sum, e) => sum + e.plannedHours, 0);
+  const totalCohortHours = cohortResults.reduce((sum, c) => sum + c.forecastHours, 0);
+  
+  const avgAttendance = employees.length > 0
+    ? employees.reduce((sum, e) => sum + e.personalAttendanceFactor, 0) / employees.length
+    : 0.92;
+  
+  const absenceLoss = totalExpected * (1 - avgAttendance);
+  const churnLoss = cohortResults.reduce((sum, c) => 
+    sum + (c.plannedHeadcount - c.effectiveHeads) * (c.forecastSales / Math.max(c.effectiveHeads, 0.1)), 0
+  );
+  
+  // Build drivers
+  const drivers: ForecastDriver[] = [];
+  
+  if (cohortResults.length > 0) {
+    drivers.push({
+      key: 'new_cohorts',
+      label: `${cohortResults.length} nye opstartshold`,
+      impact: 'positive',
+      value: `+${totalCohortSales} salg`,
+      description: `${cohortResults.reduce((s, c) => s + c.plannedHeadcount, 0)} nye sælgere bidrager med forventet ${totalCohortSales} salg efter ramp-up og churn.`,
+    });
+  }
+  
+  if (avgAttendance < 0.90) {
+    drivers.push({
+      key: 'low_attendance',
+      label: 'Lav fremmøde',
+      impact: 'negative',
+      value: `${Math.round(avgAttendance * 100)}%`,
+      description: `Gennemsnitlig fremmøde er ${Math.round(avgAttendance * 100)}%, hvilket reducerer effektive timer.`,
+    });
+  } else {
+    drivers.push({
+      key: 'attendance',
+      label: 'Fremmødefaktor',
+      impact: 'neutral',
+      value: `${Math.round(avgAttendance * 100)}%`,
+      description: `Gennemsnitlig fremmøde er ${Math.round(avgAttendance * 100)}%.`,
+    });
+  }
+  
+  const topPerformers = employeeResults
+    .sort((a, b) => b.forecastSales - a.forecastSales)
+    .slice(0, 3);
+  
+  if (topPerformers.length > 0) {
+    drivers.push({
+      key: 'top_performers',
+      label: 'Top-performere',
+      impact: 'positive',
+      value: `${topPerformers.reduce((s, p) => s + p.forecastSales, 0)} salg`,
+      description: `Top 3: ${topPerformers.map(p => p.employeeName).join(', ')}`,
+    });
+  }
+  
+  if (churnLoss > 5) {
+    drivers.push({
+      key: 'churn_risk',
+      label: 'Churn-effekt',
+      impact: 'negative',
+      value: `-${Math.round(churnLoss)} salg`,
+      description: `Forventet churn blandt nye sælgere reducerer forecast med ~${Math.round(churnLoss)} salg.`,
+    });
+  }
+  
+  return {
+    periodStart,
+    periodEnd,
+    clientId,
+    clientCampaignId,
+    totalSalesExpected: totalExpected,
+    totalSalesLow: Math.round(totalExpected * LOW_FACTOR),
+    totalSalesHigh: Math.round(totalExpected * HIGH_FACTOR),
+    totalHours: totalEmployeeHours + totalCohortHours,
+    totalHeads: employees.length + cohortResults.reduce((s, c) => s + c.effectiveHeads, 0),
+    churnLoss: Math.round(churnLoss),
+    absenceLoss: Math.round(absenceLoss),
+    establishedEmployees: employeeResults,
+    cohorts: cohortResults,
+    drivers,
+  };
+}
+
+// ============================================================================
+// MOCK DATA
+// ============================================================================
+
+export const MOCK_RAMP_PROFILE: ForecastRampProfile = {
+  id: 'mock-ramp-1',
+  name: 'Standard TM Ramp',
+  client_campaign_id: null,
+  day_1_7_factor: 0.15,
+  day_8_14_factor: 0.35,
+  day_15_30_factor: 0.60,
+  day_31_60_factor: 0.85,
+  steady_state_factor: 1.0,
+  created_at: new Date().toISOString(),
+};
+
+export const MOCK_SURVIVAL_PROFILE: ForecastSurvivalProfile = {
+  id: 'mock-surv-1',
+  name: 'Standard Churn',
+  client_campaign_id: null,
+  survival_day_7: 0.92,
+  survival_day_14: 0.84,
+  survival_day_30: 0.74,
+  survival_day_60: 0.66,
+  created_at: new Date().toISOString(),
+};
+
+export function generateMockEmployees(): EmployeePerformance[] {
+  const names = [
+    'Andreas M.', 'Sofia K.', 'Mikkel J.', 'Emma L.', 'Oliver P.',
+    'Ida R.', 'Victor S.', 'Freja N.', 'Noah H.', 'Laura B.',
+    'Christian T.', 'Mathilde A.',
+  ];
+  
+  return names.map((name, i) => ({
+    employeeId: `emp-${i}`,
+    employeeName: name,
+    teamName: i < 6 ? 'Team Alpha' : 'Team Beta',
+    avatarUrl: null,
+    weeklySalesPerHour: Array.from({ length: 8 }, () => 0.3 + Math.random() * 0.6),
+    plannedHours: 140 + Math.floor(Math.random() * 40),
+    personalAttendanceFactor: 0.88 + Math.random() * 0.10,
+    isEstablished: true,
+    daysSinceStart: 90 + Math.floor(Math.random() * 300),
+  }));
+}
+
+export function generateMockCohorts(): CohortForecastInput[] {
+  const nextMonth = new Date();
+  nextMonth.setMonth(nextMonth.getMonth() + 1);
+  nextMonth.setDate(1);
+  
+  return [
+    {
+      cohort: {
+        id: 'cohort-1',
+        client_id: 'mock-client',
+        client_campaign_id: null,
+        start_date: new Date(nextMonth.getFullYear(), nextMonth.getMonth(), 15).toISOString().split('T')[0],
+        planned_headcount: 5,
+        ramp_profile_id: null,
+        survival_profile_id: null,
+        note: '5 nye starter midt i måneden',
+        created_by: null,
+        created_at: new Date().toISOString(),
+      },
+      rampProfile: MOCK_RAMP_PROFILE,
+      survivalProfile: MOCK_SURVIVAL_PROFILE,
+      campaignBaselineSph: 0.45,
+      weeklyHoursPerHead: DEFAULT_WEEKLY_HOURS,
+      attendanceFactor: 0.90,
+    },
+    {
+      cohort: {
+        id: 'cohort-2',
+        client_id: 'mock-client',
+        client_campaign_id: null,
+        start_date: new Date(nextMonth.getFullYear(), nextMonth.getMonth(), 1).toISOString().split('T')[0],
+        planned_headcount: 3,
+        ramp_profile_id: null,
+        survival_profile_id: null,
+        note: '3 nye fra start af måneden',
+        created_by: null,
+        created_at: new Date().toISOString(),
+      },
+      rampProfile: MOCK_RAMP_PROFILE,
+      survivalProfile: MOCK_SURVIVAL_PROFILE,
+      campaignBaselineSph: 0.45,
+      weeklyHoursPerHead: DEFAULT_WEEKLY_HOURS,
+      attendanceFactor: 0.90,
+    },
+  ];
+}
+
+export function generateMockForecastVsActual(): ForecastVsActual[] {
+  return [
+    { period: 'Dec 2025', forecastLow: 245, forecastExpected: 290, forecastHigh: 325, actual: 278, accuracy: 96 },
+    { period: 'Jan 2026', forecastLow: 260, forecastExpected: 305, forecastHigh: 342, actual: 312, accuracy: 98 },
+    { period: 'Feb 2026', forecastLow: 240, forecastExpected: 285, forecastHigh: 320, actual: 268, accuracy: 94 },
+    { period: 'Mar 2026', forecastLow: 270, forecastExpected: 315, forecastHigh: 353, actual: 0, accuracy: 0 },
+  ];
+}
+
+export function generateMockForecast(): ForecastResult {
+  const now = new Date();
+  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const endOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 2, 0);
+  
+  return calculateFullForecast(
+    generateMockEmployees(),
+    generateMockCohorts(),
+    nextMonth.toISOString().split('T')[0],
+    endOfNextMonth.toISOString().split('T')[0],
+    'mock-client',
+    null,
+  );
+}

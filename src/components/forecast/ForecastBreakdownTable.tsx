@@ -1,0 +1,143 @@
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Users, UserPlus } from "lucide-react";
+import type { EmployeeForecastResult, CohortForecastResult } from "@/types/forecast";
+import { ForecastIntervalBadge } from "./ForecastIntervalBadge";
+
+interface Props {
+  employees: EmployeeForecastResult[];
+  cohorts: CohortForecastResult[];
+}
+
+export function ForecastBreakdownTable({ employees, cohorts }: Props) {
+  const sortedEmployees = [...employees].sort((a, b) => b.forecastSales - a.forecastSales);
+
+  return (
+    <div className="space-y-4">
+      {/* Established employees */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Users className="h-4 w-4 text-muted-foreground" />
+            Etablerede sælgere ({employees.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left">
+                  <th className="pb-2 font-medium text-muted-foreground">Sælger</th>
+                  <th className="pb-2 font-medium text-muted-foreground text-right">Timer</th>
+                  <th className="pb-2 font-medium text-muted-foreground text-right">Salg/time</th>
+                  <th className="pb-2 font-medium text-muted-foreground text-right">Fremmøde</th>
+                  <th className="pb-2 font-medium text-muted-foreground text-right">Forecast</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedEmployees.map((emp) => (
+                  <tr key={emp.employeeId} className="border-b last:border-0 hover:bg-muted/30">
+                    <td className="py-2.5">
+                      <div>
+                        <p className="font-medium">{emp.employeeName}</p>
+                        {emp.teamName && (
+                          <p className="text-xs text-muted-foreground">{emp.teamName}</p>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-2.5 text-right tabular-nums">{emp.plannedHours}</td>
+                    <td className="py-2.5 text-right tabular-nums">{emp.expectedSph.toFixed(2)}</td>
+                    <td className="py-2.5 text-right tabular-nums">{Math.round(emp.attendanceFactor * 100)}%</td>
+                    <td className="py-2.5 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <span className="font-semibold tabular-nums">{emp.forecastSales}</span>
+                        <span className="text-xs text-muted-foreground">
+                          ({emp.forecastSalesLow}-{emp.forecastSalesHigh})
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t font-semibold">
+                  <td className="pt-2">Total</td>
+                  <td className="pt-2 text-right tabular-nums">{employees.reduce((s, e) => s + e.plannedHours, 0)}</td>
+                  <td className="pt-2 text-right">—</td>
+                  <td className="pt-2 text-right">—</td>
+                  <td className="pt-2 text-right tabular-nums">{employees.reduce((s, e) => s + e.forecastSales, 0)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Cohorts */}
+      {cohorts.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <UserPlus className="h-4 w-4 text-muted-foreground" />
+              Nye opstartshold ({cohorts.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left">
+                    <th className="pb-2 font-medium text-muted-foreground">Hold</th>
+                    <th className="pb-2 font-medium text-muted-foreground text-right">Planlagt</th>
+                    <th className="pb-2 font-medium text-muted-foreground text-right">Effektive</th>
+                    <th className="pb-2 font-medium text-muted-foreground text-right">Ramp</th>
+                    <th className="pb-2 font-medium text-muted-foreground text-right">Survival</th>
+                    <th className="pb-2 font-medium text-muted-foreground text-right">Forecast</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cohorts.map((cohort) => (
+                    <tr key={cohort.cohortId} className="border-b last:border-0 hover:bg-muted/30">
+                      <td className="py-2.5">
+                        <div>
+                          <p className="font-medium">Start {new Date(cohort.startDate).toLocaleDateString('da-DK', { day: 'numeric', month: 'short' })}</p>
+                          {cohort.note && <p className="text-xs text-muted-foreground">{cohort.note}</p>}
+                        </div>
+                      </td>
+                      <td className="py-2.5 text-right tabular-nums">{cohort.plannedHeadcount}</td>
+                      <td className="py-2.5 text-right tabular-nums">{cohort.effectiveHeads}</td>
+                      <td className="py-2.5 text-right">
+                        <Badge variant="outline" className="text-xs">{Math.round(cohort.rampFactor * 100)}%</Badge>
+                      </td>
+                      <td className="py-2.5 text-right">
+                        <Badge variant="outline" className="text-xs">{Math.round(cohort.survivalFactor * 100)}%</Badge>
+                      </td>
+                      <td className="py-2.5 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <span className="font-semibold tabular-nums">{cohort.forecastSales}</span>
+                          <span className="text-xs text-muted-foreground">
+                            ({cohort.forecastSalesLow}-{cohort.forecastSalesHigh})
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t font-semibold">
+                    <td className="pt-2">Total</td>
+                    <td className="pt-2 text-right tabular-nums">{cohorts.reduce((s, c) => s + c.plannedHeadcount, 0)}</td>
+                    <td className="pt-2 text-right tabular-nums">{cohorts.reduce((s, c) => s + c.effectiveHeads, 0).toFixed(1)}</td>
+                    <td className="pt-2 text-right">—</td>
+                    <td className="pt-2 text-right">—</td>
+                    <td className="pt-2 text-right tabular-nums">{cohorts.reduce((s, c) => s + c.forecastSales, 0)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
