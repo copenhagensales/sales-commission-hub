@@ -271,7 +271,8 @@ serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const maxBatch = body.maxBatch || 20;
+    const turboMode = body.turboMode === true;
+    const maxBatch = body.maxBatch || (turboMode ? 80 : 20);
     const saleExternalId = typeof body.saleExternalId === "string" ? body.saleExternalId.trim() : "";
     const providerFilter = typeof body.provider === "string" ? body.provider.trim() : "";
     const integrationIdFilter = typeof body.integrationId === "string" ? body.integrationId.trim() : "";
@@ -282,7 +283,7 @@ serve(async (req) => {
       logs.push(msg);
     };
 
-    log(`Starting enrichment healer (maxBatch=${maxBatch}, saleExternalId=${saleExternalId || "none"})`);
+    log(`Starting enrichment healer (maxBatch=${maxBatch}, turbo=${turboMode}, saleExternalId=${saleExternalId || "none"})`);
 
     // Fetch sales needing healing — include source for grouping by integration
     let salesQuery = supabase
