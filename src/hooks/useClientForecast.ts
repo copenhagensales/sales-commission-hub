@@ -184,6 +184,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" =
         teamStandardShiftsRes,
         shiftDaysRes,
         absencesRes,
+        holidaysRes,
       ] = await Promise.all([
         supabase
           .from("shift")
@@ -208,7 +209,17 @@ export function useClientForecast(clientId: string, period: "current" | "next" =
           .in("type", ["sick", "vacation", "no_show", "day_off"])
           .lte("start_date", forecastEndStr)
           .gte("end_date", ninetyDaysAgo),
+        (supabase as any)
+          .from("danish_holidays")
+          .select("date")
+          .gte("date", ninetyDaysAgo)
+          .lte("date", forecastEndStr),
       ]);
+
+      // Build holiday set
+      const holidayDates = new Set<string>(
+        (holidaysRes.data || []).map((h: any) => h.date)
+      );
 
       // Build shift maps (same pattern as useTeamGoalForecast)
       const shiftDays = shiftDaysRes.data || [];
@@ -263,6 +274,11 @@ export function useClientForecast(clientId: string, period: "current" | "next" =
         const cur = new Date(rangeStart);
         while (cur <= rangeEnd) {
           const dateStr = format(cur, "yyyy-MM-dd");
+          // Skip holidays — they are never working days
+          if (holidayDates.has(dateStr)) {
+            cur.setDate(cur.getDate() + 1);
+            continue;
+          }
           if (excludeAbsence && absenceDates.has(dateStr)) {
             cur.setDate(cur.getDate() + 1);
             continue;
@@ -446,15 +462,16 @@ export function useClientForecast(clientId: string, period: "current" | "next" =
       if (period === "current") {
         const todayStr = format(now, "yyyy-MM-dd");
         
-        // Count working days elapsed and remaining
-        const cur = new Date(forecastStart);
-        while (cur <= forecastEnd) {
-          const dow = cur.getDay();
-          if (dow !== 0 && dow !== 6) { // weekdays only
-            if (cur <= now) daysElapsed++;
+        // Count working days elapsed and remaining (exclude weekends + holidays)
+        const cur2 = new Date(forecastStart);
+        while (cur2 <= forecastEnd) {
+          const dow = cur2.getDay();
+          const ds = format(cur2, "yyyy-MM-dd");
+          if (dow !== 0 && dow !== 6 && !holidayDates.has(ds)) {
+            if (cur2 <= now) daysElapsed++;
             else daysRemaining++;
           }
-          cur.setDate(cur.getDate() + 1);
+          cur2.setDate(cur2.getDate() + 1);
         }
         
         // Fetch actual sales this month — per agent email
