@@ -900,7 +900,7 @@ export function SupplierReportTab() {
             </Button>
             <Button
               variant="outline"
-              onClick={() => {
+              onClick={async () => {
                 const WEEKDAY_NAMES_SHORT = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"];
                 const hasDiscount = discountRules && discountRules.length > 0;
                 const headers = [

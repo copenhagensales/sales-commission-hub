@@ -125,12 +125,7 @@ export function EmployeeExcelImport() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = async (ev) => {
-        const buffer = ev.target?.result as ArrayBuffer;
-        await handleParseExcelInternal(buffer, file.name);
-      };
-      reader.readAsArrayBuffer(file);
+      handleParseExcel(file);
     }
   };
 
