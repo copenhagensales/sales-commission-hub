@@ -39,7 +39,7 @@ export default function Forecast() {
   });
 
   // Real forecast data
-  const { data: forecastData, isLoading: forecastLoading, refetch } = useClientForecast(selectedClient);
+  const { data: forecastData, isLoading: forecastLoading, refetch } = useClientForecast(selectedClient, period);
   const forecast = forecastData?.forecast;
   const cohorts = forecastData?.cohorts || [];
   const calculatedAt = forecastData?.calculatedAt || null;
