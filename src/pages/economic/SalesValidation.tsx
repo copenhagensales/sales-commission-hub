@@ -93,6 +93,43 @@ export default function SalesValidation() {
     enabled: !!clientId,
   });
 
+  // Aggregated sales stats for selected client + period
+  const { data: salesStats } = useQuery({
+    queryKey: ["sales-validation-stats", clientId, periodMonth],
+    queryFn: async () => {
+      const [yearStr, monthStr] = periodMonth.split("-");
+      const startDate = `${yearStr}-${monthStr}-01`;
+      const endMonth = parseInt(monthStr);
+      const endYear = parseInt(yearStr);
+      const nextMonth = endMonth === 12 ? 1 : endMonth + 1;
+      const nextYear = endMonth === 12 ? endYear + 1 : endYear;
+      const endDate = `${nextYear}-${String(nextMonth).padStart(2, "0")}-01`;
+
+      const { data: campaigns } = await supabase
+        .from("client_campaigns")
+        .select("id")
+        .eq("client_id", clientId);
+      const campaignIds = (campaigns || []).map((c) => c.id);
+      if (campaignIds.length === 0) return { totalSales: 0, totalRevenue: 0, totalCommission: 0 };
+
+      const { data } = await supabase
+        .from("sale_items")
+        .select("quantity, mapped_revenue, mapped_commission, sale_id, sales!inner(sale_datetime, client_campaign_id, validation_status)")
+        .in("sales.client_campaign_id", campaignIds)
+        .gte("sales.sale_datetime", startDate)
+        .lt("sales.sale_datetime", endDate)
+        .neq("sales.validation_status", "rejected");
+
+      const items = data || [];
+      return {
+        totalSales: items.reduce((sum, i) => sum + (i.quantity || 1), 0),
+        totalRevenue: items.reduce((sum, i) => sum + (i.mapped_revenue || 0), 0),
+        totalCommission: items.reduce((sum, i) => sum + (i.mapped_commission || 0), 0),
+      };
+    },
+    enabled: !!clientId && !!periodMonth,
+  });
+
   const monthOptions = useMemo(() => {
     const opts: { value: string; label: string }[] = [];
     const now = new Date();
