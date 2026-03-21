@@ -203,7 +203,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" =
           .select("employee_id, start_date, end_date, type")
           .in("employee_id", activeIds)
           .eq("status", "approved")
-          .in("type", ["sick", "vacation", "no_show"])
+          .in("type", ["sick", "vacation", "no_show", "day_off"])
           .lte("start_date", forecastEndStr)
           .gte("end_date", ninetyDaysAgo),
       ]);
@@ -298,11 +298,15 @@ export function useClientForecast(clientId: string, period: "current" | "next" =
 
         const isEstablished = daysSinceStart > 60;
 
-        // Weekly SPH (most recent first)
+        // Weekly SPH (most recent first) — use absence-adjusted shifts
         const weeklySph: number[] = [];
         for (const ws of weekStarts) {
           const we = endOfWeek(ws, { weekStartsOn: 1 });
-          const shiftsInWeek = countShifts(emp.id, ws, we, false);
+          const shiftsInWeek = countShifts(emp.id, ws, we, true); // exclude absences
+          
+          // Skip weeks with 0 effective shifts (full vacation/sick) — not low performance
+          if (shiftsInWeek === 0) continue;
+          
           const hoursInWeek = shiftsInWeek * HOURS_PER_SHIFT;
 
           let salesInWeek = 0;
