@@ -1,6 +1,6 @@
 import { Outlet, NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Receipt, Target, Settings2, List } from "lucide-react";
+import { LayoutDashboard, Receipt, Target, Settings2, List, Scale } from "lucide-react";
 
 const navItems = [
   { path: "/economic", label: "Overblik", icon: LayoutDashboard, end: true },
@@ -8,6 +8,7 @@ const navItems = [
   { path: "/economic/expenses", label: "Udgifter", icon: Receipt },
   { path: "/economic/budget", label: "Budget 2026", icon: Target },
   { path: "/economic/mapping", label: "Kontomapping", icon: Settings2 },
+  { path: "/economic/revenue-match", label: "Omsætning", icon: Scale },
 ];
 
 export default function EconomicLayout() {
