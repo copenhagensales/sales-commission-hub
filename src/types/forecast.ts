@@ -86,6 +86,8 @@ export interface CohortForecastInput {
   campaignBaselineSph: number;
   weeklyHoursPerHead: number;
   attendanceFactor: number;
+  periodStart: string;
+  periodEnd: string;
 }
 
 export interface EmployeeForecastResult {

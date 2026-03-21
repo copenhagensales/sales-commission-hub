@@ -434,6 +434,8 @@ export function useClientForecast(clientId: string, period: "current" | "next" =
         campaignBaselineSph: baselineSph,
         weeklyHoursPerHead: DEFAULT_WEEKLY_HOURS,
         attendanceFactor: avgAttendance,
+        periodStart: format(forecastStart, "yyyy-MM-dd"),
+        periodEnd: format(forecastEnd, "yyyy-MM-dd"),
       }));
 
       // 8. For current period: fetch actual sales to date
