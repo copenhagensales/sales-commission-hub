@@ -203,7 +203,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" =
           .select("employee_id, start_date, end_date, type")
           .in("employee_id", activeIds)
           .eq("status", "approved")
-          .in("type", ["sick", "vacation", "no_show"])
+          .in("type", ["sick", "vacation", "no_show", "day_off"])
           .lte("start_date", forecastEndStr)
           .gte("end_date", ninetyDaysAgo),
       ]);
