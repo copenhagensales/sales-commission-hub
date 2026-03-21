@@ -251,7 +251,7 @@ async function healEnreach(
       healed++;
       log(`Healed Enreach sale ${externalId}`);
 
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, turboMode ? 300 : 500));
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
       await supabase.from("sales").update({
