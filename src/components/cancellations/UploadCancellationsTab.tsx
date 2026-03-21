@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import * as XLSX from "xlsx";
+import { parseExcelFile } from "@/utils/excel";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
