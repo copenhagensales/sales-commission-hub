@@ -149,7 +149,7 @@ function matchPostering(p: Postering, mappings: any[]): { mapping: any; matchTyp
 }
 
 export default function EconomicRevenueMatch() {
-  const [year, setYear] = useState(2025);
+  const [year, setYear] = useState(new Date().getFullYear());
   const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
   const [searchText, setSearchText] = useState("");
   const [showUnmappedOnly, setShowUnmappedOnly] = useState(false);
