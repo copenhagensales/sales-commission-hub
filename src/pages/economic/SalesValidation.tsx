@@ -789,5 +789,6 @@ export default function SalesValidation() {
         </Card>
       )}
     </div>
+    </MainLayout>
   );
 }
