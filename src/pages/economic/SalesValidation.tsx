@@ -14,7 +14,7 @@ import { Upload, ShieldCheck, AlertTriangle, CheckCircle2, XCircle, Download, Se
 import { normalizePhoneNumber } from "@/lib/phone-utils";
 import { useDropzone } from "react-dropzone";
 import ExcelJS from "exceljs";
-import { useEmployeeData } from "@/hooks/useEmployeeData";
+import { useCurrentEmployeeId } from "@/hooks/useOnboarding";
 
 type MatchResult = {
   phone: string;
