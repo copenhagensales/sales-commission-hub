@@ -1,16 +1,29 @@
 
 
-# Fix: Standard-år skal være 2026 + ASE-faktura synlighed
+# Fix: Undtagelse kun for faktura 940
 
 ## Problem
-1. **År er sat til 2025 som standard** — men de fleste posteringer (inkl. ASE faktura 955) er fra 2026
-2. ASE faktura 955 har `dato: 2026-03-01` → med -1 måned-logik = **februar 2026** — den er der, men skjult bag forkert årsfilter
+Den nuværende logik trækker altid 1 måned fra alle fakturadatoer. Faktura 940 (ASE, 395.900 DKK, dato 2026-01-31) skal **ikke** have trukket en måned fra — den tilhører januar.
 
 ## Løsning
+Tilføj en simpel undtagelse: hvis `faktura_nr` er `"940"`, spring -1 måned over.
 
-### Ændring i `src/pages/economic/EconomicRevenueMatch.tsx`
-- Sæt `year` default til **2026** (eller `new Date().getFullYear()` for dynamisk)
-- Linje 152: `const [year, setYear] = useState(2025)` → `useState(new Date().getFullYear())`
+## Ændring
 
-Det er en 1-linje fix. ASE faktura 955 (448.200 DKK) vil derefter vises korrekt i februar 2026.
+| Fil | Hvad |
+|-----|------|
+| `src/pages/economic/EconomicRevenueMatch.tsx` (linje ~89-93) | Tilføj check: kun -1 måned hvis faktura_nr !== "940" |
+
+**Logik:**
+```typescript
+const d = new Date(r.dato + "T00:00:00");
+if (String(r.faktura_nr) !== "940") {
+  d.setMonth(d.getMonth() - 1);
+}
+const adjustedMonth = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+```
+
+## Resultat
+- Faktura 940 → **januar 2026** ✓
+- Alle andre fakturaer → forrige måned som hidtil ✓
 
