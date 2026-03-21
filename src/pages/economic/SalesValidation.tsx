@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,18 +9,18 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Upload, ShieldCheck, AlertTriangle, CheckCircle2, XCircle, Download, Search } from "lucide-react";
+import { ShieldCheck, AlertTriangle, CheckCircle2, XCircle, Download, Search, Upload } from "lucide-react";
 import { normalizePhoneNumber } from "@/lib/phone-utils";
+import { useCurrentEmployeeId } from "@/hooks/useOnboarding";
 import { useDropzone } from "react-dropzone";
 import ExcelJS from "exceljs";
-import { useCurrentEmployeeId } from "@/hooks/useOnboarding";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 type MatchResult = {
   phone: string;
   type: "cancelled" | "billable";
-  // matched sale info
   matched?: {
     saleId: string;
     agentName: string;
@@ -30,9 +30,17 @@ type MatchResult = {
     customerCompany: string;
     internalReference: string;
   };
-  // category
   category: "matched_cancellation" | "unmatched_cancellation" | "unverified_sale" | "verified_sale";
 };
+
+function parsePhoneLines(text: string): string[] {
+  return text
+    .split(/[\n\r,;]+/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((line) => normalizePhoneNumber(line))
+    .filter((p): p is string => p !== null);
+}
 
 export default function SalesValidation() {
   const [clientId, setClientId] = useState<string>("");
@@ -44,7 +52,12 @@ export default function SalesValidation() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Column mapping state
+  // Textarea states
+  const [billableText, setBillableText] = useState("");
+  const [cancelledText, setCancelledText] = useState("");
+
+  // Excel fallback states
+  const [showExcelUpload, setShowExcelUpload] = useState(false);
   const [showColumnMapping, setShowColumnMapping] = useState(false);
   const [uploadedRows, setUploadedRows] = useState<Record<string, string>[]>([]);
   const [uploadedHeaders, setUploadedHeaders] = useState<string[]>([]);
@@ -56,7 +69,6 @@ export default function SalesValidation() {
 
   const { data: employeeId } = useCurrentEmployeeId();
 
-  // Fetch clients
   const { data: clients } = useQuery({
     queryKey: ["clients-for-validation"],
     queryFn: async () => {
@@ -65,7 +77,6 @@ export default function SalesValidation() {
     },
   });
 
-  // Fetch previous uploads
   const { data: previousUploads, refetch: refetchUploads } = useQuery({
     queryKey: ["sales-validation-uploads", clientId, periodMonth],
     queryFn: async () => {
@@ -81,7 +92,6 @@ export default function SalesValidation() {
     enabled: !!clientId,
   });
 
-  // Generate month options
   const monthOptions = useMemo(() => {
     const opts: { value: string; label: string }[] = [];
     const now = new Date();
@@ -94,109 +104,14 @@ export default function SalesValidation() {
     return opts;
   }, []);
 
-  // File upload handler
-  const onDrop = useCallback(async (acceptedFiles: File[]) => {
-    const file = acceptedFiles[0];
-    if (!file) return;
+  // Live counters
+  const billableCount = useMemo(() => parsePhoneLines(billableText).length, [billableText]);
+  const cancelledCount = useMemo(() => parsePhoneLines(cancelledText).length, [cancelledText]);
 
-    setFileName(file.name);
-
-    try {
-      const workbook = new ExcelJS.Workbook();
-      const buffer = await file.arrayBuffer();
-      await workbook.xlsx.load(buffer);
-
-      const sheet = workbook.worksheets[0];
-      if (!sheet) {
-        toast.error("Ingen ark fundet i filen");
-        return;
-      }
-
-      const headers: string[] = [];
-      const rows: Record<string, string>[] = [];
-
-      sheet.eachRow((row, rowNumber) => {
-        if (rowNumber === 1) {
-          row.eachCell((cell, colNumber) => {
-            headers.push(String(cell.value || `Kolonne ${colNumber}`));
-          });
-        } else {
-          const rowData: Record<string, string> = {};
-          row.eachCell((cell, colNumber) => {
-            const header = headers[colNumber - 1] || `col_${colNumber}`;
-            rowData[header] = String(cell.value || "");
-          });
-          rows.push(rowData);
-        }
-      });
-
-      setUploadedHeaders(headers);
-      setUploadedRows(rows);
-
-      // Auto-detect columns
-      const phoneLike = headers.find((h) =>
-        /telefon|phone|tlf|mobil|nummer/i.test(h)
-      );
-      const statusLike = headers.find((h) =>
-        /status|type|kategori|faktu/i.test(h)
-      );
-      if (phoneLike) setPhoneCol(phoneLike);
-      if (statusLike) setStatusCol(statusLike);
-
-      setShowColumnMapping(true);
-    } catch (e) {
-      toast.error("Kunne ikke læse filen");
-    }
-  }, []);
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: {
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
-      "application/vnd.ms-excel": [".xls"],
-      "text/csv": [".csv"],
-    },
-    maxFiles: 1,
-  });
-
-  // Process matching
-  const processMatching = async () => {
-    if (!clientId || !phoneCol) {
-      toast.error("Vælg kunde og telefonnummer-kolonne");
-      return;
-    }
-
+  // Core matching logic (shared between textarea and excel flows)
+  const runMatching = async (billablePhones: Set<string>, cancelledPhones: Set<string>, sourceName: string) => {
     setIsProcessing(true);
-    setShowColumnMapping(false);
-
     try {
-      // Parse uploaded data
-      const uploadedPhones: { phone: string; type: "billable" | "cancelled" }[] = [];
-
-      for (const row of uploadedRows) {
-        const rawPhone = row[phoneCol];
-        if (!rawPhone) continue;
-
-        const normalized = normalizePhoneNumber(rawPhone);
-        if (!normalized) continue;
-
-        let type: "billable" | "cancelled" = "billable";
-        if (statusCol && row[statusCol]) {
-          const val = row[statusCol].toLowerCase().trim();
-          if (
-            val.includes(cancelledValue.toLowerCase()) ||
-            val.includes("annuller") ||
-            val.includes("cancel") ||
-            val.includes("afvist")
-          ) {
-            type = "cancelled";
-          }
-        }
-
-        uploadedPhones.push({ phone: normalized, type });
-      }
-
-      // Fetch sales for this client + period
       const [yearStr, monthStr] = periodMonth.split("-");
       const startDate = `${yearStr}-${monthStr}-01`;
       const endMonth = parseInt(monthStr);
@@ -205,21 +120,18 @@ export default function SalesValidation() {
       const nextYear = endMonth === 12 ? endYear + 1 : endYear;
       const endDate = `${nextYear}-${String(nextMonth).padStart(2, "0")}-01`;
 
-      // Get campaigns for this client
       const { data: campaigns } = await supabase
         .from("client_campaigns")
         .select("id")
         .eq("client_id", clientId);
 
       const campaignIds = (campaigns || []).map((c) => c.id);
-
       if (campaignIds.length === 0) {
         toast.error("Ingen kampagner fundet for denne kunde");
         setIsProcessing(false);
         return;
       }
 
-      // Fetch sales
       const { data: salesData } = await supabase
         .from("sales")
         .select("id, agent_name, agent_email, sale_datetime, customer_phone, customer_company, internal_reference, client_campaign_id, sale_items(id, adversus_product_title, product_id, products(name))")
@@ -232,7 +144,6 @@ export default function SalesValidation() {
 
       const sales = salesData || [];
 
-      // Build phone→sale lookup
       const salesByPhone = new Map<string, typeof sales[0][]>();
       for (const sale of sales) {
         const norm = normalizePhoneNumber(sale.customer_phone);
@@ -241,104 +152,54 @@ export default function SalesValidation() {
         salesByPhone.get(norm)!.push(sale);
       }
 
-      // Build sets
-      const billablePhones = new Set(
-        uploadedPhones.filter((p) => p.type === "billable").map((p) => p.phone)
-      );
-      const cancelledPhones = new Set(
-        uploadedPhones.filter((p) => p.type === "cancelled").map((p) => p.phone)
-      );
-
       const matchResults: MatchResult[] = [];
 
-      // Category 1 & 2: Check cancellations
+      const getProduct = (sale: any) =>
+        sale.sale_items?.[0]?.products?.name ||
+        sale.sale_items?.[0]?.adversus_product_title ||
+        "Ukendt";
+
+      const toMatched = (sale: any) => ({
+        saleId: sale.id,
+        agentName: sale.agent_name || "Ukendt",
+        agentEmail: sale.agent_email || "",
+        saleDate: sale.sale_datetime || "",
+        product: getProduct(sale),
+        customerCompany: sale.customer_company || "",
+        internalReference: sale.internal_reference || "",
+      });
+
+      // Category 1 & 2: cancellations
       for (const phone of cancelledPhones) {
         const matchedSales = salesByPhone.get(phone);
         if (matchedSales && matchedSales.length > 0) {
-          const sale = matchedSales[0];
-          const productName =
-            (sale as any).sale_items?.[0]?.products?.name ||
-            (sale as any).sale_items?.[0]?.adversus_product_title ||
-            "Ukendt";
-          matchResults.push({
-            phone,
-            type: "cancelled",
-            category: "matched_cancellation",
-            matched: {
-              saleId: sale.id,
-              agentName: sale.agent_name || "Ukendt",
-              agentEmail: sale.agent_email || "",
-              saleDate: sale.sale_datetime || "",
-              product: productName,
-              customerCompany: sale.customer_company || "",
-              internalReference: sale.internal_reference || "",
-            },
-          });
+          matchResults.push({ phone, type: "cancelled", category: "matched_cancellation", matched: toMatched(matchedSales[0]) });
         } else {
-          matchResults.push({
-            phone,
-            type: "cancelled",
-            category: "unmatched_cancellation",
-          });
+          matchResults.push({ phone, type: "cancelled", category: "unmatched_cancellation" });
         }
       }
 
-      // Category 3: Unverified sales (our sales not in customer's billable list)
+      // Category 3: unverified sales
       for (const [salePhone, saleList] of salesByPhone) {
         if (!billablePhones.has(salePhone) && !cancelledPhones.has(salePhone)) {
           for (const sale of saleList) {
-            const productName =
-              (sale as any).sale_items?.[0]?.products?.name ||
-              (sale as any).sale_items?.[0]?.adversus_product_title ||
-              "Ukendt";
-            matchResults.push({
-              phone: salePhone,
-              type: "billable",
-              category: "unverified_sale",
-              matched: {
-                saleId: sale.id,
-                agentName: sale.agent_name || "Ukendt",
-                agentEmail: sale.agent_email || "",
-                saleDate: sale.sale_datetime || "",
-                product: productName,
-                customerCompany: sale.customer_company || "",
-                internalReference: sale.internal_reference || "",
-              },
-            });
+            matchResults.push({ phone: salePhone, type: "billable", category: "unverified_sale", matched: toMatched(sale) });
           }
         }
       }
 
-      // Verified sales (in both our system and customer's billable list)
+      // Category 4: verified sales
       for (const phone of billablePhones) {
         const matchedSales = salesByPhone.get(phone);
         if (matchedSales) {
           for (const sale of matchedSales) {
-            const productName =
-              (sale as any).sale_items?.[0]?.products?.name ||
-              (sale as any).sale_items?.[0]?.adversus_product_title ||
-              "Ukendt";
-            matchResults.push({
-              phone,
-              type: "billable",
-              category: "verified_sale",
-              matched: {
-                saleId: sale.id,
-                agentName: sale.agent_name || "Ukendt",
-                agentEmail: sale.agent_email || "",
-                saleDate: sale.sale_datetime || "",
-                product: productName,
-                customerCompany: sale.customer_company || "",
-                internalReference: sale.internal_reference || "",
-              },
-            });
+            matchResults.push({ phone, type: "billable", category: "verified_sale", matched: toMatched(sale) });
           }
         }
       }
 
       setResults(matchResults);
 
-      // Save upload record
       const matched = matchResults.filter((r) => r.category === "matched_cancellation").length;
       const unmatched = matchResults.filter((r) => r.category === "unmatched_cancellation").length;
       const unverified = matchResults.filter((r) => r.category === "unverified_sale").length;
@@ -346,7 +207,7 @@ export default function SalesValidation() {
       await supabase.from("sales_validation_uploads").insert({
         client_id: clientId,
         period_month: periodMonth,
-        file_name: fileName,
+        file_name: sourceName,
         total_billable: billablePhones.size,
         total_cancelled: cancelledPhones.size,
         matched_cancellations: matched,
@@ -366,37 +227,116 @@ export default function SalesValidation() {
     }
   };
 
-  // Export to Excel
+  // Textarea-based validation
+  const processFromTextarea = () => {
+    if (!clientId) {
+      toast.error("Vælg en kunde først");
+      return;
+    }
+    const billable = new Set(parsePhoneLines(billableText));
+    const cancelled = new Set(parsePhoneLines(cancelledText));
+    if (billable.size === 0 && cancelled.size === 0) {
+      toast.error("Indsæt mindst ét telefonnummer");
+      return;
+    }
+    runMatching(billable, cancelled, "copy-paste");
+  };
+
+  // Excel-based validation (kept as secondary)
+  const onDrop = async (acceptedFiles: File[]) => {
+    const file = acceptedFiles[0];
+    if (!file) return;
+    setFileName(file.name);
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const buffer = await file.arrayBuffer();
+      await workbook.xlsx.load(buffer);
+      const sheet = workbook.worksheets[0];
+      if (!sheet) { toast.error("Ingen ark fundet i filen"); return; }
+
+      const headers: string[] = [];
+      const rows: Record<string, string>[] = [];
+      sheet.eachRow((row, rowNumber) => {
+        if (rowNumber === 1) {
+          row.eachCell((cell, colNumber) => { headers.push(String(cell.value || `Kolonne ${colNumber}`)); });
+        } else {
+          const rowData: Record<string, string> = {};
+          row.eachCell((cell, colNumber) => {
+            const header = headers[colNumber - 1] || `col_${colNumber}`;
+            rowData[header] = String(cell.value || "");
+          });
+          rows.push(rowData);
+        }
+      });
+
+      setUploadedHeaders(headers);
+      setUploadedRows(rows);
+      const phoneLike = headers.find((h) => /telefon|phone|tlf|mobil|nummer/i.test(h));
+      const statusLike = headers.find((h) => /status|type|kategori|faktu/i.test(h));
+      if (phoneLike) setPhoneCol(phoneLike);
+      if (statusLike) setStatusCol(statusLike);
+      setShowColumnMapping(true);
+    } catch {
+      toast.error("Kunne ikke læse filen");
+    }
+  };
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+      "application/vnd.ms-excel": [".xls"],
+      "text/csv": [".csv"],
+    },
+    maxFiles: 1,
+  });
+
+  const processFromExcel = () => {
+    if (!clientId || !phoneCol) { toast.error("Vælg kunde og telefonnummer-kolonne"); return; }
+    setShowColumnMapping(false);
+    const billableSet = new Set<string>();
+    const cancelledSet = new Set<string>();
+    for (const row of uploadedRows) {
+      const rawPhone = row[phoneCol];
+      if (!rawPhone) continue;
+      const normalized = normalizePhoneNumber(rawPhone);
+      if (!normalized) continue;
+      let type: "billable" | "cancelled" = "billable";
+      if (statusCol && row[statusCol]) {
+        const val = row[statusCol].toLowerCase().trim();
+        if (val.includes(cancelledValue.toLowerCase()) || val.includes("annuller") || val.includes("cancel") || val.includes("afvist")) {
+          type = "cancelled";
+        }
+      }
+      if (type === "cancelled") cancelledSet.add(normalized);
+      else billableSet.add(normalized);
+    }
+    runMatching(billableSet, cancelledSet, fileName);
+  };
+
+  const uniqueStatusValues = useMemo(() => {
+    if (!statusCol || uploadedRows.length === 0) return [];
+    const vals = new Set(uploadedRows.map((r) => r[statusCol]).filter(Boolean));
+    return Array.from(vals);
+  }, [statusCol, uploadedRows]);
+
+  // Export
   const exportResults = async () => {
     if (!results) return;
-
     const workbook = new ExcelJS.Workbook();
-
     const addSheet = (name: string, items: MatchResult[]) => {
       const sheet = workbook.addWorksheet(name);
       sheet.addRow(["Telefon", "Kategori", "Sælger", "Salgsdato", "Produkt", "Firma", "Ref."]);
       sheet.getRow(1).font = { bold: true };
       for (const r of items) {
-        sheet.addRow([
-          r.phone,
-          r.category,
-          r.matched?.agentName || "",
-          r.matched?.saleDate ? new Date(r.matched.saleDate).toLocaleDateString("da-DK") : "",
-          r.matched?.product || "",
-          r.matched?.customerCompany || "",
-          r.matched?.internalReference || "",
-        ]);
+        sheet.addRow([r.phone, r.category, r.matched?.agentName || "", r.matched?.saleDate ? new Date(r.matched.saleDate).toLocaleDateString("da-DK") : "", r.matched?.product || "", r.matched?.customerCompany || "", r.matched?.internalReference || ""]);
       }
-      sheet.columns.forEach((col) => {
-        col.width = 20;
-      });
+      sheet.columns.forEach((col) => { col.width = 20; });
     };
-
     addSheet("Matchede annulleringer", results.filter((r) => r.category === "matched_cancellation"));
     addSheet("Umatchede annulleringer", results.filter((r) => r.category === "unmatched_cancellation"));
     addSheet("Uverificerede salg", results.filter((r) => r.category === "unverified_sale"));
     addSheet("Verificerede salg", results.filter((r) => r.category === "verified_sale"));
-
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     const url = URL.createObjectURL(blob);
@@ -407,25 +347,16 @@ export default function SalesValidation() {
     URL.revokeObjectURL(url);
   };
 
-  // Load previous results
   const loadPreviousResult = (upload: any) => {
     const data = upload.results_json as any;
-    if (data?.results) {
-      setResults(data.results);
-    }
+    if (data?.results) setResults(data.results);
   };
 
-  // Filter & categorize results
   const filteredResults = useMemo(() => {
     if (!results) return null;
     const term = searchTerm.toLowerCase();
-    return results.filter(
-      (r) =>
-        !term ||
-        r.phone.includes(term) ||
-        r.matched?.agentName?.toLowerCase().includes(term) ||
-        r.matched?.product?.toLowerCase().includes(term) ||
-        r.matched?.customerCompany?.toLowerCase().includes(term)
+    return results.filter((r) =>
+      !term || r.phone.includes(term) || r.matched?.agentName?.toLowerCase().includes(term) || r.matched?.product?.toLowerCase().includes(term) || r.matched?.customerCompany?.toLowerCase().includes(term)
     );
   }, [results, searchTerm]);
 
@@ -434,361 +365,384 @@ export default function SalesValidation() {
   const unverifiedSales = filteredResults?.filter((r) => r.category === "unverified_sale") || [];
   const verifiedSales = filteredResults?.filter((r) => r.category === "verified_sale") || [];
 
-  // Unique status values for column mapping preview
-  const uniqueStatusValues = useMemo(() => {
-    if (!statusCol || uploadedRows.length === 0) return [];
-    const vals = new Set(uploadedRows.map((r) => r[statusCol]).filter(Boolean));
-    return Array.from(vals);
-  }, [statusCol, uploadedRows]);
-
   return (
     <MainLayout>
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Salgsvalidering</h1>
-          <p className="text-muted-foreground">Upload kundens salgsliste og valider mod jeres registreringer</p>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Salgsvalidering</h1>
+            <p className="text-muted-foreground">Valider salg og annulleringer mod jeres registreringer</p>
+          </div>
+          {results && (
+            <Button onClick={exportResults} variant="outline" className="gap-2">
+              <Download className="h-4 w-4" />
+              Eksportér til Excel
+            </Button>
+          )}
         </div>
-        {results && (
-          <Button onClick={exportResults} variant="outline" className="gap-2">
-            <Download className="h-4 w-4" />
-            Eksportér til Excel
-          </Button>
-        )}
-      </div>
 
-      {/* Controls */}
-      <div className="flex gap-4 items-end flex-wrap">
-        <div className="space-y-1">
-          <Label>Kunde</Label>
-          <Select value={clientId} onValueChange={setClientId}>
-            <SelectTrigger className="w-[220px]">
-              <SelectValue placeholder="Vælg kunde" />
-            </SelectTrigger>
-            <SelectContent>
-              {clients?.map((c) => (
-                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        {/* Controls */}
+        <div className="flex gap-4 items-end flex-wrap">
+          <div className="space-y-1">
+            <Label>Kunde</Label>
+            <Select value={clientId} onValueChange={setClientId}>
+              <SelectTrigger className="w-[220px]">
+                <SelectValue placeholder="Vælg kunde" />
+              </SelectTrigger>
+              <SelectContent>
+                {clients?.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>Periode</Label>
+            <Select value={periodMonth} onValueChange={setPeriodMonth}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {monthOptions.map((m) => (
+                  <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-        <div className="space-y-1">
-          <Label>Periode</Label>
-          <Select value={periodMonth} onValueChange={setPeriodMonth}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {monthOptions.map((m) => (
-                <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
 
-      {/* Upload area */}
-      {clientId && (
-        <div
-          {...getRootProps()}
-          className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-            isDragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"
-          }`}
-        >
-          <input {...getInputProps()} />
-          <Upload className="h-8 w-8 mx-auto mb-3 text-muted-foreground" />
-          <p className="font-medium">Træk en Excel-fil hertil eller klik for at vælge</p>
-          <p className="text-sm text-muted-foreground mt-1">
-            Filen skal indeholde telefonnumre og evt. en status-kolonne (fakturerbar/annulleret)
-          </p>
-        </div>
-      )}
-
-      {/* Column mapping dialog */}
-      <Dialog open={showColumnMapping} onOpenChange={setShowColumnMapping}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Kolonne-mapping — {fileName}</DialogTitle>
-          </DialogHeader>
+        {/* Textarea input */}
+        {clientId && (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              {uploadedRows.length} rækker fundet. Vælg hvilke kolonner der indeholder telefonnumre og status.
-            </p>
-            <div className="space-y-2">
-              <Label>Telefonnummer-kolonne *</Label>
-              <Select value={phoneCol} onValueChange={setPhoneCol}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Vælg kolonne" />
-                </SelectTrigger>
-                <SelectContent>
-                  {uploadedHeaders.map((h) => (
-                    <SelectItem key={h} value={h}>{h}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Status-kolonne (valgfri)</Label>
-              <Select value={statusCol} onValueChange={setStatusCol}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Ingen — alle er fakturerbare" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Ingen</SelectItem>
-                  {uploadedHeaders.map((h) => (
-                    <SelectItem key={h} value={h}>{h}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {statusCol && uniqueStatusValues.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">
-                  Fundne statusværdier: {uniqueStatusValues.join(", ")}
+                <Label className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  Godkendte/fakturerbare salg (telefonnumre)
                 </Label>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label className="text-xs">Fakturerbar værdi</Label>
-                    <Input value={billableValue} onChange={(e) => setBillableValue(e.target.value)} placeholder="fx fakturerbar" />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Annulleret værdi</Label>
-                    <Input value={cancelledValue} onChange={(e) => setCancelledValue(e.target.value)} placeholder="fx annulleret" />
-                  </div>
-                </div>
+                <Textarea
+                  value={billableText}
+                  onChange={(e) => setBillableText(e.target.value)}
+                  placeholder={"52512853\n22334455\n40302010\n..."}
+                  className="min-h-[200px] font-mono text-sm"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {billableCount > 0 ? `${billableCount} numre registreret` : "Ét nummer per linje"}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <XCircle className="h-4 w-4 text-destructive" />
+                  Annullerede salg (telefonnumre)
+                </Label>
+                <Textarea
+                  value={cancelledText}
+                  onChange={(e) => setCancelledText(e.target.value)}
+                  placeholder={"40302010\n11223344\n..."}
+                  className="min-h-[200px] font-mono text-sm"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {cancelledCount > 0 ? `${cancelledCount} numre registreret` : "Ét nummer per linje"}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <Button onClick={processFromTextarea} disabled={isProcessing || (billableCount === 0 && cancelledCount === 0)} className="gap-2">
+                <ShieldCheck className="h-4 w-4" />
+                {isProcessing ? "Behandler..." : "Validér salg"}
+              </Button>
+              <Button variant="ghost" size="sm" className="text-muted-foreground gap-1" onClick={() => setShowExcelUpload(!showExcelUpload)}>
+                <Upload className="h-3 w-3" />
+                {showExcelUpload ? "Skjul Excel-upload" : "Eller upload Excel-fil"}
+              </Button>
+            </div>
+
+            {/* Excel upload fallback */}
+            {showExcelUpload && (
+              <div
+                {...getRootProps()}
+                className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+                  isDragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"
+                }`}
+              >
+                <input {...getInputProps()} />
+                <Upload className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />
+                <p className="text-sm font-medium">Træk en Excel-fil hertil eller klik for at vælge</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Filen skal indeholde telefonnumre og evt. en status-kolonne
+                </p>
               </div>
             )}
-            <div className="bg-muted rounded-md p-3">
-              <p className="text-xs font-medium mb-1">Preview (første 3 rækker)</p>
-              <div className="text-xs space-y-1">
-                {uploadedRows.slice(0, 3).map((row, i) => (
-                  <div key={i} className="flex gap-4">
-                    <span>📞 {row[phoneCol] || "—"}</span>
-                    {statusCol && <span>📋 {row[statusCol] || "—"}</span>}
+          </div>
+        )}
+
+        {/* Column mapping dialog (for Excel) */}
+        <Dialog open={showColumnMapping} onOpenChange={setShowColumnMapping}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Kolonne-mapping — {fileName}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                {uploadedRows.length} rækker fundet. Vælg hvilke kolonner der indeholder telefonnumre og status.
+              </p>
+              <div className="space-y-2">
+                <Label>Telefonnummer-kolonne *</Label>
+                <Select value={phoneCol} onValueChange={setPhoneCol}>
+                  <SelectTrigger><SelectValue placeholder="Vælg kolonne" /></SelectTrigger>
+                  <SelectContent>
+                    {uploadedHeaders.map((h) => (<SelectItem key={h} value={h}>{h}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Status-kolonne (valgfri)</Label>
+                <Select value={statusCol} onValueChange={setStatusCol}>
+                  <SelectTrigger><SelectValue placeholder="Ingen — alle er fakturerbare" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Ingen</SelectItem>
+                    {uploadedHeaders.map((h) => (<SelectItem key={h} value={h}>{h}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {statusCol && uniqueStatusValues.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Fundne statusværdier: {uniqueStatusValues.join(", ")}</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-xs">Fakturerbar værdi</Label>
+                      <Input value={billableValue} onChange={(e) => setBillableValue(e.target.value)} placeholder="fx fakturerbar" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Annulleret værdi</Label>
+                      <Input value={cancelledValue} onChange={(e) => setCancelledValue(e.target.value)} placeholder="fx annulleret" />
+                    </div>
                   </div>
-                ))}
+                </div>
+              )}
+              <div className="bg-muted rounded-md p-3">
+                <p className="text-xs font-medium mb-1">Preview (første 3 rækker)</p>
+                <div className="text-xs space-y-1">
+                  {uploadedRows.slice(0, 3).map((row, i) => (
+                    <div key={i} className="flex gap-4">
+                      <span>📞 {row[phoneCol] || "—"}</span>
+                      {statusCol && <span>📋 {row[statusCol] || "—"}</span>}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowColumnMapping(false)}>Annuller</Button>
+              <Button onClick={processFromExcel} disabled={!phoneCol || isProcessing}>
+                {isProcessing ? "Behandler..." : "Start validering"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Summary cards */}
+        {results && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="pt-4 pb-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <XCircle className="h-4 w-4 text-destructive" />
+                  <span className="text-sm font-medium">Matchede annulleringer</span>
+                </div>
+                <p className="text-2xl font-bold">{matchedCancellations.length}</p>
+                <p className="text-xs text-muted-foreground">Sælger identificeret — kan trækkes</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4 pb-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <AlertTriangle className="h-4 w-4 text-orange-500" />
+                  <span className="text-sm font-medium">Umatchede annulleringer</span>
+                </div>
+                <p className="text-2xl font-bold">{unmatchedCancellations.length}</p>
+                <p className="text-xs text-muted-foreground">Kan ikke placeres på en sælger</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4 pb-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                  <span className="text-sm font-medium">Uverificerede salg</span>
+                </div>
+                <p className="text-2xl font-bold">{unverifiedSales.length}</p>
+                <p className="text-xs text-muted-foreground">Ikke bekræftet af kunden</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4 pb-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  <span className="text-sm font-medium">Verificerede salg</span>
+                </div>
+                <p className="text-2xl font-bold">{verifiedSales.length}</p>
+                <p className="text-xs text-muted-foreground">Bekræftet fakturerbare</p>
+              </CardContent>
+            </Card>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowColumnMapping(false)}>Annuller</Button>
-            <Button onClick={processMatching} disabled={!phoneCol || isProcessing}>
-              {isProcessing ? "Behandler..." : "Start validering"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        )}
 
-      {/* Summary cards */}
-      {results && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {/* Search */}
+        {results && (
+          <div className="relative max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Søg telefon, sælger, produkt..." className="pl-9" />
+          </div>
+        )}
+
+        {/* Results tables */}
+        {matchedCancellations.length > 0 && (
           <Card>
-            <CardContent className="pt-4 pb-3">
-              <div className="flex items-center gap-2 mb-1">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
                 <XCircle className="h-4 w-4 text-destructive" />
-                <span className="text-sm font-medium">Matchede annulleringer</span>
-              </div>
-              <p className="text-2xl font-bold">{matchedCancellations.length}</p>
-              <p className="text-xs text-muted-foreground">Sælger identificeret — kan trækkes</p>
+                Matchede annulleringer — sælger identificeret ({matchedCancellations.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Telefon</TableHead>
+                    <TableHead>Sælger</TableHead>
+                    <TableHead>Salgsdato</TableHead>
+                    <TableHead>Produkt</TableHead>
+                    <TableHead>Firma</TableHead>
+                    <TableHead>Ref.</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {matchedCancellations.map((r, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="font-mono text-sm">{r.phone}</TableCell>
+                      <TableCell className="font-medium">{r.matched?.agentName}</TableCell>
+                      <TableCell>{r.matched?.saleDate ? new Date(r.matched.saleDate).toLocaleDateString("da-DK") : ""}</TableCell>
+                      <TableCell>{r.matched?.product}</TableCell>
+                      <TableCell>{r.matched?.customerCompany}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{r.matched?.internalReference}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
+        )}
+
+        {unmatchedCancellations.length > 0 && (
           <Card>
-            <CardContent className="pt-4 pb-3">
-              <div className="flex items-center gap-2 mb-1">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-orange-500" />
-                <span className="text-sm font-medium">Umatchede annulleringer</span>
-              </div>
-              <p className="text-2xl font-bold">{unmatchedCancellations.length}</p>
-              <p className="text-xs text-muted-foreground">Kan ikke placeres på en sælger</p>
+                Umatchede annulleringer — kan ikke placeres ({unmatchedCancellations.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Telefon</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {unmatchedCancellations.map((r, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="font-mono text-sm">{r.phone}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-orange-600 border-orange-300">Ingen match i jeres salg</Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
+        )}
+
+        {unverifiedSales.length > 0 && (
           <Card>
-            <CardContent className="pt-4 pb-3">
-              <div className="flex items-center gap-2 mb-1">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                <span className="text-sm font-medium">Uverificerede salg</span>
-              </div>
-              <p className="text-2xl font-bold">{unverifiedSales.length}</p>
-              <p className="text-xs text-muted-foreground">Ikke bekræftet af kunden</p>
+                Uverificerede salg — ikke bekræftet af kunden ({unverifiedSales.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Telefon</TableHead>
+                    <TableHead>Sælger</TableHead>
+                    <TableHead>Salgsdato</TableHead>
+                    <TableHead>Produkt</TableHead>
+                    <TableHead>Firma</TableHead>
+                    <TableHead>Ref.</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {unverifiedSales.map((r, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="font-mono text-sm">{r.phone}</TableCell>
+                      <TableCell className="font-medium">{r.matched?.agentName}</TableCell>
+                      <TableCell>{r.matched?.saleDate ? new Date(r.matched.saleDate).toLocaleDateString("da-DK") : ""}</TableCell>
+                      <TableCell>{r.matched?.product}</TableCell>
+                      <TableCell>{r.matched?.customerCompany}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{r.matched?.internalReference}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
+        )}
+
+        {/* Previous uploads */}
+        {previousUploads && previousUploads.length > 0 && (
           <Card>
-            <CardContent className="pt-4 pb-3">
-              <div className="flex items-center gap-2 mb-1">
-                <CheckCircle2 className="h-4 w-4 text-green-500" />
-                <span className="text-sm font-medium">Verificerede salg</span>
-              </div>
-              <p className="text-2xl font-bold">{verifiedSales.length}</p>
-              <p className="text-xs text-muted-foreground">Bekræftet fakturerbare</p>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Tidligere valideringer</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Dato</TableHead>
+                    <TableHead>Kilde</TableHead>
+                    <TableHead>Fakturerbare</TableHead>
+                    <TableHead>Annullerede</TableHead>
+                    <TableHead>Matchede</TableHead>
+                    <TableHead>Umatchede</TableHead>
+                    <TableHead>Uverificerede</TableHead>
+                    <TableHead></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {previousUploads.map((u: any) => (
+                    <TableRow key={u.id}>
+                      <TableCell>{new Date(u.created_at).toLocaleDateString("da-DK")}</TableCell>
+                      <TableCell className="text-sm">{u.file_name}</TableCell>
+                      <TableCell>{u.total_billable}</TableCell>
+                      <TableCell>{u.total_cancelled}</TableCell>
+                      <TableCell>{u.matched_cancellations}</TableCell>
+                      <TableCell>{u.unmatched_cancellations}</TableCell>
+                      <TableCell>{u.unverified_sales}</TableCell>
+                      <TableCell>
+                        <Button size="sm" variant="ghost" onClick={() => loadPreviousResult(u)}>Vis</Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
-        </div>
-      )}
-
-      {/* Search */}
-      {results && (
-        <div className="relative max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Søg telefon, sælger, produkt..."
-            className="pl-9"
-          />
-        </div>
-      )}
-
-      {/* Results tables */}
-      {matchedCancellations.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <XCircle className="h-4 w-4 text-destructive" />
-              Matchede annulleringer — sælger identificeret ({matchedCancellations.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Telefon</TableHead>
-                  <TableHead>Sælger</TableHead>
-                  <TableHead>Salgsdato</TableHead>
-                  <TableHead>Produkt</TableHead>
-                  <TableHead>Firma</TableHead>
-                  <TableHead>Ref.</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {matchedCancellations.map((r, i) => (
-                  <TableRow key={i}>
-                    <TableCell className="font-mono text-sm">{r.phone}</TableCell>
-                    <TableCell className="font-medium">{r.matched?.agentName}</TableCell>
-                    <TableCell>{r.matched?.saleDate ? new Date(r.matched.saleDate).toLocaleDateString("da-DK") : ""}</TableCell>
-                    <TableCell>{r.matched?.product}</TableCell>
-                    <TableCell>{r.matched?.customerCompany}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{r.matched?.internalReference}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
-
-      {unmatchedCancellations.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-orange-500" />
-              Umatchede annulleringer — kan ikke placeres ({unmatchedCancellations.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Telefon</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {unmatchedCancellations.map((r, i) => (
-                  <TableRow key={i}>
-                    <TableCell className="font-mono text-sm">{r.phone}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="text-orange-600 border-orange-300">
-                        Ingen match i jeres salg
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
-
-      {unverifiedSales.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-yellow-500" />
-              Uverificerede salg — ikke bekræftet af kunden ({unverifiedSales.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Telefon</TableHead>
-                  <TableHead>Sælger</TableHead>
-                  <TableHead>Salgsdato</TableHead>
-                  <TableHead>Produkt</TableHead>
-                  <TableHead>Firma</TableHead>
-                  <TableHead>Ref.</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {unverifiedSales.map((r, i) => (
-                  <TableRow key={i}>
-                    <TableCell className="font-mono text-sm">{r.phone}</TableCell>
-                    <TableCell className="font-medium">{r.matched?.agentName}</TableCell>
-                    <TableCell>{r.matched?.saleDate ? new Date(r.matched.saleDate).toLocaleDateString("da-DK") : ""}</TableCell>
-                    <TableCell>{r.matched?.product}</TableCell>
-                    <TableCell>{r.matched?.customerCompany}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{r.matched?.internalReference}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Previous uploads */}
-      {previousUploads && previousUploads.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Tidligere uploads</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Dato</TableHead>
-                  <TableHead>Fil</TableHead>
-                  <TableHead>Fakturerbare</TableHead>
-                  <TableHead>Annullerede</TableHead>
-                  <TableHead>Matchede</TableHead>
-                  <TableHead>Umatchede</TableHead>
-                  <TableHead>Uverificerede</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {previousUploads.map((u: any) => (
-                  <TableRow key={u.id}>
-                    <TableCell>{new Date(u.created_at).toLocaleDateString("da-DK")}</TableCell>
-                    <TableCell className="text-sm">{u.file_name}</TableCell>
-                    <TableCell>{u.total_billable}</TableCell>
-                    <TableCell>{u.total_cancelled}</TableCell>
-                    <TableCell>{u.matched_cancellations}</TableCell>
-                    <TableCell>{u.unmatched_cancellations}</TableCell>
-                    <TableCell>{u.unverified_sales}</TableCell>
-                    <TableCell>
-                      <Button size="sm" variant="ghost" onClick={() => loadPreviousResult(u)}>
-                        Vis
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+        )}
+      </div>
     </MainLayout>
   );
 }
