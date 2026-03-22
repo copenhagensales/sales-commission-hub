@@ -306,8 +306,8 @@ function ReportDrivers({ forecast }: { forecast: ForecastResult }) {
             <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-2">Positivt</p>
             {positiveDrivers.map(d => (
               <div key={d.key} className="mb-2">
-                <p className="text-sm font-medium">{d.label}</p>
-                <p className="text-sm text-muted-foreground">{d.description}</p>
+                <p className="text-sm font-medium">{clientFriendlyLabel(d.label)}</p>
+                <p className="text-sm text-muted-foreground">{clientFriendlyDescription(d.description)}</p>
               </div>
             ))}
           </div>
@@ -317,8 +317,8 @@ function ReportDrivers({ forecast }: { forecast: ForecastResult }) {
             <p className="text-xs font-semibold text-destructive uppercase tracking-wide mb-2">Negativt</p>
             {negativeDrivers.map(d => (
               <div key={d.key} className="mb-2">
-                <p className="text-sm font-medium">{d.label}</p>
-                <p className="text-sm text-muted-foreground">{d.description}</p>
+                <p className="text-sm font-medium">{clientFriendlyLabel(d.label)}</p>
+                <p className="text-sm text-muted-foreground">{clientFriendlyDescription(d.description)}</p>
               </div>
             ))}
           </div>
