@@ -35,7 +35,7 @@ export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = f
     else { setSortKey(key); setSortDir('desc'); }
   };
 
-  const sortedEmployees = [...mappedEmployees].sort((a, b) => {
+  const sortedEmployees = [...activeEmployees].sort((a, b) => {
     const dir = sortDir === 'desc' ? -1 : 1;
     switch (sortKey) {
       case 'name': return dir * a.employeeName.localeCompare(b.employeeName) * -1;
