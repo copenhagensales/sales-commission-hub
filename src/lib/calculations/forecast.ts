@@ -135,8 +135,46 @@ export function forecastEstablishedEmployee(emp: EmployeePerformance, teamChurnR
     teamName: emp.teamName,
     avatarUrl: emp.avatarUrl,
     isEstablished: true,
+    isNew: false,
     plannedHours: emp.plannedHours,
     expectedSph: ewmaSph,
+    attendanceFactor: emp.personalAttendanceFactor,
+    forecastSales: Math.round(expected),
+    forecastSalesLow: Math.round(expected * LOW_FACTOR),
+    forecastSalesHigh: Math.round(expected * HIGH_FACTOR),
+    churnProbability,
+    churnLoss: Math.round(churnLoss),
+    missingAgentMapping: emp.missingAgentMapping,
+  };
+}
+
+/**
+ * Calculate forecast for a new employee (≤60 days) using ramp-up model.
+ */
+export function forecastNewEmployee(
+  emp: EmployeePerformance,
+  rampProfile: ForecastRampProfile,
+  baselineSph: number,
+  teamChurnRates?: TeamChurnRates,
+): EmployeeForecastResult {
+  const rampFactor = getRampFactor(emp.daysSinceStart, rampProfile);
+  const rampedSph = baselineSph * rampFactor;
+  const effectiveHours = emp.plannedHours * emp.personalAttendanceFactor;
+  const expected = effectiveHours * rampedSph;
+  
+  const churnProbability = getEstablishedChurnRate(emp.daysSinceStart, emp.teamName, teamChurnRates);
+  const churnLoss = expected * churnProbability;
+  
+  return {
+    employeeId: emp.employeeId,
+    employeeName: emp.employeeName,
+    teamName: emp.teamName,
+    avatarUrl: emp.avatarUrl,
+    isEstablished: false,
+    isNew: true,
+    rampFactor,
+    plannedHours: emp.plannedHours,
+    expectedSph: rampedSph,
     attendanceFactor: emp.personalAttendanceFactor,
     forecastSales: Math.round(expected),
     forecastSalesLow: Math.round(expected * LOW_FACTOR),
