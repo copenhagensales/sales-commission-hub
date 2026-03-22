@@ -1,46 +1,31 @@
 
 
-# Vis netto-forecast (efter churn-fradrag) som hovedtal
+# Tilføj opstartshold-sektion i kundarapporten
 
 ## Problem
-`totalSalesExpected` viser brutto-kapacitet (1.337) uden at fratrække churn-tab (192). Det giver et for optimistisk hovedtal.
+Kundarapporten nævner kun opstartshold kort i teksten ("X opstartshold") og som en positiv effekt ("+Y salg"), men viser ikke **detaljer**: hvornår holdene starter, hvor mange personer, og hvad de forventes at bidrage med. Kunden kan ikke se at der er planlagt nye hold.
+
+Cohort-salg er allerede inkluderet i forecast-beregningen (også næste måned) — det er kun rapporten der mangler at vise det tydeligt.
 
 ## Løsning
-Fratræk churn fra totalen så hovedtallet viser det realistiske netto-forecast.
+Tilføj en ny **"Planlagte opstartshold"**-sektion i kundarapporten, placeret mellem Nøgletal og Drivers.
 
-### `src/lib/calculations/forecast.ts` (linje 388-404)
+### Ny sektion i `ForecastClientReport.tsx`
+- Ny komponent `ReportCohorts` der viser:
+  - Antal hold og samlet forventet bidrag
+  - Per hold: startdato, antal sælgere, forventet salg, ramp-fase (fx "Uge 1-2: 35% kapacitet")
+  - Kort tekst: "Nye hold er indregnet i det samlede forecast med gradvis optrapning"
+- Vises kun hvis `forecast.cohorts.length > 0`
 
-Ændre beregningen af `totalSalesExpected`:
+### Opdatering af PDF-generatoren (`forecastReportPdfGenerator.ts`)
+- Tilføj samme cohort-sektion i HTML-rapporten mellem Nøgletal og Drivers
+- Vis tabel med startdato, headcount og forventet salg per hold
 
-```ts
-// Nuværende (brutto):
-totalSalesExpected: totalExpected,
-
-// Nyt (netto):
-totalSalesExpected: totalExpected - Math.round(cohortChurnLoss) - Math.round(totalEstablishedChurnLoss),
-```
-
-Tilføj `totalSalesGross` til returværdien så brutto-kapaciteten stadig er tilgængelig:
-```ts
-totalSalesGross: totalExpected,
-```
-
-Opdater `Low` og `High` til også at fratrække churn:
-```ts
-totalSalesLow: Math.round(totalExpected * LOW_FACTOR) - Math.round(cohortChurnLoss) - Math.round(totalEstablishedChurnLoss),
-totalSalesHigh: Math.round(totalExpected * HIGH_FACTOR) - Math.round(cohortChurnLoss) - Math.round(totalEstablishedChurnLoss),
-```
-
-### `src/types/forecast.ts`
-Tilføj `totalSalesGross?: number` til `ForecastResult`.
-
-### Effekt
-- Hovedtal ændres fra ~1.337 til ~1.145 (netto efter churn)
-- Alle KPI-kort, summary og rapporter viser automatisk netto-tal
-- Brutto-kapacitet er stadig tilgængelig via `totalSalesGross` til drivers/detaljer
+### Ingen beregningsændringer
+Cohort-salg er allerede korrekt inkluderet i `totalSalesExpected` for både denne og næste måned via `calculateFullForecast`.
 
 | Fil | Ændring |
 |-----|---------|
-| `src/lib/calculations/forecast.ts` | Fratræk churn fra totalSalesExpected, tilføj totalSalesGross |
-| `src/types/forecast.ts` | Tilføj `totalSalesGross` felt |
+| `src/pages/ForecastClientReport.tsx` | Ny `ReportCohorts` sektion med hold-detaljer |
+| `src/utils/forecastReportPdfGenerator.ts` | Tilføj cohort-tabel i PDF-rapporten |
 
