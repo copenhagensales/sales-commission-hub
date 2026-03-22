@@ -1,48 +1,28 @@
 
 
-# Fix: Liga viser forkerte tal for FM vs. dagsrapporter
+# Fix: Liga ekskluderer salg med NULL validation_status
 
 ## Problem
-`league-calculate-standings` edge-funktionen bruger sin egen aggregeringslogik der afviger fra `get_sales_aggregates_v2` RPC'en (som dagsrapporter bruger) på 3 kritiske punkter:
+PostgreSQL's `.neq("rejected")` ekskluderer rækker hvor `validation_status` er NULL — dette er en kendt fælde i Supabase/PostgREST. Dagsrapporter bruger korrekt `.or("validation_status.neq.rejected,validation_status.is.null")`, men liga-funktionen bruger `.neq("validation_status", "rejected")` som stille dropper NULL-rækker.
 
-### 1. Ingen `validation_status`-filtrering
-Liga-funktionen inkluderer **afviste salg** — den har ingen `validation_status != 'rejected'` check. Dagsrapporter ekskluderer afviste salg via RPC'en.
+Frederik Forman: 18.480 kr i dagsrapporter vs 13.640 kr i liga = ~4.840 kr mangler pga. NULL-status salg.
 
-### 2. Ingen `counts_as_sale`-produktfiltrering
-Liga tæller deals som `+1` per salgsrække, uden at checke om produktet faktisk tæller som et salg (`counts_as_sale` flag på products-tabellen). RPC'en bruger `CASE WHEN p.counts_as_sale IS NOT FALSE THEN si.quantity ELSE 0 END`.
-
-### 3. Deals tæller rækker, ikke quantity
-For FM-salg gør liga `dealsCount += 1` per sale-row, mens RPC'en summerer `si.quantity` fra sale_items (korrekt for multi-quantity transaktioner).
-
-## Løsning
-Opdater `league-calculate-standings` til at bruge samme datalogik som RPC'en.
+## Ændring
 
 ### `supabase/functions/league-calculate-standings/index.ts`
+- **Linje 177** (TM-query): Erstat `.neq("validation_status", "rejected")` med `.or("validation_status.neq.rejected,validation_status.is.null")`
+- **Linje 211** (FM-query): Samme ændring
 
-**A. Tilføj `validation_status`-filter på begge salgs-queries (TM + FM):**
-```
-.neq("validation_status", "rejected")
-```
-(Linje ~173 for TM og ~206 for FM)
-
-**B. Hent `quantity` og `counts_as_sale` fra sale_items:**
-- Ændr sale_items query til også at hente `product_id`
-- Join med products for at checke `counts_as_sale`
-- Brug `quantity` til deals-tælling: `dealsCount += item.counts_as_sale ? item.quantity : 0`
-
-**C. Tilsvarende ændringer i `league-process-round/index.ts`:**
-- Samme 3 fixes for konsistens i runde-beregninger
-
-### Ingen ændringer i frontend
-Standings-tabellen viser data fra `league_qualification_standings`, som populeres af edge-funktionen. Når funktionen beregner korrekt, viser UI automatisk de rigtige tal.
+### `supabase/functions/league-process-round/index.ts`
+- Tilsvarende ændring i alle salgs-queries der bruger validation_status filter
 
 ## Effekt
-- FM-sælgeres provision og deals i ligaen matcher nu præcis med dagsrapporter
-- Afviste salg tælles ikke længere med
-- Multi-quantity salg tælles korrekt
+- Alle salg med `validation_status = NULL` inkluderes nu (som i dagsrapporter)
+- Frederik Formans liga-tal matcher dagsrapportens 18.480 kr
+- Gælder for alle sælgere med NULL-status salg
 
 | Fil | Ændring |
 |-----|---------|
-| `supabase/functions/league-calculate-standings/index.ts` | Tilføj validation_status filter, counts_as_sale check, quantity-baseret deals |
-| `supabase/functions/league-process-round/index.ts` | Samme 3 fixes for runde-beregninger |
+| `supabase/functions/league-calculate-standings/index.ts` | `.neq` → `.or` for NULL-inkludering (2 steder) |
+| `supabase/functions/league-process-round/index.ts` | Samme fix |
 
