@@ -402,6 +402,7 @@ export const routes: RouteConfig[] = [
 
   // Forecast
   { path: "/forecast", component: Forecast, access: "role", positionPermission: "menu_forecast" },
+  { path: "/forecast/rapport", component: ForecastClientReport, access: "role", positionPermission: "menu_forecast" },
 
   // AMO Compliance Hub
   { path: "/amo", component: AmoDashboard, access: "role", positionPermission: "menu_amo_dashboard" },
