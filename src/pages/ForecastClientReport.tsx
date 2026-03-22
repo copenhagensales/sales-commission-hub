@@ -215,7 +215,7 @@ function ReportKeyFigures({ forecast }: { forecast: ForecastResult }) {
 
   const negatives = [
     { label: "Fraværseffekt", value: `-${forecast.absenceLoss}`, desc: "Planlagt og forventet fravær" },
-    { label: "Churn-effekt", value: `-${churnTotal}`, desc: "Forventet medarbejderafgang" },
+    { label: "Teamudskiftning", value: `-${churnTotal}`, desc: "Indregnet naturlig udskiftning i teamet" },
   ].filter(n => parseInt(n.value) !== 0);
 
   const positives = [
