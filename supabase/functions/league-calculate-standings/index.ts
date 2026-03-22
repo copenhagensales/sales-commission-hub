@@ -331,7 +331,7 @@ Deno.serve(async (req) => {
       const fmSaleIds = employeeToFmSaleIds[employeeId] || [];
       for (const saleId of fmSaleIds) {
         currentProvision += saleToCommission[saleId] || 0;
-        dealsCount += 1;
+        dealsCount += saleToDeals[saleId] || 0;
       }
 
       if (currentProvision > 0 || dealsCount > 0) {
