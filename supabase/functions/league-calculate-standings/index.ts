@@ -174,7 +174,7 @@ Deno.serve(async (req) => {
         .from("sales")
         .select("id, agent_email")
         .neq("source", "fieldmarketing")
-        .neq("validation_status", "rejected")
+        .or("validation_status.neq.rejected,validation_status.is.null")
         .gte("sale_datetime", sourceStart)
         .lt("sale_datetime", sourceEndExclusive)
         .range(salesOffset, salesOffset + SALES_PAGE_SIZE - 1);
