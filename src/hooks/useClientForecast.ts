@@ -212,7 +212,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           .lte("start_date", forecastEndStr)
           .gte("end_date", ninetyDaysAgo),
         (supabase as any)
-          .from("danish_holidays")
+          .from("danish_holiday")
           .select("date")
           .gte("date", ninetyDaysAgo)
           .lte("date", forecastEndStr),
