@@ -333,12 +333,12 @@ function ReportRecommendations({ forecast }: { forecast: ForecastResult }) {
   const employees = forecast.establishedEmployees;
   const avgSph = employees.length > 0 ? employees.reduce((s, e) => s + e.expectedSph, 0) / employees.length : 0;
 
-  const highChurn = employees.filter(e => e.churnProbability > 0.3);
-  if (highChurn.length > 0) {
+  const churnLossTotal = forecast.churnLoss + (forecast.establishedChurnLoss || 0);
+  if (churnLossTotal > 0) {
     recommendations.push({
       icon: AlertTriangle,
       title: "Fastholdelse",
-      text: `${highChurn.length} sælger${highChurn.length > 1 ? "e" : ""} ligger i forhøjet churn-risiko. Tidlig opfølgning og tæt lederkontakt kan mindske tabet.`,
+      text: `Vi har indregnet en forventet naturlig udskiftning i teamet svarende til ${churnLossTotal} salg. Tæt lederkontakt og tidlig opfølgning kan reducere denne effekt.`,
     });
   }
 

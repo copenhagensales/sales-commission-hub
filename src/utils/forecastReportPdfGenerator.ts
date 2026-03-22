@@ -102,7 +102,7 @@ export function generateForecastReportPdf(data: ReportData) {
       <div class="kpi-box"><div class="val">${Math.round(forecast.totalHours).toLocaleString("da-DK")}</div><div class="lbl">Timer</div></div>
     </div>
     ${forecast.absenceLoss > 0 ? `<div class="effect-row effect-neg"><span class="effect-label">Fraværseffekt</span><span class="effect-value neg">-${forecast.absenceLoss} salg</span></div>` : ""}
-    ${churnTotal > 0 ? `<div class="effect-row effect-neg"><span class="effect-label">Churn-effekt</span><span class="effect-value neg">-${churnTotal} salg</span></div>` : ""}
+    ${churnTotal > 0 ? `<div class="effect-row effect-neg"><span class="effect-label">Teamudskiftning</span><span class="effect-value neg">-${churnTotal} salg</span></div>` : ""}
     ${cohortSales > 0 ? `<div class="effect-row effect-pos"><span class="effect-label">Nye hold</span><span class="effect-value pos">+${cohortSales} salg</span></div>` : ""}
   </div>
 
