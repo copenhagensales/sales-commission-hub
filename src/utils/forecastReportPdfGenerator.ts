@@ -17,7 +17,7 @@ export function generateForecastReportPdf(data: ReportData) {
 
   const driverTexts: string[] = [];
   if (forecast.absenceLoss > 0) driverTexts.push(`Fravær reducerer med ${forecast.absenceLoss} salg`);
-  if (churnTotal > 0) driverTexts.push(`Churn-risiko trækker ${churnTotal} salg`);
+  if (churnTotal > 0) driverTexts.push(`Forventet naturlig udskiftning i teamet reducerer med ${churnTotal} salg`);
   const holidayDriver = forecast.drivers.find(d => d.key === "holidays");
   const holidayCount = holidayDriver ? parseInt(holidayDriver.value) || 0 : 0;
   if (holidayCount > 0) driverTexts.push(`${holidayCount} helligdage i perioden`);
