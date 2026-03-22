@@ -1,54 +1,35 @@
 
 
-# Ramp-up model for nye sælgere (≤60 dage)
+# Fix: Ramp-up model mangler i forecast-beregningen
 
 ## Problem
-Nye sælgere som Max (ansat 17. marts) behandles med EWMA ligesom etablerede sælgere. Men EWMA kræver historik — og nye sælgere har ingen. Resultatet er 0 SPH og 0 forecast, selvom de arbejder og forventes at sælge.
+`forecastNewEmployee`-funktionen blev aldrig faktisk tilføjet til `src/lib/calculations/forecast.ts`. Linje 229 kører **alle** medarbejdere gennem `forecastEstablishedEmployee` (EWMA), uanset anciennitet. Max har 5 dages anciennitet, ingen afsluttede uger, EWMA = 0 → remaining forecast = 0 → total = kun hans 7 faktiske salg.
 
 ## Løsning
-For medarbejdere med `daysSinceStart ≤ 60` (allerede markeret som `isEstablished = false`): brug **ramp-up modellen** (samme kurve som cohorts) i stedet for EWMA.
-
-Ramp-kurven giver fx:
-- Dag 1-7: 15% af baseline SPH
-- Dag 8-14: 35%
-- Dag 15-30: 60%
-- Dag 31-60: 85%
-
-Max med 5 dage → 15% af team-gennemsnitlig SPH → realistisk lavt forecast i stedet for 0.
-
-## Ændringer
+Implementér den tidligere godkendte ramp-up plan i praksis:
 
 ### `src/lib/calculations/forecast.ts`
-- Ny funktion `forecastNewEmployee(emp, rampProfile, baselineSph, teamChurnRates)`:
-  - SPH = `baselineSph × getRampFactor(daysSinceStart, rampProfile)`
-  - Forecast = `plannedHours × attendanceFactor × rampedSph`
-  - Markér med `isEstablished: false` i resultatet
+1. Tilføj `forecastNewEmployee(emp, rampProfile, baselineSph, teamChurnRates)`:
+   - SPH = `baselineSph × getRampFactor(daysSinceStart, rampProfile)`
+   - Forecast = `plannedHours × attendanceFactor × rampedSph`
+   - Sæt `isEstablished: false`, `isNew: true`, `rampFactor`
 
-- Opdater `calculateFullForecast` til at splitte employees i established vs new:
-  - Established (>60 dage) → `forecastEstablishedEmployee` (EWMA, som nu)
-  - New (≤60 dage) → `forecastNewEmployee` (ramp-up)
+2. Opdater `calculateFullForecast` signatur til at acceptere `baselineSph` og `rampProfile` (optional)
+
+3. Split medarbejdere: `isEstablished` → EWMA, ellers → ramp-up
 
 ### `src/hooks/useClientForecast.ts`
-- Send `baselineSph` og `rampProfile` med til `calculateFullForecast` (allerede beregnet i hooken)
-
-### `src/types/forecast.ts`
-- Tilføj `baselineSph` og `rampProfile` som optional parametre til `calculateFullForecast` signatur
-- Tilføj `isNew?: boolean` til `EmployeeForecastResult` for UI-visning
+- Send `baselineSph` og `MOCK_RAMP_PROFILE` til `calculateFullForecast`
 
 ### `src/components/forecast/ForecastBreakdownTable.tsx`
-- Vis "Under ramp-up" badge (blå) for nye sælgere i stedet for "Churn-risiko"
-- Vis ramp-faktor i tooltip (fx "15% af normal kapacitet")
+- Vis nye medarbejdere med "Under oplæring" badge + ramp-faktor i stedet for "Churn-risiko"
 
-## Effekt
-- Max (dag 5) → forecast baseret på 15% af baseline SPH → fx 3-5 salg i stedet for 0
-- Kasper (dag 5, har 3 salg) → også ramp-up, men reelle tal kan være højere end ramp-estimatet
-- Nye sælgere flyttes fra "Ingen salgsdata" tilbage til hovedtabellen med realistisk forecast
-- Ingen ændring for etablerede sælgere
+### Effekt
+Max (dag 5, 15% ramp) med fx baseline SPH 0.45 og 7 resterende vagter → remaining forecast ~4 salg → total = 7 + 4 = 11 salg i stedet for bare 7.
 
 | Fil | Ændring |
 |-----|---------|
-| `src/lib/calculations/forecast.ts` | Ny `forecastNewEmployee` + split i `calculateFullForecast` |
-| `src/hooks/useClientForecast.ts` | Send `baselineSph` + `rampProfile` til forecast-beregning |
-| `src/types/forecast.ts` | Tilføj `isNew`, `baselineSph`, `rampProfile` felter |
-| `src/components/forecast/ForecastBreakdownTable.tsx` | "Under ramp-up" badge for nye sælgere |
+| `src/lib/calculations/forecast.ts` | Tilføj `forecastNewEmployee`, opdater `calculateFullForecast` |
+| `src/hooks/useClientForecast.ts` | Send baselineSph + rampProfile til beregning |
+| `src/components/forecast/ForecastBreakdownTable.tsx` | "Under oplæring" badge for nye sælgere |
 
