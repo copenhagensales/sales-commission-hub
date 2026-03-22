@@ -312,6 +312,19 @@ export function calculateFullForecast(
   // Build drivers
   const drivers: ForecastDriver[] = [];
   
+  // Projection basis driver — explains methodology for non-current periods
+  const establishedSalesTotal = employeeResults.reduce((s, e) => s + e.forecastSales, 0);
+  const newHireCount = newResults.length;
+  const newHireSales = newResults.reduce((s, e) => s + e.forecastSales, 0);
+  
+  drivers.push({
+    key: 'projection_basis',
+    label: 'Beregningsgrundlag',
+    impact: 'neutral',
+    value: `${employees.length} sælgere`,
+    description: `Ren projektion baseret på historisk salgsrate (EWMA) for ${established.length} etablerede sælgere (${Math.round(establishedSalesTotal - newHireSales)} salg)${newHireCount > 0 ? ` og ramp-up model for ${newHireCount} nye sælgere (${Math.round(newHireSales)} salg)` : ''}. Churn og fravær fratrækkes det samlede forecast.`,
+  });
+  
   if (cohortResults.length > 0) {
     drivers.push({
       key: 'new_cohorts',
