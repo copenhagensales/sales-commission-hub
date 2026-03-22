@@ -110,7 +110,7 @@ export function useForecastVsActual(clientId: string) {
         });
       }
 
-      return results;
+      return results.filter(r => r.actual > 0 || r.forecastExpected > 0);
     },
     staleTime: 5 * 60 * 1000,
   });
