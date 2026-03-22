@@ -108,8 +108,8 @@ export function generateForecastReportPdf(data: ReportData) {
 
   <div class="section">
     <div class="section-title">Hvad driver forecastet</div>
-    ${positiveDrivers.length > 0 ? `<p style="font-size:10px;font-weight:600;color:#16a34a;margin-bottom:4px;">POSITIVT</p>${positiveDrivers.map(d => `<div class="driver-block"><strong>${d.label}</strong><p>${d.description}</p></div>`).join("")}` : ""}
-    ${negativeDrivers.length > 0 ? `<p style="font-size:10px;font-weight:600;color:#dc2626;margin-bottom:4px;margin-top:8px;">NEGATIVT</p>${negativeDrivers.map(d => `<div class="driver-block"><strong>${d.label}</strong><p>${d.description}</p></div>`).join("")}` : ""}
+    ${positiveDrivers.length > 0 ? `<p style="font-size:10px;font-weight:600;color:#16a34a;margin-bottom:4px;">POSITIVT</p>${positiveDrivers.map(d => `<div class="driver-block"><strong>${d.label.replace(/churn/gi, "teamudskiftning")}</strong><p>${d.description.replace(/churn/gi, "udskiftning")}</p></div>`).join("")}` : ""}
+    ${negativeDrivers.length > 0 ? `<p style="font-size:10px;font-weight:600;color:#dc2626;margin-bottom:4px;margin-top:8px;">NEGATIVT</p>${negativeDrivers.map(d => `<div class="driver-block"><strong>${d.label.replace(/churn/gi, "teamudskiftning")}</strong><p>${d.description.replace(/churn/gi, "udskiftning")}</p></div>`).join("")}` : ""}
   </div>
 
   ${recs.length > 0 ? `
