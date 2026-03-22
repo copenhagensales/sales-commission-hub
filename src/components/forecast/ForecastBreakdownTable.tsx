@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, UserPlus, ArrowUpDown, AlertTriangle, Info } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Users, UserPlus, ArrowUpDown, AlertTriangle, Info, GraduationCap } from "lucide-react";
 import type { EmployeeForecastResult, CohortForecastResult } from "@/types/forecast";
 import { ForecastIntervalBadge } from "./ForecastIntervalBadge";
 
@@ -19,9 +20,11 @@ export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = f
   const mappedEmployees = employees.filter(e => !e.missingAgentMapping);
   const unmappedEmployees = employees.filter(e => e.missingAgentMapping);
 
-  // Further split mapped into active (has data) vs no-data
-  const activeEmployees = mappedEmployees.filter(e => e.expectedSph > 0 || (e.actualSales || 0) > 0);
-  const noDataEmployees = mappedEmployees.filter(e => e.expectedSph === 0 && (e.actualSales || 0) === 0);
+  // Split mapped into: new (ramp-up), active (established with data), no-data
+  const newEmployees = mappedEmployees.filter(e => e.isNew);
+  const establishedMapped = mappedEmployees.filter(e => !e.isNew);
+  const activeEmployees = establishedMapped.filter(e => e.expectedSph > 0 || (e.actualSales || 0) > 0);
+  const noDataEmployees = establishedMapped.filter(e => e.expectedSph === 0 && (e.actualSales || 0) === 0);
 
   const hasActuals = isCurrentPeriod && activeEmployees.some(e => (e.actualSales || 0) > 0);
 
@@ -168,6 +171,88 @@ export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = f
           </div>
         </CardContent>
       </Card>
+
+      {/* New employees — under ramp-up */}
+      {newEmployees.length > 0 && (
+        <Card className="border-indigo-200 bg-indigo-50/50">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <GraduationCap className="h-4 w-4 text-indigo-600" />
+              <span>Under oplæring ({newEmployees.length})</span>
+              <Badge variant="outline" className="text-xs bg-indigo-100 text-indigo-700 border-indigo-200 ml-auto">
+                Ramp-up model
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <p className="text-xs text-indigo-700 mb-3">
+              Nye medarbejdere (≤60 dage). Forecast er baseret på ramp-up kurve — ikke historisk performance.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-indigo-200 text-left">
+                    <th className="pb-2 font-medium text-indigo-700">Sælger</th>
+                    <th className="pb-2 font-medium text-indigo-700 text-right">Timer</th>
+                    <th className="pb-2 font-medium text-indigo-700 text-right">Ramp</th>
+                    <th className="pb-2 font-medium text-indigo-700 text-right">SPH</th>
+                    {isCurrentPeriod && <th className="pb-2 font-medium text-indigo-700 text-right">Faktisk</th>}
+                    <th className="pb-2 font-medium text-indigo-700 text-right">Forecast</th>
+                    {isCurrentPeriod && <th className="pb-2 font-medium text-indigo-700 text-right">Total</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  <TooltipProvider>
+                    {newEmployees.map((emp) => {
+                      const actual = emp.actualSales || 0;
+                      const total = actual + emp.forecastSales;
+                      const rampPct = emp.rampFactor ? Math.round(emp.rampFactor * 100) : 0;
+                      return (
+                        <tr key={emp.employeeId} className="border-b border-indigo-100 last:border-0 hover:bg-indigo-50/50">
+                          <td className="py-2.5">
+                            <div>
+                              <p className="font-medium">{emp.employeeName}</p>
+                              {emp.teamName && <p className="text-xs text-muted-foreground">{emp.teamName}</p>}
+                            </div>
+                          </td>
+                          <td className="py-2.5 text-right tabular-nums">{emp.plannedHours}</td>
+                          <td className="py-2.5 text-right">
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Badge variant="outline" className="text-xs bg-indigo-100 text-indigo-700 border-indigo-200">
+                                  {rampPct}%
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>{rampPct}% af normal kapacitet (ramp-up kurve)</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </td>
+                          <td className="py-2.5 text-right tabular-nums">{emp.expectedSph.toFixed(2)}</td>
+                          {isCurrentPeriod && <td className="py-2.5 text-right tabular-nums font-medium">{actual}</td>}
+                          <td className="py-2.5 text-right tabular-nums">{emp.forecastSales}</td>
+                          {isCurrentPeriod && <td className="py-2.5 text-right font-semibold tabular-nums">{total}</td>}
+                        </tr>
+                      );
+                    })}
+                  </TooltipProvider>
+                </tbody>
+                <tfoot>
+                  <tr className="border-t border-indigo-200 font-semibold">
+                    <td className="pt-2">Total</td>
+                    <td className="pt-2 text-right tabular-nums">{newEmployees.reduce((s, e) => s + e.plannedHours, 0)}</td>
+                    <td className="pt-2 text-right">—</td>
+                    <td className="pt-2 text-right">—</td>
+                    {isCurrentPeriod && <td className="pt-2 text-right tabular-nums">{newEmployees.reduce((s, e) => s + (e.actualSales || 0), 0)}</td>}
+                    <td className="pt-2 text-right tabular-nums">{newEmployees.reduce((s, e) => s + e.forecastSales, 0)}</td>
+                    {isCurrentPeriod && <td className="pt-2 text-right tabular-nums">{newEmployees.reduce((s, e) => s + (e.actualSales || 0) + e.forecastSales, 0)}</td>}
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* No-data employees — mapped but zero sales */}
       {noDataEmployees.length > 0 && (

@@ -97,6 +97,8 @@ export interface EmployeeForecastResult {
   teamName: string | null;
   avatarUrl: string | null;
   isEstablished: boolean;
+  isNew?: boolean;
+  rampFactor?: number;
   plannedHours: number;
   expectedSph: number;
   attendanceFactor: number;

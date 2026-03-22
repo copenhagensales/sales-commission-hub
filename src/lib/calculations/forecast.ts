@@ -135,8 +135,46 @@ export function forecastEstablishedEmployee(emp: EmployeePerformance, teamChurnR
     teamName: emp.teamName,
     avatarUrl: emp.avatarUrl,
     isEstablished: true,
+    isNew: false,
     plannedHours: emp.plannedHours,
     expectedSph: ewmaSph,
+    attendanceFactor: emp.personalAttendanceFactor,
+    forecastSales: Math.round(expected),
+    forecastSalesLow: Math.round(expected * LOW_FACTOR),
+    forecastSalesHigh: Math.round(expected * HIGH_FACTOR),
+    churnProbability,
+    churnLoss: Math.round(churnLoss),
+    missingAgentMapping: emp.missingAgentMapping,
+  };
+}
+
+/**
+ * Calculate forecast for a new employee (≤60 days) using ramp-up model.
+ */
+export function forecastNewEmployee(
+  emp: EmployeePerformance,
+  rampProfile: ForecastRampProfile,
+  baselineSph: number,
+  teamChurnRates?: TeamChurnRates,
+): EmployeeForecastResult {
+  const rampFactor = getRampFactor(emp.daysSinceStart, rampProfile);
+  const rampedSph = baselineSph * rampFactor;
+  const effectiveHours = emp.plannedHours * emp.personalAttendanceFactor;
+  const expected = effectiveHours * rampedSph;
+  
+  const churnProbability = getEstablishedChurnRate(emp.daysSinceStart, emp.teamName, teamChurnRates);
+  const churnLoss = expected * churnProbability;
+  
+  return {
+    employeeId: emp.employeeId,
+    employeeName: emp.employeeName,
+    teamName: emp.teamName,
+    avatarUrl: emp.avatarUrl,
+    isEstablished: false,
+    isNew: true,
+    rampFactor,
+    plannedHours: emp.plannedHours,
+    expectedSph: rampedSph,
     attendanceFactor: emp.personalAttendanceFactor,
     forecastSales: Math.round(expected),
     forecastSalesLow: Math.round(expected * LOW_FACTOR),
@@ -225,8 +263,19 @@ export function calculateFullForecast(
   clientId: string,
   clientCampaignId: string | null,
   teamChurnRates?: TeamChurnRates,
+  rampProfile?: ForecastRampProfile,
+  baselineSph?: number,
 ): ForecastResult {
-  const employeeResults = employees.map(e => forecastEstablishedEmployee(e, teamChurnRates));
+  // Split employees into established (>60 days) and new (≤60 days)
+  const established = employees.filter(e => e.isEstablished);
+  const newHires = employees.filter(e => !e.isEstablished);
+  
+  const establishedResults = established.map(e => forecastEstablishedEmployee(e, teamChurnRates));
+  const newResults = (rampProfile && baselineSph != null)
+    ? newHires.map(e => forecastNewEmployee(e, rampProfile, baselineSph, teamChurnRates))
+    : newHires.map(e => forecastEstablishedEmployee(e, teamChurnRates)); // fallback
+  
+  const employeeResults = [...establishedResults, ...newResults];
   const cohortResults = cohortInputs.map(forecastCohort);
   
   const totalEstablishedChurnLoss = employeeResults.reduce((sum, e) => sum + e.churnLoss, 0);
