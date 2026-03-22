@@ -149,18 +149,18 @@ export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = f
               <tfoot>
                 <tr className="border-t font-semibold">
                   <td className="pt-2">Total</td>
-                  <td className="pt-2 text-right tabular-nums">{mappedEmployees.reduce((s, e) => s + e.plannedHours, 0)}</td>
+                  <td className="pt-2 text-right tabular-nums">{activeEmployees.reduce((s, e) => s + e.plannedHours, 0)}</td>
                   <td className="pt-2 text-right">—</td>
                   <td className="pt-2 text-right">—</td>
                   <td className="pt-2 text-right">—</td>
                   {hasActuals ? (
                     <>
-                      <td className="pt-2 text-right tabular-nums">{mappedEmployees.reduce((s, e) => s + (e.actualSales || 0), 0)}</td>
-                      <td className="pt-2 text-right tabular-nums">{mappedEmployees.reduce((s, e) => s + e.forecastSales, 0)}</td>
-                      <td className="pt-2 text-right tabular-nums">{mappedEmployees.reduce((s, e) => s + (e.actualSales || 0) + e.forecastSales, 0)}</td>
+                      <td className="pt-2 text-right tabular-nums">{activeEmployees.reduce((s, e) => s + (e.actualSales || 0), 0)}</td>
+                      <td className="pt-2 text-right tabular-nums">{activeEmployees.reduce((s, e) => s + e.forecastSales, 0)}</td>
+                      <td className="pt-2 text-right tabular-nums">{activeEmployees.reduce((s, e) => s + (e.actualSales || 0) + e.forecastSales, 0)}</td>
                     </>
                   ) : (
-                    <td className="pt-2 text-right tabular-nums">{mappedEmployees.reduce((s, e) => s + e.forecastSales, 0)}</td>
+                    <td className="pt-2 text-right tabular-nums">{activeEmployees.reduce((s, e) => s + e.forecastSales, 0)}</td>
                   )}
                 </tr>
               </tfoot>
