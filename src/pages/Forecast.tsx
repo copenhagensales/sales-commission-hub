@@ -155,6 +155,12 @@ export default function Forecast() {
                 ))}
               </SelectContent>
             </Select>
+            <Link to="/forecast/rapport">
+              <Button variant="outline" size="sm">
+                <FileText className="h-4 w-4 mr-2" />
+                Kunderapport
+              </Button>
+            </Link>
             <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isLoading}>
               {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
             </Button>
