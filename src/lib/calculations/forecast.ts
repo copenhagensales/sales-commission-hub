@@ -359,6 +359,21 @@ export function calculateFullForecast(
     description: `Ren projektion baseret på historisk salgsrate (EWMA) for ${established.length} etablerede sælgere (${Math.round(establishedSalesTotal - newHireSales)} salg)${newHireCount > 0 ? ` og ramp-up model for ${newHireCount} nye sælgere (${Math.round(newHireSales)} salg)` : ''}. Churn og fravær fratrækkes det samlede forecast.`,
   });
   
+  // Momentum driver — show when momentum correction is active
+  if (isFuturePeriod) {
+    const empWithMomentum = establishedResults.filter(e => e.momentumFactor && e.momentumFactor > 1.0);
+    if (empWithMomentum.length > 0) {
+      const avgMomentum = empWithMomentum.reduce((s, e) => s + (e.momentumFactor || 1), 0) / empWithMomentum.length;
+      drivers.push({
+        key: 'momentum',
+        label: 'Positiv momentum',
+        impact: 'positive',
+        value: `+${Math.round((avgMomentum - 1) * 100)}%`,
+        description: `${empWithMomentum.length} af ${established.length} etablerede sælgere har positiv trend de seneste 2 uger. Deres forecast er justeret op (maks +25%) for at afspejle nuværende momentum.`,
+      });
+    }
+  }
+
   if (cohortResults.length > 0) {
     drivers.push({
       key: 'new_cohorts',
