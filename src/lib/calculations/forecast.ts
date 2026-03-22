@@ -196,7 +196,7 @@ export function forecastNewEmployee(
   const expected = effectiveHours * rampedSph;
   
   const churnProbability = getEstablishedChurnRate(emp.daysSinceStart, emp.teamName, teamChurnRates);
-  const churnLoss = expected * churnProbability;
+  const churnLoss = expected * churnProbability * 0.5; // Mid-month departure: avg half month lost
   
   return {
     employeeId: emp.employeeId,
