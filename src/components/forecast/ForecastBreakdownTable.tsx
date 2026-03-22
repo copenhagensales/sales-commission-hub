@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, UserPlus, ArrowUpDown, AlertTriangle } from "lucide-react";
+import { Users, UserPlus, ArrowUpDown, AlertTriangle, Info } from "lucide-react";
 import type { EmployeeForecastResult, CohortForecastResult } from "@/types/forecast";
 import { ForecastIntervalBadge } from "./ForecastIntervalBadge";
 
@@ -19,11 +19,15 @@ export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = f
   const mappedEmployees = employees.filter(e => !e.missingAgentMapping);
   const unmappedEmployees = employees.filter(e => e.missingAgentMapping);
 
-  const hasActuals = isCurrentPeriod && mappedEmployees.some(e => (e.actualSales || 0) > 0);
+  // Further split mapped into active (has data) vs no-data
+  const activeEmployees = mappedEmployees.filter(e => e.expectedSph > 0 || (e.actualSales || 0) > 0);
+  const noDataEmployees = mappedEmployees.filter(e => e.expectedSph === 0 && (e.actualSales || 0) === 0);
 
-  // Avg SPH for risk badges — only from mapped employees
-  const avgSph = mappedEmployees.length > 0
-    ? mappedEmployees.reduce((s, e) => s + e.expectedSph, 0) / mappedEmployees.length
+  const hasActuals = isCurrentPeriod && activeEmployees.some(e => (e.actualSales || 0) > 0);
+
+  // Avg SPH for risk badges — only from active employees
+  const avgSph = activeEmployees.length > 0
+    ? activeEmployees.reduce((s, e) => s + e.expectedSph, 0) / activeEmployees.length
     : 0;
 
   const toggleSort = (key: typeof sortKey) => {
@@ -31,7 +35,7 @@ export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = f
     else { setSortKey(key); setSortDir('desc'); }
   };
 
-  const sortedEmployees = [...mappedEmployees].sort((a, b) => {
+  const sortedEmployees = [...activeEmployees].sort((a, b) => {
     const dir = sortDir === 'desc' ? -1 : 1;
     switch (sortKey) {
       case 'name': return dir * a.employeeName.localeCompare(b.employeeName) * -1;
@@ -53,7 +57,7 @@ export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = f
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Users className="h-4 w-4 text-muted-foreground" />
-            Etablerede sælgere ({mappedEmployees.length})
+            Etablerede sælgere ({activeEmployees.length})
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-0">
@@ -145,18 +149,18 @@ export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = f
               <tfoot>
                 <tr className="border-t font-semibold">
                   <td className="pt-2">Total</td>
-                  <td className="pt-2 text-right tabular-nums">{mappedEmployees.reduce((s, e) => s + e.plannedHours, 0)}</td>
+                  <td className="pt-2 text-right tabular-nums">{activeEmployees.reduce((s, e) => s + e.plannedHours, 0)}</td>
                   <td className="pt-2 text-right">—</td>
                   <td className="pt-2 text-right">—</td>
                   <td className="pt-2 text-right">—</td>
                   {hasActuals ? (
                     <>
-                      <td className="pt-2 text-right tabular-nums">{mappedEmployees.reduce((s, e) => s + (e.actualSales || 0), 0)}</td>
-                      <td className="pt-2 text-right tabular-nums">{mappedEmployees.reduce((s, e) => s + e.forecastSales, 0)}</td>
-                      <td className="pt-2 text-right tabular-nums">{mappedEmployees.reduce((s, e) => s + (e.actualSales || 0) + e.forecastSales, 0)}</td>
+                      <td className="pt-2 text-right tabular-nums">{activeEmployees.reduce((s, e) => s + (e.actualSales || 0), 0)}</td>
+                      <td className="pt-2 text-right tabular-nums">{activeEmployees.reduce((s, e) => s + e.forecastSales, 0)}</td>
+                      <td className="pt-2 text-right tabular-nums">{activeEmployees.reduce((s, e) => s + (e.actualSales || 0) + e.forecastSales, 0)}</td>
                     </>
                   ) : (
-                    <td className="pt-2 text-right tabular-nums">{mappedEmployees.reduce((s, e) => s + e.forecastSales, 0)}</td>
+                    <td className="pt-2 text-right tabular-nums">{activeEmployees.reduce((s, e) => s + e.forecastSales, 0)}</td>
                   )}
                 </tr>
               </tfoot>
@@ -164,6 +168,46 @@ export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = f
           </div>
         </CardContent>
       </Card>
+
+      {/* No-data employees — mapped but zero sales */}
+      {noDataEmployees.length > 0 && (
+        <Card className="border-blue-200 bg-blue-50/50">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Info className="h-4 w-4 text-blue-600" />
+              <span>Ingen salgsdata ({noDataEmployees.length})</span>
+              <Badge variant="outline" className="text-xs bg-blue-100 text-blue-700 border-blue-200 ml-auto">
+                Korrekt opsat — ingen salg registreret
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <p className="text-xs text-blue-700 mb-3">
+              Disse medarbejdere er korrekt opsat, men har ingen registrerede salg for den valgte kampagne i de seneste 8 uger. De indgår derfor ikke i forecastet.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-blue-200 text-left">
+                    <th className="pb-2 font-medium text-blue-700">Medarbejder</th>
+                    <th className="pb-2 font-medium text-blue-700 text-right">Team</th>
+                    <th className="pb-2 font-medium text-blue-700 text-right">Planlagte timer</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {noDataEmployees.map((emp) => (
+                    <tr key={emp.employeeId} className="border-b border-blue-100 last:border-0">
+                      <td className="py-2 font-medium">{emp.employeeName}</td>
+                      <td className="py-2 text-right text-muted-foreground">{emp.teamName || '—'}</td>
+                      <td className="py-2 text-right tabular-nums">{emp.plannedHours}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Unmapped employees — missing agent mapping */}
       {unmappedEmployees.length > 0 && (
