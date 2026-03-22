@@ -249,6 +249,7 @@ Deno.serve(async (req) => {
 
     const allSaleIds = [...allTmSales.map(s => s.id), ...allFmSales.map(s => s.id)];
     const saleToCommission: Record<string, number> = {};
+    const saleToDeals: Record<string, number> = {};
 
     if (allSaleIds.length > 0) {
       const BATCH = 100;
@@ -256,11 +257,28 @@ Deno.serve(async (req) => {
         const batchIds = allSaleIds.slice(i, i + BATCH);
         const { data: items } = await supabase
           .from("sale_items")
-          .select("sale_id, mapped_commission")
+          .select("sale_id, mapped_commission, quantity, product_id")
           .in("sale_id", batchIds);
         
+        // Fetch product counts_as_sale flags
+        const productIds = [...new Set((items || []).map(i => i.product_id).filter(Boolean))];
+        let productCounts: Record<string, boolean> = {};
+        if (productIds.length > 0) {
+          const { data: products } = await supabase
+            .from("products")
+            .select("id, counts_as_sale")
+            .in("id", productIds);
+          for (const p of products || []) {
+            productCounts[p.id] = p.counts_as_sale !== false;
+          }
+        }
+
         for (const item of items || []) {
           saleToCommission[item.sale_id] = (saleToCommission[item.sale_id] || 0) + (Number(item.mapped_commission) || 0);
+          const countsSale = item.product_id ? (productCounts[item.product_id] ?? true) : true;
+          const qty = countsSale ? (Number(item.quantity) || 1) : 0;
+          if (!saleToDeals[item.sale_id]) saleToDeals[item.sale_id] = 0;
+          saleToDeals[item.sale_id] += qty;
         }
       }
     }
