@@ -263,8 +263,19 @@ export function calculateFullForecast(
   clientId: string,
   clientCampaignId: string | null,
   teamChurnRates?: TeamChurnRates,
+  rampProfile?: ForecastRampProfile,
+  baselineSph?: number,
 ): ForecastResult {
-  const employeeResults = employees.map(e => forecastEstablishedEmployee(e, teamChurnRates));
+  // Split employees into established (>60 days) and new (≤60 days)
+  const established = employees.filter(e => e.isEstablished);
+  const newHires = employees.filter(e => !e.isEstablished);
+  
+  const establishedResults = established.map(e => forecastEstablishedEmployee(e, teamChurnRates));
+  const newResults = (rampProfile && baselineSph != null)
+    ? newHires.map(e => forecastNewEmployee(e, rampProfile, baselineSph, teamChurnRates))
+    : newHires.map(e => forecastEstablishedEmployee(e, teamChurnRates)); // fallback
+  
+  const employeeResults = [...establishedResults, ...newResults];
   const cohortResults = cohortInputs.map(forecastCohort);
   
   const totalEstablishedChurnLoss = employeeResults.reduce((sum, e) => sum + e.churnLoss, 0);
