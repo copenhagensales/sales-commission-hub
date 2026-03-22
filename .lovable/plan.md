@@ -1,43 +1,48 @@
 
 
-# Redesign league-rows: "Tjent i dag" + Top 3-ikoner + visuelt løft
+# Fix: Liga viser forkerte tal for FM vs. dagsrapporter
 
-## Ændringer
+## Problem
+`league-calculate-standings` edge-funktionen bruger sin egen aggregeringslogik der afviger fra `get_sales_aggregates_v2` RPC'en (som dagsrapporter bruger) på 3 kritiske punkter:
 
-### 1. `src/components/league/DailyTopBadge.tsx` — Større, mere levende top 3-badge
-- Gør badgen større (h-4 w-4) med en glow-effekt og `animate-pulse`
-- Top 1: Flamme-ikon i guld med glow
-- Top 2: Lyn-ikon i sølv
-- Top 3: Lyn-ikon i bronze
-- Tilføj et nyt `DailyTopBadgeLarge` variant der viser ikon + "🔥 #1" tekst for ekstra synlighed
+### 1. Ingen `validation_status`-filtrering
+Liga-funktionen inkluderer **afviste salg** — den har ingen `validation_status != 'rejected'` check. Dagsrapporter ekskluderer afviste salg via RPC'en.
 
-### 2. `src/components/league/QualificationBoard.tsx` — PlayerRow redesign
-**Erstat deals med "tjent i dag":**
-- Under provision-beløbet: vis altid "I dag: X kr" (emerald når > 0, muted når 0)
-- Fjern "0 pt" placeholder (linje 363, 384-386)
+### 2. Ingen `counts_as_sale`-produktfiltrering
+Liga tæller deals som `+1` per salgsrække, uden at checke om produktet faktisk tæller som et salg (`counts_as_sale` flag på products-tabellen). RPC'en bruger `CASE WHEN p.counts_as_sale IS NOT FALSE THEN si.quantity ELSE 0 END`.
 
-**Top 3 badge mere prominent:**
-- For top 3 daglige: vis DailyTopBadge ved siden af navnet (ikke gemt under provision)
-- Tilføj en subtil glow-baggrund på hele rækken for top 3 daglige
+### 3. Deals tæller rækker, ikke quantity
+For FM-salg gør liga `dealsCount += 1` per sale-row, mens RPC'en summerer `si.quantity` fra sale_items (korrekt for multi-quantity transaktioner).
 
-**Visuelt løft:**
-- Bedre spacing og mere luft i rækkerne
-- Provision-beløbet i lidt større font med bedre kontrast
-- "I dag"-beløbet i emerald-grøn med lille pulserende dot for aktive
-- Fjern den statiske "0 pt" kolonne som fylder plads uden værdi
-- Rank-change pile mere kompakte og inline med navnet
+## Løsning
+Opdater `league-calculate-standings` til at bruge samme datalogik som RPC'en.
 
-### 3. `src/components/league/PremierLeagueBoard.tsx` — Tilsvarende ændringer
-- Tilføj `todayProvisionMap` og `todayDailyRank` props (som QualificationBoard allerede har)
-- Vis "I dag: X kr" under provision i stedet for deals
-- Top 3 daily badge ved aktive sælgere
+### `supabase/functions/league-calculate-standings/index.ts`
 
-## Ingen backend-ændringer
-Al data (todayProvision, todayDailyRank) er allerede tilgængelig via props.
+**A. Tilføj `validation_status`-filter på begge salgs-queries (TM + FM):**
+```
+.neq("validation_status", "rejected")
+```
+(Linje ~173 for TM og ~206 for FM)
+
+**B. Hent `quantity` og `counts_as_sale` fra sale_items:**
+- Ændr sale_items query til også at hente `product_id`
+- Join med products for at checke `counts_as_sale`
+- Brug `quantity` til deals-tælling: `dealsCount += item.counts_as_sale ? item.quantity : 0`
+
+**C. Tilsvarende ændringer i `league-process-round/index.ts`:**
+- Samme 3 fixes for konsistens i runde-beregninger
+
+### Ingen ændringer i frontend
+Standings-tabellen viser data fra `league_qualification_standings`, som populeres af edge-funktionen. Når funktionen beregner korrekt, viser UI automatisk de rigtige tal.
+
+## Effekt
+- FM-sælgeres provision og deals i ligaen matcher nu præcis med dagsrapporter
+- Afviste salg tælles ikke længere med
+- Multi-quantity salg tælles korrekt
 
 | Fil | Ændring |
 |-----|---------|
-| `src/components/league/DailyTopBadge.tsx` | Større badge med glow-effekt for top 3 |
-| `src/components/league/QualificationBoard.tsx` | Erstat deals/pt med "I dag: X kr", visuelt løft, prominent top 3 |
-| `src/components/league/PremierLeagueBoard.tsx` | Samme "I dag" + top 3 badge tilføjelser |
+| `supabase/functions/league-calculate-standings/index.ts` | Tilføj validation_status filter, counts_as_sale check, quantity-baseret deals |
+| `supabase/functions/league-process-round/index.ts` | Samme 3 fixes for runde-beregninger |
 
