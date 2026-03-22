@@ -130,6 +130,9 @@ export default function ForecastClientReport() {
             {/* 2. Nøgletal */}
             <ReportKeyFigures forecast={forecast} />
 
+            {/* 2.5 Planlagte opstartshold */}
+            <ReportCohorts forecast={forecast} />
+
             {/* 3. Hvad driver forecastet */}
             <ReportDrivers forecast={forecast} />
 
