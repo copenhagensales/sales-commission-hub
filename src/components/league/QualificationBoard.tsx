@@ -350,17 +350,19 @@ const PlayerRow = memo(function PlayerRow({
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <div className="text-right">
             <div className="flex items-center gap-1.5 justify-end">
-              <div className="font-mono text-sm sm:text-[15px] font-semibold whitespace-nowrap">
+              {todayDailyRank && <DailyTopBadge rank={todayDailyRank} size="lg" />}
+              <div className="font-mono text-sm sm:text-base font-semibold whitespace-nowrap">
                 {standing.current_provision.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
               </div>
             </div>
-            {todayProvision > 0 && (
-              <div className="text-[10px] text-emerald-400 font-medium flex items-center gap-1">
-                {todayDailyRank && <DailyTopBadge rank={todayDailyRank} />}
-                I dag: {todayProvision.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
-              </div>
-            )}
-            {todayProvision <= 0 && <div className="text-[10px] text-muted-foreground sm:hidden">0 pt</div>}
+            <div className={cn(
+              "text-[10px] font-medium flex items-center gap-1 justify-end",
+              todayProvision > 0 ? "text-emerald-400" : "text-muted-foreground/50"
+            )}>
+              I dag: {todayProvision > 0
+                ? `${todayProvision.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr`
+                : "0 kr"}
+            </div>
             {/* Gap indicators — only for current user */}
             {isCurrentUser && gapUp !== null && gapUp > 0 && (
               <div className="text-[9px] text-muted-foreground/70 font-mono">
@@ -380,9 +382,6 @@ const PlayerRow = memo(function PlayerRow({
                 className="mt-1 w-20 ml-auto"
               />
             )}
-          </div>
-          <div className="hidden sm:block text-right min-w-[50px]">
-            <span className="text-sm text-muted-foreground">0 pt</span>
           </div>
           <div className="w-16 sm:w-20 text-right">
             {isPromoZone && <Badge className="bg-green-500/20 text-green-600 border-green-500/30 text-[10px] px-1.5 py-0">Oprykker</Badge>}

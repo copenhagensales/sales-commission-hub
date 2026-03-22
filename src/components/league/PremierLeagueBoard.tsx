@@ -11,6 +11,7 @@ import { MvpBadge } from "./MvpBadge";
 import { PersonalBestBadge } from "./PersonalBestBadge";
 import { DistanceToZone } from "./DistanceToZone";
 import { RivalryIndicator } from "./RivalryIndicator";
+import { DailyTopBadge, computeTodayTop3 } from "./DailyTopBadge";
 import { cn } from "@/lib/utils";
 import { formatPlayerName } from "@/lib/formatPlayerName";
 
@@ -19,6 +20,7 @@ interface PremierLeagueBoardProps {
   playersPerDivision: number;
   isLoading: boolean;
   currentEmployeeId?: string;
+  todayProvisionMap?: Record<string, number>;
 }
 
 export function PremierLeagueBoard({
@@ -26,7 +28,9 @@ export function PremierLeagueBoard({
   playersPerDivision,
   isLoading,
   currentEmployeeId,
+  todayProvisionMap = {},
 }: PremierLeagueBoardProps) {
+  const todayTop3 = useMemo(() => computeTodayTop3(todayProvisionMap), [todayProvisionMap]);
   // Group standings by division
   const divisionGroups = useMemo(() => {
     const groups: { division: number; players: MockQualificationStanding[] }[] = [];
@@ -210,6 +214,9 @@ export function PremierLeagueBoard({
                     ? getZoneThresholds(group.players, idx, isTopDivision, isBottomDivision) 
                     : null;
 
+                  const todayProvision = todayProvisionMap[standing.employee_id] || 0;
+                  const dailyRank = todayTop3[standing.employee_id] || null;
+
                   return (
                     <div key={standing.id}>
                       {/* Zone separator */}
@@ -327,12 +334,23 @@ export function PremierLeagueBoard({
                           </div>
                         </div>
 
-                        {/* Right side: Provision + Form + Status */}
+                        {/* Right side: Provision + Today + Form + Status */}
                         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                           {/* Provision */}
                           <div className="text-right">
-                            <div className="font-mono text-sm sm:text-[15px] font-semibold whitespace-nowrap">
-                              {standing.current_provision.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
+                            <div className="flex items-center gap-1.5 justify-end">
+                              {dailyRank && <DailyTopBadge rank={dailyRank} size="lg" />}
+                              <div className="font-mono text-sm sm:text-base font-semibold whitespace-nowrap">
+                                {standing.current_provision.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
+                              </div>
+                            </div>
+                            <div className={cn(
+                              "text-[10px] font-medium flex items-center gap-1 justify-end",
+                              todayProvision > 0 ? "text-emerald-400" : "text-muted-foreground/50"
+                            )}>
+                              I dag: {todayProvision > 0
+                                ? `${todayProvision.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr`
+                                : "0 kr"}
                             </div>
                             {isCurrentUser && zoneData && (
                               <DistanceToZone
