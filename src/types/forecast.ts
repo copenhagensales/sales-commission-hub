@@ -144,6 +144,7 @@ export interface ForecastResult {
   clientCampaignId: string | null;
 
   // Totals
+  totalSalesGross?: number;
   totalSalesExpected: number;
   totalSalesLow: number;
   totalSalesHigh: number;
