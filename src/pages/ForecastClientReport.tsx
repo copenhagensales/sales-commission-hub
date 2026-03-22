@@ -154,7 +154,7 @@ function ReportExecutiveSummary({ forecast, clientName, periodLabel, monthOffset
 
   const driverTexts: string[] = [];
   if (absLoss > 0) driverTexts.push(`fravær reducerer med ${absLoss} salg`);
-  if (churnLoss > 0) driverTexts.push(`churn-risiko trækker ${churnLoss} salg`);
+  if (churnLoss > 0) driverTexts.push(`forventet naturlig udskiftning i teamet reducerer med ${churnLoss} salg`);
 
   const holidayDriver = forecast.drivers.find(d => d.key === "holidays");
   const holidayCount = holidayDriver ? parseInt(holidayDriver.value) || 0 : 0;
