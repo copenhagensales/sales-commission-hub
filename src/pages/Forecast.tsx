@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +16,7 @@ import { ForecastCohortManager } from "@/components/forecast/ForecastCohortManag
 import { ForecastAssumptions } from "@/components/forecast/ForecastAssumptions";
 import { ForecastSummary } from "@/components/forecast/ForecastSummary";
 import { ForecastProgressBar } from "@/components/forecast/ForecastProgressBar";
+import { ForecastTeamOverview } from "@/components/forecast/ForecastTeamOverview";
 
 import { ForecastInsights } from "@/components/forecast/ForecastInsights";
 import { DataFreshnessBadge } from "@/components/ui/DataFreshnessBadge";
@@ -28,6 +30,7 @@ import type { ClientForecastCohort } from "@/types/forecast";
 export default function Forecast() {
   const [selectedClient, setSelectedClient] = useState("all");
   const [period, setPeriod] = useState<"current" | "next">("next");
+  const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   // Fetch real clients for dropdown
@@ -189,6 +192,14 @@ export default function Forecast() {
 
             {/* Progress bar (current period only) */}
             {period === "current" && <ForecastProgressBar forecast={forecast} />}
+
+            {/* Team Overview */}
+            <ForecastTeamOverview
+              forecast={forecast}
+              isCurrentPeriod={period === "current"}
+              onTeamClick={setSelectedTeam}
+              selectedTeam={selectedTeam}
+            />
 
             {/* KPI Cards */}
             <ForecastKpiCards forecast={forecast} />
