@@ -1,40 +1,50 @@
 
 
-# Hvorfor næste måned viser færre salg trods 11 nye fra opstartshold
+# Momentum-korrektion i forecast
 
-## Analyse
+## Problem
+EWMA bruger kun afsluttede uger (uge -1 til -8). Hvis teamet er i en opadgående trend — fx de seneste 2 uger er markant bedre end EWMA-gennemsnittet — ignorerer næste måneds forecast dette momentum. Kunder ser et fald som virker urealistisk.
 
-Jeg har gennemgået beregningslogikken og fundet **to hovedårsager**:
+## Løsning
+Tilføj en **momentum-faktor** der sammenligner de seneste 2 ugers SPH med den fulde EWMA. Hvis der er positiv trend, justér SPH op (med et loft så det ikke eksploderer).
 
-### 1. Indeværende måned er "boosted" af faktiske salg over pace
-For marts bruges modellen "Actual + Remaining": de 150+ faktiske salg til dato låses ind, og kun de resterende dage forecasts med EWMA. Hvis teamet sælger over deres historiske gennemsnit (EWMA), bliver totalen højere end en ren projektion.
+### Beregning
+```text
+recentSph = gennemsnit af de 2 nyeste ugers SPH
+ewmaSph   = standard EWMA over alle 8 uger
+ratio     = recentSph / ewmaSph
 
-For april bruges **kun** EWMA-projektion for hele måneden — ingen "boost" fra over-performance.
+Hvis ratio > 1.05 (5% over gennemsnit):
+  momentumFactor = min(ratio, 1.25)  // max 25% boost
+  adjustedSph = ewmaSph × momentumFactor
+Ellers:
+  adjustedSph = ewmaSph (ingen ændring)
+```
 
-### 2. Cohort-bidraget er lavere end forventet pga. ramp + survival
-De 11 nye bidrager ikke med fuld kapacitet:
-- **Hold 1** (5 pers, start 31/3): Ramp-faktor ~60%, survival ~85% → arbejder effektivt som ~2.5 sælgere
-- **Hold 2** (6 pers, start 14/4): Kun ~2.3 uger i april, ramp ~35%, survival ~92% → effektivt som ~1.5 sælgere
-- **Samlet cohort-bidrag**: ~50 salg (i stedet for ~150 som 11 fuldt produktive sælgere ville give)
+Momentum-korrektionen anvendes **kun for fremtidige perioder** (næste måned+). For indeværende måned bruges actual + remaining som i dag.
 
-## Løsningsforslag
+### Ændringer
 
-For at gøre dette mere gennemsigtigt og potentielt mere retvisende:
+**`src/lib/calculations/forecast.ts`**
+- Ny funktion `applyMomentum(weeklySph, ewmaSph)` → returnerer justeret SPH + momentumFactor
+- Opdater `forecastEstablishedEmployee`: kald `applyMomentum` og brug justeret SPH til forecast-beregning
+- Tilføj `momentumFactor` til `EmployeeForecastResult` (optional)
+- Tilføj en "Momentum"-driver i `calculateFullForecast` når gennemsnitlig momentum > 1.05
 
-### A. Vis "Kapacitetssammenligning" i drivers (anbefalet)
-Tilføj en driver i næste-måned-forecast der forklarer forskellen:
-- "Denne måned: X faktiske + Y remaining = Z total"  
-- "Næste måned: Ren projektion baseret på historisk SPH + cohorts"
-- Gør det tydeligt at forskellen skyldes at marts-salg er over pace
+**`src/types/forecast.ts`**
+- Tilføj `momentumFactor?: number` til `EmployeeForecastResult`
 
-### B. Alternativ: Juster næste-måned-projektion for momentum
-Hvis EWMA under-estimerer fordi teamet er i en opadgående trend, kan vi tilføje en **trend-korrektion**: sammenlign seneste 2 ugers SPH med EWMA og justér op hvis der er positiv momentum.
+**`src/components/forecast/ForecastBreakdownTable.tsx`**
+- Vis momentum-indikator (fx "↑12%") ved siden af SPH for medarbejdere med momentum > 1.05
 
-## Anbefaling
-Start med **A** (transparens) — det er en ren UI-ændring der ikke ændrer beregninger, men gør det klart hvorfor tallene ser ud som de gør. **B** kan tilføjes som fase 2 hvis forecasts konsekvent er for konservative.
+### Effekt
+- Hvis teamet sælger 15% over historisk gennemsnit de seneste 2 uger → næste måneds forecast justeres op med 15%
+- Maksimalt 25% boost for at undgå overoptimistiske tal
+- Kun nedad-trend ignoreres (vi justerer ikke ned — EWMA håndterer det allerede via decay)
 
 | Fil | Ændring |
 |-----|---------|
-| `src/lib/calculations/forecast.ts` | Tilføj "kapacitetssammenligning"-driver for non-current periods |
-| `src/hooks/useClientForecast.ts` | Send denne-måneds-total med som kontekst til drivers |
+| `src/lib/calculations/forecast.ts` | Ny `applyMomentum` funktion, brug i established forecast + driver |
+| `src/types/forecast.ts` | Tilføj `momentumFactor` felt |
+| `src/components/forecast/ForecastBreakdownTable.tsx` | Vis momentum-indikator per medarbejder |
 
