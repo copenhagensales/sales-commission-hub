@@ -390,6 +390,8 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
       if (histData && histData.length > 0) {
         // Group exits by team and tenure bucket
         const teamExits = new Map<string, { bucket0_60: number; bucket61_180: number; bucket180plus: number }>();
+        // Count total starters per team (people who entered each bucket) for proper denominator
+        const teamStarters = new Map<string, { entered0_60: number; entered61_180: number; entered180plus: number }>();
         
         for (const h of histData) {
           if (!h.team_name || !h.start_date || !h.end_date) continue;
@@ -398,27 +400,49 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           if (!teamExits.has(h.team_name)) {
             teamExits.set(h.team_name, { bucket0_60: 0, bucket61_180: 0, bucket180plus: 0 });
           }
+          if (!teamStarters.has(h.team_name)) {
+            teamStarters.set(h.team_name, { entered0_60: 0, entered61_180: 0, entered180plus: 0 });
+          }
           const buckets = teamExits.get(h.team_name)!;
-          if (tenureDays <= 60) buckets.bucket0_60++;
-          else if (tenureDays <= 180) buckets.bucket61_180++;
-          else buckets.bucket180plus++;
+          const starters = teamStarters.get(h.team_name)!;
+          
+          // Every employee who left entered the 0-60 bucket
+          starters.entered0_60++;
+          if (tenureDays <= 60) {
+            buckets.bucket0_60++;
+          } else {
+            // They survived 0-60, so they entered 61-180
+            starters.entered61_180++;
+            if (tenureDays <= 180) {
+              buckets.bucket61_180++;
+            } else {
+              // They survived 61-180, so they entered 180+
+              starters.entered180plus++;
+              buckets.bucket180plus++;
+            }
+          }
         }
 
-        // Estimate avg headcount per team from current employees
-        const teamHeadcounts = new Map<string, number>();
+        // Also count current employees as starters (they entered but didn't exit)
         for (const emp of employeePerformances) {
-          if (emp.teamName) {
-            teamHeadcounts.set(emp.teamName, (teamHeadcounts.get(emp.teamName) || 0) + 1);
+          if (!emp.teamName) continue;
+          if (!teamStarters.has(emp.teamName)) {
+            teamStarters.set(emp.teamName, { entered0_60: 0, entered61_180: 0, entered180plus: 0 });
           }
+          const starters = teamStarters.get(emp.teamName)!;
+          starters.entered0_60++;
+          if (emp.daysSinceStart > 60) starters.entered61_180++;
+          if (emp.daysSinceStart > 180) starters.entered180plus++;
         }
 
         const monthsObserved = 12;
         for (const [teamName, exits] of teamExits) {
-          const headcount = Math.max(teamHeadcounts.get(teamName) || 10, 3);
+          const starters = teamStarters.get(teamName) || { entered0_60: 1, entered61_180: 1, entered180plus: 1 };
           const rates: TenureBucketRates = {
-            bucket0_60: Math.min(exits.bucket0_60 / (headcount * monthsObserved * 0.3), 0.60),
-            bucket61_180: Math.min(exits.bucket61_180 / (headcount * monthsObserved * 0.3), 0.30),
-            bucket180plus: Math.min(exits.bucket180plus / (headcount * monthsObserved * 0.4), 0.10),
+            // Monthly rate = exits / (people who entered bucket) / months observed
+            bucket0_60: Math.min(exits.bucket0_60 / (Math.max(starters.entered0_60, 1) * monthsObserved), 0.25),
+            bucket61_180: Math.min(exits.bucket61_180 / (Math.max(starters.entered61_180, 1) * monthsObserved), 0.12),
+            bucket180plus: Math.min(exits.bucket180plus / (Math.max(starters.entered180plus, 1) * monthsObserved), 0.05),
           };
           teamChurnRates.set(teamName, rates);
         }
