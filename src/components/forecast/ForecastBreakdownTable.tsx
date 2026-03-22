@@ -169,6 +169,46 @@ export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = f
         </CardContent>
       </Card>
 
+      {/* No-data employees — mapped but zero sales */}
+      {noDataEmployees.length > 0 && (
+        <Card className="border-blue-200 bg-blue-50/50">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Info className="h-4 w-4 text-blue-600" />
+              <span>Ingen salgsdata ({noDataEmployees.length})</span>
+              <Badge variant="outline" className="text-xs bg-blue-100 text-blue-700 border-blue-200 ml-auto">
+                Korrekt opsat — ingen salg registreret
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <p className="text-xs text-blue-700 mb-3">
+              Disse medarbejdere er korrekt opsat, men har ingen registrerede salg for den valgte kampagne i de seneste 8 uger. De indgår derfor ikke i forecastet.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-blue-200 text-left">
+                    <th className="pb-2 font-medium text-blue-700">Medarbejder</th>
+                    <th className="pb-2 font-medium text-blue-700 text-right">Team</th>
+                    <th className="pb-2 font-medium text-blue-700 text-right">Planlagte timer</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {noDataEmployees.map((emp) => (
+                    <tr key={emp.employeeId} className="border-b border-blue-100 last:border-0">
+                      <td className="py-2 font-medium">{emp.employeeName}</td>
+                      <td className="py-2 text-right text-muted-foreground">{emp.teamName || '—'}</td>
+                      <td className="py-2 text-right tabular-nums">{emp.plannedHours}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Unmapped employees — missing agent mapping */}
       {unmappedEmployees.length > 0 && (
         <Card className="border-amber-200 bg-amber-50/50">
