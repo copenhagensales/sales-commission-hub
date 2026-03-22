@@ -118,7 +118,12 @@ export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = f
                         </div>
                       </td>
                       <td className="py-2.5 text-right tabular-nums">{emp.plannedHours}</td>
-                      <td className="py-2.5 text-right tabular-nums">{emp.expectedSph.toFixed(2)}</td>
+                      <td className="py-2.5 text-right tabular-nums">
+                        <span>{emp.expectedSph.toFixed(2)}</span>
+                        {emp.momentumFactor && emp.momentumFactor > 1.0 && (
+                          <span className="ml-1 text-xs text-emerald-600 font-medium">↑{Math.round((emp.momentumFactor - 1) * 100)}%</span>
+                        )}
+                      </td>
                       <td className="py-2.5 text-right tabular-nums">{Math.round(emp.attendanceFactor * 100)}%</td>
                       <td className="py-2.5 text-right">
                         {riskBadge ? (

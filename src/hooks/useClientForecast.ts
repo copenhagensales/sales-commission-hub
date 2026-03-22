@@ -646,6 +646,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         teamChurnRates,
         MOCK_RAMP_PROFILE,
         baselineSph,
+        true, // isFuturePeriod — apply momentum correction
       );
 
       return {
