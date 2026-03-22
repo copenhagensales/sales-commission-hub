@@ -174,6 +174,7 @@ Deno.serve(async (req) => {
         .from("sales")
         .select("id, agent_email")
         .neq("source", "fieldmarketing")
+        .neq("validation_status", "rejected")
         .gte("sale_datetime", sourceStart)
         .lt("sale_datetime", sourceEndExclusive)
         .range(salesOffset, salesOffset + SALES_PAGE_SIZE - 1);
@@ -207,6 +208,7 @@ Deno.serve(async (req) => {
         .from("sales")
         .select("id, raw_payload")
         .eq("source", "fieldmarketing")
+        .neq("validation_status", "rejected")
         .gte("sale_datetime", sourceStart)
         .lt("sale_datetime", sourceEndExclusive)
         .range(fmOffset, fmOffset + SALES_PAGE_SIZE - 1);
@@ -254,6 +256,7 @@ Deno.serve(async (req) => {
     // 6. Get sale_items with mapped_commission for ALL sales (TM + FM)
     const allSaleIds = [...allTmSales.map((s) => s.id), ...allFmSales.map((s) => s.id)];
     const saleToCommission: Record<string, number> = {};
+    const saleToDeals: Record<string, number> = {};
 
     if (allSaleIds.length > 0) {
       const BATCH_SIZE = 100;
@@ -262,14 +265,31 @@ Deno.serve(async (req) => {
         const batchIds = allSaleIds.slice(i, i + BATCH_SIZE);
         const { data: batchItems, error: batchError } = await supabase
           .from("sale_items")
-          .select("sale_id, mapped_commission")
+          .select("sale_id, mapped_commission, quantity, product_id")
           .in("sale_id", batchIds);
         
         if (batchError) {
           console.error(`[league-calculate-standings] Failed to fetch sale_items batch ${i}-${i + BATCH_SIZE}:`, batchError);
         } else if (batchItems) {
+          // Collect product_ids to check counts_as_sale
+          const productIds = [...new Set(batchItems.map(i => i.product_id).filter(Boolean))];
+          let productCounts: Record<string, boolean> = {};
+          if (productIds.length > 0) {
+            const { data: products } = await supabase
+              .from("products")
+              .select("id, counts_as_sale")
+              .in("id", productIds);
+            for (const p of products || []) {
+              productCounts[p.id] = p.counts_as_sale !== false;
+            }
+          }
+
           for (const item of batchItems) {
             saleToCommission[item.sale_id] = (saleToCommission[item.sale_id] || 0) + (Number(item.mapped_commission) || 0);
+            const countsSale = item.product_id ? (productCounts[item.product_id] ?? true) : true;
+            const qty = countsSale ? (Number(item.quantity) || 1) : 0;
+            if (!saleToDeals[item.sale_id]) saleToDeals[item.sale_id] = 0;
+            saleToDeals[item.sale_id] += qty;
           }
         }
       }
@@ -284,7 +304,7 @@ Deno.serve(async (req) => {
       let dealsCount = 0;
       for (const saleId of saleIds) {
         totalCommission += saleToCommission[saleId] || 0;
-        dealsCount += 1;
+        dealsCount += saleToDeals[saleId] || 0;
       }
       saleItemsMap[email] = { total_commission: totalCommission, deals_count: dealsCount };
     }
@@ -311,7 +331,7 @@ Deno.serve(async (req) => {
       const fmSaleIds = employeeToFmSaleIds[employeeId] || [];
       for (const saleId of fmSaleIds) {
         currentProvision += saleToCommission[saleId] || 0;
-        dealsCount += 1;
+        dealsCount += saleToDeals[saleId] || 0;
       }
 
       if (currentProvision > 0 || dealsCount > 0) {
