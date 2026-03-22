@@ -669,13 +669,21 @@ export default function DailyReports() {
         }
       });
 
-      // Fetch fieldmarketing sales from unified sales table (linked directly to employee via raw_payload->>'fm_seller_id')
+      // Fetch fieldmarketing sales from unified sales table WITH sale_items (same approach as TM)
       const rawFmSalesData = await fetchAllRows<{
         id: string; agent_name: string; sale_datetime: string;
         raw_payload: any; client_campaign_id: string | null;
+        sale_items: Array<{
+          quantity: number;
+          mapped_commission: number | null;
+          mapped_revenue: number | null;
+          product_id: string | null;
+          products: { name: string; counts_as_sale: boolean | null } | null;
+        }>;
       }>(
         "sales",
-        "id, agent_name, sale_datetime, raw_payload, client_campaign_id",
+        `id, agent_name, sale_datetime, raw_payload, client_campaign_id,
+         sale_items(quantity, mapped_commission, mapped_revenue, product_id, products(name, counts_as_sale))`,
         (q) => q.eq("source", "fieldmarketing")
           .gte("sale_datetime", `${startStr}T00:00:00`)
           .lte("sale_datetime", `${endStr}T23:59:59`),
@@ -696,39 +704,6 @@ export default function DailyReports() {
       });
       
       console.log("[DailyReport] FM Sales fetched:", fmSalesData?.length);
-      
-      // Fetch products with campaign overrides for FM commission and revenue lookup
-      // First get all products
-      const { data: allProducts } = await supabase
-        .from("products")
-        .select("id, name, commission_dkk, revenue_dkk");
-      
-      // Use pricing rules for FM products as well
-      const overrideByProductId = new Map<string, { commission: number; revenue: number }>();
-      productPricingRules?.forEach((rule) => {
-        if (!rule.product_id) return;
-        const existing = overrideByProductId.get(rule.product_id);
-        if (!existing || (rule.commission_dkk ?? 0) > (existing.commission ?? 0)) {
-          overrideByProductId.set(rule.product_id, {
-            commission: rule.commission_dkk ?? 0,
-            revenue: rule.revenue_dkk ?? 0,
-          });
-        }
-      });
-      
-      // Build commission and revenue maps: prefer pricing rule, fallback to base values
-      const productCommissionMap = new Map<string, number>();
-      const productRevenueMap = new Map<string, number>();
-      
-      allProducts?.forEach(p => {
-        if (p.name) {
-          const override = overrideByProductId.get(p.id);
-          const commission = override?.commission ?? p.commission_dkk ?? 0;
-          const revenue = override?.revenue ?? p.revenue_dkk ?? 0;
-          productCommissionMap.set(p.name.toLowerCase(), commission);
-          productRevenueMap.set(p.name.toLowerCase(), revenue);
-        }
-      });
 
       // Build report data - aggregate per employee with daily breakdown
       const report: EmployeeReportData[] = [];
