@@ -1,43 +1,43 @@
 
 
-# Redesign league-rows: "Tjent i dag" + Top 3-ikoner + visuelt løft
+# FM Dashboard vs Dagsrapporter: Uoverensstemmelse i salgstal
 
-## Ændringer
+## Problem fundet
 
-### 1. `src/components/league/DailyTopBadge.tsx` — Større, mere levende top 3-badge
-- Gør badgen større (h-4 w-4) med en glow-effekt og `animate-pulse`
-- Top 1: Flamme-ikon i guld med glow
-- Top 2: Lyn-ikon i sølv
-- Top 3: Lyn-ikon i bronze
-- Tilføj et nyt `DailyTopBadgeLarge` variant der viser ikon + "🔥 #1" tekst for ekstra synlighed
+Der er **to fundamentale forskelle** i hvordan FM-salg tælles:
 
-### 2. `src/components/league/QualificationBoard.tsx` — PlayerRow redesign
-**Erstat deals med "tjent i dag":**
-- Under provision-beløbet: vis altid "I dag: X kr" (emerald når > 0, muted når 0)
-- Fjern "0 pt" placeholder (linje 363, 384-386)
+### 1. Salgstælling: 1 per salg vs sale_items quantity
+**Dagsrapporter** (linje 885): `salesCount += 1` per FM-salgsrække — tæller rå salgsposter, ignorerer `sale_items.quantity`.
 
-**Top 3 badge mere prominent:**
-- For top 3 daglige: vis DailyTopBadge ved siden af navnet (ikke gemt under provision)
-- Tilføj en subtil glow-baggrund på hele rækken for top 3 daglige
+**FM Dashboard** (cached KPIs via `calculate-kpi-incremental`): Bruger `sale_items.quantity` som er standarden i hele systemet.
 
-**Visuelt løft:**
-- Bedre spacing og mere luft i rækkerne
-- Provision-beløbet i lidt større font med bedre kontrast
-- "I dag"-beløbet i emerald-grøn med lille pulserende dot for aktive
-- Fjern den statiske "0 pt" kolonne som fylder plads uden værdi
-- Rank-change pile mere kompakte og inline med navnet
+Hvis en FM-sale har en sale_item med quantity 2, viser FM-dashboardet 2 salg men Dagsrapporter kun 1.
 
-### 3. `src/components/league/PremierLeagueBoard.tsx` — Tilsvarende ændringer
-- Tilføj `todayProvisionMap` og `todayDailyRank` props (som QualificationBoard allerede har)
-- Vis "I dag: X kr" under provision i stedet for deals
-- Top 3 daily badge ved aktive sælgere
+### 2. Kommission/omsætning: Klient-side lookup vs sale_items
+**Dagsrapporter**: Beregner FM-kommission via produktnavns-opslag i `products` + `product_pricing_rules` (klient-side). Tager IKKE hensyn til kampagne-specifikke priser.
 
-## Ingen backend-ændringer
-Al data (todayProvision, todayDailyRank) er allerede tilgængelig via props.
+**FM Dashboard**: Bruger `sale_items.mapped_commission` og `mapped_revenue` som er sat af database-triggeren `create_fm_sale_items` med korrekt kampagne-aware pricing.
+
+### Løsning
+
+Ret Dagsrapporter til at bruge `sale_items` for FM-salg — præcis som den gør for TM-salg. Dette sikrer konsistens med alle andre dele af systemet.
+
+### Ændring i `src/pages/reports/DailyReports.tsx`
+
+**Nuværende flow (linje 672-696, 883-908)**:
+- Henter FM-salg som rå rækker fra `sales`
+- Tæller `salesCount += 1` per salg
+- Beregner kommission via produktnavns-lookup
+
+**Nyt flow**:
+- Hent FM-salg MED `sale_items` (ligesom TM-salg): `sale_items(quantity, mapped_commission, mapped_revenue, product_id, products(name, counts_as_sale))`
+- Tæl via `sale_items.quantity` (respektér `counts_as_sale`)
+- Brug `mapped_commission` og `mapped_revenue` fra sale_items
+- Fjern den separate `productCommissionMap`/`productRevenueMap` logik for FM
+
+Denne ændring bringer FM-tælling og økonomi i Dagsrapporter i overensstemmelse med FM Dashboard, KPI-cache, leaderboards og lønberegninger.
 
 | Fil | Ændring |
 |-----|---------|
-| `src/components/league/DailyTopBadge.tsx` | Større badge med glow-effekt for top 3 |
-| `src/components/league/QualificationBoard.tsx` | Erstat deals/pt med "I dag: X kr", visuelt løft, prominent top 3 |
-| `src/components/league/PremierLeagueBoard.tsx` | Samme "I dag" + top 3 badge tilføjelser |
+| `src/pages/reports/DailyReports.tsx` | Brug `sale_items` for FM-salg i stedet for rå tælling + klient-side pricing |
 
