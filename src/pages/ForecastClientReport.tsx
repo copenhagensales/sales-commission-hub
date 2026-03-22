@@ -12,6 +12,21 @@ import { generateForecastReportPdf } from "@/utils/forecastReportPdfGenerator";
 import { Link } from "react-router-dom";
 import type { ForecastResult, ForecastDriver } from "@/types/forecast";
 
+
+function clientFriendlyLabel(label: string): string {
+  return label
+    .replace(/churn[-\s]?risiko/gi, "naturlig udskiftning")
+    .replace(/\bchurn\b/gi, "teamudskiftning")
+    .replace(/etableret churn/gi, "naturlig udskiftning");
+}
+
+function clientFriendlyDescription(desc: string): string {
+  return desc
+    .replace(/churn[-\s]?risiko/gi, "naturlig udskiftning i teamet")
+    .replace(/\bchurn\b/gi, "udskiftning")
+    .replace(/forhøjet churn/gi, "forventet udskiftning");
+}
+
 export default function ForecastClientReport() {
   const [selectedClient, setSelectedClient] = useState("all");
   const [monthOffset, setMonthOffset] = useState(1);
@@ -154,7 +169,7 @@ function ReportExecutiveSummary({ forecast, clientName, periodLabel, monthOffset
 
   const driverTexts: string[] = [];
   if (absLoss > 0) driverTexts.push(`fravær reducerer med ${absLoss} salg`);
-  if (churnLoss > 0) driverTexts.push(`churn-risiko trækker ${churnLoss} salg`);
+  if (churnLoss > 0) driverTexts.push(`forventet naturlig udskiftning i teamet reducerer med ${churnLoss} salg`);
 
   const holidayDriver = forecast.drivers.find(d => d.key === "holidays");
   const holidayCount = holidayDriver ? parseInt(holidayDriver.value) || 0 : 0;
@@ -215,7 +230,7 @@ function ReportKeyFigures({ forecast }: { forecast: ForecastResult }) {
 
   const negatives = [
     { label: "Fraværseffekt", value: `-${forecast.absenceLoss}`, desc: "Planlagt og forventet fravær" },
-    { label: "Churn-effekt", value: `-${churnTotal}`, desc: "Forventet medarbejderafgang" },
+    { label: "Teamudskiftning", value: `-${churnTotal}`, desc: "Indregnet naturlig udskiftning i teamet" },
   ].filter(n => parseInt(n.value) !== 0);
 
   const positives = [
@@ -306,8 +321,8 @@ function ReportDrivers({ forecast }: { forecast: ForecastResult }) {
             <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-2">Positivt</p>
             {positiveDrivers.map(d => (
               <div key={d.key} className="mb-2">
-                <p className="text-sm font-medium">{d.label}</p>
-                <p className="text-sm text-muted-foreground">{d.description}</p>
+                <p className="text-sm font-medium">{clientFriendlyLabel(d.label)}</p>
+                <p className="text-sm text-muted-foreground">{clientFriendlyDescription(d.description)}</p>
               </div>
             ))}
           </div>
@@ -317,8 +332,8 @@ function ReportDrivers({ forecast }: { forecast: ForecastResult }) {
             <p className="text-xs font-semibold text-destructive uppercase tracking-wide mb-2">Negativt</p>
             {negativeDrivers.map(d => (
               <div key={d.key} className="mb-2">
-                <p className="text-sm font-medium">{d.label}</p>
-                <p className="text-sm text-muted-foreground">{d.description}</p>
+                <p className="text-sm font-medium">{clientFriendlyLabel(d.label)}</p>
+                <p className="text-sm text-muted-foreground">{clientFriendlyDescription(d.description)}</p>
               </div>
             ))}
           </div>
@@ -333,12 +348,12 @@ function ReportRecommendations({ forecast }: { forecast: ForecastResult }) {
   const employees = forecast.establishedEmployees;
   const avgSph = employees.length > 0 ? employees.reduce((s, e) => s + e.expectedSph, 0) / employees.length : 0;
 
-  const highChurn = employees.filter(e => e.churnProbability > 0.3);
-  if (highChurn.length > 0) {
+  const churnLossTotal = forecast.churnLoss + (forecast.establishedChurnLoss || 0);
+  if (churnLossTotal > 0) {
     recommendations.push({
       icon: AlertTriangle,
       title: "Fastholdelse",
-      text: `${highChurn.length} sælger${highChurn.length > 1 ? "e" : ""} ligger i forhøjet churn-risiko. Tidlig opfølgning og tæt lederkontakt kan mindske tabet.`,
+      text: `Vi har indregnet en forventet naturlig udskiftning i teamet svarende til ${churnLossTotal} salg. Tæt lederkontakt og tidlig opfølgning kan reducere denne effekt.`,
     });
   }
 

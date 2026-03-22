@@ -17,7 +17,7 @@ export function generateForecastReportPdf(data: ReportData) {
 
   const driverTexts: string[] = [];
   if (forecast.absenceLoss > 0) driverTexts.push(`Fravær reducerer med ${forecast.absenceLoss} salg`);
-  if (churnTotal > 0) driverTexts.push(`Churn-risiko trækker ${churnTotal} salg`);
+  if (churnTotal > 0) driverTexts.push(`Forventet naturlig udskiftning i teamet reducerer med ${churnTotal} salg`);
   const holidayDriver = forecast.drivers.find(d => d.key === "holidays");
   const holidayCount = holidayDriver ? parseInt(holidayDriver.value) || 0 : 0;
   if (holidayCount > 0) driverTexts.push(`${holidayCount} helligdage i perioden`);
@@ -27,9 +27,9 @@ export function generateForecastReportPdf(data: ReportData) {
 
   // Build recommendations
   const recs: string[] = [];
-  const highChurn = forecast.establishedEmployees.filter(e => e.churnProbability > 0.3);
-  if (highChurn.length > 0) {
-    recs.push(`<strong>Fastholdelse:</strong> ${highChurn.length} sælger${highChurn.length > 1 ? "e" : ""} har forhøjet churn-risiko. Tidlig opfølgning og tæt lederkontakt kan mindske tabet.`);
+  
+  if (churnTotal > 0) {
+    recs.push(`<strong>Fastholdelse:</strong> Vi har indregnet en forventet naturlig udskiftning i teamet svarende til ${churnTotal} salg. Tæt lederkontakt og tidlig opfølgning kan reducere denne effekt.`);
   }
   if (forecast.absenceLoss > 15) {
     recs.push(`<strong>Fravær:</strong> Fravær koster ${forecast.absenceLoss} salg. Se på planlægning, vikardækning eller mønstre.`);
@@ -102,14 +102,14 @@ export function generateForecastReportPdf(data: ReportData) {
       <div class="kpi-box"><div class="val">${Math.round(forecast.totalHours).toLocaleString("da-DK")}</div><div class="lbl">Timer</div></div>
     </div>
     ${forecast.absenceLoss > 0 ? `<div class="effect-row effect-neg"><span class="effect-label">Fraværseffekt</span><span class="effect-value neg">-${forecast.absenceLoss} salg</span></div>` : ""}
-    ${churnTotal > 0 ? `<div class="effect-row effect-neg"><span class="effect-label">Churn-effekt</span><span class="effect-value neg">-${churnTotal} salg</span></div>` : ""}
+    ${churnTotal > 0 ? `<div class="effect-row effect-neg"><span class="effect-label">Teamudskiftning</span><span class="effect-value neg">-${churnTotal} salg</span></div>` : ""}
     ${cohortSales > 0 ? `<div class="effect-row effect-pos"><span class="effect-label">Nye hold</span><span class="effect-value pos">+${cohortSales} salg</span></div>` : ""}
   </div>
 
   <div class="section">
     <div class="section-title">Hvad driver forecastet</div>
-    ${positiveDrivers.length > 0 ? `<p style="font-size:10px;font-weight:600;color:#16a34a;margin-bottom:4px;">POSITIVT</p>${positiveDrivers.map(d => `<div class="driver-block"><strong>${d.label}</strong><p>${d.description}</p></div>`).join("")}` : ""}
-    ${negativeDrivers.length > 0 ? `<p style="font-size:10px;font-weight:600;color:#dc2626;margin-bottom:4px;margin-top:8px;">NEGATIVT</p>${negativeDrivers.map(d => `<div class="driver-block"><strong>${d.label}</strong><p>${d.description}</p></div>`).join("")}` : ""}
+    ${positiveDrivers.length > 0 ? `<p style="font-size:10px;font-weight:600;color:#16a34a;margin-bottom:4px;">POSITIVT</p>${positiveDrivers.map(d => `<div class="driver-block"><strong>${d.label.replace(/churn/gi, "teamudskiftning")}</strong><p>${d.description.replace(/churn/gi, "udskiftning")}</p></div>`).join("")}` : ""}
+    ${negativeDrivers.length > 0 ? `<p style="font-size:10px;font-weight:600;color:#dc2626;margin-bottom:4px;margin-top:8px;">NEGATIVT</p>${negativeDrivers.map(d => `<div class="driver-block"><strong>${d.label.replace(/churn/gi, "teamudskiftning")}</strong><p>${d.description.replace(/churn/gi, "udskiftning")}</p></div>`).join("")}` : ""}
   </div>
 
   ${recs.length > 0 ? `
