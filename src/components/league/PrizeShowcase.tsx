@@ -105,7 +105,7 @@ export function PrizeShowcase({ standings, prizeLeaders, seasonStatus, isActive 
       </button>
 
       {/* Special prizes */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="flex gap-2 overflow-x-auto pb-1 sm:grid sm:grid-cols-3 sm:gap-3 sm:overflow-visible sm:pb-0 snap-x snap-mandatory scrollbar-hide">
         {([
           {
             type: "bestRound" as const,
@@ -139,11 +139,12 @@ export function PrizeShowcase({ standings, prizeLeaders, seasonStatus, isActive 
             key={card.title}
             type="button"
             className={cn(
-              "relative rounded-xl p-4 border-2 text-center space-y-1 transition-all cursor-pointer",
+              "relative rounded-xl p-3 sm:p-4 border-2 text-center space-y-1 transition-all cursor-pointer",
               "hover:scale-[1.03] disabled:hover:scale-100",
               `bg-gradient-to-b ${card.gradientClass} bg-slate-800/80`,
               card.borderClass,
-              "disabled:cursor-default disabled:opacity-80"
+              "disabled:cursor-default disabled:opacity-80",
+              "min-w-[140px] sm:min-w-0 snap-center flex-shrink-0 sm:flex-shrink"
             )}
             disabled={!isActive}
             onClick={() => handleOpen(card.type)}
@@ -153,10 +154,10 @@ export function PrizeShowcase({ standings, prizeLeaders, seasonStatus, isActive 
                 <Lock className="h-4 w-4 text-muted-foreground/40" />
               </div>
             )}
-            <span className="text-2xl">{card.emoji}</span>
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{card.title}</p>
-            <p className="text-sm font-bold truncate">{card.playerName}</p>
-            <p className="text-xs text-muted-foreground">{card.subtitle}</p>
+            <span className="text-xl sm:text-2xl">{card.emoji}</span>
+            <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-muted-foreground">{card.title}</p>
+            <p className="text-xs sm:text-sm font-bold truncate">{card.playerName}</p>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">{card.subtitle}</p>
           </button>
         ))}
       </div>

@@ -566,11 +566,11 @@ export default function CommissionLeague() {
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-2 sm:px-6">
                   <Tabs defaultValue="all">
-                    <TabsList className="mb-3">
-                      <TabsTrigger value="all">Alle Divisioner</TabsTrigger>
-                      {!isFan && <TabsTrigger value="my">Min Division</TabsTrigger>}
+                    <TabsList className="mb-2 sm:mb-3 w-full sm:w-auto">
+                      <TabsTrigger value="all" className="text-xs sm:text-sm flex-1 sm:flex-none">Alle Divisioner</TabsTrigger>
+                      {!isFan && <TabsTrigger value="my" className="text-xs sm:text-sm flex-1 sm:flex-none">Min Division</TabsTrigger>}
                     </TabsList>
 
                     <TabsContent value="all">

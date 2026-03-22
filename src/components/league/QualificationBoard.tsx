@@ -273,7 +273,7 @@ const PlayerRow = memo(function PlayerRow({
       {showDashedBefore && <div className="border-t-2 border-dashed border-muted-foreground/20" />}
       <div
         className={cn(
-          "flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-2 sm:py-2.5 min-h-[52px] transition-all duration-200",
+          "flex items-center gap-1.5 sm:gap-3 px-2 sm:px-3 py-2 sm:py-2.5 min-h-[48px] sm:min-h-[52px] transition-all duration-200",
           "hover:bg-muted/30 hover:shadow-[inset_0_0_0_1px_hsl(var(--border)/0.5)] cursor-default",
           isCurrentUser && "bg-primary/10 border-l-[3px] border-l-primary",
           !isCurrentUser && isPromoZone && "bg-green-500/8",
@@ -282,7 +282,8 @@ const PlayerRow = memo(function PlayerRow({
           !isCurrentUser && isRelegationZone && "bg-red-500/8"
         )}
       >
-        <div className="flex items-center gap-1 w-8 sm:w-10 shrink-0 justify-center">
+        {/* Rank */}
+        <div className="flex items-center gap-0.5 sm:gap-1 w-7 sm:w-10 shrink-0 justify-center">
           <div className={cn(
             "w-0.5 h-5 rounded-full shrink-0",
             isPromoZone && "bg-green-500",
@@ -292,15 +293,15 @@ const PlayerRow = memo(function PlayerRow({
             !isPromoZone && !isTopZone && !isPlayoffZone && !isRelegationZone && "bg-transparent"
           )} />
           {isPodium ? (
-            <PodiumBadge rank={podiumRank} className="scale-90 sm:scale-100" />
+            <PodiumBadge rank={podiumRank} className="scale-75 sm:scale-100" />
           ) : (
-            <span className="text-sm font-bold text-muted-foreground w-5 text-center">{standing.projected_rank}</span>
+            <span className="text-xs sm:text-sm font-bold text-muted-foreground w-5 text-center">{standing.projected_rank}</span>
           )}
         </div>
 
-        {/* Name — fixed width for sparkline alignment */}
-        <div className="w-[180px] sm:w-[220px] shrink-0">
-          <div className="flex items-center gap-1.5 flex-wrap">
+        {/* Name — fluid on mobile */}
+        <div className="min-w-0 flex-1 sm:w-[220px] sm:flex-none sm:shrink-0">
+          <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
             {todayProvision > 0 && (
               <span className="relative flex h-1.5 w-1.5 shrink-0">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
@@ -315,28 +316,30 @@ const PlayerRow = memo(function PlayerRow({
               division={division}
             >
               <span className={cn(
-                "font-medium text-sm sm:text-[15px] truncate max-w-[140px] sm:max-w-none cursor-default",
+                "font-medium text-xs sm:text-[15px] truncate max-w-[100px] sm:max-w-none cursor-default",
                 isCurrentUser && "text-primary font-semibold"
               )}>
                 {playerName}
               </span>
             </PlayerHoverCard>
-            {isCurrentUser && <span className="text-[10px] text-muted-foreground">(dig)</span>}
+            {isCurrentUser && <span className="text-[9px] sm:text-[10px] text-muted-foreground">(dig)</span>}
             {rankChange !== 0 && (
-              <span className={cn("text-xs font-semibold flex items-center", rankChange > 0 ? "text-green-500" : "text-red-500")}>
-                {rankChange > 0 ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
-                <span className="text-[11px]">{Math.abs(rankChange)}</span>
+              <span className={cn("text-[10px] sm:text-xs font-semibold flex items-center", rankChange > 0 ? "text-green-500" : "text-red-500")}>
+                {rankChange > 0 ? <ArrowUpRight className="h-3 w-3 sm:h-3.5 sm:w-3.5" /> : <ArrowDownRight className="h-3 w-3 sm:h-3.5 sm:w-3.5" />}
+                <span className="text-[10px] sm:text-[11px]">{Math.abs(rankChange)}</span>
               </span>
             )}
+            {/* Daily top badge inline on mobile */}
+            {todayDailyRank && <DailyTopBadge rank={todayDailyRank} size="lg" />}
           </div>
-          <div className="flex items-center gap-1.5 mt-0.5">
+          <div className="hidden sm:flex items-center gap-1.5 mt-0.5">
             <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-normal">
               {standing.employee?.team_name || "Ingen team"}
             </Badge>
           </div>
         </div>
 
-        {/* Sparkline — centrally placed */}
+        {/* Sparkline — hidden on mobile */}
         <div className="hidden sm:flex flex-1 items-center min-w-[120px]">
           {weeklyData && weeklyData.length > 0 && (
             <ProvisionSparkline
@@ -347,16 +350,17 @@ const PlayerRow = memo(function PlayerRow({
           )}
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        {/* Provision + today — compact on mobile */}
+        <div className="flex items-center gap-1 sm:gap-3 shrink-0">
           <div className="text-right">
-            <div className="flex items-center gap-1.5 justify-end">
-              {todayDailyRank && <DailyTopBadge rank={todayDailyRank} size="lg" />}
-              <div className="font-mono text-sm sm:text-base font-semibold whitespace-nowrap">
+            <div className="flex items-center gap-1 sm:gap-1.5 justify-end">
+              {todayDailyRank && <span className="hidden sm:inline"><DailyTopBadge rank={todayDailyRank} size="lg" /></span>}
+              <div className="font-mono text-xs sm:text-base font-semibold whitespace-nowrap">
                 {standing.current_provision.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
               </div>
             </div>
             <div className={cn(
-              "text-[10px] font-medium flex items-center gap-1 justify-end",
+              "text-[9px] sm:text-[10px] font-medium flex items-center gap-1 justify-end",
               todayProvision > 0 ? "text-emerald-400" : "text-muted-foreground/50"
             )}>
               I dag: {todayProvision > 0
@@ -365,12 +369,12 @@ const PlayerRow = memo(function PlayerRow({
             </div>
             {/* Gap indicators — only for current user */}
             {isCurrentUser && gapUp !== null && gapUp > 0 && (
-              <div className="text-[9px] text-muted-foreground/70 font-mono">
-                ↑ {gapUp.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr til #{standing.projected_rank - 1}
+              <div className="text-[8px] sm:text-[9px] text-muted-foreground/70 font-mono">
+                ↑ {gapUp.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
               </div>
             )}
             {isCurrentUser && gapDown !== null && gapDown > 0 && (
-              <div className="text-[9px] text-muted-foreground/50 font-mono">
+              <div className="hidden sm:block text-[9px] text-muted-foreground/50 font-mono">
                 ↓ {gapDown.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr forspring
               </div>
             )}
@@ -379,11 +383,12 @@ const PlayerRow = memo(function PlayerRow({
                 current={standing.current_provision}
                 target={zoneTarget}
                 zone={zone}
-                className="mt-1 w-20 ml-auto"
+                className="mt-0.5 sm:mt-1 w-16 sm:w-20 ml-auto"
               />
             )}
           </div>
-          <div className="w-16 sm:w-20 text-right">
+          {/* Zone badges — hidden on mobile (shown via color stripe) */}
+          <div className="hidden sm:block w-20 text-right">
             {isPromoZone && <Badge className="bg-green-500/20 text-green-600 border-green-500/30 text-[10px] px-1.5 py-0">Oprykker</Badge>}
             {isTopZone && <Badge className="bg-yellow-500/20 text-yellow-600 border-yellow-500/30 text-[10px] px-1.5 py-0">Top 3</Badge>}
             {isPlayoffZone && <Badge className="bg-orange-500/20 text-orange-600 border-orange-500/30 text-[10px] px-1.5 py-0">Playoff</Badge>}
