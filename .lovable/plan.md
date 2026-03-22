@@ -1,24 +1,35 @@
 
 
-# Fjern december og januar fra Forecast vs. Actual chart
+# Vis advarsel for medarbejdere uden agent-mapping
 
 ## Problem
-Chartet viser de seneste 5 måneder, men december og januar havde ingen salg og giver støj i grafen.
+Medarbejdere uden `employee_agent_mapping` viser 0 salg og 0 forecast — ikke fordi de performer dårligt, men fordi systemet ikke kan matche deres salg. Det er forvirrende i breakdown-tabellen.
 
 ## Løsning
-Filtrer perioder uden data (0 actual + 0 forecast) fra resultatet i `useForecastVsActual.ts`.
+Tilføj et `missingAgentMapping` flag per medarbejder og vis dem separat i breakdown-tabellen med en tydelig "Mangler opsætning"-advarsel.
 
-### `src/hooks/useForecastVsActual.ts`
+### Ændringer
 
-Efter `results.push(...)` (linje 103-110), tilføj et filter inden return:
+**`src/types/forecast.ts`**
+- Tilføj `missingAgentMapping?: boolean` til `EmployeeForecastResult`
 
-```ts
-return results.filter(r => r.actual > 0 || r.forecastExpected > 0);
-```
+**`src/hooks/useClientForecast.ts`**
+- Når `EmployeePerformance` objekter bygges: sæt `missingAgentMapping = true` hvis medarbejderen ikke har nogen emails i `empEmailMap`
+- Propagér flaget videre til `EmployeeForecastResult`
 
-Dette fjerner automatisk alle måneder hvor der hverken er faktiske salg eller forecast — altså december og januar, samt fremtidige tomme måneder.
+**`src/lib/calculations/forecast.ts`**
+- I `forecastEstablishedEmployee`: kopiér `missingAgentMapping` fra input til output
+
+**`src/components/forecast/ForecastBreakdownTable.tsx`**
+- Split medarbejdere i to grupper: `mapped` (har agent-mapping) og `unmapped` (mangler)
+- Vis `mapped` i hovedtabellen som i dag
+- Vis `unmapped` i en separat sektion med gul advarselsbadge: "Mangler opsætning — salgsdata kan ikke tilknyttes"
+- Unmapped medarbejdere tæller ikke med i gennemsnits-SPH
 
 | Fil | Ændring |
 |-----|---------|
-| `src/hooks/useForecastVsActual.ts` | Filtrer tomme perioder fra resultatet |
+| `src/types/forecast.ts` | Tilføj `missingAgentMapping` felt |
+| `src/hooks/useClientForecast.ts` | Sæt flaget baseret på email-mapping |
+| `src/lib/calculations/forecast.ts` | Propagér flaget til result |
+| `src/components/forecast/ForecastBreakdownTable.tsx` | Vis unmapped medarbejdere separat med advarsel |
 
