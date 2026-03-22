@@ -256,6 +256,7 @@ Deno.serve(async (req) => {
     // 6. Get sale_items with mapped_commission for ALL sales (TM + FM)
     const allSaleIds = [...allTmSales.map((s) => s.id), ...allFmSales.map((s) => s.id)];
     const saleToCommission: Record<string, number> = {};
+    const saleToDeals: Record<string, number> = {};
 
     if (allSaleIds.length > 0) {
       const BATCH_SIZE = 100;
