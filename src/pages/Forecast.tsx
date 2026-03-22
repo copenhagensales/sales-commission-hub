@@ -15,7 +15,7 @@ import { ForecastCohortManager } from "@/components/forecast/ForecastCohortManag
 import { ForecastAssumptions } from "@/components/forecast/ForecastAssumptions";
 import { ForecastSummary } from "@/components/forecast/ForecastSummary";
 import { ForecastProgressBar } from "@/components/forecast/ForecastProgressBar";
-import { ForecastWaterfallChart } from "@/components/forecast/ForecastWaterfallChart";
+
 import { ForecastInsights } from "@/components/forecast/ForecastInsights";
 import { DataFreshnessBadge } from "@/components/ui/DataFreshnessBadge";
 import { MOCK_RAMP_PROFILE, MOCK_SURVIVAL_PROFILE } from "@/lib/calculations/forecast";
@@ -193,8 +193,6 @@ export default function Forecast() {
             {/* KPI Cards */}
             <ForecastKpiCards forecast={forecast} />
 
-            {/* Waterfall chart */}
-            <ForecastWaterfallChart forecast={forecast} />
 
             {/* Main content grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
