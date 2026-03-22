@@ -143,6 +143,7 @@ export function forecastEstablishedEmployee(emp: EmployeePerformance, teamChurnR
     forecastSalesHigh: Math.round(expected * HIGH_FACTOR),
     churnProbability,
     churnLoss: Math.round(churnLoss),
+    missingAgentMapping: emp.missingAgentMapping,
   };
 }
 

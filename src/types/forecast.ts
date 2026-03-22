@@ -77,6 +77,7 @@ export interface EmployeePerformance {
   personalAttendanceFactor: number;
   isEstablished: boolean;
   daysSinceStart: number;
+  missingAgentMapping?: boolean;
 }
 
 export interface CohortForecastInput {
@@ -105,6 +106,7 @@ export interface EmployeeForecastResult {
   actualSales?: number;
   churnProbability: number;
   churnLoss: number;
+  missingAgentMapping?: boolean;
 }
 
 // ============================================================================
