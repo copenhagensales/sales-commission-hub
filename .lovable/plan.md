@@ -1,35 +1,32 @@
 
 
-# Team-KPI-kort på forecast-oversigten
+# Separér medarbejdere uden salgshistorik
 
-## Idé
-Når man åbner forecast-siden (især med "Alle kunder"), vises et grid af **team-kort** øverst der giver et hurtigt overblik: forventet salg, antal sælgere, status (on track / behind / ahead) — per team. Man kan klikke et kort for at filtrere til det team.
+## Problem
+Medarbejdere som Kasper og Max har korrekt agent-mapping, men 0 salg for den valgte kampagne. De vises i hovedtabellen med "Churn-risiko" badge — misvisende, da problemet er manglende salgsdata, ikke dårlig performance.
 
-## Ny komponent: `ForecastTeamOverview.tsx`
+## Løsning
+Tilføj en tredje gruppe i breakdown-tabellen: "Ingen salgsdata" — for medarbejdere der er mappet men har 0 SPH og 0 salg.
 
-Grupperer `forecast.establishedEmployees` efter `teamName` og beregner per team:
-- **Forventet salg** (sum af `forecastSales`)
-- **Antal sælgere** (count, ekskl. `missingAgentMapping`)
-- **Gns. SPH** (gennemsnit af `expectedSph`)
-- **Status-badge**: For indeværende måned — sammenligner `actualSales` vs. forventet pace → "On track" / "Foran" / "Bagud"
-- **Fraværs-tab** (sum af churnLoss + absence-relateret tab per team)
+### `src/components/forecast/ForecastBreakdownTable.tsx`
 
-Hvert kort er et kompakt Card med team-navn, stort tal (forventet salg), og en farvet status-indikator.
+1. Split `mappedEmployees` i to undergrupper:
+   - `activeEmployees`: har `expectedSph > 0` ELLER `actualSales > 0`
+   - `noDataEmployees`: har `expectedSph === 0` OG `(actualSales || 0) === 0`
 
-## Ændring i `Forecast.tsx`
+2. Vis `noDataEmployees` i en separat sektion (blå/neutral farve) med:
+   - Info-ikon + "Ingen salgsdata for denne kampagne"
+   - Forklaring: "Disse medarbejdere er korrekt opsat, men har ingen registrerede salg for den valgte kampagne i de seneste 8 uger."
+   - Vis navn, team, planlagte timer
 
-Indsæt `<ForecastTeamOverview>` mellem Executive Summary og KPI Cards (linje ~193). Vises kun når der er mere end 1 team. Evt. klikbar: sætter et team-filter der highlighter det pågældende team i breakdown-tabellen.
+3. Fjern dem fra `activeEmployees`-tabellen og fra gennemsnits-SPH beregning
 
-## Andre forslag til hurtigt overblik
-
-Disse kan implementeres som fase 2:
-- **Mini-sparklines** på hvert team-kort der viser salgsudvikling de sidste 4 uger
-- **"Største risiko"-flag** — det team med højest samlet churn/fravær-tab fremhæves
-
-## Filer
+### Effekt
+- Kasper og Max flyttes ud af hovedtabellen → ingen misvisende "Churn-risiko"
+- Hovedtabellens gennemsnit forvrænges ikke af 0-SPH medarbejdere
+- Klar kommunikation om hvad der mangler
 
 | Fil | Ændring |
 |-----|---------|
-| `src/components/forecast/ForecastTeamOverview.tsx` | Ny komponent: team-grid med KPI-kort |
-| `src/pages/Forecast.tsx` | Indsæt team-oversigt mellem summary og KPI cards |
+| `src/components/forecast/ForecastBreakdownTable.tsx` | Tilføj tredje gruppe for mapped-men-ingen-data |
 
