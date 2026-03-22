@@ -1,32 +1,33 @@
 
 
-# Separér medarbejdere uden salgshistorik
+# Inkludér indeværende (ufuldstændig) uge i SPH for nye sælgere
 
 ## Problem
-Medarbejdere som Kasper og Max har korrekt agent-mapping, men 0 salg for den valgte kampagne. De vises i hovedtabellen med "Churn-risiko" badge — misvisende, da problemet er manglende salgsdata, ikke dårlig performance.
+Kasper har 3 salg denne uge, men EWMA-beregningen kigger kun på **afsluttede** uger (uge -1 til -8). Da Kasper ikke har salg i nogen afsluttet uge, er hans SPH = 0 og forecast = 0 — selv om han tydeligvis sælger.
+
+For indeværende måned fanges han af `actualSales = 3`, men for **næste måned** vises han med 0 forecast i "Ingen salgsdata"-sektionen.
 
 ## Løsning
-Tilføj en tredje gruppe i breakdown-tabellen: "Ingen salgsdata" — for medarbejdere der er mappet men har 0 SPH og 0 salg.
+Inkludér den **igangværende uge** i EWMA-beregningen for medarbejdere der ellers ville have 0 datapunkter. Den igangværende uge normaliseres til hele ugen (fx 3 salg på 2 dage → fremskrives til 5 dage).
 
-### `src/components/forecast/ForecastBreakdownTable.tsx`
+### `src/hooks/useClientForecast.ts`
 
-1. Split `mappedEmployees` i to undergrupper:
-   - `activeEmployees`: har `expectedSph > 0` ELLER `actualSales > 0`
-   - `noDataEmployees`: har `expectedSph === 0` OG `(actualSales || 0) === 0`
+I EWMA-loopet (linje ~305-345):
 
-2. Vis `noDataEmployees` i en separat sektion (blå/neutral farve) med:
-   - Info-ikon + "Ingen salgsdata for denne kampagne"
-   - Forklaring: "Disse medarbejdere er korrekt opsat, men har ingen registrerede salg for den valgte kampagne i de seneste 8 uger."
-   - Vis navn, team, planlagte timer
-
-3. Fjern dem fra `activeEmployees`-tabellen og fra gennemsnits-SPH beregning
+1. **Efter** det eksisterende loop over afsluttede uger: tjek om `weeklySph` er tom
+2. Hvis ja — beregn en **current-week fallback**:
+   - Tæl salg og vagter for igangværende uge (mandag til i dag)
+   - Normaliser til fuld uge: `adjustedSales = salesSoFar × (5 / daysWorkedSoFar)`
+   - Beregn SPH fra det normaliserede tal
+   - Brug dette som eneste datapunkt i EWMA
+3. Denne fallback bruges KUN for medarbejdere uden historiske uger — etablerede sælgere med data påvirkes ikke
 
 ### Effekt
-- Kasper og Max flyttes ud af hovedtabellen → ingen misvisende "Churn-risiko"
-- Hovedtabellens gennemsnit forvrænges ikke af 0-SPH medarbejdere
-- Klar kommunikation om hvad der mangler
+- Kasper ville få SPH baseret på denne uges performance → realistisk forecast for næste måned
+- Medarbejdere med historik påvirkes ikke
+- Nye sælgere får hurtigere en baseline-forventning
 
 | Fil | Ændring |
 |-----|---------|
-| `src/components/forecast/ForecastBreakdownTable.tsx` | Tilføj tredje gruppe for mapped-men-ingen-data |
+| `src/hooks/useClientForecast.ts` | Tilføj current-week fallback i EWMA for medarbejdere uden historik |
 
