@@ -294,7 +294,7 @@ Deno.serve(async (req) => {
         if (emailToSaleIds[email]) {
           for (const saleId of emailToSaleIds[email]) {
             provision += saleToCommission[saleId] || 0;
-            deals++;
+            deals += saleToDeals[saleId] || 0;
           }
         }
       }
