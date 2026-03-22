@@ -28,8 +28,8 @@ export function generateForecastReportPdf(data: ReportData) {
   // Build recommendations
   const recs: string[] = [];
   const highChurn = forecast.establishedEmployees.filter(e => e.churnProbability > 0.3);
-  if (highChurn.length > 0) {
-    recs.push(`<strong>Fastholdelse:</strong> ${highChurn.length} sælger${highChurn.length > 1 ? "e" : ""} har forhøjet churn-risiko. Tidlig opfølgning og tæt lederkontakt kan mindske tabet.`);
+  if (churnTotal > 0) {
+    recs.push(`<strong>Fastholdelse:</strong> Vi har indregnet en forventet naturlig udskiftning i teamet svarende til ${churnTotal} salg. Tæt lederkontakt og tidlig opfølgning kan reducere denne effekt.`);
   }
   if (forecast.absenceLoss > 15) {
     recs.push(`<strong>Fravær:</strong> Fravær koster ${forecast.absenceLoss} salg. Se på planlægning, vikardækning eller mønstre.`);
