@@ -193,6 +193,14 @@ export default function Forecast() {
             {/* Progress bar (current period only) */}
             {period === "current" && <ForecastProgressBar forecast={forecast} />}
 
+            {/* Team Overview */}
+            <ForecastTeamOverview
+              forecast={forecast}
+              isCurrentPeriod={period === "current"}
+              onTeamClick={setSelectedTeam}
+              selectedTeam={selectedTeam}
+            />
+
             {/* KPI Cards */}
             <ForecastKpiCards forecast={forecast} />
 
