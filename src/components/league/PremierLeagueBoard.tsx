@@ -214,6 +214,9 @@ export function PremierLeagueBoard({
                     ? getZoneThresholds(group.players, idx, isTopDivision, isBottomDivision) 
                     : null;
 
+                  const todayProvision = todayProvisionMap[standing.employee_id] || 0;
+                  const dailyRank = todayTop3[standing.employee_id] || null;
+
                   return (
                     <div key={standing.id}>
                       {/* Zone separator */}
