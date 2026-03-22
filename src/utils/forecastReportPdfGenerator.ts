@@ -27,7 +27,7 @@ export function generateForecastReportPdf(data: ReportData) {
 
   // Build recommendations
   const recs: string[] = [];
-  const highChurn = forecast.establishedEmployees.filter(e => e.churnProbability > 0.3);
+  
   if (churnTotal > 0) {
     recs.push(`<strong>Fastholdelse:</strong> Vi har indregnet en forventet naturlig udskiftning i teamet svarende til ${churnTotal} salg. Tæt lederkontakt og tidlig opfølgning kan reducere denne effekt.`);
   }
