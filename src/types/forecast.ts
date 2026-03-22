@@ -108,6 +108,7 @@ export interface EmployeeForecastResult {
   actualSales?: number;
   churnProbability: number;
   churnLoss: number;
+  momentumFactor?: number;
   missingAgentMapping?: boolean;
 }
 
