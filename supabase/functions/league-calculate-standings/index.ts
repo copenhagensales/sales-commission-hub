@@ -304,7 +304,7 @@ Deno.serve(async (req) => {
       let dealsCount = 0;
       for (const saleId of saleIds) {
         totalCommission += saleToCommission[saleId] || 0;
-        dealsCount += 1;
+        dealsCount += saleToDeals[saleId] || 0;
       }
       saleItemsMap[email] = { total_commission: totalCommission, deals_count: dealsCount };
     }
