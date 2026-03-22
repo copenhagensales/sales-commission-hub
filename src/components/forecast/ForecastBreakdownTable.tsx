@@ -57,7 +57,7 @@ export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = f
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Users className="h-4 w-4 text-muted-foreground" />
-            Etablerede sælgere ({mappedEmployees.length})
+            Etablerede sælgere ({activeEmployees.length})
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-0">
