@@ -314,8 +314,8 @@ export default function CommissionLeague() {
           todayProvision={myTodayProvision}
         />
       )}
-      <div className="min-h-screen bg-slate-900 p-4 md:p-6">
-        <div className="max-w-6xl mx-auto space-y-6">
+      <div className="min-h-screen bg-slate-900 p-2 sm:p-4 md:p-6">
+        <div className="max-w-6xl mx-auto space-y-3 sm:space-y-6">
           {/* Header - Hero with gradient */}
           <div ref={headerRef}>
               <div className="rounded-xl bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-950 border border-indigo-500/20 border-t-2 border-t-indigo-500/30 p-6 md:p-8 shadow-lg shadow-indigo-500/5">
