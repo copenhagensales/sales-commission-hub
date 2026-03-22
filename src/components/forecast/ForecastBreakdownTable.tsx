@@ -20,9 +20,11 @@ export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = f
   const mappedEmployees = employees.filter(e => !e.missingAgentMapping);
   const unmappedEmployees = employees.filter(e => e.missingAgentMapping);
 
-  // Further split mapped into active (has data) vs no-data
-  const activeEmployees = mappedEmployees.filter(e => e.expectedSph > 0 || (e.actualSales || 0) > 0);
-  const noDataEmployees = mappedEmployees.filter(e => e.expectedSph === 0 && (e.actualSales || 0) === 0);
+  // Split mapped into: new (ramp-up), active (established with data), no-data
+  const newEmployees = mappedEmployees.filter(e => e.isNew);
+  const establishedMapped = mappedEmployees.filter(e => !e.isNew);
+  const activeEmployees = establishedMapped.filter(e => e.expectedSph > 0 || (e.actualSales || 0) > 0);
+  const noDataEmployees = establishedMapped.filter(e => e.expectedSph === 0 && (e.actualSales || 0) === 0);
 
   const hasActuals = isCurrentPeriod && activeEmployees.some(e => (e.actualSales || 0) > 0);
 
