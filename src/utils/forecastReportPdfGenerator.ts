@@ -106,6 +106,36 @@ export function generateForecastReportPdf(data: ReportData) {
     ${cohortSales > 0 ? `<div class="effect-row effect-pos"><span class="effect-label">Nye hold</span><span class="effect-value pos">+${cohortSales} salg</span></div>` : ""}
   </div>
 
+  ${forecast.cohorts.filter(c => c.forecastSales > 0 || c.plannedHeadcount > 0).length > 0 ? `
+  <div class="section">
+    <div class="section-title">Planlagte opstartshold</div>
+    <p style="font-size:11px;color:#64748b;margin-bottom:8px;">
+      Der er planlagt ${forecast.cohorts.filter(c => c.forecastSales > 0 || c.plannedHeadcount > 0).length} opstartshold med i alt ${forecast.cohorts.filter(c => c.forecastSales > 0 || c.plannedHeadcount > 0).reduce((s, c) => s + c.plannedHeadcount, 0)} nye sælgere.
+      Nye hold er indregnet i det samlede forecast med gradvis optrapning.
+    </p>
+    <table style="width:100%;border-collapse:collapse;font-size:11px;">
+      <thead>
+        <tr style="border-bottom:1px solid #e2e8f0;">
+          <th style="text-align:left;padding:6px 8px;color:#64748b;font-weight:600;">Startdato</th>
+          <th style="text-align:center;padding:6px 8px;color:#64748b;font-weight:600;">Antal</th>
+          <th style="text-align:center;padding:6px 8px;color:#64748b;font-weight:600;">Ramp-fase</th>
+          <th style="text-align:right;padding:6px 8px;color:#64748b;font-weight:600;">Forventet salg</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${forecast.cohorts.filter(c => c.forecastSales > 0 || c.plannedHeadcount > 0).map(c => {
+          const rampLabel = c.rampFactor <= 0.2 ? "Opstartsfase (15%)" : c.rampFactor <= 0.4 ? "Tidlig fase (35%)" : c.rampFactor <= 0.7 ? "Optrapning (60%)" : c.rampFactor <= 0.9 ? "Næsten fuld (85%)" : "Fuld kapacitet";
+          return `<tr style="border-bottom:1px solid #f1f5f9;">
+            <td style="padding:6px 8px;">${new Date(c.startDate).toLocaleDateString("da-DK", { day: "numeric", month: "short", year: "numeric" })}</td>
+            <td style="text-align:center;padding:6px 8px;">${c.plannedHeadcount} sælgere</td>
+            <td style="text-align:center;padding:6px 8px;"><span style="background:#f0f9ff;padding:2px 6px;border-radius:4px;font-size:10px;">${rampLabel}</span></td>
+            <td style="text-align:right;padding:6px 8px;font-weight:700;">${c.forecastSales} salg</td>
+          </tr>`;
+        }).join("")}
+      </tbody>
+    </table>
+  </div>` : ""}
+
   <div class="section">
     <div class="section-title">Hvad driver forecastet</div>
     ${positiveDrivers.length > 0 ? `<p style="font-size:10px;font-weight:600;color:#16a34a;margin-bottom:4px;">POSITIVT</p>${positiveDrivers.map(d => `<div class="driver-block"><strong>${d.label.replace(/churn/gi, "teamudskiftning")}</strong><p>${d.description.replace(/churn/gi, "udskiftning")}</p></div>`).join("")}` : ""}

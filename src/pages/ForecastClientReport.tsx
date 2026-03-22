@@ -305,6 +305,69 @@ function ReportKeyFigures({ forecast }: { forecast: ForecastResult }) {
   );
 }
 
+function ReportCohorts({ forecast }: { forecast: ForecastResult }) {
+  const activeCohorts = forecast.cohorts.filter(c => c.forecastSales > 0 || c.plannedHeadcount > 0);
+  if (activeCohorts.length === 0) return null;
+
+  const totalCohortSales = activeCohorts.reduce((s, c) => s + c.forecastSales, 0);
+  const totalHeads = activeCohorts.reduce((s, c) => s + c.plannedHeadcount, 0);
+
+  function getRampLabel(rampFactor: number): string {
+    if (rampFactor <= 0.2) return "Opstartsfase (15%)";
+    if (rampFactor <= 0.4) return "Tidlig fase (35%)";
+    if (rampFactor <= 0.7) return "Optrapning (60%)";
+    if (rampFactor <= 0.9) return "Næsten fuld kapacitet (85%)";
+    return "Fuld kapacitet";
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Users className="h-4 w-4 text-muted-foreground" />
+          Planlagte opstartshold
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          Der er planlagt {activeCohorts.length} opstartshold med i alt {totalHeads} nye sælgere, som forventes at bidrage med {totalCohortSales} salg i perioden.
+          Nye hold er indregnet i det samlede forecast med gradvis optrapning.
+        </p>
+        <div className="space-y-2">
+          {activeCohorts.map((cohort) => (
+            <div key={cohort.cohortId} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <Users className="h-4 w-4 text-primary" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">{cohort.plannedHeadcount} sælgere</span>
+                    <Badge variant="outline" className="text-xs">
+                      <Calendar className="h-3 w-3 mr-1" />
+                      Start: {new Date(cohort.startDate).toLocaleDateString("da-DK", { day: "numeric", month: "short", year: "numeric" })}
+                    </Badge>
+                    <Badge variant="secondary" className="text-xs">
+                      {getRampLabel(cohort.rampFactor)}
+                    </Badge>
+                  </div>
+                  {cohort.note && (
+                    <p className="text-xs text-muted-foreground mt-0.5">{cohort.note}</p>
+                  )}
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-sm font-bold">{cohort.forecastSales} salg</span>
+                <p className="text-xs text-muted-foreground">{Math.round(cohort.effectiveHeads)} effektive</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function ReportDrivers({ forecast }: { forecast: ForecastResult }) {
   const positiveDrivers = forecast.drivers.filter(d => d.impact === "positive");
   const negativeDrivers = forecast.drivers.filter(d => d.impact === "negative");
