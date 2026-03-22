@@ -19,11 +19,15 @@ export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = f
   const mappedEmployees = employees.filter(e => !e.missingAgentMapping);
   const unmappedEmployees = employees.filter(e => e.missingAgentMapping);
 
-  const hasActuals = isCurrentPeriod && mappedEmployees.some(e => (e.actualSales || 0) > 0);
+  // Further split mapped into active (has data) vs no-data
+  const activeEmployees = mappedEmployees.filter(e => e.expectedSph > 0 || (e.actualSales || 0) > 0);
+  const noDataEmployees = mappedEmployees.filter(e => e.expectedSph === 0 && (e.actualSales || 0) === 0);
 
-  // Avg SPH for risk badges — only from mapped employees
-  const avgSph = mappedEmployees.length > 0
-    ? mappedEmployees.reduce((s, e) => s + e.expectedSph, 0) / mappedEmployees.length
+  const hasActuals = isCurrentPeriod && activeEmployees.some(e => (e.actualSales || 0) > 0);
+
+  // Avg SPH for risk badges — only from active employees
+  const avgSph = activeEmployees.length > 0
+    ? activeEmployees.reduce((s, e) => s + e.expectedSph, 0) / activeEmployees.length
     : 0;
 
   const toggleSort = (key: typeof sortKey) => {
