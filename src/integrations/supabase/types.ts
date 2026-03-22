@@ -12367,6 +12367,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      heal_fm_missing_sale_items: { Args: never; Returns: number }
       is_chat_conversation_member: {
         Args: { _conversation_id: string }
         Returns: boolean
