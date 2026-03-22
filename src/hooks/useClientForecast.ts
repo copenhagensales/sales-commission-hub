@@ -361,7 +361,6 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         const teamId = employeeTeamMap.get(emp.id);
         const teamName = teamId ? teamNameMap.get(teamId) || null : null;
 
-        const emails = empEmailMap.get(emp.id) || [];
         const missingAgentMapping = emails.length === 0;
 
         employeePerformances.push({
