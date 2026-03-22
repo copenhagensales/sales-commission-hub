@@ -1,75 +1,57 @@
 
 
-# Gør forecast-værktøjet mere værdifuldt og letaflæseligt
+# Kundevendt Forecast-rapport — Plan
 
-## Overordnet retning
-Skift fra et "data-dump"-layout til en **narrativ, handlingsorienteret** oplevelse. Kunden skal kunne forstå forecastet på 10 sekunder og vide hvad de kan gøre ved det.
+## Vurdering af forslaget
 
-## Foreslåede forbedringer
+ChatGPT-forslaget er godt og matcher næsten 1:1 med det, I allerede har bygget. Executive Summary, KPI'er, Drivers, Insights/Anbefalinger og Waterfall eksisterer allerede som komponenter. Det reelle arbejde er:
 
-### 1. Executive Summary — "Forecast på 10 sekunder"
-Tilføj et fremhævet summary-panel øverst der forklarer forecastet i naturligt sprog:
+1. En **ny side/visning** der genbruger forecast-data men præsenterer dem i kundevendt sprog (ingen medarbejdernavne, ingen EWMA/SPH-jargon)
+2. **PDF-eksport** via print-til-PDF (samme mønster som kontrakter og leverandørrapporter)
+3. **Outlook +2 måneder** (udvid hooken med `monthOffset`)
 
-> *"I april forventer vi **1.180 salg** fra 18 sælgere over 19 arbejdsdage. Det er 8% under marts pga. 3 helligdage i påsken og 2 medarbejdere under ramp-up. Største risiko: churn hos 3 nyansatte."*
+## Implementering
 
-- Genereres automatisk fra forecast-data (drivers, cohorts, aktuelle vs. forrige periode)
-- Ingen AI nødvendig — ren template-logik med conditional tekst-blokke
-- Vises i et Card med stort tal + undertekst
+### 1. Ny side: `/forecast/rapport`
 
-### 2. Visuel "Waterfall"-graf — Hvad bygger forecastet op
-Erstat de 6 KPI-kort med en **waterfall-chart** der viser:
+Ny side `src/pages/ForecastClientReport.tsx` med kundevendt layout:
 
-```text
-Brutto-kapacitet (timer × SPH)  ████████████████████ 1.450
-  - Fravær (ferie/sygdom)       ████                  -120
-  - Churn-risiko                ██                     -85
-  + Nye hold (ramp-up)          ███                    +65
-  = Forventet salg              ████████████████      1.310
-```
+- **Sektioner**: Executive Summary → Nøgletal → Drivers → Anbefalinger → Outlook
+- **Datakilde**: Genbruger `useClientForecast` — henter forecast for valgt kunde + periode
+- Ingen medarbejdernavne, ingen SPH, ingen EWMA — alt formuleret i naturligt sprog
+- Kundevalg + periodevalg i toppen
+- "Download PDF"-knap i header
 
-- Gør det intuitivt klart *hvor* salg forsvinder og *hvad* der bidrager
-- Brug Recharts `BarChart` med positive/negative stacked bars
-- KPI-kortene kan beholdes under som sekundær detalje
+### 2. PDF-eksport
 
-### 3. Progress-tracker for indeværende måned
-For "Denne måned": vis en **progress bar** der viser:
-- Faktiske salg vs. forecast med % completion
-- "On track" / "Behind" / "Ahead" status-badge
-- Simpel pace-indikator: "60 salg/dag behøves → I laver 63/dag"
+Ny `src/utils/forecastReportPdfGenerator.ts` — samme print-window-mønster som `contractPdfGenerator.ts` og `supplierReportPdfGenerator.ts`:
+- Åben popup med stylet HTML (A4 portrait, 1 side)
+- Sektioner: header med kundenavn + periode, executive summary, nøgletal-tabel, drivers, anbefalinger
+- `window.print()` for at gemme som PDF
 
-### 4. Medarbejder risk-flagging i breakdown
-Tilføj visuelle indikatorer i breakdown-tabellen:
-- 🔴 Rød badge: "Under ramp" eller "Høj churn-risiko"
-- 🟡 Gul badge: "Lav performance vs. team-gns"
-- 🟢 Grøn: "Over team-gns"
-- Gør tabellen sorterbar (klik på kolonnehoveder)
+### 3. Udvid hook med `monthOffset`
 
-### 5. "Hvad kan du gøre?"-sektion
-Tilføj actionable insights under drivers-panelet:
-- "3 medarbejdere performer under 50% af team-gns → overvej coaching"
-- "Påskeugen koster 180 salg → overvej ekstra vagter i uge 13/15"
-- "2 nyansatte har 45% churn-risiko → fokusér onboarding"
+I `useClientForecast.ts`:
+- Erstat `period: "current" | "next"` med `monthOffset: number` (0 = denne md, 1 = næste, 2 = +2)
+- For `monthOffset >= 2`: tilføj en usikkerhedsfaktor (fx bredere interval) og marker som "retningsgivende"
+- Backward-compatible: Forecast.tsx bruger stadig 0/1
 
-Genereres med simple business rules (thresholds), ikke AI.
+### 4. Routing
 
-### 6. Sammenligning med forrige måned
-Tilføj delta-pile (▲▼) på KPI-kort der viser ændring vs. forrige periode:
-- "1.310 salg (▼ 8% vs. marts)"
-- Kontekstualiserer tallet så kunden ved om det er godt eller dårligt
+Tilføj `/forecast/rapport` route i App.tsx med adgangskontrol.
 
-## Implementeringsplan (prioriteret)
+## Filer
 
-| Prioritet | Feature | Fil(er) | Kompleksitet |
-|-----------|---------|---------|--------------|
-| 1 | Executive Summary panel | Ny: `ForecastSummary.tsx`, ændring i `Forecast.tsx` | Medium |
-| 2 | Progress-tracker (indev. måned) | Ny: `ForecastProgressBar.tsx`, ændring i `Forecast.tsx` | Lav |
-| 3 | Waterfall-chart | Ny: `ForecastWaterfallChart.tsx`, ændring i `Forecast.tsx` | Medium |
-| 4 | Risk-badges i breakdown | Ændring i `ForecastBreakdownTable.tsx` | Lav |
-| 5 | Delta vs. forrige måned | Ændring i `ForecastKpiCards.tsx` + hook | Medium |
-| 6 | Actionable insights | Ny: `ForecastInsights.tsx` | Medium |
+| Fil | Ændring |
+|-----|---------|
+| `src/pages/ForecastClientReport.tsx` | Ny side med kundevendt rapport-layout |
+| `src/utils/forecastReportPdfGenerator.ts` | Ny PDF-generator (print-window) |
+| `src/hooks/useClientForecast.ts` | Udvid med `monthOffset` (0/1/2) |
+| `src/App.tsx` | Tilføj route |
+| `src/pages/Forecast.tsx` | Tilføj link til kunderapport |
 
-## Anbefaling
-Start med **1 + 2 + 4** — de tre features der giver mest værdi med mindst arbejde. Waterfall og insights kan komme i næste iteration.
-
-Skal jeg implementere alle 6, eller vil du prioritere en delmængde?
+## Hvad der IKKE ændres
+- Forecast-motoren (`forecast.ts`) — fungerer allerede
+- Eksisterende forecast-side — forbliver som intern visning
+- Eksisterende komponenter — genbruges ikke direkte (kundeversionen har sit eget layout)
 
