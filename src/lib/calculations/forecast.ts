@@ -115,16 +115,48 @@ export function getEstablishedChurnRate(daysSinceStart: number, teamName: string
 }
 
 // ============================================================================
+// MOMENTUM CORRECTION
+// ============================================================================
+
+/**
+ * Apply momentum correction for future periods.
+ * Compares the 2 most recent weeks' SPH against the full EWMA.
+ * If recent performance is >5% above EWMA, boost SPH (capped at +25%).
+ */
+export function applyMomentum(weeklySph: number[], ewmaSph: number): { adjustedSph: number; momentumFactor: number } {
+  if (weeklySph.length < 2 || ewmaSph <= 0) {
+    return { adjustedSph: ewmaSph, momentumFactor: 1.0 };
+  }
+
+  const recentSph = (weeklySph[0] + weeklySph[1]) / 2;
+  const ratio = recentSph / ewmaSph;
+
+  if (ratio > 1.05) {
+    const momentumFactor = Math.min(ratio, 1.25);
+    return { adjustedSph: ewmaSph * momentumFactor, momentumFactor };
+  }
+
+  return { adjustedSph: ewmaSph, momentumFactor: 1.0 };
+}
+
+// ============================================================================
 // EMPLOYEE FORECAST
 // ============================================================================
 
 /**
  * Calculate forecast for a single established employee.
+ * When isFuturePeriod is true, momentum correction is applied.
  */
-export function forecastEstablishedEmployee(emp: EmployeePerformance, teamChurnRates?: TeamChurnRates): EmployeeForecastResult {
+export function forecastEstablishedEmployee(emp: EmployeePerformance, teamChurnRates?: TeamChurnRates, isFuturePeriod?: boolean): EmployeeForecastResult {
   const ewmaSph = calculateEwmaSph(emp.weeklySalesPerHour);
+  
+  // Apply momentum only for future periods
+  const { adjustedSph, momentumFactor } = isFuturePeriod
+    ? applyMomentum(emp.weeklySalesPerHour, ewmaSph)
+    : { adjustedSph: ewmaSph, momentumFactor: 1.0 };
+  
   const effectiveHours = emp.plannedHours * emp.personalAttendanceFactor;
-  const expected = effectiveHours * ewmaSph;
+  const expected = effectiveHours * adjustedSph;
   
   const churnProbability = getEstablishedChurnRate(emp.daysSinceStart, emp.teamName, teamChurnRates);
   const churnLoss = expected * churnProbability;
@@ -137,13 +169,14 @@ export function forecastEstablishedEmployee(emp: EmployeePerformance, teamChurnR
     isEstablished: true,
     isNew: false,
     plannedHours: emp.plannedHours,
-    expectedSph: ewmaSph,
+    expectedSph: adjustedSph,
     attendanceFactor: emp.personalAttendanceFactor,
     forecastSales: Math.round(expected),
     forecastSalesLow: Math.round(expected * LOW_FACTOR),
     forecastSalesHigh: Math.round(expected * HIGH_FACTOR),
     churnProbability,
     churnLoss: Math.round(churnLoss),
+    momentumFactor: momentumFactor > 1.0 ? momentumFactor : undefined,
     missingAgentMapping: emp.missingAgentMapping,
   };
 }
