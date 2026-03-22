@@ -16,6 +16,7 @@ import { ForecastCohortManager } from "@/components/forecast/ForecastCohortManag
 import { ForecastAssumptions } from "@/components/forecast/ForecastAssumptions";
 import { ForecastSummary } from "@/components/forecast/ForecastSummary";
 import { ForecastProgressBar } from "@/components/forecast/ForecastProgressBar";
+import { ForecastTeamOverview } from "@/components/forecast/ForecastTeamOverview";
 
 import { ForecastInsights } from "@/components/forecast/ForecastInsights";
 import { DataFreshnessBadge } from "@/components/ui/DataFreshnessBadge";
