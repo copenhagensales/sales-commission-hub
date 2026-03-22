@@ -4,18 +4,35 @@ import { cn } from "@/lib/utils";
 interface DailyTopBadgeProps {
   rank: 1 | 2 | 3;
   className?: string;
+  size?: "sm" | "lg";
 }
 
 const config = {
-  1: { icon: Flame, color: "text-amber-400", label: "🔥" },
-  2: { icon: Zap, color: "text-slate-300", label: "⚡" },
-  3: { icon: Zap, color: "text-orange-400", label: "⚡" },
+  1: { icon: Flame, color: "text-amber-400", glow: "drop-shadow-[0_0_6px_rgba(251,191,36,0.7)]", label: "#1" },
+  2: { icon: Zap, color: "text-slate-300", glow: "drop-shadow-[0_0_5px_rgba(203,213,225,0.6)]", label: "#2" },
+  3: { icon: Zap, color: "text-orange-400", glow: "drop-shadow-[0_0_5px_rgba(251,146,60,0.6)]", label: "#3" },
 };
 
-export function DailyTopBadge({ rank, className }: DailyTopBadgeProps) {
-  const { icon: Icon, color } = config[rank];
+export function DailyTopBadge({ rank, className, size = "sm" }: DailyTopBadgeProps) {
+  const { icon: Icon, color, glow, label } = config[rank];
+
+  if (size === "lg") {
+    return (
+      <span className={cn(
+        "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5",
+        rank === 1 && "bg-amber-400/15",
+        rank === 2 && "bg-slate-300/15",
+        rank === 3 && "bg-orange-400/15",
+        className
+      )}>
+        <Icon className={cn("h-3.5 w-3.5 shrink-0 animate-pulse", color, glow)} />
+        <span className={cn("text-[10px] font-bold", color)}>{label}</span>
+      </span>
+    );
+  }
+
   return (
-    <Icon className={cn("h-3 w-3 shrink-0 animate-pulse", color, className)} />
+    <Icon className={cn("h-3.5 w-3.5 shrink-0 animate-pulse", color, glow, className)} />
   );
 }
 
