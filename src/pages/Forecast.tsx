@@ -193,8 +193,6 @@ export default function Forecast() {
             {/* KPI Cards */}
             <ForecastKpiCards forecast={forecast} />
 
-            {/* Waterfall chart */}
-            <ForecastWaterfallChart forecast={forecast} />
 
             {/* Main content grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
