@@ -302,7 +302,7 @@ Deno.serve(async (req) => {
       const fmSaleIds = employeeToFmSaleIds[empId] || [];
       for (const saleId of fmSaleIds) {
         provision += saleToCommission[saleId] || 0;
-        deals++;
+        deals += saleToDeals[saleId] || 0;
       }
       employeeProvision[empId] = { provision, deals };
     }
