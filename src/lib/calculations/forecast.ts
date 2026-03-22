@@ -385,14 +385,17 @@ export function calculateFullForecast(
     });
   }
   
+  const totalChurnLoss = Math.round(cohortChurnLoss) + Math.round(totalEstablishedChurnLoss);
+
   return {
     periodStart,
     periodEnd,
     clientId,
     clientCampaignId,
-    totalSalesExpected: totalExpected,
-    totalSalesLow: Math.round(totalExpected * LOW_FACTOR),
-    totalSalesHigh: Math.round(totalExpected * HIGH_FACTOR),
+    totalSalesGross: totalExpected,
+    totalSalesExpected: totalExpected - totalChurnLoss,
+    totalSalesLow: Math.round(totalExpected * LOW_FACTOR) - totalChurnLoss,
+    totalSalesHigh: Math.round(totalExpected * HIGH_FACTOR) - totalChurnLoss,
     totalHours: totalEmployeeHours + totalCohortHours,
     totalHeads: employees.length + cohortResults.reduce((s, c) => s + c.effectiveHeads, 0),
     churnLoss: Math.round(cohortChurnLoss),
