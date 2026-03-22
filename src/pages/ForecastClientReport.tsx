@@ -12,6 +12,21 @@ import { generateForecastReportPdf } from "@/utils/forecastReportPdfGenerator";
 import { Link } from "react-router-dom";
 import type { ForecastResult, ForecastDriver } from "@/types/forecast";
 
+
+function clientFriendlyLabel(label: string): string {
+  return label
+    .replace(/churn[-\s]?risiko/gi, "naturlig udskiftning")
+    .replace(/\bchurn\b/gi, "teamudskiftning")
+    .replace(/etableret churn/gi, "naturlig udskiftning");
+}
+
+function clientFriendlyDescription(desc: string): string {
+  return desc
+    .replace(/churn[-\s]?risiko/gi, "naturlig udskiftning i teamet")
+    .replace(/\bchurn\b/gi, "udskiftning")
+    .replace(/forhøjet churn/gi, "forventet udskiftning");
+}
+
 export default function ForecastClientReport() {
   const [selectedClient, setSelectedClient] = useState("all");
   const [monthOffset, setMonthOffset] = useState(1);
