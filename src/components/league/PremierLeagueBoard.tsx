@@ -334,12 +334,23 @@ export function PremierLeagueBoard({
                           </div>
                         </div>
 
-                        {/* Right side: Provision + Form + Status */}
+                        {/* Right side: Provision + Today + Form + Status */}
                         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                           {/* Provision */}
                           <div className="text-right">
-                            <div className="font-mono text-sm sm:text-[15px] font-semibold whitespace-nowrap">
-                              {standing.current_provision.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
+                            <div className="flex items-center gap-1.5 justify-end">
+                              {dailyRank && <DailyTopBadge rank={dailyRank} size="lg" />}
+                              <div className="font-mono text-sm sm:text-base font-semibold whitespace-nowrap">
+                                {standing.current_provision.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
+                              </div>
+                            </div>
+                            <div className={cn(
+                              "text-[10px] font-medium flex items-center gap-1 justify-end",
+                              todayProvision > 0 ? "text-emerald-400" : "text-muted-foreground/50"
+                            )}>
+                              I dag: {todayProvision > 0
+                                ? `${todayProvision.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr`
+                                : "0 kr"}
                             </div>
                             {isCurrentUser && zoneData && (
                               <DistanceToZone
