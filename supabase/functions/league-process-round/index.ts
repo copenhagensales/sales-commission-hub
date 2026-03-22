@@ -213,6 +213,7 @@ Deno.serve(async (req) => {
         .from("sales")
         .select("id, raw_payload")
         .eq("source", "fieldmarketing")
+        .neq("validation_status", "rejected")
         .gte("sale_datetime", roundStart)
         .lte("sale_datetime", roundEnd)
         .range(fmOffset, fmOffset + PAGE - 1);
