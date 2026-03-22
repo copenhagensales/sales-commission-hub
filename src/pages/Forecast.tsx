@@ -5,7 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { BarChart3, RefreshCcw, Loader2 } from "lucide-react";
+import { BarChart3, RefreshCcw, Loader2, FileText } from "lucide-react";
+import { Link } from "react-router-dom";
 import { ForecastKpiCards } from "@/components/forecast/ForecastKpiCards";
 import { ForecastDriversPanel } from "@/components/forecast/ForecastDriversPanel";
 import { ForecastBreakdownTable } from "@/components/forecast/ForecastBreakdownTable";
@@ -154,6 +155,12 @@ export default function Forecast() {
                 ))}
               </SelectContent>
             </Select>
+            <Link to="/forecast/rapport">
+              <Button variant="outline" size="sm">
+                <FileText className="h-4 w-4 mr-2" />
+                Kunderapport
+              </Button>
+            </Link>
             <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isLoading}>
               {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
             </Button>

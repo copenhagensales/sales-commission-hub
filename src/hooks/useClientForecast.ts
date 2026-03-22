@@ -26,21 +26,23 @@ const DEFAULT_WEEKLY_HOURS = 37;
  * Fetches employees, sales (8 weeks EWMA), shifts, absences from DB.
  * Uses existing pure calculation functions from forecast.ts.
  */
-export function useClientForecast(clientId: string, period: "current" | "next" = "next") {
+export function useClientForecast(clientId: string, period: "current" | "next" | number = "next") {
+  // Normalize period to monthOffset for backward compat
+  const monthOffset = typeof period === "number" ? period : period === "current" ? 0 : 1;
+
   return useQuery({
-    queryKey: ["client-forecast", clientId, period],
+    queryKey: ["client-forecast", clientId, monthOffset],
     queryFn: async (): Promise<{
       forecast: ForecastResult;
       cohorts: ClientForecastCohort[];
       calculatedAt: string;
     }> => {
       const now = new Date();
-      const forecastStart = period === "current"
-        ? startOfMonth(now)
-        : startOfMonth(new Date(now.getFullYear(), now.getMonth() + 1, 1));
+      const forecastStart = startOfMonth(new Date(now.getFullYear(), now.getMonth() + monthOffset, 1));
       const forecastEnd = endOfMonth(forecastStart);
       const forecastStartStr = format(forecastStart, "yyyy-MM-dd");
       const forecastEndStr = format(forecastEnd, "yyyy-MM-dd");
+      const isCurrentPeriod = monthOffset === 0;
 
       // 1. Find teams for this client (or all teams)
       let teamIds: string[] = [];
@@ -459,7 +461,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" =
       let daysElapsed = 0;
       let daysRemaining = 0;
       
-      if (period === "current") {
+      if (isCurrentPeriod) {
         const todayStr = format(now, "yyyy-MM-dd");
         
         // Count working days elapsed and remaining (exclude weekends + holidays)
