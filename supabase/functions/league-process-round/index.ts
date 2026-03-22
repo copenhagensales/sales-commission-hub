@@ -189,7 +189,7 @@ Deno.serve(async (req) => {
         .from("sales")
         .select("id, agent_email")
         .neq("source", "fieldmarketing")
-        .neq("validation_status", "rejected")
+        .or("validation_status.neq.rejected,validation_status.is.null")
         .gte("sale_datetime", roundStart)
         .lte("sale_datetime", roundEnd)
         .range(offset, offset + PAGE - 1);
@@ -213,7 +213,7 @@ Deno.serve(async (req) => {
         .from("sales")
         .select("id, raw_payload")
         .eq("source", "fieldmarketing")
-        .neq("validation_status", "rejected")
+        .or("validation_status.neq.rejected,validation_status.is.null")
         .gte("sale_datetime", roundStart)
         .lte("sale_datetime", roundEnd)
         .range(fmOffset, fmOffset + PAGE - 1);
