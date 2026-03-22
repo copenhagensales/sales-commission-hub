@@ -1,35 +1,35 @@
 
 
-# Vis advarsel for medarbejdere uden agent-mapping
+# Team-KPI-kort på forecast-oversigten
 
-## Problem
-Medarbejdere uden `employee_agent_mapping` viser 0 salg og 0 forecast — ikke fordi de performer dårligt, men fordi systemet ikke kan matche deres salg. Det er forvirrende i breakdown-tabellen.
+## Idé
+Når man åbner forecast-siden (især med "Alle kunder"), vises et grid af **team-kort** øverst der giver et hurtigt overblik: forventet salg, antal sælgere, status (on track / behind / ahead) — per team. Man kan klikke et kort for at filtrere til det team.
 
-## Løsning
-Tilføj et `missingAgentMapping` flag per medarbejder og vis dem separat i breakdown-tabellen med en tydelig "Mangler opsætning"-advarsel.
+## Ny komponent: `ForecastTeamOverview.tsx`
 
-### Ændringer
+Grupperer `forecast.establishedEmployees` efter `teamName` og beregner per team:
+- **Forventet salg** (sum af `forecastSales`)
+- **Antal sælgere** (count, ekskl. `missingAgentMapping`)
+- **Gns. SPH** (gennemsnit af `expectedSph`)
+- **Status-badge**: For indeværende måned — sammenligner `actualSales` vs. forventet pace → "On track" / "Foran" / "Bagud"
+- **Fraværs-tab** (sum af churnLoss + absence-relateret tab per team)
 
-**`src/types/forecast.ts`**
-- Tilføj `missingAgentMapping?: boolean` til `EmployeeForecastResult`
+Hvert kort er et kompakt Card med team-navn, stort tal (forventet salg), og en farvet status-indikator.
 
-**`src/hooks/useClientForecast.ts`**
-- Når `EmployeePerformance` objekter bygges: sæt `missingAgentMapping = true` hvis medarbejderen ikke har nogen emails i `empEmailMap`
-- Propagér flaget videre til `EmployeeForecastResult`
+## Ændring i `Forecast.tsx`
 
-**`src/lib/calculations/forecast.ts`**
-- I `forecastEstablishedEmployee`: kopiér `missingAgentMapping` fra input til output
+Indsæt `<ForecastTeamOverview>` mellem Executive Summary og KPI Cards (linje ~193). Vises kun når der er mere end 1 team. Evt. klikbar: sætter et team-filter der highlighter det pågældende team i breakdown-tabellen.
 
-**`src/components/forecast/ForecastBreakdownTable.tsx`**
-- Split medarbejdere i to grupper: `mapped` (har agent-mapping) og `unmapped` (mangler)
-- Vis `mapped` i hovedtabellen som i dag
-- Vis `unmapped` i en separat sektion med gul advarselsbadge: "Mangler opsætning — salgsdata kan ikke tilknyttes"
-- Unmapped medarbejdere tæller ikke med i gennemsnits-SPH
+## Andre forslag til hurtigt overblik
+
+Disse kan implementeres som fase 2:
+- **Mini-sparklines** på hvert team-kort der viser salgsudvikling de sidste 4 uger
+- **"Største risiko"-flag** — det team med højest samlet churn/fravær-tab fremhæves
+
+## Filer
 
 | Fil | Ændring |
 |-----|---------|
-| `src/types/forecast.ts` | Tilføj `missingAgentMapping` felt |
-| `src/hooks/useClientForecast.ts` | Sæt flaget baseret på email-mapping |
-| `src/lib/calculations/forecast.ts` | Propagér flaget til result |
-| `src/components/forecast/ForecastBreakdownTable.tsx` | Vis unmapped medarbejdere separat med advarsel |
+| `src/components/forecast/ForecastTeamOverview.tsx` | Ny komponent: team-grid med KPI-kort |
+| `src/pages/Forecast.tsx` | Indsæt team-oversigt mellem summary og KPI cards |
 
