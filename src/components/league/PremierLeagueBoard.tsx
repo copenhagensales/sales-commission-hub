@@ -11,6 +11,7 @@ import { MvpBadge } from "./MvpBadge";
 import { PersonalBestBadge } from "./PersonalBestBadge";
 import { DistanceToZone } from "./DistanceToZone";
 import { RivalryIndicator } from "./RivalryIndicator";
+import { DailyTopBadge, computeTodayTop3 } from "./DailyTopBadge";
 import { cn } from "@/lib/utils";
 import { formatPlayerName } from "@/lib/formatPlayerName";
 
