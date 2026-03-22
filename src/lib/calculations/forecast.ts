@@ -298,15 +298,16 @@ export function calculateFullForecast(
   teamChurnRates?: TeamChurnRates,
   rampProfile?: ForecastRampProfile,
   baselineSph?: number,
+  isFuturePeriod?: boolean,
 ): ForecastResult {
   // Split employees into established (>60 days) and new (≤60 days)
   const established = employees.filter(e => e.isEstablished);
   const newHires = employees.filter(e => !e.isEstablished);
   
-  const establishedResults = established.map(e => forecastEstablishedEmployee(e, teamChurnRates));
+  const establishedResults = established.map(e => forecastEstablishedEmployee(e, teamChurnRates, isFuturePeriod));
   const newResults = (rampProfile && baselineSph != null)
     ? newHires.map(e => forecastNewEmployee(e, rampProfile, baselineSph, teamChurnRates))
-    : newHires.map(e => forecastEstablishedEmployee(e, teamChurnRates)); // fallback
+    : newHires.map(e => forecastEstablishedEmployee(e, teamChurnRates, isFuturePeriod)); // fallback
   
   const employeeResults = [...establishedResults, ...newResults];
   const cohortResults = cohortInputs.map(forecastCohort);
