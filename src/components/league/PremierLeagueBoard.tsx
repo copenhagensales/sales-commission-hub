@@ -20,6 +20,7 @@ interface PremierLeagueBoardProps {
   playersPerDivision: number;
   isLoading: boolean;
   currentEmployeeId?: string;
+  todayProvisionMap?: Record<string, number>;
 }
 
 export function PremierLeagueBoard({
@@ -27,7 +28,9 @@ export function PremierLeagueBoard({
   playersPerDivision,
   isLoading,
   currentEmployeeId,
+  todayProvisionMap = {},
 }: PremierLeagueBoardProps) {
+  const todayTop3 = useMemo(() => computeTodayTop3(todayProvisionMap), [todayProvisionMap]);
   // Group standings by division
   const divisionGroups = useMemo(() => {
     const groups: { division: number; players: MockQualificationStanding[] }[] = [];
