@@ -314,11 +314,11 @@ export default function CommissionLeague() {
           todayProvision={myTodayProvision}
         />
       )}
-      <div className="min-h-screen bg-slate-900 p-4 md:p-6">
-        <div className="max-w-6xl mx-auto space-y-6">
+      <div className="min-h-screen bg-slate-900 p-2 sm:p-4 md:p-6">
+        <div className="max-w-6xl mx-auto space-y-3 sm:space-y-6">
           {/* Header - Hero with gradient */}
           <div ref={headerRef}>
-              <div className="rounded-xl bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-950 border border-indigo-500/20 border-t-2 border-t-indigo-500/30 p-6 md:p-8 shadow-lg shadow-indigo-500/5">
+              <div className="rounded-xl bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-950 border border-indigo-500/20 border-t-2 border-t-indigo-500/30 p-4 sm:p-6 md:p-8 shadow-lg shadow-indigo-500/5">
                 {/* Mobile: stacked center-first | Desktop: 3-column grid */}
                 <div className="flex flex-col items-center text-center gap-5 md:grid md:grid-cols-[1fr_auto_1fr] md:items-center md:text-left md:gap-6">
 
@@ -538,7 +538,7 @@ export default function CommissionLeague() {
 
               {/* Leaderboard */}
               <Card className="bg-slate-800/30 border-slate-700">
-                <CardHeader className="pb-3">
+                <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <Trophy className="h-5 w-5 text-yellow-400" />
@@ -566,11 +566,11 @@ export default function CommissionLeague() {
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-2 sm:px-6">
                   <Tabs defaultValue="all">
-                    <TabsList className="mb-3">
-                      <TabsTrigger value="all">Alle Divisioner</TabsTrigger>
-                      {!isFan && <TabsTrigger value="my">Min Division</TabsTrigger>}
+                    <TabsList className="mb-2 sm:mb-3 w-full sm:w-auto">
+                      <TabsTrigger value="all" className="text-xs sm:text-sm flex-1 sm:flex-none">Alle Divisioner</TabsTrigger>
+                      {!isFan && <TabsTrigger value="my" className="text-xs sm:text-sm flex-1 sm:flex-none">Min Division</TabsTrigger>}
                     </TabsList>
 
                     <TabsContent value="all">

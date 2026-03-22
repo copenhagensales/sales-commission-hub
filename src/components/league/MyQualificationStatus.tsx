@@ -90,12 +90,12 @@ export function MyQualificationStatus({
 
   return (
     <Card className={cn("border-primary/30 overflow-hidden", `bg-gradient-to-br ${zoneInfo.gradient}`)}>
-      <CardContent className="pt-6">
-        <div className="flex items-start justify-between mb-4">
+      <CardContent className="pt-4 sm:pt-6 px-3 sm:px-6">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-0 mb-4">
           <div>
-            <p className="text-sm text-muted-foreground mb-1">Din nuværende placering</p>
+            <p className="text-xs sm:text-sm text-muted-foreground mb-1">Din nuværende placering</p>
             <div className="flex items-center gap-3">
-              <span className="text-4xl font-bold number-animate">#{standing.overall_rank}</span>
+              <span className="text-3xl sm:text-4xl font-bold number-animate">#{standing.overall_rank}</span>
               {rankChange !== 0 && (
                 <Badge
                   variant={rankChange > 0 ? "default" : "destructive"}
@@ -118,23 +118,23 @@ export function MyQualificationStatus({
                 </Badge>
               )}
             </div>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="text-xs sm:text-sm text-muted-foreground mt-1">
               af {totalPlayers} tilmeldte
             </p>
           </div>
 
-          <div className="text-right">
+          <div className="sm:text-right">
             <div className="flex items-center gap-2 mb-1">
               <Trophy className={cn(
-                "h-5 w-5",
+                "h-4 sm:h-5 w-4 sm:w-5",
                 standing.projected_division === 1 ? "text-yellow-500" : "text-muted-foreground"
               )} />
-              <span className="font-semibold">
+              <span className="font-semibold text-sm sm:text-base">
                 Division {standing.projected_division}
                 {standing.projected_division === 1 && " (Topliga)"}
               </span>
             </div>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs sm:text-sm text-muted-foreground">
               Rank #{standing.projected_rank} i divisionen
             </p>
           </div>
