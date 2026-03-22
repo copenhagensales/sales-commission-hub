@@ -136,6 +136,7 @@ import {
   CustomerInquiries,
   TvLeagueDashboard,
   Forecast,
+  ForecastClientReport,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
