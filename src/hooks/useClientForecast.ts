@@ -461,7 +461,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
       let daysElapsed = 0;
       let daysRemaining = 0;
       
-      if (period === "current") {
+      if (isCurrentPeriod) {
         const todayStr = format(now, "yyyy-MM-dd");
         
         // Count working days elapsed and remaining (exclude weekends + holidays)
