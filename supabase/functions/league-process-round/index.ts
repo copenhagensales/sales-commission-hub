@@ -138,43 +138,174 @@ Deno.serve(async (req) => {
       );
     }
 
-    // --- Fetch weekly provision for all players via RPC (single source of truth) ---
+    // --- Fetch weekly provision for all players ---
     const employeeIds = seasonStandings.map(s => s.employee_id);
-    const employeeProvision: Record<string, { provision: number; deals: number }> = {};
+    
+    const { data: agentMappings } = await supabase
+      .from("employee_agent_mapping")
+      .select("employee_id, agent_id")
+      .in("employee_id", employeeIds);
 
+    const agentIds = (agentMappings || []).map(m => m.agent_id).filter(Boolean);
+    const { data: agents } = await supabase
+      .from("agents")
+      .select("id, email")
+      .in("id", agentIds.length > 0 ? agentIds : ["__none__"]);
+
+    const employeeToEmails: Record<string, string[]> = {};
+    const addEmail = (empId: string, email: string | null | undefined) => {
+      if (!email) return;
+      const lower = email.toLowerCase();
+      if (!employeeToEmails[empId]) employeeToEmails[empId] = [];
+      if (!employeeToEmails[empId].includes(lower)) employeeToEmails[empId].push(lower);
+    };
+
+    for (const mapping of agentMappings || []) {
+      const agent = (agents || []).find(a => a.id === mapping.agent_id);
+      if (agent?.email) addEmail(mapping.employee_id, agent.email);
+    }
+
+    const { data: empData } = await supabase
+      .from("employee_master_data")
+      .select("id, work_email, private_email")
+      .in("id", employeeIds);
+
+    for (const emp of empData || []) {
+      addEmail(emp.id, emp.work_email);
+      addEmail(emp.id, emp.private_email);
+    }
+
+    // Fetch TM sales in round period (exclude FM)
     const roundStart = expiredRound.start_date;
     const roundEnd = expiredRound.end_date;
-    const RPC_BATCH = 10;
+    
+    let allTmSales: any[] = [];
+    const PAGE = 1000;
+    let offset = 0;
+    let hasMore = true;
 
-    for (let i = 0; i < employeeIds.length; i += RPC_BATCH) {
-      const batch = employeeIds.slice(i, i + RPC_BATCH);
-      const results = await Promise.all(
-        batch.map(async (empId) => {
-          const { data, error } = await supabase.rpc("get_sales_aggregates_v2", {
-            p_start: roundStart,
-            p_end: roundEnd,
-            p_employee_id: empId,
-            p_group_by: "none",
-          });
+    while (hasMore) {
+      const { data: batch } = await supabase
+        .from("sales")
+        .select("id, agent_email")
+        .neq("source", "fieldmarketing")
+        .or("validation_status.neq.rejected,validation_status.is.null")
+        .gte("sale_datetime", roundStart)
+        .lte("sale_datetime", roundEnd)
+        .range(offset, offset + PAGE - 1);
 
-          if (error) {
-            console.error(`[league-process-round] RPC error for ${empId}:`, error);
-          }
-
-          const row = data?.[0];
-          return {
-            empId,
-            provision: Number(row?.total_commission) || 0,
-            deals: Number(row?.total_sales) || 0,
-          };
-        })
-      );
-      for (const r of results) {
-        employeeProvision[r.empId] = { provision: r.provision, deals: r.deals };
+      if (batch && batch.length > 0) {
+        allTmSales = [...allTmSales, ...batch];
+        offset += batch.length;
+        hasMore = batch.length === PAGE;
+      } else {
+        hasMore = false;
       }
     }
 
-    console.log(`[league-process-round] Fetched aggregates for ${employeeIds.length} players via RPC`);
+    // Fetch FM sales separately — matched by raw_payload->>'fm_seller_id'
+    let allFmSales: any[] = [];
+    let fmOffset = 0;
+    let hasMoreFm = true;
+
+    while (hasMoreFm) {
+      const { data: fmBatch } = await supabase
+        .from("sales")
+        .select("id, raw_payload")
+        .eq("source", "fieldmarketing")
+        .or("validation_status.neq.rejected,validation_status.is.null")
+        .gte("sale_datetime", roundStart)
+        .lte("sale_datetime", roundEnd)
+        .range(fmOffset, fmOffset + PAGE - 1);
+
+      if (fmBatch && fmBatch.length > 0) {
+        allFmSales = [...allFmSales, ...fmBatch];
+        fmOffset += fmBatch.length;
+        hasMoreFm = fmBatch.length === PAGE;
+      } else {
+        hasMoreFm = false;
+      }
+    }
+
+    // Build email -> sale IDs map for TM
+    const emailToSaleIds: Record<string, string[]> = {};
+    for (const sale of allTmSales) {
+      const email = sale.agent_email?.toLowerCase();
+      if (email) {
+        if (!emailToSaleIds[email]) emailToSaleIds[email] = [];
+        emailToSaleIds[email].push(sale.id);
+      }
+    }
+
+    // Build employee_id -> FM sale IDs map
+    const employeeToFmSaleIds: Record<string, string[]> = {};
+    for (const sale of allFmSales) {
+      const fmSellerId = sale.raw_payload?.fm_seller_id;
+      if (fmSellerId) {
+        if (!employeeToFmSaleIds[fmSellerId]) employeeToFmSaleIds[fmSellerId] = [];
+        employeeToFmSaleIds[fmSellerId].push(sale.id);
+      }
+    }
+
+    const allSaleIds = [...allTmSales.map(s => s.id), ...allFmSales.map(s => s.id)];
+    const saleToCommission: Record<string, number> = {};
+    const saleToDeals: Record<string, number> = {};
+
+    if (allSaleIds.length > 0) {
+      const BATCH = 100;
+      for (let i = 0; i < allSaleIds.length; i += BATCH) {
+        const batchIds = allSaleIds.slice(i, i + BATCH);
+        const { data: items } = await supabase
+          .from("sale_items")
+          .select("sale_id, mapped_commission, quantity, product_id")
+          .in("sale_id", batchIds);
+        
+        // Fetch product counts_as_sale flags
+        const productIds = [...new Set((items || []).map(i => i.product_id).filter(Boolean))];
+        let productCounts: Record<string, boolean> = {};
+        if (productIds.length > 0) {
+          const { data: products } = await supabase
+            .from("products")
+            .select("id, counts_as_sale")
+            .in("id", productIds);
+          for (const p of products || []) {
+            productCounts[p.id] = p.counts_as_sale !== false;
+          }
+        }
+
+        for (const item of items || []) {
+          saleToCommission[item.sale_id] = (saleToCommission[item.sale_id] || 0) + (Number(item.mapped_commission) || 0);
+          const countsSale = item.product_id ? (productCounts[item.product_id] ?? true) : true;
+          const qty = countsSale ? (Number(item.quantity) || 1) : 0;
+          if (!saleToDeals[item.sale_id]) saleToDeals[item.sale_id] = 0;
+          saleToDeals[item.sale_id] += qty;
+        }
+      }
+    }
+
+    // Calculate provision per employee (TM via email + FM via fm_seller_id)
+    const employeeProvision: Record<string, { provision: number; deals: number }> = {};
+    for (const empId of employeeIds) {
+      const emails = employeeToEmails[empId] || [];
+      let provision = 0;
+      let deals = 0;
+      // TM sales (all emails)
+      for (const email of emails) {
+        if (emailToSaleIds[email]) {
+          for (const saleId of emailToSaleIds[email]) {
+            provision += saleToCommission[saleId] || 0;
+            deals += saleToDeals[saleId] || 0;
+          }
+        }
+      }
+      // FM sales
+      const fmSaleIds = employeeToFmSaleIds[empId] || [];
+      for (const saleId of fmSaleIds) {
+        provision += saleToCommission[saleId] || 0;
+        deals += saleToDeals[saleId] || 0;
+      }
+      employeeProvision[empId] = { provision, deals };
+    }
 
     // --- Group players by division and rank within ---
     const divisionGroups: Record<number, { empId: string; provision: number; deals: number }[]> = {};
