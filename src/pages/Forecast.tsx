@@ -30,6 +30,7 @@ import type { ClientForecastCohort } from "@/types/forecast";
 export default function Forecast() {
   const [selectedClient, setSelectedClient] = useState("all");
   const [period, setPeriod] = useState<"current" | "next">("next");
+  const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   // Fetch real clients for dropdown
