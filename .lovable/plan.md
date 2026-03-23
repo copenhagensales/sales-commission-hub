@@ -1,54 +1,30 @@
 
 
-# Fix: Respektér special shifts med 0 dage (Sandra, Jesus, Martin Lind m.fl.)
+# Fix: FM-medarbejdere bruger KUN bookinger til forecast-vagter
 
 ## Problem
-Flere FM-medarbejdere (Sandra R, Jesus, Martin Lind osv.) har en **special shift** tildelt i `employee_standard_shifts`, men den shift har **0 dage konfigureret**. Det betyder: "denne medarbejder har ikke faste vagter".
+FM-medarbejdere som Melissa (5 bookinger i april) får 22 vagter fordi `countShifts` falder igennem til team standard (man-fre). FM-medarbejdere skal KUN tælle individuelle vagter + booking assignments — aldrig employee standard eller team standard.
 
-Men `countShifts` ser `empStandardDays = undefined` (fordi `shiftDaysMap` ikke har nogen dage for det shift_id) og falder igennem til **team standard** (man-fre = 22 dage). Det giver forkert forecast.
+## Ændring i `src/hooks/useClientForecast.ts`
 
-Den korrekte logik (som vagtplanen bruger): Hvis medarbejderen HAR en special shift → brug KUN den, også selvom den har 0 dage. Fald ALDRIG igennem til team standard.
+### 1. Detect FM-medarbejdere
+`teamNameMap` eksisterer allerede (linje 126). Brug det til at checke om medarbejderens team indeholder "fieldmarketing" eller "field marketing".
 
-## Ændringer i `src/hooks/useClientForecast.ts`
+### 2. Ret `countShifts` — tilføj `isFm`-parameter (linje 330-375)
+Tilføj en `isFm: boolean = false` parameter. Når `isFm = true`: tæl KUN individuelle vagter + booking assignments. Spring employee standard og team standard over.
 
-### 1. Ret `countShifts` fallback (linje 361-367)
-**Fra:**
-```typescript
-} else if (!bookingOnly) {
-  if (empStandardDays !== undefined) {
-    if (empStandardDays.includes(dayNumber)) count++;
-  } else if (teamDays && teamDays.includes(dayNumber)) {
-    count++;
-  }
-}
-```
+### 3. Ret `getNormalWeeklyShifts` (linje 379-406)
+Tilføj `isFm`-parameter. Når `isFm = true`: brug gennemsnitlig booking-frekvens, spring team standard over.
 
-**Til:**
-```typescript
-} else {
-  const empHasSpecialShift = empShiftIdMap.has(empId);
-  if (empHasSpecialShift) {
-    // Employee has a special shift — use ONLY its days (even if 0)
-    if (empStandardDays && empStandardDays.includes(dayNumber)) count++;
-  } else if (teamDays && teamDays.includes(dayNumber)) {
-    // No special shift — fall back to team standard
-    count++;
-  }
-}
-```
-
-### 2. Fjern FM bookingOnly-logik (linje 486-492)
-Fjern `isFmEmployee`, `useBookingOnly` og `bookingOnly`-parameteren fra forecast-kaldene. Standard `countShifts` håndterer det nu korrekt for alle.
-
-### 3. Ret `getNormalWeeklyShifts` tilsvarende
-Samme logik: Hvis medarbejder har special shift → brug dens dage, fald ikke igennem til team standard.
+### 4. Brug FM-flag i forecast-loop (linje 436-490)
+Beregn `isFmEmployee` fra teamnavnet og send det med til `countShifts` og `getNormalWeeklyShifts`.
 
 ## Resultat
-- Sandra R, Jesus, Martin Lind (special shift, 0 dage): 0 vagter → 0 forecast ✓
-- Andre FM-medarbejdere uden special shift: Team standard (man-fre) tælles → "ikke booket" = rigtig vagt ✓
-- Non-FM medarbejdere: Uændret
+- Melissa: 5 bookinger → 5 vagter → 37.5 timer
+- Sandra/Jesus/Martin (special shift, 0 dage): 0 vagter → 0 forecast (uændret)
+- Non-FM medarbejdere: bruger fortsat team standard fallback (uændret)
 
 | Fil | Ændring |
 |-----|---------|
-| `src/hooks/useClientForecast.ts` | Ret countShifts fallback, fjern bookingOnly FM-logik, ret getNormalWeeklyShifts |
+| `src/hooks/useClientForecast.ts` | Tilføj isFm-parameter til countShifts og getNormalWeeklyShifts, brug det for FM-teams |
 
