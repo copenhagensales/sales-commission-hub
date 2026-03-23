@@ -222,51 +222,41 @@ export function usePrizeLeaders(
       let comeback: PrizeLeader | null = null;
 
       if (isActive) {
-        const { data: round1 } = await supabase
-          .from("league_rounds")
-          .select("id")
-          .eq("season_id", seasonId)
-          .eq("round_number", 1)
-          .maybeSingle();
+        // Use qualification final ranking as baseline for comeback
+        const { data: qualRankings } = await supabase
+          .from("league_qualification_standings")
+          .select("employee_id, overall_rank")
+          .eq("season_id", seasonId);
 
-        if (round1) {
-          const { data: round1Standings } = await supabase
-            .from("league_round_standings")
-            .select("employee_id, division, rank_in_division")
-            .eq("round_id", round1.id)
-            .order("division", { ascending: true })
-            .order("rank_in_division", { ascending: true });
+        const { data: currentStandings } = await supabase
+          .from("league_season_standings")
+          .select(`
+            employee_id, overall_rank,
+            employee:employee_master_data!league_season_standings_employee_id_fkey(id, first_name, last_name)
+          `)
+          .eq("season_id", seasonId);
 
-          const { data: currentStandings } = await supabase
-            .from("league_season_standings")
-            .select(`
-              employee_id, overall_rank,
-              employee:employee_master_data!league_season_standings_employee_id_fkey(id, first_name, last_name)
-            `)
-            .eq("season_id", seasonId);
+        if (qualRankings && currentStandings) {
+          const qualRankMap: Record<string, number> = {};
+          qualRankings.forEach((s: any) => { qualRankMap[s.employee_id] = s.overall_rank; });
 
-          if (round1Standings && currentStandings) {
-            const startRankMap: Record<string, number> = {};
-            round1Standings.forEach((s, idx) => { startRankMap[s.employee_id] = idx + 1; });
-
-            const comebackEntries: RankedComeback[] = [];
-            for (const cs of currentStandings) {
-              const startRank = startRankMap[cs.employee_id];
-              if (startRank == null) continue;
-              const improvement = startRank - cs.overall_rank;
-              if (improvement > 0) {
-                comebackEntries.push({ employee: cs.employee as any, improvement });
-              }
+          const comebackEntries: RankedComeback[] = [];
+          for (const cs of currentStandings) {
+            const kvalRank = qualRankMap[cs.employee_id];
+            if (kvalRank == null) continue;
+            const improvement = kvalRank - cs.overall_rank;
+            if (improvement > 0) {
+              comebackEntries.push({ employee: cs.employee as any, improvement });
             }
-            allComebacks = comebackEntries.sort((a, b) => b.improvement - a.improvement);
+          }
+          allComebacks = comebackEntries.sort((a, b) => b.improvement - a.improvement);
 
-            if (allComebacks.length > 0) {
-              comeback = {
-                employee: allComebacks[0].employee,
-                value: allComebacks[0].improvement,
-                label: `+${allComebacks[0].improvement} pladser`,
-              };
-            }
+          if (allComebacks.length > 0) {
+            comeback = {
+              employee: allComebacks[0].employee,
+              value: allComebacks[0].improvement,
+              label: `+${allComebacks[0].improvement} pladser`,
+            };
           }
         }
       } else {
