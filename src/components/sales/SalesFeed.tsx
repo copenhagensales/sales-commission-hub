@@ -172,8 +172,8 @@ interface SalesFeedProps {
 
 export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
   const [isPaused, setIsPaused] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
   const [datePreset, setDatePreset] = useState<DatePreset>("all");
   const [validationStatusFilter, setValidationStatusFilter] = useState<string>("all");
   const [salesStatusFilter, setSalesStatusFilter] = useState<string>("all");
@@ -186,14 +186,20 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
   const [expandedSaleIds, setExpandedSaleIds] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
 
-  // Debounce search input
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(searchQuery);
+  // Submit search — only when user presses Enter or clicks search button
+  const submitSearch = useCallback(() => {
+    const trimmed = searchInput.trim();
+    if (trimmed.length >= 2 || trimmed.length === 0) {
+      setAppliedSearch(trimmed);
       setCurrentPage(1);
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
+    }
+  }, [searchInput]);
+
+  const clearSearch = useCallback(() => {
+    setSearchInput("");
+    setAppliedSearch("");
+    setCurrentPage(1);
+  }, []);
 
   // Toggle expanded state for a sale
   const toggleExpanded = useCallback((saleId: string) => {
@@ -252,7 +258,7 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
   // Fetch paginated sales data
   const dateRange = getEffectiveDateRange();
   const { data, isLoading } = useQuery({
-    queryKey: ["sales-feed", currentPage, debouncedSearch, datePreset, validationStatusFilter, salesStatusFilter, sourceFilter, customDateRange.from?.toISOString(), customDateRange.to?.toISOString(), selectedClientId],
+    queryKey: ["sales-feed", currentPage, appliedSearch, datePreset, validationStatusFilter, salesStatusFilter, sourceFilter, customDateRange.from?.toISOString(), customDateRange.to?.toISOString(), selectedClientId],
     queryFn: async () => {
       const from = (currentPage - 1) * ITEMS_PER_PAGE;
       const to = from + ITEMS_PER_PAGE - 1;
@@ -289,13 +295,13 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
         .order("sale_datetime", { ascending: false });
 
       // Apply filters - use RPC for full-text search across all fields including raw_payload
-      if (debouncedSearch) {
+      if (appliedSearch) {
         const { data: matchedIds, error: searchError } = await supabase
-          .rpc('search_sales', { search_query: debouncedSearch, max_results: 200 });
+          .rpc('search_sales', { search_query: appliedSearch, max_results: 200 });
         
         if (searchError) {
           console.error("Search RPC error:", searchError);
-          query = query.or(`customer_phone.ilike.%${debouncedSearch}%,customer_company.ilike.%${debouncedSearch}%,agent_name.ilike.%${debouncedSearch}%`);
+          query = query.or(`customer_phone.ilike.%${appliedSearch}%,customer_company.ilike.%${appliedSearch}%,agent_name.ilike.%${appliedSearch}%`);
         } else if (matchedIds && matchedIds.length > 0) {
           query = query.in('id', matchedIds);
         } else {
@@ -421,7 +427,7 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, datePreset, validationStatusFilter, salesStatusFilter, sourceFilter, customDateRange, selectedClientId]);
+  }, [appliedSearch, datePreset, validationStatusFilter, salesStatusFilter, sourceFilter, customDateRange, selectedClientId]);
 
   // Copy phone number
   const copyPhone = useCallback((phone: string, saleId: string) => {
@@ -648,25 +654,34 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
       <div className="space-y-4">
         {/* Controls */}
         <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
-          <div className="relative flex-1 min-w-[260px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Søg efter kunde, telefon, sælger, OPP, lead ID..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 pr-9"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => { setSearchQuery(""); setDebouncedSearch(""); }}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
-            {searchQuery !== debouncedSearch && (
-              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
-            )}
+          <div className="relative flex-1 min-w-[260px] flex gap-1">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Søg efter kunde, telefon, sælger, OPP, lead ID..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") submitSearch(); }}
+                className="pl-9 pr-9"
+              />
+              {searchInput && (
+                <button
+                  onClick={clearSearch}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={submitSearch}
+              disabled={searchInput.trim().length > 0 && searchInput.trim().length < 2}
+              className="shrink-0"
+            >
+              <Search className="h-4 w-4" />
+            </Button>
           </div>
           
           {/* Date Filter */}
@@ -813,10 +828,10 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
               )} />
               {isPaused ? "Pause" : "Live"}
             </div>
-            {debouncedSearch && (
+            {appliedSearch && (
               <Badge variant="secondary" className="gap-1 font-normal">
-                Søgning: "{debouncedSearch}"
-                <button onClick={() => { setSearchQuery(""); setDebouncedSearch(""); }}>
+                Søgning: "{appliedSearch}"
+                <button onClick={clearSearch}>
                   <X className="h-3 w-3" />
                 </button>
               </Badge>
