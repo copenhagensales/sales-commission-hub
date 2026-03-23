@@ -114,11 +114,31 @@ export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = f
                   return (
                     <tr key={emp.employeeId} className="border-b last:border-0 hover:bg-muted/30">
                       <td className="py-2.5">
-                        <div>
-                          <p className="font-medium">{emp.employeeName}</p>
-                          {emp.teamName && (
-                            <p className="text-xs text-muted-foreground">{emp.teamName}</p>
+                        <div className="flex items-center gap-1.5">
+                          <div>
+                            <p className="font-medium">{emp.employeeName}</p>
+                            {emp.teamName && (
+                              <p className="text-xs text-muted-foreground">{emp.teamName}</p>
+                            )}
+                          </div>
+                          {emp.plannedEndDate && (
+                            <Badge variant="outline" className="text-[10px] bg-orange-100 text-orange-700 border-orange-200 cursor-pointer" onClick={() => setDepartureDialog({ id: emp.employeeId, name: emp.employeeName, endDate: emp.plannedEndDate })}>
+                              Stopper {format(new Date(emp.plannedEndDate), "d/M")}
+                            </Badge>
                           )}
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  className="text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                                  onClick={() => setDepartureDialog({ id: emp.employeeId, name: emp.employeeName, endDate: emp.plannedEndDate })}
+                                >
+                                  <CalendarOff className="h-3.5 w-3.5" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent>Sæt planlagt afgang</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         </div>
                       </td>
                       <td className="py-2.5 text-right tabular-nums">{emp.plannedHours}</td>
