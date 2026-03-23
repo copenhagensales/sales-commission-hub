@@ -1,21 +1,31 @@
 
 
-# Skjul "Ingen salgsdata" og "Mangler opsætning" fra forecast
+# Fix: Vagter vises som 00:00-00:00
 
-## Problem
-I Eesy FM-forecastet vises medarbejdere under "Ingen salgsdata" og "Mangler opsætning", selvom de sandsynligvis arbejder på Yousee og ikke bør indgå i Eesy FM-forecastet. De skaber forvirring og forurener overblikket.
+## Årsag
+Individuelle vagter i `shift`-tabellen har `start_time = '00:00:00'` og `end_time = '00:00:00'`. Da individuelle vagter har højeste prioritet i visningen (linje 687-694 i VagtplanFMContent), overrider de standard-vagttiderne fra teamet.
+
+## Løsning
+Behandl vagter med `start_time = '00:00:00' AND end_time = '00:00:00'` som "ingen individuel vagt" og fald ned til standard-vagttider i stedet.
 
 ## Ændring
 
-### `src/components/forecast/ForecastBreakdownTable.tsx`
-- Fjern de to sektioner "Ingen salgsdata" og "Mangler opsætning" helt fra visningen
-- Fjern de tilhørende variabler (`noDataEmployees`, `unmappedEmployees`) da de ikke længere bruges
-- Dette gør forecastet rent og kun fokuseret på medarbejdere med faktisk salgsaktivitet
+### `src/pages/vagt-flow/VagtplanFMContent.tsx` — linje 624
+Filtrér 00:00-vagter fra i `dayShifts`:
+```typescript
+// Fra:
+const dayShifts = shiftsByEmployeeAndDate.get(employee.id)?.get(dateStr) || [];
 
-### `src/components/forecast/ForecastTeamOverview.tsx`
-- Sørg for at team-kort kun tæller mapped+aktive medarbejdere (allerede filtreret via `!e.missingAgentMapping`, men verificér at no-data medarbejdere heller ikke påvirker team-totaler)
+// Til:
+const dayShiftsRaw = shiftsByEmployeeAndDate.get(employee.id)?.get(dateStr) || [];
+const dayShifts = dayShiftsRaw.filter(s => 
+  !(s.start_time?.startsWith('00:00') && s.end_time?.startsWith('00:00'))
+);
+```
+
+Dermed falder visningen igennem til `workTimes` (standard-vagttider) når individuelle vagter kun er 00:00-00:00.
 
 | Fil | Ændring |
 |-----|---------|
-| `src/components/forecast/ForecastBreakdownTable.tsx` | Fjern "Ingen salgsdata" og "Mangler opsætning" sektionerne |
+| `src/pages/vagt-flow/VagtplanFMContent.tsx` | Linje 624: filtrér 00:00-vagter fra så standard-tider vises |
 
