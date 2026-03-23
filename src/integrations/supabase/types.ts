@@ -2419,6 +2419,41 @@ export type Database = {
           },
         ]
       }
+      client_monthly_targets: {
+        Row: {
+          client_id: string
+          id: string
+          note: string | null
+          period_start: string
+          target_sales: number
+          updated_at: string | null
+        }
+        Insert: {
+          client_id: string
+          id?: string
+          note?: string | null
+          period_start: string
+          target_sales: number
+          updated_at?: string | null
+        }
+        Update: {
+          client_id?: string
+          id?: string
+          note?: string | null
+          period_start?: string
+          target_sales?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_monthly_targets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           created_at: string | null
