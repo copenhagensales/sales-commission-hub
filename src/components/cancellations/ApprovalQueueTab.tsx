@@ -58,6 +58,12 @@ function normalizeProductName(name: string, mode: string): string {
   return lower;
 }
 
+function isIrrelevantValue(val: unknown): boolean {
+  if (val === null || val === undefined || val === "") return true;
+  const s = String(val).trim().toLowerCase();
+  return s === "total" || s === "0" || s === "";
+}
+
 function computeDiff(
   uploadedData: Record<string, unknown> | null,
   saleItems: Array<{ product_name: string; quantity: number; mapped_commission: number; mapped_revenue: number }>,
@@ -67,22 +73,54 @@ function computeDiff(
   if (!mapping) return []; // No config → no diff (don't guess)
 
   const diffs: DiffField[] = [];
-  const matchMode = mapping.product_match_mode || "exact";
 
   // System totals
   const systemRevenue = saleItems.reduce((sum, si) => sum + (si.mapped_revenue || 0), 0);
   const systemCommission = saleItems.reduce((sum, si) => sum + (si.mapped_commission || 0), 0);
-  const systemProducts = saleItems.map((si) => si.product_name).filter(Boolean);
 
-  // Compare product columns
+  // Compare revenue (uploaded is in kr, system is in kr already from mapped_revenue)
+  if (mapping.revenue_column) {
+    const val = uploadedData[mapping.revenue_column];
+    if (!isIrrelevantValue(val)) {
+      const uploadedVal = parseFloat(String(val).replace(/[^0-9.,\-]/g, "").replace(",", "."));
+      if (!isNaN(uploadedVal) && Math.abs(uploadedVal - systemRevenue) > 1) {
+        diffs.push({
+          label: `Omsætning (${mapping.revenue_column})`,
+          systemValue: `${systemRevenue.toFixed(0)} kr`,
+          uploadedValue: `${uploadedVal.toFixed(0)} kr`,
+          isDifferent: true,
+        });
+      }
+    }
+  }
+
+  // Compare commission
+  if (mapping.commission_column) {
+    const val = uploadedData[mapping.commission_column];
+    if (!isIrrelevantValue(val)) {
+      const uploadedVal = parseFloat(String(val).replace(/[^0-9.,\-]/g, "").replace(",", "."));
+      if (!isNaN(uploadedVal) && Math.abs(uploadedVal - systemCommission) > 1) {
+        diffs.push({
+          label: `Provision (${mapping.commission_column})`,
+          systemValue: `${systemCommission.toFixed(0)} kr`,
+          uploadedValue: `${uploadedVal.toFixed(0)} kr`,
+          isDifferent: true,
+        });
+      }
+    }
+  }
+
+  // Compare product columns (only if configured)
   if (mapping.product_columns && mapping.product_columns.length > 0) {
+    const matchMode = mapping.product_match_mode || "exact";
+    const systemProducts = saleItems.map((si) => si.product_name).filter(Boolean);
+
     for (const colName of mapping.product_columns) {
       const val = uploadedData[colName];
-      if (val === null || val === undefined || val === "" || val === 0) continue;
+      if (isIrrelevantValue(val)) continue;
 
       const uploadedQty = Number(val);
       if (!isNaN(uploadedQty) && uploadedQty !== 0) {
-        // TDC-style: column name IS the product name, value is quantity
         const normalizedCol = normalizeProductName(colName, matchMode);
         const matchedItem = saleItems.find(
           (si) => normalizeProductName(si.product_name, matchMode) === normalizedCol
@@ -98,7 +136,6 @@ function computeDiff(
           });
         }
       } else {
-        // Value is a product name string
         const uploadedProduct = String(val).trim();
         const normalizedUploaded = normalizeProductName(uploadedProduct, matchMode);
         const matchesAny = systemProducts.some(
@@ -112,38 +149,6 @@ function computeDiff(
             isDifferent: true,
           });
         }
-      }
-    }
-  }
-
-  // Compare revenue
-  if (mapping.revenue_column) {
-    const val = uploadedData[mapping.revenue_column];
-    if (val !== null && val !== undefined && val !== "") {
-      const uploadedVal = parseFloat(String(val).replace(/[^0-9.,\-]/g, "").replace(",", "."));
-      if (!isNaN(uploadedVal) && Math.abs(uploadedVal - systemRevenue) > 0.01) {
-        diffs.push({
-          label: mapping.revenue_column,
-          systemValue: `${systemRevenue.toFixed(2)} kr`,
-          uploadedValue: `${uploadedVal.toFixed(2)} kr`,
-          isDifferent: true,
-        });
-      }
-    }
-  }
-
-  // Compare commission
-  if (mapping.commission_column) {
-    const val = uploadedData[mapping.commission_column];
-    if (val !== null && val !== undefined && val !== "") {
-      const uploadedVal = parseFloat(String(val).replace(/[^0-9.,\-]/g, "").replace(",", "."));
-      if (!isNaN(uploadedVal) && Math.abs(uploadedVal - systemCommission) > 0.01) {
-        diffs.push({
-          label: mapping.commission_column,
-          systemValue: `${systemCommission.toFixed(2)} kr`,
-          uploadedValue: `${uploadedVal.toFixed(2)} kr`,
-          isDifferent: true,
-        });
       }
     }
   }
