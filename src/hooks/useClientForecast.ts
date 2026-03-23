@@ -377,10 +377,15 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
       function countConcreteShifts(empId: string, rangeStart: Date, rangeEnd: Date): number {
         const individualDates = individualShiftMap.get(empId) || new Set();
         const bookingDates = bookingAssignmentMap.get(empId) || new Set();
+        const absenceDates = absenceDateMap.get(empId) || new Set();
         let count = 0;
         const cur = new Date(rangeStart);
         while (cur <= rangeEnd) {
           const dateStr = format(cur, "yyyy-MM-dd");
+          if (holidayDates.has(dateStr) || absenceDates.has(dateStr)) {
+            cur.setDate(cur.getDate() + 1);
+            continue;
+          }
           if (individualDates.has(dateStr) || bookingDates.has(dateStr)) {
             count++;
           }
