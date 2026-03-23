@@ -118,7 +118,7 @@ export default function CommissionLeague() {
   const [selectedRoundIndex, setSelectedRoundIndex] = useState<number | null>(null);
   const effectiveIndex = selectedRoundIndex ?? activeRoundIndex;
   const selectedRound = roundHistory ? roundHistory[effectiveIndex] : undefined;
-  const { data: selectedRoundStandings } = useRoundStandings(selectedRound?.id);
+  const { data: selectedRoundStandings } = useRoundStandings(selectedRound?.status !== "active" ? selectedRound?.id : undefined);
   const { data: prizeLeaders } = usePrizeLeaders(
     season?.id,
     season?.start_date,
