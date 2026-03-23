@@ -54,6 +54,12 @@ export default function ForecastClientReport() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
   }, [monthOffset]);
 
+  const nextMonthStart = useMemo(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + monthOffset + 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+  }, [monthOffset]);
+
   const { data: clientTarget } = useQuery({
     queryKey: ["client-monthly-target", selectedClient, periodStart],
     queryFn: async () => {
@@ -62,7 +68,8 @@ export default function ForecastClientReport() {
         .from("client_monthly_targets")
         .select("target_sales")
         .eq("client_id", selectedClient)
-        .eq("period_start", periodStart)
+        .gte("period_start", periodStart)
+        .lt("period_start", nextMonthStart)
         .maybeSingle();
       return data?.target_sales ?? null;
     },
