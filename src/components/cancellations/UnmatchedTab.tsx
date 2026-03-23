@@ -80,8 +80,8 @@ export function UnmatchedTab({ clientId }: UnmatchedTabProps) {
     enabled: !!selectedImportId,
   });
 
-  // Get client_id from queue items
-  const clientId = queueSaleIds[0]?.client_id || null;
+  // Get client_id from queue items or use the prop
+  const resolvedClientId = clientId || queueSaleIds[0]?.client_id || null;
   const matchedSaleIdSet = new Set(queueSaleIds.map(q => q.sale_id));
 
   // Fetch system sales for the client that are NOT in the queue
