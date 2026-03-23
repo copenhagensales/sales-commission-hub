@@ -1,26 +1,38 @@
 
 
-# Split godkendelseskø i to: Annulleringer og Kurv-rettelser
+# Flyt kundevælger til toppen af Annulleringer-siden
 
-## Problem
-Alt blandes i én liste. Brugeren vil have separate visninger for annulleringer og kurv-rettelser.
+## Hvad
+En global kundevælger i toppen af `/salary/cancellations` som alle tabs deler. Når man vælger en kunde, handler hele siden om den kunde.
 
-## Løsning
-Tilføj en intern tab-switcher (Tabs) i `ApprovalQueueTab` der filtrerer på `upload_type`:
-- **Annulleringer** (`upload_type === "cancellation"`)
-- **Kurv-rettelser** (`upload_type === "basket_difference"`)
-
-Hver sub-tab viser sin egen tabel med egne "Godkend alle / Afvis alle" knapper og tæller.
-
-## Ændring
+## Ændringer
 
 | Fil | Hvad |
 |-----|------|
-| `src/components/cancellations/ApprovalQueueTab.tsx` | Tilføj intern `Tabs` med "Annulleringer" og "Kurv-rettelser". Filtrer `oppGroups` og `flatItems` på `uploadType`/`upload_type` per tab. Flyt bulk-actions og tabeller ind i hver tab. |
+| `src/pages/salary/Cancellations.tsx` | Tilføj `selectedClientId` state + clients query + Select i toppen. Send `clientId` som prop til alle tab-komponenter. |
+| `src/components/cancellations/ManualCancellationsTab.tsx` | Modtag `clientId` prop i stedet for egen kundevælger. Fjern lokal `selectedClientId` state og client-select UI. |
+| `src/components/cancellations/UploadCancellationsTab.tsx` | Modtag `clientId` prop. Fjern lokal kundevælger. |
+| `src/components/cancellations/DuplicatesTab.tsx` | Modtag `clientId` prop. Fjern lokal kundevælger. Behold "Alle kunder" som fallback når `clientId` er tom. |
+| `src/components/cancellations/ApprovalQueueTab.tsx` | Modtag `clientId` prop. Filtrer queue items på `client_id` når sat. |
+| `src/components/cancellations/UnmatchedTab.tsx` | Modtag `clientId` prop. Filtrer imports/results på den valgte kunde. |
 
 ## Teknisk detalje
-- `filteredOppGroups` og `filteredFlatItems` splittes yderligere med `.filter(x => x.uploadType === activeSubTab)` hhv. `.filter(x => x.upload_type === activeSubTab)`
-- Sub-tab state: `const [subTab, setSubTab] = useState<"cancellation" | "basket_difference">("cancellation")`
-- Tælling per sub-tab vises i tab-label: "Annulleringer (12)" / "Kurv-rettelser (3)"
-- Eksisterende status-filter og "kun forskelle" checkbox bevares og virker inden for den aktive sub-tab
+
+**Cancellations.tsx** — ny state og UI:
+```tsx
+const [selectedClientId, setSelectedClientId] = useState("");
+// Query clients
+// Render Select i header-sektionen mellem titel og tabs
+```
+
+**Alle tabs** — interface ændring:
+```tsx
+interface Props { clientId: string; }
+// Erstatter lokal selectedClientId med props.clientId
+// Fjerner client Select fra UI
+// Queries bruger clientId fra props
+```
+
+**ApprovalQueueTab + UnmatchedTab** — filtrering:
+- Disse tabs har ikke en eksisterende kundevælger, så de får tilføjet et `.eq("client_id", clientId)` filter på deres queries når `clientId` er sat.
 
