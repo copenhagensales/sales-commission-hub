@@ -259,22 +259,32 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
       });
 
       const absenceDateMap = new Map<string, Set<string>>();
+      const sickOnlyAbsenceDateMap = new Map<string, Set<string>>();
       (absencesRes.data || []).forEach(a => {
         if (!absenceDateMap.has(a.employee_id)) absenceDateMap.set(a.employee_id, new Set());
+        if (!sickOnlyAbsenceDateMap.has(a.employee_id)) sickOnlyAbsenceDateMap.set(a.employee_id, new Set());
         const absStart = new Date(a.start_date);
         const absEnd = new Date(a.end_date);
         const cur = new Date(absStart);
         while (cur <= absEnd) {
-          absenceDateMap.get(a.employee_id)!.add(format(cur, "yyyy-MM-dd"));
+          const dateStr = format(cur, "yyyy-MM-dd");
+          absenceDateMap.get(a.employee_id)!.add(dateStr);
+          // Only sick/no_show count toward attendance factor penalty
+          if (a.type === 'sick' || a.type === 'no_show') {
+            sickOnlyAbsenceDateMap.get(a.employee_id)!.add(dateStr);
+          }
           cur.setDate(cur.getDate() + 1);
         }
       });
 
       // Count shifts in a range for an employee
-      function countShifts(empId: string, rangeStart: Date, rangeEnd: Date, excludeAbsence: boolean): number {
+      // absenceMode: 'all' = exclude all absences, 'sick_only' = exclude only sick/no_show, false = no exclusion
+      function countShifts(empId: string, rangeStart: Date, rangeEnd: Date, excludeAbsence: boolean | 'sick_only' = false): number {
         const empTeamId = employeeTeamMap.get(empId);
         const teamDays = empTeamId ? teamShiftDaysMap.get(empTeamId) : undefined;
-        const absenceDates = absenceDateMap.get(empId) || new Set();
+        const absenceDates = excludeAbsence === 'sick_only'
+          ? (sickOnlyAbsenceDateMap.get(empId) || new Set())
+          : (absenceDateMap.get(empId) || new Set());
         const individualDates = individualShiftMap.get(empId) || new Set();
         const empShiftId = empShiftIdMap.get(empId);
         const empStandardDays = empShiftId ? shiftDaysMap.get(empShiftId) : undefined;
@@ -307,6 +317,16 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         return count;
       }
 
+      // Helper: get normal weekly shift count for an employee (from standard schedule, no absences)
+      function getNormalWeeklyShifts(empId: string): number {
+        const empShiftId = empShiftIdMap.get(empId);
+        const empStandardDays = empShiftId ? shiftDaysMap.get(empShiftId) : undefined;
+        if (empStandardDays !== undefined) return empStandardDays.length;
+        const empTeamId = employeeTeamMap.get(empId);
+        const teamDays = empTeamId ? teamShiftDaysMap.get(empTeamId) : undefined;
+        return teamDays?.length || 5;
+      }
+
       // 6. Build EmployeePerformance for each active employee
       // For EWMA: get SPH per week (sales / shifts / 7.5)
       const weekStarts: Date[] = [];
@@ -335,12 +355,13 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
 
         // Weekly SPH (most recent first) — use absence-adjusted shifts
         const weeklySph: number[] = [];
+        const normalWeeklyShifts = getNormalWeeklyShifts(emp.id);
         for (const ws of weekStarts) {
           const we = endOfWeek(ws, { weekStartsOn: 1 });
           const shiftsInWeek = countShifts(emp.id, ws, we, true); // exclude absences
           
-          // Skip weeks with 0 effective shifts (full vacation/sick)
-          if (shiftsInWeek === 0) continue;
+          // Skip weeks with less than 50% of normal capacity (partial vacation weeks)
+          if (shiftsInWeek < normalWeeklyShifts * 0.5) continue;
           
           const hoursInWeek = shiftsInWeek * HOURS_PER_SHIFT;
 
@@ -366,12 +387,12 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         const forecastShifts = countShifts(emp.id, forecastStart, empForecastEnd, true);
         const plannedHours = forecastShifts * HOURS_PER_SHIFT;
 
-        // Attendance factor: (shifts - absence days) / shifts over past 90 days
+        // Attendance factor: only sick/no_show reduces attendance (vacation is planned, not a penalty)
         const past90Start = subWeeks(now, 13);
         const totalShiftsPast90 = countShifts(emp.id, past90Start, now, false);
-        const totalShiftsNoAbsence = countShifts(emp.id, past90Start, now, true);
+        const totalShiftsNoSick = countShifts(emp.id, past90Start, now, 'sick_only');
         const attendanceFactor = totalShiftsPast90 > 0
-          ? Math.min(1, totalShiftsNoAbsence / totalShiftsPast90)
+          ? Math.min(1, totalShiftsNoSick / totalShiftsPast90)
           : 0.92;
 
         const teamId = employeeTeamMap.get(emp.id);
