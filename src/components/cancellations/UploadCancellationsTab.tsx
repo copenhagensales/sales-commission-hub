@@ -58,7 +58,11 @@ interface UploadConfig {
   is_default: boolean;
 }
 
-export function UploadCancellationsTab() {
+interface UploadCancellationsTabProps {
+  clientId: string;
+}
+
+export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCancellationsTabProps) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const [file, setFile] = useState<File | null>(null);
@@ -70,7 +74,6 @@ export function UploadCancellationsTab() {
   const [productColumn, setProductColumn] = useState<string>("__none__");
   const [revenueColumn, setRevenueColumn] = useState<string>("__none__");
   const [commissionColumn, setCommissionColumn] = useState<string>("__none__");
-  const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [selectedConfigId, setSelectedConfigId] = useState<string>("__none__");
   const [matchedSales, setMatchedSales] = useState<MatchedSale[]>([]);
   const [isMatching, setIsMatching] = useState(false);
@@ -78,19 +81,6 @@ export function UploadCancellationsTab() {
   const [step, setStep] = useState<"upload" | "mapping" | "preview" | "done">("upload");
   const [configName, setConfigName] = useState("");
   const [showSaveConfig, setShowSaveConfig] = useState(false);
-
-  // Fetch clients
-  const { data: clients = [] } = useQuery({
-    queryKey: ["clients-for-cancellations-upload"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("clients")
-        .select("id, name")
-        .order("name");
-      if (error) throw error;
-      return data;
-    },
-  });
 
   // Fetch configs for selected client
   const { data: clientConfigs = [] } = useQuery({
@@ -560,7 +550,6 @@ export function UploadCancellationsTab() {
     setRevenueColumn("__none__");
     setCommissionColumn("__none__");
     setUploadType("cancellation");
-    setSelectedClientId("");
     setSelectedConfigId("__none__");
     setMatchedSales([]);
     setStep("upload");
@@ -621,17 +610,7 @@ export function UploadCancellationsTab() {
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label>Vælg kunde</Label>
-                <Select value={selectedClientId} onValueChange={setSelectedClientId}>
-                  <SelectTrigger><SelectValue placeholder="Vælg kunde..." /></SelectTrigger>
-                  <SelectContent>
-                    {clients.map((client) => (
-                      <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+
 
               {clientConfigs.length > 0 && (
                 <div className="space-y-2">

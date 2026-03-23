@@ -1,4 +1,9 @@
+import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { ManualCancellationsTab } from "@/components/cancellations/ManualCancellationsTab";
 import { UploadCancellationsTab } from "@/components/cancellations/UploadCancellationsTab";
 import { DuplicatesTab } from "@/components/cancellations/DuplicatesTab";
@@ -6,23 +11,35 @@ import { ApprovalQueueTab } from "@/components/cancellations/ApprovalQueueTab";
 import { UnmatchedTab } from "@/components/cancellations/UnmatchedTab";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
-import { useMemo } from "react";
 
 export default function Cancellations() {
   const { canView, isOwner } = useUnifiedPermissions();
+  const [selectedClientId, setSelectedClientId] = useState<string>("");
+
+  const { data: clients = [] } = useQuery({
+    queryKey: ["clients-for-cancellations-page"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("clients")
+        .select("id, name")
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
 
   const visibleTabs = useMemo(() => {
-    const tabs = [] as { value: string; label: string; key: string }[];
+    const tabs = [] as { value: string; label: string }[];
     if (isOwner || canView('tab_cancellations_manual'))
-      tabs.push({ value: 'manual', label: 'Rediger kurv', key: 'tab_cancellations_manual' });
+      tabs.push({ value: 'manual', label: 'Rediger kurv' });
     if (isOwner || canView('tab_cancellations_upload'))
-      tabs.push({ value: 'upload', label: 'Upload/match', key: 'tab_cancellations_upload' });
+      tabs.push({ value: 'upload', label: 'Upload/match' });
     if (isOwner || canView('tab_cancellations_duplicates'))
-      tabs.push({ value: 'duplicates', label: 'Dubletter', key: 'tab_cancellations_duplicates' });
+      tabs.push({ value: 'duplicates', label: 'Dubletter' });
     if (isOwner || canView('tab_cancellations_approval'))
-      tabs.push({ value: 'approval', label: 'Godkendelseskø', key: 'tab_cancellations_approval' });
+      tabs.push({ value: 'approval', label: 'Godkendelseskø' });
     if (isOwner || canView('tab_cancellations_unmatched'))
-      tabs.push({ value: 'unmatched', label: 'Ingen match', key: 'tab_cancellations_unmatched' });
+      tabs.push({ value: 'unmatched', label: 'Ingen match' });
     return tabs;
   }, [isOwner, canView]);
 
@@ -31,11 +48,28 @@ export default function Cancellations() {
   return (
     <MainLayout>
       <div className="container mx-auto py-8 px-4 max-w-7xl">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold tracking-tight">Annulleringer</h1>
-          <p className="text-muted-foreground mt-2">
-            Administrer manuelle og bulk-annulleringer af salg
-          </p>
+        <div className="mb-8 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Annulleringer</h1>
+            <p className="text-muted-foreground mt-2">
+              Administrer manuelle og bulk-annulleringer af salg
+            </p>
+          </div>
+          <div className="space-y-1 min-w-[250px]">
+            <Label>Kunde</Label>
+            <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Vælg kunde..." />
+              </SelectTrigger>
+              <SelectContent>
+                {clients.map((client) => (
+                  <SelectItem key={client.id} value={client.id}>
+                    {client.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {visibleTabs.length === 0 ? (
@@ -49,27 +83,27 @@ export default function Cancellations() {
             </TabsList>
             {visibleTabs.some(t => t.value === 'manual') && (
               <TabsContent value="manual" className="mt-6">
-                <ManualCancellationsTab />
+                <ManualCancellationsTab clientId={selectedClientId} />
               </TabsContent>
             )}
             {visibleTabs.some(t => t.value === 'upload') && (
               <TabsContent value="upload" className="mt-6">
-                <UploadCancellationsTab />
+                <UploadCancellationsTab clientId={selectedClientId} />
               </TabsContent>
             )}
             {visibleTabs.some(t => t.value === 'duplicates') && (
               <TabsContent value="duplicates" className="mt-6">
-                <DuplicatesTab />
+                <DuplicatesTab clientId={selectedClientId} />
               </TabsContent>
             )}
             {visibleTabs.some(t => t.value === 'approval') && (
               <TabsContent value="approval" className="mt-6">
-                <ApprovalQueueTab />
+                <ApprovalQueueTab clientId={selectedClientId} />
               </TabsContent>
             )}
             {visibleTabs.some(t => t.value === 'unmatched') && (
               <TabsContent value="unmatched" className="mt-6">
-                <UnmatchedTab />
+                <UnmatchedTab clientId={selectedClientId} />
               </TabsContent>
             )}
           </Tabs>
