@@ -1390,7 +1390,7 @@ export function TeamsTab() {
                                 </span>
                               )}
                             </div>
-                            {getEmployeeTeamCount(emp.id) === 1 && editingTeam && (
+                            {(getEmployeeTeamCount(emp.id) === 1 || emp.is_staff_employee) && editingTeam && (
                               <Button
                                 variant="ghost"
                                 size="icon"
