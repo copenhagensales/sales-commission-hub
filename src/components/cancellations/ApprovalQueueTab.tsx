@@ -288,6 +288,12 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   const [statusFilter, setStatusFilter] = useState<string>("pending");
   const [onlyDifferences, setOnlyDifferences] = useState(false);
   const [subTab, setSubTab] = useState<"cancellation" | "basket_difference" | "unmatched">("cancellation");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sellerFilter, setSellerFilter] = useState("all");
+  type QueueSortKey = "date" | "agent" | "opp" | "type";
+  type QueueSortDir = "asc" | "desc";
+  const [sortKey, setSortKey] = useState<QueueSortKey>("date");
+  const [sortDir, setSortDir] = useState<QueueSortDir>("desc");
 
   const { data: currentEmployee } = useQuery({
     queryKey: ["current-employee-for-approval", user?.email],
