@@ -24,6 +24,7 @@ interface ActiveSeasonBoardProps {
   defaultShowAll?: boolean;
   todayProvisionMap?: Record<string, number>;
   weeklyProvisionMap?: Record<string, number[]>;
+  roundProvisionMap?: Record<string, number>;
 }
 
 export function ActiveSeasonBoard({
@@ -34,6 +35,7 @@ export function ActiveSeasonBoard({
   defaultShowAll = false,
   todayProvisionMap = {},
   weeklyProvisionMap = {},
+  roundProvisionMap = {},
 }: ActiveSeasonBoardProps) {
   const [showAll, setShowAll] = useState(defaultShowAll);
   const todayTop3 = useMemo(() => computeTodayTop3(todayProvisionMap), [todayProvisionMap]);
