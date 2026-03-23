@@ -529,8 +529,7 @@ export default function LocationProfitabilityContent() {
                         const daySellerCost = dayCommission * (1 + VACATION_PAY_RATES.SELLER);
                         const dayLocCost = isBooked ? loc.dailyRate : 0;
                         const dayDietCost = dietByLocationDate.get(`${loc.locationId}|${dateStr}`) || 0;
-                        // Hotel is aggregated at booking level, not per day — show 0 on daily rows
-                        const dayHotelCost = 0;
+                        const dayHotelCost = isBooked && loc.bookedDays.length > 0 ? (loc.hotelCost / loc.bookedDays.length) : 0;
                         const dayDB = dayRevenue - daySellerCost - dayLocCost - dayHotelCost - dayDietCost;
 
                         return (
