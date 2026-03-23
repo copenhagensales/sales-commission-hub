@@ -13,7 +13,8 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
-import { Check, X, Loader2, Clock, Filter } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Check, X, Loader2, Clock, Filter, Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { UnmatchedTab } from "@/components/cancellations/UnmatchedTab";
@@ -287,6 +288,12 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   const [statusFilter, setStatusFilter] = useState<string>("pending");
   const [onlyDifferences, setOnlyDifferences] = useState(false);
   const [subTab, setSubTab] = useState<"cancellation" | "basket_difference" | "unmatched">("cancellation");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sellerFilter, setSellerFilter] = useState("all");
+  type QueueSortKey = "date" | "agent" | "opp" | "type";
+  type QueueSortDir = "asc" | "desc";
+  const [sortKey, setSortKey] = useState<QueueSortKey>("date");
+  const [sortDir, setSortDir] = useState<QueueSortDir>("desc");
 
   const { data: currentEmployee } = useQuery({
     queryKey: ["current-employee-for-approval", user?.email],
@@ -530,7 +537,73 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   const subOppGroups = useMemo(() => filteredOppGroups.filter((g) => g.uploadType === subTab), [filteredOppGroups, subTab]);
   const subFlatItems = useMemo(() => filteredFlatItems.filter((i) => i.upload_type === subTab), [filteredFlatItems, subTab]);
 
-  // Counts per sub-tab for labels
+  // Unique sellers across all items for filter
+  const allSellers = useMemo(() => {
+    const names = new Set<string>();
+    filteredOppGroups.forEach(g => g.agents.forEach(a => names.add(a)));
+    filteredFlatItems.forEach(i => names.add(i.agentName));
+    return [...names].sort();
+  }, [filteredOppGroups, filteredFlatItems]);
+
+  // Apply search + seller filter + sort to sub-tab items
+  const filterAndSort = <T extends { agentName?: string; agents?: string[]; oppNumber?: string; oppGroup?: string; phone?: string; company?: string; saleDate?: string; createdAt?: string; fileName?: string }>(
+    items: T[],
+    getAgent: (item: T) => string,
+    getSearchStr: (item: T) => string,
+    getDateStr: (item: T) => string,
+  ): T[] => {
+    let result = [...items];
+
+    if (sellerFilter !== "all") {
+      result = result.filter(item => {
+        const agent = getAgent(item);
+        return agent === sellerFilter || (item as any).agents?.includes(sellerFilter);
+      });
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(item => getSearchStr(item).toLowerCase().includes(q));
+    }
+
+    result.sort((a, b) => {
+      let cmp = 0;
+      switch (sortKey) {
+        case "date":
+          cmp = (getDateStr(a)).localeCompare(getDateStr(b));
+          break;
+        case "agent":
+          cmp = getAgent(a).localeCompare(getAgent(b));
+          break;
+        case "opp":
+          cmp = ((a as any).oppNumber || (a as any).oppGroup || "").localeCompare((b as any).oppNumber || (b as any).oppGroup || "");
+          break;
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+
+    return result;
+  };
+
+  const processedOppGroups = useMemo(() =>
+    filterAndSort(
+      subOppGroups,
+      g => g.agents.join(", "),
+      g => [g.oppGroup, ...g.agents, g.fileName].join(" "),
+      g => g.createdAt,
+    ),
+    [subOppGroups, sellerFilter, searchQuery, sortKey, sortDir]);
+
+  const processedFlatItems = useMemo(() =>
+    filterAndSort(
+      subFlatItems,
+      i => i.agentName,
+      i => [i.agentName, i.oppNumber, i.phone, i.company, i.fileName].join(" "),
+      i => i.saleDate,
+    ),
+    [subFlatItems, sellerFilter, searchQuery, sortKey, sortDir]);
+
+  // Counts per sub-tab for labels (use original unfiltered)
   const cancellationCount = useMemo(() =>
     filteredOppGroups.filter((g) => g.uploadType === "cancellation").length +
     filteredFlatItems.filter((i) => i.upload_type === "cancellation").length,
@@ -540,10 +613,26 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
     filteredFlatItems.filter((i) => i.upload_type === "basket_difference").length,
     [filteredOppGroups, filteredFlatItems]);
 
-  const pendingOppGroups = subOppGroups.filter((g) => g.status === "pending");
-  const pendingFlatItems = subFlatItems.filter((i) => i.status === "pending");
+  const pendingOppGroups = processedOppGroups.filter((g) => g.status === "pending");
+  const pendingFlatItems = processedFlatItems.filter((i) => i.status === "pending");
   const totalPending = pendingOppGroups.length + pendingFlatItems.length;
   const isPending = approveMutation.isPending || rejectMutation.isPending;
+
+  const handleSort = (key: QueueSortKey) => {
+    if (sortKey === key) {
+      setSortDir(d => d === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortDir(key === "date" ? "desc" : "asc");
+    }
+  };
+
+  const QueueSortIcon = ({ column }: { column: QueueSortKey }) => {
+    if (sortKey !== column) return <ArrowUpDown className="h-3 w-3 ml-1 opacity-40" />;
+    return sortDir === "asc"
+      ? <ArrowUp className="h-3 w-3 ml-1" />
+      : <ArrowDown className="h-3 w-3 ml-1" />;
+  };
 
   const handleApproveAllPending = () => {
     for (const g of pendingOppGroups) {
@@ -563,35 +652,41 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   };
 
   const renderTable = () => {
-    if (subOppGroups.length === 0 && subFlatItems.length === 0) {
+    if (processedOppGroups.length === 0 && processedFlatItems.length === 0) {
       return (
         <div className="py-8 text-center text-muted-foreground">
-          {onlyDifferences ? "Ingen salg med forskelle fundet." : `Ingen ${statusFilter === "pending" ? "ventende" : ""} items i køen.`}
+          {searchQuery || sellerFilter !== "all"
+            ? "Ingen resultater matcher din søgning/filter."
+            : onlyDifferences ? "Ingen salg med forskelle fundet." : `Ingen ${statusFilter === "pending" ? "ventende" : ""} items i køen.`}
         </div>
       );
     }
 
     return (
       <div className="space-y-6">
-        {subOppGroups.length > 0 && (
+        {processedOppGroups.length > 0 && (
           <div>
             <h3 className="text-sm font-semibold mb-2 text-muted-foreground">TDC Erhverv — OPP-grupperet</h3>
             <div className="rounded-md border max-h-[600px] overflow-auto">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>OPP</TableHead>
-                    <TableHead>Sælgere</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>System (aggregeret)</TableHead>
-                    <TableHead>Uploadet data</TableHead>
-                    <TableHead>Forskelle</TableHead>
-                    <TableHead>Status</TableHead>
-                    {statusFilter === "pending" && <TableHead>Handlinger</TableHead>}
-                  </TableRow>
+                   <TableRow>
+                     <TableHead className="cursor-pointer select-none" onClick={() => handleSort("opp")}>
+                       <span className="flex items-center">OPP <QueueSortIcon column="opp" /></span>
+                     </TableHead>
+                     <TableHead className="cursor-pointer select-none" onClick={() => handleSort("agent")}>
+                       <span className="flex items-center">Sælgere <QueueSortIcon column="agent" /></span>
+                     </TableHead>
+                     <TableHead>Type</TableHead>
+                     <TableHead>System (aggregeret)</TableHead>
+                     <TableHead>Uploadet data</TableHead>
+                     <TableHead>Forskelle</TableHead>
+                     <TableHead>Status</TableHead>
+                     {statusFilter === "pending" && <TableHead>Handlinger</TableHead>}
+                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {subOppGroups.map((g) => {
+                  {processedOppGroups.map((g) => {
                     const summarizedItems = summarizeSaleItems(g.saleItems);
                     const uploadedPreview = buildUploadedPreview(g.uploadedData, g.mapping);
                     return (
@@ -681,28 +776,34 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
           </div>
         )}
 
-        {subFlatItems.length > 0 && (
+        {processedFlatItems.length > 0 && (
           <div>
-            {subOppGroups.length > 0 && (
+            {processedOppGroups.length > 0 && (
               <h3 className="text-sm font-semibold mb-2 text-muted-foreground">Andre kunder — per salg</h3>
             )}
             <div className="rounded-md border max-h-[600px] overflow-auto">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Salgsdato</TableHead>
-                    <TableHead>Sælger</TableHead>
-                    <TableHead>OPP</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>System data</TableHead>
-                    <TableHead>Uploadet data</TableHead>
-                    <TableHead>Forskelle</TableHead>
-                    <TableHead>Status</TableHead>
-                    {statusFilter === "pending" && <TableHead>Handlinger</TableHead>}
-                  </TableRow>
+                   <TableRow>
+                     <TableHead className="cursor-pointer select-none" onClick={() => handleSort("date")}>
+                       <span className="flex items-center">Salgsdato <QueueSortIcon column="date" /></span>
+                     </TableHead>
+                     <TableHead className="cursor-pointer select-none" onClick={() => handleSort("agent")}>
+                       <span className="flex items-center">Sælger <QueueSortIcon column="agent" /></span>
+                     </TableHead>
+                     <TableHead className="cursor-pointer select-none" onClick={() => handleSort("opp")}>
+                       <span className="flex items-center">OPP <QueueSortIcon column="opp" /></span>
+                     </TableHead>
+                     <TableHead>Type</TableHead>
+                     <TableHead>System data</TableHead>
+                     <TableHead>Uploadet data</TableHead>
+                     <TableHead>Forskelle</TableHead>
+                     <TableHead>Status</TableHead>
+                     {statusFilter === "pending" && <TableHead>Handlinger</TableHead>}
+                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {subFlatItems.map((item) => {
+                  {processedFlatItems.map((item) => {
                     const summarizedItems = summarizeSaleItems(item.saleItems);
                     const uploadedPreview = buildUploadedPreview(item.uploadedData, item.mapping);
                     return (
@@ -828,7 +929,27 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="flex items-center gap-2">
+                <Select value={sellerFilter} onValueChange={setSellerFilter}>
+                  <SelectTrigger className="w-[180px]"><SelectValue placeholder="Alle sælgere" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Alle sælgere</SelectItem>
+                    {allSellers.map(name => (
+                      <SelectItem key={name} value={name}>{name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
+          </div>
+          <div className="relative max-w-sm mt-3">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Søg i alle felter..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
