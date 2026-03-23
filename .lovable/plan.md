@@ -1,26 +1,26 @@
 
 
-# Tilføj Hotel-fane i Rediger Booking dialogen
+# Fix: Tillad fjernelse af stab-medarbejdere fra teams
 
-## Hvad der bygges
-En ny "Hotel" fane i `EditBookingDialog` der viser det tilknyttede hotel (hvis der er et) med mulighed for at redigere pris, status, bekræftelsesnummer — eller tildele et nyt hotel direkte fra booking-dialogen.
+## Problem
+Fjern-knappen (X) vises kun når en medarbejder er på **præcis 1 team** (`getEmployeeTeamCount(emp.id) === 1`). Thomas Wehage er stab-medarbejder og er på flere teams, så knappen skjules.
 
-## Ændringer
+For ikke-stab medarbejdere giver reglen mening (de bør flyttes i stedet for fjernes), men stab-medarbejdere skal frit kunne fjernes fra individuelle teams.
 
-### 1. `src/components/vagt-flow/EditBookingDialog.tsx`
-- Udvid TabsList fra `grid-cols-4` til `grid-cols-5`
-- Tilføj ny `TabsTrigger` for "Hotel" med `Building2`-ikon
-- Tilføj ny `TabsContent value="hotel"` der:
-  - Henter `booking_hotel` for den aktuelle booking via `useBookingHotels([booking.id])`
-  - **Hvis hotel er tildelt**: Viser hotelnavnm, pris pr. nat (redigerbar), status, bekræftelsesnummer, noter — med gem-knap
-  - **Hvis intet hotel**: Viser knap "Tildel hotel" der åbner `AssignHotelDialog`
-- Importér `useBookingHotels`, `useUpdateBookingHotel` fra `useBookingHotels` hook
-- Importér `AssignHotelDialog` til sub-dialog åbning
+## Ændring
 
-### 2. Ingen andre filer ændres
-Alt genbrug eksisterende hooks og komponenter.
+### `src/components/employees/TeamsTab.tsx` — linje 1393
+Udvid betingelsen så X-knappen også vises for stab-medarbejdere:
+
+```typescript
+// Fra:
+{getEmployeeTeamCount(emp.id) === 1 && editingTeam && (
+
+// Til:
+{(getEmployeeTeamCount(emp.id) === 1 || emp.is_staff_employee) && editingTeam && (
+```
 
 | Fil | Ændring |
 |-----|---------|
-| `src/components/vagt-flow/EditBookingDialog.tsx` | Ny Hotel-fane med visning/redigering af hoteltildeling |
+| `src/components/employees/TeamsTab.tsx` | Linje 1393: vis fjern-knap for stab-medarbejdere uanset antal teams |
 
