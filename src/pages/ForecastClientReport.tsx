@@ -161,7 +161,7 @@ function ReportExecutiveSummary({ forecast, clientName, periodLabel, monthOffset
 }) {
   const total = forecast.totalSalesExpected;
   const numEmployees = forecast.establishedEmployees.length;
-  const numCohorts = forecast.cohorts.filter(c => c.forecastSales > 0).length;
+  const numCohorts = forecast.cohorts.filter(c => c.forecastSales > 0 && c.startDate >= forecast.periodStart && c.startDate <= forecast.periodEnd).length;
   const absLoss = forecast.absenceLoss;
   const churnLoss = forecast.churnLoss + (forecast.establishedChurnLoss || 0);
   const isCurrentPeriod = monthOffset === 0;
