@@ -1,29 +1,31 @@
 
 
-# Fix: Sandra R forecast i klientforecast (useClientForecast.ts)
+# Debug & Fix: Sandra R stadig med 144 salg i forecast
 
 ## Problem
-Rettelsen fra `useTeamGoalForecast.ts` (bookingOnly-logikken) blev **ikke** spejlet i `useClientForecast.ts`. Denne hook har sin egen `countShifts`-funktion (linje 330-369) som stadig falder igennem til team standard shifts (mon-fre = ~22 vagter). Derudover returnerer `getNormalWeeklyShifts` (linje 395) `return 5` som fallback.
+Koden i `useClientForecast.ts` ser korrekt ud — `useBookingOnly`-logikken burde give Sandra 0 vagter og dermed 0 forecast. Men hun viser stadig 144. Der er to mulige årsager:
 
-Det er derfor Sandra R stadig fremskrives med 144 salg — systemet bruger `useClientForecast` på forecast-siden, ikke `useTeamGoalForecast`.
+1. **Sandra har en `employee_standard_shift`-entry** i databasen, som giver hende et shift_id. I det tilfælde finder `empStandardDays` dage (f.eks. man-fre), og selvom `bookingOnly=true` burde springe det over, kan der være et subtilt problem.
 
-## Løsning
+2. **Ændringerne er ikke trådt i kraft** — React Query cacher resultater med `staleTime`, og brugerens browser kan vise cached data fra før rettelsen.
 
-### 1. `useClientForecast.ts` — Tilføj bookingOnly-logik til `countShifts`
-- Tilføj `bookingOnly`-parameter til `countShifts` (ligesom i useTeamGoalForecast)
-- Når `bookingOnly = true`: spring employee standard og team standard over
+## Plan
 
-### 2. `useClientForecast.ts` — Brug bookingOnly for forecast-måneden
-- Før `grossShifts` og `forecastShifts` beregnes (linje 479-482): check om medarbejderen har individuelle vagter eller booking assignments i forecast-perioden
-- Hvis ingen af delene findes: brug `countShifts(..., bookingOnly=true)` som giver 0
+### 1. Tilføj debug-logging for Sandra
+Tilføj midlertidig `console.log` i forecast-loopet der viser:
+- `hasAnyForecastShifts`, `hasAnyForecastBookings`, `useBookingOnly`
+- `grossShifts`, `forecastShifts`, `plannedHours`
+- Om hun har `empStandardDays`
 
-### 3. `useClientForecast.ts` — Ret `getNormalWeeklyShifts` fallback
-- Fjern `return 5` fallback. Hvis ingen standard shifts og ingen bookinger findes, returnér 0 i stedet for 5
+Denne log gør det muligt at se i konsollen præcis hvad der sker.
+
+### 2. Forcer `useBookingOnly`-logikken med ekstra sikkerhed
+Tilføj en **sekundær check**: Hvis `grossShifts > 0` men `useBookingOnly === true`, tving `grossShifts = 0`. Dette er et safety-net i tilfælde af en edge case i `countShifts`.
+
+### 3. Check om `employee_standard_shifts` giver Sandra vagter
+I `countShifts`-funktionen: Selv med `bookingOnly=true` springes standard shifts korrekt over (linje 361). Men der kan være en timing-bug hvor `empStandardDays` linker til et shift_id der også bruges som team standard shift. Tilføj ekstra logging for at verificere.
 
 | Fil | Ændring |
 |-----|---------|
-| `src/hooks/useClientForecast.ts` | Tilføj bookingOnly til countShifts + brug det for forecast-vagter + ret fallback |
-
-## Resultat
-Sandra R (og alle andre FM-medarbejdere uden bookinger i forecast-måneden) vil få `grossShifts = 0`, `plannedHours = 0`, og dermed `forecast = 0`.
+| `src/hooks/useClientForecast.ts` | Tilføj debug-log + safety-net for bookingOnly |
 
