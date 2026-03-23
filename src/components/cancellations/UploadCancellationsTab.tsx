@@ -424,6 +424,17 @@ export function UploadCancellationsTab() {
     mutationFn: async () => {
       const saleIds = matchedSales.map(s => s.saleId);
 
+      // Identify unmatched uploaded rows (rows not linked to any matched sale)
+      const matchedUploadedRows = new Set<string>();
+      matchedSales.forEach(s => {
+        if (s.uploadedRowData && Object.keys(s.uploadedRowData).length > 0) {
+          matchedUploadedRows.add(JSON.stringify(s.uploadedRowData));
+        }
+      });
+      const unmatchedRows = parsedData
+        .map(r => r.originalRow)
+        .filter(row => !matchedUploadedRows.has(JSON.stringify(row)));
+
       // Log the import first
       let importId: string | null = null;
       if (currentEmployee?.id && file) {
@@ -439,6 +450,7 @@ export function UploadCancellationsTab() {
             rows_matched: matchedSales.length,
             upload_type: uploadType,
             config_id: configId,
+            unmatched_rows: unmatchedRows.length > 0 ? unmatchedRows : null,
           } as any)
           .select("id")
           .single();
