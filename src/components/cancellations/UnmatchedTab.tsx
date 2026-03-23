@@ -241,26 +241,46 @@ export function UnmatchedTab() {
                         <TableHead>Dato</TableHead>
                         <TableHead>Sælger</TableHead>
                         <TableHead>OPP</TableHead>
+                        <TableHead>Produkter</TableHead>
+                        <TableHead>Omsætning</TableHead>
                         <TableHead>Telefon</TableHead>
                         <TableHead>Virksomhed</TableHead>
                         <TableHead>Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {missingFromUpload.map(sale => (
-                        <TableRow key={sale.id}>
-                          <TableCell className="whitespace-nowrap">
-                            {sale.sale_datetime ? format(new Date(sale.sale_datetime), "dd/MM/yyyy") : "-"}
-                          </TableCell>
-                          <TableCell>{sale.agent_name || "-"}</TableCell>
-                          <TableCell>{extractOpp(sale.raw_payload) || "-"}</TableCell>
-                          <TableCell>{sale.customer_phone || "-"}</TableCell>
-                          <TableCell>{sale.customer_company || "-"}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{sale.validation_status || "pending"}</Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {missingFromUpload.map(sale => {
+                        const products = (sale.saleItems || [])
+                          .map((si: any) => si.product?.name || si.adversus_product_title || "Ukendt")
+                          .filter(Boolean);
+                        const revenue = (sale.saleItems || [])
+                          .reduce((sum: number, si: any) => sum + (si.mapped_revenue || 0), 0);
+                        return (
+                          <TableRow key={sale.id}>
+                            <TableCell className="whitespace-nowrap">
+                              {sale.sale_datetime ? format(new Date(sale.sale_datetime), "dd/MM/yyyy") : "-"}
+                            </TableCell>
+                            <TableCell>{sale.agent_name || "-"}</TableCell>
+                            <TableCell>{extractOpp(sale.raw_payload) || "-"}</TableCell>
+                            <TableCell>
+                              {products.length > 0 
+                                ? products.map((p: string, i: number) => (
+                                    <Badge key={i} variant="outline" className="mr-1 mb-1">{p}</Badge>
+                                  ))
+                                : <span className="text-muted-foreground">-</span>
+                              }
+                            </TableCell>
+                            <TableCell className="font-mono">
+                              {revenue > 0 ? `${Math.round(revenue).toLocaleString("da-DK")} kr` : "-"}
+                            </TableCell>
+                            <TableCell>{sale.customer_phone || "-"}</TableCell>
+                            <TableCell>{sale.customer_company || "-"}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{sale.validation_status || "pending"}</Badge>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
