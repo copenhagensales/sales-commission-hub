@@ -428,6 +428,16 @@ export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = f
           </CardContent>
         </Card>
       )}
+
+      {departureDialog && (
+        <SetPlannedDepartureDialog
+          open={!!departureDialog}
+          onOpenChange={(open) => !open && setDepartureDialog(null)}
+          employeeId={departureDialog.id}
+          employeeName={departureDialog.name}
+          currentEndDate={departureDialog.endDate}
+        />
+      )}
     </div>
   );
 }
