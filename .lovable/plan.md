@@ -1,17 +1,37 @@
 
 
-# Fix: Kundetarget vises ikke i rapporten (dato-mismatch)
+# Redesign forecast PDF til at matche sidens UI/UX + fix kundetarget
 
 ## Problem
-Targets i `client_monthly_targets` er gemt med `period_start = '2026-03-31'` (sidste dag i måneden), men både Forecast.tsx og ForecastClientReport.tsx søger med `period_start = '2026-03-01'` (første dag). De matcher aldrig.
+1. **Kundetarget vises ikke** — koden er der, men det ser ud til at `clientTarget` ikke kommer med korrekt (muligvis stadig dato-mismatch eller at "all" er valgt)
+2. **PDF'en ser generisk ud** — hvid baggrund, system-fonts, ingen visuel sammenhæng med sidens mørke tema
 
 ## Løsning
-Dobbelt fix — ret de eksisterende data OG gør rapporten mere robust:
 
-| Ændring | Hvad |
-|---------|------|
-| **Database migration** | Opdater eksisterende rækker: `UPDATE client_monthly_targets SET period_start = date_trunc('month', period_start)::date` — så `2026-03-31` → `2026-03-01`. |
-| **ForecastClientReport.tsx** | Ingen kodeændring nødvendig — den beregner allerede korrekt `YYYY-MM-01`. |
+### Fil: `src/utils/forecastReportPdfGenerator.ts` — komplet redesign
 
-Alternativt, hvis dataene bevidst blev gemt med dag-31, kan vi i stedet ændre query'en til at matche på måned+år i stedet for eksakt dato. Men da Forecast.tsx upsert'er med dag-1, er den korrekte fix at rette de eksisterende data.
+**Visuelt tema (matcher sidens CSS-variabler):**
+- Mørk baggrund: `#0f172a` (sidens `--background`)
+- Kort-baggrund: `#162032` (sidens `--card`)
+- Primær grøn: `#0BA360` (sidens `--primary`)
+- Tekst: `#f8f8f8` (lys) og `#9ca3af` (muted)
+- Destructive rød: `#ef4444`
+- Border: `#1e3a5f`
+
+**Struktur redesignet:**
+- **Header**: Grøn accent-linje top, stort bold klientnavn + periode, genereret-dato subtilt
+- **Executive Summary boks**: Gradient-border kort med stort forecast-tal, interval, og kundetarget med farvekodet badge (grøn/rød) — præcis som UI'en
+- **KPI-grid**: 3 kolonner med mørke bokse, tal i hvid, labels i muted
+- **Effekter**: Røde/grønne rækker med ikoner (▼/▲) som på siden
+- **Opstartshold-tabel**: Stilet som sidens Card-komponent
+- **Drivers sektion**: Positiv/negativ gruppering med farvede labels
+- **Outlook**: Primær + sekundær boks (dashed border for M2)
+- **Footer**: Subtil, grøn accent-linje
+
+**Kundetarget fix:**
+- Sikre at target-linjen vises prominent i summary-boksen med Target-ikon og diff-badge
+- Debugge: tilføj fallback query der matcher på `date_trunc('month', period_start)` i stedet for eksakt dato-match, for at undgå fremtidige mismatch
+
+### Fil: `src/pages/ForecastClientReport.tsx`
+- Gør target-query mere robust: match på måned i stedet for eksakt dato (`.gte(periodStart).lt(nextMonthStart)`)
 
