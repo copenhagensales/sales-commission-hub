@@ -55,6 +55,7 @@ export function UploadCancellationsTab() {
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [matchedSales, setMatchedSales] = useState<MatchedSale[]>([]);
   const [isMatching, setIsMatching] = useState(false);
+  const [uploadType, setUploadType] = useState<"cancellation" | "basket_difference">("cancellation");
   const [step, setStep] = useState<"upload" | "mapping" | "preview" | "done">("upload");
 
   // Fetch clients
@@ -292,46 +293,61 @@ export function UploadCancellationsTab() {
     }
   };
 
-  // Bulk cancel mutation
-  const bulkCancelMutation = useMutation({
+  // Send to approval queue mutation
+  const sendToQueueMutation = useMutation({
     mutationFn: async () => {
       const saleIds = matchedSales.map(s => s.saleId);
-      
-      // Update sales in batches of 50
-      for (let i = 0; i < saleIds.length; i += 50) {
-        const batch = saleIds.slice(i, i + 50);
-        const { error } = await supabase
-          .from("sales")
-          .update({ validation_status: "cancelled" })
-          .in("id", batch);
-        if (error) throw error;
+
+      // Log the import first
+      let importId: string | null = null;
+      if (currentEmployee?.id && file) {
+        const { data: importData, error: importError } = await supabase
+          .from("cancellation_imports")
+          .insert({
+            uploaded_by: currentEmployee.id,
+            file_name: file.name,
+            file_size_bytes: file.size,
+            status: "pending_approval",
+            rows_processed: parsedData.length,
+            rows_matched: matchedSales.length,
+            upload_type: uploadType,
+          })
+          .select("id")
+          .single();
+        if (importError) throw importError;
+        importId = importData.id;
       }
 
-      // Log the import
-      if (currentEmployee?.id && file) {
-        await supabase.from("cancellation_imports").insert({
-          uploaded_by: currentEmployee.id,
-          file_name: file.name,
-          file_size_bytes: file.size,
-          status: "completed",
-          rows_processed: parsedData.length,
-          rows_matched: matchedSales.length,
-        });
+      if (!importId) throw new Error("Kunne ikke oprette import-log");
+
+      // Insert queue items in batches of 50
+      for (let i = 0; i < saleIds.length; i += 50) {
+        const batch = saleIds.slice(i, i + 50).map(saleId => ({
+          import_id: importId!,
+          sale_id: saleId,
+          upload_type: uploadType,
+          status: "pending",
+        }));
+        const { error } = await supabase
+          .from("cancellation_queue")
+          .insert(batch);
+        if (error) throw error;
       }
 
       return { count: saleIds.length };
     },
     onSuccess: ({ count }) => {
       toast({
-        title: "Annullering fuldført",
-        description: `${count} salg er blevet annulleret.`,
+        title: "Sendt til godkendelse",
+        description: `${count} salg er sendt til godkendelseskøen.`,
       });
       queryClient.invalidateQueries({ queryKey: ["cancellation-imports-history"] });
+      queryClient.invalidateQueries({ queryKey: ["cancellation-queue"] });
       setStep("done");
     },
     onError: (error: Error) => {
       toast({
-        title: "Fejl ved annullering",
+        title: "Fejl ved afsendelse til kø",
         description: error.message,
         variant: "destructive",
       });
@@ -345,6 +361,7 @@ export function UploadCancellationsTab() {
     setPhoneColumn("__none__");
     setCompanyColumn("__none__");
     setOppColumn("__none__");
+    setUploadType("cancellation");
     setSelectedClientId("");
     setMatchedSales([]);
     setStep("upload");
@@ -392,8 +409,21 @@ export function UploadCancellationsTab() {
               Vælg hvilke kolonner der indeholder telefonnumre og/eller virksomhedsnavne til matching.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+           <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="space-y-2">
+                <Label>Upload-type</Label>
+                <Select value={uploadType} onValueChange={(v) => setUploadType(v as "cancellation" | "basket_difference")}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cancellation">Annullering</SelectItem>
+                    <SelectItem value="basket_difference">Kurv difference</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="space-y-2">
                 <Label>Vælg kunde</Label>
                 <Select value={selectedClientId} onValueChange={setSelectedClientId}>
@@ -492,10 +522,10 @@ export function UploadCancellationsTab() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-warning" />
-              Bekræft annullering
+              Bekræft og send til godkendelse
             </CardTitle>
             <CardDescription>
-              Følgende {matchedSales.length} salg vil blive annulleret. Gennemse listen inden du fortsætter.
+              Følgende {matchedSales.length} salg vil blive sendt til godkendelseskøen som "{uploadType === 'cancellation' ? 'Annullering' : 'Kurv difference'}".
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -537,19 +567,18 @@ export function UploadCancellationsTab() {
 
                 <div className="flex gap-2">
                   <Button
-                    variant="destructive"
-                    onClick={() => bulkCancelMutation.mutate()}
-                    disabled={bulkCancelMutation.isPending}
+                    onClick={() => sendToQueueMutation.mutate()}
+                    disabled={sendToQueueMutation.isPending}
                   >
-                    {bulkCancelMutation.isPending ? (
+                    {sendToQueueMutation.isPending ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Annullerer...
+                        Sender til kø...
                       </>
                     ) : (
                       <>
-                        <X className="h-4 w-4 mr-2" />
-                        Annuller {matchedSales.length} salg
+                        <Check className="h-4 w-4 mr-2" />
+                        Send {matchedSales.length} salg til godkendelse
                       </>
                     )}
                   </Button>
@@ -571,10 +600,10 @@ export function UploadCancellationsTab() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-primary">
               <Check className="h-5 w-5" />
-              Annullering fuldført
+              Sendt til godkendelse
             </CardTitle>
             <CardDescription>
-              {matchedSales.length} salg er blevet markeret som annulleret.
+              {matchedSales.length} salg er sendt til godkendelseskøen og afventer godkendelse.
             </CardDescription>
           </CardHeader>
           <CardContent>
