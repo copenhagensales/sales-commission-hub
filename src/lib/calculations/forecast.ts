@@ -218,6 +218,7 @@ export function forecastNewEmployee(
     churnLoss: Math.round(churnLoss),
     missingAgentMapping: emp.missingAgentMapping,
     plannedEndDate: emp.plannedEndDate,
+    isOnCall: emp.isOnCall,
   };
 }
 
