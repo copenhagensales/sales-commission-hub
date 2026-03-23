@@ -204,7 +204,7 @@ export default function ReportsManagement() {
       `${clientLabel.toLowerCase().replace(/\s+/g, "-")}-salg-${periodLabel}.xlsx`,
       [
         { name: "Opsummering", rows: summaryRows, columnWidths: summaryWidths },
-        { name: "Rådata", rows: rawRows, columnWidths: [20, 25, 20, 8, 14, 14, 14, 20, 12, 18] },
+        { name: "Rådata", rows: rawRows, columnWidths: [20, 25, 20, 8, 14, 14, 14, 20, 12, 18, 18] },
       ]
     );
   };

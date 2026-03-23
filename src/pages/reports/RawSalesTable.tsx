@@ -89,6 +89,7 @@ export function RawSalesTable({ data, isLoading }: RawSalesTableProps) {
               <TableCell>{r.customer_company ?? ""}</TableCell>
               <TableCell>{r.status ?? ""}</TableCell>
               <TableCell>{r.internal_reference ?? ""}</TableCell>
+              <TableCell>{r.adversus_opp_number ?? ""}</TableCell>
             </TableRow>
           ))}
         </TableBody>
