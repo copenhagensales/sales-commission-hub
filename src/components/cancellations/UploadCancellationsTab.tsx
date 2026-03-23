@@ -48,8 +48,8 @@ export function UploadCancellationsTab() {
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<ParsedRow[]>([]);
   const [columns, setColumns] = useState<string[]>([]);
-  const [phoneColumn, setPhoneColumn] = useState<string>("");
-  const [companyColumn, setCompanyColumn] = useState<string>("");
+  const [phoneColumn, setPhoneColumn] = useState<string>("__none__");
+  const [companyColumn, setCompanyColumn] = useState<string>("__none__");
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [matchedSales, setMatchedSales] = useState<MatchedSale[]>([]);
   const [isMatching, setIsMatching] = useState(false);
@@ -135,7 +135,7 @@ export function UploadCancellationsTab() {
   });
 
   const handleMatch = async () => {
-    if (!phoneColumn && !companyColumn) {
+    if (phoneColumn === "__none__" && companyColumn === "__none__") {
       toast({
         title: "Vælg kolonner",
         description: "Vælg mindst én kolonne at matche på (telefon eller virksomhed).",
@@ -161,10 +161,10 @@ export function UploadCancellationsTab() {
       const companies: string[] = [];
 
       parsedData.forEach(row => {
-        if (phoneColumn && row.originalRow[phoneColumn]) {
+        if (phoneColumn !== "__none__" && row.originalRow[phoneColumn]) {
           phones.push(String(row.originalRow[phoneColumn]).replace(/\D/g, ""));
         }
-        if (companyColumn && row.originalRow[companyColumn]) {
+        if (companyColumn !== "__none__" && row.originalRow[companyColumn]) {
           companies.push(String(row.originalRow[companyColumn]).toLowerCase().trim());
         }
       });
@@ -288,8 +288,8 @@ export function UploadCancellationsTab() {
     setFile(null);
     setParsedData([]);
     setColumns([]);
-    setPhoneColumn("");
-    setCompanyColumn("");
+    setPhoneColumn("__none__");
+    setCompanyColumn("__none__");
     setSelectedClientId("");
     setMatchedSales([]);
     setStep("upload");
@@ -362,7 +362,7 @@ export function UploadCancellationsTab() {
                     <SelectValue placeholder="Vælg kolonne..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Ingen</SelectItem>
+                    <SelectItem value="__none__">Ingen</SelectItem>
                     {columns.map((col) => (
                       <SelectItem key={col} value={col}>
                         {col}
@@ -379,7 +379,7 @@ export function UploadCancellationsTab() {
                     <SelectValue placeholder="Vælg kolonne..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Ingen</SelectItem>
+                    <SelectItem value="__none__">Ingen</SelectItem>
                     {columns.map((col) => (
                       <SelectItem key={col} value={col}>
                         {col}
