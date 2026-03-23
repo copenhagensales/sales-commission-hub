@@ -41,6 +41,7 @@ interface MatchedSale {
   saleDate: string;
   employee: string;
   currentStatus: string;
+  uploadedRowData: Record<string, unknown>;
 }
 
 export function UploadCancellationsTab() {
