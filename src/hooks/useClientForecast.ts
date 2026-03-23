@@ -373,6 +373,22 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         return count;
       }
 
+      // Helper: count only "concrete" shifts (individual + booking assignments) — no standard fallback
+      function countConcreteShifts(empId: string, rangeStart: Date, rangeEnd: Date): number {
+        const individualDates = individualShiftMap.get(empId) || new Set();
+        const bookingDates = bookingAssignmentMap.get(empId) || new Set();
+        let count = 0;
+        const cur = new Date(rangeStart);
+        while (cur <= rangeEnd) {
+          const dateStr = format(cur, "yyyy-MM-dd");
+          if (individualDates.has(dateStr) || bookingDates.has(dateStr)) {
+            count++;
+          }
+          cur.setDate(cur.getDate() + 1);
+        }
+        return count;
+      }
+
       // Helper: get normal weekly shift count for an employee (from standard schedule, no absences)
       // For FM employees with bookings but no standard shifts, average their recent booking frequency
       function getNormalWeeklyShifts(empId: string): number {
@@ -457,7 +473,10 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
             salesInWeek += fmWeekMap.get(ws.getTime()) || 0;
           }
 
-          // Skip weeks with 0 sales and very few shifts (likely unrecorded absence)
+          // Skip weeks with 0 sales and no concrete shifts (individual/booking)
+          // This handles cases where team standard gives shifts but employee didn't actually work
+          const concreteShiftsInWeek = countConcreteShifts(emp.id, ws, we);
+          if (salesInWeek === 0 && concreteShiftsInWeek === 0) continue;
           if (salesInWeek === 0 && shiftsInWeek <= 2) continue;
 
           const sph = hoursInWeek > 0 ? salesInWeek / hoursInWeek : 0;
