@@ -83,7 +83,7 @@ export function ActiveSeasonBoard({
   }, [standings, roundProvisionMap]);
 
   const totalDivisions = divisionGroups.length;
-
+  const multiplier = ROUND_MULTIPLIERS[Math.min((currentRoundNumber || 1) - 1, ROUND_MULTIPLIERS.length - 1)] || 1;
   const visibleGroups = useMemo(() => {
     if (showAll || !currentEmployeeId || myDivision === null) return divisionGroups;
     return divisionGroups.filter(g => g.division === 1 || g.division === myDivision);
