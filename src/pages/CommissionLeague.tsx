@@ -109,8 +109,15 @@ export default function CommissionLeague() {
   const { data: seasonStandings, isLoading: seasonStandingsLoading } = useSeasonStandings(season?.status === "active" ? season?.id : undefined);
   const { data: roundHistory } = useRoundHistory(season?.status === "active" ? season?.id : undefined);
   const { data: mySeasonStanding } = useMySeasonStanding(season?.status === "active" ? season?.id : undefined);
-  const [selectedRoundIndex, setSelectedRoundIndex] = useState(-1); // -1 = "Samlet stilling"
-  const selectedRound = selectedRoundIndex >= 0 && roundHistory ? roundHistory[selectedRoundIndex] : undefined;
+  // Default to last round (active round) index; update when roundHistory loads
+  const activeRoundIndex = useMemo(() => {
+    if (!roundHistory || roundHistory.length === 0) return 0;
+    const activeIdx = roundHistory.findIndex(r => r.status === "active");
+    return activeIdx >= 0 ? activeIdx : roundHistory.length - 1;
+  }, [roundHistory]);
+  const [selectedRoundIndex, setSelectedRoundIndex] = useState<number | null>(null);
+  const effectiveIndex = selectedRoundIndex ?? activeRoundIndex;
+  const selectedRound = roundHistory ? roundHistory[effectiveIndex] : undefined;
   const { data: selectedRoundStandings } = useRoundStandings(selectedRound?.id);
   const { data: prizeLeaders } = usePrizeLeaders(
     season?.id,
