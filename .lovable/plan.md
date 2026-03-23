@@ -1,28 +1,29 @@
 
 
-# Fix: Sandra R får forecast trods ingen vagter
+# Fix: Sandra R forecast i klientforecast (useClientForecast.ts)
 
 ## Problem
-`countNormalShifts` bruger et fallback-hierarki: individuelle vagter → booking assignments → employee standard → **team standard**. Sandra R har ingen af de tre første, men teamets standard shift er mon-fre, så hun får ~22 "vagter" i marts og dermed et forecast baseret på forrige måneds SPH.
+Rettelsen fra `useTeamGoalForecast.ts` (bookingOnly-logikken) blev **ikke** spejlet i `useClientForecast.ts`. Denne hook har sin egen `countShifts`-funktion (linje 330-369) som stadig falder igennem til team standard shifts (mon-fre = ~22 vagter). Derudover returnerer `getNormalWeeklyShifts` (linje 395) `return 5` som fallback.
 
-For FM-medarbejdere skal forecast være 0 når der ikke er bookinger — team standard shifts er irrelevant for FM.
+Det er derfor Sandra R stadig fremskrives med 144 salg — systemet bruger `useClientForecast` på forecast-siden, ikke `useTeamGoalForecast`.
 
 ## Løsning
-Forecastet skal for FM-medarbejdere kun tælle vagter fra individuelle shifts og booking assignments — **ikke** falde igennem til employee standard eller team standard.
 
-### Ændring i `useTeamGoalForecast.ts`
+### 1. `useClientForecast.ts` — Tilføj bookingOnly-logik til `countShifts`
+- Tilføj `bookingOnly`-parameter til `countShifts` (ligesom i useTeamGoalForecast)
+- Når `bookingOnly = true`: spring employee standard og team standard over
 
-**Tilføj FM-team detection:**
-- Hent teamets navn eller brug en kendt team_id for at afgøre om teamet er FM
-- Alternativt: check om medarbejderen har booking_assignments i perioden — hvis ikke, og der heller ikke er individuelle vagter, sæt targetShifts = 0
+### 2. `useClientForecast.ts` — Brug bookingOnly for forecast-måneden
+- Før `grossShifts` og `forecastShifts` beregnes (linje 479-482): check om medarbejderen har individuelle vagter eller booking assignments i forecast-perioden
+- Hvis ingen af delene findes: brug `countShifts(..., bookingOnly=true)` som giver 0
 
-**Simpleste fix:** For `targetShifts`-beregningen (fremtiden): Hvis medarbejderen ikke har nogen individuelle vagter OG ikke har nogen booking assignments i target-måneden, sæt targetShifts = 0 i stedet for at falde igennem til team standard.
-
-Dette matcher den dokumenterede regel: "Ingen bookinger = 0 forecast".
-
-**Konkret:** I `countNormalShifts`, tilføj en parameter `bookingOnly: boolean`. Når det er true, spring employee standard og team standard over. Brug dette flag for target-måneden når medarbejderen ikke har individuelle vagter eller bookings.
+### 3. `useClientForecast.ts` — Ret `getNormalWeeklyShifts` fallback
+- Fjern `return 5` fallback. Hvis ingen standard shifts og ingen bookinger findes, returnér 0 i stedet for 5
 
 | Fil | Ændring |
 |-----|---------|
-| `useTeamGoalForecast.ts` | Stop fallback til team/employee standard shifts for target-måneden når ingen bookinger findes |
+| `src/hooks/useClientForecast.ts` | Tilføj bookingOnly til countShifts + brug det for forecast-vagter + ret fallback |
+
+## Resultat
+Sandra R (og alle andre FM-medarbejdere uden bookinger i forecast-måneden) vil få `grossShifts = 0`, `plannedHours = 0`, og dermed `forecast = 0`.
 
