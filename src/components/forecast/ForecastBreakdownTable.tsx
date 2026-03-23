@@ -4,7 +4,7 @@ import { da } from "date-fns/locale";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Users, UserPlus, ArrowUpDown, GraduationCap, CalendarOff } from "lucide-react";
+import { Users, UserPlus, ArrowUpDown, GraduationCap, CalendarOff, PhoneCall } from "lucide-react";
 import type { EmployeeForecastResult, CohortForecastResult } from "@/types/forecast";
 import { ForecastIntervalBadge } from "./ForecastIntervalBadge";
 import { SetPlannedDepartureDialog } from "./SetPlannedDepartureDialog";
