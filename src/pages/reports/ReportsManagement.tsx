@@ -351,7 +351,7 @@ export default function ReportsManagement() {
                   </TabsContent>
 
                   <TabsContent value="raadata">
-                    <RawSalesTable data={rawSalesData} isLoading={isLoading} />
+                    <RawSalesTable data={rawSalesData} isLoading={isLoading} isError={isErrorRaw} error={errorRaw} />
                   </TabsContent>
                 </Tabs>
               </CardContent>
