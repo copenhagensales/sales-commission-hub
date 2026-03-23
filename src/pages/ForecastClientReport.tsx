@@ -239,7 +239,7 @@ function ReportKeyFigures({ forecast }: { forecast: ForecastResult }) {
   ].filter(n => parseInt(n.value) !== 0);
 
   const positives = [
-    ...(cohortSales > 0 ? [{ label: "Nye hold", value: `+${cohortSales}`, desc: `${forecast.cohorts.length} opstartshold` }] : []),
+    ...(cohortSales > 0 ? [{ label: "Nye hold", value: `+${cohortSales}`, desc: `${periodCohorts.length} opstartshold` }] : []),
     ...(topSales > 0 ? [{ label: "Top-performere (top 5)", value: `${topSales}`, desc: "Salg fra de 5 stærkeste sælgere" }] : []),
   ];
 
