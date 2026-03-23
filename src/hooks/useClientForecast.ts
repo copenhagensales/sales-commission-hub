@@ -373,6 +373,22 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         return count;
       }
 
+      // Helper: count only "concrete" shifts (individual + booking assignments) — no standard fallback
+      function countConcreteShifts(empId: string, rangeStart: Date, rangeEnd: Date): number {
+        const individualDates = individualShiftMap.get(empId) || new Set();
+        const bookingDates = bookingAssignmentMap.get(empId) || new Set();
+        let count = 0;
+        const cur = new Date(rangeStart);
+        while (cur <= rangeEnd) {
+          const dateStr = format(cur, "yyyy-MM-dd");
+          if (individualDates.has(dateStr) || bookingDates.has(dateStr)) {
+            count++;
+          }
+          cur.setDate(cur.getDate() + 1);
+        }
+        return count;
+      }
+
       // Helper: get normal weekly shift count for an employee (from standard schedule, no absences)
       // For FM employees with bookings but no standard shifts, average their recent booking frequency
       function getNormalWeeklyShifts(empId: string): number {
