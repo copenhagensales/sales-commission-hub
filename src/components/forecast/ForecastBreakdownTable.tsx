@@ -18,6 +18,7 @@ interface Props {
 export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = false }: Props) {
   const [sortKey, setSortKey] = useState<'name' | 'sph' | 'forecast' | 'total'>('total');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [departureDialog, setDepartureDialog] = useState<{ id: string; name: string; endDate?: string | null } | null>(null);
 
   // Split mapped vs unmapped employees
   const mappedEmployees = employees.filter(e => !e.missingAgentMapping);
