@@ -192,6 +192,7 @@ export function ActiveSeasonBoard({
                               roundProvision={roundProv}
                               prevProvision={prevRoundProv}
                               nextProvision={nextRoundProv}
+                              pointsAtStake={calculatePointsAtStake(group.division, idx + 1, totalDivisions, multiplier)}
                             />
                           </motion.div>
                         );
