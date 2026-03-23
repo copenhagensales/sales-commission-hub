@@ -12261,6 +12261,7 @@ export type Database = {
         | {
             Args: { p_client_id: string; p_end: string; p_start: string }
             Returns: {
+              adversus_opp_number: string
               commission: number
               customer_company: string
               customer_phone: string
@@ -12282,6 +12283,7 @@ export type Database = {
               p_start: string
             }
             Returns: {
+              adversus_opp_number: string
               commission: number
               customer_company: string
               customer_phone: string

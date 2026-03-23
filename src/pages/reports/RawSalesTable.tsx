@@ -19,6 +19,7 @@ interface RawRow {
   customer_company: string;
   status: string;
   internal_reference: string;
+  adversus_opp_number: string;
 }
 
 interface RawSalesTableProps {
@@ -58,6 +59,7 @@ export function RawSalesTable({ data, isLoading }: RawSalesTableProps) {
             <TableHead>Virksomhed</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Reference</TableHead>
+            <TableHead>OPP-nummer</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -87,6 +89,7 @@ export function RawSalesTable({ data, isLoading }: RawSalesTableProps) {
               <TableCell>{r.customer_company ?? ""}</TableCell>
               <TableCell>{r.status ?? ""}</TableCell>
               <TableCell>{r.internal_reference ?? ""}</TableCell>
+              <TableCell>{r.adversus_opp_number ?? ""}</TableCell>
             </TableRow>
           ))}
         </TableBody>

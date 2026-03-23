@@ -52,6 +52,7 @@ interface RawRow {
   customer_company: string;
   status: string;
   internal_reference: string;
+  adversus_opp_number: string;
 }
 
 interface EmployeeRow {
@@ -196,13 +197,14 @@ export default function ReportsManagement() {
       Virksomhed: r.customer_company ?? "",
       Status: r.status ?? "",
       Reference: r.internal_reference ?? "",
+      "OPP-nummer": r.adversus_opp_number ?? "",
     }));
 
     await downloadExcel(
       `${clientLabel.toLowerCase().replace(/\s+/g, "-")}-salg-${periodLabel}.xlsx`,
       [
         { name: "Opsummering", rows: summaryRows, columnWidths: summaryWidths },
-        { name: "Rådata", rows: rawRows, columnWidths: [20, 25, 20, 8, 14, 14, 14, 20, 12, 18] },
+        { name: "Rådata", rows: rawRows, columnWidths: [20, 25, 20, 8, 14, 14, 14, 20, 12, 18, 18] },
       ]
     );
   };
