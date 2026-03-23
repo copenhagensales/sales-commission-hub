@@ -296,12 +296,17 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         shiftDaysMap.get(sd.shift_id)!.push(sd.day_of_week);
       });
 
-      // Map team -> active shift days
+      // Map team -> active shift days (merge all active shifts, filter out empty ones)
       const teamShiftDaysMap = new Map<string, number[]>();
       (teamStandardShiftsRes.data || []).forEach(s => {
         if (s.is_active) {
           const days = shiftDaysMap.get(s.id);
-          if (days) teamShiftDaysMap.set(s.team_id, days);
+          if (days && days.length > 0) {
+            // Merge days for same team (dedup)
+            const existing = teamShiftDaysMap.get(s.team_id) || [];
+            const merged = [...new Set([...existing, ...days])];
+            teamShiftDaysMap.set(s.team_id, merged);
+          }
         }
       });
 
