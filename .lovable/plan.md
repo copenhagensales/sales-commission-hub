@@ -1,21 +1,33 @@
 
 
-# Fordel hotelomkostning ud på dage
+# FM Forecast: Inkludér FM-sælgeres salg via work_email fallback
 
 ## Problem
-I den daglige nedbrydning vises hotel altid som 0 kr, fordi hotelomkostningen kun beregnes samlet per booking. Brugeren vil se den fordelt jævnt over de bookede dage.
+Forecast-hooken (`useClientForecast`) finder salg via `employee_agent_mapping → agents.email`. FM-sælgere har ingen agent-mapping (de bruger ikke en dialer), så deres salg tælles som 0 og de vises med "mangler agent-mapping" advarsel.
+
+FM-salg gemmes med `agent_email` = medarbejderens `work_email` fra `employee_master_data`. Løsningen er at bruge `work_email` som fallback når der ikke findes en agent-mapping.
 
 ## Ændring
 
-### `src/pages/vagt-flow/LocationProfitabilityContent.tsx` — linje 532-533
-I stedet for `dayHotelCost = 0`, beregn:
+### `src/hooks/useClientForecast.ts`
+
+**I email-map bygningen (linje 128-138):**
+- Efter agent-mapping er bygget, tilføj fallback: for medarbejdere uden agent-emails, brug `employee_master_data.work_email` i stedet
+- Kræver at `work_email` hentes med i employee-queryen (tilføj til select på linje 106)
+
 ```
-dayHotelCost = isBooked ? (loc.hotelCost / loc.bookedDays.length) : 0
+// Eksisterende: empEmailMap bygges fra agent_mapping
+// Nyt fallback for FM-medarbejdere:
+for (const emp of employees) {
+  if (!empEmailMap.has(emp.id) && emp.work_email) {
+    empEmailMap.set(emp.id, [emp.work_email.toLowerCase()]);
+  }
+}
 ```
 
-Så den samlede hotelomkostning for lokationen deles ligeligt ud på alle bookede dage. Ugen-totalen forbliver den samme.
+Det er hele ændringen — resten af forecast-logikken (ugentlig SPH, vagter, fravær, churn) virker allerede korrekt, da den er medarbejder-baseret og ikke dialer-specifik.
 
 | Fil | Ændring |
 |-----|---------|
-| `src/pages/vagt-flow/LocationProfitabilityContent.tsx` | Linje 532-533: fordel hotelomkostning per booked dag |
+| `src/hooks/useClientForecast.ts` | Tilføj `work_email` til employee select + fallback i email-map |
 
