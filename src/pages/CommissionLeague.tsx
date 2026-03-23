@@ -128,6 +128,7 @@ export default function CommissionLeague() {
   }, [standings, seasonStandings]);
   const { data: todayProvisionMap } = useLeagueTodayProvision(allEmployeeIds.length > 0 ? allEmployeeIds : undefined);
   const { data: weeklyProvisionMap } = useLeagueWeeklyProvision(allEmployeeIds.length > 0 ? allEmployeeIds : undefined);
+  const { data: roundProvisionMap } = useLeagueRoundProvision(currentRound, allEmployeeIds.length > 0 ? allEmployeeIds : undefined);
 
   const isEnrolled = !!enrollment;
   const isFan = enrollment?.is_spectator === true;
