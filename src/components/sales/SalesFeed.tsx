@@ -648,14 +648,25 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
       <div className="space-y-4">
         {/* Controls */}
         <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
-          <div className="relative flex-1 min-w-[200px]">
+          <div className="relative flex-1 min-w-[260px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Søg i alle felter (kunde, telefon, lead ID, agent...)"
+              placeholder="Søg efter kunde, telefon, sælger, OPP, lead ID..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
+              className="pl-9 pr-9"
             />
+            {searchQuery && (
+              <button
+                onClick={() => { setSearchQuery(""); setDebouncedSearch(""); }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+            {searchQuery !== debouncedSearch && (
+              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+            )}
           </div>
           
           {/* Date Filter with Presets + Calendar side-by-side */}
