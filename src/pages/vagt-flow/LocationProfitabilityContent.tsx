@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { getWeekStartDate, getWeekNumber, getWeekYear } from "@/lib/calculations";
 import { VACATION_PAY_RATES } from "@/lib/calculations/vacation-pay";
@@ -8,14 +8,31 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
-  TrendingUp, TrendingDown, MapPin, DollarSign, BarChart3,
+  TrendingUp, TrendingDown, MapPin,
 } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { da } from "date-fns/locale";
+import { toast } from "sonner";
+
+interface Placement {
+  id: string;
+  name: string;
+  daily_rate: number;
+  location_id: string;
+}
+
+interface BookingInfo {
+  id: string;
+  placementId: string | null;
+  dailyRateOverride: number | null;
+}
 
 interface LocationSalesData {
   locationId: string;
@@ -23,6 +40,9 @@ interface LocationSalesData {
   dailyRate: number;
   bookedDays: number[];
   dailyBreakdown: Record<string, { sales: number; commission: number; revenue: number }>;
+  placements: Placement[];
+  selectedPlacementId: string | null;
+  bookings: BookingInfo[];
 }
 
 function formatKr(amount: number) {
@@ -36,6 +56,7 @@ function formatPct(value: number) {
 
 export default function LocationProfitabilityContent() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const queryClient = useQueryClient();
   const now = new Date();
   const currentWeek = getWeekNumber(now);
   const currentYear = getWeekYear(now);
@@ -53,17 +74,16 @@ export default function LocationProfitabilityContent() {
     d.setDate(d.getDate() + delta * 7);
     const newWeek = getWeekNumber(d);
     const newYear = getWeekYear(d);
-    const params: Record<string, string> = { tab: "okonomi", week: String(newWeek), year: String(newYear) };
-    setSearchParams(params);
+    setSearchParams({ tab: "okonomi", week: String(newWeek), year: String(newYear) });
   };
 
-  // Fetch bookings for the week with location data
+  // Fetch bookings with location + placement data
   const { data: bookings, isLoading: loadingBookings } = useQuery({
     queryKey: ["location-profitability-bookings", week, year],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("booking")
-        .select("id, location_id, booked_days, daily_rate_override, start_date, end_date, location!inner(id, name, daily_rate)")
+        .select("id, location_id, booked_days, daily_rate_override, placement_id, start_date, end_date, location!inner(id, name, daily_rate)")
         .eq("week_number", week)
         .eq("year", year);
       if (error) throw error;
@@ -71,7 +91,27 @@ export default function LocationProfitabilityContent() {
     },
   });
 
-  // Fetch FM sales for the week grouped by location
+  // Fetch all placements for locations in the bookings
+  const locationIds = useMemo(() => {
+    if (!bookings) return [];
+    return [...new Set(bookings.map(b => b.location_id))];
+  }, [bookings]);
+
+  const { data: placements } = useQuery({
+    queryKey: ["location-profitability-placements", locationIds],
+    queryFn: async () => {
+      if (locationIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("location_placements")
+        .select("*")
+        .in("location_id", locationIds);
+      if (error) throw error;
+      return (data || []) as Placement[];
+    },
+    enabled: locationIds.length > 0,
+  });
+
+  // Fetch FM sales for the week
   const { data: salesData, isLoading: loadingSales } = useQuery({
     queryKey: ["location-profitability-sales", startStr, endStr],
     queryFn: async () => {
@@ -87,37 +127,65 @@ export default function LocationProfitabilityContent() {
     },
   });
 
+  // Mutation: update booking placement
+  const updatePlacement = useMutation({
+    mutationFn: async ({ bookingIds, placementId, dailyRate }: { bookingIds: string[]; placementId: string; dailyRate: number }) => {
+      for (const id of bookingIds) {
+        const { error } = await supabase
+          .from("booking")
+          .update({ placement_id: placementId, daily_rate_override: dailyRate })
+          .eq("id", id);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["location-profitability-bookings"] });
+      toast.success("Placering opdateret");
+    },
+    onError: () => toast.error("Kunne ikke opdatere placering"),
+  });
+
   // Build location profitability data
   const locationData = useMemo(() => {
     if (!bookings || !salesData) return [];
 
-    // Group bookings by location
+    const placementsByLocation = new Map<string, Placement[]>();
+    for (const p of placements || []) {
+      if (!placementsByLocation.has(p.location_id)) placementsByLocation.set(p.location_id, []);
+      placementsByLocation.get(p.location_id)!.push(p);
+    }
+
     const locationMap = new Map<string, LocationSalesData>();
 
     for (const booking of bookings) {
       const loc = booking.location as any;
       const locId = booking.location_id;
+      const locPlacements = placementsByLocation.get(locId) || [];
+      const selectedPlacement = locPlacements.find(p => p.id === booking.placement_id);
+      const effectiveRate = booking.daily_rate_override ?? selectedPlacement?.daily_rate ?? loc?.daily_rate ?? 0;
+
       if (!locationMap.has(locId)) {
         locationMap.set(locId, {
           locationId: locId,
           locationName: loc?.name || "Ukendt",
-          dailyRate: booking.daily_rate_override ?? loc?.daily_rate ?? 0,
+          dailyRate: effectiveRate,
           bookedDays: booking.booked_days || [],
           dailyBreakdown: {},
+          placements: locPlacements,
+          selectedPlacementId: booking.placement_id,
+          bookings: [{ id: booking.id, placementId: booking.placement_id, dailyRateOverride: booking.daily_rate_override }],
         });
       } else {
-        // Merge booked days from multiple bookings on same location
         const existing = locationMap.get(locId)!;
         const mergedDays = new Set([...existing.bookedDays, ...(booking.booked_days || [])]);
         existing.bookedDays = Array.from(mergedDays);
-        // Use override if present
-        if (booking.daily_rate_override) {
-          existing.dailyRate = booking.daily_rate_override;
-        }
+        existing.bookings.push({ id: booking.id, placementId: booking.placement_id, dailyRateOverride: booking.daily_rate_override });
+        if (booking.daily_rate_override) existing.dailyRate = booking.daily_rate_override;
+        if (booking.placement_id) existing.selectedPlacementId = booking.placement_id;
       }
     }
 
-    // Map sales to locations by fm_location_id
+    // Map sales to locations
     for (const sale of salesData) {
       const payload = sale.raw_payload as any;
       const locId = payload?.fm_location_id;
@@ -125,10 +193,7 @@ export default function LocationProfitabilityContent() {
 
       const saleDate = format(new Date(sale.sale_datetime), "yyyy-MM-dd");
       const items = (sale as any).sale_items || [];
-
-      let commission = 0;
-      let revenue = 0;
-      let salesCount = 0;
+      let commission = 0, revenue = 0, salesCount = 0;
 
       for (const item of items) {
         const countsAsSale = item.products?.counts_as_sale !== false;
@@ -137,43 +202,34 @@ export default function LocationProfitabilityContent() {
         if (countsAsSale) salesCount += item.quantity || 1;
       }
 
-      // Add to existing location or create entry for orphan sales
       if (!locationMap.has(locId)) {
         locationMap.set(locId, {
-          locationId: locId,
-          locationName: "Ukendt lokation",
-          dailyRate: 0,
-          bookedDays: [],
-          dailyBreakdown: {},
+          locationId: locId, locationName: "Ukendt lokation", dailyRate: 0,
+          bookedDays: [], dailyBreakdown: {}, placements: [], selectedPlacementId: null, bookings: [],
         });
       }
 
-      const loc = locationMap.get(locId)!;
-      if (!loc.dailyBreakdown[saleDate]) {
-        loc.dailyBreakdown[saleDate] = { sales: 0, commission: 0, revenue: 0 };
-      }
-      loc.dailyBreakdown[saleDate].sales += salesCount;
-      loc.dailyBreakdown[saleDate].commission += commission;
-      loc.dailyBreakdown[saleDate].revenue += revenue;
+      const l = locationMap.get(locId)!;
+      if (!l.dailyBreakdown[saleDate]) l.dailyBreakdown[saleDate] = { sales: 0, commission: 0, revenue: 0 };
+      l.dailyBreakdown[saleDate].sales += salesCount;
+      l.dailyBreakdown[saleDate].commission += commission;
+      l.dailyBreakdown[saleDate].revenue += revenue;
     }
 
-    // Calculate totals and sort
     return Array.from(locationMap.values())
       .map((loc) => {
         const totalRevenue = Object.values(loc.dailyBreakdown).reduce((s, d) => s + d.revenue, 0);
         const totalCommission = Object.values(loc.dailyBreakdown).reduce((s, d) => s + d.commission, 0);
         const totalSales = Object.values(loc.dailyBreakdown).reduce((s, d) => s + d.sales, 0);
-        const sellerCost = totalCommission * (1 + VACATION_PAY_RATES.SELLER); // +12.5% feriepenge
+        const sellerCost = totalCommission * (1 + VACATION_PAY_RATES.SELLER);
         const locationCost = loc.dailyRate * loc.bookedDays.length;
         const db = totalRevenue - sellerCost - locationCost;
         const dbPct = totalRevenue > 0 ? (db / totalRevenue) * 100 : 0;
-
         return { ...loc, totalRevenue, totalCommission, totalSales, sellerCost, locationCost, db, dbPct };
       })
       .sort((a, b) => b.totalRevenue - a.totalRevenue);
-  }, [bookings, salesData]);
+  }, [bookings, salesData, placements]);
 
-  // Totals
   const totals = useMemo(() => {
     const totalRevenue = locationData.reduce((s, l) => s + l.totalRevenue, 0);
     const totalSellerCost = locationData.reduce((s, l) => s + l.sellerCost, 0);
@@ -186,18 +242,24 @@ export default function LocationProfitabilityContent() {
   const toggleExpand = (locId: string) => {
     setExpandedLocations((prev) => {
       const next = new Set(prev);
-      if (next.has(locId)) next.delete(locId);
-      else next.add(locId);
+      if (next.has(locId)) next.delete(locId); else next.add(locId);
       return next;
+    });
+  };
+
+  const handlePlacementChange = (loc: LocationSalesData & { totalRevenue: number }, placementId: string) => {
+    const placement = loc.placements.find(p => p.id === placementId);
+    if (!placement || loc.bookings.length === 0) return;
+    updatePlacement.mutate({
+      bookingIds: loc.bookings.map(b => b.id),
+      placementId: placement.id,
+      dailyRate: placement.daily_rate,
     });
   };
 
   const isLoading = loadingBookings || loadingSales;
 
-  // Generate array of dates for the week
-  const weekDates = useMemo(() => {
-    return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-  }, [weekStart]);
+  const weekDates = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
 
   return (
     <div className="space-y-6">
@@ -254,11 +316,7 @@ export default function LocationProfitabilityContent() {
               <p className={`text-xl font-bold ${totals.dbPct >= 0 ? "text-emerald-600" : "text-destructive"}`}>
                 {formatPct(totals.dbPct)}
               </p>
-              {totals.dbPct >= 0 ? (
-                <TrendingUp className="h-4 w-4 text-emerald-600" />
-              ) : (
-                <TrendingDown className="h-4 w-4 text-destructive" />
-              )}
+              {totals.dbPct >= 0 ? <TrendingUp className="h-4 w-4 text-emerald-600" /> : <TrendingDown className="h-4 w-4 text-destructive" />}
             </div>
           </CardContent>
         </Card>
@@ -277,14 +335,13 @@ export default function LocationProfitabilityContent() {
           {isLoading ? (
             <div className="flex items-center justify-center py-12 text-muted-foreground">Indlæser...</div>
           ) : locationData.length === 0 ? (
-            <div className="flex items-center justify-center py-12 text-muted-foreground">
-              Ingen bookinger i denne uge
-            </div>
+            <div className="flex items-center justify-center py-12 text-muted-foreground">Ingen bookinger i denne uge</div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="pl-6">Lokation</TableHead>
+                  <TableHead>Placering</TableHead>
                   <TableHead className="text-right">Dage</TableHead>
                   <TableHead className="text-right">Salg</TableHead>
                   <TableHead className="text-right">Omsætning</TableHead>
@@ -297,6 +354,9 @@ export default function LocationProfitabilityContent() {
               <TableBody>
                 {locationData.map((loc) => {
                   const isExpanded = expandedLocations.has(loc.locationId);
+                  const hasPlacements = loc.placements.length > 0;
+                  const selectedPlacement = loc.placements.find(p => p.id === loc.selectedPlacementId);
+
                   return (
                     <>
                       <TableRow
@@ -309,6 +369,27 @@ export default function LocationProfitabilityContent() {
                             {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                             {loc.locationName}
                           </div>
+                        </TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          {hasPlacements ? (
+                            <Select
+                              value={loc.selectedPlacementId || ""}
+                              onValueChange={(val) => handlePlacementChange(loc, val)}
+                            >
+                              <SelectTrigger className="h-8 w-[140px] text-xs">
+                                <SelectValue placeholder="Vælg placering" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {loc.placements.map((p) => (
+                                  <SelectItem key={p.id} value={p.id}>
+                                    {p.name} ({formatKr(p.daily_rate)}/dag)
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-right">{loc.bookedDays.length}</TableCell>
                         <TableCell className="text-right">{loc.totalSales}</TableCell>
@@ -324,7 +405,7 @@ export default function LocationProfitabilityContent() {
                       </TableRow>
                       {isExpanded && weekDates.map((date) => {
                         const dateStr = format(date, "yyyy-MM-dd");
-                        const dayNum = date.getDay() === 0 ? 7 : date.getDay(); // 1=Mon...7=Sun
+                        const dayNum = date.getDay() === 0 ? 7 : date.getDay();
                         const isBooked = loc.bookedDays.includes(dayNum);
                         const day = loc.dailyBreakdown[dateStr];
                         const dayRevenue = day?.revenue || 0;
@@ -338,6 +419,9 @@ export default function LocationProfitabilityContent() {
                             <TableCell className="pl-12 text-muted-foreground text-sm">
                               {format(date, "EEEE d/M", { locale: da })}
                               {!isBooked && <span className="ml-2 text-xs opacity-50">(ikke booket)</span>}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {selectedPlacement?.name || "—"}
                             </TableCell>
                             <TableCell className="text-right text-sm">{isBooked ? "1" : "–"}</TableCell>
                             <TableCell className="text-right text-sm">{day?.sales || 0}</TableCell>
