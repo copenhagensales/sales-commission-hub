@@ -16,6 +16,13 @@ import { ZoneProgressBar } from "./ZoneProgressBar";
 import { LeagueSeasonStanding } from "@/hooks/useLeagueActiveData";
 import { motion, AnimatePresence } from "framer-motion";
 
+const ROUND_MULTIPLIERS = [1, 1.2, 1.4, 1.6, 1.8, 2.0];
+
+function calculatePointsAtStake(division: number, rank: number, totalDivisions: number, multiplier: number): number {
+  const basePoints = Math.max(0, (totalDivisions - division + 1) * 20 - (rank - 1) * 5);
+  return Math.round(basePoints * multiplier);
+}
+
 interface ActiveSeasonBoardProps {
   standings: LeagueSeasonStanding[];
   playersPerDivision: number;
@@ -25,6 +32,7 @@ interface ActiveSeasonBoardProps {
   todayProvisionMap?: Record<string, number>;
   weeklyProvisionMap?: Record<string, number[]>;
   roundProvisionMap?: Record<string, number>;
+  currentRoundNumber?: number;
 }
 
 export function ActiveSeasonBoard({
@@ -36,6 +44,7 @@ export function ActiveSeasonBoard({
   todayProvisionMap = {},
   weeklyProvisionMap = {},
   roundProvisionMap = {},
+  currentRoundNumber = 1,
 }: ActiveSeasonBoardProps) {
   const [showAll, setShowAll] = useState(defaultShowAll);
   const todayTop3 = useMemo(() => computeTodayTop3(todayProvisionMap), [todayProvisionMap]);
@@ -74,7 +83,7 @@ export function ActiveSeasonBoard({
   }, [standings, roundProvisionMap]);
 
   const totalDivisions = divisionGroups.length;
-
+  const multiplier = ROUND_MULTIPLIERS[Math.min((currentRoundNumber || 1) - 1, ROUND_MULTIPLIERS.length - 1)] || 1;
   const visibleGroups = useMemo(() => {
     if (showAll || !currentEmployeeId || myDivision === null) return divisionGroups;
     return divisionGroups.filter(g => g.division === 1 || g.division === myDivision);
@@ -183,6 +192,7 @@ export function ActiveSeasonBoard({
                               roundProvision={roundProv}
                               prevProvision={prevRoundProv}
                               nextProvision={nextRoundProv}
+                              pointsAtStake={calculatePointsAtStake(group.division, idx + 1, totalDivisions, multiplier)}
                             />
                           </motion.div>
                         );
@@ -226,6 +236,7 @@ interface SeasonPlayerRowProps {
   roundProvision: number;
   prevProvision: number | null;
   nextProvision: number | null;
+  pointsAtStake: number;
 }
 
 const SeasonPlayerRow = memo(function SeasonPlayerRow({
@@ -242,6 +253,7 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
   roundProvision,
   prevProvision,
   nextProvision,
+  pointsAtStake,
 }: SeasonPlayerRowProps) {
   const rank = idx + 1; // rank based on sorted position (by round provision)
   const divChanged = standing.previous_division !== null && standing.previous_division !== standing.current_division;
@@ -306,9 +318,9 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
           <div className="flex items-center gap-1.5 flex-wrap">
             {/* Live pulse dot */}
             {todayProvision > 0 && (
-              <span className="relative flex h-1.5 w-1.5 shrink-0">
+              <span className="relative flex h-2.5 w-2.5 shrink-0">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.6)]" />
               </span>
             )}
             <PlayerHoverCard
@@ -363,6 +375,11 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
               <div className="font-mono text-sm sm:text-[15px] font-semibold whitespace-nowrap">
                 {roundProvision.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
               </div>
+              {pointsAtStake > 0 && (
+                <span className="font-mono text-[10px] text-primary/70 font-semibold">
+                  +{pointsAtStake} pt
+                </span>
+              )}
             </div>
             <div className="text-[10px] text-muted-foreground">
               {Number(standing.total_points).toLocaleString("da-DK", { maximumFractionDigits: 0 })} pt samlet
@@ -385,11 +402,13 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
               </div>
             )}
           </div>
-          <div className="hidden sm:block text-right min-w-[50px]">
-            <span className="text-sm text-muted-foreground">
-              {standing.rounds_played} runder
-            </span>
-          </div>
+          {standing.rounds_played > 0 && (
+            <div className="hidden sm:block text-right min-w-[50px]">
+              <span className="text-sm text-muted-foreground">
+                {standing.rounds_played} runder
+              </span>
+            </div>
+          )}
 
           <div className="w-16 sm:w-20 text-right">
             {isPromoZone && (
