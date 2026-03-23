@@ -242,6 +242,7 @@ export default function Forecast() {
                     });
                   }}
                   onDelete={(id) => deleteCohort.mutate(id)}
+                  onEdit={(id, data) => updateCohort.mutate({ id, data })}
                 />
                 <ForecastAssumptions
                   rampProfile={MOCK_RAMP_PROFILE}
