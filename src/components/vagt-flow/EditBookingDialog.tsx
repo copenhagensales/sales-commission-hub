@@ -74,7 +74,138 @@ interface EditBookingDialogProps {
 
 const DAY_NAMES = ["Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag", "Søndag"];
 
-export function EditBookingDialog({ 
+function HotelTabContent({ booking }: { booking: any }) {
+  const { data: bookingHotels = [], isLoading } = useBookingHotels(booking?.id ? [booking.id] : []);
+  const updateBookingHotel = useUpdateBookingHotel();
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [editingHotel, setEditingHotel] = useState<BookingHotel | null>(null);
+
+  const hotelEntry = bookingHotels[0] || null;
+
+  const [price, setPrice] = useState("");
+  const [confNum, setConfNum] = useState("");
+  const [status, setStatus] = useState("pending");
+  const [notes, setNotes] = useState("");
+
+  useEffect(() => {
+    if (hotelEntry) {
+      setPrice(hotelEntry.price_per_night?.toString() || "");
+      setConfNum(hotelEntry.confirmation_number || "");
+      setStatus(hotelEntry.status);
+      setNotes(hotelEntry.notes || "");
+    }
+  }, [hotelEntry]);
+
+  const handleSave = async () => {
+    if (!hotelEntry) return;
+    await updateBookingHotel.mutateAsync({
+      id: hotelEntry.id,
+      price_per_night: price ? Number(price) : undefined,
+      confirmation_number: confNum || undefined,
+      status,
+      notes: notes || undefined,
+    });
+  };
+
+  if (isLoading) {
+    return <p className="text-sm text-muted-foreground">Indlæser...</p>;
+  }
+
+  if (!hotelEntry) {
+    return (
+      <div className="text-center py-8 space-y-3">
+        <Building2 className="h-10 w-10 mx-auto text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">Intet hotel tildelt denne booking</p>
+        <Button onClick={() => setAssignDialogOpen(true)}>
+          <Building2 className="h-4 w-4 mr-2" />
+          Tildel hotel
+        </Button>
+        {booking && (
+          <AssignHotelDialog
+            open={assignDialogOpen}
+            onOpenChange={setAssignDialogOpen}
+            booking={{
+              id: booking.id,
+              start_date: booking.start_date,
+              end_date: booking.end_date,
+              location: booking.location,
+            }}
+          />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="font-medium">{hotelEntry.hotel?.name}</p>
+          <p className="text-sm text-muted-foreground">{hotelEntry.hotel?.city} • {hotelEntry.check_in} → {hotelEntry.check_out}</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => {
+          setEditingHotel(hotelEntry);
+          setAssignDialogOpen(true);
+        }}>
+          <Pencil className="h-4 w-4 mr-1" />
+          Rediger alle felter
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label className="text-xs">Pris pr. nat (DKK) *</Label>
+          <Input
+            type="number"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            className={!price ? "border-destructive" : ""}
+            placeholder="Påkrævet"
+          />
+        </div>
+        <div>
+          <Label className="text-xs">Status</Label>
+          <Select value={status} onValueChange={setStatus}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="pending">Ubekræftet</SelectItem>
+              <SelectItem value="confirmed">Bekræftet</SelectItem>
+              <SelectItem value="cancelled">Annulleret</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="col-span-2">
+          <Label className="text-xs">Bekræftelsesnummer</Label>
+          <Input value={confNum} onChange={(e) => setConfNum(e.target.value)} />
+        </div>
+        <div className="col-span-2">
+          <Label className="text-xs">Bemærkninger</Label>
+          <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+        </div>
+      </div>
+
+      <Button onClick={handleSave} disabled={updateBookingHotel.isPending || !price}>
+        {updateBookingHotel.isPending ? "Gemmer..." : "Gem ændringer"}
+      </Button>
+
+      {booking && (
+        <AssignHotelDialog
+          open={assignDialogOpen}
+          onOpenChange={setAssignDialogOpen}
+          booking={{
+            id: booking.id,
+            start_date: booking.start_date,
+            end_date: booking.end_date,
+            location: booking.location,
+          }}
+          existingBookingHotel={editingHotel}
+        />
+      )}
+    </div>
+  );
+}
+
+export function EditBookingDialog({
   open, 
   onOpenChange, 
   booking,
