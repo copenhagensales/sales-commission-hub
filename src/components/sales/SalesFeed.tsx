@@ -173,6 +173,7 @@ interface SalesFeedProps {
 export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
   const [isPaused, setIsPaused] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [datePreset, setDatePreset] = useState<DatePreset>("all");
   const [validationStatusFilter, setValidationStatusFilter] = useState<string>("all");
   const [salesStatusFilter, setSalesStatusFilter] = useState<string>("all");
@@ -184,6 +185,15 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedSaleIds, setExpandedSaleIds] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Toggle expanded state for a sale
   const toggleExpanded = useCallback((saleId: string) => {
@@ -242,7 +252,7 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
   // Fetch paginated sales data
   const dateRange = getEffectiveDateRange();
   const { data, isLoading } = useQuery({
-    queryKey: ["sales-feed", currentPage, searchQuery, datePreset, validationStatusFilter, salesStatusFilter, sourceFilter, customDateRange.from?.toISOString(), customDateRange.to?.toISOString(), selectedClientId],
+    queryKey: ["sales-feed", currentPage, debouncedSearch, datePreset, validationStatusFilter, salesStatusFilter, sourceFilter, customDateRange.from?.toISOString(), customDateRange.to?.toISOString(), selectedClientId],
     queryFn: async () => {
       const from = (currentPage - 1) * ITEMS_PER_PAGE;
       const to = from + ITEMS_PER_PAGE - 1;
@@ -279,18 +289,16 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
         .order("sale_datetime", { ascending: false });
 
       // Apply filters - use RPC for full-text search across all fields including raw_payload
-      if (searchQuery) {
+      if (debouncedSearch) {
         const { data: matchedIds, error: searchError } = await supabase
-          .rpc('search_sales', { search_query: searchQuery, max_results: 200 });
+          .rpc('search_sales', { search_query: debouncedSearch, max_results: 200 });
         
         if (searchError) {
           console.error("Search RPC error:", searchError);
-          // Fallback to basic search
-          query = query.or(`customer_phone.ilike.%${searchQuery}%,customer_company.ilike.%${searchQuery}%,agent_name.ilike.%${searchQuery}%`);
+          query = query.or(`customer_phone.ilike.%${debouncedSearch}%,customer_company.ilike.%${debouncedSearch}%,agent_name.ilike.%${debouncedSearch}%`);
         } else if (matchedIds && matchedIds.length > 0) {
           query = query.in('id', matchedIds);
         } else {
-          // No results from search - return empty
           return { sales: [] as Sale[], totalCount: 0 };
         }
       }
@@ -640,45 +648,68 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
       <div className="space-y-4">
         {/* Controls */}
         <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
-          <div className="relative flex-1 min-w-[200px]">
+          <div className="relative flex-1 min-w-[260px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Søg i alle felter (kunde, telefon, lead ID, agent...)"
+              placeholder="Søg efter kunde, telefon, sælger, OPP, lead ID..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
+              className="pl-9 pr-9"
             />
+            {searchQuery && (
+              <button
+                onClick={() => { setSearchQuery(""); setDebouncedSearch(""); }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+            {searchQuery !== debouncedSearch && (
+              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+            )}
           </div>
           
-          {/* Date Filter with Presets + Calendar side-by-side */}
+          {/* Date Filter */}
           <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
                 className={cn(
-                  "w-full sm:w-[220px] justify-start text-left font-normal",
-                  datePreset === "all" && "text-muted-foreground"
+                  "w-full sm:w-[240px] justify-start text-left font-normal gap-2",
+                  datePreset !== "all" && "border-primary/50 bg-primary/5 text-foreground"
                 )}
               >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {datePreset === "custom" && customDateRange.from 
-                  ? customDateRange.to 
-                    ? `${format(customDateRange.from, "d/M", { locale: da })} - ${format(customDateRange.to, "d/M", { locale: da })}`
-                    : format(customDateRange.from, "d. MMM yyyy", { locale: da })
-                  : DATE_PRESETS.find(p => p.value === datePreset)?.label || "Alle datoer"
-                }
+                <CalendarIcon className="h-4 w-4 shrink-0" />
+                <span className="truncate">
+                  {datePreset === "custom" && customDateRange.from 
+                    ? customDateRange.to 
+                      ? `${format(customDateRange.from, "d. MMM", { locale: da })} – ${format(customDateRange.to, "d. MMM yyyy", { locale: da })}`
+                      : format(customDateRange.from, "d. MMM yyyy", { locale: da })
+                    : DATE_PRESETS.find(p => p.value === datePreset)?.label || "Alle datoer"
+                  }
+                </span>
+                {datePreset !== "all" && (
+                  <X 
+                    className="h-3.5 w-3.5 shrink-0 ml-auto text-muted-foreground hover:text-foreground" 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDatePreset("all");
+                      setCustomDateRange({ from: undefined, to: undefined });
+                    }}
+                  />
+                )}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
               <div className="flex">
-                {/* Preset buttons */}
-                <div className="border-r p-2 space-y-1">
+                <div className="border-r p-2 space-y-0.5 min-w-[140px]">
+                  <p className="text-xs font-medium text-muted-foreground px-2 py-1.5">Hurtig valg</p>
                   {DATE_PRESETS.filter(p => p.value !== "custom").map((preset) => (
                     <Button
                       key={preset.value}
                       variant={datePreset === preset.value ? "secondary" : "ghost"}
                       size="sm"
-                      className="w-full justify-start text-sm"
+                      className="w-full justify-start text-sm h-8"
                       onClick={() => {
                         setDatePreset(preset.value);
                         setCustomDateRange({ from: undefined, to: undefined });
@@ -689,39 +720,27 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
                     </Button>
                   ))}
                 </div>
-                {/* Calendar for custom range */}
-                <Calendar
-                  mode="range"
-                  defaultMonth={customDateRange.from}
-                  selected={customDateRange.from && customDateRange.to ? { from: customDateRange.from, to: customDateRange.to } : undefined}
-                  onSelect={(range) => {
-                    setCustomDateRange({ from: range?.from, to: range?.to });
-                    if (range?.from && range?.to) {
-                      setDatePreset("custom");
-                      setIsCalendarOpen(false);
-                    }
-                  }}
-                  numberOfMonths={2}
-                  locale={da}
-                  className="pointer-events-auto p-3"
-                />
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground px-3 pt-3 pb-1">Eller vælg periode</p>
+                  <Calendar
+                    mode="range"
+                    defaultMonth={customDateRange.from}
+                    selected={customDateRange.from && customDateRange.to ? { from: customDateRange.from, to: customDateRange.to } : undefined}
+                    onSelect={(range) => {
+                      setCustomDateRange({ from: range?.from, to: range?.to });
+                      if (range?.from && range?.to) {
+                        setDatePreset("custom");
+                        setIsCalendarOpen(false);
+                      }
+                    }}
+                    numberOfMonths={2}
+                    locale={da}
+                    className="pointer-events-auto p-3"
+                  />
+                </div>
               </div>
             </PopoverContent>
           </Popover>
-          
-          {datePreset !== "all" && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => {
-                setDatePreset("all");
-                setCustomDateRange({ from: undefined, to: undefined });
-              }}
-              className="h-10 w-10"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          )}
 
           {/* Sales Status Filter */}
           <Select value={salesStatusFilter} onValueChange={setSalesStatusFilter}>
@@ -784,14 +803,34 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
           </Button>
         </div>
 
-        {/* Live indicator */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Radio className={cn(
-              "h-4 w-4",
-              isPaused ? "text-muted-foreground" : "text-green-500 animate-pulse"
-            )} />
-            {isPaused ? "Live opdateringer sat på pause" : "Live - nye salg vises automatisk"}
+        {/* Active filters + Live indicator */}
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
+            <div className="flex items-center gap-1.5">
+              <Radio className={cn(
+                "h-4 w-4",
+                isPaused ? "text-muted-foreground" : "text-green-500 animate-pulse"
+              )} />
+              {isPaused ? "Pause" : "Live"}
+            </div>
+            {debouncedSearch && (
+              <Badge variant="secondary" className="gap-1 font-normal">
+                Søgning: "{debouncedSearch}"
+                <button onClick={() => { setSearchQuery(""); setDebouncedSearch(""); }}>
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            )}
+            {datePreset !== "all" && (
+              <Badge variant="secondary" className="gap-1 font-normal">
+                {datePreset === "custom" && customDateRange.from
+                  ? `${format(customDateRange.from, "d. MMM", { locale: da })} – ${format(customDateRange.to || customDateRange.from, "d. MMM", { locale: da })}`
+                  : DATE_PRESETS.find(p => p.value === datePreset)?.label}
+                <button onClick={() => { setDatePreset("all"); setCustomDateRange({ from: undefined, to: undefined }); }}>
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            )}
           </div>
           <span className="text-sm text-muted-foreground">
             Viser {sales.length} af {totalCount} salg
