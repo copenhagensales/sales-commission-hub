@@ -135,6 +135,13 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         }
       });
 
+      // Fallback for FM employees: use work_email when no agent mapping exists
+      for (const emp of employees) {
+        if (!empEmailMap.has(emp.id) && (emp as any).work_email) {
+          empEmailMap.set(emp.id, [(emp as any).work_email.toLowerCase()]);
+        }
+      }
+
       const allEmails = [...new Set(Array.from(empEmailMap.values()).flat())];
 
       // 4. Get weekly sales for the past 8 weeks
