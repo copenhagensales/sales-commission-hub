@@ -103,7 +103,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
       const [empRes, agentRes, teamsRes] = await Promise.all([
         supabase
           .from("employee_master_data")
-          .select("id, first_name, last_name, team_id, avatar_url, employment_start_date")
+          .select("id, first_name, last_name, team_id, avatar_url, employment_start_date, work_email")
           .in("id", employeeIds)
           .eq("is_active", true),
         supabase
@@ -134,6 +134,13 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           empEmailMap.get(m.employee_id)!.push(email.toLowerCase());
         }
       });
+
+      // Fallback for FM employees: use work_email when no agent mapping exists
+      for (const emp of employees) {
+        if (!empEmailMap.has(emp.id) && (emp as any).work_email) {
+          empEmailMap.set(emp.id, [(emp as any).work_email.toLowerCase()]);
+        }
+      }
 
       const allEmails = [...new Set(Array.from(empEmailMap.values()).flat())];
 
