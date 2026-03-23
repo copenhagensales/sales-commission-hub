@@ -1,31 +1,39 @@
 
 
-# Debug & Fix: Sandra R stadig med 144 salg i forecast
+# Fix: FM-medarbejdere skal ALTID bruge bookingOnly
 
 ## Problem
-Koden i `useClientForecast.ts` ser korrekt ud — `useBookingOnly`-logikken burde give Sandra 0 vagter og dermed 0 forecast. Men hun viser stadig 144. Der er to mulige årsager:
+Vagtplanen viser "09:30-17:30 / ikke booket" for alle FM-medarbejdere — det er team standard shifts (man-fre). Forecastet tæller disse som rigtige vagter, fordi `useBookingOnly` kun er `true` når der er **nul** bookinger. Har medarbejderen bare 1 booking, bruges team standard for alle andre dage → oppustet forecast.
 
-1. **Sandra har en `employee_standard_shift`-entry** i databasen, som giver hende et shift_id. I det tilfælde finder `empStandardDays` dage (f.eks. man-fre), og selvom `bookingOnly=true` burde springe det over, kan der være et subtilt problem.
+## Løsning
+Identificér FM-medarbejdere via teamnavnet og tving `bookingOnly = true` for dem alle. Så tælles KUN individuelle vagter + booking assignments — aldrig team standard.
 
-2. **Ændringerne er ikke trådt i kraft** — React Query cacher resultater med `staleTime`, og brugerens browser kan vise cached data fra før rettelsen.
+## Ændring i `src/hooks/useClientForecast.ts`
 
-## Plan
+**Linje 482-508 erstattes med:**
+```typescript
+// FM employees: ALWAYS use bookingOnly (team standard is irrelevant for FM)
+const empTeamId = employeeTeamMap.get(emp.id);
+const empTeamName = empTeamId ? teamNameMap.get(empTeamId) : null;
+const isFmEmployee = empTeamName?.toLowerCase().includes('fieldmarketing') 
+  || empTeamName?.toLowerCase().includes('field marketing');
 
-### 1. Tilføj debug-logging for Sandra
-Tilføj midlertidig `console.log` i forecast-loopet der viser:
-- `hasAnyForecastShifts`, `hasAnyForecastBookings`, `useBookingOnly`
-- `grossShifts`, `forecastShifts`, `plannedHours`
-- Om hun har `empStandardDays`
+const useBookingOnly = isFmEmployee || (!hasAnyForecastShifts && !hasAnyForecastBookings);
 
-Denne log gør det muligt at se i konsollen præcis hvad der sker.
+let grossShifts = countShifts(emp.id, forecastStart, empForecastEnd, false, useBookingOnly);
+let forecastShifts = countShifts(emp.id, forecastStart, empForecastEnd, true, useBookingOnly);
+```
 
-### 2. Forcer `useBookingOnly`-logikken med ekstra sikkerhed
-Tilføj en **sekundær check**: Hvis `grossShifts > 0` men `useBookingOnly === true`, tving `grossShifts = 0`. Dette er et safety-net i tilfælde af en edge case i `countShifts`.
+- Fjern safety-net (linje 490-495) — nu overflødig
+- Fjern debug-logs (linje 497-508) — nu overflødig
+- Kræver at `teamNameMap` allerede eksisterer (skal verificeres, evt. bygges fra eksisterende team-data)
 
-### 3. Check om `employee_standard_shifts` giver Sandra vagter
-I `countShifts`-funktionen: Selv med `bookingOnly=true` springes standard shifts korrekt over (linje 361). Men der kan være en timing-bug hvor `empStandardDays` linker til et shift_id der også bruges som team standard shift. Tilføj ekstra logging for at verificere.
+## Resultat
+- Sandra R april: 0 bookinger → 0 vagter → 0 forecast
+- Sandra R marts: kun hendes faktiske bookinger+vagter tælles
+- Non-FM medarbejdere: uændret (bruger stadig team standard som fallback)
 
 | Fil | Ændring |
 |-----|---------|
-| `src/hooks/useClientForecast.ts` | Tilføj debug-log + safety-net for bookingOnly |
+| `src/hooks/useClientForecast.ts` | FM = altid bookingOnly, fjern debug+safety-net |
 
