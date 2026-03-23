@@ -387,12 +387,12 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         const forecastShifts = countShifts(emp.id, forecastStart, empForecastEnd, true);
         const plannedHours = forecastShifts * HOURS_PER_SHIFT;
 
-        // Attendance factor: (shifts - absence days) / shifts over past 90 days
+        // Attendance factor: only sick/no_show reduces attendance (vacation is planned, not a penalty)
         const past90Start = subWeeks(now, 13);
         const totalShiftsPast90 = countShifts(emp.id, past90Start, now, false);
-        const totalShiftsNoAbsence = countShifts(emp.id, past90Start, now, true);
+        const totalShiftsNoSick = countShifts(emp.id, past90Start, now, 'sick_only');
         const attendanceFactor = totalShiftsPast90 > 0
-          ? Math.min(1, totalShiftsNoAbsence / totalShiftsPast90)
+          ? Math.min(1, totalShiftsNoSick / totalShiftsPast90)
           : 0.92;
 
         const teamId = employeeTeamMap.get(emp.id);
