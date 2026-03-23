@@ -8,7 +8,7 @@ import { ManualCancellationsTab } from "@/components/cancellations/ManualCancell
 import { UploadCancellationsTab } from "@/components/cancellations/UploadCancellationsTab";
 import { DuplicatesTab } from "@/components/cancellations/DuplicatesTab";
 import { ApprovalQueueTab } from "@/components/cancellations/ApprovalQueueTab";
-import { UnmatchedTab } from "@/components/cancellations/UnmatchedTab";
+
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
 
@@ -38,8 +38,6 @@ export default function Cancellations() {
       tabs.push({ value: 'duplicates', label: 'Dubletter' });
     if (isOwner || canView('tab_cancellations_approval'))
       tabs.push({ value: 'approval', label: 'Godkendelseskø' });
-    if (isOwner || canView('tab_cancellations_unmatched'))
-      tabs.push({ value: 'unmatched', label: 'Ingen match' });
     return tabs;
   }, [isOwner, canView]);
 
@@ -99,11 +97,6 @@ export default function Cancellations() {
             {visibleTabs.some(t => t.value === 'approval') && (
               <TabsContent value="approval" className="mt-6">
                 <ApprovalQueueTab clientId={selectedClientId} />
-              </TabsContent>
-            )}
-            {visibleTabs.some(t => t.value === 'unmatched') && (
-              <TabsContent value="unmatched" className="mt-6">
-                <UnmatchedTab clientId={selectedClientId} />
               </TabsContent>
             )}
           </Tabs>
