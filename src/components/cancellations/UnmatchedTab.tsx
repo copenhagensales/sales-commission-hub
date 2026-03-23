@@ -86,15 +86,15 @@ export function UnmatchedTab({ clientId }: UnmatchedTabProps) {
 
   // Fetch system sales for the client that are NOT in the queue
   const { data: missingFromUpload = [], isLoading: loadingSystemSales } = useQuery({
-    queryKey: ["system-sales-missing-from-upload", selectedImportId, clientId],
+    queryKey: ["system-sales-missing-from-upload", selectedImportId, resolvedClientId],
     queryFn: async () => {
-      if (!clientId) return [];
+      if (!resolvedClientId) return [];
 
       // Get campaigns for this client
       const { data: campaigns } = await supabase
         .from("client_campaigns")
         .select("id")
-        .eq("client_id", clientId);
+        .eq("client_id", resolvedClientId);
       
       const campaignIds = campaigns?.map(c => c.id) || [];
       if (campaignIds.length === 0) return [];
@@ -132,7 +132,7 @@ export function UnmatchedTab({ clientId }: UnmatchedTabProps) {
       
       return unmatched.map(s => ({ ...s, saleItems: [] as any[] }));
     },
-    enabled: !!selectedImportId && !!clientId && matchedSaleIdSet.size > 0,
+    enabled: !!selectedImportId && !!resolvedClientId && matchedSaleIdSet.size > 0,
   });
 
   // Get column names from unmatched rows
