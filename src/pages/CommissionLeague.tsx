@@ -700,6 +700,7 @@ export default function CommissionLeague() {
                       todayProvisionMap={todayProvisionMap || {}}
                       weeklyProvisionMap={weeklyProvisionMap || {}}
                       roundProvisionMap={roundProvisionMap || {}}
+                      currentRoundNumber={currentRound?.round_number}
                     />
                   ) : selectedRound && selectedRoundStandings && selectedRoundStandings.length > 0 ? (
                     <RoundResultsCard

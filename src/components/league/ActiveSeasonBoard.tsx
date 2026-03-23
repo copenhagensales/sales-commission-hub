@@ -16,6 +16,13 @@ import { ZoneProgressBar } from "./ZoneProgressBar";
 import { LeagueSeasonStanding } from "@/hooks/useLeagueActiveData";
 import { motion, AnimatePresence } from "framer-motion";
 
+const ROUND_MULTIPLIERS = [1, 1.2, 1.4, 1.6, 1.8, 2.0];
+
+function calculatePointsAtStake(division: number, rank: number, totalDivisions: number, multiplier: number): number {
+  const basePoints = Math.max(0, (totalDivisions - division + 1) * 20 - (rank - 1) * 5);
+  return Math.round(basePoints * multiplier);
+}
+
 interface ActiveSeasonBoardProps {
   standings: LeagueSeasonStanding[];
   playersPerDivision: number;
@@ -25,6 +32,7 @@ interface ActiveSeasonBoardProps {
   todayProvisionMap?: Record<string, number>;
   weeklyProvisionMap?: Record<string, number[]>;
   roundProvisionMap?: Record<string, number>;
+  currentRoundNumber?: number;
 }
 
 export function ActiveSeasonBoard({
