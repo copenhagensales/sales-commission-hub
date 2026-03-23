@@ -107,7 +107,26 @@ export function UnmatchedTab() {
       if (error) throw error;
       
       // Filter out sales already in queue
-      return (allSales || []).filter(s => !matchedSaleIdSet.has(s.id));
+      const unmatched = (allSales || []).filter(s => !matchedSaleIdSet.has(s.id));
+      
+      // Fetch sale_items with product names for these sales
+      if (unmatched.length > 0) {
+        const saleIds = unmatched.map(s => s.id);
+        const { data: items } = await supabase
+          .from("sale_items")
+          .select("sale_id, quantity, mapped_commission, mapped_revenue, product:products(name)")
+          .in("sale_id", saleIds.slice(0, 500));
+        
+        const itemsBySale: Record<string, typeof items> = {};
+        (items || []).forEach(item => {
+          if (!itemsBySale[item.sale_id]) itemsBySale[item.sale_id] = [];
+          itemsBySale[item.sale_id].push(item);
+        });
+        
+        return unmatched.map(s => ({ ...s, saleItems: itemsBySale[s.id] || [] }));
+      }
+      
+      return unmatched.map(s => ({ ...s, saleItems: [] as any[] }));
     },
     enabled: !!selectedImportId && !!clientId && matchedSaleIdSet.size > 0,
   });
