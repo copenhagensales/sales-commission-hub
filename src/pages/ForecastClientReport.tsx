@@ -219,7 +219,8 @@ function ReportExecutiveSummary({ forecast, clientName, periodLabel, monthOffset
 
 function ReportKeyFigures({ forecast }: { forecast: ForecastResult }) {
   const churnTotal = forecast.churnLoss + (forecast.establishedChurnLoss || 0);
-  const cohortSales = forecast.cohorts.reduce((s, c) => s + c.forecastSales, 0);
+  const periodCohorts = forecast.cohorts.filter(c => c.startDate >= forecast.periodStart && c.startDate <= forecast.periodEnd);
+  const cohortSales = periodCohorts.reduce((s, c) => s + c.forecastSales, 0);
   const topPerformers = forecast.establishedEmployees
     .filter(e => e.forecastSales + (e.actualSales || 0) > 0)
     .sort((a, b) => (b.forecastSales + (b.actualSales || 0)) - (a.forecastSales + (a.actualSales || 0)))
