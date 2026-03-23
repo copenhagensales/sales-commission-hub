@@ -85,7 +85,7 @@ export function AssignHotelDialog({ open, onOpenChange, booking, existingBooking
 
   const handleSubmit = async () => {
     if (!pricePerNight || Number(pricePerNight) <= 0) {
-      toast({ title: "Pris mangler", description: "Pris pr. nat er påkrævet for at gemme hoteltildelingen.", variant: "destructive" });
+      toast({ title: "Pris mangler", description: "Samlet pris er påkrævet for at gemme hoteltildelingen.", variant: "destructive" });
       return;
     }
 
@@ -261,7 +261,7 @@ export function AssignHotelDialog({ open, onOpenChange, booking, existingBooking
               <Input type="number" min={1} value={rooms} onChange={(e) => setRooms(Number(e.target.value))} />
             </div>
             <div>
-              <Label className="text-xs">Pris pr. nat (DKK) *</Label>
+              <Label className="text-xs">Samlet pris (DKK) *</Label>
               <Input type="number" value={pricePerNight} onChange={(e) => setPricePerNight(e.target.value)} className={!pricePerNight ? "border-destructive" : ""} placeholder="Påkrævet" />
             </div>
             <div className="col-span-2">

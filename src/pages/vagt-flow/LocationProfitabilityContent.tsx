@@ -184,8 +184,7 @@ export default function LocationProfitabilityContent() {
   const hotelCostByBooking = useMemo(() => {
     const map = new Map<string, number>();
     for (const h of hotelData || []) {
-      const nights = Math.max(differenceInCalendarDays(new Date(h.check_out), new Date(h.check_in)), 1);
-      const cost = nights * (h.price_per_night || 0) * (h.rooms || 1);
+      const cost = (h.price_per_night || 0) * (h.rooms || 1);
       map.set(h.booking_id, (map.get(h.booking_id) || 0) + cost);
     }
     return map;
