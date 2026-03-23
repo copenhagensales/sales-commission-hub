@@ -1,25 +1,26 @@
 
 
-# Ny sub-tab "Fejl i match" i Godkendelseskøen
+# Tilføj kundetarget til Kunderapport og PDF
 
 ## Hvad
-Tilføj en fjerde sub-tab kaldet **"Fejl i match"** i Godkendelseskøen. Den viser alle rækker fra uploads der ikke kunne matches til et salg i systemet — data fra `cancellation_imports.unmatched_rows` (JSONB-kolonnen).
+Vis kundetarget i kunderapporten (ForecastClientReport) og inkluder det i den downloadbare PDF.
 
 ## Ændringer
 
 | Fil | Hvad |
 |-----|------|
-| `src/components/cancellations/MatchErrorsSubTab.tsx` | **Ny fil.** Henter alle `cancellation_imports` for den valgte kunde hvor `unmatched_rows` ikke er null. Viser rækkerne i en tabel med de uploadede felter (OPP, produkt, beløb osv.), grupperet pr. import (filnavn + dato). Søgefelt og sortering. |
-| `src/components/cancellations/ApprovalQueueTab.tsx` | Udvid `subTab` type med `"match_errors"`. Tilføj ny `TabsTrigger` "Fejl i match" med count. Tilføj `TabsContent` der renderer `<MatchErrorsSubTab clientId={clientId} />`. |
+| `src/pages/ForecastClientReport.tsx` | Tilføj query til `client_monthly_targets` for valgt kunde/periode. Vis target i `ReportExecutiveSummary` (som på Forecast-siden: "Kundetarget: X salg" med diff-badge). Send `clientTarget` til `generateForecastReportPdf`. |
+| `src/utils/forecastReportPdfGenerator.ts` | Udvid `ReportData` med `clientTarget?: number \| null`. Tilføj en target-linje i summary-boksen der viser "Kundetarget: X salg" med afvigelse (forecast vs target) i parentes. |
 
 ## Teknisk detalje
 
-**MatchErrorsSubTab query:**
-1. Hent `cancellation_imports` hvor `unmatched_rows IS NOT NULL` og filtret på uploads tilhørende den valgte kundes kampagner (via `cancellation_queue.client_id` eller importens kontekst)
-2. Parse `unmatched_rows` JSON-array — hver entry er en Excel-række der ikke matchede
-3. Vis i tabel: filnavn, upload-dato, og de uploadede feltværdier (OPP, produkt, beløb etc.)
-4. Søgefelt + sortering på upload-dato
+**ForecastClientReport.tsx:**
+- Beregn `periodStart` fra `monthOffset` (samme logik som Forecast.tsx)
+- Query `client_monthly_targets` med `client_id` + `period_start`
+- Vis i `ReportExecutiveSummary`: Target-ikon + "Kundetarget: {target} salg" + grøn/rød badge med diff
+- Send `clientTarget` med til `generateForecastReportPdf`
 
-**Count i tab-header:**
-- Query antal imports med unmatched_rows for badge-visning
+**PDF:**
+- Under summary-boksens interval-tekst, tilføj linje: "Kundetarget: X salg (forecast afviger +Y / -Y%)"
+- Kun vist når `clientTarget > 0`
 
