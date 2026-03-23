@@ -1,26 +1,17 @@
 
 
-# Tilføj kundetarget til Kunderapport og PDF
+# Fix: Kundetarget vises ikke i rapporten (dato-mismatch)
 
-## Hvad
-Vis kundetarget i kunderapporten (ForecastClientReport) og inkluder det i den downloadbare PDF.
+## Problem
+Targets i `client_monthly_targets` er gemt med `period_start = '2026-03-31'` (sidste dag i måneden), men både Forecast.tsx og ForecastClientReport.tsx søger med `period_start = '2026-03-01'` (første dag). De matcher aldrig.
 
-## Ændringer
+## Løsning
+Dobbelt fix — ret de eksisterende data OG gør rapporten mere robust:
 
-| Fil | Hvad |
-|-----|------|
-| `src/pages/ForecastClientReport.tsx` | Tilføj query til `client_monthly_targets` for valgt kunde/periode. Vis target i `ReportExecutiveSummary` (som på Forecast-siden: "Kundetarget: X salg" med diff-badge). Send `clientTarget` til `generateForecastReportPdf`. |
-| `src/utils/forecastReportPdfGenerator.ts` | Udvid `ReportData` med `clientTarget?: number \| null`. Tilføj en target-linje i summary-boksen der viser "Kundetarget: X salg" med afvigelse (forecast vs target) i parentes. |
+| Ændring | Hvad |
+|---------|------|
+| **Database migration** | Opdater eksisterende rækker: `UPDATE client_monthly_targets SET period_start = date_trunc('month', period_start)::date` — så `2026-03-31` → `2026-03-01`. |
+| **ForecastClientReport.tsx** | Ingen kodeændring nødvendig — den beregner allerede korrekt `YYYY-MM-01`. |
 
-## Teknisk detalje
-
-**ForecastClientReport.tsx:**
-- Beregn `periodStart` fra `monthOffset` (samme logik som Forecast.tsx)
-- Query `client_monthly_targets` med `client_id` + `period_start`
-- Vis i `ReportExecutiveSummary`: Target-ikon + "Kundetarget: {target} salg" + grøn/rød badge med diff
-- Send `clientTarget` med til `generateForecastReportPdf`
-
-**PDF:**
-- Under summary-boksens interval-tekst, tilføj linje: "Kundetarget: X salg (forecast afviger +Y / -Y%)"
-- Kun vist når `clientTarget > 0`
+Alternativt, hvis dataene bevidst blev gemt med dag-31, kan vi i stedet ændre query'en til at matche på måned+år i stedet for eksakt dato. Men da Forecast.tsx upsert'er med dag-1, er den korrekte fix at rette de eksisterende data.
 
