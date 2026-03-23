@@ -14,7 +14,9 @@ interface Props {
   showTarget?: boolean;
 }
 
-export function ForecastSummary({ forecast, periodLabel, isCurrentPeriod }: Props) {
+export function ForecastSummary({ forecast, periodLabel, isCurrentPeriod, clientTarget, onTargetChange, showTarget }: Props) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState("");
   const totalSales = forecast.totalSalesExpected;
   const numEmployees = forecast.establishedEmployees.length;
   const numCohorts = forecast.cohorts.length;
