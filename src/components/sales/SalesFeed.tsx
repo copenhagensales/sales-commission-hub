@@ -289,18 +289,16 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
         .order("sale_datetime", { ascending: false });
 
       // Apply filters - use RPC for full-text search across all fields including raw_payload
-      if (searchQuery) {
+      if (debouncedSearch) {
         const { data: matchedIds, error: searchError } = await supabase
-          .rpc('search_sales', { search_query: searchQuery, max_results: 200 });
+          .rpc('search_sales', { search_query: debouncedSearch, max_results: 200 });
         
         if (searchError) {
           console.error("Search RPC error:", searchError);
-          // Fallback to basic search
-          query = query.or(`customer_phone.ilike.%${searchQuery}%,customer_company.ilike.%${searchQuery}%,agent_name.ilike.%${searchQuery}%`);
+          query = query.or(`customer_phone.ilike.%${debouncedSearch}%,customer_company.ilike.%${debouncedSearch}%,agent_name.ilike.%${debouncedSearch}%`);
         } else if (matchedIds && matchedIds.length > 0) {
           query = query.in('id', matchedIds);
         } else {
-          // No results from search - return empty
           return { sales: [] as Sale[], totalCount: 0 };
         }
       }
