@@ -93,11 +93,11 @@ export function generateForecastReportPdf(data: ReportData) {
     ${cohortSales > 0 ? `<div class="effect-row effect-pos"><span class="effect-label">Nye hold</span><span class="effect-value pos">+${cohortSales} salg</span></div>` : ""}
   </div>
 
-  ${forecast.cohorts.filter(c => c.forecastSales > 0 || c.plannedHeadcount > 0).length > 0 ? `
+  ${periodCohorts.filter(c => c.forecastSales > 0 || c.plannedHeadcount > 0).length > 0 ? `
   <div class="section">
     <div class="section-title">Planlagte opstartshold</div>
     <p style="font-size:11px;color:#64748b;margin-bottom:8px;">
-      Der er planlagt ${forecast.cohorts.filter(c => c.forecastSales > 0 || c.plannedHeadcount > 0).length} opstartshold med i alt ${forecast.cohorts.filter(c => c.forecastSales > 0 || c.plannedHeadcount > 0).reduce((s, c) => s + c.plannedHeadcount, 0)} nye sælgere.
+      Der er planlagt ${periodCohorts.filter(c => c.forecastSales > 0 || c.plannedHeadcount > 0).length} opstartshold med i alt ${periodCohorts.filter(c => c.forecastSales > 0 || c.plannedHeadcount > 0).reduce((s, c) => s + c.plannedHeadcount, 0)} nye sælgere.
       Nye hold er indregnet i det samlede forecast med gradvis optrapning.
     </p>
     <table style="width:100%;border-collapse:collapse;font-size:11px;">
@@ -110,7 +110,7 @@ export function generateForecastReportPdf(data: ReportData) {
         </tr>
       </thead>
       <tbody>
-        ${forecast.cohorts.filter(c => c.forecastSales > 0 || c.plannedHeadcount > 0).map(c => {
+        ${periodCohorts.filter(c => c.forecastSales > 0 || c.plannedHeadcount > 0).map(c => {
           const rampLabel = c.rampFactor <= 0.2 ? "Opstartsfase (15%)" : c.rampFactor <= 0.4 ? "Tidlig fase (35%)" : c.rampFactor <= 0.7 ? "Optrapning (60%)" : c.rampFactor <= 0.9 ? "Næsten fuld (85%)" : "Fuld kapacitet";
           return `<tr style="border-bottom:1px solid #f1f5f9;">
             <td style="padding:6px 8px;">${new Date(c.startDate).toLocaleDateString("da-DK", { day: "numeric", month: "short", year: "numeric" })}</td>
