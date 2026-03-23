@@ -6,11 +6,12 @@ import type { ForecastResult } from "@/types/forecast";
 
 interface Props {
   forecast: ForecastResult;
+  clientTarget?: number | null;
 }
 
-export function ForecastProgressBar({ forecast }: Props) {
+export function ForecastProgressBar({ forecast, clientTarget }: Props) {
   const actual = forecast.actualSalesToDate;
-  const total = forecast.totalSalesExpected;
+  const total = clientTarget ?? forecast.totalSalesExpected;
   const daysElapsed = forecast.daysElapsed;
   const daysRemaining = forecast.daysRemaining;
 
