@@ -26,20 +26,6 @@ export function generateForecastReportPdf(data: ReportData) {
   const positiveDrivers = forecast.drivers.filter(d => d.impact === "positive");
   const negativeDrivers = forecast.drivers.filter(d => d.impact === "negative");
 
-  // Build recommendations
-  const recs: string[] = [];
-  
-  if (churnTotal > 0) {
-    recs.push(`<strong>Fastholdelse:</strong> Vi har indregnet en forventet naturlig udskiftning i teamet svarende til ${churnTotal} salg. Tæt lederkontakt og tidlig opfølgning kan reducere denne effekt.`);
-  }
-  if (forecast.absenceLoss > 15) {
-    recs.push(`<strong>Fravær:</strong> Fravær koster ${forecast.absenceLoss} salg. Se på planlægning, vikardækning eller mønstre.`);
-  }
-  const avgSph = numEmployees > 0 ? forecast.establishedEmployees.reduce((s, e) => s + e.expectedSph, 0) / numEmployees : 0;
-  const lowPerf = forecast.establishedEmployees.filter(e => e.expectedSph < avgSph * 0.5 && e.expectedSph > 0);
-  if (lowPerf.length > 0) {
-    recs.push(`<strong>Performance-løft:</strong> ${lowPerf.length} sælger${lowPerf.length > 1 ? "e" : ""} performer under teamgennemsnittet. Coaching kan løfte output.`);
-  }
 
   const html = `<!DOCTYPE html>
 <html lang="da">
