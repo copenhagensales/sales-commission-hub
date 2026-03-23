@@ -1,36 +1,33 @@
 
 
-# Fix: Comeback beregnes fra kval-placering (ikke runde 1)
+# Tilføj OPP-nummer til TDC Erhverv udtrækket
 
 ## Problem
-Comeback-logikken (linje 220-270) bruger runde 1-placeringer som baseline. Men ifølge reglerne er det **kvalifikationsrundens endelige placering** der er udgangspunktet. Vinderen er den der rykker flest pladser fra kval-slutplacering til nuværende/endelig placering.
+OPP-nummeret fra Adversus er gemt i `sales.adversus_opp_number`, men `get_sales_report_raw` RPC'en returnerer det ikke. Feltet "Reference" er `internal_reference` (internt MG-salgsid), ikke OPP-nummeret.
 
-Derudover kræver den nuværende kode at runde 1 er **afsluttet** (`league_round_standings` populeret) — så under runde 1 vises ingen comeback-data.
+## Ændringer
 
-## Ændring
+### 1. Database migration: Udvid `get_sales_report_raw`
+Tilføj `adversus_opp_number` som nyt felt i RPC'ens RETURNS TABLE og SELECT:
+```sql
+-- Tilføj til RETURNS TABLE:
+adversus_opp_number text
 
-### `src/hooks/useLeaguePrizeData.ts` — Comeback-blokken (linje 220-271)
-
-**Erstat** baseline fra `league_round_standings` (runde 1) med `league_qualification_standings.overall_rank`:
-
-```
-Gammel logik:
-  startRank = runde 1 placering (fra league_round_standings)
-  currentRank = overall_rank (fra league_season_standings)
-  improvement = startRank - currentRank
-
-Ny logik:
-  startRank = overall_rank fra league_qualification_standings (kval-slutplacering)
-  currentRank = overall_rank fra league_season_standings
-  improvement = startRank - currentRank
+-- Tilføj til SELECT:
+s.adversus_opp_number AS adversus_opp_number
 ```
 
-- Fjern opslaget af `round1` og `round1Standings`
-- Hent i stedet `league_qualification_standings` med `employee_id, overall_rank` for `season_id`
-- Brug kval `overall_rank` som baseline
-- Virker allerede fra runde 1 (kval-data eksisterer altid når sæsonen er aktiv)
+### 2. `src/pages/reports/ReportsManagement.tsx`
+- Tilføj `adversus_opp_number` til `RawRow` interface
+- Tilføj "OPP-nummer" kolonne i Excel-eksporten (Rådata-fanen)
+
+### 3. `src/pages/reports/RawSalesTable.tsx`
+- Tilføj `adversus_opp_number` til `RawRow` interface
+- Tilføj "OPP-nummer" kolonne i tabellen (mellem "Reference" og andre kolonner)
 
 | Fil | Ændring |
 |-----|---------|
-| `src/hooks/useLeaguePrizeData.ts` | Brug kval-placering som comeback-baseline i stedet for runde 1 |
+| Migration SQL | Tilføj `adversus_opp_number` til `get_sales_report_raw` |
+| `src/pages/reports/ReportsManagement.tsx` | OPP-nummer i RawRow + Excel-eksport |
+| `src/pages/reports/RawSalesTable.tsx` | OPP-nummer kolonne i tabel |
 
