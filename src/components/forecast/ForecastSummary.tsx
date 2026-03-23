@@ -1,11 +1,17 @@
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Sparkles } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Sparkles, Pencil, Check, X, Target } from "lucide-react";
 import type { ForecastResult } from "@/types/forecast";
 
 interface Props {
   forecast: ForecastResult;
   periodLabel: string;
   isCurrentPeriod: boolean;
+  clientTarget?: number | null;
+  onTargetChange?: (target: number) => void;
+  showTarget?: boolean;
 }
 
 export function ForecastSummary({ forecast, periodLabel, isCurrentPeriod }: Props) {
