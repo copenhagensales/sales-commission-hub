@@ -6,10 +6,11 @@ interface ReportData {
   forecast: ForecastResult;
   forecastM2: ForecastResult | null;
   periodLabelM2: string;
+  clientTarget?: number | null;
 }
 
 export function generateForecastReportPdf(data: ReportData) {
-  const { clientName, periodLabel, forecast, forecastM2, periodLabelM2 } = data;
+  const { clientName, periodLabel, forecast, forecastM2, periodLabelM2, clientTarget } = data;
   const churnTotal = forecast.churnLoss + (forecast.establishedChurnLoss || 0);
   const periodCohorts = forecast.cohorts.filter(c => c.startDate >= forecast.periodStart && c.startDate <= forecast.periodEnd);
   const cohortSales = periodCohorts.reduce((s, c) => s + c.forecastSales, 0);
@@ -77,6 +78,12 @@ export function generateForecastReportPdf(data: ReportData) {
         <span style="font-size: 13px; color: #64748b; margin-left: 8px;">forventede salg</span>
       </div>
       <p>Forecastet er baseret på ${numEmployees} etablerede sælgere${numCohorts > 0 ? ` og ${numCohorts} opstartshold` : ""}. Det forventede interval er ${forecast.totalSalesLow.toLocaleString("da-DK")}–${forecast.totalSalesHigh.toLocaleString("da-DK")} salg.</p>
+      ${clientTarget && clientTarget > 0 ? (() => {
+        const diff = forecast.totalSalesExpected - clientTarget;
+        const pct = Math.round((diff / clientTarget) * 100);
+        const color = diff >= 0 ? "#16a34a" : "#dc2626";
+        return `<p style="margin-top: 6px;"><strong>Kundetarget: ${clientTarget.toLocaleString("da-DK")} salg</strong> <span style="color:${color};font-weight:700;">(forecast afviger ${diff >= 0 ? "+" : ""}${diff.toLocaleString("da-DK")} / ${pct >= 0 ? "+" : ""}${pct}%)</span></p>`;
+      })() : ""}
       ${driverTexts.length > 0 ? `<p style="margin-top: 6px;">De vigtigste faktorer: ${driverTexts.join(", ")}.</p>` : ""}
     </div>
   </div>

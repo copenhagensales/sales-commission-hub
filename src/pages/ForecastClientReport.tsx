@@ -47,6 +47,28 @@ export default function ForecastClientReport() {
   const forecast = forecastData?.forecast;
   const forecastM2 = forecastDataM2?.forecast;
 
+  // Compute periodStart for target query
+  const periodStart = useMemo(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + monthOffset);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+  }, [monthOffset]);
+
+  const { data: clientTarget } = useQuery({
+    queryKey: ["client-monthly-target", selectedClient, periodStart],
+    queryFn: async () => {
+      if (selectedClient === "all") return null;
+      const { data } = await supabase
+        .from("client_monthly_targets")
+        .select("target_sales")
+        .eq("client_id", selectedClient)
+        .eq("period_start", periodStart)
+        .maybeSingle();
+      return data?.target_sales ?? null;
+    },
+    enabled: selectedClient !== "all",
+  });
+
   const clientName = useMemo(() => {
     if (selectedClient === "all") return "Alle kunder";
     return clients.find(c => c.id === selectedClient)?.name || "Kunde";
@@ -72,6 +94,7 @@ export default function ForecastClientReport() {
       forecast,
       forecastM2: forecastM2 || null,
       periodLabelM2,
+      clientTarget: clientTarget ?? null,
     });
   };
 
@@ -125,7 +148,7 @@ export default function ForecastClientReport() {
         {!isLoading && forecast && (
           <div className="space-y-6" id="forecast-report-content">
             {/* 1. Executive Summary */}
-            <ReportExecutiveSummary forecast={forecast} clientName={clientName} periodLabel={periodLabel} monthOffset={monthOffset} />
+            <ReportExecutiveSummary forecast={forecast} clientName={clientName} periodLabel={periodLabel} monthOffset={monthOffset} clientTarget={clientTarget ?? null} />
 
             {/* 2. Nøgletal */}
             <ReportKeyFigures forecast={forecast} />
@@ -154,8 +177,8 @@ export default function ForecastClientReport() {
 
 // ─── Section Components (kundevendt sprog, ingen jargon) ──────────────────
 
-function ReportExecutiveSummary({ forecast, clientName, periodLabel, monthOffset }: {
-  forecast: ForecastResult; clientName: string; periodLabel: string; monthOffset: number;
+function ReportExecutiveSummary({ forecast, clientName, periodLabel, monthOffset, clientTarget }: {
+  forecast: ForecastResult; clientName: string; periodLabel: string; monthOffset: number; clientTarget: number | null;
 }) {
   const total = forecast.totalSalesExpected;
   const numEmployees = forecast.establishedEmployees.length;
@@ -198,6 +221,21 @@ function ReportExecutiveSummary({ forecast, clientName, periodLabel, monthOffset
               Forecastet er baseret på {teamParts.join(" og ")}.
               {" "}Det forventede interval er {forecast.totalSalesLow.toLocaleString("da-DK")}–{forecast.totalSalesHigh.toLocaleString("da-DK")} salg.
             </p>
+            {clientTarget && clientTarget > 0 && (
+              <div className="flex items-center gap-2 mt-1">
+                <Target className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Kundetarget: {clientTarget.toLocaleString("da-DK")} salg</span>
+                {(() => {
+                  const diff = forecast.totalSalesExpected - clientTarget;
+                  const pct = Math.round((diff / clientTarget) * 100);
+                  return (
+                    <Badge variant={diff >= 0 ? "default" : "destructive"} className="text-xs">
+                      {diff >= 0 ? "+" : ""}{diff.toLocaleString("da-DK")} ({pct >= 0 ? "+" : ""}{pct}%)
+                    </Badge>
+                  );
+                })()}
+              </div>
+            )}
             {driverTexts.length > 0 && (
               <p className="text-sm text-muted-foreground">
                 De vigtigste faktorer: {driverTexts.join(", ")}.
