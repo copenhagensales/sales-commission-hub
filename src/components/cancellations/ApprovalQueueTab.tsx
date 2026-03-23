@@ -276,7 +276,11 @@ interface FlatQueueRow {
   hasDifferences: boolean;
 }
 
-export function ApprovalQueueTab() {
+interface ApprovalQueueTabProps {
+  clientId: string;
+}
+
+export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const [statusFilter, setStatusFilter] = useState<string>("pending");

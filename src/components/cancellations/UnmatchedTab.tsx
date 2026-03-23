@@ -28,7 +28,11 @@ function extractOpp(rawPayload: unknown): string {
   return "";
 }
 
-export function UnmatchedTab() {
+interface UnmatchedTabProps {
+  clientId: string;
+}
+
+export function UnmatchedTab({ clientId }: UnmatchedTabProps) {
   const [selectedImportId, setSelectedImportId] = useState<string>("");
 
   // Fetch imports

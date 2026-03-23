@@ -227,23 +227,7 @@ export function DuplicatesTab({ clientId: selectedClientId }: DuplicatesTabProps
   return (
     <div className="space-y-6">
       {/* Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="space-y-2">
-          <Label>Vælg kunde</Label>
-          <Select value={selectedClientId} onValueChange={(v) => { setSelectedClientId(v); setSelectedAgent(""); }}>
-            <SelectTrigger>
-              <SelectValue placeholder="Vælg en kunde..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Alle kunder</SelectItem>
-              {clients.map((client) => (
-                <SelectItem key={client.id} value={client.id}>
-                  {client.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 
         <div className="space-y-2">
           <Label>Fra dato</Label>
