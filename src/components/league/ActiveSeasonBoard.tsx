@@ -223,6 +223,7 @@ interface SeasonPlayerRowProps {
   todayDailyRank: 1 | 2 | 3 | null;
   weeklyData?: number[];
   divisionAvg?: number[];
+  roundProvision: number;
   prevProvision: number | null;
   nextProvision: number | null;
 }
@@ -238,10 +239,11 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
   todayDailyRank,
   weeklyData,
   divisionAvg,
+  roundProvision,
   prevProvision,
   nextProvision,
 }: SeasonPlayerRowProps) {
-  const rank = standing.division_rank;
+  const rank = idx + 1; // rank based on sorted position (by round provision)
   const divChanged = standing.previous_division !== null && standing.previous_division !== standing.current_division;
   const promoted = divChanged && standing.previous_division !== null && standing.previous_division > standing.current_division;
   const relegated = divChanged && standing.previous_division !== null && standing.previous_division < standing.current_division;
@@ -262,9 +264,8 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
 
   const playerName = formatPlayerName(standing.employee);
 
-  const myProvision = Number(standing.total_provision);
-  const gapUp = isCurrentUser && prevProvision !== null ? prevProvision - myProvision : null;
-  const gapDown = isCurrentUser && nextProvision !== null ? myProvision - nextProvision : null;
+  const gapUp = isCurrentUser && prevProvision !== null ? prevProvision - roundProvision : null;
+  const gapDown = isCurrentUser && nextProvision !== null ? roundProvision - nextProvision : null;
 
   return (
     <div>
