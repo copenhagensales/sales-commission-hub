@@ -828,10 +828,10 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
               )} />
               {isPaused ? "Pause" : "Live"}
             </div>
-            {debouncedSearch && (
+            {appliedSearch && (
               <Badge variant="secondary" className="gap-1 font-normal">
-                Søgning: "{debouncedSearch}"
-                <button onClick={() => { setSearchQuery(""); setDebouncedSearch(""); }}>
+                Søgning: "{appliedSearch}"
+                <button onClick={clearSearch}>
                   <X className="h-3 w-3" />
                 </button>
               </Badge>
