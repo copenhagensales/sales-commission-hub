@@ -140,10 +140,10 @@ export default function Forecast() {
   // Target data
   const periodStart = useMemo(() => {
     const now = new Date();
-    const target = period === "current"
-      ? new Date(now.getFullYear(), now.getMonth(), 1)
-      : new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    return target.toISOString().slice(0, 10);
+    const m = period === "current" ? now.getMonth() : now.getMonth() + 1;
+    const y = now.getFullYear() + Math.floor(m / 12);
+    const month = (m % 12) + 1;
+    return `${y}-${String(month).padStart(2, '0')}-01`;
   }, [period]);
 
   const { data: targetData } = useQuery({
