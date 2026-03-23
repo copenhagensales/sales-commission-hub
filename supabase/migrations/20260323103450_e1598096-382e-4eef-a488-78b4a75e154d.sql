@@ -1,0 +1,1 @@
+ALTER TABLE public.employee_master_data ADD COLUMN expected_monthly_shifts integer DEFAULT NULL;

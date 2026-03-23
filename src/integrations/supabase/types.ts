@@ -4936,6 +4936,7 @@ export type Database = {
           department: string | null
           employment_end_date: string | null
           employment_start_date: string | null
+          expected_monthly_shifts: number | null
           failed_login_count: number | null
           first_name: string
           freelance_company_address: string | null
@@ -4996,6 +4997,7 @@ export type Database = {
           department?: string | null
           employment_end_date?: string | null
           employment_start_date?: string | null
+          expected_monthly_shifts?: number | null
           failed_login_count?: number | null
           first_name: string
           freelance_company_address?: string | null
@@ -5056,6 +5058,7 @@ export type Database = {
           department?: string | null
           employment_end_date?: string | null
           employment_start_date?: string | null
+          expected_monthly_shifts?: number | null
           failed_login_count?: number | null
           first_name?: string
           freelance_company_address?: string | null
