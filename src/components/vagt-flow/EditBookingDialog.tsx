@@ -959,7 +959,7 @@ export function EditBookingDialog({
         </DialogHeader>
         
         <Tabs defaultValue="booking" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="booking" className="flex items-center gap-2">
               <FileText className="h-4 w-4" />
               Booking
@@ -975,6 +975,10 @@ export function EditBookingDialog({
             <TabsTrigger value="diet" className="flex items-center gap-2">
               <Utensils className="h-4 w-4" />
               Diæt
+            </TabsTrigger>
+            <TabsTrigger value="hotel" className="flex items-center gap-2">
+              <Building2 className="h-4 w-4" />
+              Hotel
             </TabsTrigger>
           </TabsList>
           
