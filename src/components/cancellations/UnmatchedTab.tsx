@@ -225,7 +225,7 @@ export function UnmatchedTab({ clientId }: UnmatchedTabProps) {
               <CardDescription>Salg i systemet for denne kunde der ikke blev matchet af uploaden</CardDescription>
             </CardHeader>
             <CardContent>
-              {!clientId ? (
+              {!resolvedClientId ? (
                 <div className="flex items-center gap-2 text-muted-foreground py-4">
                   <AlertCircle className="h-4 w-4" />
                   <span>Ingen kundedata tilgængelig for denne import.</span>

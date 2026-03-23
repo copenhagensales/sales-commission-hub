@@ -304,7 +304,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   });
 
   const { data: queryResult, isLoading } = useQuery({
-    queryKey: ["cancellation-queue", statusFilter],
+    queryKey: ["cancellation-queue", statusFilter, clientId],
     queryFn: async () => {
       let query = supabase
         .from("cancellation_queue")
@@ -313,6 +313,10 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
 
       if (statusFilter !== "all") {
         query = query.eq("status", statusFilter);
+      }
+
+      if (clientId) {
+        query = query.eq("client_id", clientId);
       }
 
       const { data, error } = await query.limit(500);
