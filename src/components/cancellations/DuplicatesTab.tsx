@@ -36,8 +36,25 @@ import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { EditCartDialog } from "./EditCartDialog";
+import { CLIENT_IDS } from "@/utils/clientIds";
 
 const DUMMY_PHONES = new Set(["0000000", "00000000", "99999999", "", null]);
+
+function extractOpp(raw: Record<string, unknown> | null): string | null {
+  if (!raw) return null;
+  const direct = raw["OPP nr"] ?? raw["opp_nr"] ?? raw["legacy_opp_number"];
+  if (direct) return String(direct).trim();
+  const lrd = raw["leadResultData"];
+  if (Array.isArray(lrd)) {
+    for (const item of lrd) {
+      if (item && typeof item === "object") {
+        const val = (item as Record<string, unknown>)["OPP nr"];
+        if (val) return String(val).trim();
+      }
+    }
+  }
+  return null;
+}
 
 interface SaleRow {
   id: string;
@@ -139,43 +156,49 @@ export function DuplicatesTab() {
     enabled: !!selectedClientId,
   });
 
+  const isTdc = selectedClientId === CLIENT_IDS["TDC Erhverv"];
+
   const duplicateGroups = useMemo(() => {
-    // Group by phone number
-    const phoneMap = new Map<string, SaleRow[]>();
+    const groupMap = new Map<string, SaleRow[]>();
 
     for (const sale of sales) {
-      const phone = sale.customer_phone?.trim();
-      if (isValidPhone(phone)) {
-        const existing = phoneMap.get(phone) || [];
+      let key: string | null = null;
+      if (isTdc) {
+        key = extractOpp(sale.raw_payload);
+      } else {
+        const phone = sale.customer_phone?.trim();
+        if (isValidPhone(phone)) key = phone;
+      }
+      if (key) {
+        const existing = groupMap.get(key) || [];
         existing.push(sale);
-        phoneMap.set(phone, existing);
+        groupMap.set(key, existing);
       }
     }
 
     const minCount = 2;
     const groups: DuplicateGroup[] = [];
 
-    for (const [phone, phoneSales] of phoneMap) {
-      if (phoneSales.length >= minCount) {
-        const firstSale = phoneSales[0];
+    for (const [key, keySales] of groupMap) {
+      if (keySales.length >= minCount) {
+        const firstSale = keySales[0];
         const customerName = firstSale.raw_payload
           ? (firstSale.raw_payload as Record<string, unknown>)["CustomerName"] as string | null
           : null;
 
         groups.push({
-          key: phone,
-          phone,
+          key,
+          phone: isTdc ? null : key,
           company: firstSale.customer_company,
           customerName,
-          sales: phoneSales,
+          sales: keySales,
         });
       }
     }
 
-    // Sort by number of duplicates descending
     groups.sort((a, b) => b.sales.length - a.sales.length);
     return groups;
-  }, [sales]);
+  }, [sales, isTdc]);
 
   // Agents that appear in duplicate groups
   const agentsWithDuplicates = useMemo(() => {
@@ -323,7 +346,9 @@ export function DuplicatesTab() {
                         )}
                         <Copy className="h-4 w-4 text-muted-foreground" />
                         <div>
-                          <span className="font-medium">{group.phone}</span>
+                          <span className="font-medium">
+                            {isTdc ? `OPP: ${group.key}` : group.phone}
+                          </span>
                           {group.company && (
                             <span className="text-muted-foreground ml-2">— {group.company}</span>
                           )}
