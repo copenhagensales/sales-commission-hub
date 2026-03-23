@@ -341,8 +341,17 @@ export default function ShiftOverview() {
     const membership = teamMemberships.find(m => m.employee_id === employeeId);
     if (!membership) return NO_SPECIAL_SHIFT;
 
-    // Find primary shift for team
-    const primaryShift = primaryShiftsData.shifts.find(s => s.team_id === membership.team_id);
+    // Build set of shift IDs used as special employee assignments
+    const specialShiftIds = new Set(
+      (employeeSpecialShifts?.assignments || []).map(a => a.shift_id)
+    );
+
+    // Find primary shift for team: prefer non-special, non-zero-time shift
+    const teamShifts = primaryShiftsData.shifts.filter(s => s.team_id === membership.team_id);
+    const primaryShift = teamShifts.find(s => 
+      !specialShiftIds.has(s.id) && 
+      !(s.start_time.startsWith('00:00') && s.end_time.startsWith('00:00'))
+    ) || teamShifts.find(s => !specialShiftIds.has(s.id)) || teamShifts[0];
     if (!primaryShift) return NO_SPECIAL_SHIFT;
 
     // Check for day-specific times in primary shift

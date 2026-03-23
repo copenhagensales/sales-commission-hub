@@ -282,7 +282,16 @@ export default function VagtplanFMContent() {
     // 2. FALLBACK: Use team's primary shift (only when no special shift assigned)
     if (!primaryShiftsData || primaryShiftsData.shifts.length === 0) return null;
 
-    const primaryShift = primaryShiftsData.shifts[0];
+    // Build set of shift IDs used as special employee assignments
+    const specialShiftIds = new Set(
+      (employeeSpecialShifts?.assignments || []).map(a => a.shift_id)
+    );
+
+    // Pick the default team shift: not a special assignment, and not a zero-time shift
+    const primaryShift = primaryShiftsData.shifts.find(s => 
+      !specialShiftIds.has(s.id) && 
+      !(s.start_time.startsWith('00:00') && s.end_time.startsWith('00:00'))
+    ) || primaryShiftsData.shifts.find(s => !specialShiftIds.has(s.id)) || primaryShiftsData.shifts[0];
     if (!primaryShift) return null;
 
     const dayConfig = primaryShiftsData.days.find(
