@@ -1,86 +1,28 @@
 
 
-# FM Profit Agent — Rigtig data + AI Chat-interface
+# Fix: Sandra R får forecast trods ingen vagter
 
-## Overblik
-Erstat mock-data med rigtige FM-salgsdata fra databasen og ombyg hele UI'et til et **chat-baseret interface** hvor managere kan stille spørgsmål om lokationer, sælgere og profitabilitet. AI'en har adgang til de beregnede scores og observations og svarer i naturligt sprog.
+## Problem
+`countNormalShifts` bruger et fallback-hierarki: individuelle vagter → booking assignments → employee standard → **team standard**. Sandra R har ingen af de tre første, men teamets standard shift er mon-fre, så hun får ~22 "vagter" i marts og dermed et forecast baseret på forrige måneds SPH.
 
-## Arkitektur
+For FM-medarbejdere skal forecast være 0 når der ikke er bookinger — team standard shifts er irrelevant for FM.
 
-```text
-┌─────────────────────────────────────────┐
-│  FmProfitAgentContent.tsx               │
-│  ┌───────────────────────────────────┐  │
-│  │  Chat interface (besked-liste)    │  │
-│  │  - Bruger spørgsmål               │  │
-│  │  - AI svar med markdown           │  │
-│  │  - Inline KPI-kort & tabeller     │  │
-│  └───────────────────────────────────┘  │
-│  ┌───────────────────────────────────┐  │
-│  │  Input + quick-action chips       │  │
-│  │  "Bedste lokationer?" "Risiko?"   │  │
-│  └───────────────────────────────────┘  │
-└────────────┬────────────────────────────┘
-             │ invoke
-┌────────────▼────────────────────────────┐
-│  Edge function: fm-profit-agent         │
-│  1. Hent FM data (sales, bookings,      │
-│     costs, employees, locations)        │
-│  2. Beregn observations & scores        │
-│  3. Byg kontekst-prompt med data        │
-│  4. Kald Lovable AI med brugerens       │
-│     spørgsmål + data-kontekst           │
-│  5. Stream svar tilbage                 │
-└─────────────────────────────────────────┘
-```
+## Løsning
+Forecastet skal for FM-medarbejdere kun tælle vagter fra individuelle shifts og booking assignments — **ikke** falde igennem til employee standard eller team standard.
 
-## Ændringer
+### Ændring i `useTeamGoalForecast.ts`
 
-### 1. Ny edge function: `supabase/functions/fm-profit-agent/index.ts`
-- Modtager `{ message, history }` fra frontend
-- Henter FM-data fra databasen:
-  - `sales` (source=fieldmarketing, seneste 12 uger) med `sale_items` og `raw_payload` (fm_location_id, fm_seller_id)
-  - `fm_locations` (navn)
-  - `employee_master_data` (sælgernavne via fm_seller_id)
-  - `booking` + `booking_hotel` + `booking_diet` (omkostninger)
-- Beregner observations (samme scoring-logik som nuværende, men med rigtige data)
-- Bygger et system-prompt med:
-  - Aggregerede lokationsscores, sælgerscores, kombinationer
-  - Totaler, trends, risikoflag
-- Kalder Lovable AI Gateway med streaming
-- Returnerer SSE stream
+**Tilføj FM-team detection:**
+- Hent teamets navn eller brug en kendt team_id for at afgøre om teamet er FM
+- Alternativt: check om medarbejderen har booking_assignments i perioden — hvis ikke, og der heller ikke er individuelle vagter, sæt targetShifts = 0
 
-### 2. Omskriv `FmProfitAgentContent.tsx` — Chat UI
-- Fjern alle 4 sub-tabs og mock-data
-- Erstat med chat-interface:
-  - Beskedliste med bruger/AI-bobler
-  - Markdown-rendering af AI-svar (react-markdown)
-  - Quick-action chips: "Oversigt", "Bedste lokationer", "Driver-analyse", "Risikoflag", "Forecast næste uge"
-  - Streaming af AI-svar token-by-token
-- Brug `supabase.functions.invoke('fm-profit-agent', ...)` med streaming
-- Behold premium SaaS-look med clean cards og spacing
+**Simpleste fix:** For `targetShifts`-beregningen (fremtiden): Hvis medarbejderen ikke har nogen individuelle vagter OG ikke har nogen booking assignments i target-måneden, sæt targetShifts = 0 i stedet for at falde igennem til team standard.
 
-### 3. Quick-action chips (foreslåede spørgsmål)
-- "Giv mig en oversigt over alle lokationer"
-- "Hvilke lokationer er sælger-drevne?"
-- "Hvem er de bedste sælgere?"
-- "Vis risikoflag"
-- "Hvor bør vi stå næste uge?"
-- "Sammenlign Fields og Lyngby Storcenter"
+Dette matcher den dokumenterede regel: "Ingen bookinger = 0 forecast".
 
-## Data-flow i edge function
-
-```text
-1. Hent sales (12 uger) → grupper per uge/lokation/sælger
-2. Hent omkostninger fra booking/hotel/diet
-3. Beregn: revenue, commission, sellerCost, locationCost, hotelCost, dietCost, DB
-4. Kør scoring-engine (location/seller/combo scores)
-5. Formatér som kontekst-tekst til AI
-6. Send til Lovable AI med brugerens spørgsmål
-```
+**Konkret:** I `countNormalShifts`, tilføj en parameter `bookingOnly: boolean`. Når det er true, spring employee standard og team standard over. Brug dette flag for target-måneden når medarbejderen ikke har individuelle vagter eller bookings.
 
 | Fil | Ændring |
 |-----|---------|
-| `supabase/functions/fm-profit-agent/index.ts` | Ny edge function — data + AI |
-| `src/pages/vagt-flow/FmProfitAgentContent.tsx` | Omskriv til chat-interface |
+| `useTeamGoalForecast.ts` | Stop fallback til team/employee standard shifts for target-måneden når ingen bookinger findes |
 
