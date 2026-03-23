@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { toast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -83,13 +84,18 @@ export function AssignHotelDialog({ open, onOpenChange, booking, existingBooking
   }, [existingBookingHotel, booking, open]);
 
   const handleSubmit = async () => {
+    if (!pricePerNight || Number(pricePerNight) <= 0) {
+      toast({ title: "Pris mangler", description: "Pris pr. nat er påkrævet for at gemme hoteltildelingen.", variant: "destructive" });
+      return;
+    }
+
     if (isEditing && existingBookingHotel) {
       await updateBookingHotel.mutateAsync({
         id: existingBookingHotel.id,
         status,
         confirmation_number: confirmationNumber || undefined,
         rooms,
-        price_per_night: pricePerNight ? Number(pricePerNight) : undefined,
+        price_per_night: Number(pricePerNight),
         notes: notes || undefined,
       });
       onOpenChange(false);
@@ -255,8 +261,8 @@ export function AssignHotelDialog({ open, onOpenChange, booking, existingBooking
               <Input type="number" min={1} value={rooms} onChange={(e) => setRooms(Number(e.target.value))} />
             </div>
             <div>
-              <Label className="text-xs">Pris pr. nat (DKK)</Label>
-              <Input type="number" value={pricePerNight} onChange={(e) => setPricePerNight(e.target.value)} />
+              <Label className="text-xs">Pris pr. nat (DKK) *</Label>
+              <Input type="number" value={pricePerNight} onChange={(e) => setPricePerNight(e.target.value)} className={!pricePerNight ? "border-destructive" : ""} placeholder="Påkrævet" />
             </div>
             <div className="col-span-2">
               <Label className="text-xs">Bekræftelsesnummer</Label>
@@ -282,7 +288,7 @@ export function AssignHotelDialog({ open, onOpenChange, booking, existingBooking
             <Button variant="outline" onClick={() => onOpenChange(false)}>Annuller</Button>
             <Button
               onClick={handleSubmit}
-              disabled={isSubmitting || (!isEditing && !selectedHotelId && !showNewHotel) || (showNewHotel && (!newName || !newCity))}
+              disabled={isSubmitting || !pricePerNight || Number(pricePerNight) <= 0 || (!isEditing && !selectedHotelId && !showNewHotel) || (showNewHotel && (!newName || !newCity))}
             >
               {isSubmitting ? "Gemmer..." : isEditing ? "Gem ændringer" : "Tildel hotel"}
             </Button>
