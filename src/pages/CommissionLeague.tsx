@@ -109,9 +109,16 @@ export default function CommissionLeague() {
   const { data: seasonStandings, isLoading: seasonStandingsLoading } = useSeasonStandings(season?.status === "active" ? season?.id : undefined);
   const { data: roundHistory } = useRoundHistory(season?.status === "active" ? season?.id : undefined);
   const { data: mySeasonStanding } = useMySeasonStanding(season?.status === "active" ? season?.id : undefined);
-  const [selectedRoundIndex, setSelectedRoundIndex] = useState(-1); // -1 = "Samlet stilling"
-  const selectedRound = selectedRoundIndex >= 0 && roundHistory ? roundHistory[selectedRoundIndex] : undefined;
-  const { data: selectedRoundStandings } = useRoundStandings(selectedRound?.id);
+  // Default to last round (active round) index; update when roundHistory loads
+  const activeRoundIndex = useMemo(() => {
+    if (!roundHistory || roundHistory.length === 0) return 0;
+    const activeIdx = roundHistory.findIndex(r => r.status === "active");
+    return activeIdx >= 0 ? activeIdx : roundHistory.length - 1;
+  }, [roundHistory]);
+  const [selectedRoundIndex, setSelectedRoundIndex] = useState<number | null>(null);
+  const effectiveIndex = selectedRoundIndex ?? activeRoundIndex;
+  const selectedRound = roundHistory ? roundHistory[effectiveIndex] : undefined;
+  const { data: selectedRoundStandings } = useRoundStandings(selectedRound?.status !== "active" ? selectedRound?.id : undefined);
   const { data: prizeLeaders } = usePrizeLeaders(
     season?.id,
     season?.start_date,
@@ -647,18 +654,10 @@ export default function CommissionLeague() {
                 <CardContent>
                   {/* Round navigation — chips */}
                   <div className="flex flex-wrap items-center gap-1.5 mb-4 overflow-x-auto pb-1">
-                    <Button
-                      variant={selectedRoundIndex === -1 ? "default" : "outline"}
-                      size="sm"
-                      className="text-xs h-7 px-2.5 shrink-0"
-                      onClick={() => setSelectedRoundIndex(-1)}
-                    >
-                      Samlet
-                    </Button>
                     {(roundHistory || []).map((r, idx) => (
                       <Button
                         key={r.id}
-                        variant={selectedRoundIndex === idx ? "default" : "outline"}
+                        variant={effectiveIndex === idx ? "default" : "outline"}
                         size="sm"
                         className="text-xs h-7 px-2.5 shrink-0"
                         onClick={() => setSelectedRoundIndex(idx)}
@@ -674,7 +673,7 @@ export default function CommissionLeague() {
                     ))}
                   </div>
 
-                  {selectedRoundIndex === -1 ? (
+                  {selectedRound?.status === "active" ? (
                     <ActiveSeasonBoard
                       standings={seasonStandings || []}
                       playersPerDivision={playersPerDivision}
@@ -694,11 +693,7 @@ export default function CommissionLeague() {
                   ) : (
                     <Card className="bg-card border-border">
                       <CardContent className="py-10 text-center">
-                        <p className="text-muted-foreground text-sm">
-                          {selectedRound?.status === "active"
-                            ? `Runde ${selectedRound.round_number} er stadig i gang. Resultater vises når runden afsluttes.`
-                            : "Ingen rundedata endnu."}
-                        </p>
+                        <p className="text-muted-foreground text-sm">Ingen rundedata endnu.</p>
                       </CardContent>
                     </Card>
                   )}
