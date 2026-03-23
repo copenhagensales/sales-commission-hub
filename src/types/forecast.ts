@@ -79,6 +79,7 @@ export interface EmployeePerformance {
   daysSinceStart: number;
   missingAgentMapping?: boolean;
   plannedEndDate?: string;
+  isOnCall?: boolean;
 }
 
 export interface CohortForecastInput {
@@ -112,6 +113,7 @@ export interface EmployeeForecastResult {
   momentumFactor?: number;
   missingAgentMapping?: boolean;
   plannedEndDate?: string;
+  isOnCall?: boolean;
 }
 
 // ============================================================================
