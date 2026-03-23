@@ -288,7 +288,7 @@ export function AssignHotelDialog({ open, onOpenChange, booking, existingBooking
             <Button variant="outline" onClick={() => onOpenChange(false)}>Annuller</Button>
             <Button
               onClick={handleSubmit}
-              disabled={isSubmitting || (!isEditing && !selectedHotelId && !showNewHotel) || (showNewHotel && (!newName || !newCity))}
+              disabled={isSubmitting || !pricePerNight || Number(pricePerNight) <= 0 || (!isEditing && !selectedHotelId && !showNewHotel) || (showNewHotel && (!newName || !newCity))}
             >
               {isSubmitting ? "Gemmer..." : isEditing ? "Gem ændringer" : "Tildel hotel"}
             </Button>
