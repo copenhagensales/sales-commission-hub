@@ -410,6 +410,15 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         let plannedHours = forecastShifts * HOURS_PER_SHIFT;
         let isOnCall = false;
 
+        // DEBUG: Log Rebecca's forecast inputs
+        if (emp.id.startsWith('8d24c8f3')) {
+          console.log('[DEBUG Rebecca forecast]', {
+            grossShifts, forecastShifts, grossPlannedHours, plannedHours,
+            forecastStart: format(forecastStart, 'yyyy-MM-dd'),
+            empForecastEnd: format(empForecastEnd, 'yyyy-MM-dd'),
+          });
+        }
+
         // Fallback for on-call employees (no scheduled shifts but have sales history)
         if (grossShifts === 0) {
           const empExpectedMonthly = (emp as any).expected_monthly_shifts as number | null;
