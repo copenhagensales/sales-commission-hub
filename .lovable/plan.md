@@ -1,18 +1,34 @@
 
 
-# Problem: Rebecca viser stadig 12 salg
+# Fix: Sandra forecaster +18 salg trods ingen vagter
 
-## Diagnose
-`.limit(10000)` er korrekt implementeret i koden. Rebeccas data (133 salg i jan/feb) burde give en EWMA-SPH på ~1.7-2.0 og et forecast på ~50-60 salg for de resterende 4 arbejdsdage.
+## Problem
+Tilkaldevagt-fallbacken (linje 422-468) aktiveres når `grossShifts === 0` for den resterende periode. Sandra har haft vagter **tidligere** denne måned, men har ingen **flere** planlagte vagter. Koden skelner ikke mellem:
+- "Ingen vagter overhovedet" (ægte tilkaldevikar) → brug historisk estimat
+- "Ingen vagter **mere** denne måned" (normal medarbejder færdig) → forecast = 0
 
-**To mulige årsager:**
+## Løsning
+Tjek om medarbejderen har haft vagter **tidligere** i hele måneden. Hvis ja, er hun en normal medarbejder uden flere vagter — ikke en tilkaldevikar. Fallbacken skal kun aktiveres for medarbejdere der heller ikke har vagter i starten af måneden.
 
-1. **Browser cache**: React Query har `staleTime: 5 min` og `refetchOnWindowFocus: false`. Prøv at trykke refresh-knappen på forecast-siden, eller hard-refresh browseren (Ctrl+Shift+R).
+## Ændring
 
-2. **Reelt dataproblem**: Hvis refresh ikke hjælper, kan Rebeccas `work_email` fallback ikke matche den email salget er registreret under. Jeg foreslår at tilføje console-logging midlertidigt for at debugge hendes specifikke beregning.
+### `src/hooks/useClientForecast.ts` — linje 422-423
+Før tilkalde-fallbacken, tjek om medarbejderen har haft vagter fra månedens start til i dag:
 
-## Foreslået handling
-1. Først: Prøv at refreshe forecast-siden med refresh-knappen
-2. Hvis 12 stadig vises: Jeg tilføjer midlertidig debug-logging i `useClientForecast.ts` der printer Rebeccas SPH-data, så vi kan se præcist hvad der sker
+```typescript
+// Kun aktiver on-call fallback hvis medarbejderen OGSÅ har 0 vagter 
+// i hele måneden (ikke bare i den resterende periode)
+const monthStart = startOfMonth(new Date(year, month - 1, 1));
+const shiftsEarlierInMonth = countShifts(emp.id, monthStart, now, false);
 
-Vil du prøve at refreshe først, eller skal jeg tilføje debug-logging direkte?
+if (grossShifts === 0 && shiftsEarlierInMonth === 0) {
+  // On-call fallback logic...
+}
+```
+
+Medarbejdere som Sandra, der har haft vagter tidligere på måneden men ingen flere, vil nu korrekt få forecast = 0 for resten af perioden.
+
+| Fil | Ændring |
+|-----|---------|
+| `src/hooks/useClientForecast.ts` | Tilføj check for vagter tidligere i måneden før tilkalde-fallback |
+
