@@ -227,6 +227,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         shiftDaysRes,
         absencesRes,
         holidaysRes,
+        bookingAssignmentsRes,
       ] = await Promise.all([
         supabase
           .from("shift")
@@ -254,6 +255,12 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         (supabase as any)
           .from("danish_holiday")
           .select("date")
+          .gte("date", ninetyDaysAgo)
+          .lte("date", forecastEndStr),
+        supabase
+          .from("booking_assignment")
+          .select("employee_id, date")
+          .in("employee_id", activeIds)
           .gte("date", ninetyDaysAgo)
           .lte("date", forecastEndStr),
       ]);
