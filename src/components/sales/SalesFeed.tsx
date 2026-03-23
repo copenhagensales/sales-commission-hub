@@ -803,14 +803,34 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
           </Button>
         </div>
 
-        {/* Live indicator */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Radio className={cn(
-              "h-4 w-4",
-              isPaused ? "text-muted-foreground" : "text-green-500 animate-pulse"
-            )} />
-            {isPaused ? "Live opdateringer sat på pause" : "Live - nye salg vises automatisk"}
+        {/* Active filters + Live indicator */}
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
+            <div className="flex items-center gap-1.5">
+              <Radio className={cn(
+                "h-4 w-4",
+                isPaused ? "text-muted-foreground" : "text-green-500 animate-pulse"
+              )} />
+              {isPaused ? "Pause" : "Live"}
+            </div>
+            {debouncedSearch && (
+              <Badge variant="secondary" className="gap-1 font-normal">
+                Søgning: "{debouncedSearch}"
+                <button onClick={() => { setSearchQuery(""); setDebouncedSearch(""); }}>
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            )}
+            {datePreset !== "all" && (
+              <Badge variant="secondary" className="gap-1 font-normal">
+                {datePreset === "custom" && customDateRange.from
+                  ? `${format(customDateRange.from, "d. MMM", { locale: da })} – ${format(customDateRange.to || customDateRange.from, "d. MMM", { locale: da })}`
+                  : DATE_PRESETS.find(p => p.value === datePreset)?.label}
+                <button onClick={() => { setDatePreset("all"); setCustomDateRange({ from: undefined, to: undefined }); }}>
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            )}
           </div>
           <span className="text-sm text-muted-foreground">
             Viser {sales.length} af {totalCount} salg
