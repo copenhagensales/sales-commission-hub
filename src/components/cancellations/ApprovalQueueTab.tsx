@@ -537,7 +537,73 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   const subOppGroups = useMemo(() => filteredOppGroups.filter((g) => g.uploadType === subTab), [filteredOppGroups, subTab]);
   const subFlatItems = useMemo(() => filteredFlatItems.filter((i) => i.upload_type === subTab), [filteredFlatItems, subTab]);
 
-  // Counts per sub-tab for labels
+  // Unique sellers across all items for filter
+  const allSellers = useMemo(() => {
+    const names = new Set<string>();
+    filteredOppGroups.forEach(g => g.agents.forEach(a => names.add(a)));
+    filteredFlatItems.forEach(i => names.add(i.agentName));
+    return [...names].sort();
+  }, [filteredOppGroups, filteredFlatItems]);
+
+  // Apply search + seller filter + sort to sub-tab items
+  const filterAndSort = <T extends { agentName?: string; agents?: string[]; oppNumber?: string; oppGroup?: string; phone?: string; company?: string; saleDate?: string; createdAt?: string; fileName?: string }>(
+    items: T[],
+    getAgent: (item: T) => string,
+    getSearchStr: (item: T) => string,
+    getDateStr: (item: T) => string,
+  ): T[] => {
+    let result = [...items];
+
+    if (sellerFilter !== "all") {
+      result = result.filter(item => {
+        const agent = getAgent(item);
+        return agent === sellerFilter || (item as any).agents?.includes(sellerFilter);
+      });
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(item => getSearchStr(item).toLowerCase().includes(q));
+    }
+
+    result.sort((a, b) => {
+      let cmp = 0;
+      switch (sortKey) {
+        case "date":
+          cmp = (getDateStr(a)).localeCompare(getDateStr(b));
+          break;
+        case "agent":
+          cmp = getAgent(a).localeCompare(getAgent(b));
+          break;
+        case "opp":
+          cmp = ((a as any).oppNumber || (a as any).oppGroup || "").localeCompare((b as any).oppNumber || (b as any).oppGroup || "");
+          break;
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+
+    return result;
+  };
+
+  const processedOppGroups = useMemo(() =>
+    filterAndSort(
+      subOppGroups,
+      g => g.agents.join(", "),
+      g => [g.oppGroup, ...g.agents, g.fileName].join(" "),
+      g => g.createdAt,
+    ),
+    [subOppGroups, sellerFilter, searchQuery, sortKey, sortDir]);
+
+  const processedFlatItems = useMemo(() =>
+    filterAndSort(
+      subFlatItems,
+      i => i.agentName,
+      i => [i.agentName, i.oppNumber, i.phone, i.company, i.fileName].join(" "),
+      i => i.saleDate,
+    ),
+    [subFlatItems, sellerFilter, searchQuery, sortKey, sortDir]);
+
+  // Counts per sub-tab for labels (use original unfiltered)
   const cancellationCount = useMemo(() =>
     filteredOppGroups.filter((g) => g.uploadType === "cancellation").length +
     filteredFlatItems.filter((i) => i.upload_type === "cancellation").length,
@@ -547,10 +613,26 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
     filteredFlatItems.filter((i) => i.upload_type === "basket_difference").length,
     [filteredOppGroups, filteredFlatItems]);
 
-  const pendingOppGroups = subOppGroups.filter((g) => g.status === "pending");
-  const pendingFlatItems = subFlatItems.filter((i) => i.status === "pending");
+  const pendingOppGroups = processedOppGroups.filter((g) => g.status === "pending");
+  const pendingFlatItems = processedFlatItems.filter((i) => i.status === "pending");
   const totalPending = pendingOppGroups.length + pendingFlatItems.length;
   const isPending = approveMutation.isPending || rejectMutation.isPending;
+
+  const handleSort = (key: QueueSortKey) => {
+    if (sortKey === key) {
+      setSortDir(d => d === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortDir(key === "date" ? "desc" : "asc");
+    }
+  };
+
+  const QueueSortIcon = ({ column }: { column: QueueSortKey }) => {
+    if (sortKey !== column) return <ArrowUpDown className="h-3 w-3 ml-1 opacity-40" />;
+    return sortDir === "asc"
+      ? <ArrowUp className="h-3 w-3 ml-1" />
+      : <ArrowDown className="h-3 w-3 ml-1" />;
+  };
 
   const handleApproveAllPending = () => {
     for (const g of pendingOppGroups) {
