@@ -103,7 +103,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
       const [empRes, agentRes, teamsRes] = await Promise.all([
         supabase
           .from("employee_master_data")
-          .select("id, first_name, last_name, team_id, avatar_url, employment_start_date, work_email")
+          .select("id, first_name, last_name, team_id, avatar_url, employment_start_date, work_email, employment_end_date")
           .in("id", employeeIds)
           .eq("is_active", true),
         supabase
@@ -319,6 +319,14 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
       for (const emp of employees) {
         const emails = empEmailMap.get(emp.id) || [];
         const empStartDate = emp.employment_start_date ? new Date(emp.employment_start_date) : null;
+        const empEndDate = (emp as any).employment_end_date ? new Date((emp as any).employment_end_date) : null;
+        
+        // Skip employees whose planned end date is before the forecast period starts
+        if (empEndDate && empEndDate < forecastStart) continue;
+        
+        // Effective forecast end for this employee (capped by their end date)
+        const empForecastEnd = empEndDate && empEndDate < forecastEnd ? empEndDate : forecastEnd;
+        
         const daysSinceStart = empStartDate
           ? Math.max(0, Math.floor((now.getTime() - empStartDate.getTime()) / (1000 * 60 * 60 * 24)))
           : 365;
@@ -352,9 +360,10 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         }
 
         // Planned hours for forecast month (gross = full capacity, net = minus absences)
-        const grossShifts = countShifts(emp.id, forecastStart, forecastEnd, false);
+        // Use empForecastEnd to cap hours for employees with planned departure
+        const grossShifts = countShifts(emp.id, forecastStart, empForecastEnd, false);
         const grossPlannedHours = grossShifts * HOURS_PER_SHIFT;
-        const forecastShifts = countShifts(emp.id, forecastStart, forecastEnd, true);
+        const forecastShifts = countShifts(emp.id, forecastStart, empForecastEnd, true);
         const plannedHours = forecastShifts * HOURS_PER_SHIFT;
 
         // Attendance factor: (shifts - absence days) / shifts over past 90 days
@@ -382,6 +391,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           isEstablished,
           daysSinceStart,
           missingAgentMapping,
+          plannedEndDate: (emp as any).employment_end_date || undefined,
         });
       }
 

@@ -1,10 +1,13 @@
 import { useState } from "react";
+import { format } from "date-fns";
+import { da } from "date-fns/locale";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Users, UserPlus, ArrowUpDown, AlertTriangle, Info, GraduationCap } from "lucide-react";
+import { Users, UserPlus, ArrowUpDown, AlertTriangle, Info, GraduationCap, CalendarOff } from "lucide-react";
 import type { EmployeeForecastResult, CohortForecastResult } from "@/types/forecast";
 import { ForecastIntervalBadge } from "./ForecastIntervalBadge";
+import { SetPlannedDepartureDialog } from "./SetPlannedDepartureDialog";
 
 interface Props {
   employees: EmployeeForecastResult[];
@@ -15,6 +18,7 @@ interface Props {
 export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = false }: Props) {
   const [sortKey, setSortKey] = useState<'name' | 'sph' | 'forecast' | 'total'>('total');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [departureDialog, setDepartureDialog] = useState<{ id: string; name: string; endDate?: string | null } | null>(null);
 
   // Split mapped vs unmapped employees
   const mappedEmployees = employees.filter(e => !e.missingAgentMapping);
@@ -110,11 +114,31 @@ export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = f
                   return (
                     <tr key={emp.employeeId} className="border-b last:border-0 hover:bg-muted/30">
                       <td className="py-2.5">
-                        <div>
-                          <p className="font-medium">{emp.employeeName}</p>
-                          {emp.teamName && (
-                            <p className="text-xs text-muted-foreground">{emp.teamName}</p>
+                        <div className="flex items-center gap-1.5">
+                          <div>
+                            <p className="font-medium">{emp.employeeName}</p>
+                            {emp.teamName && (
+                              <p className="text-xs text-muted-foreground">{emp.teamName}</p>
+                            )}
+                          </div>
+                          {emp.plannedEndDate && (
+                            <Badge variant="outline" className="text-[10px] bg-orange-100 text-orange-700 border-orange-200 cursor-pointer" onClick={() => setDepartureDialog({ id: emp.employeeId, name: emp.employeeName, endDate: emp.plannedEndDate })}>
+                              Stopper {format(new Date(emp.plannedEndDate), "d/M")}
+                            </Badge>
                           )}
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  className="text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                                  onClick={() => setDepartureDialog({ id: emp.employeeId, name: emp.employeeName, endDate: emp.plannedEndDate })}
+                                >
+                                  <CalendarOff className="h-3.5 w-3.5" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent>Sæt planlagt afgang</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         </div>
                       </td>
                       <td className="py-2.5 text-right tabular-nums">{emp.plannedHours}</td>
@@ -403,6 +427,16 @@ export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = f
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {departureDialog && (
+        <SetPlannedDepartureDialog
+          open={!!departureDialog}
+          onOpenChange={(open) => !open && setDepartureDialog(null)}
+          employeeId={departureDialog.id}
+          employeeName={departureDialog.name}
+          currentEndDate={departureDialog.endDate}
+        />
       )}
     </div>
   );

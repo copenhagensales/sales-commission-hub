@@ -78,6 +78,7 @@ export interface EmployeePerformance {
   isEstablished: boolean;
   daysSinceStart: number;
   missingAgentMapping?: boolean;
+  plannedEndDate?: string;
 }
 
 export interface CohortForecastInput {
@@ -110,6 +111,7 @@ export interface EmployeeForecastResult {
   churnLoss: number;
   momentumFactor?: number;
   missingAgentMapping?: boolean;
+  plannedEndDate?: string;
 }
 
 // ============================================================================

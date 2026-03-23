@@ -178,6 +178,7 @@ export function forecastEstablishedEmployee(emp: EmployeePerformance, teamChurnR
     churnLoss: Math.round(churnLoss),
     momentumFactor: momentumFactor > 1.0 ? momentumFactor : undefined,
     missingAgentMapping: emp.missingAgentMapping,
+    plannedEndDate: emp.plannedEndDate,
   };
 }
 
@@ -215,6 +216,7 @@ export function forecastNewEmployee(
     churnProbability,
     churnLoss: Math.round(churnLoss),
     missingAgentMapping: emp.missingAgentMapping,
+    plannedEndDate: emp.plannedEndDate,
   };
 }
 
