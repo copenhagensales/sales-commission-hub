@@ -223,22 +223,24 @@ export function UploadCancellationsTab() {
         allMatched = matchedData || [];
       }
 
-      // If OPP numbers specified, do a separate text search on raw_payload using textSearch via RPC or cast
+      // If OPP numbers specified, fetch recent sales and match OPP client-side from raw_payload
       if (oppNumbers.length > 0) {
-        // Build OR filter matching OPP in raw_payload cast to text
-        const oppFilter = oppNumbers.map(opp => `raw_payload::text.ilike.%${opp}%`).join(",");
-        const { data: oppData } = await supabase
+        const { data: oppCandidates } = await supabase
           .from("sales")
           .select(`id, sale_datetime, customer_phone, customer_company, validation_status, agent_name, raw_payload`)
           .in("client_campaign_id", campaignIds)
           .neq("validation_status", "cancelled")
-          .or(oppFilter)
-          .limit(500);
+          .order("sale_datetime", { ascending: false })
+          .limit(2000);
 
-        if (oppData) {
+        if (oppCandidates) {
           const existingIds = new Set(allMatched.map(s => s.id));
-          for (const sale of oppData) {
-            if (!existingIds.has(sale.id)) {
+          const oppSet = new Set(oppNumbers.map(o => o.toUpperCase().trim()));
+          
+          for (const sale of oppCandidates) {
+            if (existingIds.has(sale.id)) continue;
+            const saleOpp = extractOpp(sale.raw_payload).toUpperCase().trim();
+            if (saleOpp && oppSet.has(saleOpp)) {
               allMatched.push(sale);
               existingIds.add(sale.id);
             }
