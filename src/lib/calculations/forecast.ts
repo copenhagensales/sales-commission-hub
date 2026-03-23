@@ -179,6 +179,7 @@ export function forecastEstablishedEmployee(emp: EmployeePerformance, teamChurnR
     momentumFactor: momentumFactor > 1.0 ? momentumFactor : undefined,
     missingAgentMapping: emp.missingAgentMapping,
     plannedEndDate: emp.plannedEndDate,
+    isOnCall: emp.isOnCall,
   };
 }
 
