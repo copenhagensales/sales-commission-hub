@@ -150,6 +150,7 @@ export function useTeamGoalForecast(
         teamStandardShiftsRes,
         shiftDaysRes,
         absencesRes,
+        bookingAssignmentsRes,
       ] = await Promise.all([
         supabase
           .from("shift")
@@ -176,6 +177,12 @@ export function useTeamGoalForecast(
           .in("type", ["sick", "vacation", "no_show"])
           .lte("start_date", targetEndStr)
           .gte("end_date", overallStart),
+        supabase
+          .from("booking_assignment")
+          .select("employee_id, date")
+          .in("employee_id", activeIds)
+          .gte("date", overallStart)
+          .lte("date", targetEndStr),
       ]);
 
       const individualShifts = individualShiftsRes.data || [];
@@ -205,6 +212,13 @@ export function useTeamGoalForecast(
         empShiftIdMap.set(s.employee_id, s.shift_id);
       });
 
+      // Build booking assignment map (FM employees' shifts)
+      const bookingAssignmentMap = new Map<string, Set<string>>();
+      (bookingAssignmentsRes.data || []).forEach((ba: any) => {
+        if (!bookingAssignmentMap.has(ba.employee_id)) bookingAssignmentMap.set(ba.employee_id, new Set());
+        bookingAssignmentMap.get(ba.employee_id)!.add(ba.date);
+      });
+
       const absenceDateMap = new Map<string, Set<string>>();
       absences.forEach(a => {
         if (!absenceDateMap.has(a.employee_id)) absenceDateMap.set(a.employee_id, new Set());
@@ -218,6 +232,7 @@ export function useTeamGoalForecast(
       });
 
       // Helper: count normal shifts for an employee in a date range
+      // Hierarchy: individual shifts → booking assignments → employee standard → team standard
       function countNormalShifts(empId: string, rangeStart: Date, rangeEnd: Date): number {
         const dates: string[] = [];
         const cur = new Date(rangeStart);
@@ -228,6 +243,7 @@ export function useTeamGoalForecast(
 
         const absenceDates = absenceDateMap.get(empId) || new Set();
         const individualDates = individualShiftMap.get(empId) || new Set();
+        const bookingDates = bookingAssignmentMap.get(empId) || new Set();
         const empShiftId = empShiftIdMap.get(empId);
         const empStandardDays = empShiftId ? shiftDaysMap.get(empShiftId) : undefined;
 
@@ -239,6 +255,8 @@ export function useTeamGoalForecast(
           const dayNumber = dayOfWeek === 0 ? 7 : dayOfWeek;
 
           if (individualDates.has(dateStr)) {
+            count++;
+          } else if (bookingDates.has(dateStr)) {
             count++;
           } else if (empStandardDays !== undefined) {
             if (empStandardDays.includes(dayNumber)) count++;
