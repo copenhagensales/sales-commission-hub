@@ -1,34 +1,39 @@
 
 
-# Fix: Rul FM booking-only logik tilbage — brug vagtplan-hierarkiet korrekt
+# Fix: Skip uger med 0 salg og kun team-standard vagter i EWMA
 
-## Problemet
-Brugeren forklarer at "ikke booket" på vagtplanen = medarbejderen HAR en vagt (fra employee/team standard), men er bare ikke tildelt en lokation endnu. Kun tomme celler (som Sandras "-") = ingen vagt.
+## Problem
+Melissa har 0 salg i marts fordi hun har haft fri. Men `countShifts` returnerer 5 vagter/uge (fra team standard man-fre), så 50%-reglen springer IKKE ugen over. Resultatet: uger med 0 salg tæller som 0 SPH → trækker hele gennemsnittet ned.
 
-Den nuværende `isFm`-logik springer employee standard og team standard over for FM-medarbejdere, hvilket er forkert. Melissa har vagter man-fre fra team standard — hun har bare ikke fået lokationer endnu.
+Linje 460-461 har allerede en safety: "skip weeks with 0 sales and ≤2 shifts" — men team standard giver 5 shifts, så den trigges ikke.
 
-## Korrekt logik
-- **Sandra** (special shift med 0 dage): 0 vagter ✓ (allerede håndteret korrekt)
-- **Melissa** (ingen special shift, team standard = man-fre): 22 vagter ✓
-- **Alle FM-medarbejdere**: Brug det normale hierarki (individuel → booking → employee standard → team standard)
+## Løsning
+Udvid skip-logikken (linje 460-461) til også at springe uger over hvor:
+- Medarbejderen har **0 salg** i ugen
+- Medarbejderen har **0 individuelle vagter og 0 booking assignments** i ugen (dvs. alle vagter kommer kun fra team/employee standard)
+
+Hvis der ikke er nogen konkret vagtdata (kun standard-fallback) OG ingen salg, er det sandsynligt at medarbejderen ikke arbejdede den uge.
 
 ## Ændring i `src/hooks/useClientForecast.ts`
 
-### 1. Fjern `isFm`-parameter fra `countShifts` (linje 330-374)
-Fjern `isFm` parameteren og `!isFm` checket. Behold den eksisterende special-shift logik (som allerede håndterer Sandra korrekt).
+### Linje 438-461: Tilføj check for "kun standard-vagter"
+Tilføj en hjælpefunktion `countConcreteShifts(empId, start, end)` der KUN tæller individuelle vagter + booking assignments (ikke standard fallback). Brug den i EWMA-loopet:
 
-### 2. Fjern `isFm`-logik fra `getNormalWeeklyShifts` (linje 378-420)
-Fjern `isFm` parameteren og FM-booking-gennemsnit blokken. Behold special-shift og team standard logik.
+```typescript
+// After line 461, replace the skip condition:
+const concreteShiftsInWeek = countConcreteShifts(emp.id, ws, we);
+if (salesInWeek === 0 && concreteShiftsInWeek === 0) continue;
+```
 
-### 3. Fjern `isFmEmployee` fra forecast-loopet (linje ~486-500)
-Fjern FM-team detection og stop med at sende `isFm` til funktionerne.
+### Ny hjælpefunktion `countConcreteShifts` (efter linje 374)
+Tæller kun individuelle vagter + booking assignments for en periode, ignorerer standard-fallback. Bruges kun til at afgøre om en uge skal springes over.
 
 ## Resultat
-- Melissa: team standard (man-fre) → 22 vagter → ~255 salg forecast ✓
-- Sandra: special shift (0 dage) → 0 vagter → 0 forecast ✓  
-- Alle andre FM uden special shift: team standard → korrekte vagter ✓
+- Melissa marts-uger: 0 salg + 0 konkrete vagter → springes over → SPH baseres kun på jan/feb
+- Melissa med salg+bookinger: tælles normalt
+- Non-FM medarbejdere med rigtige vagter (individuelle): uændret
 
 | Fil | Ændring |
 |-----|---------|
-| `src/hooks/useClientForecast.ts` | Fjern isFm parameter og logik fra countShifts, getNormalWeeklyShifts, og forecast-loop |
+| `src/hooks/useClientForecast.ts` | Tilføj `countConcreteShifts`, ret EWMA skip-logik |
 
