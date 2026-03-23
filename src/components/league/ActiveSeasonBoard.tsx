@@ -236,6 +236,7 @@ interface SeasonPlayerRowProps {
   roundProvision: number;
   prevProvision: number | null;
   nextProvision: number | null;
+  pointsAtStake: number;
 }
 
 const SeasonPlayerRow = memo(function SeasonPlayerRow({
@@ -252,6 +253,7 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
   roundProvision,
   prevProvision,
   nextProvision,
+  pointsAtStake,
 }: SeasonPlayerRowProps) {
   const rank = idx + 1; // rank based on sorted position (by round provision)
   const divChanged = standing.previous_division !== null && standing.previous_division !== standing.current_division;
