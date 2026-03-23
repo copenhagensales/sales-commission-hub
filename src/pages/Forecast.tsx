@@ -254,6 +254,9 @@ export default function Forecast() {
               forecast={forecast}
               periodLabel={periodLabel}
               isCurrentPeriod={period === "current"}
+              clientTarget={targetData}
+              onTargetChange={(t) => upsertTarget.mutate(t)}
+              showTarget={selectedClient !== "all"}
             />
 
             {/* Progress bar (current period only) */}
