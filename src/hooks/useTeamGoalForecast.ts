@@ -233,7 +233,7 @@ export function useTeamGoalForecast(
 
       // Helper: count normal shifts for an employee in a date range
       // Hierarchy: individual shifts → booking assignments → employee standard → team standard
-      function countNormalShifts(empId: string, rangeStart: Date, rangeEnd: Date): number {
+      function countNormalShifts(empId: string, rangeStart: Date, rangeEnd: Date, bookingOnly = false): number {
         const dates: string[] = [];
         const cur = new Date(rangeStart);
         while (cur <= rangeEnd) {
@@ -258,10 +258,13 @@ export function useTeamGoalForecast(
             count++;
           } else if (bookingDates.has(dateStr)) {
             count++;
-          } else if (empStandardDays !== undefined) {
-            if (empStandardDays.includes(dayNumber)) count++;
-          } else if (teamDays && teamDays.includes(dayNumber)) {
-            count++;
+          } else if (!bookingOnly) {
+            // Only fall through to standard shifts if not in bookingOnly mode
+            if (empStandardDays !== undefined) {
+              if (empStandardDays.includes(dayNumber)) count++;
+            } else if (teamDays && teamDays.includes(dayNumber)) {
+              count++;
+            }
           }
         }
         return count;
@@ -274,7 +277,18 @@ export function useTeamGoalForecast(
         const emails = empEmailMap.get(emp.id) || [];
         const prevSales = emails.reduce((sum, email) => sum + (salesByEmail[email] || 0), 0);
         const prevShifts = countNormalShifts(emp.id, prevStart, prevEnd);
-        const targetShifts = countNormalShifts(emp.id, targetStart, targetEnd);
+
+        // For target month: check if employee has ANY individual shifts or booking assignments
+        // If not, don't fall back to team/employee standard (no bookings = 0 forecast)
+        const hasIndividualShifts = (individualShiftMap.get(emp.id) || new Set());
+        const hasBookingAssignments = (bookingAssignmentMap.get(emp.id) || new Set());
+        const targetStartStr = format(targetStart, "yyyy-MM-dd");
+        const targetEndDate = format(targetEnd, "yyyy-MM-dd");
+        const hasAnyTargetShifts = Array.from(hasIndividualShifts).some(d => d >= targetStartStr && d <= targetEndDate);
+        const hasAnyTargetBookings = Array.from(hasBookingAssignments).some(d => d >= targetStartStr && d <= targetEndDate);
+        const useBookingOnly = !hasAnyTargetShifts && !hasAnyTargetBookings;
+
+        const targetShifts = countNormalShifts(emp.id, targetStart, targetEnd, useBookingOnly);
 
         const salesPerDay = prevShifts > 0 ? prevSales / prevShifts : 0;
         const forecast = Math.round(salesPerDay * targetShifts);
