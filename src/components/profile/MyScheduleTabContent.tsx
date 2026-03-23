@@ -168,6 +168,11 @@ export function MyScheduleTabContent({ employeeId, salaryType, salaryAmount }: M
 
     if (!primaryShiftData?.shift) return null;
 
+    // Skip if the primary shift has zero times (e.g. "Deltid" placeholder)
+    const shiftStart = primaryShiftData.shift.start_time.slice(0,5);
+    const shiftEnd = primaryShiftData.shift.end_time.slice(0,5);
+    if (shiftStart === '00:00' && shiftEnd === '00:00') return null;
+
     const dayConfig = primaryShiftData.days.find(
       (d: { day_of_week: number }) => d.day_of_week === dbDayOfWeek
     );
@@ -178,7 +183,7 @@ export function MyScheduleTabContent({ employeeId, salaryType, salaryAmount }: M
 
     if (dbDayOfWeek === 6 || dbDayOfWeek === 7) return null;
 
-    return `${primaryShiftData.shift.start_time.slice(0,5)}-${primaryShiftData.shift.end_time.slice(0,5)}`;
+    return `${shiftStart}-${shiftEnd}`;
   }, [primaryShiftData, employeeSpecialShift]);
 
   const isHoliday = (date: Date) => {
