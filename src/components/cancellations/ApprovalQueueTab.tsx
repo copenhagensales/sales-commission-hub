@@ -13,7 +13,8 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
-import { Check, X, Loader2, Clock, Filter } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Check, X, Loader2, Clock, Filter, Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { UnmatchedTab } from "@/components/cancellations/UnmatchedTab";
