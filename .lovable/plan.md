@@ -1,54 +1,42 @@
 
 
-# Fix: Liga-side for aktiv sæson + rundehistorik
+# Vis foreløbige præmieledere med kval som runde
 
-## Problemer fundet
+## Problem
+Præmiekortene viser "Afsløres efter runde 1" selvom sæsonen er aktiv og der er live provision-data. Kvalifikationsrunden tæller som en runde i konkurrencen og skal medregnes.
 
-**1. Kvalifikations-UI vises altid (uanset sæson-status)**
-Linje 486-604 i `CommissionLeague.tsx` viser kvalifikationsboardet for alle tilmeldte brugere — uden at tjekke om sæsonen stadig er i "qualification". Det betyder at selvom sæsonen nu er "active", vises det gamle kvalifikationsboard med de kumulative tal fra kvalifikationsperioden.
+## Ændringer
 
-**2. ActiveSeasonBoard viser kumulativ provision — ikke runde-provision**
-`ActiveSeasonBoard` viser `total_provision` fra `league_season_standings`, som er kumulativt. Ifølge reglerne bestemmes din placering i divisionen af din provision **i den aktuelle runde** (uge). Boardet skal vise den aktuelle rundes provision som primær metric.
+### 1. `src/pages/CommissionLeague.tsx`
+- Send `roundProvisionMap` og `seasonStandings` (med employee-data) til `PrizeShowcase`
 
-**3. Rundenavigation mangler tydelig historik-UI**
-Runde-navigationen (linje 646-697) eksisterer men viser kun resultater for færdige runder via `RoundResultsCard`. Der mangler en tydelig oversigt over færdige runder.
+### 2. `src/components/league/PrizeShowcase.tsx`
+- Tilføj props: `roundProvisionMap?: Record<string, number>` og en liste af spillere med employee-info
+- Når `isActive` og `prizeLeaders?.bestRound` er null (ingen afsluttede runder i `league_round_standings`):
+  - Find spilleren med højest provision i `roundProvisionMap`
+  - Vis som foreløbig leder med "Foreløbig" badge
+- Samme logik for talent og comeback hvor relevant
 
-## Plan
+### 3. `src/hooks/useLeaguePrizeData.ts`
+- Kvalifikationsrunden skal tælle med i "Bedste Runde" også når sæsonen er aktiv
+- I `isActive`-blokken: hent også kvalifikationsdata og inkluder den bedste kval-præstation som "Kval" i `allBestRounds`
+- Sammenlign kval-bedste med runde-bedste for at finde den reelle leder
+- "Sæsonens Comeback": Beregn allerede fra kval → runde 1 (nuværende logik kræver `round1` afsluttet — brug live `roundProvisionMap` som fallback)
 
-### 1. Wrap kvalifikations-UI i `isQualificationPhase` guard
-**Fil:** `CommissionLeague.tsx` (linje 486)
-- Ændr `{isEnrolled && (` til `{isQualificationPhase && isEnrolled && (`
-- Sikrer at kvalifikationsboardet kun vises under kvalifikation
+### Beregningslogik for foreløbig leder
+```text
+bestRound candidates:
+  1. Alle afsluttede runder fra league_round_standings (points)
+  2. Kvalifikationsrundens bedste (provision fra league_qualification_standings)  
+  3. Live aktuel runde (provision fra roundProvisionMap) — "Foreløbig"
 
-### 2. Ny hook: `useLeagueRoundProvision`
-**Ny fil:** `src/hooks/useLeagueRoundProvision.ts`
-- Tager `currentRound` (med `start_date` og `end_date`) og liste af employee IDs
-- Kalder `get_sales_aggregates_v2` med rundens datoer og `p_group_by: "employee"`
-- Returnerer `Record<string, number>` (employee_id → provision i runden)
-- Refetch hver 2. minut (som `useLeagueTodayProvision`)
-
-### 3. Opdater `ActiveSeasonBoard` til at vise runde-provision
-**Fil:** `ActiveSeasonBoard.tsx`
-- Tilføj ny prop `roundProvisionMap: Record<string, number>`
-- Vis `roundProvisionMap[employee_id]` som primær provision-visning (i stedet for `total_provision`)
-- Behold `total_points` og `total_provision` som sekundær info
-- Sortér spillere indenfor division efter runde-provision (afspejler aktuel rangering)
-
-### 4. Tilslut runde-provision i `CommissionLeague.tsx`
-- Importér `useLeagueRoundProvision` og kald med `currentRound`
-- Send `roundProvisionMap` til `ActiveSeasonBoard`
-
-### 5. Forbedret rundehistorik-navigation
-**Fil:** `CommissionLeague.tsx` (linje 646-697)
-- Tilføj en dropdown/tabs med alle afsluttede runder i stedet for kun pile-navigation
-- Vis rundenummer + datoer + status (afsluttet/i gang)
-- "Samlet stilling" som standard, med mulighed for at klikke ind på specifikke runder
-
-## Tekniske detaljer
+Vis den højeste af alle tre som leder.
+For live-data: vis "Foreløbig" tag.
+```
 
 | Fil | Ændring |
 |-----|---------|
-| `src/pages/CommissionLeague.tsx` | Guard qualification UI med `isQualificationPhase`, tilslut runde-provision, forbedret rundehistorik-UI |
-| `src/hooks/useLeagueRoundProvision.ts` | Ny hook der henter provision scoped til aktuel runde |
-| `src/components/league/ActiveSeasonBoard.tsx` | Vis runde-provision som primær, total points som sekundær |
+| `src/hooks/useLeaguePrizeData.ts` | Inkluder kval-provision i bestRound-beregning |
+| `src/components/league/PrizeShowcase.tsx` | Tilføj `roundProvisionMap` prop, vis foreløbig leder fra live data |
+| `src/pages/CommissionLeague.tsx` | Send `roundProvisionMap` + standings til PrizeShowcase |
 
