@@ -40,6 +40,11 @@ interface SaleItem {
   mapped_revenue: number;
 }
 
+interface PreviewField {
+  label: string;
+  value: string;
+}
+
 function extractOpp(rawPayload: unknown): string {
   if (!rawPayload || typeof rawPayload !== "object") return "";
   const rp = rawPayload as Record<string, unknown>;
@@ -145,7 +150,78 @@ function computeDiff(
   return diffs;
 }
 
-// --- OPP Group types ---
+function summarizeSaleItems(saleItems: SaleItem[]): SaleItem[] {
+  const map = new Map<string, SaleItem>();
+
+  for (const item of saleItems) {
+    const key = item.product_name || "Ukendt";
+    const existing = map.get(key);
+    if (existing) {
+      existing.quantity += item.quantity || 1;
+      existing.mapped_commission += item.mapped_commission || 0;
+      existing.mapped_revenue += item.mapped_revenue || 0;
+    } else {
+      map.set(key, {
+        product_name: key,
+        quantity: item.quantity || 1,
+        mapped_commission: item.mapped_commission || 0,
+        mapped_revenue: item.mapped_revenue || 0,
+      });
+    }
+  }
+
+  return Array.from(map.values()).sort((a, b) => b.quantity - a.quantity || a.product_name.localeCompare(b.product_name));
+}
+
+function buildUploadedPreview(
+  uploadedData: Record<string, unknown> | null,
+  mapping: ColumnMapping | null,
+): PreviewField[] {
+  if (!uploadedData || Object.keys(uploadedData).length === 0) return [];
+
+  const fields: PreviewField[] = [];
+  const seen = new Set<string>();
+
+  const addField = (label: string, value: unknown) => {
+    const rendered = value == null ? "" : String(value).trim();
+    if (!rendered || seen.has(label)) return;
+    fields.push({ label, value: rendered });
+    seen.add(label);
+  };
+
+  mapping?.product_columns?.forEach((column) => {
+    const value = uploadedData[column];
+    if (!isIrrelevantValue(value)) addField(column, value);
+  });
+
+  if (mapping?.revenue_column && !isIrrelevantValue(uploadedData[mapping.revenue_column])) {
+    addField(mapping.revenue_column, uploadedData[mapping.revenue_column]);
+  }
+
+  if (mapping?.commission_column && !isIrrelevantValue(uploadedData[mapping.commission_column])) {
+    addField(mapping.commission_column, uploadedData[mapping.commission_column]);
+  }
+
+  const prioritizedFallback = Object.entries(uploadedData)
+    .filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== "")
+    .sort(([a], [b]) => {
+      const score = (key: string) => {
+        const lower = key.toLowerCase();
+        if (lower.includes("produkt")) return 0;
+        if (lower.includes("opp")) return 1;
+        if (lower.includes("cpo") || lower === "tt" || lower.includes("oms") || lower.includes("prov")) return 2;
+        return 3;
+      };
+      return score(a) - score(b);
+    });
+
+  for (const [label, value] of prioritizedFallback) {
+    if (fields.length >= 10) break;
+    addField(label, value);
+  }
+
+  return fields;
+}
 
 interface OppGroupRow {
   oppGroup: string;
@@ -153,6 +229,7 @@ interface OppGroupRow {
   saleCount: number;
   saleItems: SaleItem[];
   uploadedData: Record<string, unknown> | null;
+  mapping: ColumnMapping | null;
   diffs: DiffField[];
   hasDifferences: boolean;
   queueItemIds: string[];
@@ -182,6 +259,7 @@ interface FlatQueueRow {
   fileName: string;
   saleItems: SaleItem[];
   uploadedData: Record<string, unknown> | null;
+  mapping: ColumnMapping | null;
   diffs: DiffField[];
   hasDifferences: boolean;
 }
@@ -223,7 +301,6 @@ export function ApprovalQueueTab() {
       const { data, error } = await query.limit(500);
       if (error) throw error;
 
-      // Fetch uploaded_data + opp_group + client_id separately
       const queueIds = data.map((d) => d.id);
       let extendedDataMap = new Map<string, { uploaded_data: Record<string, unknown> | null; opp_group: string | null; client_id: string | null }>();
       if (queueIds.length > 0) {
@@ -254,7 +331,7 @@ export function ApprovalQueueTab() {
       ]);
 
       const configIds = [...new Set((importsResult.data || []).map((i: any) => i.config_id).filter(Boolean))];
-      let configsMap = new Map<string, ColumnMapping>();
+      const configsMap = new Map<string, ColumnMapping>();
       if (configIds.length > 0) {
         const { data: configs } = await supabase
           .from("cancellation_upload_configs")
@@ -294,7 +371,6 @@ export function ApprovalQueueTab() {
         saleItemsBySale.set(si.sale_id, items);
       }
 
-      // Build flat items
       const flatItems: FlatQueueRow[] = data.map((item) => {
         const sale = salesMap.get(item.sale_id);
         const imp = importsMap.get(item.import_id);
@@ -318,14 +394,14 @@ export function ApprovalQueueTab() {
           fileName: imp?.file_name || "",
           saleItems,
           uploadedData: uploaded,
+          mapping,
           diffs,
           hasDifferences: diffs.length > 0,
         };
       });
 
-      // --- Group by OPP for TDC Erhverv ---
-      const tdcItems = flatItems.filter(i => i.client_id === TDC_ERHVERV_CLIENT_ID && i.opp_group);
-      const nonTdcItems = flatItems.filter(i => !(i.client_id === TDC_ERHVERV_CLIENT_ID && i.opp_group));
+      const tdcItems = flatItems.filter((i) => i.client_id === TDC_ERHVERV_CLIENT_ID && i.opp_group);
+      const nonTdcItems = flatItems.filter((i) => !(i.client_id === TDC_ERHVERV_CLIENT_ID && i.opp_group));
 
       const oppGroupsMap = new Map<string, FlatQueueRow[]>();
       for (const item of tdcItems) {
@@ -337,18 +413,16 @@ export function ApprovalQueueTab() {
 
       const oppGroups: OppGroupRow[] = [];
       for (const [oppGroup, items] of oppGroupsMap.entries()) {
-        // Aggregate all sale items across all sales in this OPP group
         const aggregatedItems: SaleItem[] = [];
         for (const item of items) {
           aggregatedItems.push(...item.saleItems);
         }
 
-        const agents = [...new Set(items.map(i => i.agentName))];
-        const uploaded = items[0]?.uploadedData || null; // same uploaded row for all
+        const agents = [...new Set(items.map((i) => i.agentName))];
+        const uploaded = items[0]?.uploadedData || null;
         const imp = importsMap.get(items[0]?.import_id);
         const configId = imp?.config_id;
         const mapping = configId ? configsMap.get(configId) || null : null;
-
         const diffs = computeDiff(uploaded, aggregatedItems, mapping);
 
         oppGroups.push({
@@ -357,10 +431,11 @@ export function ApprovalQueueTab() {
           saleCount: items.length,
           saleItems: aggregatedItems,
           uploadedData: uploaded,
+          mapping,
           diffs,
           hasDifferences: diffs.length > 0,
-          queueItemIds: items.map(i => i.id),
-          saleIds: items.map(i => i.sale_id),
+          queueItemIds: items.map((i) => i.id),
+          saleIds: items.map((i) => i.sale_id),
           uploadType: items[0]?.upload_type || "cancellation",
           status: items[0]?.status || "pending",
           fileName: items[0]?.fileName || "",
@@ -380,13 +455,11 @@ export function ApprovalQueueTab() {
       if (!currentEmployee?.id) throw new Error("Ingen medarbejder fundet");
       const newStatus = uploadType === "cancellation" ? "cancelled" : "basket_changed";
 
-      // Update all sales
       for (const saleId of saleIds) {
         const { error } = await supabase.from("sales").update({ validation_status: newStatus }).eq("id", saleId);
         if (error) throw error;
       }
 
-      // Update all queue items
       for (const id of queueItemIds) {
         const { error } = await supabase.from("cancellation_queue").update({
           status: "approved",
@@ -428,21 +501,18 @@ export function ApprovalQueueTab() {
     },
   });
 
-  // Filter
-  const filteredOppGroups = onlyDifferences ? oppGroups.filter(g => g.hasDifferences) : oppGroups;
-  const filteredFlatItems = onlyDifferences ? flatItems.filter(i => i.hasDifferences) : flatItems;
+  const filteredOppGroups = onlyDifferences ? oppGroups.filter((g) => g.hasDifferences) : oppGroups;
+  const filteredFlatItems = onlyDifferences ? flatItems.filter((i) => i.hasDifferences) : flatItems;
 
-  const pendingOppGroups = filteredOppGroups.filter(g => g.status === "pending");
-  const pendingFlatItems = filteredFlatItems.filter(i => i.status === "pending");
+  const pendingOppGroups = filteredOppGroups.filter((g) => g.status === "pending");
+  const pendingFlatItems = filteredFlatItems.filter((i) => i.status === "pending");
   const totalPending = pendingOppGroups.length + pendingFlatItems.length;
   const isPending = approveMutation.isPending || rejectMutation.isPending;
 
   const handleApproveAllPending = () => {
-    // Approve all OPP groups
     for (const g of pendingOppGroups) {
       approveMutation.mutate({ queueItemIds: g.queueItemIds, saleIds: g.saleIds, uploadType: g.uploadType });
     }
-    // Approve all flat items
     for (const item of pendingFlatItems) {
       approveMutation.mutate({ queueItemIds: [item.id], saleIds: [item.sale_id], uploadType: item.upload_type });
     }
@@ -450,8 +520,8 @@ export function ApprovalQueueTab() {
 
   const handleRejectAllPending = () => {
     const allIds = [
-      ...pendingOppGroups.flatMap(g => g.queueItemIds),
-      ...pendingFlatItems.map(i => i.id),
+      ...pendingOppGroups.flatMap((g) => g.queueItemIds),
+      ...pendingFlatItems.map((i) => i.id),
     ];
     if (allIds.length > 0) rejectMutation.mutate(allIds);
   };
@@ -516,7 +586,6 @@ export function ApprovalQueueTab() {
             </div>
           ) : (
             <div className="space-y-6">
-              {/* TDC Erhverv — OPP-grupperet visning */}
               {filteredOppGroups.length > 0 && (
                 <div>
                   <h3 className="text-sm font-semibold mb-2 text-muted-foreground">TDC Erhverv — OPP-grupperet</h3>
@@ -535,93 +604,96 @@ export function ApprovalQueueTab() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredOppGroups.map((g) => (
-                          <TableRow key={g.oppGroup}>
-                            <TableCell className="font-mono text-xs">{g.oppGroup}</TableCell>
-                            <TableCell className="text-xs">
-                              {g.agents.join(", ")}
-                              <div className="text-muted-foreground">({g.saleCount} salg)</div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={g.uploadType === "cancellation" ? "destructive" : "secondary"}>
-                                {g.uploadType === "cancellation" ? "Annullering" : "Kurv diff."}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-xs max-w-[200px]">
-                              {g.saleItems.length > 0 ? (
-                                <div className="space-y-0.5">
-                                  {g.saleItems.map((si, idx) => (
-                                    <div key={idx} className="truncate" title={si.product_name}>
-                                      {si.product_name} (×{si.quantity})
+                        {filteredOppGroups.map((g) => {
+                          const summarizedItems = summarizeSaleItems(g.saleItems);
+                          const uploadedPreview = buildUploadedPreview(g.uploadedData, g.mapping);
+                          return (
+                            <TableRow key={g.oppGroup}>
+                              <TableCell className="font-mono text-xs">{g.oppGroup}</TableCell>
+                              <TableCell className="text-xs align-top">
+                                {g.agents.join(", ")}
+                                <div className="text-muted-foreground">({g.saleCount} salg)</div>
+                              </TableCell>
+                              <TableCell className="align-top">
+                                <Badge variant={g.uploadType === "cancellation" ? "destructive" : "secondary"}>
+                                  {g.uploadType === "cancellation" ? "Annullering" : "Kurv diff."}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-xs min-w-[300px] align-top">
+                                {summarizedItems.length > 0 ? (
+                                  <div className="space-y-2">
+                                    <div className="font-medium">Produkter solgt</div>
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {summarizedItems.map((si, idx) => (
+                                        <Badge key={`${si.product_name}-${idx}`} variant="outline" className="whitespace-normal break-words text-left h-auto py-1">
+                                          {si.product_name} ×{si.quantity}
+                                        </Badge>
+                                      ))}
                                     </div>
-                                  ))}
-                                  <div className="text-muted-foreground mt-1">
-                                    Oms: {g.saleItems.reduce((s, si) => s + si.mapped_revenue, 0).toFixed(0)} kr
-                                    {" | "}
-                                    Provi: {g.saleItems.reduce((s, si) => s + si.mapped_commission, 0).toFixed(0)} kr
+                                    <div className="text-muted-foreground">
+                                      Oms: {summarizedItems.reduce((s, si) => s + si.mapped_revenue, 0).toFixed(0)} kr
+                                      {" | "}
+                                      Provi: {summarizedItems.reduce((s, si) => s + si.mapped_commission, 0).toFixed(0)} kr
+                                    </div>
                                   </div>
-                                </div>
-                              ) : (
-                                <span className="text-muted-foreground">Ingen produkter</span>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-xs max-w-[200px]">
-                              {g.uploadedData && Object.keys(g.uploadedData).length > 0 ? (
-                                <div className="space-y-0.5 max-h-24 overflow-auto">
-                                  {Object.entries(g.uploadedData)
-                                    .filter(([, v]) => v !== null && v !== undefined && v !== "")
-                                    .slice(0, 8)
-                                    .map(([k, v]) => (
-                                      <div key={k} className="truncate" title={`${k}: ${v}`}>
-                                        <span className="text-muted-foreground">{k}:</span> {String(v)}
+                                ) : (
+                                  <span className="text-muted-foreground">Ingen produkter</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-xs min-w-[260px] align-top">
+                                {uploadedPreview.length > 0 ? (
+                                  <div className="space-y-1 max-h-32 overflow-auto">
+                                    {uploadedPreview.map((field) => (
+                                      <div key={field.label} className="leading-relaxed break-words">
+                                        <span className="text-muted-foreground">{field.label}:</span> {field.value}
                                       </div>
                                     ))}
-                                </div>
-                              ) : (
-                                <span className="text-muted-foreground">-</span>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-xs max-w-[200px]">
-                              {g.diffs.length > 0 ? (
-                                <div className="space-y-1">
-                                  {g.diffs.map((d, idx) => (
-                                    <div key={idx} className="p-1 rounded bg-destructive/10 border border-destructive/20">
-                                      <div className="font-medium text-destructive">{d.label}</div>
-                                      <div>System: <span className="font-mono">{d.systemValue}</span></div>
-                                      <div>Upload: <span className="font-mono">{d.uploadedValue}</span></div>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <Badge variant="outline" className="text-green-600 border-green-300">✓ Match</Badge>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={g.status === "approved" ? "default" : g.status === "rejected" ? "destructive" : "secondary"}>
-                                {g.status === "pending" ? "Ventende" : g.status === "approved" ? "Godkendt" : "Afvist"}
-                              </Badge>
-                            </TableCell>
-                            {statusFilter === "pending" && (
-                              <TableCell>
-                                <div className="flex gap-1">
-                                  <Button size="sm" variant="ghost" onClick={() => approveMutation.mutate({ queueItemIds: g.queueItemIds, saleIds: g.saleIds, uploadType: g.uploadType })} disabled={isPending}>
-                                    <Check className="h-4 w-4" />
-                                  </Button>
-                                  <Button size="sm" variant="ghost" onClick={() => rejectMutation.mutate(g.queueItemIds)} disabled={isPending}>
-                                    <X className="h-4 w-4" />
-                                  </Button>
-                                </div>
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground">-</span>
+                                )}
                               </TableCell>
-                            )}
-                          </TableRow>
-                        ))}
+                              <TableCell className="text-xs min-w-[220px] align-top">
+                                {g.diffs.length > 0 ? (
+                                  <div className="space-y-1">
+                                    {g.diffs.map((d, idx) => (
+                                      <div key={idx} className="p-1 rounded bg-destructive/10 border border-destructive/20">
+                                        <div className="font-medium text-destructive">{d.label}</div>
+                                        <div>System: <span className="font-mono">{d.systemValue}</span></div>
+                                        <div>Upload: <span className="font-mono">{d.uploadedValue}</span></div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <Badge variant="outline">✓ Match</Badge>
+                                )}
+                              </TableCell>
+                              <TableCell className="align-top">
+                                <Badge variant={g.status === "approved" ? "default" : g.status === "rejected" ? "destructive" : "secondary"}>
+                                  {g.status === "pending" ? "Ventende" : g.status === "approved" ? "Godkendt" : "Afvist"}
+                                </Badge>
+                              </TableCell>
+                              {statusFilter === "pending" && (
+                                <TableCell className="align-top">
+                                  <div className="flex gap-1">
+                                    <Button size="sm" variant="ghost" onClick={() => approveMutation.mutate({ queueItemIds: g.queueItemIds, saleIds: g.saleIds, uploadType: g.uploadType })} disabled={isPending}>
+                                      <Check className="h-4 w-4" />
+                                    </Button>
+                                    <Button size="sm" variant="ghost" onClick={() => rejectMutation.mutate(g.queueItemIds)} disabled={isPending}>
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              )}
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </div>
                 </div>
               )}
 
-              {/* Andre kunder — per-salg visning */}
               {filteredFlatItems.length > 0 && (
                 <div>
                   {filteredOppGroups.length > 0 && (
@@ -643,75 +715,88 @@ export function ApprovalQueueTab() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredFlatItems.map((item) => (
-                          <TableRow key={item.id}>
-                            <TableCell>{item.saleDate ? format(new Date(item.saleDate), "dd/MM/yyyy HH:mm") : "-"}</TableCell>
-                            <TableCell>{item.agentName}</TableCell>
-                            <TableCell>{item.oppNumber || "-"}</TableCell>
-                            <TableCell>
-                              <Badge variant={item.upload_type === "cancellation" ? "destructive" : "secondary"}>
-                                {item.upload_type === "cancellation" ? "Annullering" : "Kurv diff."}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-xs max-w-[200px]">
-                              {item.saleItems.length > 0 ? (
-                                <div className="space-y-0.5">
-                                  {item.saleItems.map((si, idx) => (
-                                    <div key={idx} className="truncate" title={si.product_name}>{si.product_name} (×{si.quantity})</div>
-                                  ))}
-                                  <div className="text-muted-foreground mt-1">
-                                    Oms: {item.saleItems.reduce((s, si) => s + si.mapped_revenue, 0).toFixed(0)} kr | Provi: {item.saleItems.reduce((s, si) => s + si.mapped_commission, 0).toFixed(0)} kr
-                                  </div>
-                                </div>
-                              ) : (
-                                <span className="text-muted-foreground">Ingen produkter</span>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-xs max-w-[200px]">
-                              {item.uploadedData && Object.keys(item.uploadedData).length > 0 ? (
-                                <div className="space-y-0.5 max-h-24 overflow-auto">
-                                  {Object.entries(item.uploadedData).filter(([, v]) => v !== null && v !== undefined && v !== "").slice(0, 8).map(([k, v]) => (
-                                    <div key={k} className="truncate" title={`${k}: ${v}`}><span className="text-muted-foreground">{k}:</span> {String(v)}</div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <span className="text-muted-foreground">-</span>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-xs max-w-[200px]">
-                              {item.diffs.length > 0 ? (
-                                <div className="space-y-1">
-                                  {item.diffs.map((d, idx) => (
-                                    <div key={idx} className="p-1 rounded bg-destructive/10 border border-destructive/20">
-                                      <div className="font-medium text-destructive">{d.label}</div>
-                                      <div>System: <span className="font-mono">{d.systemValue}</span></div>
-                                      <div>Upload: <span className="font-mono">{d.uploadedValue}</span></div>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <span className="text-muted-foreground">Ingen forskelle</span>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={item.status === "approved" ? "default" : item.status === "rejected" ? "destructive" : "secondary"}>
-                                {item.status === "pending" ? "Ventende" : item.status === "approved" ? "Godkendt" : "Afvist"}
-                              </Badge>
-                            </TableCell>
-                            {statusFilter === "pending" && (
+                        {filteredFlatItems.map((item) => {
+                          const summarizedItems = summarizeSaleItems(item.saleItems);
+                          const uploadedPreview = buildUploadedPreview(item.uploadedData, item.mapping);
+                          return (
+                            <TableRow key={item.id}>
+                              <TableCell>{item.saleDate ? format(new Date(item.saleDate), "dd/MM/yyyy HH:mm") : "-"}</TableCell>
+                              <TableCell>{item.agentName}</TableCell>
+                              <TableCell>{item.oppNumber || "-"}</TableCell>
                               <TableCell>
-                                <div className="flex gap-1">
-                                  <Button size="sm" variant="ghost" onClick={() => approveMutation.mutate({ queueItemIds: [item.id], saleIds: [item.sale_id], uploadType: item.upload_type })} disabled={isPending}>
-                                    <Check className="h-4 w-4" />
-                                  </Button>
-                                  <Button size="sm" variant="ghost" onClick={() => rejectMutation.mutate([item.id])} disabled={isPending}>
-                                    <X className="h-4 w-4" />
-                                  </Button>
-                                </div>
+                                <Badge variant={item.upload_type === "cancellation" ? "destructive" : "secondary"}>
+                                  {item.upload_type === "cancellation" ? "Annullering" : "Kurv diff."}
+                                </Badge>
                               </TableCell>
-                            )}
-                          </TableRow>
-                        ))}
+                              <TableCell className="text-xs min-w-[280px] align-top">
+                                {summarizedItems.length > 0 ? (
+                                  <div className="space-y-2">
+                                    <div className="font-medium">Produkter solgt</div>
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {summarizedItems.map((si, idx) => (
+                                        <Badge key={`${si.product_name}-${idx}`} variant="outline" className="whitespace-normal break-words text-left h-auto py-1">
+                                          {si.product_name} ×{si.quantity}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                    <div className="text-muted-foreground">
+                                      Oms: {summarizedItems.reduce((s, si) => s + si.mapped_revenue, 0).toFixed(0)} kr
+                                      {" | "}
+                                      Provi: {summarizedItems.reduce((s, si) => s + si.mapped_commission, 0).toFixed(0)} kr
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground">Ingen produkter</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-xs min-w-[260px] align-top">
+                                {uploadedPreview.length > 0 ? (
+                                  <div className="space-y-1 max-h-32 overflow-auto">
+                                    {uploadedPreview.map((field) => (
+                                      <div key={field.label} className="leading-relaxed break-words">
+                                        <span className="text-muted-foreground">{field.label}:</span> {field.value}
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground">-</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-xs min-w-[220px] align-top">
+                                {item.diffs.length > 0 ? (
+                                  <div className="space-y-1">
+                                    {item.diffs.map((d, idx) => (
+                                      <div key={idx} className="p-1 rounded bg-destructive/10 border border-destructive/20">
+                                        <div className="font-medium text-destructive">{d.label}</div>
+                                        <div>System: <span className="font-mono">{d.systemValue}</span></div>
+                                        <div>Upload: <span className="font-mono">{d.uploadedValue}</span></div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground">Ingen forskelle</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={item.status === "approved" ? "default" : item.status === "rejected" ? "destructive" : "secondary"}>
+                                  {item.status === "pending" ? "Ventende" : item.status === "approved" ? "Godkendt" : "Afvist"}
+                                </Badge>
+                              </TableCell>
+                              {statusFilter === "pending" && (
+                                <TableCell>
+                                  <div className="flex gap-1">
+                                    <Button size="sm" variant="ghost" onClick={() => approveMutation.mutate({ queueItemIds: [item.id], saleIds: [item.sale_id], uploadType: item.upload_type })} disabled={isPending}>
+                                      <Check className="h-4 w-4" />
+                                    </Button>
+                                    <Button size="sm" variant="ghost" onClick={() => rejectMutation.mutate([item.id])} disabled={isPending}>
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              )}
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </div>
