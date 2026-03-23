@@ -448,12 +448,17 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
 
         const isEstablished = daysSinceStart > 60;
 
+        // Detect FM employee by team name
+        const empTeamId = employeeTeamMap.get(emp.id);
+        const empTeamName = empTeamId ? teamNameMap.get(empTeamId) : null;
+        const isFmEmployee = !!(empTeamName && (empTeamName.toLowerCase().includes('fieldmarketing') || empTeamName.toLowerCase().includes('field marketing')));
+
         // Weekly SPH (most recent first) — use absence-adjusted shifts
         const weeklySph: number[] = [];
-        const normalWeeklyShifts = getNormalWeeklyShifts(emp.id);
+        const normalWeeklyShifts = getNormalWeeklyShifts(emp.id, isFmEmployee);
         for (const ws of weekStarts) {
           const we = endOfWeek(ws, { weekStartsOn: 1 });
-          const shiftsInWeek = countShifts(emp.id, ws, we, true); // exclude absences
+          const shiftsInWeek = countShifts(emp.id, ws, we, true, isFmEmployee); // exclude absences
           
           // Skip weeks with less than 50% of normal capacity (partial vacation weeks)
           if (shiftsInWeek < normalWeeklyShifts * 0.5) continue;
@@ -480,39 +485,18 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         weeklySph.push(sph);
         }
 
-        // DEBUG: Log Rebecca's data
-        if (emp.id.startsWith('8d24c8f3')) {
-          console.log('[DEBUG Rebecca]', {
-            id: emp.id,
-            name: `${emp.first_name} ${emp.last_name}`,
-            emails,
-            weeklySph,
-            normalWeeklyShifts,
-            weekDetails: weekStarts.map(ws => {
-              const we = endOfWeek(ws, { weekStartsOn: 1 });
-              const shifts = countShifts(emp.id, ws, we, true);
-              let sales = 0;
-              for (const email of emails) {
-                const weekMap = salesByEmailByWeek.get(email);
-                if (weekMap) sales += weekMap.get(ws.getTime()) || 0;
-              }
-              return { week: format(ws, 'yyyy-MM-dd'), shifts, sales, skipped: shifts < normalWeeklyShifts * 0.5 };
-            }),
-          });
-        }
-
         // Planned hours for forecast month (gross = full capacity, net = minus absences)
         // Use empForecastEnd to cap hours for employees with planned departure
-        let grossShifts = countShifts(emp.id, forecastStart, empForecastEnd, false);
-        let forecastShifts = countShifts(emp.id, forecastStart, empForecastEnd, true);
+        let grossShifts = countShifts(emp.id, forecastStart, empForecastEnd, false, isFmEmployee);
+        let forecastShifts = countShifts(emp.id, forecastStart, empForecastEnd, true, isFmEmployee);
 
         let grossPlannedHours = grossShifts * HOURS_PER_SHIFT;
         let plannedHours = forecastShifts * HOURS_PER_SHIFT;
 
         // Attendance factor: only sick/no_show reduces attendance (vacation is planned, not a penalty)
         const past90Start = subWeeks(now, 13);
-        const totalShiftsPast90 = countShifts(emp.id, past90Start, now, false);
-        const totalShiftsNoSick = countShifts(emp.id, past90Start, now, 'sick_only');
+        const totalShiftsPast90 = countShifts(emp.id, past90Start, now, false, isFmEmployee);
+        const totalShiftsNoSick = countShifts(emp.id, past90Start, now, 'sick_only', isFmEmployee);
         const attendanceFactor = totalShiftsPast90 > 0
           ? Math.min(1, totalShiftsNoSick / totalShiftsPast90)
           : 0.92;
