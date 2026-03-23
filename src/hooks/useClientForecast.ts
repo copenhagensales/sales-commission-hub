@@ -278,10 +278,13 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
       });
 
       // Count shifts in a range for an employee
-      function countShifts(empId: string, rangeStart: Date, rangeEnd: Date, excludeAbsence: boolean): number {
+      // absenceMode: 'all' = exclude all absences, 'sick_only' = exclude only sick/no_show, false = no exclusion
+      function countShifts(empId: string, rangeStart: Date, rangeEnd: Date, excludeAbsence: boolean | 'sick_only' = false): number {
         const empTeamId = employeeTeamMap.get(empId);
         const teamDays = empTeamId ? teamShiftDaysMap.get(empTeamId) : undefined;
-        const absenceDates = absenceDateMap.get(empId) || new Set();
+        const absenceDates = excludeAbsence === 'sick_only'
+          ? (sickOnlyAbsenceDateMap.get(empId) || new Set())
+          : (absenceDateMap.get(empId) || new Set());
         const individualDates = individualShiftMap.get(empId) || new Set();
         const empShiftId = empShiftIdMap.get(empId);
         const empStandardDays = empShiftId ? shiftDaysMap.get(empShiftId) : undefined;
@@ -312,6 +315,16 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           cur.setDate(cur.getDate() + 1);
         }
         return count;
+      }
+
+      // Helper: get normal weekly shift count for an employee (from standard schedule, no absences)
+      function getNormalWeeklyShifts(empId: string): number {
+        const empShiftId = empShiftIdMap.get(empId);
+        const empStandardDays = empShiftId ? shiftDaysMap.get(empShiftId) : undefined;
+        if (empStandardDays !== undefined) return empStandardDays.length;
+        const empTeamId = employeeTeamMap.get(empId);
+        const teamDays = empTeamId ? teamShiftDaysMap.get(empTeamId) : undefined;
+        return teamDays?.length || 5;
       }
 
       // 6. Build EmployeePerformance for each active employee
