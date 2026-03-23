@@ -670,16 +670,20 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
             <div className="rounded-md border max-h-[600px] overflow-auto">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>OPP</TableHead>
-                    <TableHead>Sælgere</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>System (aggregeret)</TableHead>
-                    <TableHead>Uploadet data</TableHead>
-                    <TableHead>Forskelle</TableHead>
-                    <TableHead>Status</TableHead>
-                    {statusFilter === "pending" && <TableHead>Handlinger</TableHead>}
-                  </TableRow>
+                   <TableRow>
+                     <TableHead className="cursor-pointer select-none" onClick={() => handleSort("opp")}>
+                       <span className="flex items-center">OPP <QueueSortIcon column="opp" /></span>
+                     </TableHead>
+                     <TableHead className="cursor-pointer select-none" onClick={() => handleSort("agent")}>
+                       <span className="flex items-center">Sælgere <QueueSortIcon column="agent" /></span>
+                     </TableHead>
+                     <TableHead>Type</TableHead>
+                     <TableHead>System (aggregeret)</TableHead>
+                     <TableHead>Uploadet data</TableHead>
+                     <TableHead>Forskelle</TableHead>
+                     <TableHead>Status</TableHead>
+                     {statusFilter === "pending" && <TableHead>Handlinger</TableHead>}
+                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {processedOppGroups.map((g) => {
