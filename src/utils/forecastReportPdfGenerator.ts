@@ -129,12 +129,6 @@ export function generateForecastReportPdf(data: ReportData) {
     ${negativeDrivers.length > 0 ? `<p style="font-size:10px;font-weight:600;color:#dc2626;margin-bottom:4px;margin-top:8px;">NEGATIVT</p>${negativeDrivers.map(d => `<div class="driver-block"><strong>${d.label.replace(/churn/gi, "teamudskiftning")}</strong><p>${d.description.replace(/churn/gi, "udskiftning")}</p></div>`).join("")}` : ""}
   </div>
 
-  ${recs.length > 0 ? `
-  <div class="section">
-    <div class="section-title">Anbefalinger</div>
-    <p style="margin-bottom:8px;font-size:11px;color:#64748b;">Vi anbefaler at fokusere på:</p>
-    ${recs.map(r => `<div class="rec-item"><p style="font-size:11px;">${r}</p></div>`).join("")}
-  </div>` : ""}
 
   <div class="section">
     <div class="section-title">Outlook</div>
