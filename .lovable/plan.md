@@ -1,21 +1,24 @@
 
 
-# Fjern fallback-estimering af vagter i forecast
+# Månedsprogress baseret på kundetarget
 
 ## Problem
-Når en medarbejder (f.eks. Sandra) har 0 bookede vagter i forecast-perioden, bruger systemet en fallback der estimerer vagter baseret på historisk salgsaktivitet eller `expected_monthly_shifts`. Det giver misvisende forecasts for medarbejdere der reelt ikke skal arbejde.
+Progress-baren bruger `totalSalesExpected` (forecast) som mål. Den bør bruge kundens manuelle target fra `client_monthly_targets` som grundlag for progress og pace-beregning.
 
-## Ændring
+## Ændringer
 
-### `src/hooks/useClientForecast.ts` — linje 422-472
+### 1. `src/components/forecast/ForecastProgressBar.tsx`
+- Tilføj prop `clientTarget?: number | null`
+- Brug `clientTarget` som `total` i stedet for `totalSalesExpected` (fallback til forecast hvis intet target er sat)
+- Pace "behøves resten" beregnes ud fra target
+- Vis "Intet kundetarget" besked hvis target mangler (i stedet for at bruge forecast)
 
-**Fjern hele fallback-blokken** for on-call medarbejdere. Hvis en medarbejder har 0 bookede vagter, skal forecastet være 0.
-
-- Slet linje 422-472 (hele `if (grossShifts === 0 && shiftsEarlierInMonth === 0)` blokken)
-- Fjern relateret `isOnCall`-variabel og dens brug nedstrøms
-- Medarbejdere uden vagter vil dermed få `forecastShifts = 0` → `forecast = 0`
+### 2. `src/pages/Forecast.tsx`
+- Send `clientTarget={targetData}` til `ForecastProgressBar`
+- Skjul progress-bar hvis intet target er sat (eller vis med besked)
 
 | Fil | Ændring |
 |-----|---------|
-| `src/hooks/useClientForecast.ts` | Fjern fallback-estimering (linje 422-472), brug kun faktiske vagter |
+| `src/components/forecast/ForecastProgressBar.tsx` | Brug `clientTarget` prop som mål for progress |
+| `src/pages/Forecast.tsx` | Send `targetData` til ForecastProgressBar |
 
