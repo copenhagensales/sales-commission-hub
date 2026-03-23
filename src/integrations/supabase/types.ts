@@ -1593,6 +1593,7 @@ export type Database = {
           sale_id: string
           status: string
           upload_type: string
+          uploaded_data: Json | null
         }
         Insert: {
           created_at?: string
@@ -1603,6 +1604,7 @@ export type Database = {
           sale_id: string
           status?: string
           upload_type?: string
+          uploaded_data?: Json | null
         }
         Update: {
           created_at?: string
@@ -1613,6 +1615,7 @@ export type Database = {
           sale_id?: string
           status?: string
           upload_type?: string
+          uploaded_data?: Json | null
         }
         Relationships: [
           {

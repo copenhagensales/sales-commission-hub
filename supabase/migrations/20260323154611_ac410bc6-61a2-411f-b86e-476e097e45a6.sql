@@ -1,0 +1,1 @@
+ALTER TABLE public.cancellation_queue ADD COLUMN IF NOT EXISTS uploaded_data JSONB;

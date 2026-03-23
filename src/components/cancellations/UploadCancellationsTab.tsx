@@ -41,6 +41,7 @@ interface MatchedSale {
   saleDate: string;
   employee: string;
   currentStatus: string;
+  uploadedRowData: Record<string, unknown>;
 }
 
 export function UploadCancellationsTab() {
@@ -52,6 +53,9 @@ export function UploadCancellationsTab() {
   const [phoneColumn, setPhoneColumn] = useState<string>("__none__");
   const [companyColumn, setCompanyColumn] = useState<string>("__none__");
   const [oppColumn, setOppColumn] = useState<string>("__none__");
+  const [productColumn, setProductColumn] = useState<string>("__none__");
+  const [revenueColumn, setRevenueColumn] = useState<string>("__none__");
+  const [commissionColumn, setCommissionColumn] = useState<string>("__none__");
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [matchedSales, setMatchedSales] = useState<MatchedSale[]>([]);
   const [isMatching, setIsMatching] = useState(false);
@@ -264,6 +268,33 @@ export function UploadCancellationsTab() {
         }
       }
 
+      // Build a lookup from OPP/phone/company → uploaded row for associating uploaded data
+      const uploadedRowByOpp = new Map<string, Record<string, unknown>>();
+      const uploadedRowByPhone = new Map<string, Record<string, unknown>>();
+      const uploadedRowByCompany = new Map<string, Record<string, unknown>>();
+      
+      parsedData.forEach(row => {
+        if (oppColumn !== "__none__" && row.originalRow[oppColumn]) {
+          uploadedRowByOpp.set(String(row.originalRow[oppColumn]).toUpperCase().trim(), row.originalRow);
+        }
+        if (phoneColumn !== "__none__" && row.originalRow[phoneColumn]) {
+          uploadedRowByPhone.set(String(row.originalRow[phoneColumn]).replace(/\D/g, ""), row.originalRow);
+        }
+        if (companyColumn !== "__none__" && row.originalRow[companyColumn]) {
+          uploadedRowByCompany.set(String(row.originalRow[companyColumn]).toLowerCase().trim(), row.originalRow);
+        }
+      });
+
+      const findUploadedRow = (sale: any): Record<string, unknown> => {
+        const saleOpp = extractOpp(sale.raw_payload).toUpperCase().trim();
+        if (saleOpp && uploadedRowByOpp.has(saleOpp)) return uploadedRowByOpp.get(saleOpp)!;
+        const salePhone = (sale.customer_phone || "").replace(/\D/g, "");
+        if (salePhone && uploadedRowByPhone.has(salePhone)) return uploadedRowByPhone.get(salePhone)!;
+        const saleCompany = (sale.customer_company || "").toLowerCase().trim();
+        if (saleCompany && uploadedRowByCompany.has(saleCompany)) return uploadedRowByCompany.get(saleCompany)!;
+        return {};
+      };
+
       const matched: MatchedSale[] = allMatched.map(sale => ({
         saleId: sale.id,
         phone: sale.customer_phone || "",
@@ -272,6 +303,7 @@ export function UploadCancellationsTab() {
         saleDate: sale.sale_datetime || "",
         employee: sale.agent_name || "Ukendt",
         currentStatus: sale.validation_status || "pending",
+        uploadedRowData: findUploadedRow(sale),
       }));
 
       setMatchedSales(matched);
@@ -319,6 +351,9 @@ export function UploadCancellationsTab() {
 
       if (!importId) throw new Error("Kunne ikke oprette import-log");
 
+      // Build a map of saleId → uploadedRowData
+      const uploadedDataMap = new Map(matchedSales.map(s => [s.saleId, s.uploadedRowData]));
+
       // Insert queue items in batches of 50
       for (let i = 0; i < saleIds.length; i += 50) {
         const batch = saleIds.slice(i, i + 50).map(saleId => ({
@@ -326,10 +361,11 @@ export function UploadCancellationsTab() {
           sale_id: saleId,
           upload_type: uploadType,
           status: "pending",
+          uploaded_data: uploadedDataMap.get(saleId) || null,
         }));
         const { error } = await supabase
           .from("cancellation_queue")
-          .insert(batch);
+          .insert(batch as any);
         if (error) throw error;
       }
 
@@ -360,6 +396,9 @@ export function UploadCancellationsTab() {
     setPhoneColumn("__none__");
     setCompanyColumn("__none__");
     setOppColumn("__none__");
+    setProductColumn("__none__");
+    setRevenueColumn("__none__");
+    setCommissionColumn("__none__");
     setUploadType("cancellation");
     setSelectedClientId("");
     setMatchedSales([]);
@@ -409,13 +448,11 @@ export function UploadCancellationsTab() {
             </CardDescription>
           </CardHeader>
            <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="space-y-2">
                 <Label>Upload-type</Label>
                 <Select value={uploadType} onValueChange={(v) => setUploadType(v as "cancellation" | "basket_difference")}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="cancellation">Annullering</SelectItem>
                     <SelectItem value="basket_difference">Kurv difference</SelectItem>
@@ -426,14 +463,10 @@ export function UploadCancellationsTab() {
               <div className="space-y-2">
                 <Label>Vælg kunde</Label>
                 <Select value={selectedClientId} onValueChange={setSelectedClientId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Vælg kunde..." />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Vælg kunde..." /></SelectTrigger>
                   <SelectContent>
                     {clients.map((client) => (
-                      <SelectItem key={client.id} value={client.id}>
-                        {client.name}
-                      </SelectItem>
+                      <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -442,16 +475,10 @@ export function UploadCancellationsTab() {
               <div className="space-y-2">
                 <Label>Telefonkolonne (valgfri)</Label>
                 <Select value={phoneColumn} onValueChange={setPhoneColumn}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Vælg kolonne..." />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Vælg kolonne..." /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">Ingen</SelectItem>
-                    {columns.map((col) => (
-                      <SelectItem key={col} value={col}>
-                        {col}
-                      </SelectItem>
-                    ))}
+                    {columns.map((col) => (<SelectItem key={col} value={col}>{col}</SelectItem>))}
                   </SelectContent>
                 </Select>
               </div>
@@ -459,16 +486,10 @@ export function UploadCancellationsTab() {
               <div className="space-y-2">
                 <Label>Virksomhedskolonne (valgfri)</Label>
                 <Select value={companyColumn} onValueChange={setCompanyColumn}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Vælg kolonne..." />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Vælg kolonne..." /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">Ingen</SelectItem>
-                    {columns.map((col) => (
-                      <SelectItem key={col} value={col}>
-                        {col}
-                      </SelectItem>
-                    ))}
+                    {columns.map((col) => (<SelectItem key={col} value={col}>{col}</SelectItem>))}
                   </SelectContent>
                 </Select>
               </div>
@@ -476,16 +497,43 @@ export function UploadCancellationsTab() {
               <div className="space-y-2">
                 <Label>OPP-kolonne (valgfri)</Label>
                 <Select value={oppColumn} onValueChange={setOppColumn}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Vælg kolonne..." />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Vælg kolonne..." /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">Ingen</SelectItem>
-                    {columns.map((col) => (
-                      <SelectItem key={col} value={col}>
-                        {col}
-                      </SelectItem>
-                    ))}
+                    {columns.map((col) => (<SelectItem key={col} value={col}>{col}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Produktkolonne (valgfri)</Label>
+                <Select value={productColumn} onValueChange={setProductColumn}>
+                  <SelectTrigger><SelectValue placeholder="Vælg kolonne..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Ingen</SelectItem>
+                    {columns.map((col) => (<SelectItem key={col} value={col}>{col}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Omsætningskolonne (valgfri)</Label>
+                <Select value={revenueColumn} onValueChange={setRevenueColumn}>
+                  <SelectTrigger><SelectValue placeholder="Vælg kolonne..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Ingen</SelectItem>
+                    {columns.map((col) => (<SelectItem key={col} value={col}>{col}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Provisionskolonne (valgfri)</Label>
+                <Select value={commissionColumn} onValueChange={setCommissionColumn}>
+                  <SelectTrigger><SelectValue placeholder="Vælg kolonne..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Ingen</SelectItem>
+                    {columns.map((col) => (<SelectItem key={col} value={col}>{col}</SelectItem>))}
                   </SelectContent>
                 </Select>
               </div>
