@@ -103,7 +103,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
       const [empRes, agentRes, teamsRes] = await Promise.all([
         supabase
           .from("employee_master_data")
-          .select("id, first_name, last_name, team_id, avatar_url, employment_start_date")
+          .select("id, first_name, last_name, team_id, avatar_url, employment_start_date, work_email")
           .in("id", employeeIds)
           .eq("is_active", true),
         supabase
