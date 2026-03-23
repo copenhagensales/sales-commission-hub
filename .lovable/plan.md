@@ -1,34 +1,54 @@
 
 
-# Fix: Sandra forecaster +18 salg trods ingen vagter
+# Fix: Liga-side for aktiv sæson + rundehistorik
 
-## Problem
-Tilkaldevagt-fallbacken (linje 422-468) aktiveres når `grossShifts === 0` for den resterende periode. Sandra har haft vagter **tidligere** denne måned, men har ingen **flere** planlagte vagter. Koden skelner ikke mellem:
-- "Ingen vagter overhovedet" (ægte tilkaldevikar) → brug historisk estimat
-- "Ingen vagter **mere** denne måned" (normal medarbejder færdig) → forecast = 0
+## Problemer fundet
 
-## Løsning
-Tjek om medarbejderen har haft vagter **tidligere** i hele måneden. Hvis ja, er hun en normal medarbejder uden flere vagter — ikke en tilkaldevikar. Fallbacken skal kun aktiveres for medarbejdere der heller ikke har vagter i starten af måneden.
+**1. Kvalifikations-UI vises altid (uanset sæson-status)**
+Linje 486-604 i `CommissionLeague.tsx` viser kvalifikationsboardet for alle tilmeldte brugere — uden at tjekke om sæsonen stadig er i "qualification". Det betyder at selvom sæsonen nu er "active", vises det gamle kvalifikationsboard med de kumulative tal fra kvalifikationsperioden.
 
-## Ændring
+**2. ActiveSeasonBoard viser kumulativ provision — ikke runde-provision**
+`ActiveSeasonBoard` viser `total_provision` fra `league_season_standings`, som er kumulativt. Ifølge reglerne bestemmes din placering i divisionen af din provision **i den aktuelle runde** (uge). Boardet skal vise den aktuelle rundes provision som primær metric.
 
-### `src/hooks/useClientForecast.ts` — linje 422-423
-Før tilkalde-fallbacken, tjek om medarbejderen har haft vagter fra månedens start til i dag:
+**3. Rundenavigation mangler tydelig historik-UI**
+Runde-navigationen (linje 646-697) eksisterer men viser kun resultater for færdige runder via `RoundResultsCard`. Der mangler en tydelig oversigt over færdige runder.
 
-```typescript
-// Kun aktiver on-call fallback hvis medarbejderen OGSÅ har 0 vagter 
-// i hele måneden (ikke bare i den resterende periode)
-const monthStart = startOfMonth(new Date(year, month - 1, 1));
-const shiftsEarlierInMonth = countShifts(emp.id, monthStart, now, false);
+## Plan
 
-if (grossShifts === 0 && shiftsEarlierInMonth === 0) {
-  // On-call fallback logic...
-}
-```
+### 1. Wrap kvalifikations-UI i `isQualificationPhase` guard
+**Fil:** `CommissionLeague.tsx` (linje 486)
+- Ændr `{isEnrolled && (` til `{isQualificationPhase && isEnrolled && (`
+- Sikrer at kvalifikationsboardet kun vises under kvalifikation
 
-Medarbejdere som Sandra, der har haft vagter tidligere på måneden men ingen flere, vil nu korrekt få forecast = 0 for resten af perioden.
+### 2. Ny hook: `useLeagueRoundProvision`
+**Ny fil:** `src/hooks/useLeagueRoundProvision.ts`
+- Tager `currentRound` (med `start_date` og `end_date`) og liste af employee IDs
+- Kalder `get_sales_aggregates_v2` med rundens datoer og `p_group_by: "employee"`
+- Returnerer `Record<string, number>` (employee_id → provision i runden)
+- Refetch hver 2. minut (som `useLeagueTodayProvision`)
+
+### 3. Opdater `ActiveSeasonBoard` til at vise runde-provision
+**Fil:** `ActiveSeasonBoard.tsx`
+- Tilføj ny prop `roundProvisionMap: Record<string, number>`
+- Vis `roundProvisionMap[employee_id]` som primær provision-visning (i stedet for `total_provision`)
+- Behold `total_points` og `total_provision` som sekundær info
+- Sortér spillere indenfor division efter runde-provision (afspejler aktuel rangering)
+
+### 4. Tilslut runde-provision i `CommissionLeague.tsx`
+- Importér `useLeagueRoundProvision` og kald med `currentRound`
+- Send `roundProvisionMap` til `ActiveSeasonBoard`
+
+### 5. Forbedret rundehistorik-navigation
+**Fil:** `CommissionLeague.tsx` (linje 646-697)
+- Tilføj en dropdown/tabs med alle afsluttede runder i stedet for kun pile-navigation
+- Vis rundenummer + datoer + status (afsluttet/i gang)
+- "Samlet stilling" som standard, med mulighed for at klikke ind på specifikke runder
+
+## Tekniske detaljer
 
 | Fil | Ændring |
 |-----|---------|
-| `src/hooks/useClientForecast.ts` | Tilføj check for vagter tidligere i måneden før tilkalde-fallback |
+| `src/pages/CommissionLeague.tsx` | Guard qualification UI med `isQualificationPhase`, tilslut runde-provision, forbedret rundehistorik-UI |
+| `src/hooks/useLeagueRoundProvision.ts` | Ny hook der henter provision scoped til aktuel runde |
+| `src/components/league/ActiveSeasonBoard.tsx` | Vis runde-provision som primær, total points som sekundær |
 
