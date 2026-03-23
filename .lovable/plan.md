@@ -1,41 +1,50 @@
 
+# Plan: Gør søgningen langsommere og mere kontrolleret på Salg-siden
 
-# Ny fane: "Ingen match" — vis umatchede salg
+## Problem
+Søgningen kører stadig automatisk for hurtigt, fordi den bliver sendt kort tid efter hvert tastetryk. Det giver for mange forespørgsler og en urolig oplevelse.
 
-## Overblik
-Tilføj en ny fane der viser to lister:
-1. **Upload-rækker uden match** — rækker fra Excel-filen der ikke matchede noget salg i systemet
-2. **System-salg uden match** — salg i systemet (for den valgte kunde/periode) der ikke er i den uploadede fil
+## Løsning
+Jeg vil ændre søgningen fra “auto-søg næsten med det samme” til en mere bevidst søgning, så brugeren selv styrer hvornår der søges.
 
-## Database
+## Hvad jeg vil bygge
 
-### Tilføj `unmatched_rows` JSONB kolonne til `cancellation_imports`
-Gemmer de uploadede rækker der ikke matchede ved import-tidspunktet, så "Ingen match"-fanen kan vise dem uden at brugeren skal uploade igen.
+### 1. Skift fra hurtig auto-søgning til “anvend søgning”
+I `SalesFeed.tsx` vil jeg splitte søgningen i to states:
+- `searchInput` = det brugeren skriver
+- `appliedSearch` = det der faktisk bruges i databasen
 
-## Kodeændringer
+Det betyder:
+- der søges **ikke** ved hvert tastetryk
+- søgning kører først når brugeren:
+  - trykker Enter
+  - klikker på en søgeknap
 
-### 1. `UploadCancellationsTab.tsx` — Gem umatchede rækker
-Efter matching: identificer hvilke `parsedData`-rækker der **ikke** matchede (ingen tilsvarende sale fundet). Gem dem som `unmatched_rows` JSONB-array på `cancellation_imports` ved insert.
+### 2. Tilføj tydelig søgehandling i UI
+Søgefeltet får en mere tydelig handling:
+- søgeknap ved inputfeltet
+- Enter aktiverer søgning
+- X nulstiller både input og aktiv søgning med det samme
 
-### 2. Ny komponent: `UnmatchedTab.tsx`
-- Vælg en import fra dropdown (hent fra `cancellation_imports`)
-- **Sektion 1: "I upload men ikke i system"**
-  - Hent `unmatched_rows` fra den valgte `cancellation_imports`-række
-  - Vis i tabel med de originale Excel-kolonner (OPP, telefon, virksomhed osv.)
-- **Sektion 2: "I system men ikke i upload"**
-  - Hent alle salg for kunden i perioden (via `client_campaign_id`)
-  - Hent alle `sale_id`'er fra `cancellation_queue` for den valgte import
-  - Vis salg der IKKE er i `cancellation_queue` — altså system-salg uden match
-  - Vis: Salgsdato, Sælger, OPP, Telefon, Virksomhed, Status
+### 3. Tilføj minimumslængde på søgning
+For at undgå støj vil jeg kun aktivere søgning når der er nok tekst, fx:
+- mindst 2-3 tegn
+- undtagelse hvis det ligner telefon/OPP/id-format
 
-### 3. `Cancellations.tsx` — Tilføj fanen
-- Ny fane "Ingen match" med permission `tab_cancellations_unmatched`
-- Render `UnmatchedTab`
+Det reducerer unødige opslag markant.
 
-| Fil | Ændring |
-|-----|---------|
-| Migration | Tilføj `unmatched_rows JSONB` til `cancellation_imports` |
-| `UploadCancellationsTab.tsx` | Beregn og gem umatchede rækker ved import |
-| `UnmatchedTab.tsx` | Ny komponent med to sektioner |
-| `Cancellations.tsx` | Tilføj "Ingen match" fane |
+### 4. Behold nuværende gode date-filter, men uden at søgning føles “live”
+Datofilteret kan blive som det er nu, men søgeforespørgslen bindes kun til den anvendte søgning (`appliedSearch`) i stedet for det rå input.
 
+## Filer
+- `src/components/sales/SalesFeed.tsx`
+
+## Resultat
+Efter ændringen vil siden føles mere rolig:
+- brugeren kan skrive færdigt først
+- søgningen starter kun når det giver mening
+- færre unødige kald
+- mere præcis og kontrolleret søgeadfærd
+
+## Teknisk note
+Jeg vil fjerne afhængigheden af den nuværende 400ms debounce som primær mekanik og i stedet bruge en “submit search”-model. Query-key og databasekald skal kun reagere på den aktive søgning, ikke mens brugeren stadig skriver.
