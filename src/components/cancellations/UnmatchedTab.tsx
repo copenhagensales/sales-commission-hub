@@ -28,7 +28,11 @@ function extractOpp(rawPayload: unknown): string {
   return "";
 }
 
-export function UnmatchedTab() {
+interface UnmatchedTabProps {
+  clientId: string;
+}
+
+export function UnmatchedTab({ clientId }: UnmatchedTabProps) {
   const [selectedImportId, setSelectedImportId] = useState<string>("");
 
   // Fetch imports
@@ -76,21 +80,21 @@ export function UnmatchedTab() {
     enabled: !!selectedImportId,
   });
 
-  // Get client_id from queue items
-  const clientId = queueSaleIds[0]?.client_id || null;
+  // Get client_id from queue items or use the prop
+  const resolvedClientId = clientId || queueSaleIds[0]?.client_id || null;
   const matchedSaleIdSet = new Set(queueSaleIds.map(q => q.sale_id));
 
   // Fetch system sales for the client that are NOT in the queue
   const { data: missingFromUpload = [], isLoading: loadingSystemSales } = useQuery({
-    queryKey: ["system-sales-missing-from-upload", selectedImportId, clientId],
+    queryKey: ["system-sales-missing-from-upload", selectedImportId, resolvedClientId],
     queryFn: async () => {
-      if (!clientId) return [];
+      if (!resolvedClientId) return [];
 
       // Get campaigns for this client
       const { data: campaigns } = await supabase
         .from("client_campaigns")
         .select("id")
-        .eq("client_id", clientId);
+        .eq("client_id", resolvedClientId);
       
       const campaignIds = campaigns?.map(c => c.id) || [];
       if (campaignIds.length === 0) return [];
@@ -128,7 +132,7 @@ export function UnmatchedTab() {
       
       return unmatched.map(s => ({ ...s, saleItems: [] as any[] }));
     },
-    enabled: !!selectedImportId && !!clientId && matchedSaleIdSet.size > 0,
+    enabled: !!selectedImportId && !!resolvedClientId && matchedSaleIdSet.size > 0,
   });
 
   // Get column names from unmatched rows
@@ -221,7 +225,7 @@ export function UnmatchedTab() {
               <CardDescription>Salg i systemet for denne kunde der ikke blev matchet af uploaden</CardDescription>
             </CardHeader>
             <CardContent>
-              {!clientId ? (
+              {!resolvedClientId ? (
                 <div className="flex items-center gap-2 text-muted-foreground py-4">
                   <AlertCircle className="h-4 w-4" />
                   <span>Ingen kundedata tilgængelig for denne import.</span>

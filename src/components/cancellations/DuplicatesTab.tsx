@@ -94,8 +94,11 @@ function isValidPhone(phone: string | null | undefined): phone is string {
   return !!phone && !DUMMY_PHONES.has(phone.trim());
 }
 
-export function DuplicatesTab() {
-  const [selectedClientId, setSelectedClientId] = useState<string>("");
+interface DuplicatesTabProps {
+  clientId: string;
+}
+
+export function DuplicatesTab({ clientId: selectedClientId }: DuplicatesTabProps) {
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
   
@@ -103,37 +106,25 @@ export function DuplicatesTab() {
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
 
-  const { data: clients = [] } = useQuery({
-    queryKey: ["clients-for-cancellations"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("clients")
-        .select("id, name")
-        .order("name");
-      if (error) throw error;
-      return data;
-    },
-  });
-
   const { data: sales = [], isLoading } = useQuery({
     queryKey: ["sales-for-duplicates", selectedClientId, dateFrom, dateTo],
     queryFn: async () => {
+      if (!selectedClientId) return [];
+
       let query = supabase
         .from("sales")
         .select("id, sale_datetime, customer_phone, customer_company, validation_status, agent_name, source, raw_payload")
         .neq("validation_status", "cancelled")
         .order("sale_datetime", { ascending: false });
 
-      if (selectedClientId !== "all") {
-        const { data: campaigns } = await supabase
-          .from("client_campaigns")
-          .select("id")
-          .eq("client_id", selectedClientId);
+      const { data: campaigns } = await supabase
+        .from("client_campaigns")
+        .select("id")
+        .eq("client_id", selectedClientId);
 
-        const campaignIds = campaigns?.map((c) => c.id) || [];
-        if (campaignIds.length === 0) return [];
-        query = query.in("client_campaign_id", campaignIds);
-      }
+      const campaignIds = campaigns?.map((c) => c.id) || [];
+      if (campaignIds.length === 0) return [];
+      query = query.in("client_campaign_id", campaignIds);
 
       if (dateFrom) query = query.gte("sale_datetime", format(dateFrom, "yyyy-MM-dd"));
       if (dateTo) query = query.lte("sale_datetime", format(dateTo, "yyyy-MM-dd") + "T23:59:59");
@@ -236,23 +227,7 @@ export function DuplicatesTab() {
   return (
     <div className="space-y-6">
       {/* Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="space-y-2">
-          <Label>Vælg kunde</Label>
-          <Select value={selectedClientId} onValueChange={(v) => { setSelectedClientId(v); setSelectedAgent(""); }}>
-            <SelectTrigger>
-              <SelectValue placeholder="Vælg en kunde..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Alle kunder</SelectItem>
-              {clients.map((client) => (
-                <SelectItem key={client.id} value={client.id}>
-                  {client.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 
         <div className="space-y-2">
           <Label>Fra dato</Label>

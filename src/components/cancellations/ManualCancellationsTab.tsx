@@ -35,26 +35,16 @@ import { CLIENT_IDS } from "@/utils/clientIds";
 
 const RELATEL_CLIENT_ID = CLIENT_IDS["Relatel"];
 
-export function ManualCancellationsTab() {
-  const [selectedClientId, setSelectedClientId] = useState<string>("");
+interface ManualCancellationsTabProps {
+  clientId: string;
+}
+
+export function ManualCancellationsTab({ clientId: selectedClientId }: ManualCancellationsTabProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
   const [selectedAgent, setSelectedAgent] = useState<string>("");
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
-
-  // Fetch clients
-  const { data: clients = [], isLoading: isLoadingClients } = useQuery({
-    queryKey: ["clients-for-cancellations"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("clients")
-        .select("id, name")
-        .order("name");
-      if (error) throw error;
-      return data;
-    },
-  });
 
   // Fetch sales based on filters
   const { data: sales = [], isLoading: isLoadingSales } = useQuery({
@@ -161,23 +151,7 @@ export function ManualCancellationsTab() {
   return (
     <div className="space-y-6">
       {/* Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="client-select">Vælg kunde</Label>
-          <Select value={selectedClientId} onValueChange={(v) => { setSelectedClientId(v); setSelectedAgent(""); }}>
-            <SelectTrigger id="client-select">
-              <SelectValue placeholder="Vælg en kunde..." />
-            </SelectTrigger>
-            <SelectContent>
-              {clients.map((client) => (
-                <SelectItem key={client.id} value={client.id}>
-                  {client.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="space-y-2">
           <Label>Fra dato</Label>
           <Popover>
@@ -243,7 +217,7 @@ export function ManualCancellationsTab() {
       {!selectedClientId ? (
         <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
           <AlertCircle className="h-12 w-12 mb-4" />
-          <p>Vælg en kunde for at se salg</p>
+          <p>Vælg en kunde i toppen for at se salg</p>
         </div>
       ) : isLoadingSales ? (
         <div className="flex items-center justify-center py-12">

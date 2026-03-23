@@ -276,7 +276,11 @@ interface FlatQueueRow {
   hasDifferences: boolean;
 }
 
-export function ApprovalQueueTab() {
+interface ApprovalQueueTabProps {
+  clientId: string;
+}
+
+export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const [statusFilter, setStatusFilter] = useState<string>("pending");
@@ -300,7 +304,7 @@ export function ApprovalQueueTab() {
   });
 
   const { data: queryResult, isLoading } = useQuery({
-    queryKey: ["cancellation-queue", statusFilter],
+    queryKey: ["cancellation-queue", statusFilter, clientId],
     queryFn: async () => {
       let query = supabase
         .from("cancellation_queue")
@@ -309,6 +313,10 @@ export function ApprovalQueueTab() {
 
       if (statusFilter !== "all") {
         query = query.eq("status", statusFilter);
+      }
+
+      if (clientId) {
+        query = query.eq("client_id", clientId);
       }
 
       const { data, error } = await query.limit(500);
