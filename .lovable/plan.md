@@ -1,34 +1,31 @@
 
 
-# Fix: Gem alle upload-rækker per OPP (ikke kun Total-rækken)
+# Fix: Dubletter for TDC Erhverv baseret på OPP-nummer
 
 ## Problem
-TDC's Excel har flere rækker per OPP — én pr. produkt + en "Total"-række. Men `uploadedRowByOpp` er en `Map<string, Record>` der kun gemmer **den sidste række** per OPP. Resultatet er at `uploaded_data` altid indeholder "Produkt: Total" i stedet for de faktiske produkter.
+Dubletter-fanen grupperer kun på telefonnummer. For TDC Erhverv er det OPP-nummeret der definerer om noget er et dublet — samme OPP kan have flere salg (lovligt, da et OPP kan deles mellem sælgere), men det er også der man finder reelle dubletter. Med telefonnummer-logik finder systemet "ingen dubletter" fordi TDC-salg ofte har dummy-telefonnumre.
 
 ## Løsning
+Gør grupperingslogikken i `DuplicatesTab.tsx` kundespecifik:
+- **TDC Erhverv** → gruppér på OPP-nummer (fra `raw_payload`)
+- **Alle andre kunder** → behold nuværende telefonnummer-gruppering
 
-### 1. `UploadCancellationsTab.tsx` — Gem alle rækker per OPP
-- Ændr `uploadedRowByOpp` fra `Map<string, Record>` til `Map<string, Record[]>` (array af alle rækker)
-- `findUploadedRow` returnerer et samlet objekt med:
-  - Alle felter fra Total-rækken (omsætning, CPO osv.)
-  - Et nyt felt `_product_rows` med de individuelle produktrækker (hvor "Produkt" ikke er "Total")
-- Gem dette samlede objekt som `uploaded_data` på queue-items
+## Ændringer i `DuplicatesTab.tsx`
 
-### 2. `ApprovalQueueTab.tsx` — Vis produkter fra upload
-- I `buildUploadedPreview`: Check for `_product_rows` i `uploadedData`
-- Hvis det findes: vis produktnavnene som badges (fra "Produkt"-kolonnen i hver produktrække)
-- Vis stadig omsætning/CPO fra Total-rækken
+### 1. Importér `CLIENT_IDS` og tilføj OPP-ekstraktion
+- Importér `CLIENT_IDS` fra `@/utils/clientIds`
+- Tilføj `extractOpp()` funktion (samme som i `UploadCancellationsTab`)
 
-### Resultat
-Godkendelseskøen vil vise f.eks.:
-```text
-Upload: Mobil 0%, Mobilt Bredbånd 50%, Fastnet 100%
-CPO Total: 10600
-```
-I stedet for bare "Produkt: Total"
+### 2. Betinget gruppering i `duplicateGroups` useMemo
+- Hvis `selectedClientId === CLIENT_IDS["TDC Erhverv"]`: gruppér salg på OPP-nummer i stedet for telefon
+- Ellers: behold nuværende telefon-gruppering
+- OPP-grupper viser OPP-nummeret som group key i stedet for telefon
+
+### 3. UI-tilpasning
+- Vis "OPP" label i stedet for telefon-ikon når det er TDC
+- Vis OPP-nummer i stedet for telefonnummer i gruppeoverskriften
 
 | Fil | Ændring |
 |-----|---------|
-| `UploadCancellationsTab.tsx` | Saml alle upload-rækker per OPP i ét objekt med `_product_rows` |
-| `ApprovalQueueTab.tsx` | Vis produktnavne fra `_product_rows` i uploaded preview |
+| `DuplicatesTab.tsx` | Tilføj OPP-ekstraktion, betinget gruppering per kunde |
 
