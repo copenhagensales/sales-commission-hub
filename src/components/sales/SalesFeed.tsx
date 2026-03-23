@@ -252,7 +252,7 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
   // Fetch paginated sales data
   const dateRange = getEffectiveDateRange();
   const { data, isLoading } = useQuery({
-    queryKey: ["sales-feed", currentPage, searchQuery, datePreset, validationStatusFilter, salesStatusFilter, sourceFilter, customDateRange.from?.toISOString(), customDateRange.to?.toISOString(), selectedClientId],
+    queryKey: ["sales-feed", currentPage, debouncedSearch, datePreset, validationStatusFilter, salesStatusFilter, sourceFilter, customDateRange.from?.toISOString(), customDateRange.to?.toISOString(), selectedClientId],
     queryFn: async () => {
       const from = (currentPage - 1) * ITEMS_PER_PAGE;
       const to = from + ITEMS_PER_PAGE - 1;
