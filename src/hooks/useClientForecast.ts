@@ -502,7 +502,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
             useBookingOnly,
             grossShifts,
             forecastShifts,
-            empStandardDays: empStandardShiftMap.get(emp.id),
+            empStandardDays: empShiftIdMap.get(emp.id) ? shiftDaysMap.get(empShiftIdMap.get(emp.id)!) : undefined,
             forecastPeriod: `${forecastStartStr} → ${format(empForecastEnd, 'yyyy-MM-dd')}`,
           });
         }
