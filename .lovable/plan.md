@@ -1,26 +1,21 @@
 
 
-# Fix: Tillad fjernelse af stab-medarbejdere fra teams
+# Fordel hotelomkostning ud på dage
 
 ## Problem
-Fjern-knappen (X) vises kun når en medarbejder er på **præcis 1 team** (`getEmployeeTeamCount(emp.id) === 1`). Thomas Wehage er stab-medarbejder og er på flere teams, så knappen skjules.
-
-For ikke-stab medarbejdere giver reglen mening (de bør flyttes i stedet for fjernes), men stab-medarbejdere skal frit kunne fjernes fra individuelle teams.
+I den daglige nedbrydning vises hotel altid som 0 kr, fordi hotelomkostningen kun beregnes samlet per booking. Brugeren vil se den fordelt jævnt over de bookede dage.
 
 ## Ændring
 
-### `src/components/employees/TeamsTab.tsx` — linje 1393
-Udvid betingelsen så X-knappen også vises for stab-medarbejdere:
-
-```typescript
-// Fra:
-{getEmployeeTeamCount(emp.id) === 1 && editingTeam && (
-
-// Til:
-{(getEmployeeTeamCount(emp.id) === 1 || emp.is_staff_employee) && editingTeam && (
+### `src/pages/vagt-flow/LocationProfitabilityContent.tsx` — linje 532-533
+I stedet for `dayHotelCost = 0`, beregn:
 ```
+dayHotelCost = isBooked ? (loc.hotelCost / loc.bookedDays.length) : 0
+```
+
+Så den samlede hotelomkostning for lokationen deles ligeligt ud på alle bookede dage. Ugen-totalen forbliver den samme.
 
 | Fil | Ændring |
 |-----|---------|
-| `src/components/employees/TeamsTab.tsx` | Linje 1393: vis fjern-knap for stab-medarbejdere uanset antal teams |
+| `src/pages/vagt-flow/LocationProfitabilityContent.tsx` | Linje 532-533: fordel hotelomkostning per booked dag |
 
