@@ -83,6 +83,25 @@ export function usePrizeLeaders(
       let bestRound: PrizeLeader | null = null;
       let allBestRounds: RankedRound[] = [];
 
+      // Always fetch qualification best for "Bedste Runde" (kval counts as a round)
+      const { data: qualBestStandings } = await supabase
+        .from("league_qualification_standings")
+        .select(`
+          current_provision,
+          employee:employee_master_data!league_qualification_standings_employee_id_fkey(id, first_name, last_name)
+        `)
+        .eq("season_id", seasonId)
+        .order("current_provision", { ascending: false })
+        .limit(50);
+
+      const qualBestRounds: RankedRound[] = (qualBestStandings ?? [])
+        .filter((s: any) => (s.current_provision || 0) > 0)
+        .map((s: any) => ({
+          employee: { id: s.employee.id, first_name: s.employee.first_name, last_name: s.employee.last_name },
+          points_earned: Math.round(s.current_provision),
+          round_number: 0, // 0 = Kval
+        }));
+
       if (isActive) {
         const { data: roundStandings } = await supabase
           .from("league_round_standings")
@@ -101,7 +120,7 @@ export function usePrizeLeaders(
           (rounds ?? []).forEach((r: any) => { roundNumberMap[r.id] = r.round_number; });
         }
 
-        allBestRounds = (roundStandings ?? [])
+        const finishedBestRounds: RankedRound[] = (roundStandings ?? [])
           .filter((r: any) => r.points_earned > 0)
           .map((r: any) => ({
             employee: r.employee as any,
@@ -109,31 +128,28 @@ export function usePrizeLeaders(
             round_number: r.round_id ? (roundNumberMap[r.round_id] ?? null) : null,
           }));
 
+        // Merge kval + finished rounds, sort by points descending
+        allBestRounds = [...qualBestRounds, ...finishedBestRounds]
+          .sort((a, b) => b.points_earned - a.points_earned);
+
         if (allBestRounds.length > 0) {
+          const top = allBestRounds[0];
+          const roundLabel = top.round_number === 0 ? "kval" : top.round_number ? `runde ${top.round_number}` : "";
           bestRound = {
-            employee: allBestRounds[0].employee,
-            value: allBestRounds[0].points_earned,
-            label: `${allBestRounds[0].points_earned} pt${allBestRounds[0].round_number ? ` (runde ${allBestRounds[0].round_number})` : ""}`,
+            employee: top.employee,
+            value: top.points_earned,
+            label: `${top.points_earned} pt${roundLabel ? ` (${roundLabel})` : ""}`,
           };
         }
       } else {
-        // Qualification: best round = highest provision
-        const { data: qualStandings } = await supabase
-          .from("league_qualification_standings")
-          .select(`
-            current_provision,
-            employee:employee_master_data!league_qualification_standings_employee_id_fkey(id, first_name, last_name)
-          `)
-          .eq("season_id", seasonId)
-          .order("current_provision", { ascending: false })
-          .limit(1);
-
-        if (qualStandings?.[0] && (qualStandings[0] as any).current_provision > 0) {
-          const top = qualStandings[0] as any;
+        // Qualification phase only
+        allBestRounds = qualBestRounds;
+        if (qualBestRounds.length > 0) {
+          const top = qualBestRounds[0];
           bestRound = {
             employee: top.employee,
-            value: top.current_provision,
-            label: `${Math.round(top.current_provision).toLocaleString("da-DK")} kr`,
+            value: top.points_earned,
+            label: `${top.points_earned.toLocaleString("da-DK")} kr`,
           };
         }
       }

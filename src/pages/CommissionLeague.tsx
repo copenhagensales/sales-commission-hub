@@ -397,6 +397,7 @@ export default function CommissionLeague() {
             prizeLeaders={prizeLeaders}
             seasonStatus={season.status || ""}
             isActive={isActivePhase}
+            roundProvisionMap={roundProvisionMap || {}}
           />
 
           {/* Not enrolled - show landing */}

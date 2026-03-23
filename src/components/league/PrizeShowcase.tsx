@@ -32,13 +32,14 @@ interface PrizeShowcaseProps {
   prizeLeaders: PrizeLeaders | undefined;
   seasonStatus: string;
   isActive: boolean;
+  roundProvisionMap?: Record<string, number>;
 }
 
 type DialogType = "top3" | "bestRound" | "talent" | "comeback" | null;
 
 const fmtNum = (n: number) => Number(n).toLocaleString("da-DK", { maximumFractionDigits: 0 });
 
-export function PrizeShowcase({ standings, prizeLeaders, seasonStatus, isActive }: PrizeShowcaseProps) {
+export function PrizeShowcase({ standings, prizeLeaders, seasonStatus, isActive, roundProvisionMap }: PrizeShowcaseProps) {
   const [openDialog, setOpenDialog] = useState<DialogType>(null);
   const notStarted = !isActive;
 
@@ -54,6 +55,26 @@ export function PrizeShowcase({ standings, prizeLeaders, seasonStatus, isActive 
 
   const pendingText = notStarted ? "Afgøres når sæsonen starter" : "Afsløres efter runde 1";
   const revealed = prizeLeaders != null;
+
+  // Compute live best round leader from roundProvisionMap
+  const liveBestRound = (() => {
+    if (!isActive || !roundProvisionMap || Object.keys(roundProvisionMap).length === 0) return null;
+    let bestId = "";
+    let bestVal = 0;
+    for (const [empId, val] of Object.entries(roundProvisionMap)) {
+      if (val > bestVal) { bestId = empId; bestVal = val; }
+    }
+    if (!bestId || bestVal <= 0) return null;
+    const standing = standings.find(s => s.employee?.id === bestId);
+    return {
+      employee: standing?.employee ?? null,
+      value: bestVal,
+      label: `${fmtNum(bestVal)} kr (foreløbig)`,
+    };
+  })();
+
+  // Determine displayed best round: prefer finalized, then live
+  const displayBestRound = revealed && prizeLeaders.bestRound ? prizeLeaders.bestRound : liveBestRound;
 
   const podium = [
     { emoji: "🥇", label: "1.", standing: top1, colorClass: "text-yellow-400" },
@@ -111,8 +132,8 @@ export function PrizeShowcase({ standings, prizeLeaders, seasonStatus, isActive 
             type: "bestRound" as const,
             emoji: "🔥",
             title: "Bedste Runde",
-            playerName: revealed && prizeLeaders.bestRound ? formatPlayerName(prizeLeaders.bestRound.employee) : pendingText,
-            subtitle: revealed && prizeLeaders.bestRound ? prizeLeaders.bestRound.label : "",
+            playerName: displayBestRound ? formatPlayerName(displayBestRound.employee) : pendingText,
+            subtitle: displayBestRound ? displayBestRound.label : "",
             borderClass: "border-red-500/40 hover:border-red-500/60",
             gradientClass: "from-red-500/5 to-transparent",
           },
