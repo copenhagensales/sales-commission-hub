@@ -259,13 +259,20 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
       });
 
       const absenceDateMap = new Map<string, Set<string>>();
+      const sickOnlyAbsenceDateMap = new Map<string, Set<string>>();
       (absencesRes.data || []).forEach(a => {
         if (!absenceDateMap.has(a.employee_id)) absenceDateMap.set(a.employee_id, new Set());
+        if (!sickOnlyAbsenceDateMap.has(a.employee_id)) sickOnlyAbsenceDateMap.set(a.employee_id, new Set());
         const absStart = new Date(a.start_date);
         const absEnd = new Date(a.end_date);
         const cur = new Date(absStart);
         while (cur <= absEnd) {
-          absenceDateMap.get(a.employee_id)!.add(format(cur, "yyyy-MM-dd"));
+          const dateStr = format(cur, "yyyy-MM-dd");
+          absenceDateMap.get(a.employee_id)!.add(dateStr);
+          // Only sick/no_show count toward attendance factor penalty
+          if (a.type === 'sick' || a.type === 'no_show') {
+            sickOnlyAbsenceDateMap.get(a.employee_id)!.add(dateStr);
+          }
           cur.setDate(cur.getDate() + 1);
         }
       });
