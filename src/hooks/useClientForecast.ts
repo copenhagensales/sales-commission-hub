@@ -484,16 +484,9 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           const hoursInWeek = shiftsInWeek * HOURS_PER_SHIFT;
 
           let salesInWeek = 0;
-          for (const email of emails) {
-            const weekMap = salesByEmailByWeek.get(email);
-            if (weekMap) {
-              salesInWeek += weekMap.get(ws.getTime()) || 0;
-            }
-          }
-          // Add FM sales matched by employee ID
-          const fmWeekMap = salesByEmployeeIdByWeek.get(emp.id);
-          if (fmWeekMap) {
-            salesInWeek += fmWeekMap.get(ws.getTime()) || 0;
+          const empWeekMap = salesByEmployeeByWeek.get(emp.id);
+          if (empWeekMap) {
+            salesInWeek = empWeekMap.get(ws.getTime()) || 0;
           }
 
           // Skip weeks with 0 sales and no concrete shifts (individual/booking)
@@ -525,7 +518,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         const teamId = employeeTeamMap.get(emp.id);
         const teamName = teamId ? teamNameMap.get(teamId) || null : null;
 
-        const hasFmSales = salesByEmployeeIdByWeek.has(emp.id);
+        const hasFmSales = salesByEmployeeByWeek.has(emp.id);
         const missingAgentMapping = emails.length === 0 && !hasFmSales;
 
         employeePerformances.push({
