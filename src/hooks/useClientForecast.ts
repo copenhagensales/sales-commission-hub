@@ -327,7 +327,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
       // Count shifts in a range for an employee
       // absenceMode: 'all' = exclude all absences, 'sick_only' = exclude only sick/no_show, false = no exclusion
       // Hierarchy: individual shifts → booking assignments → employee standard → team standard
-      function countShifts(empId: string, rangeStart: Date, rangeEnd: Date, excludeAbsence: boolean | 'sick_only' = false, isFm: boolean = false): number {
+      function countShifts(empId: string, rangeStart: Date, rangeEnd: Date, excludeAbsence: boolean | 'sick_only' = false): number {
         const empTeamId = employeeTeamMap.get(empId);
         const teamDays = empTeamId ? teamShiftDaysMap.get(empTeamId) : undefined;
         const absenceDates = excludeAbsence === 'sick_only'
@@ -358,11 +358,11 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
             count++;
           } else if (bookingDates.has(dateStr)) {
             count++;
-          } else if (!isFm) {
-            // FM employees: ONLY count individual shifts + booking assignments, never fallback
-            // Non-FM employees: use employee standard or team standard
+          } else {
+            // Employee standard or team standard fallback
             const empHasSpecialShift = empShiftIdMap.has(empId);
             if (empHasSpecialShift) {
+              // Employee has a special shift — use ONLY its days (even if 0)
               if (empStandardDays && empStandardDays.includes(dayNumber)) count++;
             } else if (teamDays && teamDays.includes(dayNumber)) {
               count++;
@@ -375,30 +375,13 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
 
       // Helper: get normal weekly shift count for an employee (from standard schedule, no absences)
       // For FM employees with bookings but no standard shifts, average their recent booking frequency
-      function getNormalWeeklyShifts(empId: string, isFm: boolean = false): number {
+      function getNormalWeeklyShifts(empId: string): number {
         const empHasSpecialShift = empShiftIdMap.has(empId);
         const empShiftId = empShiftIdMap.get(empId);
         const empStandardDays = empShiftId ? shiftDaysMap.get(empShiftId) : undefined;
         if (empHasSpecialShift) {
           // Special shift assigned — use ONLY its days (even if 0)
           return empStandardDays ? empStandardDays.length : 0;
-        }
-
-        // FM employees: use average booking frequency, never team standard
-        if (isFm) {
-          const bookingDates = bookingAssignmentMap.get(empId);
-          if (bookingDates && bookingDates.size > 0) {
-            const eightWeeksAgo = subWeeks(now, EWMA_WEEKS);
-            let bookingsInPeriod = 0;
-            bookingDates.forEach(dateStr => {
-              const d = new Date(dateStr);
-              if (d >= eightWeeksAgo && d <= now) bookingsInPeriod++;
-            });
-            if (bookingsInPeriod > 0) {
-              return Math.max(1, Math.round(bookingsInPeriod / EWMA_WEEKS));
-            }
-          }
-          return 0;
         }
 
         const empTeamId = employeeTeamMap.get(empId);
