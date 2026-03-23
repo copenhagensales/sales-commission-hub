@@ -1,33 +1,27 @@
 
 
-# Tilføj hotel- og diætomkostninger til Lokationsøkonomi
+# Fix: Dag-nummer konvertering i daglig nedbrydning
 
-## Problem
-Beregningen inkluderer kun sælgerløn og lokationsomkostning. Hotel og diæt mangler, så DB er højere end reelt.
+## Årsag
+`booked_days` i DB: mandag=0, fredag=4.
+`getDay()` i JS: mandag=1, fredag=5.
+Koden matcher aldrig fredag (5 ≠ 4).
 
-## Datakilder
-- **`booking_diet`**: `booking_id`, `employee_id`, `date`, `amount` — summér `amount` per booking_id
-- **`booking_hotel`**: `booking_id`, `price_per_night`, `rooms`, `check_in`, `check_out` — beregn antal nætter × pris × rum per booking_id
+## Ændring
 
-## Ændringer i `src/pages/vagt-flow/LocationProfitabilityContent.tsx`
+### `src/pages/vagt-flow/LocationProfitabilityContent.tsx` — linje 523
+```typescript
+// Fra:
+const dayNum = date.getDay() === 0 ? 7 : date.getDay();
 
-### 1. Hent hotel- og diætdata (2 nye queries)
-- `booking_diet` filtreret på booking_ids for ugen → summér amount per booking_id
-- `booking_hotel` filtreret på booking_ids for ugen → beregn total hotelomkostning per booking_id (nætter × pris_per_nat × rum)
+// Til:
+const jsDay = date.getDay();
+const dayNum = jsDay === 0 ? 6 : jsDay - 1;
+```
 
-### 2. Tilføj til beregningen
-- Map hotel- og diæt-totaler til lokationer via booking_id
-- Ny beregning: `DB = Omsætning − Sælgerløn − Lokationsomkostning − Hotel − Diæt`
-
-### 3. Nye kolonner i tabellen
-- Tilføj **"Hotel"** og **"Diæt"** kolonner mellem "Lokation" og "DB"
-- Samme kolonner i daglig nedbrydning (expanderet visning)
-
-### 4. KPI-kort
-- Tilføj 2 nye KPI-kort: Total hotel og total diæt
-- Opdatér DB-beregning i totals
+Én linje. Total-beregningen er allerede korrekt (bruger `bookedDays.length`).
 
 | Fil | Ændring |
 |-----|---------|
-| `src/pages/vagt-flow/LocationProfitabilityContent.tsx` | 2 nye queries, 2 nye kolonner, opdateret DB-beregning |
+| `src/pages/vagt-flow/LocationProfitabilityContent.tsx` | Linje 523: fix dag-konvertering |
 
