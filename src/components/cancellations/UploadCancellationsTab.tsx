@@ -351,6 +351,9 @@ export function UploadCancellationsTab() {
 
       if (!importId) throw new Error("Kunne ikke oprette import-log");
 
+      // Build a map of saleId → uploadedRowData
+      const uploadedDataMap = new Map(matchedSales.map(s => [s.saleId, s.uploadedRowData]));
+
       // Insert queue items in batches of 50
       for (let i = 0; i < saleIds.length; i += 50) {
         const batch = saleIds.slice(i, i + 50).map(saleId => ({
@@ -358,10 +361,11 @@ export function UploadCancellationsTab() {
           sale_id: saleId,
           upload_type: uploadType,
           status: "pending",
+          uploaded_data: uploadedDataMap.get(saleId) || null,
         }));
         const { error } = await supabase
           .from("cancellation_queue")
-          .insert(batch);
+          .insert(batch as any);
         if (error) throw error;
       }
 
@@ -392,6 +396,9 @@ export function UploadCancellationsTab() {
     setPhoneColumn("__none__");
     setCompanyColumn("__none__");
     setOppColumn("__none__");
+    setProductColumn("__none__");
+    setRevenueColumn("__none__");
+    setCommissionColumn("__none__");
     setUploadType("cancellation");
     setSelectedClientId("");
     setMatchedSales([]);
