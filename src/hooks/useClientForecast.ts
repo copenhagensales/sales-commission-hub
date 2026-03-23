@@ -185,6 +185,38 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         }
       }
 
+      // 4b. Get FM sales by employee ID (fm_seller_id) for employees without agent mapping
+      const salesByEmployeeIdByWeek = new Map<string, Map<number, number>>();
+      if (campaignIds.length > 0) {
+        const campaignChunks = chunk(campaignIds, 200);
+        for (const campaignBatch of campaignChunks) {
+          const { data: fmSalesData } = await supabase
+            .from("sales")
+            .select("raw_payload, sale_datetime, sale_items!inner(quantity, product_id, products(counts_as_sale))")
+            .eq("source", "fieldmarketing")
+            .gte("sale_datetime", salesStartStr)
+            .lte("sale_datetime", salesEndStr + "T23:59:59")
+            .in("client_campaign_id", campaignBatch)
+            .limit(10000);
+
+          (fmSalesData || []).forEach((s: any) => {
+            const sellerId = s.raw_payload?.fm_seller_id;
+            if (!sellerId) return;
+            const saleDate = new Date(s.sale_datetime);
+            const weekStart = startOfWeek(saleDate, { weekStartsOn: 1 });
+            const weekKey = weekStart.getTime();
+
+            (s.sale_items || []).forEach((si: any) => {
+              if (si.products?.counts_as_sale !== false) {
+                if (!salesByEmployeeIdByWeek.has(sellerId)) salesByEmployeeIdByWeek.set(sellerId, new Map());
+                const weekMap = salesByEmployeeIdByWeek.get(sellerId)!;
+                weekMap.set(weekKey, (weekMap.get(weekKey) || 0) + (si.quantity || 1));
+              }
+            });
+          });
+        }
+      }
+
       // 5. Shift data + absences for forecast period + past 90 days (attendance)
       const ninetyDaysAgo = format(subWeeks(now, 13), "yyyy-MM-dd");
 
@@ -373,6 +405,11 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
               salesInWeek += weekMap.get(ws.getTime()) || 0;
             }
           }
+          // Add FM sales matched by employee ID
+          const fmWeekMap = salesByEmployeeIdByWeek.get(emp.id);
+          if (fmWeekMap) {
+            salesInWeek += fmWeekMap.get(ws.getTime()) || 0;
+          }
 
           // Skip weeks with 0 sales and very few shifts (likely unrecorded absence)
           if (salesInWeek === 0 && shiftsInWeek <= 2) continue;
@@ -420,7 +457,8 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         const teamId = employeeTeamMap.get(emp.id);
         const teamName = teamId ? teamNameMap.get(teamId) || null : null;
 
-        const missingAgentMapping = emails.length === 0;
+        const hasFmSales = salesByEmployeeIdByWeek.has(emp.id);
+        const missingAgentMapping = emails.length === 0 && !hasFmSales;
 
         employeePerformances.push({
           employeeId: emp.id,
