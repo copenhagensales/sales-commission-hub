@@ -1,42 +1,36 @@
 
 
-# Vis foreløbige præmieledere med kval som runde
+# Fix: Comeback beregnes fra kval-placering (ikke runde 1)
 
 ## Problem
-Præmiekortene viser "Afsløres efter runde 1" selvom sæsonen er aktiv og der er live provision-data. Kvalifikationsrunden tæller som en runde i konkurrencen og skal medregnes.
+Comeback-logikken (linje 220-270) bruger runde 1-placeringer som baseline. Men ifølge reglerne er det **kvalifikationsrundens endelige placering** der er udgangspunktet. Vinderen er den der rykker flest pladser fra kval-slutplacering til nuværende/endelig placering.
 
-## Ændringer
+Derudover kræver den nuværende kode at runde 1 er **afsluttet** (`league_round_standings` populeret) — så under runde 1 vises ingen comeback-data.
 
-### 1. `src/pages/CommissionLeague.tsx`
-- Send `roundProvisionMap` og `seasonStandings` (med employee-data) til `PrizeShowcase`
+## Ændring
 
-### 2. `src/components/league/PrizeShowcase.tsx`
-- Tilføj props: `roundProvisionMap?: Record<string, number>` og en liste af spillere med employee-info
-- Når `isActive` og `prizeLeaders?.bestRound` er null (ingen afsluttede runder i `league_round_standings`):
-  - Find spilleren med højest provision i `roundProvisionMap`
-  - Vis som foreløbig leder med "Foreløbig" badge
-- Samme logik for talent og comeback hvor relevant
+### `src/hooks/useLeaguePrizeData.ts` — Comeback-blokken (linje 220-271)
 
-### 3. `src/hooks/useLeaguePrizeData.ts`
-- Kvalifikationsrunden skal tælle med i "Bedste Runde" også når sæsonen er aktiv
-- I `isActive`-blokken: hent også kvalifikationsdata og inkluder den bedste kval-præstation som "Kval" i `allBestRounds`
-- Sammenlign kval-bedste med runde-bedste for at finde den reelle leder
-- "Sæsonens Comeback": Beregn allerede fra kval → runde 1 (nuværende logik kræver `round1` afsluttet — brug live `roundProvisionMap` som fallback)
+**Erstat** baseline fra `league_round_standings` (runde 1) med `league_qualification_standings.overall_rank`:
 
-### Beregningslogik for foreløbig leder
-```text
-bestRound candidates:
-  1. Alle afsluttede runder fra league_round_standings (points)
-  2. Kvalifikationsrundens bedste (provision fra league_qualification_standings)  
-  3. Live aktuel runde (provision fra roundProvisionMap) — "Foreløbig"
-
-Vis den højeste af alle tre som leder.
-For live-data: vis "Foreløbig" tag.
 ```
+Gammel logik:
+  startRank = runde 1 placering (fra league_round_standings)
+  currentRank = overall_rank (fra league_season_standings)
+  improvement = startRank - currentRank
+
+Ny logik:
+  startRank = overall_rank fra league_qualification_standings (kval-slutplacering)
+  currentRank = overall_rank fra league_season_standings
+  improvement = startRank - currentRank
+```
+
+- Fjern opslaget af `round1` og `round1Standings`
+- Hent i stedet `league_qualification_standings` med `employee_id, overall_rank` for `season_id`
+- Brug kval `overall_rank` som baseline
+- Virker allerede fra runde 1 (kval-data eksisterer altid når sæsonen er aktiv)
 
 | Fil | Ændring |
 |-----|---------|
-| `src/hooks/useLeaguePrizeData.ts` | Inkluder kval-provision i bestRound-beregning |
-| `src/components/league/PrizeShowcase.tsx` | Tilføj `roundProvisionMap` prop, vis foreløbig leder fra live data |
-| `src/pages/CommissionLeague.tsx` | Send `roundProvisionMap` + standings til PrizeShowcase |
+| `src/hooks/useLeaguePrizeData.ts` | Brug kval-placering som comeback-baseline i stedet for runde 1 |
 
