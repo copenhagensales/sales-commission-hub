@@ -173,6 +173,7 @@ interface SalesFeedProps {
 export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
   const [isPaused, setIsPaused] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [datePreset, setDatePreset] = useState<DatePreset>("all");
   const [validationStatusFilter, setValidationStatusFilter] = useState<string>("all");
   const [salesStatusFilter, setSalesStatusFilter] = useState<string>("all");
@@ -184,6 +185,15 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedSaleIds, setExpandedSaleIds] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Toggle expanded state for a sale
   const toggleExpanded = useCallback((saleId: string) => {
