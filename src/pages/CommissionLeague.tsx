@@ -654,6 +654,14 @@ export default function CommissionLeague() {
                 <CardContent>
                   {/* Round navigation — chips */}
                   <div className="flex flex-wrap items-center gap-1.5 mb-4 overflow-x-auto pb-1">
+                    <Button
+                      variant={effectiveIndex === -1 ? "default" : "outline"}
+                      size="sm"
+                      className="text-xs h-7 px-2.5 shrink-0"
+                      onClick={() => setSelectedRoundIndex(-1)}
+                    >
+                      Kval
+                    </Button>
                     {(roundHistory || []).map((r, idx) => (
                       <Button
                         key={r.id}
@@ -673,7 +681,16 @@ export default function CommissionLeague() {
                     ))}
                   </div>
 
-                  {selectedRound?.status === "active" ? (
+                  {effectiveIndex === -1 ? (
+                    <QualificationBoard
+                      standings={standings || []}
+                      playersPerDivision={playersPerDivision}
+                      isLoading={standingsLoading}
+                      currentEmployeeId={currentEmployeeId}
+                      todayProvisionMap={{}}
+                      weeklyProvisionMap={{}}
+                    />
+                  ) : selectedRound?.status === "active" ? (
                     <ActiveSeasonBoard
                       standings={seasonStandings || []}
                       playersPerDivision={playersPerDivision}
