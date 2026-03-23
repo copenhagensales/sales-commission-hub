@@ -1,39 +1,45 @@
 
 
-# Fix: Skip uger med 0 salg og kun team-standard vagter i EWMA
+# Fix: `countConcreteShifts` ignorerer fravær og helligdage
 
 ## Problem
-Melissa har 0 salg i marts fordi hun har haft fri. Men `countShifts` returnerer 5 vagter/uge (fra team standard man-fre), så 50%-reglen springer IKKE ugen over. Resultatet: uger med 0 salg tæller som 0 SPH → trækker hele gennemsnittet ned.
-
-Linje 460-461 har allerede en safety: "skip weeks with 0 sales and ≤2 shifts" — men team standard giver 5 shifts, så den trigges ikke.
+`countConcreteShifts` tæller rå individuelle vagter + booking assignments UDEN at fratrække godkendt fravær (ferie/sygdom) og helligdage. Hvis Melissa har booking assignments i marts-uger hvor hun var fraværende, viser `concreteShiftsInWeek > 0`, og EWMA-loopet springer IKKE ugen over. Resultatet: uger med 0 salg men "konkrete" vagter (som hun reelt ikke arbejdede) tæller som 0 SPH → trækker gennemsnittet ned til ~143.
 
 ## Løsning
-Udvid skip-logikken (linje 460-461) til også at springe uger over hvor:
-- Medarbejderen har **0 salg** i ugen
-- Medarbejderen har **0 individuelle vagter og 0 booking assignments** i ugen (dvs. alle vagter kommer kun fra team/employee standard)
-
-Hvis der ikke er nogen konkret vagtdata (kun standard-fallback) OG ingen salg, er det sandsynligt at medarbejderen ikke arbejdede den uge.
+Ret `countConcreteShifts` til også at ekskludere:
+1. Datoer med godkendt fravær (`absenceDateMap`)
+2. Helligdage (`holidayDates`)
 
 ## Ændring i `src/hooks/useClientForecast.ts`
 
-### Linje 438-461: Tilføj check for "kun standard-vagter"
-Tilføj en hjælpefunktion `countConcreteShifts(empId, start, end)` der KUN tæller individuelle vagter + booking assignments (ikke standard fallback). Brug den i EWMA-loopet:
-
+### Linje 377-389: Tilføj absence + holiday check
 ```typescript
-// After line 461, replace the skip condition:
-const concreteShiftsInWeek = countConcreteShifts(emp.id, ws, we);
-if (salesInWeek === 0 && concreteShiftsInWeek === 0) continue;
+function countConcreteShifts(empId: string, rangeStart: Date, rangeEnd: Date): number {
+  const individualDates = individualShiftMap.get(empId) || new Set();
+  const bookingDates = bookingAssignmentMap.get(empId) || new Set();
+  const absenceDates = absenceDateMap.get(empId) || new Set();
+  let count = 0;
+  const cur = new Date(rangeStart);
+  while (cur <= rangeEnd) {
+    const dateStr = format(cur, "yyyy-MM-dd");
+    if (holidayDates.has(dateStr) || absenceDates.has(dateStr)) {
+      cur.setDate(cur.getDate() + 1);
+      continue;
+    }
+    if (individualDates.has(dateStr) || bookingDates.has(dateStr)) {
+      count++;
+    }
+    cur.setDate(cur.getDate() + 1);
+  }
+  return count;
+}
 ```
 
-### Ny hjælpefunktion `countConcreteShifts` (efter linje 374)
-Tæller kun individuelle vagter + booking assignments for en periode, ignorerer standard-fallback. Bruges kun til at afgøre om en uge skal springes over.
-
 ## Resultat
-- Melissa marts-uger: 0 salg + 0 konkrete vagter → springes over → SPH baseres kun på jan/feb
-- Melissa med salg+bookinger: tælles normalt
-- Non-FM medarbejdere med rigtige vagter (individuelle): uændret
+- Melissa marts-uger: booking assignments eksisterer, men godkendt fravær → 0 concrete shifts → springes over → SPH baseres på jan/feb → ~254 salg i april
+- Andre medarbejdere: uændret (absences allerede håndteret korrekt i `countShifts`)
 
 | Fil | Ændring |
 |-----|---------|
-| `src/hooks/useClientForecast.ts` | Tilføj `countConcreteShifts`, ret EWMA skip-logik |
+| `src/hooks/useClientForecast.ts` | Tilføj absence + holiday check til `countConcreteShifts` |
 
