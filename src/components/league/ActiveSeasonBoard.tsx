@@ -24,6 +24,7 @@ interface ActiveSeasonBoardProps {
   defaultShowAll?: boolean;
   todayProvisionMap?: Record<string, number>;
   weeklyProvisionMap?: Record<string, number[]>;
+  roundProvisionMap?: Record<string, number>;
 }
 
 export function ActiveSeasonBoard({
@@ -34,6 +35,7 @@ export function ActiveSeasonBoard({
   defaultShowAll = false,
   todayProvisionMap = {},
   weeklyProvisionMap = {},
+  roundProvisionMap = {},
 }: ActiveSeasonBoardProps) {
   const [showAll, setShowAll] = useState(defaultShowAll);
   const todayTop3 = useMemo(() => computeTodayTop3(todayProvisionMap), [todayProvisionMap]);
@@ -57,10 +59,19 @@ export function ActiveSeasonBoard({
     });
 
     groups.sort((a, b) => a.division - b.division);
-    groups.forEach(g => g.players.sort((a, b) => a.division_rank - b.division_rank));
+    
+    // Sort players within division by round provision (descending) if available, else by division_rank
+    const hasRoundData = Object.keys(roundProvisionMap).length > 0;
+    groups.forEach(g => {
+      if (hasRoundData) {
+        g.players.sort((a, b) => (roundProvisionMap[b.employee_id] || 0) - (roundProvisionMap[a.employee_id] || 0));
+      } else {
+        g.players.sort((a, b) => a.division_rank - b.division_rank);
+      }
+    });
 
     return groups;
-  }, [standings]);
+  }, [standings, roundProvisionMap]);
 
   const totalDivisions = divisionGroups.length;
 
@@ -147,8 +158,9 @@ export function ActiveSeasonBoard({
                   return (
                     <AnimatePresence mode="popLayout">
                       {group.players.map((standing, idx) => {
-                        const prevProvision = idx > 0 ? Number(group.players[idx - 1].total_provision) : null;
-                        const nextProvision = idx < group.players.length - 1 ? Number(group.players[idx + 1].total_provision) : null;
+                        const roundProv = roundProvisionMap[standing.employee_id] || 0;
+                        const prevRoundProv = idx > 0 ? (roundProvisionMap[group.players[idx - 1].employee_id] || 0) : null;
+                        const nextRoundProv = idx < group.players.length - 1 ? (roundProvisionMap[group.players[idx + 1].employee_id] || 0) : null;
                         return (
                           <motion.div
                             key={standing.employee_id}
@@ -168,8 +180,9 @@ export function ActiveSeasonBoard({
                               todayDailyRank={todayTop3[standing.employee_id] || null}
                               weeklyData={weeklyProvisionMap[standing.employee_id]}
                               divisionAvg={divisionAvg}
-                              prevProvision={prevProvision}
-                              nextProvision={nextProvision}
+                              roundProvision={roundProv}
+                              prevProvision={prevRoundProv}
+                              nextProvision={nextRoundProv}
                             />
                           </motion.div>
                         );
@@ -210,6 +223,7 @@ interface SeasonPlayerRowProps {
   todayDailyRank: 1 | 2 | 3 | null;
   weeklyData?: number[];
   divisionAvg?: number[];
+  roundProvision: number;
   prevProvision: number | null;
   nextProvision: number | null;
 }
@@ -225,10 +239,11 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
   todayDailyRank,
   weeklyData,
   divisionAvg,
+  roundProvision,
   prevProvision,
   nextProvision,
 }: SeasonPlayerRowProps) {
-  const rank = standing.division_rank;
+  const rank = idx + 1; // rank based on sorted position (by round provision)
   const divChanged = standing.previous_division !== null && standing.previous_division !== standing.current_division;
   const promoted = divChanged && standing.previous_division !== null && standing.previous_division > standing.current_division;
   const relegated = divChanged && standing.previous_division !== null && standing.previous_division < standing.current_division;
@@ -249,9 +264,8 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
 
   const playerName = formatPlayerName(standing.employee);
 
-  const myProvision = Number(standing.total_provision);
-  const gapUp = isCurrentUser && prevProvision !== null ? prevProvision - myProvision : null;
-  const gapDown = isCurrentUser && nextProvision !== null ? myProvision - nextProvision : null;
+  const gapUp = isCurrentUser && prevProvision !== null ? prevProvision - roundProvision : null;
+  const gapDown = isCurrentUser && nextProvision !== null ? roundProvision - nextProvision : null;
 
   return (
     <div>
@@ -347,11 +361,11 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
           <div className="text-right">
             <div className="flex items-center gap-1.5 justify-end">
               <div className="font-mono text-sm sm:text-[15px] font-semibold whitespace-nowrap">
-                {Number(standing.total_points).toLocaleString("da-DK", { maximumFractionDigits: 0 })} pt
+                {roundProvision.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
               </div>
             </div>
             <div className="text-[10px] text-muted-foreground">
-              {Number(standing.total_provision).toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
+              {Number(standing.total_points).toLocaleString("da-DK", { maximumFractionDigits: 0 })} pt samlet
             </div>
             {todayProvision > 0 && (
               <div className="text-[10px] text-emerald-400 font-medium flex items-center gap-1">
