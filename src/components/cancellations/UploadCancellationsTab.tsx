@@ -223,26 +223,24 @@ export function UploadCancellationsTab() {
         allMatched = matchedData || [];
       }
 
-      // If OPP numbers specified, do a separate text search on raw_payload
+      // If OPP numbers specified, do a separate text search on raw_payload using textSearch via RPC or cast
       if (oppNumbers.length > 0) {
-        const oppPromises = oppNumbers.map(opp =>
-          supabase
-            .from("sales")
-            .select(`id, sale_datetime, customer_phone, customer_company, validation_status, agent_name, raw_payload`)
-            .in("client_campaign_id", campaignIds)
-            .neq("validation_status", "cancelled")
-            .ilike("raw_payload", `%${opp}%`)
-            .limit(100)
-        );
-        const oppResults = await Promise.all(oppPromises);
-        const existingIds = new Set(allMatched.map(s => s.id));
-        for (const result of oppResults) {
-          if (result.data) {
-            for (const sale of result.data) {
-              if (!existingIds.has(sale.id)) {
-                allMatched.push(sale);
-                existingIds.add(sale.id);
-              }
+        // Build OR filter matching OPP in raw_payload cast to text
+        const oppFilter = oppNumbers.map(opp => `raw_payload::text.ilike.%${opp}%`).join(",");
+        const { data: oppData } = await supabase
+          .from("sales")
+          .select(`id, sale_datetime, customer_phone, customer_company, validation_status, agent_name, raw_payload`)
+          .in("client_campaign_id", campaignIds)
+          .neq("validation_status", "cancelled")
+          .or(oppFilter)
+          .limit(500);
+
+        if (oppData) {
+          const existingIds = new Set(allMatched.map(s => s.id));
+          for (const sale of oppData) {
+            if (!existingIds.has(sale.id)) {
+              allMatched.push(sale);
+              existingIds.add(sale.id);
             }
           }
         }
