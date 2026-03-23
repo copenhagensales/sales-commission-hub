@@ -1,0 +1,1 @@
+ALTER TABLE public.cancellation_queue ADD COLUMN IF NOT EXISTS opp_group TEXT, ADD COLUMN IF NOT EXISTS client_id UUID REFERENCES public.clients(id);
