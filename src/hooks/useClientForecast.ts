@@ -408,68 +408,6 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         let grossPlannedHours = grossShifts * HOURS_PER_SHIFT;
         let forecastShifts = countShifts(emp.id, forecastStart, empForecastEnd, true);
         let plannedHours = forecastShifts * HOURS_PER_SHIFT;
-        let isOnCall = false;
-
-        // DEBUG: Log Rebecca's forecast inputs
-        if (emp.id.startsWith('8d24c8f3')) {
-          console.log('[DEBUG Rebecca forecast]', {
-            grossShifts, forecastShifts, grossPlannedHours, plannedHours,
-            forecastStart: format(forecastStart, 'yyyy-MM-dd'),
-            empForecastEnd: format(empForecastEnd, 'yyyy-MM-dd'),
-          });
-        }
-
-        // Fallback for on-call employees (no scheduled shifts but have sales history)
-        // Only activate if the employee also had 0 shifts earlier in the month
-        // (i.e. they are truly an on-call worker, not a regular employee who finished their shifts)
-        const monthStartDate = startOfMonth(forecastStart);
-        const shiftsEarlierInMonth = countShifts(emp.id, monthStartDate, now, false);
-        if (grossShifts === 0 && shiftsEarlierInMonth === 0) {
-          const empExpectedMonthly = (emp as any).expected_monthly_shifts as number | null;
-          if (empExpectedMonthly && empExpectedMonthly > 0) {
-            // Manual override: use expected_monthly_shifts
-            // Scale by how much of the forecast period remains
-            const totalDaysInPeriod = Math.max(1, Math.round((empForecastEnd.getTime() - forecastStart.getTime()) / (1000 * 60 * 60 * 24)));
-            const scaleFactor = totalDaysInPeriod / 30;
-            const scaledShifts = Math.round(empExpectedMonthly * scaleFactor);
-            grossShifts = scaledShifts;
-            grossPlannedHours = scaledShifts * HOURS_PER_SHIFT;
-            forecastShifts = scaledShifts;
-            plannedHours = scaledShifts * HOURS_PER_SHIFT;
-            isOnCall = true;
-          } else {
-            // Historical fallback: count unique sale days in last 8 weeks
-            const emails = empEmailMap.get(emp.id) || [];
-            let uniqueSaleDays = new Set<string>();
-            for (const email of emails) {
-              const weekMap = salesByEmailByWeek.get(email);
-              if (weekMap) {
-                // We have weekly aggregates; estimate unique days from sales data
-                // Each week with sales ≈ proportional days
-                weekMap.forEach((salesCount, _weekKey) => {
-                  if (salesCount > 0) {
-                    // Estimate days worked: min(salesCount, 5) as proxy
-                    const estimatedDays = Math.min(salesCount, 5);
-                    for (let d = 0; d < estimatedDays; d++) {
-                      uniqueSaleDays.add(`${email}-${_weekKey}-${d}`);
-                    }
-                  }
-                });
-              }
-            }
-            if (uniqueSaleDays.size > 0) {
-              const estimatedMonthly = Math.round((uniqueSaleDays.size / EWMA_WEEKS) * 4.33);
-              const totalDaysInPeriod = Math.max(1, Math.round((empForecastEnd.getTime() - forecastStart.getTime()) / (1000 * 60 * 60 * 24)));
-              const scaleFactor = totalDaysInPeriod / 30;
-              const scaledShifts = Math.max(1, Math.round(estimatedMonthly * scaleFactor));
-              grossShifts = scaledShifts;
-              grossPlannedHours = scaledShifts * HOURS_PER_SHIFT;
-              forecastShifts = scaledShifts;
-              plannedHours = scaledShifts * HOURS_PER_SHIFT;
-              isOnCall = true;
-            }
-          }
-        }
 
         // Attendance factor: only sick/no_show reduces attendance (vacation is planned, not a penalty)
         const past90Start = subWeeks(now, 13);
