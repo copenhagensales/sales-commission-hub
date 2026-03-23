@@ -1,18 +1,15 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, History } from "lucide-react";
+import { Loader2, History, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
+import { toast } from "@/hooks/use-toast";
 
 interface CancellationImport {
   id: string;
@@ -27,9 +24,12 @@ interface CancellationImport {
     first_name: string | null;
     last_name: string | null;
   } | null;
+  hasApprovedItems?: boolean;
 }
 
 export function CancellationHistoryTable() {
+  const queryClient = useQueryClient();
+
   const { data: imports = [], isLoading } = useQuery({
     queryKey: ["cancellation-imports-history"],
     queryFn: async () => {
@@ -50,7 +50,51 @@ export function CancellationHistoryTable() {
         .limit(20);
 
       if (error) throw error;
-      return data as unknown as CancellationImport[];
+
+      // Check which imports have approved queue items
+      const importIds = data.map((d: any) => d.id);
+      let approvedSet = new Set<string>();
+      if (importIds.length > 0) {
+        const { data: approvedItems } = await supabase
+          .from("cancellation_queue")
+          .select("import_id")
+          .in("import_id", importIds)
+          .eq("status", "approved");
+        if (approvedItems) {
+          approvedSet = new Set(approvedItems.map((a) => a.import_id));
+        }
+      }
+
+      return (data as unknown as CancellationImport[]).map((imp) => ({
+        ...imp,
+        hasApprovedItems: approvedSet.has(imp.id),
+      }));
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (importId: string) => {
+      // First delete all non-approved queue items for this import
+      const { error: queueError } = await supabase
+        .from("cancellation_queue")
+        .delete()
+        .eq("import_id", importId);
+      if (queueError) throw queueError;
+
+      // Then delete the import itself
+      const { error: importError } = await supabase
+        .from("cancellation_imports")
+        .delete()
+        .eq("id", importId);
+      if (importError) throw importError;
+    },
+    onSuccess: () => {
+      toast({ title: "Slettet", description: "Upload og tilhørende kø-elementer er slettet." });
+      queryClient.invalidateQueries({ queryKey: ["cancellation-imports-history"] });
+      queryClient.invalidateQueries({ queryKey: ["cancellation-queue"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
     },
   });
 
@@ -105,6 +149,7 @@ export function CancellationHistoryTable() {
                   <TableHead>Rækker</TableHead>
                   <TableHead>Matchede</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="w-[80px]">Handling</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -134,6 +179,29 @@ export function CancellationHistoryTable() {
                         <span className="block text-xs text-destructive mt-1">
                           {imp.error_message}
                         </span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {imp.hasApprovedItems ? (
+                        <span className="text-xs text-muted-foreground">Godkendt</span>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => {
+                            if (confirm(`Slet "${imp.file_name}" og alle tilhørende kø-elementer?`)) {
+                              deleteMutation.mutate(imp.id);
+                            }
+                          }}
+                          disabled={deleteMutation.isPending}
+                        >
+                          {deleteMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </Button>
                       )}
                     </TableCell>
                   </TableRow>
