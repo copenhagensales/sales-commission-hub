@@ -189,7 +189,16 @@ export function UploadCancellationsTab() {
         return;
       }
 
-      // Query sales based on phone numbers, company names, and/or OPP numbers
+      // Build OR conditions for matching
+      const orConditions: string[] = [];
+      if (phones.length > 0) {
+        orConditions.push(...phones.map(p => `customer_phone.ilike.%${p}%`));
+      }
+      if (companies.length > 0) {
+        orConditions.push(...companies.map(c => `customer_company.ilike.%${c}%`));
+      }
+
+      // Query sales based on phone/company first
       let query = supabase
         .from("sales")
         .select(`
@@ -199,21 +208,10 @@ export function UploadCancellationsTab() {
           customer_company,
           validation_status,
           agent_name,
-          adversus_opp_number
+          raw_payload
         `)
         .in("client_campaign_id", campaignIds)
         .neq("validation_status", "cancelled");
-
-      const orConditions: string[] = [];
-      if (phones.length > 0) {
-        orConditions.push(...phones.map(p => `customer_phone.ilike.%${p}%`));
-      }
-      if (companies.length > 0) {
-        orConditions.push(...companies.map(c => `customer_company.ilike.%${c}%`));
-      }
-      if (oppNumbers.length > 0) {
-        orConditions.push(...oppNumbers.map(o => `adversus_opp_number.eq.${o}`));
-      }
 
       if (orConditions.length > 0) {
         query = query.or(orConditions.join(","));
@@ -223,11 +221,54 @@ export function UploadCancellationsTab() {
 
       if (error) throw error;
 
-      const matched: MatchedSale[] = (matchedData || []).map(sale => ({
+      let allMatched = matchedData || [];
+
+      // If OPP numbers specified, do a separate text search on raw_payload
+      if (oppNumbers.length > 0) {
+        const oppPromises = oppNumbers.map(opp =>
+          supabase
+            .from("sales")
+            .select(`id, sale_datetime, customer_phone, customer_company, validation_status, agent_name, raw_payload`)
+            .in("client_campaign_id", campaignIds)
+            .neq("validation_status", "cancelled")
+            .ilike("raw_payload", `%${opp}%`)
+            .limit(100)
+        );
+        const oppResults = await Promise.all(oppPromises);
+        const existingIds = new Set(allMatched.map(s => s.id));
+        for (const result of oppResults) {
+          if (result.data) {
+            for (const sale of result.data) {
+              if (!existingIds.has(sale.id)) {
+                allMatched.push(sale);
+                existingIds.add(sale.id);
+              }
+            }
+          }
+        }
+      }
+
+      // Extract OPP number from raw_payload
+      const extractOpp = (rawPayload: unknown): string => {
+        if (!rawPayload || typeof rawPayload !== 'object') return "";
+        const rp = rawPayload as Record<string, unknown>;
+        if (rp['legacy_opp_number']) return String(rp['legacy_opp_number']);
+        const fields = rp['leadResultFields'] as Record<string, unknown> | undefined;
+        if (fields?.['OPP nr']) return String(fields['OPP nr']);
+        if (fields?.['OPP-nr']) return String(fields['OPP-nr']);
+        const data = rp['leadResultData'] as Array<{label?: string; value?: string}> | undefined;
+        if (Array.isArray(data)) {
+          const found = data.find(d => d.label === 'OPP nr' || d.label === 'OPP-nr');
+          if (found?.value) return String(found.value);
+        }
+        return "";
+      };
+
+      const matched: MatchedSale[] = allMatched.map(sale => ({
         saleId: sale.id,
         phone: sale.customer_phone || "",
         company: sale.customer_company || "",
-        oppNumber: sale.adversus_opp_number || "",
+        oppNumber: extractOpp(sale.raw_payload),
         saleDate: sale.sale_datetime || "",
         employee: sale.agent_name || "Ukendt",
         currentStatus: sale.validation_status || "pending",
