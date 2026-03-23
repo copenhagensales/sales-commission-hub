@@ -1,22 +1,18 @@
 
 
-# Fix: Forecast afskæres af 1000-rækkers grænse
+# Problem: Rebecca viser stadig 12 salg
 
-## Problem
-Salgsqueryen i SPH-beregningen (linje 160-166 i `useClientForecast.ts`) har ingen `.limit()`. Supabase returnerer maks 1000 rækker som standard. For teams med mange medarbejdere og 8 ugers salgsdata afskæres ældre rækker — herunder Rebeccas data fra januar/februar (hendes eneste aktive uger). Det giver SPH ≈ 0 → forecast = 12 i stedet for ~60.
+## Diagnose
+`.limit(10000)` er korrekt implementeret i koden. Rebeccas data (133 salg i jan/feb) burde give en EWMA-SPH på ~1.7-2.0 og et forecast på ~50-60 salg for de resterende 4 arbejdsdage.
 
-Samme problem eksisterer i den aktuelle-salg query (linje 601-607).
+**To mulige årsager:**
 
-## Løsning
-Tilføj `.limit(10000)` på begge salgsqueries for at sikre at alle rækker returneres.
+1. **Browser cache**: React Query har `staleTime: 5 min` og `refetchOnWindowFocus: false`. Prøv at trykke refresh-knappen på forecast-siden, eller hard-refresh browseren (Ctrl+Shift+R).
 
-## Ændringer
+2. **Reelt dataproblem**: Hvis refresh ikke hjælper, kan Rebeccas `work_email` fallback ikke matche den email salget er registreret under. Jeg foreslår at tilføje console-logging midlertidigt for at debugge hendes specifikke beregning.
 
-### `src/hooks/useClientForecast.ts`
-1. **Linje 166**: Tilføj `.limit(10000)` til EWMA-salgsqueryen
-2. **Linje 607**: Tilføj `.limit(10000)` til aktuel-salg queryen
+## Foreslået handling
+1. Først: Prøv at refreshe forecast-siden med refresh-knappen
+2. Hvis 12 stadig vises: Jeg tilføjer midlertidig debug-logging i `useClientForecast.ts` der printer Rebeccas SPH-data, så vi kan se præcist hvad der sker
 
-| Fil | Ændring |
-|-----|---------|
-| `src/hooks/useClientForecast.ts` | Tilføj `.limit(10000)` på 2 salgsqueries |
-
+Vil du prøve at refreshe først, eller skal jeg tilføje debug-logging direkte?
