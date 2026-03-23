@@ -1,31 +1,52 @@
 
+# Fix: 00:00 vises stadig i FM-vagtplan
 
-# Fix: Vagter vises som 00:00-00:00
+## Hvorfor det stadig sker
+Den tidligere plan ramte det forkerte lag.
 
-## Årsag
-Individuelle vagter i `shift`-tabellen har `start_time = '00:00:00'` og `end_time = '00:00:00'`. Da individuelle vagter har højeste prioritet i visningen (linje 687-694 i VagtplanFMContent), overrider de standard-vagttiderne fra teamet.
+Der er **ingen individuelle vagter** i `shift`-tabellen for uge 13, så 00:00 kommer ikke derfra.
 
-## Løsning
-Behandl vagter med `start_time = '00:00:00' AND end_time = '00:00:00'` som "ingen individuel vagt" og fald ned til standard-vagttider i stedet.
+Problemet kommer i stedet fra fallback-logikken i `VagtplanFMContent`:
+- `team_standard_shifts` har **flere aktive vagter**
+- én af dem er **"Deltid"** med `start_time = 00:00` og `end_time = 00:00`
+- koden bruger bare `primaryShiftsData.shifts[0]` som “primær” vagt
+- når den tilfældigvis vælger **Deltid**, vises `00:00-00:00` for alle uden individuel specialvagt
 
 ## Ændring
 
-### `src/pages/vagt-flow/VagtplanFMContent.tsx` — linje 624
-Filtrér 00:00-vagter fra i `dayShifts`:
-```typescript
-// Fra:
-const dayShifts = shiftsByEmployeeAndDate.get(employee.id)?.get(dateStr) || [];
+### 1. `src/pages/vagt-flow/VagtplanFMContent.tsx`
+Ret logikken i `getWorkTimesForEmployeeAndDay` så teamets standardvagt vælges korrekt.
 
-// Til:
-const dayShiftsRaw = shiftsByEmployeeAndDate.get(employee.id)?.get(dateStr) || [];
-const dayShifts = dayShiftsRaw.filter(s => 
-  !(s.start_time?.startsWith('00:00') && s.end_time?.startsWith('00:00'))
-);
+I stedet for:
+```ts
+const primaryShift = primaryShiftsData.shifts[0];
 ```
 
-Dermed falder visningen igennem til `workTimes` (standard-vagttider) når individuelle vagter kun er 00:00-00:00.
+brug:
+- et `specialShiftIds`-set fra `employeeStandardShifts.assignments`
+- vælg teamets **default-vagt** som en aktiv vagt der **ikke** er brugt som medarbejder-specifik specialvagt
+- hvis flere matcher, prioritér en vagt med dag-konfigurationer / ikke-00:00 tider
 
+Så hierarchy bliver:
+1. Individuel vagt fra `shift`
+2. Medarbejder-specifik standardvagt fra `employee_standard_shifts`
+3. Teamets reelle standardvagt (ikke “Deltid”-specialvagt)
+
+### 2. Behold den tidligere 00:00-filtering
+Filtreringen af `dayShiftsRaw` må gerne blive stående som ekstra sikkerhed, men den er **ikke** hovedfixet.
+
+## Teknisk note
+Den samme svaghed findes sandsynligvis også i:
+- `src/pages/shift-planning/ShiftOverview.tsx`
+- `src/pages/shift-planning/MySchedule.tsx`
+- `src/components/profile/MyScheduleTabContent.tsx`
+
+fordi de også antager én “primær” aktiv vagt, selvom teamet reelt har flere aktive vagter. Jeg vil derfor rette samme udvælgelsesregel dér, så 00:00 ikke dukker op andre steder senere.
+
+## Filer
 | Fil | Ændring |
 |-----|---------|
-| `src/pages/vagt-flow/VagtplanFMContent.tsx` | Linje 624: filtrér 00:00-vagter fra så standard-tider vises |
-
+| `src/pages/vagt-flow/VagtplanFMContent.tsx` | Vælg korrekt team-standardvagt i stedet for `shifts[0]` |
+| `src/pages/shift-planning/ShiftOverview.tsx` | Samme valglogik for standardvagt |
+| `src/pages/shift-planning/MySchedule.tsx` | Samme valglogik for standardvagt |
+| `src/components/profile/MyScheduleTabContent.tsx` | Samme valglogik for standardvagt |
