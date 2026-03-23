@@ -613,17 +613,6 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         tomorrow.setHours(0, 0, 0, 0);
         
         const remainingPerformances: EmployeePerformance[] = employeePerformances.map(ep => {
-          if (ep.isOnCall && ep.grossPlannedHours > 0) {
-            // For on-call employees, scale proportionally by remaining days
-            const totalDays = Math.max(1, Math.round((forecastEnd.getTime() - forecastStart.getTime()) / (1000 * 60 * 60 * 24)));
-            const remainingDays = Math.max(0, Math.round((forecastEnd.getTime() - tomorrow.getTime()) / (1000 * 60 * 60 * 24)));
-            const ratio = remainingDays / totalDays;
-            return {
-              ...ep,
-              grossPlannedHours: Math.round(ep.grossPlannedHours * ratio),
-              plannedHours: Math.round(ep.plannedHours * ratio),
-            };
-          }
           const remainingGross = countShifts(ep.employeeId, tomorrow, forecastEnd, false);
           const remainingNet = countShifts(ep.employeeId, tomorrow, forecastEnd, true);
           return {
