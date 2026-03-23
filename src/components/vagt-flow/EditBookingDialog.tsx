@@ -22,7 +22,9 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { FileText, Users, Car, Trash2, AlertTriangle, Ban, Check, DollarSign, Utensils, Pencil } from "lucide-react";
+import { FileText, Users, Car, Trash2, AlertTriangle, Ban, Check, DollarSign, Utensils, Pencil, Building2 } from "lucide-react";
+import { useBookingHotels, useUpdateBookingHotel, type BookingHotel } from "@/hooks/useBookingHotels";
+import { AssignHotelDialog } from "@/components/vagt-flow/AssignHotelDialog";
 import { Textarea } from "@/components/ui/textarea";
 import { TimeSelect } from "@/components/ui/time-select";
 
