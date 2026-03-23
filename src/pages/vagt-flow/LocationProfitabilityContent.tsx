@@ -17,7 +17,7 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
   TrendingUp, TrendingDown, MapPin,
 } from "lucide-react";
-import { format, addDays } from "date-fns";
+import { format, addDays, differenceInCalendarDays } from "date-fns";
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
 
@@ -97,6 +97,11 @@ export default function LocationProfitabilityContent() {
     return [...new Set(bookings.map(b => b.location_id))];
   }, [bookings]);
 
+  const bookingIds = useMemo(() => {
+    if (!bookings) return [];
+    return bookings.map(b => b.id);
+  }, [bookings]);
+
   const { data: placements } = useQuery({
     queryKey: ["location-profitability-placements", locationIds],
     queryFn: async () => {
@@ -109,6 +114,36 @@ export default function LocationProfitabilityContent() {
       return (data || []) as Placement[];
     },
     enabled: locationIds.length > 0,
+  });
+
+  // Fetch diet data for bookings in this week
+  const { data: dietData } = useQuery({
+    queryKey: ["location-profitability-diet", bookingIds],
+    queryFn: async () => {
+      if (bookingIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("booking_diet")
+        .select("booking_id, date, amount")
+        .in("booking_id", bookingIds);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: bookingIds.length > 0,
+  });
+
+  // Fetch hotel data for bookings in this week
+  const { data: hotelData } = useQuery({
+    queryKey: ["location-profitability-hotel", bookingIds],
+    queryFn: async () => {
+      if (bookingIds.length === 0) return [];
+      const { data, error } = await (supabase as any)
+        .from("booking_hotel")
+        .select("booking_id, check_in, check_out, price_per_night, rooms")
+        .in("booking_id", bookingIds);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: bookingIds.length > 0,
   });
 
   // Fetch FM sales for the week
@@ -129,8 +164,8 @@ export default function LocationProfitabilityContent() {
 
   // Mutation: update booking placement
   const updatePlacement = useMutation({
-    mutationFn: async ({ bookingIds, placementId, dailyRate }: { bookingIds: string[]; placementId: string; dailyRate: number }) => {
-      for (const id of bookingIds) {
+    mutationFn: async ({ bookingIds: ids, placementId, dailyRate }: { bookingIds: string[]; placementId: string; dailyRate: number }) => {
+      for (const id of ids) {
         const { error } = await supabase
           .from("booking")
           .update({ placement_id: placementId, daily_rate_override: dailyRate })
@@ -144,6 +179,53 @@ export default function LocationProfitabilityContent() {
     },
     onError: () => toast.error("Kunne ikke opdatere placering"),
   });
+
+  // Pre-compute hotel & diet costs per booking_id
+  const hotelCostByBooking = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const h of hotelData || []) {
+      const nights = Math.max(differenceInCalendarDays(new Date(h.check_out), new Date(h.check_in)), 1);
+      const cost = nights * (h.price_per_night || 0) * (h.rooms || 1);
+      map.set(h.booking_id, (map.get(h.booking_id) || 0) + cost);
+    }
+    return map;
+  }, [hotelData]);
+
+  const dietCostByBooking = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const d of dietData || []) {
+      map.set(d.booking_id, (map.get(d.booking_id) || 0) + (d.amount || 0));
+    }
+    return map;
+  }, [dietData]);
+
+  // Map booking_id -> location_id for cost attribution
+  const bookingToLocation = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const b of bookings || []) {
+      map.set(b.id, b.location_id);
+    }
+    return map;
+  }, [bookings]);
+
+  // Aggregate hotel & diet per location
+  const hotelCostByLocation = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const [bid, cost] of hotelCostByBooking) {
+      const locId = bookingToLocation.get(bid);
+      if (locId) map.set(locId, (map.get(locId) || 0) + cost);
+    }
+    return map;
+  }, [hotelCostByBooking, bookingToLocation]);
+
+  const dietCostByLocation = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const [bid, cost] of dietCostByBooking) {
+      const locId = bookingToLocation.get(bid);
+      if (locId) map.set(locId, (map.get(locId) || 0) + cost);
+    }
+    return map;
+  }, [dietCostByBooking, bookingToLocation]);
 
   // Build location profitability data
   const locationData = useMemo(() => {
@@ -223,20 +305,24 @@ export default function LocationProfitabilityContent() {
         const totalSales = Object.values(loc.dailyBreakdown).reduce((s, d) => s + d.sales, 0);
         const sellerCost = totalCommission * (1 + VACATION_PAY_RATES.SELLER);
         const locationCost = loc.dailyRate * loc.bookedDays.length;
-        const db = totalRevenue - sellerCost - locationCost;
+        const hotelCost = hotelCostByLocation.get(loc.locationId) || 0;
+        const dietCost = dietCostByLocation.get(loc.locationId) || 0;
+        const db = totalRevenue - sellerCost - locationCost - hotelCost - dietCost;
         const dbPct = totalRevenue > 0 ? (db / totalRevenue) * 100 : 0;
-        return { ...loc, totalRevenue, totalCommission, totalSales, sellerCost, locationCost, db, dbPct };
+        return { ...loc, totalRevenue, totalCommission, totalSales, sellerCost, locationCost, hotelCost, dietCost, db, dbPct };
       })
       .sort((a, b) => b.db - a.db);
-  }, [bookings, salesData, placements]);
+  }, [bookings, salesData, placements, hotelCostByLocation, dietCostByLocation]);
 
   const totals = useMemo(() => {
     const totalRevenue = locationData.reduce((s, l) => s + l.totalRevenue, 0);
     const totalSellerCost = locationData.reduce((s, l) => s + l.sellerCost, 0);
     const totalLocationCost = locationData.reduce((s, l) => s + l.locationCost, 0);
-    const totalDB = totalRevenue - totalSellerCost - totalLocationCost;
+    const totalHotelCost = locationData.reduce((s, l) => s + l.hotelCost, 0);
+    const totalDietCost = locationData.reduce((s, l) => s + l.dietCost, 0);
+    const totalDB = totalRevenue - totalSellerCost - totalLocationCost - totalHotelCost - totalDietCost;
     const dbPct = totalRevenue > 0 ? (totalDB / totalRevenue) * 100 : 0;
-    return { totalRevenue, totalSellerCost, totalLocationCost, totalDB, dbPct, locationCount: locationData.length };
+    return { totalRevenue, totalSellerCost, totalLocationCost, totalHotelCost, totalDietCost, totalDB, dbPct, locationCount: locationData.length };
   }, [locationData]);
 
   const toggleExpand = (locId: string) => {
@@ -261,6 +347,19 @@ export default function LocationProfitabilityContent() {
 
   const weekDates = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
 
+  // Diet per location per date
+  const dietByLocationDate = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const d of dietData || []) {
+      const locId = bookingToLocation.get(d.booking_id);
+      if (locId) {
+        const key = `${locId}|${d.date}`;
+        map.set(key, (map.get(key) || 0) + (d.amount || 0));
+      }
+    }
+    return map;
+  }, [dietData, bookingToLocation]);
+
   return (
     <div className="space-y-6">
       {/* Week navigation */}
@@ -282,7 +381,7 @@ export default function LocationProfitabilityContent() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
         <Card>
           <CardContent className="pt-4 pb-3 px-4">
             <p className="text-xs text-muted-foreground">Omsætning</p>
@@ -297,13 +396,25 @@ export default function LocationProfitabilityContent() {
         </Card>
         <Card>
           <CardContent className="pt-4 pb-3 px-4">
-            <p className="text-xs text-muted-foreground">Lokationsomkostning</p>
+            <p className="text-xs text-muted-foreground">Lokation</p>
             <p className="text-xl font-bold">{formatKr(totals.totalLocationCost)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 pb-3 px-4">
-            <p className="text-xs text-muted-foreground">Dækningsbidrag</p>
+            <p className="text-xs text-muted-foreground">Hotel</p>
+            <p className="text-xl font-bold">{formatKr(totals.totalHotelCost)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3 px-4">
+            <p className="text-xs text-muted-foreground">Diæt</p>
+            <p className="text-xl font-bold">{formatKr(totals.totalDietCost)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3 px-4">
+            <p className="text-xs text-muted-foreground">DB</p>
             <p className={`text-xl font-bold ${totals.totalDB >= 0 ? "text-emerald-600" : "text-destructive"}`}>
               {formatKr(totals.totalDB)}
             </p>
@@ -347,6 +458,8 @@ export default function LocationProfitabilityContent() {
                   <TableHead className="text-right">Omsætning</TableHead>
                   <TableHead className="text-right">Sælgerløn</TableHead>
                   <TableHead className="text-right">Lokation</TableHead>
+                  <TableHead className="text-right">Hotel</TableHead>
+                  <TableHead className="text-right">Diæt</TableHead>
                   <TableHead className="text-right">DB</TableHead>
                   <TableHead className="text-right pr-6">DB%</TableHead>
                 </TableRow>
@@ -396,6 +509,8 @@ export default function LocationProfitabilityContent() {
                         <TableCell className="text-right">{formatKr(loc.totalRevenue)}</TableCell>
                         <TableCell className="text-right">{formatKr(loc.sellerCost)}</TableCell>
                         <TableCell className="text-right">{formatKr(loc.locationCost)}</TableCell>
+                        <TableCell className="text-right">{formatKr(loc.hotelCost)}</TableCell>
+                        <TableCell className="text-right">{formatKr(loc.dietCost)}</TableCell>
                         <TableCell className={`text-right font-semibold ${loc.db >= 0 ? "text-emerald-600" : "text-destructive"}`}>
                           {formatKr(loc.db)}
                         </TableCell>
@@ -412,7 +527,10 @@ export default function LocationProfitabilityContent() {
                         const dayCommission = day?.commission || 0;
                         const daySellerCost = dayCommission * (1 + VACATION_PAY_RATES.SELLER);
                         const dayLocCost = isBooked ? loc.dailyRate : 0;
-                        const dayDB = dayRevenue - daySellerCost - dayLocCost;
+                        const dayDietCost = dietByLocationDate.get(`${loc.locationId}|${dateStr}`) || 0;
+                        // Hotel is aggregated at booking level, not per day — show 0 on daily rows
+                        const dayHotelCost = 0;
+                        const dayDB = dayRevenue - daySellerCost - dayLocCost - dayHotelCost - dayDietCost;
 
                         return (
                           <TableRow key={`${loc.locationId}-${dateStr}`} className="bg-muted/30">
@@ -428,6 +546,8 @@ export default function LocationProfitabilityContent() {
                             <TableCell className="text-right text-sm">{formatKr(dayRevenue)}</TableCell>
                             <TableCell className="text-right text-sm">{formatKr(daySellerCost)}</TableCell>
                             <TableCell className="text-right text-sm">{formatKr(dayLocCost)}</TableCell>
+                            <TableCell className="text-right text-sm">{formatKr(dayHotelCost)}</TableCell>
+                            <TableCell className="text-right text-sm">{formatKr(dayDietCost)}</TableCell>
                             <TableCell className={`text-right text-sm font-medium ${dayDB >= 0 ? "text-emerald-600" : "text-destructive"}`}>
                               {formatKr(dayDB)}
                             </TableCell>
