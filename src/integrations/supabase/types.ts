@@ -1532,6 +1532,7 @@ export type Database = {
           rows_matched: number | null
           rows_processed: number | null
           status: string
+          upload_type: string | null
           uploaded_by: string
         }
         Insert: {
@@ -1543,6 +1544,7 @@ export type Database = {
           rows_matched?: number | null
           rows_processed?: number | null
           status?: string
+          upload_type?: string | null
           uploaded_by: string
         }
         Update: {
@@ -1554,6 +1556,7 @@ export type Database = {
           rows_matched?: number | null
           rows_processed?: number | null
           status?: string
+          upload_type?: string | null
           uploaded_by?: string
         }
         Relationships: [
@@ -1576,6 +1579,75 @@ export type Database = {
             columns: ["uploaded_by"]
             isOneToOne: false
             referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cancellation_queue: {
+        Row: {
+          created_at: string
+          id: string
+          import_id: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          sale_id: string
+          status: string
+          upload_type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          import_id: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          sale_id: string
+          status?: string
+          upload_type?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          import_id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          sale_id?: string
+          status?: string
+          upload_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cancellation_queue_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "cancellation_imports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cancellation_queue_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cancellation_queue_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cancellation_queue_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cancellation_queue_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
             referencedColumns: ["id"]
           },
         ]
