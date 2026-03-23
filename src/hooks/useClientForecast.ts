@@ -391,6 +391,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           isEstablished,
           daysSinceStart,
           missingAgentMapping,
+          plannedEndDate: (emp as any).employment_end_date || undefined,
         });
       }
 

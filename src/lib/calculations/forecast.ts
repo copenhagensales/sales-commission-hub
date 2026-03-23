@@ -216,6 +216,7 @@ export function forecastNewEmployee(
     churnProbability,
     churnLoss: Math.round(churnLoss),
     missingAgentMapping: emp.missingAgentMapping,
+    plannedEndDate: emp.plannedEndDate,
   };
 }
 
