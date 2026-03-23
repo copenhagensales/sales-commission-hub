@@ -136,8 +136,6 @@ export default function ForecastClientReport() {
             {/* 3. Hvad driver forecastet */}
             <ReportDrivers forecast={forecast} />
 
-            {/* 4. Anbefalinger */}
-            <ReportRecommendations forecast={forecast} />
 
             {/* 5. Outlook */}
             <ReportOutlook
