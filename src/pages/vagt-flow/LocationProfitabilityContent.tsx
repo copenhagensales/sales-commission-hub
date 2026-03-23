@@ -227,7 +227,7 @@ export default function LocationProfitabilityContent() {
         const dbPct = totalRevenue > 0 ? (db / totalRevenue) * 100 : 0;
         return { ...loc, totalRevenue, totalCommission, totalSales, sellerCost, locationCost, db, dbPct };
       })
-      .sort((a, b) => b.totalRevenue - a.totalRevenue);
+      .sort((a, b) => b.db - a.db);
   }, [bookings, salesData, placements]);
 
   const totals = useMemo(() => {
