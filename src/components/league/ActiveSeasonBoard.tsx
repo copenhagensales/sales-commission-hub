@@ -44,6 +44,7 @@ export function ActiveSeasonBoard({
   todayProvisionMap = {},
   weeklyProvisionMap = {},
   roundProvisionMap = {},
+  currentRoundNumber = 1,
 }: ActiveSeasonBoardProps) {
   const [showAll, setShowAll] = useState(defaultShowAll);
   const todayTop3 = useMemo(() => computeTodayTop3(todayProvisionMap), [todayProvisionMap]);
