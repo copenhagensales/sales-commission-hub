@@ -172,8 +172,8 @@ interface SalesFeedProps {
 
 export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
   const [isPaused, setIsPaused] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
   const [datePreset, setDatePreset] = useState<DatePreset>("all");
   const [validationStatusFilter, setValidationStatusFilter] = useState<string>("all");
   const [salesStatusFilter, setSalesStatusFilter] = useState<string>("all");
