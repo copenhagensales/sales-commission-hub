@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Download, Loader2, TrendingUp, TrendingDown, AlertTriangle, Sparkles, BarChart3, Target, Lightbulb, ArrowLeft, Users, Calendar } from "lucide-react";
+import { FileText, Download, Loader2, TrendingUp, TrendingDown, AlertTriangle, Sparkles, BarChart3, Target, ArrowLeft, Users, Calendar } from "lucide-react";
 import { useClientForecast } from "@/hooks/useClientForecast";
 import { supabase } from "@/integrations/supabase/client";
 import { generateForecastReportPdf } from "@/utils/forecastReportPdfGenerator";
