@@ -189,6 +189,17 @@ function buildUploadedPreview(
     seen.add(label);
   };
 
+  // Show product names from _product_rows if available (TDC multi-row OPPs)
+  const productRows = uploadedData._product_rows as Record<string, unknown>[] | undefined;
+  if (productRows && productRows.length > 0) {
+    const productNames = productRows
+      .map(r => String(r["Produkt"] || r["produkt"] || "").trim())
+      .filter(Boolean);
+    if (productNames.length > 0) {
+      addField("Produkter", productNames.join(", "));
+    }
+  }
+
   mapping?.product_columns?.forEach((column) => {
     const value = uploadedData[column];
     if (!isIrrelevantValue(value)) addField(column, value);
@@ -203,7 +214,7 @@ function buildUploadedPreview(
   }
 
   const prioritizedFallback = Object.entries(uploadedData)
-    .filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== "")
+    .filter(([key, value]) => key !== "_product_rows" && value !== null && value !== undefined && String(value).trim() !== "")
     .sort(([a], [b]) => {
       const score = (key: string) => {
         const lower = key.toLowerCase();
