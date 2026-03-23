@@ -85,10 +85,10 @@ export default function BookingManagement() {
   }
 
   // Dynamic grid columns based on visible tabs
-  const gridColsClass = visibleTabs.length === 1 ? "grid-cols-1" :
-                        visibleTabs.length === 2 ? "grid-cols-2" :
+  const gridColsClass = visibleTabs.length <= 2 ? "grid-cols-2" :
                         visibleTabs.length === 3 ? "grid-cols-3" : 
-                        visibleTabs.length === 4 ? "grid-cols-4" : "grid-cols-5";
+                        visibleTabs.length <= 5 ? "grid-cols-5" :
+                        visibleTabs.length === 6 ? "grid-cols-6" : "grid-cols-7";
 
   return (
     <MainLayout>
