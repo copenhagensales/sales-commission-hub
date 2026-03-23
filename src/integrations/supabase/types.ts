@@ -1533,6 +1533,7 @@ export type Database = {
           rows_matched: number | null
           rows_processed: number | null
           status: string
+          unmatched_rows: Json | null
           upload_type: string | null
           uploaded_by: string
         }
@@ -1546,6 +1547,7 @@ export type Database = {
           rows_matched?: number | null
           rows_processed?: number | null
           status?: string
+          unmatched_rows?: Json | null
           upload_type?: string | null
           uploaded_by: string
         }
@@ -1559,6 +1561,7 @@ export type Database = {
           rows_matched?: number | null
           rows_processed?: number | null
           status?: string
+          unmatched_rows?: Json | null
           upload_type?: string | null
           uploaded_by?: string
         }

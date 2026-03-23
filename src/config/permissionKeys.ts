@@ -217,6 +217,8 @@ export const PERMISSION_KEYS = {
   tab_cancellations_manual: { label: 'Fane: Rediger kurv', section: 'reports', parent: 'menu_cancellations' },
   tab_cancellations_upload: { label: 'Fane: Upload/match', section: 'reports', parent: 'menu_cancellations' },
   tab_cancellations_duplicates: { label: 'Fane: Dubletter', section: 'reports', parent: 'menu_cancellations' },
+  tab_cancellations_approval: { label: 'Fane: Godkendelseskø', section: 'reports', parent: 'menu_cancellations' },
+  tab_cancellations_unmatched: { label: 'Fane: Ingen match', section: 'reports', parent: 'menu_cancellations' },
 
   // ==================== ONBOARDING (under menu_section_onboarding) ====================
   menu_onboarding_overview: { label: 'Onboarding overblik', section: 'onboarding', parent: 'menu_section_onboarding' },

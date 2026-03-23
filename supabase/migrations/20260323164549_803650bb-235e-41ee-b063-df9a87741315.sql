@@ -1,0 +1,1 @@
+ALTER TABLE public.cancellation_imports ADD COLUMN IF NOT EXISTS unmatched_rows JSONB DEFAULT NULL;
