@@ -327,7 +327,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
       // Count shifts in a range for an employee
       // absenceMode: 'all' = exclude all absences, 'sick_only' = exclude only sick/no_show, false = no exclusion
       // Hierarchy: individual shifts → booking assignments → employee standard → team standard
-      function countShifts(empId: string, rangeStart: Date, rangeEnd: Date, excludeAbsence: boolean | 'sick_only' = false, bookingOnly = false): number {
+      function countShifts(empId: string, rangeStart: Date, rangeEnd: Date, excludeAbsence: boolean | 'sick_only' = false): number {
         const empTeamId = employeeTeamMap.get(empId);
         const teamDays = empTeamId ? teamShiftDaysMap.get(empTeamId) : undefined;
         const absenceDates = excludeAbsence === 'sick_only'
@@ -358,11 +358,14 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
             count++;
           } else if (bookingDates.has(dateStr)) {
             count++;
-          } else if (!bookingOnly) {
-            // Only fall through to standard shifts if not in bookingOnly mode
-            if (empStandardDays !== undefined) {
-              if (empStandardDays.includes(dayNumber)) count++;
+          } else {
+            // If employee has a special shift assigned, use ONLY its days (even if 0 days configured)
+            // This matches vagtplan logic: special shift with no days = no shifts
+            const empHasSpecialShift = empShiftIdMap.has(empId);
+            if (empHasSpecialShift) {
+              if (empStandardDays && empStandardDays.includes(dayNumber)) count++;
             } else if (teamDays && teamDays.includes(dayNumber)) {
+              // No special shift — fall back to team standard ("ikke booket" = real shift)
               count++;
             }
           }
@@ -374,9 +377,13 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
       // Helper: get normal weekly shift count for an employee (from standard schedule, no absences)
       // For FM employees with bookings but no standard shifts, average their recent booking frequency
       function getNormalWeeklyShifts(empId: string): number {
+        const empHasSpecialShift = empShiftIdMap.has(empId);
         const empShiftId = empShiftIdMap.get(empId);
         const empStandardDays = empShiftId ? shiftDaysMap.get(empShiftId) : undefined;
-        if (empStandardDays !== undefined) return empStandardDays.length;
+        if (empHasSpecialShift) {
+          // Special shift assigned — use ONLY its days (even if 0)
+          return empStandardDays ? empStandardDays.length : 0;
+        }
         const empTeamId = employeeTeamMap.get(empId);
         const teamDays = empTeamId ? teamShiftDaysMap.get(empTeamId) : undefined;
         if (teamDays?.length) return teamDays.length;
@@ -479,20 +486,8 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
 
         // Planned hours for forecast month (gross = full capacity, net = minus absences)
         // Use empForecastEnd to cap hours for employees with planned departure
-        // Check if employee has any individual shifts or booking assignments in forecast period
-        const hasAnyForecastShifts = Array.from(individualShiftMap.get(emp.id) || new Set()).some(d => d >= forecastStartStr && d <= forecastEndStr);
-        const hasAnyForecastBookings = Array.from(bookingAssignmentMap.get(emp.id) || new Set()).some(d => d >= forecastStartStr && d <= forecastEndStr);
-
-        // FM employees: ALWAYS use bookingOnly (team standard mon-fri is irrelevant for FM)
-        const empTeamId = employeeTeamMap.get(emp.id);
-        const empTeamName = empTeamId ? teamNameMap.get(empTeamId) : null;
-        const isFmEmployee = empTeamName?.toLowerCase().includes('fieldmarketing') 
-          || empTeamName?.toLowerCase().includes('field marketing');
-
-        const useBookingOnly = isFmEmployee || (!hasAnyForecastShifts && !hasAnyForecastBookings);
-
-        let grossShifts = countShifts(emp.id, forecastStart, empForecastEnd, false, useBookingOnly);
-        let forecastShifts = countShifts(emp.id, forecastStart, empForecastEnd, true, useBookingOnly);
+        let grossShifts = countShifts(emp.id, forecastStart, empForecastEnd, false);
+        let forecastShifts = countShifts(emp.id, forecastStart, empForecastEnd, true);
 
         let grossPlannedHours = grossShifts * HOURS_PER_SHIFT;
         let plannedHours = forecastShifts * HOURS_PER_SHIFT;
