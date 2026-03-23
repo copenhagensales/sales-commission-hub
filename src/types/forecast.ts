@@ -110,6 +110,7 @@ export interface EmployeeForecastResult {
   churnLoss: number;
   momentumFactor?: number;
   missingAgentMapping?: boolean;
+  plannedEndDate?: string;
 }
 
 // ============================================================================
