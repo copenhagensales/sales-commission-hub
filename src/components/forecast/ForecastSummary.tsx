@@ -1,14 +1,22 @@
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Sparkles } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Sparkles, Pencil, Check, X, Target } from "lucide-react";
 import type { ForecastResult } from "@/types/forecast";
 
 interface Props {
   forecast: ForecastResult;
   periodLabel: string;
   isCurrentPeriod: boolean;
+  clientTarget?: number | null;
+  onTargetChange?: (target: number) => void;
+  showTarget?: boolean;
 }
 
-export function ForecastSummary({ forecast, periodLabel, isCurrentPeriod }: Props) {
+export function ForecastSummary({ forecast, periodLabel, isCurrentPeriod, clientTarget, onTargetChange, showTarget }: Props) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState("");
   const totalSales = forecast.totalSalesExpected;
   const numEmployees = forecast.establishedEmployees.length;
   const numCohorts = forecast.cohorts.length;
@@ -63,6 +71,81 @@ export function ForecastSummary({ forecast, periodLabel, isCurrentPeriod }: Prop
             <p className="text-sm text-muted-foreground leading-relaxed">
               {parts.join(' ')}
             </p>
+            {showTarget && (
+              <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border/50">
+                <Target className="h-4 w-4 text-muted-foreground" />
+                {isEditing ? (
+                  <div className="flex items-center gap-1.5">
+                    <Input
+                      type="number"
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      className="h-7 w-24 text-sm"
+                      placeholder="Target"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && editValue) {
+                          onTargetChange?.(parseInt(editValue));
+                          setIsEditing(false);
+                        }
+                        if (e.key === 'Escape') setIsEditing(false);
+                      }}
+                    />
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-6 w-6"
+                      onClick={() => {
+                        if (editValue) onTargetChange?.(parseInt(editValue));
+                        setIsEditing(false);
+                      }}
+                    >
+                      <Check className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-6 w-6"
+                      onClick={() => setIsEditing(false)}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    {clientTarget ? (
+                      <>
+                        <span className="text-sm font-medium">
+                          Kundetarget: {clientTarget.toLocaleString('da-DK')} salg
+                        </span>
+                        {(() => {
+                          const diff = totalSales - clientTarget;
+                          const pct = Math.round((diff / clientTarget) * 100);
+                          return (
+                            <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${diff >= 0 ? 'bg-emerald-500/10 text-emerald-600' : 'bg-red-500/10 text-red-600'}`}>
+                              {diff >= 0 ? '+' : ''}{diff.toLocaleString('da-DK')} ({pct >= 0 ? '+' : ''}{pct}%)
+                            </span>
+                          );
+                        })()}
+                      </>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">Intet kundetarget sat</span>
+                    )}
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-6 w-6"
+                      onClick={() => {
+                        setEditValue(clientTarget?.toString() || "");
+                        setIsEditing(true);
+                      }}
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </CardContent>
