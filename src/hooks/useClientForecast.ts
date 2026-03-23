@@ -355,12 +355,13 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
 
         // Weekly SPH (most recent first) — use absence-adjusted shifts
         const weeklySph: number[] = [];
+        const normalWeeklyShifts = getNormalWeeklyShifts(emp.id);
         for (const ws of weekStarts) {
           const we = endOfWeek(ws, { weekStartsOn: 1 });
           const shiftsInWeek = countShifts(emp.id, ws, we, true); // exclude absences
           
-          // Skip weeks with 0 effective shifts (full vacation/sick)
-          if (shiftsInWeek === 0) continue;
+          // Skip weeks with less than 50% of normal capacity (partial vacation weeks)
+          if (shiftsInWeek < normalWeeklyShifts * 0.5) continue;
           
           const hoursInWeek = shiftsInWeek * HOURS_PER_SHIFT;
 
