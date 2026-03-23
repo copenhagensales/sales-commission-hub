@@ -2,6 +2,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ManualCancellationsTab } from "@/components/cancellations/ManualCancellationsTab";
 import { UploadCancellationsTab } from "@/components/cancellations/UploadCancellationsTab";
 import { DuplicatesTab } from "@/components/cancellations/DuplicatesTab";
+import { ApprovalQueueTab } from "@/components/cancellations/ApprovalQueueTab";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
 import { useMemo } from "react";
@@ -17,6 +18,8 @@ export default function Cancellations() {
       tabs.push({ value: 'upload', label: 'Upload/match', key: 'tab_cancellations_upload' });
     if (isOwner || canView('tab_cancellations_duplicates'))
       tabs.push({ value: 'duplicates', label: 'Dubletter', key: 'tab_cancellations_duplicates' });
+    if (isOwner || canView('tab_cancellations_approval'))
+      tabs.push({ value: 'approval', label: 'Godkendelseskø', key: 'tab_cancellations_approval' });
     return tabs;
   }, [isOwner, canView]);
 
@@ -54,6 +57,11 @@ export default function Cancellations() {
             {visibleTabs.some(t => t.value === 'duplicates') && (
               <TabsContent value="duplicates" className="mt-6">
                 <DuplicatesTab />
+              </TabsContent>
+            )}
+            {visibleTabs.some(t => t.value === 'approval') && (
+              <TabsContent value="approval" className="mt-6">
+                <ApprovalQueueTab />
               </TabsContent>
             )}
           </Tabs>
