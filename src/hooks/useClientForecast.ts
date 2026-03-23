@@ -30,7 +30,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
   // Normalize period to monthOffset for backward compat
   const monthOffset = typeof period === "number" ? period : period === "current" ? 0 : 1;
 
-  const FORECAST_LOGIC_VERSION = 4; // bump to bust cache after logic changes
+  const FORECAST_LOGIC_VERSION = 5; // bump to force a fresh recompute after FM forecast fixes
   return useQuery({
     queryKey: ["client-forecast", clientId, monthOffset, FORECAST_LOGIC_VERSION],
     queryFn: async (): Promise<{
@@ -845,8 +845,10 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         calculatedAt: now.toISOString(),
       };
     },
-    staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnReconnect: "always",
+    refetchOnWindowFocus: true,
   });
 }
 
