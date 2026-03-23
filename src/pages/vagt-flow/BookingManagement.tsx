@@ -1,6 +1,6 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, MapPin, ListChecks, CalendarDays, Loader2, Tent, Hotel } from "lucide-react";
+import { Calendar, MapPin, ListChecks, CalendarDays, Loader2, Tent, Hotel, BarChart3 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 import { lazy, Suspense, useMemo } from "react";
@@ -13,6 +13,7 @@ const BookingsContent = lazy(() => import("./BookingsContent"));
 const MarketsContent = lazy(() => import("./MarketsContent"));
 const VagtplanFMContent = lazy(() => import("./VagtplanFMContent"));
 const HotelsContent = lazy(() => import("./HotelsContent"));
+const LocationProfitabilityContent = lazy(() => import("./LocationProfitabilityContent"));
 
 // Tab configuration with permission keys
 const allTabs = [
@@ -22,6 +23,7 @@ const allTabs = [
   { value: "locations", label: "Lokationer", labelKey: "sidebar.locations", icon: MapPin, permissionKey: "tab_fm_locations" },
   { value: "vagtplan-fm", label: "Vagtplan", icon: CalendarDays, permissionKey: "tab_fm_vagtplan" },
   { value: "hotels", label: "Hoteller", icon: Hotel, permissionKey: "tab_fm_hotels" },
+  { value: "okonomi", label: "Økonomi", icon: BarChart3, permissionKey: "tab_fm_locations" },
 ];
 
 export default function BookingManagement() {
@@ -83,10 +85,10 @@ export default function BookingManagement() {
   }
 
   // Dynamic grid columns based on visible tabs
-  const gridColsClass = visibleTabs.length === 1 ? "grid-cols-1" :
-                        visibleTabs.length === 2 ? "grid-cols-2" :
+  const gridColsClass = visibleTabs.length <= 2 ? "grid-cols-2" :
                         visibleTabs.length === 3 ? "grid-cols-3" : 
-                        visibleTabs.length === 4 ? "grid-cols-4" : "grid-cols-5";
+                        visibleTabs.length <= 5 ? "grid-cols-5" :
+                        visibleTabs.length === 6 ? "grid-cols-6" : "grid-cols-7";
 
   return (
     <MainLayout>
@@ -150,6 +152,14 @@ export default function BookingManagement() {
             <TabsContent value="hotels" className="mt-6">
               <Suspense fallback={<div className="flex items-center justify-center py-12">Indlæser...</div>}>
                 <HotelsContent />
+              </Suspense>
+            </TabsContent>
+          )}
+
+          {visibleTabs.some(t => t.value === "okonomi") && (
+            <TabsContent value="okonomi" className="mt-6">
+              <Suspense fallback={<div className="flex items-center justify-center py-12">Indlæser...</div>}>
+                <LocationProfitabilityContent />
               </Suspense>
             </TabsContent>
           )}
