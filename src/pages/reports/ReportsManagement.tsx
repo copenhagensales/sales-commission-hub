@@ -89,7 +89,7 @@ export default function ReportsManagement() {
     enabled: !!clientId && !!periodStart && !!periodEnd,
   });
 
-  const { data: rawSalesData, isLoading: isLoadingRaw, isFetching: isFetchingRaw } = useQuery({
+  const { data: rawSalesData, isLoading: isLoadingRaw, isFetching: isFetchingRaw, isError: isErrorRaw, error: errorRaw } = useQuery({
     queryKey: ["sales-report-raw", clientId, periodStart, periodEnd],
     queryFn: async () => {
       const PAGE_SIZE = 1000;
