@@ -1,66 +1,86 @@
 
 
-# FM Forecast & Profit Agent — Ny fane i Booking
+# FM Profit Agent — Rigtig data + AI Chat-interface
 
 ## Overblik
-Tilføj en ny fane "Profit Agent" til BookingManagement-siden (`/vagt-flow/booking?tab=profit-agent`) med et fuldt internt analytics-dashboard der dekomponerer FM-performance i lokations-, sælger- og kombinationseffekter.
+Erstat mock-data med rigtige FM-salgsdata fra databasen og ombyg hele UI'et til et **chat-baseret interface** hvor managere kan stille spørgsmål om lokationer, sælgere og profitabilitet. AI'en har adgang til de beregnede scores og observations og svarer i naturligt sprog.
 
-## Struktur
+## Arkitektur
 
-### 1. `BookingManagement.tsx` — Tilføj fane
-- Ny tab: `{ value: "profit-agent", label: "Profit Agent", icon: Brain, permissionKey: "tab_fm_locations" }`
-- Lazy-load ny komponent `FmProfitAgentContent`
+```text
+┌─────────────────────────────────────────┐
+│  FmProfitAgentContent.tsx               │
+│  ┌───────────────────────────────────┐  │
+│  │  Chat interface (besked-liste)    │  │
+│  │  - Bruger spørgsmål               │  │
+│  │  - AI svar med markdown           │  │
+│  │  - Inline KPI-kort & tabeller     │  │
+│  └───────────────────────────────────┘  │
+│  ┌───────────────────────────────────┐  │
+│  │  Input + quick-action chips       │  │
+│  │  "Bedste lokationer?" "Risiko?"   │  │
+│  └───────────────────────────────────┘  │
+└────────────┬────────────────────────────┘
+             │ invoke
+┌────────────▼────────────────────────────┐
+│  Edge function: fm-profit-agent         │
+│  1. Hent FM data (sales, bookings,      │
+│     costs, employees, locations)        │
+│  2. Beregn observations & scores        │
+│  3. Byg kontekst-prompt med data        │
+│  4. Kald Lovable AI med brugerens       │
+│     spørgsmål + data-kontekst           │
+│  5. Stream svar tilbage                 │
+└─────────────────────────────────────────┘
+```
 
-### 2. `FmProfitAgentContent.tsx` — Hovedkomponent (~600 linjer)
-Indeholder 4 interne sub-tabs: **Oversigt**, **Driver-analyse**, **Forecast**, **Risiko**
+## Ændringer
 
-**Realistisk mock-data** med ~15 lokationer og ~10 sælgere der illustrerer:
-- Lokationer der ser stærke ud men er sælger-drevne
-- Sælgere der performer konsistent på tværs
-- Stærke kombinationer med begrænset data
-- Høj omsætning men svag DB
+### 1. Ny edge function: `supabase/functions/fm-profit-agent/index.ts`
+- Modtager `{ message, history }` fra frontend
+- Henter FM-data fra databasen:
+  - `sales` (source=fieldmarketing, seneste 12 uger) med `sale_items` og `raw_payload` (fm_location_id, fm_seller_id)
+  - `fm_locations` (navn)
+  - `employee_master_data` (sælgernavne via fm_seller_id)
+  - `booking` + `booking_hotel` + `booking_diet` (omkostninger)
+- Beregner observations (samme scoring-logik som nuværende, men med rigtige data)
+- Bygger et system-prompt med:
+  - Aggregerede lokationsscores, sælgerscores, kombinationer
+  - Totaler, trends, risikoflag
+- Kalder Lovable AI Gateway med streaming
+- Returnerer SSE stream
 
-**Scoring-model (mock):**
-- `locationScore`: Varians mellem sælgere på samme lokation (lav varians = stærk lokation)
-- `sellerScore`: Varians mellem lokationer for samme sælger (lav varians = stærk sælger)
-- `combinationScore`: Afvigelse fra forventet (lokation + sælger individuelt)
-- `confidence`: Baseret på antal observationer
+### 2. Omskriv `FmProfitAgentContent.tsx` — Chat UI
+- Fjern alle 4 sub-tabs og mock-data
+- Erstat med chat-interface:
+  - Beskedliste med bruger/AI-bobler
+  - Markdown-rendering af AI-svar (react-markdown)
+  - Quick-action chips: "Oversigt", "Bedste lokationer", "Driver-analyse", "Risikoflag", "Forecast næste uge"
+  - Streaming af AI-svar token-by-token
+- Brug `supabase.functions.invoke('fm-profit-agent', ...)` med streaming
+- Behold premium SaaS-look med clean cards og spacing
 
-**Driver-klassifikation:**
-- Location-driven: Høj locationScore, lav sellerScore-dominans
-- Seller-driven: Høj sellerScore, stor forskel mellem sælgere
-- Combination-driven: combinationScore > forventet
-- Uncertain: For få datapunkter
+### 3. Quick-action chips (foreslåede spørgsmål)
+- "Giv mig en oversigt over alle lokationer"
+- "Hvilke lokationer er sælger-drevne?"
+- "Hvem er de bedste sælgere?"
+- "Vis risikoflag"
+- "Hvor bør vi stå næste uge?"
+- "Sammenlign Fields og Lyngby Storcenter"
 
-### Sub-tabs indhold:
+## Data-flow i edge function
 
-**Oversigt:**
-- KPI-kort: Total DB, Gns. DB%, Bedste lokation, Bedste sælger, Risiko-flag antal
-- Top 5 lokationer (ranket på DB med driver-badge)
-- Top 5 sælgere (ranket på DB med konsistens-badge)
-- AI-indsigt panel med naturligt sprog
-
-**Driver-analyse:**
-- Seller/location matrix-heatmap (tabel)
-- Variance-chart: Spredning mellem sælgere per lokation
-- Filtre: Datospænd, lokation, sælger
-- Sammenligning: Vælg 2+ lokationer eller 2+ sælgere side-by-side
-- Forklaringstekster per resultat
-
-**Forecast:**
-- Anbefalingskort per lokation: Forventet DB, Anbefalet sælger, Konfidensgrad, Hoveddiver, Risikoniveau
-- Næste-uge planlægningsvisning
-
-**Risiko:**
-- Flag-liste: For lidt data, højt sælger-afhængig lokation, omkostningsfølsom, ustabil historik, misvisende høj omsætning
-
-### UI-stil
-- Premium SaaS-look med Cards, Charts (recharts), Tables
-- Klar typografi og spacing
-- Farve-kodede badges for driver-type (grøn=lokation, blå=sælger, lilla=kombination, grå=usikker)
+```text
+1. Hent sales (12 uger) → grupper per uge/lokation/sælger
+2. Hent omkostninger fra booking/hotel/diet
+3. Beregn: revenue, commission, sellerCost, locationCost, hotelCost, dietCost, DB
+4. Kør scoring-engine (location/seller/combo scores)
+5. Formatér som kontekst-tekst til AI
+6. Send til Lovable AI med brugerens spørgsmål
+```
 
 | Fil | Ændring |
 |-----|---------|
-| `BookingManagement.tsx` | Tilføj "Profit Agent" tab + lazy import |
-| `FmProfitAgentContent.tsx` | Ny fil — fuldt dashboard med mock data og 4 sub-tabs |
+| `supabase/functions/fm-profit-agent/index.ts` | Ny edge function — data + AI |
+| `src/pages/vagt-flow/FmProfitAgentContent.tsx` | Omskriv til chat-interface |
 
