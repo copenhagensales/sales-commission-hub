@@ -1,16 +1,26 @@
 
 
-# Gør hotelpris obligatorisk ved booking
+# Tilføj Hotel-fane i Rediger Booking dialogen
 
-## Ændring
+## Hvad der bygges
+En ny "Hotel" fane i `EditBookingDialog` der viser det tilknyttede hotel (hvis der er et) med mulighed for at redigere pris, status, bekræftelsesnummer — eller tildele et nyt hotel direkte fra booking-dialogen.
 
-### `src/components/vagt-flow/AssignHotelDialog.tsx`
+## Ændringer
 
-1. **Valideringsguard i `handleSubmit`** (linje 85): Tilføj check at `pricePerNight` skal være udfyldt og > 0 før submit tillades — vis toast-fejl hvis mangler
-2. **Submit-knap disabled**: Disable knappen når `pricePerNight` er tom
-3. **Visuelt krav**: Tilføj `*` ved pris-label og rød border hvis tom ved submit-forsøg
+### 1. `src/components/vagt-flow/EditBookingDialog.tsx`
+- Udvid TabsList fra `grid-cols-4` til `grid-cols-5`
+- Tilføj ny `TabsTrigger` for "Hotel" med `Building2`-ikon
+- Tilføj ny `TabsContent value="hotel"` der:
+  - Henter `booking_hotel` for den aktuelle booking via `useBookingHotels([booking.id])`
+  - **Hvis hotel er tildelt**: Viser hotelnavnm, pris pr. nat (redigerbar), status, bekræftelsesnummer, noter — med gem-knap
+  - **Hvis intet hotel**: Viser knap "Tildel hotel" der åbner `AssignHotelDialog`
+- Importér `useBookingHotels`, `useUpdateBookingHotel` fra `useBookingHotels` hook
+- Importér `AssignHotelDialog` til sub-dialog åbning
+
+### 2. Ingen andre filer ændres
+Alt genbrug eksisterende hooks og komponenter.
 
 | Fil | Ændring |
 |-----|---------|
-| `src/components/vagt-flow/AssignHotelDialog.tsx` | Gør pris obligatorisk med validering + visuelt krav |
+| `src/components/vagt-flow/EditBookingDialog.tsx` | Ny Hotel-fane med visning/redigering af hoteltildeling |
 
