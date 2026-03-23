@@ -2,18 +2,21 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { UserPlus, Plus, Calendar, Users, Trash2 } from "lucide-react";
+import { UserPlus, Plus, Calendar, Users, Trash2, Pencil } from "lucide-react";
 import { CreateCohortDialog } from "./CreateCohortDialog";
+import { EditForecastCohortDialog } from "./EditForecastCohortDialog";
 import type { ClientForecastCohort } from "@/types/forecast";
 
 interface Props {
   cohorts: ClientForecastCohort[];
   onAdd: (cohort: Omit<ClientForecastCohort, 'id' | 'created_at' | 'created_by'>) => void;
   onDelete?: (cohortId: string) => void;
+  onEdit?: (id: string, data: { start_date: string; planned_headcount: number; note: string | null }) => void;
 }
 
-export function ForecastCohortManager({ cohorts, onAdd, onDelete }: Props) {
+export function ForecastCohortManager({ cohorts, onAdd, onDelete, onEdit }: Props) {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingCohort, setEditingCohort] = useState<ClientForecastCohort | null>(null);
 
   return (
     <>
@@ -58,16 +61,28 @@ export function ForecastCohortManager({ cohorts, onAdd, onDelete }: Props) {
                       )}
                     </div>
                   </div>
-                  {onDelete && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                      onClick={() => onDelete(cohort.id)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
+                  <div className="flex items-center gap-1">
+                    {onEdit && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                        onClick={() => setEditingCohort(cohort)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                    {onDelete && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        onClick={() => onDelete(cohort.id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -81,6 +96,16 @@ export function ForecastCohortManager({ cohorts, onAdd, onDelete }: Props) {
         onSubmit={(data) => {
           onAdd(data);
           setDialogOpen(false);
+        }}
+      />
+
+      <EditForecastCohortDialog
+        open={!!editingCohort}
+        onOpenChange={(open) => { if (!open) setEditingCohort(null); }}
+        cohort={editingCohort}
+        onSubmit={(id, data) => {
+          onEdit?.(id, data);
+          setEditingCohort(null);
         }}
       />
     </>
