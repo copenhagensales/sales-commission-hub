@@ -295,13 +295,13 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
         .order("sale_datetime", { ascending: false });
 
       // Apply filters - use RPC for full-text search across all fields including raw_payload
-      if (debouncedSearch) {
+      if (appliedSearch) {
         const { data: matchedIds, error: searchError } = await supabase
-          .rpc('search_sales', { search_query: debouncedSearch, max_results: 200 });
+          .rpc('search_sales', { search_query: appliedSearch, max_results: 200 });
         
         if (searchError) {
           console.error("Search RPC error:", searchError);
-          query = query.or(`customer_phone.ilike.%${debouncedSearch}%,customer_company.ilike.%${debouncedSearch}%,agent_name.ilike.%${debouncedSearch}%`);
+          query = query.or(`customer_phone.ilike.%${appliedSearch}%,customer_company.ilike.%${appliedSearch}%,agent_name.ilike.%${appliedSearch}%`);
         } else if (matchedIds && matchedIds.length > 0) {
           query = query.in('id', matchedIds);
         } else {
