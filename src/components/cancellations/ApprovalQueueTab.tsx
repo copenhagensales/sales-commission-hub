@@ -652,10 +652,12 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   };
 
   const renderTable = () => {
-    if (subOppGroups.length === 0 && subFlatItems.length === 0) {
+    if (processedOppGroups.length === 0 && processedFlatItems.length === 0) {
       return (
         <div className="py-8 text-center text-muted-foreground">
-          {onlyDifferences ? "Ingen salg med forskelle fundet." : `Ingen ${statusFilter === "pending" ? "ventende" : ""} items i køen.`}
+          {searchQuery || sellerFilter !== "all"
+            ? "Ingen resultater matcher din søgning/filter."
+            : onlyDifferences ? "Ingen salg med forskelle fundet." : `Ingen ${statusFilter === "pending" ? "ventende" : ""} items i køen.`}
         </div>
       );
     }
