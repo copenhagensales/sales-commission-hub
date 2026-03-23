@@ -137,6 +137,50 @@ export default function Forecast() {
     ? forecast.establishedEmployees.reduce((s, e) => s + e.expectedSph, 0) / forecast.establishedEmployees.length
     : 0.45;
 
+  // Target data
+  const periodStart = useMemo(() => {
+    const now = new Date();
+    const target = period === "current"
+      ? new Date(now.getFullYear(), now.getMonth(), 1)
+      : new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    return target.toISOString().slice(0, 10);
+  }, [period]);
+
+  const { data: targetData } = useQuery({
+    queryKey: ["client-target", selectedClient, periodStart],
+    queryFn: async () => {
+      if (selectedClient === "all") return null;
+      const { data, error } = await supabase
+        .from("client_monthly_targets")
+        .select("target_sales")
+        .eq("client_id", selectedClient)
+        .eq("period_start", periodStart)
+        .maybeSingle();
+      if (error) throw error;
+      return data?.target_sales ?? null;
+    },
+    enabled: selectedClient !== "all",
+  });
+
+  const upsertTarget = useMutation({
+    mutationFn: async (target: number) => {
+      const { error } = await supabase
+        .from("client_monthly_targets")
+        .upsert({
+          client_id: selectedClient,
+          period_start: periodStart,
+          target_sales: target,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "client_id,period_start" });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["client-target"] });
+      toast.success("Kundetarget gemt");
+    },
+    onError: () => toast.error("Kunne ikke gemme target"),
+  });
+
   const isLoading = forecastLoading;
 
   return (
