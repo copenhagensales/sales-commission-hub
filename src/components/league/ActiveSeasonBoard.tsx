@@ -375,6 +375,11 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
               <div className="font-mono text-sm sm:text-[15px] font-semibold whitespace-nowrap">
                 {roundProvision.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
               </div>
+              {pointsAtStake > 0 && (
+                <span className="font-mono text-[10px] text-primary/70 font-semibold">
+                  +{pointsAtStake} pt
+                </span>
+              )}
             </div>
             <div className="text-[10px] text-muted-foreground">
               {Number(standing.total_points).toLocaleString("da-DK", { maximumFractionDigits: 0 })} pt samlet
@@ -397,11 +402,13 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
               </div>
             )}
           </div>
-          <div className="hidden sm:block text-right min-w-[50px]">
-            <span className="text-sm text-muted-foreground">
-              {standing.rounds_played} runder
-            </span>
-          </div>
+          {standing.rounds_played > 0 && (
+            <div className="hidden sm:block text-right min-w-[50px]">
+              <span className="text-sm text-muted-foreground">
+                {standing.rounds_played} runder
+              </span>
+            </div>
+          )}
 
           <div className="w-16 sm:w-20 text-right">
             {isPromoZone && (
