@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,7 +23,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
-import { Upload, FileSpreadsheet, Check, X, Loader2, AlertCircle } from "lucide-react";
+import { Upload, FileSpreadsheet, Check, X, Loader2, AlertCircle, Save, Settings } from "lucide-react";
 import { CancellationHistoryTable } from "./CancellationHistoryTable";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -44,6 +44,20 @@ interface MatchedSale {
   uploadedRowData: Record<string, unknown>;
 }
 
+interface UploadConfig {
+  id: string;
+  client_id: string;
+  name: string;
+  phone_column: string | null;
+  company_column: string | null;
+  opp_column: string | null;
+  product_columns: string[];
+  revenue_column: string | null;
+  commission_column: string | null;
+  product_match_mode: string;
+  is_default: boolean;
+}
+
 export function UploadCancellationsTab() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -57,10 +71,13 @@ export function UploadCancellationsTab() {
   const [revenueColumn, setRevenueColumn] = useState<string>("__none__");
   const [commissionColumn, setCommissionColumn] = useState<string>("__none__");
   const [selectedClientId, setSelectedClientId] = useState<string>("");
+  const [selectedConfigId, setSelectedConfigId] = useState<string>("__none__");
   const [matchedSales, setMatchedSales] = useState<MatchedSale[]>([]);
   const [isMatching, setIsMatching] = useState(false);
   const [uploadType, setUploadType] = useState<"cancellation" | "basket_difference">("cancellation");
   const [step, setStep] = useState<"upload" | "mapping" | "preview" | "done">("upload");
+  const [configName, setConfigName] = useState("");
+  const [showSaveConfig, setShowSaveConfig] = useState(false);
 
   // Fetch clients
   const { data: clients = [] } = useQuery({
@@ -72,6 +89,84 @@ export function UploadCancellationsTab() {
         .order("name");
       if (error) throw error;
       return data;
+    },
+  });
+
+  // Fetch configs for selected client
+  const { data: clientConfigs = [] } = useQuery({
+    queryKey: ["cancellation-upload-configs", selectedClientId],
+    queryFn: async () => {
+      if (!selectedClientId) return [];
+      const { data, error } = await supabase
+        .from("cancellation_upload_configs")
+        .select("*")
+        .eq("client_id", selectedClientId)
+        .order("is_default", { ascending: false });
+      if (error) throw error;
+      return (data || []) as UploadConfig[];
+    },
+    enabled: !!selectedClientId,
+  });
+
+  // Auto-load default config when client changes
+  useEffect(() => {
+    if (clientConfigs.length > 0) {
+      const defaultConfig = clientConfigs.find(c => c.is_default) || clientConfigs[0];
+      if (defaultConfig) {
+        applyConfig(defaultConfig);
+        setSelectedConfigId(defaultConfig.id);
+      }
+    } else {
+      setSelectedConfigId("__none__");
+    }
+  }, [clientConfigs]);
+
+  const applyConfig = (config: UploadConfig) => {
+    setPhoneColumn(config.phone_column || "__none__");
+    setCompanyColumn(config.company_column || "__none__");
+    setOppColumn(config.opp_column || "__none__");
+    setProductColumn(config.product_columns?.[0] || "__none__");
+    setRevenueColumn(config.revenue_column || "__none__");
+    setCommissionColumn(config.commission_column || "__none__");
+  };
+
+  const handleConfigChange = (configId: string) => {
+    setSelectedConfigId(configId);
+    if (configId !== "__none__") {
+      const config = clientConfigs.find(c => c.id === configId);
+      if (config) applyConfig(config);
+    }
+  };
+
+  // Save config mutation
+  const saveConfigMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedClientId || !configName.trim()) throw new Error("Vælg kunde og angiv et navn");
+      const productCols = productColumn !== "__none__" ? [productColumn] : [];
+      const { error } = await supabase
+        .from("cancellation_upload_configs")
+        .insert({
+          client_id: selectedClientId,
+          name: configName.trim(),
+          phone_column: phoneColumn !== "__none__" ? phoneColumn : null,
+          company_column: companyColumn !== "__none__" ? companyColumn : null,
+          opp_column: oppColumn !== "__none__" ? oppColumn : null,
+          product_columns: productCols,
+          revenue_column: revenueColumn !== "__none__" ? revenueColumn : null,
+          commission_column: commissionColumn !== "__none__" ? commissionColumn : null,
+          product_match_mode: "strip_percent_suffix",
+          is_default: clientConfigs.length === 0,
+        } as any);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: "Gemt", description: `Opsætning "${configName}" er gemt.` });
+      setShowSaveConfig(false);
+      setConfigName("");
+      queryClient.invalidateQueries({ queryKey: ["cancellation-upload-configs", selectedClientId] });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Fejl", description: err.message, variant: "destructive" });
     },
   });
 
@@ -332,6 +427,7 @@ export function UploadCancellationsTab() {
       // Log the import first
       let importId: string | null = null;
       if (currentEmployee?.id && file) {
+        const configId = selectedConfigId !== "__none__" ? selectedConfigId : null;
         const { data: importData, error: importError } = await supabase
           .from("cancellation_imports")
           .insert({
@@ -342,7 +438,8 @@ export function UploadCancellationsTab() {
             rows_processed: parsedData.length,
             rows_matched: matchedSales.length,
             upload_type: uploadType,
-          })
+            config_id: configId,
+          } as any)
           .select("id")
           .single();
         if (importError) throw importError;
@@ -401,6 +498,7 @@ export function UploadCancellationsTab() {
     setCommissionColumn("__none__");
     setUploadType("cancellation");
     setSelectedClientId("");
+    setSelectedConfigId("__none__");
     setMatchedSales([]);
     setStep("upload");
   };
@@ -472,6 +570,23 @@ export function UploadCancellationsTab() {
                 </Select>
               </div>
 
+              {clientConfigs.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Opsætning</Label>
+                  <Select value={selectedConfigId} onValueChange={handleConfigChange}>
+                    <SelectTrigger><SelectValue placeholder="Vælg opsætning..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Manuel</SelectItem>
+                      {clientConfigs.map((cfg) => (
+                        <SelectItem key={cfg.id} value={cfg.id}>
+                          {cfg.name} {cfg.is_default ? "(standard)" : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label>Telefonkolonne (valgfri)</Label>
                 <Select value={phoneColumn} onValueChange={setPhoneColumn}>
@@ -537,6 +652,32 @@ export function UploadCancellationsTab() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            {/* Save config section */}
+            <div className="flex items-center gap-2 pt-2 border-t">
+              {!showSaveConfig ? (
+                <Button variant="outline" size="sm" onClick={() => setShowSaveConfig(true)} disabled={!selectedClientId}>
+                  <Save className="h-4 w-4 mr-2" />
+                  Gem som opsætning
+                </Button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="Navn på opsætning..."
+                    value={configName}
+                    onChange={(e) => setConfigName(e.target.value)}
+                    className="border rounded px-3 py-1.5 text-sm bg-background"
+                  />
+                  <Button size="sm" onClick={() => saveConfigMutation.mutate()} disabled={saveConfigMutation.isPending || !configName.trim()}>
+                    {saveConfigMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Gem"}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => { setShowSaveConfig(false); setConfigName(""); }}>
+                    Annuller
+                  </Button>
+                </div>
+              )}
             </div>
 
             <div className="flex gap-2">
