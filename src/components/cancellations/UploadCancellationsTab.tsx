@@ -53,6 +53,9 @@ export function UploadCancellationsTab() {
   const [phoneColumn, setPhoneColumn] = useState<string>("__none__");
   const [companyColumn, setCompanyColumn] = useState<string>("__none__");
   const [oppColumn, setOppColumn] = useState<string>("__none__");
+  const [productColumn, setProductColumn] = useState<string>("__none__");
+  const [revenueColumn, setRevenueColumn] = useState<string>("__none__");
+  const [commissionColumn, setCommissionColumn] = useState<string>("__none__");
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [matchedSales, setMatchedSales] = useState<MatchedSale[]>([]);
   const [isMatching, setIsMatching] = useState(false);
@@ -265,6 +268,33 @@ export function UploadCancellationsTab() {
         }
       }
 
+      // Build a lookup from OPP/phone/company → uploaded row for associating uploaded data
+      const uploadedRowByOpp = new Map<string, Record<string, unknown>>();
+      const uploadedRowByPhone = new Map<string, Record<string, unknown>>();
+      const uploadedRowByCompany = new Map<string, Record<string, unknown>>();
+      
+      parsedData.forEach(row => {
+        if (oppColumn !== "__none__" && row.originalRow[oppColumn]) {
+          uploadedRowByOpp.set(String(row.originalRow[oppColumn]).toUpperCase().trim(), row.originalRow);
+        }
+        if (phoneColumn !== "__none__" && row.originalRow[phoneColumn]) {
+          uploadedRowByPhone.set(String(row.originalRow[phoneColumn]).replace(/\D/g, ""), row.originalRow);
+        }
+        if (companyColumn !== "__none__" && row.originalRow[companyColumn]) {
+          uploadedRowByCompany.set(String(row.originalRow[companyColumn]).toLowerCase().trim(), row.originalRow);
+        }
+      });
+
+      const findUploadedRow = (sale: any): Record<string, unknown> => {
+        const saleOpp = extractOpp(sale.raw_payload).toUpperCase().trim();
+        if (saleOpp && uploadedRowByOpp.has(saleOpp)) return uploadedRowByOpp.get(saleOpp)!;
+        const salePhone = (sale.customer_phone || "").replace(/\D/g, "");
+        if (salePhone && uploadedRowByPhone.has(salePhone)) return uploadedRowByPhone.get(salePhone)!;
+        const saleCompany = (sale.customer_company || "").toLowerCase().trim();
+        if (saleCompany && uploadedRowByCompany.has(saleCompany)) return uploadedRowByCompany.get(saleCompany)!;
+        return {};
+      };
+
       const matched: MatchedSale[] = allMatched.map(sale => ({
         saleId: sale.id,
         phone: sale.customer_phone || "",
@@ -273,6 +303,7 @@ export function UploadCancellationsTab() {
         saleDate: sale.sale_datetime || "",
         employee: sale.agent_name || "Ukendt",
         currentStatus: sale.validation_status || "pending",
+        uploadedRowData: findUploadedRow(sale),
       }));
 
       setMatchedSales(matched);
