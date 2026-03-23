@@ -1595,9 +1595,11 @@ export type Database = {
       }
       cancellation_queue: {
         Row: {
+          client_id: string | null
           created_at: string
           id: string
           import_id: string
+          opp_group: string | null
           reviewed_at: string | null
           reviewed_by: string | null
           sale_id: string
@@ -1606,9 +1608,11 @@ export type Database = {
           uploaded_data: Json | null
         }
         Insert: {
+          client_id?: string | null
           created_at?: string
           id?: string
           import_id: string
+          opp_group?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           sale_id: string
@@ -1617,9 +1621,11 @@ export type Database = {
           uploaded_data?: Json | null
         }
         Update: {
+          client_id?: string | null
           created_at?: string
           id?: string
           import_id?: string
+          opp_group?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           sale_id?: string
@@ -1628,6 +1634,13 @@ export type Database = {
           uploaded_data?: Json | null
         }
         Relationships: [
+          {
+            foreignKeyName: "cancellation_queue_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "cancellation_queue_import_id_fkey"
             columns: ["import_id"]

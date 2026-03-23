@@ -451,6 +451,14 @@ export function UploadCancellationsTab() {
       // Build a map of saleId → uploadedRowData
       const uploadedDataMap = new Map(matchedSales.map(s => [s.saleId, s.uploadedRowData]));
 
+      // Build OPP group lookup for each sale
+      const oppGroupMap = new Map<string, string>();
+      for (const sale of matchedSales) {
+        if (sale.oppNumber) {
+          oppGroupMap.set(sale.saleId, sale.oppNumber);
+        }
+      }
+
       // Insert queue items in batches of 50
       for (let i = 0; i < saleIds.length; i += 50) {
         const batch = saleIds.slice(i, i + 50).map(saleId => ({
@@ -459,6 +467,8 @@ export function UploadCancellationsTab() {
           upload_type: uploadType,
           status: "pending",
           uploaded_data: uploadedDataMap.get(saleId) || null,
+          opp_group: oppGroupMap.get(saleId) || null,
+          client_id: selectedClientId || null,
         }));
         const { error } = await supabase
           .from("cancellation_queue")
