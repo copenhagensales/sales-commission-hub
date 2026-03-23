@@ -1,18 +1,25 @@
 
 
-# Kør enrichment-healer for TDC Erhverv salg
+# Ny sub-tab "Fejl i match" i Godkendelseskøen
 
 ## Hvad
-Kald den eksisterende `enrichment-healer` Edge Function i små batches for at berige de ~397 Lovablecph TDC Erhverv salg der allerede har `leadId` i `raw_payload`. Ingen kodeændringer.
+Tilføj en fjerde sub-tab kaldet **"Fejl i match"** i Godkendelseskøen. Den viser alle rækker fra uploads der ikke kunne matches til et salg i systemet — data fra `cancellation_imports.unmatched_rows` (JSONB-kolonnen).
 
-## Fremgangsmåde
+## Ændringer
 
-1. Kald `enrichment-healer` med `maxBatch: 20, turboMode: true` — gentag 3-4 gange med pauser mellem
-2. Tjek logs efter hver kørsel for at verificere OPP-numre hentes
-3. Gentag indtil alle pending salg er behandlet
+| Fil | Hvad |
+|-----|------|
+| `src/components/cancellations/MatchErrorsSubTab.tsx` | **Ny fil.** Henter alle `cancellation_imports` for den valgte kunde hvor `unmatched_rows` ikke er null. Viser rækkerne i en tabel med de uploadede felter (OPP, produkt, beløb osv.), grupperet pr. import (filnavn + dato). Søgefelt og sortering. |
+| `src/components/cancellations/ApprovalQueueTab.tsx` | Udvid `subTab` type med `"match_errors"`. Tilføj ny `TabsTrigger` "Fejl i match" med count. Tilføj `TabsContent` der renderer `<MatchErrorsSubTab clientId={clientId} />`. |
 
-## Vigtige forudsætninger
-- Kun Lovablecph-salg med `leadId` behandles (eksisterende logik)
-- Relatel røres IKKE — de har ingen `leadId` og healeren skipper dem automatisk
-- Rate limit: ~20 kald pr. batch med 1.2s delay = sikkert under grænsen
+## Teknisk detalje
+
+**MatchErrorsSubTab query:**
+1. Hent `cancellation_imports` hvor `unmatched_rows IS NOT NULL` og filtret på uploads tilhørende den valgte kundes kampagner (via `cancellation_queue.client_id` eller importens kontekst)
+2. Parse `unmatched_rows` JSON-array — hver entry er en Excel-række der ikke matchede
+3. Vis i tabel: filnavn, upload-dato, og de uploadede feltværdier (OPP, produkt, beløb etc.)
+4. Søgefelt + sortering på upload-dato
+
+**Count i tab-header:**
+- Query antal imports med unmatched_rows for badge-visning
 
