@@ -435,7 +435,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           daysSinceStart,
           missingAgentMapping,
           plannedEndDate: (emp as any).employment_end_date || undefined,
-          isOnCall,
+          isOnCall: false,
         });
       }
 
