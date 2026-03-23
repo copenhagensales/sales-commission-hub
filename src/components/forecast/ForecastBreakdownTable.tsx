@@ -1,10 +1,13 @@
 import { useState } from "react";
+import { format } from "date-fns";
+import { da } from "date-fns/locale";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Users, UserPlus, ArrowUpDown, AlertTriangle, Info, GraduationCap } from "lucide-react";
+import { Users, UserPlus, ArrowUpDown, AlertTriangle, Info, GraduationCap, CalendarOff } from "lucide-react";
 import type { EmployeeForecastResult, CohortForecastResult } from "@/types/forecast";
 import { ForecastIntervalBadge } from "./ForecastIntervalBadge";
+import { SetPlannedDepartureDialog } from "./SetPlannedDepartureDialog";
 
 interface Props {
   employees: EmployeeForecastResult[];
