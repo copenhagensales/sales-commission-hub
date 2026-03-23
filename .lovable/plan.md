@@ -1,28 +1,33 @@
 
-# Tilføj placeringsvalg i Lokationsøkonomi-fanen
+
+# Tilføj hotel- og diætomkostninger til Lokationsøkonomi
 
 ## Problem
-I Økonomi-fanen (LocationProfitabilityContent) vises lokationsomkostningen som 0 kr for lokationer der bruger placeringer (K1, K2 osv.) i stedet for en fast dagspris. Det sker fordi `daily_rate_override` er null på bookingen og lokationens base `daily_rate` kan være 0.
+Beregningen inkluderer kun sælgerløn og lokationsomkostning. Hotel og diæt mangler, så DB er højere end reelt.
 
-## Ændringer
+## Datakilder
+- **`booking_diet`**: `booking_id`, `employee_id`, `date`, `amount` — summér `amount` per booking_id
+- **`booking_hotel`**: `booking_id`, `price_per_night`, `rooms`, `check_in`, `check_out` — beregn antal nætter × pris × rum per booking_id
 
-### 1. `src/pages/vagt-flow/LocationProfitabilityContent.tsx`
-- Hent `placement_id` med i booking-queryen samt join `location_placements` for at få placeringens dagspris
-- I beregningen: brug `booking.daily_rate_override ?? placement.daily_rate ?? location.daily_rate` som fallback-kæde
-- Vis placeringsnavn i tabellen (fx "RO's Torv — K1") så man kan se hvilken placering der er valgt
-- Tilføj mulighed for at ændre placering direkte fra tabellen via en Select-dropdown, der opdaterer bookingen med den valgte placerings `placement_id` og `daily_rate_override`
+## Ændringer i `src/pages/vagt-flow/LocationProfitabilityContent.tsx`
 
-### 2. Booking-opdatering ved placeringsskift
-- Når bruger vælger en ny placering i Økonomi-tabellen, opdater bookingen med:
-  - `placement_id` = den valgte placerings id
-  - `daily_rate_override` = placeringens dagspris
-- Invalidér queries så tallene genberegnes med det samme
+### 1. Hent hotel- og diætdata (2 nye queries)
+- `booking_diet` filtreret på booking_ids for ugen → summér amount per booking_id
+- `booking_hotel` filtreret på booking_ids for ugen → beregn total hotelomkostning per booking_id (nætter × pris_per_nat × rum)
 
-## Teknisk detalje
-- Hent `location_placements` for alle lokationer i ugen (1 samlet query)
-- Match placements til bookinger via `booking.location_id` → `location_placements.location_id`
-- Vis Select-dropdown kun for lokationer der har definerede placeringer
+### 2. Tilføj til beregningen
+- Map hotel- og diæt-totaler til lokationer via booking_id
+- Ny beregning: `DB = Omsætning − Sælgerløn − Lokationsomkostning − Hotel − Diæt`
+
+### 3. Nye kolonner i tabellen
+- Tilføj **"Hotel"** og **"Diæt"** kolonner mellem "Lokation" og "DB"
+- Samme kolonner i daglig nedbrydning (expanderet visning)
+
+### 4. KPI-kort
+- Tilføj 2 nye KPI-kort: Total hotel og total diæt
+- Opdatér DB-beregning i totals
 
 | Fil | Ændring |
 |-----|---------|
-| `src/pages/vagt-flow/LocationProfitabilityContent.tsx` | Hent placement-data, vis placering, tilføj placeringsvalg-dropdown, opdatér booking |
+| `src/pages/vagt-flow/LocationProfitabilityContent.tsx` | 2 nye queries, 2 nye kolonner, opdateret DB-beregning |
+
