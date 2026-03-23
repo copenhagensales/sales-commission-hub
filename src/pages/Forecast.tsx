@@ -80,6 +80,28 @@ export default function Forecast() {
     },
   });
 
+  // Update cohort mutation
+  const updateCohort = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: { start_date: string; planned_headcount: number; note: string | null } }) => {
+      const { error } = await supabase
+        .from("client_forecast_cohorts")
+        .update({
+          start_date: data.start_date,
+          planned_headcount: data.planned_headcount,
+          note: data.note,
+        })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["client-forecast"] });
+      toast.success("Opstartshold opdateret");
+    },
+    onError: () => {
+      toast.error("Kunne ikke opdatere opstartshold");
+    },
+  });
+
   // Delete cohort mutation
   const deleteCohort = useMutation({
     mutationFn: async (cohortId: string) => {
