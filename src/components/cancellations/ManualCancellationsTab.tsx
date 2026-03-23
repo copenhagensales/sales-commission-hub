@@ -35,27 +35,11 @@ import { CLIENT_IDS } from "@/utils/clientIds";
 
 const RELATEL_CLIENT_ID = CLIENT_IDS["Relatel"];
 
-export function ManualCancellationsTab() {
-  const [selectedClientId, setSelectedClientId] = useState<string>("");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [dateFrom, setDateFrom] = useState<Date | undefined>();
-  const [dateTo, setDateTo] = useState<Date | undefined>();
-  const [selectedAgent, setSelectedAgent] = useState<string>("");
-  const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
+interface ManualCancellationsTabProps {
+  clientId: string;
+}
 
-  // Fetch clients
-  const { data: clients = [], isLoading: isLoadingClients } = useQuery({
-    queryKey: ["clients-for-cancellations"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("clients")
-        .select("id, name")
-        .order("name");
-      if (error) throw error;
-      return data;
-    },
-  });
-
+export function ManualCancellationsTab({ clientId: selectedClientId }: ManualCancellationsTabProps) {
   // Fetch sales based on filters
   const { data: sales = [], isLoading: isLoadingSales } = useQuery({
     queryKey: ["sales-for-cancellations", selectedClientId, dateFrom, dateTo],
