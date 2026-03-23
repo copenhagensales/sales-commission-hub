@@ -378,7 +378,28 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           if (salesInWeek === 0 && shiftsInWeek <= 2) continue;
 
           const sph = hoursInWeek > 0 ? salesInWeek / hoursInWeek : 0;
-          weeklySph.push(sph);
+        weeklySph.push(sph);
+        }
+
+        // DEBUG: Log Rebecca's data
+        if (emp.id.startsWith('8d24c8f3')) {
+          console.log('[DEBUG Rebecca]', {
+            id: emp.id,
+            name: `${emp.first_name} ${emp.last_name}`,
+            emails,
+            weeklySph,
+            normalWeeklyShifts,
+            weekDetails: weekStarts.map(ws => {
+              const we = endOfWeek(ws, { weekStartsOn: 1 });
+              const shifts = countShifts(emp.id, ws, we, true);
+              let sales = 0;
+              for (const email of emails) {
+                const weekMap = salesByEmailByWeek.get(email);
+                if (weekMap) sales += weekMap.get(ws.getTime()) || 0;
+              }
+              return { week: format(ws, 'yyyy-MM-dd'), shifts, sales, skipped: shifts < normalWeeklyShifts * 0.5 };
+            }),
+          });
         }
 
         // Planned hours for forecast month (gross = full capacity, net = minus absences)
