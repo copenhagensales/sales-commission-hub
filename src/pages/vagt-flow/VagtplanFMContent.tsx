@@ -621,7 +621,10 @@ export default function VagtplanFMContent() {
                 </td>
                 {displayDays.map(day => {
                   const dateStr = format(day, "yyyy-MM-dd");
-                  const dayShifts = shiftsByEmployeeAndDate.get(employee.id)?.get(dateStr) || [];
+                  const dayShiftsRaw = shiftsByEmployeeAndDate.get(employee.id)?.get(dateStr) || [];
+                  const dayShifts = dayShiftsRaw.filter(s => 
+                    !(s.start_time?.startsWith('00:00') && s.end_time?.startsWith('00:00'))
+                  );
                   const absence = isDateInAbsence(employee.id, day);
                   const lateness = getLatenessForDate(employee.id, day);
                   const timeStamp = getTimeStampForDate(employee.id, day);
