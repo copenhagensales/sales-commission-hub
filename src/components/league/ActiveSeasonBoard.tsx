@@ -59,10 +59,19 @@ export function ActiveSeasonBoard({
     });
 
     groups.sort((a, b) => a.division - b.division);
-    groups.forEach(g => g.players.sort((a, b) => a.division_rank - b.division_rank));
+    
+    // Sort players within division by round provision (descending) if available, else by division_rank
+    const hasRoundData = Object.keys(roundProvisionMap).length > 0;
+    groups.forEach(g => {
+      if (hasRoundData) {
+        g.players.sort((a, b) => (roundProvisionMap[b.employee_id] || 0) - (roundProvisionMap[a.employee_id] || 0));
+      } else {
+        g.players.sort((a, b) => a.division_rank - b.division_rank);
+      }
+    });
 
     return groups;
-  }, [standings]);
+  }, [standings, roundProvisionMap]);
 
   const totalDivisions = divisionGroups.length;
 
