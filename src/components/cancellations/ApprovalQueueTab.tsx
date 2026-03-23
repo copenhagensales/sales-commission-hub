@@ -18,6 +18,7 @@ import { Check, X, Loader2, Clock, Filter, Search, ArrowUpDown, ArrowUp, ArrowDo
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { UnmatchedTab } from "@/components/cancellations/UnmatchedTab";
+import { MatchErrorsSubTab } from "@/components/cancellations/MatchErrorsSubTab";
 import { CLIENT_IDS } from "@/utils/clientIds";
 
 const TDC_ERHVERV_CLIENT_ID = CLIENT_IDS["TDC Erhverv"];
@@ -287,7 +288,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   const { user } = useAuth();
   const [statusFilter, setStatusFilter] = useState<string>("pending");
   const [onlyDifferences, setOnlyDifferences] = useState(false);
-  const [subTab, setSubTab] = useState<"cancellation" | "basket_difference" | "unmatched">("cancellation");
+  const [subTab, setSubTab] = useState<"cancellation" | "basket_difference" | "unmatched" | "match_errors">("cancellation");
   const [searchQuery, setSearchQuery] = useState("");
   const [sellerFilter, setSellerFilter] = useState("all");
   type QueueSortKey = "date" | "agent" | "opp" | "type";
@@ -956,7 +957,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
           {isLoading ? (
             <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
           ) : (
-            <Tabs value={subTab} onValueChange={(v) => setSubTab(v as "cancellation" | "basket_difference" | "unmatched")}>
+            <Tabs value={subTab} onValueChange={(v) => setSubTab(v as "cancellation" | "basket_difference" | "unmatched" | "match_errors")}>
               <TabsList>
                 <TabsTrigger value="cancellation">
                   Annulleringer {cancellationCount > 0 && `(${cancellationCount})`}
@@ -966,6 +967,9 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                 </TabsTrigger>
                 <TabsTrigger value="unmatched">
                   Afventer
+                </TabsTrigger>
+                <TabsTrigger value="match_errors">
+                  Fejl i match
                 </TabsTrigger>
               </TabsList>
 
@@ -999,6 +1003,10 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
 
               <TabsContent value="unmatched" className="mt-4">
                 <UnmatchedTab clientId={clientId} />
+              </TabsContent>
+
+              <TabsContent value="match_errors" className="mt-4">
+                <MatchErrorsSubTab clientId={clientId} />
               </TabsContent>
             </Tabs>
           )}
