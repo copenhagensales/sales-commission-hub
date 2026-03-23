@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Download, Loader2, TrendingUp, TrendingDown, AlertTriangle, Sparkles, BarChart3, Target, Lightbulb, ArrowLeft, Users, Calendar } from "lucide-react";
+import { FileText, Download, Loader2, TrendingUp, TrendingDown, AlertTriangle, Sparkles, BarChart3, Target, ArrowLeft, Users, Calendar } from "lucide-react";
 import { useClientForecast } from "@/hooks/useClientForecast";
 import { supabase } from "@/integrations/supabase/client";
 import { generateForecastReportPdf } from "@/utils/forecastReportPdfGenerator";
@@ -136,8 +136,6 @@ export default function ForecastClientReport() {
             {/* 3. Hvad driver forecastet */}
             <ReportDrivers forecast={forecast} />
 
-            {/* 4. Anbefalinger */}
-            <ReportRecommendations forecast={forecast} />
 
             {/* 5. Outlook */}
             <ReportOutlook
@@ -161,7 +159,7 @@ function ReportExecutiveSummary({ forecast, clientName, periodLabel, monthOffset
 }) {
   const total = forecast.totalSalesExpected;
   const numEmployees = forecast.establishedEmployees.length;
-  const numCohorts = forecast.cohorts.filter(c => c.forecastSales > 0).length;
+  const numCohorts = forecast.cohorts.filter(c => c.forecastSales > 0 && c.startDate >= forecast.periodStart && c.startDate <= forecast.periodEnd).length;
   const absLoss = forecast.absenceLoss;
   const churnLoss = forecast.churnLoss + (forecast.establishedChurnLoss || 0);
   const isCurrentPeriod = monthOffset === 0;
@@ -219,7 +217,8 @@ function ReportExecutiveSummary({ forecast, clientName, periodLabel, monthOffset
 
 function ReportKeyFigures({ forecast }: { forecast: ForecastResult }) {
   const churnTotal = forecast.churnLoss + (forecast.establishedChurnLoss || 0);
-  const cohortSales = forecast.cohorts.reduce((s, c) => s + c.forecastSales, 0);
+  const periodCohorts = forecast.cohorts.filter(c => c.startDate >= forecast.periodStart && c.startDate <= forecast.periodEnd);
+  const cohortSales = periodCohorts.reduce((s, c) => s + c.forecastSales, 0);
   const topPerformers = forecast.establishedEmployees
     .filter(e => e.forecastSales + (e.actualSales || 0) > 0)
     .sort((a, b) => (b.forecastSales + (b.actualSales || 0)) - (a.forecastSales + (a.actualSales || 0)))
@@ -238,7 +237,7 @@ function ReportKeyFigures({ forecast }: { forecast: ForecastResult }) {
   ].filter(n => parseInt(n.value) !== 0);
 
   const positives = [
-    ...(cohortSales > 0 ? [{ label: "Nye hold", value: `+${cohortSales}`, desc: `${forecast.cohorts.length} opstartshold` }] : []),
+    ...(cohortSales > 0 ? [{ label: "Nye hold", value: `+${cohortSales}`, desc: `${periodCohorts.length} opstartshold` }] : []),
     ...(topSales > 0 ? [{ label: "Top-performere (top 5)", value: `${topSales}`, desc: "Salg fra de 5 stærkeste sælgere" }] : []),
   ];
 
@@ -306,7 +305,7 @@ function ReportKeyFigures({ forecast }: { forecast: ForecastResult }) {
 }
 
 function ReportCohorts({ forecast }: { forecast: ForecastResult }) {
-  const activeCohorts = forecast.cohorts.filter(c => c.forecastSales > 0 || c.plannedHeadcount > 0);
+  const activeCohorts = forecast.cohorts.filter(c => (c.forecastSales > 0 || c.plannedHeadcount > 0) && c.startDate >= forecast.periodStart && c.startDate <= forecast.periodEnd);
   if (activeCohorts.length === 0) return null;
 
   const totalCohortSales = activeCohorts.reduce((s, c) => s + c.forecastSales, 0);
@@ -405,63 +404,6 @@ function ReportDrivers({ forecast }: { forecast: ForecastResult }) {
             ))}
           </div>
         )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function ReportRecommendations({ forecast }: { forecast: ForecastResult }) {
-  const recommendations: { icon: typeof AlertTriangle; title: string; text: string }[] = [];
-  const employees = forecast.establishedEmployees;
-  const avgSph = employees.length > 0 ? employees.reduce((s, e) => s + e.expectedSph, 0) / employees.length : 0;
-
-  const churnLossTotal = forecast.churnLoss + (forecast.establishedChurnLoss || 0);
-  if (churnLossTotal > 0) {
-    recommendations.push({
-      icon: AlertTriangle,
-      title: "Fastholdelse",
-      text: `Vi har indregnet en forventet naturlig udskiftning i teamet svarende til ${churnLossTotal} salg. Tæt lederkontakt og tidlig opfølgning kan reducere denne effekt.`,
-    });
-  }
-
-  if (forecast.absenceLoss > 15) {
-    recommendations.push({
-      icon: TrendingDown,
-      title: "Fravær",
-      text: `Fravær påvirker forecastet med ${forecast.absenceLoss} tabte salg. Det kan være relevant at se på planlægning, vikardækning eller mønstre i bestemte uger.`,
-    });
-  }
-
-  const lowPerformers = employees.filter(e => e.expectedSph < avgSph * 0.5 && e.expectedSph > 0);
-  if (lowPerformers.length > 0) {
-    recommendations.push({
-      icon: TrendingUp,
-      title: "Performance-løft",
-      text: `${lowPerformers.length} sælger${lowPerformers.length > 1 ? "e" : ""} performer væsentligt under teamgennemsnittet. Coaching eller ekstra træning kan løfte output.`,
-    });
-  }
-
-  if (recommendations.length === 0) return null;
-
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <Lightbulb className="h-4 w-4 text-amber-500" />
-          Anbefalinger
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <p className="text-sm text-muted-foreground">Vi anbefaler at fokusere på:</p>
-        {recommendations.map((rec, i) => {
-          const Icon = rec.icon;
-          return (
-            <div key={i} className="pl-4 border-l-2 border-primary/20">
-              <p className="text-sm font-semibold">{rec.title}</p>
-              <p className="text-sm text-muted-foreground">{rec.text}</p>
-            </div>
-          );
-        })}
       </CardContent>
     </Card>
   );

@@ -11,9 +11,10 @@ interface ReportData {
 export function generateForecastReportPdf(data: ReportData) {
   const { clientName, periodLabel, forecast, forecastM2, periodLabelM2 } = data;
   const churnTotal = forecast.churnLoss + (forecast.establishedChurnLoss || 0);
-  const cohortSales = forecast.cohorts.reduce((s, c) => s + c.forecastSales, 0);
+  const periodCohorts = forecast.cohorts.filter(c => c.startDate >= forecast.periodStart && c.startDate <= forecast.periodEnd);
+  const cohortSales = periodCohorts.reduce((s, c) => s + c.forecastSales, 0);
   const numEmployees = forecast.establishedEmployees.length;
-  const numCohorts = forecast.cohorts.filter(c => c.forecastSales > 0).length;
+  const numCohorts = periodCohorts.filter(c => c.forecastSales > 0).length;
 
   const driverTexts: string[] = [];
   if (forecast.absenceLoss > 0) driverTexts.push(`Fravær reducerer med ${forecast.absenceLoss} salg`);
@@ -25,20 +26,6 @@ export function generateForecastReportPdf(data: ReportData) {
   const positiveDrivers = forecast.drivers.filter(d => d.impact === "positive");
   const negativeDrivers = forecast.drivers.filter(d => d.impact === "negative");
 
-  // Build recommendations
-  const recs: string[] = [];
-  
-  if (churnTotal > 0) {
-    recs.push(`<strong>Fastholdelse:</strong> Vi har indregnet en forventet naturlig udskiftning i teamet svarende til ${churnTotal} salg. Tæt lederkontakt og tidlig opfølgning kan reducere denne effekt.`);
-  }
-  if (forecast.absenceLoss > 15) {
-    recs.push(`<strong>Fravær:</strong> Fravær koster ${forecast.absenceLoss} salg. Se på planlægning, vikardækning eller mønstre.`);
-  }
-  const avgSph = numEmployees > 0 ? forecast.establishedEmployees.reduce((s, e) => s + e.expectedSph, 0) / numEmployees : 0;
-  const lowPerf = forecast.establishedEmployees.filter(e => e.expectedSph < avgSph * 0.5 && e.expectedSph > 0);
-  if (lowPerf.length > 0) {
-    recs.push(`<strong>Performance-løft:</strong> ${lowPerf.length} sælger${lowPerf.length > 1 ? "e" : ""} performer under teamgennemsnittet. Coaching kan løfte output.`);
-  }
 
   const html = `<!DOCTYPE html>
 <html lang="da">
@@ -106,11 +93,11 @@ export function generateForecastReportPdf(data: ReportData) {
     ${cohortSales > 0 ? `<div class="effect-row effect-pos"><span class="effect-label">Nye hold</span><span class="effect-value pos">+${cohortSales} salg</span></div>` : ""}
   </div>
 
-  ${forecast.cohorts.filter(c => c.forecastSales > 0 || c.plannedHeadcount > 0).length > 0 ? `
+  ${periodCohorts.filter(c => c.forecastSales > 0 || c.plannedHeadcount > 0).length > 0 ? `
   <div class="section">
     <div class="section-title">Planlagte opstartshold</div>
     <p style="font-size:11px;color:#64748b;margin-bottom:8px;">
-      Der er planlagt ${forecast.cohorts.filter(c => c.forecastSales > 0 || c.plannedHeadcount > 0).length} opstartshold med i alt ${forecast.cohorts.filter(c => c.forecastSales > 0 || c.plannedHeadcount > 0).reduce((s, c) => s + c.plannedHeadcount, 0)} nye sælgere.
+      Der er planlagt ${periodCohorts.filter(c => c.forecastSales > 0 || c.plannedHeadcount > 0).length} opstartshold med i alt ${periodCohorts.filter(c => c.forecastSales > 0 || c.plannedHeadcount > 0).reduce((s, c) => s + c.plannedHeadcount, 0)} nye sælgere.
       Nye hold er indregnet i det samlede forecast med gradvis optrapning.
     </p>
     <table style="width:100%;border-collapse:collapse;font-size:11px;">
@@ -123,7 +110,7 @@ export function generateForecastReportPdf(data: ReportData) {
         </tr>
       </thead>
       <tbody>
-        ${forecast.cohorts.filter(c => c.forecastSales > 0 || c.plannedHeadcount > 0).map(c => {
+        ${periodCohorts.filter(c => c.forecastSales > 0 || c.plannedHeadcount > 0).map(c => {
           const rampLabel = c.rampFactor <= 0.2 ? "Opstartsfase (15%)" : c.rampFactor <= 0.4 ? "Tidlig fase (35%)" : c.rampFactor <= 0.7 ? "Optrapning (60%)" : c.rampFactor <= 0.9 ? "Næsten fuld (85%)" : "Fuld kapacitet";
           return `<tr style="border-bottom:1px solid #f1f5f9;">
             <td style="padding:6px 8px;">${new Date(c.startDate).toLocaleDateString("da-DK", { day: "numeric", month: "short", year: "numeric" })}</td>
@@ -142,12 +129,6 @@ export function generateForecastReportPdf(data: ReportData) {
     ${negativeDrivers.length > 0 ? `<p style="font-size:10px;font-weight:600;color:#dc2626;margin-bottom:4px;margin-top:8px;">NEGATIVT</p>${negativeDrivers.map(d => `<div class="driver-block"><strong>${d.label.replace(/churn/gi, "teamudskiftning")}</strong><p>${d.description.replace(/churn/gi, "udskiftning")}</p></div>`).join("")}` : ""}
   </div>
 
-  ${recs.length > 0 ? `
-  <div class="section">
-    <div class="section-title">Anbefalinger</div>
-    <p style="margin-bottom:8px;font-size:11px;color:#64748b;">Vi anbefaler at fokusere på:</p>
-    ${recs.map(r => `<div class="rec-item"><p style="font-size:11px;">${r}</p></div>`).join("")}
-  </div>` : ""}
 
   <div class="section">
     <div class="section-title">Outlook</div>
