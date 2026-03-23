@@ -37,6 +37,7 @@ interface MatchedSale {
   saleId: string;
   phone: string;
   company: string;
+  oppNumber: string;
   saleDate: string;
   employee: string;
   currentStatus: string;
@@ -50,6 +51,7 @@ export function UploadCancellationsTab() {
   const [columns, setColumns] = useState<string[]>([]);
   const [phoneColumn, setPhoneColumn] = useState<string>("__none__");
   const [companyColumn, setCompanyColumn] = useState<string>("__none__");
+  const [oppColumn, setOppColumn] = useState<string>("__none__");
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [matchedSales, setMatchedSales] = useState<MatchedSale[]>([]);
   const [isMatching, setIsMatching] = useState(false);
@@ -135,10 +137,10 @@ export function UploadCancellationsTab() {
   });
 
   const handleMatch = async () => {
-    if (phoneColumn === "__none__" && companyColumn === "__none__") {
+    if (phoneColumn === "__none__" && companyColumn === "__none__" && oppColumn === "__none__") {
       toast({
         title: "Vælg kolonner",
-        description: "Vælg mindst én kolonne at matche på (telefon eller virksomhed).",
+        description: "Vælg mindst én kolonne at matche på (telefon, virksomhed eller OPP-nummer).",
         variant: "destructive",
       });
       return;
@@ -159,6 +161,7 @@ export function UploadCancellationsTab() {
       // Extract values from parsed data
       const phones: string[] = [];
       const companies: string[] = [];
+      const oppNumbers: string[] = [];
 
       parsedData.forEach(row => {
         if (phoneColumn !== "__none__" && row.originalRow[phoneColumn]) {
@@ -166,6 +169,10 @@ export function UploadCancellationsTab() {
         }
         if (companyColumn !== "__none__" && row.originalRow[companyColumn]) {
           companies.push(String(row.originalRow[companyColumn]).toLowerCase().trim());
+        }
+        if (oppColumn !== "__none__" && row.originalRow[oppColumn]) {
+          const oppVal = String(row.originalRow[oppColumn]).trim();
+          oppNumbers.push(oppVal);
         }
       });
 
@@ -182,7 +189,7 @@ export function UploadCancellationsTab() {
         return;
       }
 
-      // Query sales based on phone numbers and/or company names
+      // Query sales based on phone numbers, company names, and/or OPP numbers
       let query = supabase
         .from("sales")
         .select(`
@@ -191,20 +198,25 @@ export function UploadCancellationsTab() {
           customer_phone,
           customer_company,
           validation_status,
-          agent_name
+          agent_name,
+          adversus_opp_number
         `)
         .in("client_campaign_id", campaignIds)
         .neq("validation_status", "cancelled");
 
-      if (phones.length > 0 && companies.length > 0) {
-        // Match on either phone or company
-        const phoneConditions = phones.map(p => `customer_phone.ilike.%${p}%`).join(",");
-        const companyConditions = companies.map(c => `customer_company.ilike.%${c}%`).join(",");
-        query = query.or(`${phoneConditions},${companyConditions}`);
-      } else if (phones.length > 0) {
-        query = query.or(phones.map(p => `customer_phone.ilike.%${p}%`).join(","));
-      } else if (companies.length > 0) {
-        query = query.or(companies.map(c => `customer_company.ilike.%${c}%`).join(","));
+      const orConditions: string[] = [];
+      if (phones.length > 0) {
+        orConditions.push(...phones.map(p => `customer_phone.ilike.%${p}%`));
+      }
+      if (companies.length > 0) {
+        orConditions.push(...companies.map(c => `customer_company.ilike.%${c}%`));
+      }
+      if (oppNumbers.length > 0) {
+        orConditions.push(...oppNumbers.map(o => `adversus_opp_number.eq.${o}`));
+      }
+
+      if (orConditions.length > 0) {
+        query = query.or(orConditions.join(","));
       }
 
       const { data: matchedData, error } = await query.limit(500);
@@ -215,6 +227,7 @@ export function UploadCancellationsTab() {
         saleId: sale.id,
         phone: sale.customer_phone || "",
         company: sale.customer_company || "",
+        oppNumber: sale.adversus_opp_number || "",
         saleDate: sale.sale_datetime || "",
         employee: sale.agent_name || "Ukendt",
         currentStatus: sale.validation_status || "pending",
@@ -290,6 +303,7 @@ export function UploadCancellationsTab() {
     setColumns([]);
     setPhoneColumn("__none__");
     setCompanyColumn("__none__");
+    setOppColumn("__none__");
     setSelectedClientId("");
     setMatchedSales([]);
     setStep("upload");
@@ -338,7 +352,7 @@ export function UploadCancellationsTab() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="space-y-2">
                 <Label>Vælg kunde</Label>
                 <Select value={selectedClientId} onValueChange={setSelectedClientId}>
@@ -375,6 +389,23 @@ export function UploadCancellationsTab() {
               <div className="space-y-2">
                 <Label>Virksomhedskolonne (valgfri)</Label>
                 <Select value={companyColumn} onValueChange={setCompanyColumn}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Vælg kolonne..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Ingen</SelectItem>
+                    {columns.map((col) => (
+                      <SelectItem key={col} value={col}>
+                        {col}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>OPP-kolonne (valgfri)</Label>
+                <Select value={oppColumn} onValueChange={setOppColumn}>
                   <SelectTrigger>
                     <SelectValue placeholder="Vælg kolonne..." />
                   </SelectTrigger>
@@ -437,13 +468,14 @@ export function UploadCancellationsTab() {
                 <div className="rounded-md border max-h-96 overflow-auto">
                   <Table>
                     <TableHeader>
-                      <TableRow>
-                        <TableHead>Salgsdato</TableHead>
-                        <TableHead>Sælger</TableHead>
-                        <TableHead>Telefon</TableHead>
-                        <TableHead>Virksomhed</TableHead>
-                        <TableHead>Status</TableHead>
-                      </TableRow>
+                     <TableRow>
+                         <TableHead>Salgsdato</TableHead>
+                         <TableHead>Sælger</TableHead>
+                         <TableHead>Telefon</TableHead>
+                         <TableHead>Virksomhed</TableHead>
+                         <TableHead>OPP-nummer</TableHead>
+                         <TableHead>Status</TableHead>
+                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {matchedSales.map((sale) => (
@@ -452,6 +484,7 @@ export function UploadCancellationsTab() {
                           <TableCell>{sale.employee}</TableCell>
                           <TableCell>{sale.phone || "-"}</TableCell>
                           <TableCell>{sale.company || "-"}</TableCell>
+                          <TableCell>{sale.oppNumber || "-"}</TableCell>
                           <TableCell>
                             <Badge variant="secondary">{sale.currentStatus}</Badge>
                           </TableCell>
