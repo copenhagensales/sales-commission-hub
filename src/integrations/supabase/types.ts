@@ -1524,6 +1524,7 @@ export type Database = {
       }
       cancellation_imports: {
         Row: {
+          config_id: string | null
           created_at: string
           error_message: string | null
           file_name: string
@@ -1536,6 +1537,7 @@ export type Database = {
           uploaded_by: string
         }
         Insert: {
+          config_id?: string | null
           created_at?: string
           error_message?: string | null
           file_name: string
@@ -1548,6 +1550,7 @@ export type Database = {
           uploaded_by: string
         }
         Update: {
+          config_id?: string | null
           created_at?: string
           error_message?: string | null
           file_name?: string
@@ -1560,6 +1563,13 @@ export type Database = {
           uploaded_by?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "cancellation_imports_config_id_fkey"
+            columns: ["config_id"]
+            isOneToOne: false
+            referencedRelation: "cancellation_upload_configs"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "cancellation_imports_uploaded_by_fkey"
             columns: ["uploaded_by"]
@@ -1651,6 +1661,59 @@ export type Database = {
             columns: ["sale_id"]
             isOneToOne: false
             referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cancellation_upload_configs: {
+        Row: {
+          client_id: string
+          commission_column: string | null
+          company_column: string | null
+          created_at: string
+          id: string
+          is_default: boolean | null
+          name: string
+          opp_column: string | null
+          phone_column: string | null
+          product_columns: string[] | null
+          product_match_mode: string
+          revenue_column: string | null
+        }
+        Insert: {
+          client_id: string
+          commission_column?: string | null
+          company_column?: string | null
+          created_at?: string
+          id?: string
+          is_default?: boolean | null
+          name: string
+          opp_column?: string | null
+          phone_column?: string | null
+          product_columns?: string[] | null
+          product_match_mode?: string
+          revenue_column?: string | null
+        }
+        Update: {
+          client_id?: string
+          commission_column?: string | null
+          company_column?: string | null
+          created_at?: string
+          id?: string
+          is_default?: boolean | null
+          name?: string
+          opp_column?: string | null
+          phone_column?: string | null
+          product_columns?: string[] | null
+          product_match_mode?: string
+          revenue_column?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cancellation_upload_configs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
         ]
