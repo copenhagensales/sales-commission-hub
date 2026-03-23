@@ -482,30 +482,17 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         // Check if employee has any individual shifts or booking assignments in forecast period
         const hasAnyForecastShifts = Array.from(individualShiftMap.get(emp.id) || new Set()).some(d => d >= forecastStartStr && d <= forecastEndStr);
         const hasAnyForecastBookings = Array.from(bookingAssignmentMap.get(emp.id) || new Set()).some(d => d >= forecastStartStr && d <= forecastEndStr);
-        const useBookingOnly = !hasAnyForecastShifts && !hasAnyForecastBookings;
+
+        // FM employees: ALWAYS use bookingOnly (team standard mon-fri is irrelevant for FM)
+        const empTeamId = employeeTeamMap.get(emp.id);
+        const empTeamName = empTeamId ? teamNameMap.get(empTeamId) : null;
+        const isFmEmployee = empTeamName?.toLowerCase().includes('fieldmarketing') 
+          || empTeamName?.toLowerCase().includes('field marketing');
+
+        const useBookingOnly = isFmEmployee || (!hasAnyForecastShifts && !hasAnyForecastBookings);
 
         let grossShifts = countShifts(emp.id, forecastStart, empForecastEnd, false, useBookingOnly);
         let forecastShifts = countShifts(emp.id, forecastStart, empForecastEnd, true, useBookingOnly);
-
-        // Safety-net: if bookingOnly is true, force 0 shifts regardless of what countShifts returned
-        if (useBookingOnly && (grossShifts > 0 || forecastShifts > 0)) {
-          console.warn(`[FORECAST SAFETY-NET] ${emp.first_name} ${emp.last_name}: useBookingOnly=true but grossShifts=${grossShifts}, forecastShifts=${forecastShifts}. Forcing to 0.`);
-          grossShifts = 0;
-          forecastShifts = 0;
-        }
-
-        // Debug logging for employees with bookingOnly
-        if (useBookingOnly || `${emp.first_name} ${emp.last_name}`.toLowerCase().includes('sandra')) {
-          console.log(`[FORECAST DEBUG] ${emp.first_name} ${emp.last_name}:`, {
-            hasAnyForecastShifts,
-            hasAnyForecastBookings,
-            useBookingOnly,
-            grossShifts,
-            forecastShifts,
-            empStandardDays: empShiftIdMap.get(emp.id) ? shiftDaysMap.get(empShiftIdMap.get(emp.id)!) : undefined,
-            forecastPeriod: `${forecastStartStr} → ${format(empForecastEnd, 'yyyy-MM-dd')}`,
-          });
-        }
 
         let grossPlannedHours = grossShifts * HOURS_PER_SHIFT;
         let plannedHours = forecastShifts * HOURS_PER_SHIFT;
