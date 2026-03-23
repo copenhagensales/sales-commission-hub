@@ -520,7 +520,8 @@ export default function LocationProfitabilityContent() {
                       </TableRow>
                       {isExpanded && weekDates.map((date) => {
                         const dateStr = format(date, "yyyy-MM-dd");
-                        const dayNum = date.getDay() === 0 ? 7 : date.getDay();
+                        const jsDay = date.getDay();
+                        const dayNum = jsDay === 0 ? 6 : jsDay - 1;
                         const isBooked = loc.bookedDays.includes(dayNum);
                         const day = loc.dailyBreakdown[dateStr];
                         const dayRevenue = day?.revenue || 0;
