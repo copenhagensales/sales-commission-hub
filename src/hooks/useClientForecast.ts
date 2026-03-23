@@ -457,7 +457,10 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
             salesInWeek += fmWeekMap.get(ws.getTime()) || 0;
           }
 
-          // Skip weeks with 0 sales and very few shifts (likely unrecorded absence)
+          // Skip weeks with 0 sales and no concrete shifts (individual/booking)
+          // This handles cases where team standard gives shifts but employee didn't actually work
+          const concreteShiftsInWeek = countConcreteShifts(emp.id, ws, we);
+          if (salesInWeek === 0 && concreteShiftsInWeek === 0) continue;
           if (salesInWeek === 0 && shiftsInWeek <= 2) continue;
 
           const sph = hoursInWeek > 0 ? salesInWeek / hoursInWeek : 0;
