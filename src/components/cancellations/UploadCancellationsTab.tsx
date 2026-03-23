@@ -223,32 +223,7 @@ export function UploadCancellationsTab() {
         allMatched = matchedData || [];
       }
 
-      // If OPP numbers specified, do a separate text search on raw_payload
-      if (oppNumbers.length > 0) {
-        const oppPromises = oppNumbers.map(opp =>
-          supabase
-            .from("sales")
-            .select(`id, sale_datetime, customer_phone, customer_company, validation_status, agent_name, raw_payload`)
-            .in("client_campaign_id", campaignIds)
-            .neq("validation_status", "cancelled")
-            .ilike("raw_payload", `%${opp}%`)
-            .limit(100)
-        );
-        const oppResults = await Promise.all(oppPromises);
-        const existingIds = new Set(allMatched.map(s => s.id));
-        for (const result of oppResults) {
-          if (result.data) {
-            for (const sale of result.data) {
-              if (!existingIds.has(sale.id)) {
-                allMatched.push(sale);
-                existingIds.add(sale.id);
-              }
-            }
-          }
-        }
-      }
-
-      // Extract OPP number from raw_payload
+      // Helper to extract OPP number from raw_payload
       const extractOpp = (rawPayload: unknown): string => {
         if (!rawPayload || typeof rawPayload !== 'object') return "";
         const rp = rawPayload as Record<string, unknown>;
@@ -263,6 +238,31 @@ export function UploadCancellationsTab() {
         }
         return "";
       };
+
+      // If OPP numbers specified, fetch recent sales and match OPP client-side from raw_payload
+      if (oppNumbers.length > 0) {
+        const { data: oppCandidates } = await supabase
+          .from("sales")
+          .select(`id, sale_datetime, customer_phone, customer_company, validation_status, agent_name, raw_payload`)
+          .in("client_campaign_id", campaignIds)
+          .neq("validation_status", "cancelled")
+          .order("sale_datetime", { ascending: false })
+          .limit(2000);
+
+        if (oppCandidates) {
+          const existingIds = new Set(allMatched.map(s => s.id));
+          const oppSet = new Set(oppNumbers.map(o => o.toUpperCase().trim()));
+          
+          for (const sale of oppCandidates) {
+            if (existingIds.has(sale.id)) continue;
+            const saleOpp = extractOpp(sale.raw_payload).toUpperCase().trim();
+            if (saleOpp && oppSet.has(saleOpp)) {
+              allMatched.push(sale);
+              existingIds.add(sale.id);
+            }
+          }
+        }
+      }
 
       const matched: MatchedSale[] = allMatched.map(sale => ({
         saleId: sale.id,
