@@ -654,18 +654,10 @@ export default function CommissionLeague() {
                 <CardContent>
                   {/* Round navigation — chips */}
                   <div className="flex flex-wrap items-center gap-1.5 mb-4 overflow-x-auto pb-1">
-                    <Button
-                      variant={selectedRoundIndex === -1 ? "default" : "outline"}
-                      size="sm"
-                      className="text-xs h-7 px-2.5 shrink-0"
-                      onClick={() => setSelectedRoundIndex(-1)}
-                    >
-                      Samlet
-                    </Button>
                     {(roundHistory || []).map((r, idx) => (
                       <Button
                         key={r.id}
-                        variant={selectedRoundIndex === idx ? "default" : "outline"}
+                        variant={effectiveIndex === idx ? "default" : "outline"}
                         size="sm"
                         className="text-xs h-7 px-2.5 shrink-0"
                         onClick={() => setSelectedRoundIndex(idx)}
@@ -681,7 +673,7 @@ export default function CommissionLeague() {
                     ))}
                   </div>
 
-                  {selectedRoundIndex === -1 ? (
+                  {selectedRound?.status === "active" ? (
                     <ActiveSeasonBoard
                       standings={seasonStandings || []}
                       playersPerDivision={playersPerDivision}
@@ -701,11 +693,7 @@ export default function CommissionLeague() {
                   ) : (
                     <Card className="bg-card border-border">
                       <CardContent className="py-10 text-center">
-                        <p className="text-muted-foreground text-sm">
-                          {selectedRound?.status === "active"
-                            ? `Runde ${selectedRound.round_number} er stadig i gang. Resultater vises når runden afsluttes.`
-                            : "Ingen rundedata endnu."}
-                        </p>
+                        <p className="text-muted-foreground text-sm">Ingen rundedata endnu.</p>
                       </CardContent>
                     </Card>
                   )}
