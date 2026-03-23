@@ -484,8 +484,8 @@ export default function CommissionLeague() {
             </Card>
           )}
 
-          {/* Enrolled - show dashboard */}
-          {isEnrolled && (
+          {/* Enrolled - show qualification dashboard (only during qualification) */}
+          {isQualificationPhase && isEnrolled && (
             <>
               {/* My Status - only for active participants, not fans */}
               {!isFan && (
