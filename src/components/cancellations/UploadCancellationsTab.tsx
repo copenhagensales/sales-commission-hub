@@ -289,37 +289,63 @@ export function UploadCancellationsTab() {
         return;
       }
 
-      // Build OR conditions for matching
-      const orConditions: string[] = [];
-      if (phones.length > 0) {
-        orConditions.push(...phones.map(p => `customer_phone.ilike.%${p}%`));
-      }
-      if (companies.length > 0) {
-        orConditions.push(...companies.map(c => `customer_company.ilike.%${c}%`));
-      }
-
-      // Query sales based on phone/company only if we have filters
+      // Fetch all non-cancelled sales for this client and match client-side
+      // (avoids PostgREST URL length limits with large OR condition lists)
       let allMatched: any[] = [];
+      const existingIds = new Set<string>();
 
-      if (orConditions.length > 0) {
-        const { data: matchedData, error } = await supabase
-          .from("sales")
-          .select(`
-            id,
-            sale_datetime,
-            customer_phone,
-            customer_company,
-            validation_status,
-            agent_name,
-            raw_payload
-          `)
-          .in("client_campaign_id", campaignIds)
-          .neq("validation_status", "cancelled")
-          .or(orConditions.join(","))
-          .limit(500);
+      // Fetch candidate sales in pages (Supabase default limit = 1000)
+      const fetchCandidateSales = async () => {
+        const candidates: any[] = [];
+        let from = 0;
+        const pageSize = 1000;
+        while (true) {
+          const { data, error } = await supabase
+            .from("sales")
+            .select(`
+              id,
+              sale_datetime,
+              customer_phone,
+              customer_company,
+              validation_status,
+              agent_name,
+              raw_payload
+            `)
+            .in("client_campaign_id", campaignIds)
+            .neq("validation_status", "cancelled")
+            .order("sale_datetime", { ascending: false })
+            .range(from, from + pageSize - 1);
+          if (error) throw error;
+          if (!data || data.length === 0) break;
+          candidates.push(...data);
+          if (data.length < pageSize) break;
+          from += pageSize;
+        }
+        return candidates;
+      };
 
-        if (error) throw error;
-        allMatched = matchedData || [];
+      const candidateSales = (phones.length > 0 || companies.length > 0 || oppNumbers.length > 0)
+        ? await fetchCandidateSales()
+        : [];
+
+      // Build lookup sets for client-side matching
+      const phoneSet = new Set(phones.map(p => p.replace(/\D/g, "")));
+      const companySet = new Set(companies);
+
+      // Match by phone or company client-side
+      for (const sale of candidateSales) {
+        if (existingIds.has(sale.id)) continue;
+        const salePhone = (sale.customer_phone || "").replace(/\D/g, "");
+        const saleCompany = (sale.customer_company || "").toLowerCase().trim();
+
+        let matched = false;
+        if (salePhone && phoneSet.has(salePhone)) matched = true;
+        if (!matched && saleCompany && companySet.has(saleCompany)) matched = true;
+
+        if (matched) {
+          allMatched.push(sale);
+          existingIds.add(sale.id);
+        }
       }
 
       // Helper to extract OPP number from raw_payload
@@ -340,25 +366,14 @@ export function UploadCancellationsTab() {
 
       // If OPP numbers specified, fetch recent sales and match OPP client-side from raw_payload
       if (oppNumbers.length > 0) {
-        const { data: oppCandidates } = await supabase
-          .from("sales")
-          .select(`id, sale_datetime, customer_phone, customer_company, validation_status, agent_name, raw_payload`)
-          .in("client_campaign_id", campaignIds)
-          .neq("validation_status", "cancelled")
-          .order("sale_datetime", { ascending: false })
-          .limit(2000);
-
-        if (oppCandidates) {
-          const existingIds = new Set(allMatched.map(s => s.id));
-          const oppSet = new Set(oppNumbers.map(o => o.toUpperCase().trim()));
-          
-          for (const sale of oppCandidates) {
-            if (existingIds.has(sale.id)) continue;
-            const saleOpp = extractOpp(sale.raw_payload).toUpperCase().trim();
-            if (saleOpp && oppSet.has(saleOpp)) {
-              allMatched.push(sale);
-              existingIds.add(sale.id);
-            }
+        const oppSet = new Set(oppNumbers.map(o => o.toUpperCase().trim()));
+        
+        for (const sale of candidateSales) {
+          if (existingIds.has(sale.id)) continue;
+          const saleOpp = extractOpp(sale.raw_payload).toUpperCase().trim();
+          if (saleOpp && oppSet.has(saleOpp)) {
+            allMatched.push(sale);
+            existingIds.add(sale.id);
           }
         }
       }
