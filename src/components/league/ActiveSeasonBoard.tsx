@@ -361,11 +361,11 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
           <div className="text-right">
             <div className="flex items-center gap-1.5 justify-end">
               <div className="font-mono text-sm sm:text-[15px] font-semibold whitespace-nowrap">
-                {Number(standing.total_points).toLocaleString("da-DK", { maximumFractionDigits: 0 })} pt
+                {roundProvision.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
               </div>
             </div>
             <div className="text-[10px] text-muted-foreground">
-              {Number(standing.total_provision).toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
+              {Number(standing.total_points).toLocaleString("da-DK", { maximumFractionDigits: 0 })} pt samlet
             </div>
             {todayProvision > 0 && (
               <div className="text-[10px] text-emerald-400 font-medium flex items-center gap-1">
