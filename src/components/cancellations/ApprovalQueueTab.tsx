@@ -929,7 +929,27 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="flex items-center gap-2">
+                <Select value={sellerFilter} onValueChange={setSellerFilter}>
+                  <SelectTrigger className="w-[180px]"><SelectValue placeholder="Alle sælgere" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Alle sælgere</SelectItem>
+                    {allSellers.map(name => (
+                      <SelectItem key={name} value={name}>{name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
+          </div>
+          <div className="relative max-w-sm mt-3">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Søg i alle felter..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
