@@ -16,6 +16,7 @@ import { toast } from "@/hooks/use-toast";
 import { Check, X, Loader2, Clock, Filter } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
+import { UnmatchedTab } from "@/components/cancellations/UnmatchedTab";
 import { CLIENT_IDS } from "@/utils/clientIds";
 
 const TDC_ERHVERV_CLIENT_ID = CLIENT_IDS["TDC Erhverv"];
@@ -285,7 +286,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   const { user } = useAuth();
   const [statusFilter, setStatusFilter] = useState<string>("pending");
   const [onlyDifferences, setOnlyDifferences] = useState(false);
-  const [subTab, setSubTab] = useState<"cancellation" | "basket_difference">("cancellation");
+  const [subTab, setSubTab] = useState<"cancellation" | "basket_difference" | "unmatched">("cancellation");
 
   const { data: currentEmployee } = useQuery({
     queryKey: ["current-employee-for-approval", user?.email],
@@ -834,7 +835,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
           {isLoading ? (
             <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
           ) : (
-            <Tabs value={subTab} onValueChange={(v) => setSubTab(v as "cancellation" | "basket_difference")}>
+            <Tabs value={subTab} onValueChange={(v) => setSubTab(v as "cancellation" | "basket_difference" | "unmatched")}>
               <TabsList>
                 <TabsTrigger value="cancellation">
                   Annulleringer {cancellationCount > 0 && `(${cancellationCount})`}
@@ -842,18 +843,19 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                 <TabsTrigger value="basket_difference">
                   Kurv-rettelser {basketCount > 0 && `(${basketCount})`}
                 </TabsTrigger>
+                <TabsTrigger value="unmatched">
+                  Afventer
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="cancellation" className="mt-4">
                 {statusFilter === "pending" && totalPending > 0 && (
                   <div className="flex gap-2 mb-4">
-                    <Button size="sm" onClick={handleApproveAllPending} disabled={isPending}>
-                      {approveMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Check className="h-4 w-4 mr-2" />}
-                      Godkend alle ({totalPending})
+                    <Button size="sm" variant="default" onClick={() => handleBulkAction("approved")} disabled={bulkMutation.isPending}>
+                      <Check className="h-4 w-4 mr-1" /> Godkend alle
                     </Button>
-                    <Button size="sm" variant="destructive" onClick={handleRejectAllPending} disabled={isPending}>
-                      {rejectMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <X className="h-4 w-4 mr-2" />}
-                      Afvis alle ({totalPending})
+                    <Button size="sm" variant="destructive" onClick={() => handleBulkAction("rejected")} disabled={bulkMutation.isPending}>
+                      <X className="h-4 w-4 mr-1" /> Afvis alle
                     </Button>
                   </div>
                 )}
@@ -863,17 +865,19 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
               <TabsContent value="basket_difference" className="mt-4">
                 {statusFilter === "pending" && totalPending > 0 && (
                   <div className="flex gap-2 mb-4">
-                    <Button size="sm" onClick={handleApproveAllPending} disabled={isPending}>
-                      {approveMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Check className="h-4 w-4 mr-2" />}
-                      Godkend alle ({totalPending})
+                    <Button size="sm" variant="default" onClick={() => handleBulkAction("approved")} disabled={bulkMutation.isPending}>
+                      <Check className="h-4 w-4 mr-1" /> Godkend alle
                     </Button>
-                    <Button size="sm" variant="destructive" onClick={handleRejectAllPending} disabled={isPending}>
-                      {rejectMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <X className="h-4 w-4 mr-2" />}
-                      Afvis alle ({totalPending})
+                    <Button size="sm" variant="destructive" onClick={() => handleBulkAction("rejected")} disabled={bulkMutation.isPending}>
+                      <X className="h-4 w-4 mr-1" /> Afvis alle
                     </Button>
                   </div>
                 )}
                 {renderTable()}
+              </TabsContent>
+
+              <TabsContent value="unmatched" className="mt-4">
+                <UnmatchedTab clientId={clientId} />
               </TabsContent>
             </Tabs>
           )}
