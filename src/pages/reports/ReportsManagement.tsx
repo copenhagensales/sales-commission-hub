@@ -197,6 +197,7 @@ export default function ReportsManagement() {
       Virksomhed: r.customer_company ?? "",
       Status: r.status ?? "",
       Reference: r.internal_reference ?? "",
+      "OPP-nummer": r.adversus_opp_number ?? "",
     }));
 
     await downloadExcel(
