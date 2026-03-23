@@ -664,7 +664,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
 
     return (
       <div className="space-y-6">
-        {subOppGroups.length > 0 && (
+        {processedOppGroups.length > 0 && (
           <div>
             <h3 className="text-sm font-semibold mb-2 text-muted-foreground">TDC Erhverv — OPP-grupperet</h3>
             <div className="rounded-md border max-h-[600px] overflow-auto">
@@ -682,7 +682,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {subOppGroups.map((g) => {
+                  {processedOppGroups.map((g) => {
                     const summarizedItems = summarizeSaleItems(g.saleItems);
                     const uploadedPreview = buildUploadedPreview(g.uploadedData, g.mapping);
                     return (
@@ -772,9 +772,9 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
           </div>
         )}
 
-        {subFlatItems.length > 0 && (
+        {processedFlatItems.length > 0 && (
           <div>
-            {subOppGroups.length > 0 && (
+            {processedOppGroups.length > 0 && (
               <h3 className="text-sm font-semibold mb-2 text-muted-foreground">Andre kunder — per salg</h3>
             )}
             <div className="rounded-md border max-h-[600px] overflow-auto">
@@ -793,7 +793,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {subFlatItems.map((item) => {
+                  {processedFlatItems.map((item) => {
                     const summarizedItems = summarizeSaleItems(item.saleItems);
                     const uploadedPreview = buildUploadedPreview(item.uploadedData, item.mapping);
                     return (
