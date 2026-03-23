@@ -155,6 +155,14 @@ export default function BookingManagement() {
               </Suspense>
             </TabsContent>
           )}
+
+          {visibleTabs.some(t => t.value === "okonomi") && (
+            <TabsContent value="okonomi" className="mt-6">
+              <Suspense fallback={<div className="flex items-center justify-center py-12">Indlæser...</div>}>
+                <LocationProfitabilityContent />
+              </Suspense>
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     </MainLayout>
