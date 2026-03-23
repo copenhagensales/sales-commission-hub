@@ -59,6 +59,7 @@ export function RawSalesTable({ data, isLoading }: RawSalesTableProps) {
             <TableHead>Virksomhed</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Reference</TableHead>
+            <TableHead>OPP-nummer</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
