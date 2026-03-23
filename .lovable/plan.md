@@ -1,39 +1,54 @@
 
 
-# Fix: FM-medarbejdere skal ALTID bruge bookingOnly
+# Fix: Respektér special shifts med 0 dage (Sandra, Jesus, Martin Lind m.fl.)
 
 ## Problem
-Vagtplanen viser "09:30-17:30 / ikke booket" for alle FM-medarbejdere — det er team standard shifts (man-fre). Forecastet tæller disse som rigtige vagter, fordi `useBookingOnly` kun er `true` når der er **nul** bookinger. Har medarbejderen bare 1 booking, bruges team standard for alle andre dage → oppustet forecast.
+Flere FM-medarbejdere (Sandra R, Jesus, Martin Lind osv.) har en **special shift** tildelt i `employee_standard_shifts`, men den shift har **0 dage konfigureret**. Det betyder: "denne medarbejder har ikke faste vagter".
 
-## Løsning
-Identificér FM-medarbejdere via teamnavnet og tving `bookingOnly = true` for dem alle. Så tælles KUN individuelle vagter + booking assignments — aldrig team standard.
+Men `countShifts` ser `empStandardDays = undefined` (fordi `shiftDaysMap` ikke har nogen dage for det shift_id) og falder igennem til **team standard** (man-fre = 22 dage). Det giver forkert forecast.
 
-## Ændring i `src/hooks/useClientForecast.ts`
+Den korrekte logik (som vagtplanen bruger): Hvis medarbejderen HAR en special shift → brug KUN den, også selvom den har 0 dage. Fald ALDRIG igennem til team standard.
 
-**Linje 482-508 erstattes med:**
+## Ændringer i `src/hooks/useClientForecast.ts`
+
+### 1. Ret `countShifts` fallback (linje 361-367)
+**Fra:**
 ```typescript
-// FM employees: ALWAYS use bookingOnly (team standard is irrelevant for FM)
-const empTeamId = employeeTeamMap.get(emp.id);
-const empTeamName = empTeamId ? teamNameMap.get(empTeamId) : null;
-const isFmEmployee = empTeamName?.toLowerCase().includes('fieldmarketing') 
-  || empTeamName?.toLowerCase().includes('field marketing');
-
-const useBookingOnly = isFmEmployee || (!hasAnyForecastShifts && !hasAnyForecastBookings);
-
-let grossShifts = countShifts(emp.id, forecastStart, empForecastEnd, false, useBookingOnly);
-let forecastShifts = countShifts(emp.id, forecastStart, empForecastEnd, true, useBookingOnly);
+} else if (!bookingOnly) {
+  if (empStandardDays !== undefined) {
+    if (empStandardDays.includes(dayNumber)) count++;
+  } else if (teamDays && teamDays.includes(dayNumber)) {
+    count++;
+  }
+}
 ```
 
-- Fjern safety-net (linje 490-495) — nu overflødig
-- Fjern debug-logs (linje 497-508) — nu overflødig
-- Kræver at `teamNameMap` allerede eksisterer (skal verificeres, evt. bygges fra eksisterende team-data)
+**Til:**
+```typescript
+} else {
+  const empHasSpecialShift = empShiftIdMap.has(empId);
+  if (empHasSpecialShift) {
+    // Employee has a special shift — use ONLY its days (even if 0)
+    if (empStandardDays && empStandardDays.includes(dayNumber)) count++;
+  } else if (teamDays && teamDays.includes(dayNumber)) {
+    // No special shift — fall back to team standard
+    count++;
+  }
+}
+```
+
+### 2. Fjern FM bookingOnly-logik (linje 486-492)
+Fjern `isFmEmployee`, `useBookingOnly` og `bookingOnly`-parameteren fra forecast-kaldene. Standard `countShifts` håndterer det nu korrekt for alle.
+
+### 3. Ret `getNormalWeeklyShifts` tilsvarende
+Samme logik: Hvis medarbejder har special shift → brug dens dage, fald ikke igennem til team standard.
 
 ## Resultat
-- Sandra R april: 0 bookinger → 0 vagter → 0 forecast
-- Sandra R marts: kun hendes faktiske bookinger+vagter tælles
-- Non-FM medarbejdere: uændret (bruger stadig team standard som fallback)
+- Sandra R, Jesus, Martin Lind (special shift, 0 dage): 0 vagter → 0 forecast ✓
+- Andre FM-medarbejdere uden special shift: Team standard (man-fre) tælles → "ikke booket" = rigtig vagt ✓
+- Non-FM medarbejdere: Uændret
 
 | Fil | Ændring |
 |-----|---------|
-| `src/hooks/useClientForecast.ts` | FM = altid bookingOnly, fjern debug+safety-net |
+| `src/hooks/useClientForecast.ts` | Ret countShifts fallback, fjern bookingOnly FM-logik, ret getNormalWeeklyShifts |
 
