@@ -1,19 +1,33 @@
 
 
-# Fix: Upload annulleringsfil crasher
+# Tilføj OPP-nummer matching til annullerings-upload
 
 ## Problem
-Siden crasher med fejlen: *"A Select.Item must have a value prop that is not an empty string"*. Det sker fordi `<SelectItem value="">Ingen</SelectItem>` bruges til telefon- og virksomhedskolonne-vælgerne — Radix UI Select tillader ikke tom streng som value.
+Når TDC Erhverv bruger annullerings-upload, matcher systemet kun på telefonnummer og virksomhedsnavn. TDC Erhverv identificerer salg via OPP-nummer (gemt i `adversus_opp_number` kolonnen i `sales`-tabellen), så der skal tilføjes OPP-matching.
 
 ## Ændring
 
 ### `src/components/cancellations/UploadCancellationsTab.tsx`
 
-- Erstat `<SelectItem value="">Ingen</SelectItem>` med `<SelectItem value="__none__">Ingen</SelectItem>` (2 steder: telefonkolonne og virksomhedskolonne)
-- Opdater `phoneColumn`/`companyColumn` initialisering og `handleReset` til at bruge `"__none__"` som default
-- Opdater `handleMatch` til at tjekke `phoneColumn !== "__none__"` i stedet for `!phoneColumn`
+**1. Tilføj OPP-kolonne state**
+- Ny state: `oppColumn` med default `"__none__"`
+- Reset i `handleReset()`
+
+**2. Tilføj OPP-kolonne vælger i mapping UI**
+- Nyt `<Select>` felt: "OPP-kolonne (valgfri)" ved siden af telefon og virksomhed
+- Grid ændres fra 3 til 4 kolonner
+
+**3. Udvid matching-logik i `handleMatch()`**
+- Udtræk OPP-værdier fra parsed data (normaliser til `OPP-XXXXXX` format)
+- Valideringscheck: mindst én af telefon/virksomhed/OPP skal vælges
+- Tilføj `.or()` filter på `adversus_opp_number` i salgs-queryen
+- Merge OPP-matches med telefon/virksomhed-matches
+
+**4. Vis OPP-nummer i preview-tabel**
+- Tilføj `oppNumber` felt til `MatchedSale` interface
+- Vis OPP-nummer kolonne i bekræftelses-tabellen
 
 | Fil | Ændring |
 |-----|---------|
-| `src/components/cancellations/UploadCancellationsTab.tsx` | Erstat tom streng med `"__none__"` sentinel-value i Select |
+| `src/components/cancellations/UploadCancellationsTab.tsx` | Tilføj OPP-nummer som matchingkolonne |
 
