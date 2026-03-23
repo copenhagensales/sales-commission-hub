@@ -260,7 +260,7 @@ export default function Forecast() {
             />
 
             {/* Progress bar (current period only) */}
-            {period === "current" && <ForecastProgressBar forecast={forecast} />}
+            {period === "current" && <ForecastProgressBar forecast={forecast} clientTarget={targetData} />}
 
             {/* Team Overview */}
             <ForecastTeamOverview
