@@ -6,7 +6,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
 
 interface RawRow {
   employee_name: string;
@@ -25,13 +25,24 @@ interface RawRow {
 interface RawSalesTableProps {
   data: RawRow[] | undefined;
   isLoading: boolean;
+  isError?: boolean;
+  error?: Error | null;
 }
 
-export function RawSalesTable({ data, isLoading }: RawSalesTableProps) {
+export function RawSalesTable({ data, isLoading, isError, error }: RawSalesTableProps) {
   if (isLoading) {
     return (
       <div className="flex justify-center py-8">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
+        <AlertCircle className="h-5 w-5 shrink-0" />
+        <span>Kunne ikke hente rådata: {error?.message ?? "Ukendt fejl"}</span>
       </div>
     );
   }
