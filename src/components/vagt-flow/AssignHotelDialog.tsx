@@ -85,7 +85,7 @@ export function AssignHotelDialog({ open, onOpenChange, booking, existingBooking
 
   const handleSubmit = async () => {
     if (!pricePerNight || Number(pricePerNight) <= 0) {
-      toast({ title: "Pris mangler", description: "Pris pr. nat er påkrævet for at gemme hoteltildelingen.", variant: "destructive" });
+      toast({ title: "Pris mangler", description: "Samlet pris er påkrævet for at gemme hoteltildelingen.", variant: "destructive" });
       return;
     }
 
