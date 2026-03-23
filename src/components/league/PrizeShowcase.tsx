@@ -73,8 +73,40 @@ export function PrizeShowcase({ standings, prizeLeaders, seasonStatus, isActive,
     };
   })();
 
+  // Compute live comeback leader from roundProvisionMap vs kval rank (overall_rank in standings)
+  const liveComeback = (() => {
+    if (!isActive || !roundProvisionMap || Object.keys(roundProvisionMap).length === 0) return null;
+    // Build live ranking by sorting enrolled players by round provision desc
+    const enrolled = standings
+      .filter(s => s.employee?.id)
+      .map(s => ({
+        employee: s.employee!,
+        kvalRank: s.overall_rank ?? 999,
+        roundProvision: roundProvisionMap[s.employee!.id] ?? 0,
+      }));
+    // Sort by round provision desc to get live rank
+    const sorted = [...enrolled].sort((a, b) => b.roundProvision - a.roundProvision);
+    let bestImprovement = 0;
+    let bestEmployee: Standing["employee"] = null;
+    sorted.forEach((entry, idx) => {
+      const liveRank = idx + 1;
+      const improvement = entry.kvalRank - liveRank;
+      if (improvement > bestImprovement && entry.roundProvision > 0) {
+        bestImprovement = improvement;
+        bestEmployee = entry.employee;
+      }
+    });
+    if (bestImprovement <= 0 || !bestEmployee) return null;
+    return {
+      employee: bestEmployee,
+      value: bestImprovement,
+      label: `+${bestImprovement} pladser (foreløbig)`,
+    };
+  })();
+
   // Determine displayed best round: prefer finalized, then live
   const displayBestRound = revealed && prizeLeaders.bestRound ? prizeLeaders.bestRound : liveBestRound;
+  const displayComeback = revealed && prizeLeaders.comeback ? prizeLeaders.comeback : liveComeback;
 
   const podium = [
     { emoji: "🥇", label: "1.", standing: top1, colorClass: "text-yellow-400" },
