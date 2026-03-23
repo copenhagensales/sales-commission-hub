@@ -3,6 +3,7 @@ import { ManualCancellationsTab } from "@/components/cancellations/ManualCancell
 import { UploadCancellationsTab } from "@/components/cancellations/UploadCancellationsTab";
 import { DuplicatesTab } from "@/components/cancellations/DuplicatesTab";
 import { ApprovalQueueTab } from "@/components/cancellations/ApprovalQueueTab";
+import { UnmatchedTab } from "@/components/cancellations/UnmatchedTab";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
 import { useMemo } from "react";
@@ -20,6 +21,8 @@ export default function Cancellations() {
       tabs.push({ value: 'duplicates', label: 'Dubletter', key: 'tab_cancellations_duplicates' });
     if (isOwner || canView('tab_cancellations_approval'))
       tabs.push({ value: 'approval', label: 'Godkendelseskø', key: 'tab_cancellations_approval' });
+    if (isOwner || canView('tab_cancellations_unmatched'))
+      tabs.push({ value: 'unmatched', label: 'Ingen match', key: 'tab_cancellations_unmatched' });
     return tabs;
   }, [isOwner, canView]);
 
@@ -39,7 +42,7 @@ export default function Cancellations() {
           <p className="text-muted-foreground">Du har ikke adgang til nogen faner på denne side.</p>
         ) : (
           <Tabs defaultValue={defaultTab} className="w-full">
-            <TabsList className={`grid w-full max-w-lg grid-cols-${visibleTabs.length}`}>
+            <TabsList className={`grid w-full max-w-2xl grid-cols-${visibleTabs.length}`}>
               {visibleTabs.map(tab => (
                 <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>
               ))}
@@ -62,6 +65,11 @@ export default function Cancellations() {
             {visibleTabs.some(t => t.value === 'approval') && (
               <TabsContent value="approval" className="mt-6">
                 <ApprovalQueueTab />
+              </TabsContent>
+            )}
+            {visibleTabs.some(t => t.value === 'unmatched') && (
+              <TabsContent value="unmatched" className="mt-6">
+                <UnmatchedTab />
               </TabsContent>
             )}
           </Tabs>
