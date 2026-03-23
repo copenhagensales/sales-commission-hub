@@ -1,37 +1,42 @@
 
 
-# Redesign forecast PDF til at matche sidens UI/UX + fix kundetarget
+# Fix: Kundetarget forsvinder pga. tidszoneforskydning
 
 ## Problem
-1. **Kundetarget vises ikke** — koden er der, men det ser ud til at `clientTarget` ikke kommer med korrekt (muligvis stadig dato-mismatch eller at "all" er valgt)
-2. **PDF'en ser generisk ud** — hvid baggrund, system-fonts, ingen visuel sammenhæng med sidens mørke tema
+`Forecast.tsx` bruger `new Date(...).toISOString().slice(0, 10)` til at beregne `periodStart`. I dansk tidszone (UTC+1/+2) forskyder `toISOString()` datoen en dag tilbage:
+- "Denne måned" (marts): `new Date(2026, 2, 1)` → midnat lokal → `2026-02-28T23:00:00Z` → **`2026-02-28`** (forkert!)
+- "Næste måned" (april): `new Date(2026, 3, 1)` → **`2026-03-31`** (forkert!)
+
+Resultatet: upsert gemmer med forkert dato, og næste gang den læser, matcher den ikke de korrekte rækker (`2026-03-01`, `2026-04-01`). Derfor "forsvinder" targettet.
+
+Database har nu duplikerede rækker med forkerte datoer:
+- `2026-02-28` (1250) ← forkert, nyligt gemt
+- `2026-03-31` (1500) ← forkert, nyligt gemt
+- `2026-03-01` (1530) ← korrekt, ældre
+- `2026-02-01` (1340) ← korrekt, ældre
 
 ## Løsning
 
-### Fil: `src/utils/forecastReportPdfGenerator.ts` — komplet redesign
+| Ændring | Hvad |
+|---------|------|
+| `src/pages/Forecast.tsx` | Erstat `toISOString().slice(0,10)` med manuelt formateret dato: `` `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01` `` — bruger lokal tid, ingen UTC-forskydning. |
+| **Database oprydning** | Slet de to forkerte rækker (`2026-02-28` og `2026-03-31`) eller migrer dem til korrekte datoer. |
 
-**Visuelt tema (matcher sidens CSS-variabler):**
-- Mørk baggrund: `#0f172a` (sidens `--background`)
-- Kort-baggrund: `#162032` (sidens `--card`)
-- Primær grøn: `#0BA360` (sidens `--primary`)
-- Tekst: `#f8f8f8` (lys) og `#9ca3af` (muted)
-- Destructive rød: `#ef4444`
-- Border: `#1e3a5f`
+## Teknisk detalje
+Linje ~141-147 i Forecast.tsx ændres fra:
+```typescript
+const target = period === "current"
+  ? new Date(now.getFullYear(), now.getMonth(), 1)
+  : new Date(now.getFullYear(), now.getMonth() + 1, 1);
+return target.toISOString().slice(0, 10);
+```
+til:
+```typescript
+const m = period === "current" ? now.getMonth() : now.getMonth() + 1;
+const y = now.getFullYear() + Math.floor(m / 12);
+const month = (m % 12) + 1;
+return `${y}-${String(month).padStart(2, '0')}-01`;
+```
 
-**Struktur redesignet:**
-- **Header**: Grøn accent-linje top, stort bold klientnavn + periode, genereret-dato subtilt
-- **Executive Summary boks**: Gradient-border kort med stort forecast-tal, interval, og kundetarget med farvekodet badge (grøn/rød) — præcis som UI'en
-- **KPI-grid**: 3 kolonner med mørke bokse, tal i hvid, labels i muted
-- **Effekter**: Røde/grønne rækker med ikoner (▼/▲) som på siden
-- **Opstartshold-tabel**: Stilet som sidens Card-komponent
-- **Drivers sektion**: Positiv/negativ gruppering med farvede labels
-- **Outlook**: Primær + sekundær boks (dashed border for M2)
-- **Footer**: Subtil, grøn accent-linje
-
-**Kundetarget fix:**
-- Sikre at target-linjen vises prominent i summary-boksen med Target-ikon og diff-badge
-- Debugge: tilføj fallback query der matcher på `date_trunc('month', period_start)` i stedet for eksakt dato-match, for at undgå fremtidige mismatch
-
-### Fil: `src/pages/ForecastClientReport.tsx`
-- Gør target-query mere robust: match på måned i stedet for eksakt dato (`.gte(periodStart).lt(nextMonthStart)`)
+Derefter oprydning: slet de to forkerte rækker og opdater med korrekte værdier.
 
