@@ -1748,6 +1748,11 @@ export function EditBookingDialog({
               </>
             )}
           </TabsContent>
+
+          {/* Hotel Tab */}
+          <TabsContent value="hotel" className="space-y-4 mt-4">
+            <HotelTabContent booking={booking} />
+          </TabsContent>
         </Tabs>
       </DialogContent>
     </Dialog>
