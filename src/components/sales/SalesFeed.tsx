@@ -669,35 +669,47 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
             )}
           </div>
           
-          {/* Date Filter with Presets + Calendar side-by-side */}
+          {/* Date Filter */}
           <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
                 className={cn(
-                  "w-full sm:w-[220px] justify-start text-left font-normal",
-                  datePreset === "all" && "text-muted-foreground"
+                  "w-full sm:w-[240px] justify-start text-left font-normal gap-2",
+                  datePreset !== "all" && "border-primary/50 bg-primary/5 text-foreground"
                 )}
               >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {datePreset === "custom" && customDateRange.from 
-                  ? customDateRange.to 
-                    ? `${format(customDateRange.from, "d/M", { locale: da })} - ${format(customDateRange.to, "d/M", { locale: da })}`
-                    : format(customDateRange.from, "d. MMM yyyy", { locale: da })
-                  : DATE_PRESETS.find(p => p.value === datePreset)?.label || "Alle datoer"
-                }
+                <CalendarIcon className="h-4 w-4 shrink-0" />
+                <span className="truncate">
+                  {datePreset === "custom" && customDateRange.from 
+                    ? customDateRange.to 
+                      ? `${format(customDateRange.from, "d. MMM", { locale: da })} – ${format(customDateRange.to, "d. MMM yyyy", { locale: da })}`
+                      : format(customDateRange.from, "d. MMM yyyy", { locale: da })
+                    : DATE_PRESETS.find(p => p.value === datePreset)?.label || "Alle datoer"
+                  }
+                </span>
+                {datePreset !== "all" && (
+                  <X 
+                    className="h-3.5 w-3.5 shrink-0 ml-auto text-muted-foreground hover:text-foreground" 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDatePreset("all");
+                      setCustomDateRange({ from: undefined, to: undefined });
+                    }}
+                  />
+                )}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
               <div className="flex">
-                {/* Preset buttons */}
-                <div className="border-r p-2 space-y-1">
+                <div className="border-r p-2 space-y-0.5 min-w-[140px]">
+                  <p className="text-xs font-medium text-muted-foreground px-2 py-1.5">Hurtig valg</p>
                   {DATE_PRESETS.filter(p => p.value !== "custom").map((preset) => (
                     <Button
                       key={preset.value}
                       variant={datePreset === preset.value ? "secondary" : "ghost"}
                       size="sm"
-                      className="w-full justify-start text-sm"
+                      className="w-full justify-start text-sm h-8"
                       onClick={() => {
                         setDatePreset(preset.value);
                         setCustomDateRange({ from: undefined, to: undefined });
@@ -708,39 +720,27 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
                     </Button>
                   ))}
                 </div>
-                {/* Calendar for custom range */}
-                <Calendar
-                  mode="range"
-                  defaultMonth={customDateRange.from}
-                  selected={customDateRange.from && customDateRange.to ? { from: customDateRange.from, to: customDateRange.to } : undefined}
-                  onSelect={(range) => {
-                    setCustomDateRange({ from: range?.from, to: range?.to });
-                    if (range?.from && range?.to) {
-                      setDatePreset("custom");
-                      setIsCalendarOpen(false);
-                    }
-                  }}
-                  numberOfMonths={2}
-                  locale={da}
-                  className="pointer-events-auto p-3"
-                />
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground px-3 pt-3 pb-1">Eller vælg periode</p>
+                  <Calendar
+                    mode="range"
+                    defaultMonth={customDateRange.from}
+                    selected={customDateRange.from && customDateRange.to ? { from: customDateRange.from, to: customDateRange.to } : undefined}
+                    onSelect={(range) => {
+                      setCustomDateRange({ from: range?.from, to: range?.to });
+                      if (range?.from && range?.to) {
+                        setDatePreset("custom");
+                        setIsCalendarOpen(false);
+                      }
+                    }}
+                    numberOfMonths={2}
+                    locale={da}
+                    className="pointer-events-auto p-3"
+                  />
+                </div>
               </div>
             </PopoverContent>
           </Popover>
-          
-          {datePreset !== "all" && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => {
-                setDatePreset("all");
-                setCustomDateRange({ from: undefined, to: undefined });
-              }}
-              className="h-10 w-10"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          )}
 
           {/* Sales Status Filter */}
           <Select value={salesStatusFilter} onValueChange={setSalesStatusFilter}>
