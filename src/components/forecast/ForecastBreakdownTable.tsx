@@ -117,6 +117,11 @@ export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = f
                               <p className="text-xs text-muted-foreground">{emp.teamName}</p>
                             )}
                           </div>
+                          {emp.isOnCall && (
+                            <Badge variant="outline" className="text-[10px] bg-blue-100 text-blue-700 border-blue-200">
+                              <PhoneCall className="h-2.5 w-2.5 mr-0.5" /> Tilkalde
+                            </Badge>
+                          )}
                           {emp.plannedEndDate && (
                             <Badge variant="outline" className="text-[10px] bg-orange-100 text-orange-700 border-orange-200 cursor-pointer" onClick={() => setDepartureDialog({ id: emp.employeeId, name: emp.employeeName, endDate: emp.plannedEndDate })}>
                               Stopper {format(new Date(emp.plannedEndDate), "d/M")}
