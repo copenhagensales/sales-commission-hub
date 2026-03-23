@@ -409,63 +409,6 @@ function ReportDrivers({ forecast }: { forecast: ForecastResult }) {
   );
 }
 
-function ReportRecommendations({ forecast }: { forecast: ForecastResult }) {
-  const recommendations: { icon: typeof AlertTriangle; title: string; text: string }[] = [];
-  const employees = forecast.establishedEmployees;
-  const avgSph = employees.length > 0 ? employees.reduce((s, e) => s + e.expectedSph, 0) / employees.length : 0;
-
-  const churnLossTotal = forecast.churnLoss + (forecast.establishedChurnLoss || 0);
-  if (churnLossTotal > 0) {
-    recommendations.push({
-      icon: AlertTriangle,
-      title: "Fastholdelse",
-      text: `Vi har indregnet en forventet naturlig udskiftning i teamet svarende til ${churnLossTotal} salg. Tæt lederkontakt og tidlig opfølgning kan reducere denne effekt.`,
-    });
-  }
-
-  if (forecast.absenceLoss > 15) {
-    recommendations.push({
-      icon: TrendingDown,
-      title: "Fravær",
-      text: `Fravær påvirker forecastet med ${forecast.absenceLoss} tabte salg. Det kan være relevant at se på planlægning, vikardækning eller mønstre i bestemte uger.`,
-    });
-  }
-
-  const lowPerformers = employees.filter(e => e.expectedSph < avgSph * 0.5 && e.expectedSph > 0);
-  if (lowPerformers.length > 0) {
-    recommendations.push({
-      icon: TrendingUp,
-      title: "Performance-løft",
-      text: `${lowPerformers.length} sælger${lowPerformers.length > 1 ? "e" : ""} performer væsentligt under teamgennemsnittet. Coaching eller ekstra træning kan løfte output.`,
-    });
-  }
-
-  if (recommendations.length === 0) return null;
-
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <Lightbulb className="h-4 w-4 text-amber-500" />
-          Anbefalinger
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <p className="text-sm text-muted-foreground">Vi anbefaler at fokusere på:</p>
-        {recommendations.map((rec, i) => {
-          const Icon = rec.icon;
-          return (
-            <div key={i} className="pl-4 border-l-2 border-primary/20">
-              <p className="text-sm font-semibold">{rec.title}</p>
-              <p className="text-sm text-muted-foreground">{rec.text}</p>
-            </div>
-          );
-        })}
-      </CardContent>
-    </Card>
-  );
-}
-
 function ReportOutlook({ forecast, forecastM2, periodLabel, periodLabelM2, monthOffset }: {
   forecast: ForecastResult;
   forecastM2: ForecastResult | null;
