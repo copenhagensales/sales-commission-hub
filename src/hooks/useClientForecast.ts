@@ -420,7 +420,11 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         }
 
         // Fallback for on-call employees (no scheduled shifts but have sales history)
-        if (grossShifts === 0) {
+        // Only activate if the employee also had 0 shifts earlier in the month
+        // (i.e. they are truly an on-call worker, not a regular employee who finished their shifts)
+        const monthStartDate = startOfMonth(forecastStart);
+        const shiftsEarlierInMonth = countShifts(emp.id, monthStartDate, now, false);
+        if (grossShifts === 0 && shiftsEarlierInMonth === 0) {
           const empExpectedMonthly = (emp as any).expected_monthly_shifts as number | null;
           if (empExpectedMonthly && empExpectedMonthly > 0) {
             // Manual override: use expected_monthly_shifts
