@@ -1,27 +1,16 @@
 
 
-# Fix: Dag-nummer konvertering i daglig nedbrydning
-
-## Årsag
-`booked_days` i DB: mandag=0, fredag=4.
-`getDay()` i JS: mandag=1, fredag=5.
-Koden matcher aldrig fredag (5 ≠ 4).
+# Gør hotelpris obligatorisk ved booking
 
 ## Ændring
 
-### `src/pages/vagt-flow/LocationProfitabilityContent.tsx` — linje 523
-```typescript
-// Fra:
-const dayNum = date.getDay() === 0 ? 7 : date.getDay();
+### `src/components/vagt-flow/AssignHotelDialog.tsx`
 
-// Til:
-const jsDay = date.getDay();
-const dayNum = jsDay === 0 ? 6 : jsDay - 1;
-```
-
-Én linje. Total-beregningen er allerede korrekt (bruger `bookedDays.length`).
+1. **Valideringsguard i `handleSubmit`** (linje 85): Tilføj check at `pricePerNight` skal være udfyldt og > 0 før submit tillades — vis toast-fejl hvis mangler
+2. **Submit-knap disabled**: Disable knappen når `pricePerNight` er tom
+3. **Visuelt krav**: Tilføj `*` ved pris-label og rød border hvis tom ved submit-forsøg
 
 | Fil | Ændring |
 |-----|---------|
-| `src/pages/vagt-flow/LocationProfitabilityContent.tsx` | Linje 523: fix dag-konvertering |
+| `src/components/vagt-flow/AssignHotelDialog.tsx` | Gør pris obligatorisk med validering + visuelt krav |
 
