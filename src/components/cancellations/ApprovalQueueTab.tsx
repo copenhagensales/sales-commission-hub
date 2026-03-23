@@ -23,6 +23,13 @@ interface DiffField {
   isDifferent: boolean;
 }
 
+interface ColumnMapping {
+  product_columns: string[];
+  revenue_column: string | null;
+  commission_column: string | null;
+  product_match_mode: string;
+}
+
 function extractOpp(rawPayload: unknown): string {
   if (!rawPayload || typeof rawPayload !== "object") return "";
   const rp = rawPayload as Record<string, unknown>;
@@ -38,124 +45,103 @@ function extractOpp(rawPayload: unknown): string {
   return "";
 }
 
+/** Strip trailing percent suffix like "0%", "50%", "100%" from product names */
+function stripPercentSuffix(name: string): string {
+  return name.replace(/\s+(0|50|100)%?\s*$/i, "").trim();
+}
+
+function normalizeProductName(name: string, mode: string): string {
+  const lower = name.toLowerCase().trim();
+  if (mode === "strip_percent_suffix") {
+    return stripPercentSuffix(lower);
+  }
+  return lower;
+}
+
 function computeDiff(
   uploadedData: Record<string, unknown> | null,
   saleItems: Array<{ product_name: string; quantity: number; mapped_commission: number; mapped_revenue: number }>,
+  mapping: ColumnMapping | null,
 ): DiffField[] {
   if (!uploadedData || Object.keys(uploadedData).length === 0) return [];
+  if (!mapping) return []; // No config → no diff (don't guess)
 
   const diffs: DiffField[] = [];
+  const matchMode = mapping.product_match_mode || "exact";
 
   // System totals
   const systemRevenue = saleItems.reduce((sum, si) => sum + (si.mapped_revenue || 0), 0);
   const systemCommission = saleItems.reduce((sum, si) => sum + (si.mapped_commission || 0), 0);
   const systemProducts = saleItems.map((si) => si.product_name).filter(Boolean);
 
-  // Try to find product/revenue/commission fields in uploaded data
-  const keys = Object.keys(uploadedData);
+  // Compare product columns
+  if (mapping.product_columns && mapping.product_columns.length > 0) {
+    for (const colName of mapping.product_columns) {
+      const val = uploadedData[colName];
+      if (val === null || val === undefined || val === "" || val === 0) continue;
 
-  // Detect numeric columns that might be revenue/commission
-  for (const key of keys) {
-    const val = uploadedData[key];
-    const lowerKey = key.toLowerCase();
+      const uploadedQty = Number(val);
+      if (!isNaN(uploadedQty) && uploadedQty !== 0) {
+        // TDC-style: column name IS the product name, value is quantity
+        const normalizedCol = normalizeProductName(colName, matchMode);
+        const matchedItem = saleItems.find(
+          (si) => normalizeProductName(si.product_name, matchMode) === normalizedCol
+        );
+        const systemQty = matchedItem?.quantity || 0;
 
-    // Skip empty values
-    if (val === null || val === undefined || val === "") continue;
-
-    // Product-like columns
-    if (
-      lowerKey.includes("produkt") ||
-      lowerKey.includes("product") ||
-      lowerKey.includes("vare")
-    ) {
-      const uploadedProduct = String(val).trim();
-      // Normalize: strip trailing % numbers (e.g. "TT trin 100" → compare base)
-      const normalizeProduct = (p: string) =>
-        p.replace(/\s+(0|50|100)%?\s*$/i, "").toLowerCase().trim();
-      const normalizedUploaded = normalizeProduct(uploadedProduct);
-      const matchesAny = systemProducts.some(
-        (sp) => normalizeProduct(sp) === normalizedUploaded
-      );
-      if (!matchesAny && systemProducts.length > 0) {
-        diffs.push({
-          label: key,
-          systemValue: systemProducts.join(", ") || "-",
-          uploadedValue: uploadedProduct,
-          isDifferent: true,
-        });
+        if (Math.abs(uploadedQty - systemQty) > 0.01) {
+          diffs.push({
+            label: colName,
+            systemValue: `${systemQty}`,
+            uploadedValue: `${uploadedQty}`,
+            isDifferent: true,
+          });
+        }
+      } else {
+        // Value is a product name string
+        const uploadedProduct = String(val).trim();
+        const normalizedUploaded = normalizeProductName(uploadedProduct, matchMode);
+        const matchesAny = systemProducts.some(
+          (sp) => normalizeProductName(sp, matchMode) === normalizedUploaded
+        );
+        if (!matchesAny && systemProducts.length > 0) {
+          diffs.push({
+            label: colName,
+            systemValue: systemProducts.join(", ") || "-",
+            uploadedValue: uploadedProduct,
+            isDifferent: true,
+          });
+        }
       }
-      continue;
     }
+  }
 
-    // Revenue-like columns
-    if (
-      lowerKey.includes("omsætning") ||
-      lowerKey.includes("omsaetning") ||
-      lowerKey.includes("revenue") ||
-      lowerKey.includes("oms")
-    ) {
+  // Compare revenue
+  if (mapping.revenue_column) {
+    const val = uploadedData[mapping.revenue_column];
+    if (val !== null && val !== undefined && val !== "") {
       const uploadedVal = parseFloat(String(val).replace(/[^0-9.,\-]/g, "").replace(",", "."));
       if (!isNaN(uploadedVal) && Math.abs(uploadedVal - systemRevenue) > 0.01) {
         diffs.push({
-          label: key,
+          label: mapping.revenue_column,
           systemValue: `${systemRevenue.toFixed(2)} kr`,
           uploadedValue: `${uploadedVal.toFixed(2)} kr`,
           isDifferent: true,
         });
       }
-      continue;
-    }
-
-    // Commission-like columns
-    if (
-      lowerKey.includes("provision") ||
-      lowerKey.includes("commission") ||
-      lowerKey.includes("provi")
-    ) {
-      const uploadedVal = parseFloat(String(val).replace(/[^0-9.,\-]/g, "").replace(",", "."));
-      if (!isNaN(uploadedVal) && Math.abs(uploadedVal - systemCommission) > 0.01) {
-        diffs.push({
-          label: key,
-          systemValue: `${systemCommission.toFixed(2)} kr`,
-          uploadedValue: `${uploadedVal.toFixed(2)} kr`,
-          isDifferent: true,
-        });
-      }
-      continue;
     }
   }
 
-  // If uploaded data has product columns with TDC-style names (containing 0%, 50%, 100%)
-  // Also compare individual product entries
-  const uploadedProductEntries = keys.filter((k) => {
-    const v = uploadedData[k];
-    if (v === null || v === undefined || v === "" || v === 0) return false;
-    // Check if key looks like a product name (has % or is a known product pattern)
-    return (
-      k.match(/\d+%\s*$/) ||
-      k.match(/^(TT|Mobil|Fiber|Bredbånd|Internet)/i)
-    );
-  });
-
-  if (uploadedProductEntries.length > 0) {
-    // These are product columns where key = product name, value = quantity/amount
-    for (const productKey of uploadedProductEntries) {
-      const uploadedQty = Number(uploadedData[productKey]) || 0;
-      if (uploadedQty === 0) continue;
-
-      // Find matching system product
-      const normalizeForMatch = (p: string) =>
-        p.replace(/\s+/g, " ").toLowerCase().trim();
-      const matchedItem = saleItems.find(
-        (si) => normalizeForMatch(si.product_name) === normalizeForMatch(productKey)
-      );
-
-      const systemQty = matchedItem?.quantity || 0;
-      if (Math.abs(uploadedQty - systemQty) > 0.01) {
+  // Compare commission
+  if (mapping.commission_column) {
+    const val = uploadedData[mapping.commission_column];
+    if (val !== null && val !== undefined && val !== "") {
+      const uploadedVal = parseFloat(String(val).replace(/[^0-9.,\-]/g, "").replace(",", "."));
+      if (!isNaN(uploadedVal) && Math.abs(uploadedVal - systemCommission) > 0.01) {
         diffs.push({
-          label: productKey,
-          systemValue: `${systemQty}`,
-          uploadedValue: `${uploadedQty}`,
+          label: mapping.commission_column,
+          systemValue: `${systemCommission.toFixed(2)} kr`,
+          uploadedValue: `${uploadedVal.toFixed(2)} kr`,
           isDifferent: true,
         });
       }
@@ -202,7 +188,7 @@ export function ApprovalQueueTab() {
       const { data, error } = await query.limit(500);
       if (error) throw error;
 
-      // Fetch uploaded_data separately (since types might not include it yet)
+      // Fetch uploaded_data separately
       const queueIds = data.map((d) => d.id);
       let uploadedDataMap = new Map<string, Record<string, unknown>>();
       if (queueIds.length > 0) {
@@ -228,7 +214,7 @@ export function ApprovalQueueTab() {
         importIds.length > 0
           ? supabase
               .from("cancellation_imports")
-              .select("id, file_name, uploaded_by")
+              .select("id, file_name, uploaded_by, config_id")
               .in("id", importIds)
           : { data: [] as any[], error: null },
         saleIds.length > 0
@@ -238,6 +224,26 @@ export function ApprovalQueueTab() {
               .in("sale_id", saleIds)
           : { data: [] as any[], error: null },
       ]);
+
+      // Fetch configs for imports that have config_id
+      const configIds = [...new Set((importsResult.data || []).map((i: any) => i.config_id).filter(Boolean))];
+      let configsMap = new Map<string, ColumnMapping>();
+      if (configIds.length > 0) {
+        const { data: configs } = await supabase
+          .from("cancellation_upload_configs")
+          .select("id, product_columns, revenue_column, commission_column, product_match_mode")
+          .in("id", configIds) as any;
+        if (configs) {
+          for (const cfg of configs) {
+            configsMap.set(cfg.id, {
+              product_columns: cfg.product_columns || [],
+              revenue_column: cfg.revenue_column,
+              commission_column: cfg.commission_column,
+              product_match_mode: cfg.product_match_mode || "exact",
+            });
+          }
+        }
+      }
 
       // Fetch product names for sale items
       const productIds = [...new Set((saleItemsResult.data || []).map((si) => si.product_id).filter(Boolean))];
@@ -253,7 +259,7 @@ export function ApprovalQueueTab() {
       }
 
       const salesMap = new Map((salesResult.data || []).map((s) => [s.id, s]));
-      const importsMap = new Map((importsResult.data || []).map((i) => [i.id, i]));
+      const importsMap = new Map((importsResult.data || []).map((i: any) => [i.id, i]));
 
       // Group sale items by sale_id
       const saleItemsBySale = new Map<string, Array<{ product_name: string; quantity: number; mapped_commission: number; mapped_revenue: number }>>();
@@ -273,7 +279,12 @@ export function ApprovalQueueTab() {
         const imp = importsMap.get(item.import_id);
         const saleItems = saleItemsBySale.get(item.sale_id) || [];
         const uploaded = uploadedDataMap.get(item.id) as Record<string, unknown> | null;
-        const diffs = computeDiff(uploaded, saleItems);
+        
+        // Get column mapping from config
+        const configId = imp?.config_id;
+        const mapping = configId ? configsMap.get(configId) || null : null;
+        
+        const diffs = computeDiff(uploaded, saleItems, mapping);
 
         return {
           ...item,
