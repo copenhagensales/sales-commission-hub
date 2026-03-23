@@ -30,8 +30,9 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
   // Normalize period to monthOffset for backward compat
   const monthOffset = typeof period === "number" ? period : period === "current" ? 0 : 1;
 
+  const FORECAST_LOGIC_VERSION = 4; // bump to bust cache after logic changes
   return useQuery({
-    queryKey: ["client-forecast", clientId, monthOffset],
+    queryKey: ["client-forecast", clientId, monthOffset, FORECAST_LOGIC_VERSION],
     queryFn: async (): Promise<{
       forecast: ForecastResult;
       cohorts: ClientForecastCohort[];
@@ -149,50 +150,51 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
       const salesStartStr = format(weeksAgo8, "yyyy-MM-dd");
       const salesEndStr = format(now, "yyyy-MM-dd");
 
-      let salesByEmailByWeek = new Map<string, Map<number, number>>();
-      if (allEmails.length > 0 && campaignIds.length > 0) {
-        // Batch emails in chunks of 200
-        const emailChunks = chunk(allEmails, 200);
-        const campaignChunks = chunk(campaignIds, 200);
+      // Unified sales attribution: deduplicate by sale.id so FM sales matched via
+      // both agent_email AND fm_seller_id are only counted once per employee.
+      // Build: salesByEmployeeByWeek Map<employeeId, Map<weekKey, count>>
+      const salesByEmployeeByWeek = new Map<string, Map<number, number>>();
 
-        for (const emailBatch of emailChunks) {
-          for (const campaignBatch of campaignChunks) {
-            const { data: salesData } = await supabase
-              .from("sales")
-              .select("agent_email, sale_datetime, sale_items!inner(quantity, product_id, products(counts_as_sale))")
-              .gte("sale_datetime", salesStartStr)
-              .lte("sale_datetime", salesEndStr + "T23:59:59")
-              .in("agent_email", emailBatch)
-              .in("client_campaign_id", campaignBatch)
-              .limit(10000);
-
-            (salesData || []).forEach((s: any) => {
-              const email = s.agent_email?.toLowerCase();
-              if (!email) return;
-              const saleDate = new Date(s.sale_datetime);
-              const weekStart = startOfWeek(saleDate, { weekStartsOn: 1 });
-              const weekKey = weekStart.getTime();
-
-              (s.sale_items || []).forEach((si: any) => {
-                if (si.products?.counts_as_sale !== false) {
-                  if (!salesByEmailByWeek.has(email)) salesByEmailByWeek.set(email, new Map());
-                  const weekMap = salesByEmailByWeek.get(email)!;
-                  weekMap.set(weekKey, (weekMap.get(weekKey) || 0) + (si.quantity || 1));
-                }
-              });
-            });
-          }
+      // Build reverse lookup: email -> employeeId
+      const emailToEmployeeId = new Map<string, string>();
+      for (const [empId, emails] of empEmailMap) {
+        for (const email of emails) {
+          emailToEmployeeId.set(email, empId);
         }
       }
 
-      // 4b. Get FM sales by employee ID (fm_seller_id) for employees without agent mapping
-      const salesByEmployeeIdByWeek = new Map<string, Map<number, number>>();
+      // Track attributed sale item IDs per employee to prevent double-counting
+      const attributedSaleItems = new Map<string, Set<string>>(); // empId -> Set<saleId:itemIdx>
+
+      function attributeSaleItems(empId: string, sale: any) {
+        const saleDate = new Date(sale.sale_datetime);
+        const weekStart = startOfWeek(saleDate, { weekStartsOn: 1 });
+        const weekKey = weekStart.getTime();
+        const saleId = sale.id;
+
+        if (!attributedSaleItems.has(empId)) attributedSaleItems.set(empId, new Set());
+        const seen = attributedSaleItems.get(empId)!;
+
+        (sale.sale_items || []).forEach((si: any, idx: number) => {
+          const itemKey = `${saleId}:${idx}`;
+          if (seen.has(itemKey)) return; // already counted
+          if (si.products?.counts_as_sale === false) return;
+          seen.add(itemKey);
+
+          if (!salesByEmployeeByWeek.has(empId)) salesByEmployeeByWeek.set(empId, new Map());
+          const weekMap = salesByEmployeeByWeek.get(empId)!;
+          weekMap.set(weekKey, (weekMap.get(weekKey) || 0) + (si.quantity || 1));
+        });
+      }
+
       if (campaignIds.length > 0) {
         const campaignChunks = chunk(campaignIds, 200);
+
+        // Pass 1: FM sales by fm_seller_id (highest priority)
         for (const campaignBatch of campaignChunks) {
           const { data: fmSalesData } = await supabase
             .from("sales")
-            .select("raw_payload, sale_datetime, sale_items!inner(quantity, product_id, products(counts_as_sale))")
+            .select("id, raw_payload, agent_email, sale_datetime, sale_items!inner(quantity, product_id, products(counts_as_sale))")
             .eq("source", "fieldmarketing")
             .gte("sale_datetime", salesStartStr)
             .lte("sale_datetime", salesEndStr + "T23:59:59")
@@ -201,19 +203,35 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
 
           (fmSalesData || []).forEach((s: any) => {
             const sellerId = s.raw_payload?.fm_seller_id;
-            if (!sellerId) return;
-            const saleDate = new Date(s.sale_datetime);
-            const weekStart = startOfWeek(saleDate, { weekStartsOn: 1 });
-            const weekKey = weekStart.getTime();
-
-            (s.sale_items || []).forEach((si: any) => {
-              if (si.products?.counts_as_sale !== false) {
-                if (!salesByEmployeeIdByWeek.has(sellerId)) salesByEmployeeIdByWeek.set(sellerId, new Map());
-                const weekMap = salesByEmployeeIdByWeek.get(sellerId)!;
-                weekMap.set(weekKey, (weekMap.get(weekKey) || 0) + (si.quantity || 1));
-              }
-            });
+            if (sellerId && activeIds.includes(sellerId)) {
+              attributeSaleItems(sellerId, s);
+            }
           });
+        }
+
+        // Pass 2: All sales by agent_email (only adds items not yet attributed)
+        if (allEmails.length > 0) {
+          const emailChunks = chunk(allEmails, 200);
+          for (const emailBatch of emailChunks) {
+            for (const campaignBatch of campaignChunks) {
+              const { data: salesData } = await supabase
+                .from("sales")
+                .select("id, agent_email, sale_datetime, sale_items!inner(quantity, product_id, products(counts_as_sale))")
+                .gte("sale_datetime", salesStartStr)
+                .lte("sale_datetime", salesEndStr + "T23:59:59")
+                .in("agent_email", emailBatch)
+                .in("client_campaign_id", campaignBatch)
+                .limit(10000);
+
+              (salesData || []).forEach((s: any) => {
+                const email = s.agent_email?.toLowerCase();
+                if (!email) return;
+                const empId = emailToEmployeeId.get(email);
+                if (!empId) return;
+                attributeSaleItems(empId, s);
+              });
+            }
+          }
         }
       }
 
