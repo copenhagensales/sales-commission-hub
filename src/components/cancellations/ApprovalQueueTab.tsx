@@ -281,6 +281,7 @@ export function ApprovalQueueTab() {
   const { user } = useAuth();
   const [statusFilter, setStatusFilter] = useState<string>("pending");
   const [onlyDifferences, setOnlyDifferences] = useState(false);
+  const [subTab, setSubTab] = useState<"cancellation" | "basket_difference">("cancellation");
 
   const { data: currentEmployee } = useQuery({
     queryKey: ["current-employee-for-approval", user?.email],
