@@ -199,30 +199,29 @@ export function UploadCancellationsTab() {
         orConditions.push(...companies.map(c => `customer_company.ilike.%${c}%`));
       }
 
-      // Query sales based on phone/company first
-      let query = supabase
-        .from("sales")
-        .select(`
-          id,
-          sale_datetime,
-          customer_phone,
-          customer_company,
-          validation_status,
-          agent_name,
-          raw_payload
-        `)
-        .in("client_campaign_id", campaignIds)
-        .neq("validation_status", "cancelled");
+      // Query sales based on phone/company only if we have filters
+      let allMatched: any[] = [];
 
       if (orConditions.length > 0) {
-        query = query.or(orConditions.join(","));
+        const { data: matchedData, error } = await supabase
+          .from("sales")
+          .select(`
+            id,
+            sale_datetime,
+            customer_phone,
+            customer_company,
+            validation_status,
+            agent_name,
+            raw_payload
+          `)
+          .in("client_campaign_id", campaignIds)
+          .neq("validation_status", "cancelled")
+          .or(orConditions.join(","))
+          .limit(500);
+
+        if (error) throw error;
+        allMatched = matchedData || [];
       }
-
-      const { data: matchedData, error } = await query.limit(500);
-
-      if (error) throw error;
-
-      let allMatched = matchedData || [];
 
       // If OPP numbers specified, do a separate text search on raw_payload
       if (oppNumbers.length > 0) {
