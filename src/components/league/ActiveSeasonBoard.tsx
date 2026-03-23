@@ -158,8 +158,9 @@ export function ActiveSeasonBoard({
                   return (
                     <AnimatePresence mode="popLayout">
                       {group.players.map((standing, idx) => {
-                        const prevProvision = idx > 0 ? Number(group.players[idx - 1].total_provision) : null;
-                        const nextProvision = idx < group.players.length - 1 ? Number(group.players[idx + 1].total_provision) : null;
+                        const roundProv = roundProvisionMap[standing.employee_id] || 0;
+                        const prevRoundProv = idx > 0 ? (roundProvisionMap[group.players[idx - 1].employee_id] || 0) : null;
+                        const nextRoundProv = idx < group.players.length - 1 ? (roundProvisionMap[group.players[idx + 1].employee_id] || 0) : null;
                         return (
                           <motion.div
                             key={standing.employee_id}
@@ -179,8 +180,9 @@ export function ActiveSeasonBoard({
                               todayDailyRank={todayTop3[standing.employee_id] || null}
                               weeklyData={weeklyProvisionMap[standing.employee_id]}
                               divisionAvg={divisionAvg}
-                              prevProvision={prevProvision}
-                              nextProvision={nextProvision}
+                              roundProvision={roundProv}
+                              prevProvision={prevRoundProv}
+                              nextProvision={nextRoundProv}
                             />
                           </motion.div>
                         );
