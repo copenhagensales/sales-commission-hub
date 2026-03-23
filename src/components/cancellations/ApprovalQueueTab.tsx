@@ -851,10 +851,10 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
               <TabsContent value="cancellation" className="mt-4">
                 {statusFilter === "pending" && totalPending > 0 && (
                   <div className="flex gap-2 mb-4">
-                    <Button size="sm" variant="default" onClick={() => handleBulkAction("approved")} disabled={bulkMutation.isPending}>
+                    <Button size="sm" variant="default" onClick={handleApproveAllPending} disabled={isPending}>
                       <Check className="h-4 w-4 mr-1" /> Godkend alle
                     </Button>
-                    <Button size="sm" variant="destructive" onClick={() => handleBulkAction("rejected")} disabled={bulkMutation.isPending}>
+                    <Button size="sm" variant="destructive" onClick={handleRejectAllPending} disabled={isPending}>
                       <X className="h-4 w-4 mr-1" /> Afvis alle
                     </Button>
                   </div>
@@ -865,10 +865,10 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
               <TabsContent value="basket_difference" className="mt-4">
                 {statusFilter === "pending" && totalPending > 0 && (
                   <div className="flex gap-2 mb-4">
-                    <Button size="sm" variant="default" onClick={() => handleBulkAction("approved")} disabled={bulkMutation.isPending}>
+                    <Button size="sm" variant="default" onClick={handleApproveAllPending} disabled={isPending}>
                       <Check className="h-4 w-4 mr-1" /> Godkend alle
                     </Button>
-                    <Button size="sm" variant="destructive" onClick={() => handleBulkAction("rejected")} disabled={bulkMutation.isPending}>
+                    <Button size="sm" variant="destructive" onClick={handleRejectAllPending} disabled={isPending}>
                       <X className="h-4 w-4 mr-1" /> Afvis alle
                     </Button>
                   </div>
