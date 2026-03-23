@@ -11,9 +11,10 @@ interface ReportData {
 export function generateForecastReportPdf(data: ReportData) {
   const { clientName, periodLabel, forecast, forecastM2, periodLabelM2 } = data;
   const churnTotal = forecast.churnLoss + (forecast.establishedChurnLoss || 0);
-  const cohortSales = forecast.cohorts.reduce((s, c) => s + c.forecastSales, 0);
+  const periodCohorts = forecast.cohorts.filter(c => c.startDate >= forecast.periodStart && c.startDate <= forecast.periodEnd);
+  const cohortSales = periodCohorts.reduce((s, c) => s + c.forecastSales, 0);
   const numEmployees = forecast.establishedEmployees.length;
-  const numCohorts = forecast.cohorts.filter(c => c.forecastSales > 0).length;
+  const numCohorts = periodCohorts.filter(c => c.forecastSales > 0).length;
 
   const driverTexts: string[] = [];
   if (forecast.absenceLoss > 0) driverTexts.push(`Fravær reducerer med ${forecast.absenceLoss} salg`);
