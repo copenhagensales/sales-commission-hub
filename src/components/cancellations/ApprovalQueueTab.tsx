@@ -784,17 +784,23 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
             <div className="rounded-md border max-h-[600px] overflow-auto">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Salgsdato</TableHead>
-                    <TableHead>Sælger</TableHead>
-                    <TableHead>OPP</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>System data</TableHead>
-                    <TableHead>Uploadet data</TableHead>
-                    <TableHead>Forskelle</TableHead>
-                    <TableHead>Status</TableHead>
-                    {statusFilter === "pending" && <TableHead>Handlinger</TableHead>}
-                  </TableRow>
+                   <TableRow>
+                     <TableHead className="cursor-pointer select-none" onClick={() => handleSort("date")}>
+                       <span className="flex items-center">Salgsdato <QueueSortIcon column="date" /></span>
+                     </TableHead>
+                     <TableHead className="cursor-pointer select-none" onClick={() => handleSort("agent")}>
+                       <span className="flex items-center">Sælger <QueueSortIcon column="agent" /></span>
+                     </TableHead>
+                     <TableHead className="cursor-pointer select-none" onClick={() => handleSort("opp")}>
+                       <span className="flex items-center">OPP <QueueSortIcon column="opp" /></span>
+                     </TableHead>
+                     <TableHead>Type</TableHead>
+                     <TableHead>System data</TableHead>
+                     <TableHead>Uploadet data</TableHead>
+                     <TableHead>Forskelle</TableHead>
+                     <TableHead>Status</TableHead>
+                     {statusFilter === "pending" && <TableHead>Handlinger</TableHead>}
+                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {processedFlatItems.map((item) => {
