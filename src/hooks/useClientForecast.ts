@@ -327,7 +327,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
       // Count shifts in a range for an employee
       // absenceMode: 'all' = exclude all absences, 'sick_only' = exclude only sick/no_show, false = no exclusion
       // Hierarchy: individual shifts → booking assignments → employee standard → team standard
-      function countShifts(empId: string, rangeStart: Date, rangeEnd: Date, excludeAbsence: boolean | 'sick_only' = false): number {
+      function countShifts(empId: string, rangeStart: Date, rangeEnd: Date, excludeAbsence: boolean | 'sick_only' = false, bookingOnly = false): number {
         const empTeamId = employeeTeamMap.get(empId);
         const teamDays = empTeamId ? teamShiftDaysMap.get(empTeamId) : undefined;
         const absenceDates = excludeAbsence === 'sick_only'
@@ -358,10 +358,13 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
             count++;
           } else if (bookingDates.has(dateStr)) {
             count++;
-          } else if (empStandardDays !== undefined) {
-            if (empStandardDays.includes(dayNumber)) count++;
-          } else if (teamDays && teamDays.includes(dayNumber)) {
-            count++;
+          } else if (!bookingOnly) {
+            // Only fall through to standard shifts if not in bookingOnly mode
+            if (empStandardDays !== undefined) {
+              if (empStandardDays.includes(dayNumber)) count++;
+            } else if (teamDays && teamDays.includes(dayNumber)) {
+              count++;
+            }
           }
           cur.setDate(cur.getDate() + 1);
         }
@@ -392,7 +395,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           }
         }
         
-        return 5;
+        return 0;
       }
 
       // 6. Build EmployeePerformance for each active employee
@@ -476,9 +479,14 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
 
         // Planned hours for forecast month (gross = full capacity, net = minus absences)
         // Use empForecastEnd to cap hours for employees with planned departure
-        let grossShifts = countShifts(emp.id, forecastStart, empForecastEnd, false);
+        // Check if employee has any individual shifts or booking assignments in forecast period
+        const hasAnyForecastShifts = Array.from(individualShiftMap.get(emp.id) || new Set()).some(d => d >= forecastStartStr && d <= forecastEndStr);
+        const hasAnyForecastBookings = Array.from(bookingAssignmentMap.get(emp.id) || new Set()).some(d => d >= forecastStartStr && d <= forecastEndStr);
+        const useBookingOnly = !hasAnyForecastShifts && !hasAnyForecastBookings;
+
+        let grossShifts = countShifts(emp.id, forecastStart, empForecastEnd, false, useBookingOnly);
         let grossPlannedHours = grossShifts * HOURS_PER_SHIFT;
-        let forecastShifts = countShifts(emp.id, forecastStart, empForecastEnd, true);
+        let forecastShifts = countShifts(emp.id, forecastStart, empForecastEnd, true, useBookingOnly);
         let plannedHours = forecastShifts * HOURS_PER_SHIFT;
 
         // Attendance factor: only sick/no_show reduces attendance (vacation is planned, not a penalty)
