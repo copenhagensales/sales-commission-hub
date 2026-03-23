@@ -1,38 +1,20 @@
 
 
-# Flyt kundevælger til toppen af Annulleringer-siden
+# Flyt "Ingen match" ind som sub-tab "Afventer" i Godkendelseskøen
 
 ## Hvad
-En global kundevælger i toppen af `/salary/cancellations` som alle tabs deler. Når man vælger en kunde, handler hele siden om den kunde.
+Fjern "Ingen match" som selvstændig top-fane. Tilføj den i stedet som en tredje sub-tab kaldet **"Afventer"** inde i Godkendelseskøen, ved siden af "Annulleringer" og "Kurv-rettelser". Denne fane viser alle salg der endnu ikke er matchet eller godkendt.
 
 ## Ændringer
 
 | Fil | Hvad |
 |-----|------|
-| `src/pages/salary/Cancellations.tsx` | Tilføj `selectedClientId` state + clients query + Select i toppen. Send `clientId` som prop til alle tab-komponenter. |
-| `src/components/cancellations/ManualCancellationsTab.tsx` | Modtag `clientId` prop i stedet for egen kundevælger. Fjern lokal `selectedClientId` state og client-select UI. |
-| `src/components/cancellations/UploadCancellationsTab.tsx` | Modtag `clientId` prop. Fjern lokal kundevælger. |
-| `src/components/cancellations/DuplicatesTab.tsx` | Modtag `clientId` prop. Fjern lokal kundevælger. Behold "Alle kunder" som fallback når `clientId` er tom. |
-| `src/components/cancellations/ApprovalQueueTab.tsx` | Modtag `clientId` prop. Filtrer queue items på `client_id` når sat. |
-| `src/components/cancellations/UnmatchedTab.tsx` | Modtag `clientId` prop. Filtrer imports/results på den valgte kunde. |
+| `src/pages/salary/Cancellations.tsx` | Fjern "Ingen match" fra `visibleTabs` og fjern `<UnmatchedTab>` renderingen. |
+| `src/components/cancellations/ApprovalQueueTab.tsx` | Tilføj tredje sub-tab "Afventer" i den interne `Tabs`. Importer og render `UnmatchedTab` indhold i denne sub-tab. Send `clientId` videre. |
 
 ## Teknisk detalje
-
-**Cancellations.tsx** — ny state og UI:
-```tsx
-const [selectedClientId, setSelectedClientId] = useState("");
-// Query clients
-// Render Select i header-sektionen mellem titel og tabs
-```
-
-**Alle tabs** — interface ændring:
-```tsx
-interface Props { clientId: string; }
-// Erstatter lokal selectedClientId med props.clientId
-// Fjerner client Select fra UI
-// Queries bruger clientId fra props
-```
-
-**ApprovalQueueTab + UnmatchedTab** — filtrering:
-- Disse tabs har ikke en eksisterende kundevælger, så de får tilføjet et `.eq("client_id", clientId)` filter på deres queries når `clientId` er sat.
+- `ApprovalQueueTab` får en tredje `TabsTrigger` med value `"unmatched"` og label "Afventer".
+- `TabsContent value="unmatched"` renderer `<UnmatchedTab clientId={clientId} />` direkte.
+- `subTab` state udvides til `"cancellation" | "basket_difference" | "unmatched"`.
+- Fjern `tab_cancellations_unmatched` permission-check og import fra `Cancellations.tsx`.
 
