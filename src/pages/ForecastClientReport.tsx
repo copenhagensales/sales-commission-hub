@@ -307,7 +307,7 @@ function ReportKeyFigures({ forecast }: { forecast: ForecastResult }) {
 }
 
 function ReportCohorts({ forecast }: { forecast: ForecastResult }) {
-  const activeCohorts = forecast.cohorts.filter(c => c.forecastSales > 0 || c.plannedHeadcount > 0);
+  const activeCohorts = forecast.cohorts.filter(c => (c.forecastSales > 0 || c.plannedHeadcount > 0) && c.startDate >= forecast.periodStart && c.startDate <= forecast.periodEnd);
   if (activeCohorts.length === 0) return null;
 
   const totalCohortSales = activeCohorts.reduce((s, c) => s + c.forecastSales, 0);
