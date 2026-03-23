@@ -645,29 +645,33 @@ export default function CommissionLeague() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {/* Round navigation */}
-                  <div className="flex items-center justify-between mb-4">
+                  {/* Round navigation — chips */}
+                  <div className="flex flex-wrap items-center gap-1.5 mb-4 overflow-x-auto pb-1">
                     <Button
-                      variant="ghost"
-                      size="icon"
-                      disabled={selectedRoundIndex <= -1}
-                      onClick={() => setSelectedRoundIndex(i => i - 1)}
+                      variant={selectedRoundIndex === -1 ? "default" : "outline"}
+                      size="sm"
+                      className="text-xs h-7 px-2.5 shrink-0"
+                      onClick={() => setSelectedRoundIndex(-1)}
                     >
-                      <ChevronLeft className="h-5 w-5" />
+                      Samlet
                     </Button>
-                    <span className="text-sm font-semibold">
-                      {selectedRoundIndex === -1
-                        ? "Samlet stilling"
-                        : `Runde ${selectedRound?.round_number ?? ""}${selectedRound?.status === "active" ? " (i gang)" : ""}`}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      disabled={!roundHistory || selectedRoundIndex >= roundHistory.length - 1}
-                      onClick={() => setSelectedRoundIndex(i => i + 1)}
-                    >
-                      <ChevronRight className="h-5 w-5" />
-                    </Button>
+                    {(roundHistory || []).map((r, idx) => (
+                      <Button
+                        key={r.id}
+                        variant={selectedRoundIndex === idx ? "default" : "outline"}
+                        size="sm"
+                        className="text-xs h-7 px-2.5 shrink-0"
+                        onClick={() => setSelectedRoundIndex(idx)}
+                      >
+                        R{r.round_number}
+                        {r.status === "active" && (
+                          <span className="ml-1 relative flex h-1.5 w-1.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+                          </span>
+                        )}
+                      </Button>
+                    ))}
                   </div>
 
                   {selectedRoundIndex === -1 ? (
@@ -678,6 +682,7 @@ export default function CommissionLeague() {
                       currentEmployeeId={currentEmployeeId}
                       todayProvisionMap={todayProvisionMap || {}}
                       weeklyProvisionMap={weeklyProvisionMap || {}}
+                      roundProvisionMap={roundProvisionMap || {}}
                     />
                   ) : selectedRound && selectedRoundStandings && selectedRoundStandings.length > 0 ? (
                     <RoundResultsCard
