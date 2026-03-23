@@ -19,6 +19,7 @@ interface RawRow {
   customer_company: string;
   status: string;
   internal_reference: string;
+  adversus_opp_number: string;
 }
 
 interface RawSalesTableProps {
