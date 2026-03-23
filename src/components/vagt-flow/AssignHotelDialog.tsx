@@ -84,13 +84,18 @@ export function AssignHotelDialog({ open, onOpenChange, booking, existingBooking
   }, [existingBookingHotel, booking, open]);
 
   const handleSubmit = async () => {
+    if (!pricePerNight || Number(pricePerNight) <= 0) {
+      toast({ title: "Pris mangler", description: "Pris pr. nat er påkrævet for at gemme hoteltildelingen.", variant: "destructive" });
+      return;
+    }
+
     if (isEditing && existingBookingHotel) {
       await updateBookingHotel.mutateAsync({
         id: existingBookingHotel.id,
         status,
         confirmation_number: confirmationNumber || undefined,
         rooms,
-        price_per_night: pricePerNight ? Number(pricePerNight) : undefined,
+        price_per_night: Number(pricePerNight),
         notes: notes || undefined,
       });
       onOpenChange(false);
