@@ -163,7 +163,8 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
               .gte("sale_datetime", salesStartStr)
               .lte("sale_datetime", salesEndStr + "T23:59:59")
               .in("agent_email", emailBatch)
-              .in("client_campaign_id", campaignBatch);
+              .in("client_campaign_id", campaignBatch)
+              .limit(10000);
 
             (salesData || []).forEach((s: any) => {
               const email = s.agent_email?.toLowerCase();
