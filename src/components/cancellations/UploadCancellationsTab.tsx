@@ -223,6 +223,22 @@ export function UploadCancellationsTab() {
         allMatched = matchedData || [];
       }
 
+      // Helper to extract OPP number from raw_payload
+      const extractOpp = (rawPayload: unknown): string => {
+        if (!rawPayload || typeof rawPayload !== 'object') return "";
+        const rp = rawPayload as Record<string, unknown>;
+        if (rp['legacy_opp_number']) return String(rp['legacy_opp_number']);
+        const fields = rp['leadResultFields'] as Record<string, unknown> | undefined;
+        if (fields?.['OPP nr']) return String(fields['OPP nr']);
+        if (fields?.['OPP-nr']) return String(fields['OPP-nr']);
+        const data = rp['leadResultData'] as Array<{label?: string; value?: string}> | undefined;
+        if (Array.isArray(data)) {
+          const found = data.find(d => d.label === 'OPP nr' || d.label === 'OPP-nr');
+          if (found?.value) return String(found.value);
+        }
+        return "";
+      };
+
       // If OPP numbers specified, fetch recent sales and match OPP client-side from raw_payload
       if (oppNumbers.length > 0) {
         const { data: oppCandidates } = await supabase
@@ -247,22 +263,6 @@ export function UploadCancellationsTab() {
           }
         }
       }
-
-      // Extract OPP number from raw_payload
-      const extractOpp = (rawPayload: unknown): string => {
-        if (!rawPayload || typeof rawPayload !== 'object') return "";
-        const rp = rawPayload as Record<string, unknown>;
-        if (rp['legacy_opp_number']) return String(rp['legacy_opp_number']);
-        const fields = rp['leadResultFields'] as Record<string, unknown> | undefined;
-        if (fields?.['OPP nr']) return String(fields['OPP nr']);
-        if (fields?.['OPP-nr']) return String(fields['OPP-nr']);
-        const data = rp['leadResultData'] as Array<{label?: string; value?: string}> | undefined;
-        if (Array.isArray(data)) {
-          const found = data.find(d => d.label === 'OPP nr' || d.label === 'OPP-nr');
-          if (found?.value) return String(found.value);
-        }
-        return "";
-      };
 
       const matched: MatchedSale[] = allMatched.map(sale => ({
         saleId: sale.id,
