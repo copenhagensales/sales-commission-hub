@@ -448,13 +448,11 @@ export function UploadCancellationsTab() {
             </CardDescription>
           </CardHeader>
            <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="space-y-2">
                 <Label>Upload-type</Label>
                 <Select value={uploadType} onValueChange={(v) => setUploadType(v as "cancellation" | "basket_difference")}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="cancellation">Annullering</SelectItem>
                     <SelectItem value="basket_difference">Kurv difference</SelectItem>
@@ -465,14 +463,10 @@ export function UploadCancellationsTab() {
               <div className="space-y-2">
                 <Label>Vælg kunde</Label>
                 <Select value={selectedClientId} onValueChange={setSelectedClientId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Vælg kunde..." />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Vælg kunde..." /></SelectTrigger>
                   <SelectContent>
                     {clients.map((client) => (
-                      <SelectItem key={client.id} value={client.id}>
-                        {client.name}
-                      </SelectItem>
+                      <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -481,16 +475,10 @@ export function UploadCancellationsTab() {
               <div className="space-y-2">
                 <Label>Telefonkolonne (valgfri)</Label>
                 <Select value={phoneColumn} onValueChange={setPhoneColumn}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Vælg kolonne..." />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Vælg kolonne..." /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">Ingen</SelectItem>
-                    {columns.map((col) => (
-                      <SelectItem key={col} value={col}>
-                        {col}
-                      </SelectItem>
-                    ))}
+                    {columns.map((col) => (<SelectItem key={col} value={col}>{col}</SelectItem>))}
                   </SelectContent>
                 </Select>
               </div>
@@ -498,16 +486,10 @@ export function UploadCancellationsTab() {
               <div className="space-y-2">
                 <Label>Virksomhedskolonne (valgfri)</Label>
                 <Select value={companyColumn} onValueChange={setCompanyColumn}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Vælg kolonne..." />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Vælg kolonne..." /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">Ingen</SelectItem>
-                    {columns.map((col) => (
-                      <SelectItem key={col} value={col}>
-                        {col}
-                      </SelectItem>
-                    ))}
+                    {columns.map((col) => (<SelectItem key={col} value={col}>{col}</SelectItem>))}
                   </SelectContent>
                 </Select>
               </div>
@@ -515,16 +497,43 @@ export function UploadCancellationsTab() {
               <div className="space-y-2">
                 <Label>OPP-kolonne (valgfri)</Label>
                 <Select value={oppColumn} onValueChange={setOppColumn}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Vælg kolonne..." />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Vælg kolonne..." /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">Ingen</SelectItem>
-                    {columns.map((col) => (
-                      <SelectItem key={col} value={col}>
-                        {col}
-                      </SelectItem>
-                    ))}
+                    {columns.map((col) => (<SelectItem key={col} value={col}>{col}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Produktkolonne (valgfri)</Label>
+                <Select value={productColumn} onValueChange={setProductColumn}>
+                  <SelectTrigger><SelectValue placeholder="Vælg kolonne..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Ingen</SelectItem>
+                    {columns.map((col) => (<SelectItem key={col} value={col}>{col}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Omsætningskolonne (valgfri)</Label>
+                <Select value={revenueColumn} onValueChange={setRevenueColumn}>
+                  <SelectTrigger><SelectValue placeholder="Vælg kolonne..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Ingen</SelectItem>
+                    {columns.map((col) => (<SelectItem key={col} value={col}>{col}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Provisionskolonne (valgfri)</Label>
+                <Select value={commissionColumn} onValueChange={setCommissionColumn}>
+                  <SelectTrigger><SelectValue placeholder="Vælg kolonne..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Ingen</SelectItem>
+                    {columns.map((col) => (<SelectItem key={col} value={col}>{col}</SelectItem>))}
                   </SelectContent>
                 </Select>
               </div>
