@@ -364,13 +364,17 @@ export function UploadCancellationsTab() {
       }
 
       // Build a lookup from OPP/phone/company → uploaded row for associating uploaded data
-      const uploadedRowByOpp = new Map<string, Record<string, unknown>>();
+      // Collect ALL rows per OPP (not just last one) to preserve product details
+      const uploadedRowsByOpp = new Map<string, Record<string, unknown>[]>();
       const uploadedRowByPhone = new Map<string, Record<string, unknown>>();
       const uploadedRowByCompany = new Map<string, Record<string, unknown>>();
       
       parsedData.forEach(row => {
         if (oppColumn !== "__none__" && row.originalRow[oppColumn]) {
-          uploadedRowByOpp.set(String(row.originalRow[oppColumn]).toUpperCase().trim(), row.originalRow);
+          const key = String(row.originalRow[oppColumn]).toUpperCase().trim();
+          const arr = uploadedRowsByOpp.get(key) || [];
+          arr.push(row.originalRow);
+          uploadedRowsByOpp.set(key, arr);
         }
         if (phoneColumn !== "__none__" && row.originalRow[phoneColumn]) {
           uploadedRowByPhone.set(String(row.originalRow[phoneColumn]).replace(/\D/g, ""), row.originalRow);
@@ -380,9 +384,31 @@ export function UploadCancellationsTab() {
         }
       });
 
+      // Consolidate all rows for an OPP into one object with _product_rows
+      const consolidateOppRows = (rows: Record<string, unknown>[]): Record<string, unknown> => {
+        // Find the "Total" row (if any) for financial totals, otherwise use the last row
+        const totalRow = rows.find(r => {
+          const produktVal = String(r["Produkt"] || r["produkt"] || "").trim();
+          return produktVal.toLowerCase() === "total";
+        }) || rows[rows.length - 1];
+
+        // Product rows = all rows except the Total row
+        const productRows = rows.filter(r => {
+          const produktVal = String(r["Produkt"] || r["produkt"] || "").trim();
+          return produktVal.toLowerCase() !== "total" && produktVal !== "";
+        });
+
+        return {
+          ...totalRow,
+          _product_rows: productRows.length > 0 ? productRows : undefined,
+        };
+      };
+
       const findUploadedRow = (sale: any): Record<string, unknown> => {
         const saleOpp = extractOpp(sale.raw_payload).toUpperCase().trim();
-        if (saleOpp && uploadedRowByOpp.has(saleOpp)) return uploadedRowByOpp.get(saleOpp)!;
+        if (saleOpp && uploadedRowsByOpp.has(saleOpp)) {
+          return consolidateOppRows(uploadedRowsByOpp.get(saleOpp)!);
+        }
         const salePhone = (sale.customer_phone || "").replace(/\D/g, "");
         if (salePhone && uploadedRowByPhone.has(salePhone)) return uploadedRowByPhone.get(salePhone)!;
         const saleCompany = (sale.customer_company || "").toLowerCase().trim();
