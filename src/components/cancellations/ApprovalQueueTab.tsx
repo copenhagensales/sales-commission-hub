@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import { Check, X, Loader2, Clock, Filter } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -280,6 +281,7 @@ export function ApprovalQueueTab() {
   const { user } = useAuth();
   const [statusFilter, setStatusFilter] = useState<string>("pending");
   const [onlyDifferences, setOnlyDifferences] = useState(false);
+  const [subTab, setSubTab] = useState<"cancellation" | "basket_difference">("cancellation");
 
   const { data: currentEmployee } = useQuery({
     queryKey: ["current-employee-for-approval", user?.email],
@@ -515,8 +517,22 @@ export function ApprovalQueueTab() {
   const filteredOppGroups = onlyDifferences ? oppGroups.filter((g) => g.hasDifferences) : oppGroups;
   const filteredFlatItems = onlyDifferences ? flatItems.filter((i) => i.hasDifferences) : flatItems;
 
-  const pendingOppGroups = filteredOppGroups.filter((g) => g.status === "pending");
-  const pendingFlatItems = filteredFlatItems.filter((i) => i.status === "pending");
+  // Split by sub-tab (upload_type)
+  const subOppGroups = useMemo(() => filteredOppGroups.filter((g) => g.uploadType === subTab), [filteredOppGroups, subTab]);
+  const subFlatItems = useMemo(() => filteredFlatItems.filter((i) => i.upload_type === subTab), [filteredFlatItems, subTab]);
+
+  // Counts per sub-tab for labels
+  const cancellationCount = useMemo(() =>
+    filteredOppGroups.filter((g) => g.uploadType === "cancellation").length +
+    filteredFlatItems.filter((i) => i.upload_type === "cancellation").length,
+    [filteredOppGroups, filteredFlatItems]);
+  const basketCount = useMemo(() =>
+    filteredOppGroups.filter((g) => g.uploadType === "basket_difference").length +
+    filteredFlatItems.filter((i) => i.upload_type === "basket_difference").length,
+    [filteredOppGroups, filteredFlatItems]);
+
+  const pendingOppGroups = subOppGroups.filter((g) => g.status === "pending");
+  const pendingFlatItems = subFlatItems.filter((i) => i.status === "pending");
   const totalPending = pendingOppGroups.length + pendingFlatItems.length;
   const isPending = approveMutation.isPending || rejectMutation.isPending;
 
@@ -535,6 +551,237 @@ export function ApprovalQueueTab() {
       ...pendingFlatItems.map((i) => i.id),
     ];
     if (allIds.length > 0) rejectMutation.mutate(allIds);
+  };
+
+  const renderTable = () => {
+    if (subOppGroups.length === 0 && subFlatItems.length === 0) {
+      return (
+        <div className="py-8 text-center text-muted-foreground">
+          {onlyDifferences ? "Ingen salg med forskelle fundet." : `Ingen ${statusFilter === "pending" ? "ventende" : ""} items i køen.`}
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-6">
+        {subOppGroups.length > 0 && (
+          <div>
+            <h3 className="text-sm font-semibold mb-2 text-muted-foreground">TDC Erhverv — OPP-grupperet</h3>
+            <div className="rounded-md border max-h-[600px] overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>OPP</TableHead>
+                    <TableHead>Sælgere</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>System (aggregeret)</TableHead>
+                    <TableHead>Uploadet data</TableHead>
+                    <TableHead>Forskelle</TableHead>
+                    <TableHead>Status</TableHead>
+                    {statusFilter === "pending" && <TableHead>Handlinger</TableHead>}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {subOppGroups.map((g) => {
+                    const summarizedItems = summarizeSaleItems(g.saleItems);
+                    const uploadedPreview = buildUploadedPreview(g.uploadedData, g.mapping);
+                    return (
+                      <TableRow key={g.oppGroup}>
+                        <TableCell className="font-mono text-xs">{g.oppGroup}</TableCell>
+                        <TableCell className="text-xs align-top">
+                          {g.agents.join(", ")}
+                          <div className="text-muted-foreground">({g.saleCount} salg)</div>
+                        </TableCell>
+                        <TableCell className="align-top">
+                          <Badge variant={g.uploadType === "cancellation" ? "destructive" : "secondary"}>
+                            {g.uploadType === "cancellation" ? "Annullering" : "Kurv diff."}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-xs min-w-[300px] align-top">
+                          {summarizedItems.length > 0 ? (
+                            <div className="space-y-2">
+                              <div className="font-medium">Produkter solgt</div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {summarizedItems.map((si, idx) => (
+                                  <Badge key={`${si.product_name}-${idx}`} variant="outline" className="whitespace-normal break-words text-left h-auto py-1">
+                                    {si.product_name} ×{si.quantity}
+                                  </Badge>
+                                ))}
+                              </div>
+                              <div className="text-muted-foreground">
+                                Oms: {summarizedItems.reduce((s, si) => s + si.mapped_revenue, 0).toFixed(0)} kr
+                                {" | "}
+                                Provi: {summarizedItems.reduce((s, si) => s + si.mapped_commission, 0).toFixed(0)} kr
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">Ingen produkter</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs min-w-[260px] align-top">
+                          {uploadedPreview.length > 0 ? (
+                            <div className="space-y-1 max-h-32 overflow-auto">
+                              {uploadedPreview.map((field) => (
+                                <div key={field.label} className="leading-relaxed break-words">
+                                  <span className="text-muted-foreground">{field.label}:</span> {field.value}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs min-w-[220px] align-top">
+                          {g.diffs.length > 0 ? (
+                            <div className="space-y-1">
+                              {g.diffs.map((d, idx) => (
+                                <div key={idx} className="p-1 rounded bg-destructive/10 border border-destructive/20">
+                                  <div className="font-medium text-destructive">{d.label}</div>
+                                  <div>System: <span className="font-mono">{d.systemValue}</span></div>
+                                  <div>Upload: <span className="font-mono">{d.uploadedValue}</span></div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <Badge variant="outline">✓ Match</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="align-top">
+                          <Badge variant={g.status === "approved" ? "default" : g.status === "rejected" ? "destructive" : "secondary"}>
+                            {g.status === "pending" ? "Ventende" : g.status === "approved" ? "Godkendt" : "Afvist"}
+                          </Badge>
+                        </TableCell>
+                        {statusFilter === "pending" && (
+                          <TableCell className="align-top">
+                            <div className="flex gap-1">
+                              <Button size="sm" variant="ghost" onClick={() => approveMutation.mutate({ queueItemIds: g.queueItemIds, saleIds: g.saleIds, uploadType: g.uploadType })} disabled={isPending}>
+                                <Check className="h-4 w-4" />
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={() => rejectMutation.mutate(g.queueItemIds)} disabled={isPending}>
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        )}
+
+        {subFlatItems.length > 0 && (
+          <div>
+            {subOppGroups.length > 0 && (
+              <h3 className="text-sm font-semibold mb-2 text-muted-foreground">Andre kunder — per salg</h3>
+            )}
+            <div className="rounded-md border max-h-[600px] overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Salgsdato</TableHead>
+                    <TableHead>Sælger</TableHead>
+                    <TableHead>OPP</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>System data</TableHead>
+                    <TableHead>Uploadet data</TableHead>
+                    <TableHead>Forskelle</TableHead>
+                    <TableHead>Status</TableHead>
+                    {statusFilter === "pending" && <TableHead>Handlinger</TableHead>}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {subFlatItems.map((item) => {
+                    const summarizedItems = summarizeSaleItems(item.saleItems);
+                    const uploadedPreview = buildUploadedPreview(item.uploadedData, item.mapping);
+                    return (
+                      <TableRow key={item.id}>
+                        <TableCell>{item.saleDate ? format(new Date(item.saleDate), "dd/MM/yyyy HH:mm") : "-"}</TableCell>
+                        <TableCell>{item.agentName}</TableCell>
+                        <TableCell>{item.oppNumber || "-"}</TableCell>
+                        <TableCell>
+                          <Badge variant={item.upload_type === "cancellation" ? "destructive" : "secondary"}>
+                            {item.upload_type === "cancellation" ? "Annullering" : "Kurv diff."}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-xs min-w-[280px] align-top">
+                          {summarizedItems.length > 0 ? (
+                            <div className="space-y-2">
+                              <div className="font-medium">Produkter solgt</div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {summarizedItems.map((si, idx) => (
+                                  <Badge key={`${si.product_name}-${idx}`} variant="outline" className="whitespace-normal break-words text-left h-auto py-1">
+                                    {si.product_name} ×{si.quantity}
+                                  </Badge>
+                                ))}
+                              </div>
+                              <div className="text-muted-foreground">
+                                Oms: {summarizedItems.reduce((s, si) => s + si.mapped_revenue, 0).toFixed(0)} kr
+                                {" | "}
+                                Provi: {summarizedItems.reduce((s, si) => s + si.mapped_commission, 0).toFixed(0)} kr
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">Ingen produkter</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs min-w-[260px] align-top">
+                          {uploadedPreview.length > 0 ? (
+                            <div className="space-y-1 max-h-32 overflow-auto">
+                              {uploadedPreview.map((field) => (
+                                <div key={field.label} className="leading-relaxed break-words">
+                                  <span className="text-muted-foreground">{field.label}:</span> {field.value}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs min-w-[220px] align-top">
+                          {item.diffs.length > 0 ? (
+                            <div className="space-y-1">
+                              {item.diffs.map((d, idx) => (
+                                <div key={idx} className="p-1 rounded bg-destructive/10 border border-destructive/20">
+                                  <div className="font-medium text-destructive">{d.label}</div>
+                                  <div>System: <span className="font-mono">{d.systemValue}</span></div>
+                                  <div>Upload: <span className="font-mono">{d.uploadedValue}</span></div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">Ingen forskelle</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={item.status === "approved" ? "default" : item.status === "rejected" ? "destructive" : "secondary"}>
+                            {item.status === "pending" ? "Ventende" : item.status === "approved" ? "Godkendt" : "Afvist"}
+                          </Badge>
+                        </TableCell>
+                        {statusFilter === "pending" && (
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <Button size="sm" variant="ghost" onClick={() => approveMutation.mutate({ queueItemIds: [item.id], saleIds: [item.sale_id], uploadType: item.upload_type })} disabled={isPending}>
+                                <Check className="h-4 w-4" />
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={() => rejectMutation.mutate([item.id])} disabled={isPending}>
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -576,244 +823,51 @@ export function ApprovalQueueTab() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {statusFilter === "pending" && totalPending > 0 && (
-            <div className="flex gap-2">
-              <Button size="sm" onClick={handleApproveAllPending} disabled={isPending}>
-                {approveMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Check className="h-4 w-4 mr-2" />}
-                Godkend alle ({totalPending})
-              </Button>
-              <Button size="sm" variant="destructive" onClick={handleRejectAllPending} disabled={isPending}>
-                {rejectMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <X className="h-4 w-4 mr-2" />}
-                Afvis alle ({totalPending})
-              </Button>
-            </div>
-          )}
-
           {isLoading ? (
             <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
-          ) : (filteredOppGroups.length === 0 && filteredFlatItems.length === 0) ? (
-            <div className="py-8 text-center text-muted-foreground">
-              {onlyDifferences ? "Ingen salg med forskelle fundet." : `Ingen ${statusFilter === "pending" ? "ventende" : ""} items i køen.`}
-            </div>
           ) : (
-            <div className="space-y-6">
-              {filteredOppGroups.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-semibold mb-2 text-muted-foreground">TDC Erhverv — OPP-grupperet</h3>
-                  <div className="rounded-md border max-h-[600px] overflow-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>OPP</TableHead>
-                          <TableHead>Sælgere</TableHead>
-                          <TableHead>Type</TableHead>
-                          <TableHead>System (aggregeret)</TableHead>
-                          <TableHead>Uploadet data</TableHead>
-                          <TableHead>Forskelle</TableHead>
-                          <TableHead>Status</TableHead>
-                          {statusFilter === "pending" && <TableHead>Handlinger</TableHead>}
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredOppGroups.map((g) => {
-                          const summarizedItems = summarizeSaleItems(g.saleItems);
-                          const uploadedPreview = buildUploadedPreview(g.uploadedData, g.mapping);
-                          return (
-                            <TableRow key={g.oppGroup}>
-                              <TableCell className="font-mono text-xs">{g.oppGroup}</TableCell>
-                              <TableCell className="text-xs align-top">
-                                {g.agents.join(", ")}
-                                <div className="text-muted-foreground">({g.saleCount} salg)</div>
-                              </TableCell>
-                              <TableCell className="align-top">
-                                <Badge variant={g.uploadType === "cancellation" ? "destructive" : "secondary"}>
-                                  {g.uploadType === "cancellation" ? "Annullering" : "Kurv diff."}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-xs min-w-[300px] align-top">
-                                {summarizedItems.length > 0 ? (
-                                  <div className="space-y-2">
-                                    <div className="font-medium">Produkter solgt</div>
-                                    <div className="flex flex-wrap gap-1.5">
-                                      {summarizedItems.map((si, idx) => (
-                                        <Badge key={`${si.product_name}-${idx}`} variant="outline" className="whitespace-normal break-words text-left h-auto py-1">
-                                          {si.product_name} ×{si.quantity}
-                                        </Badge>
-                                      ))}
-                                    </div>
-                                    <div className="text-muted-foreground">
-                                      Oms: {summarizedItems.reduce((s, si) => s + si.mapped_revenue, 0).toFixed(0)} kr
-                                      {" | "}
-                                      Provi: {summarizedItems.reduce((s, si) => s + si.mapped_commission, 0).toFixed(0)} kr
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <span className="text-muted-foreground">Ingen produkter</span>
-                                )}
-                              </TableCell>
-                              <TableCell className="text-xs min-w-[260px] align-top">
-                                {uploadedPreview.length > 0 ? (
-                                  <div className="space-y-1 max-h-32 overflow-auto">
-                                    {uploadedPreview.map((field) => (
-                                      <div key={field.label} className="leading-relaxed break-words">
-                                        <span className="text-muted-foreground">{field.label}:</span> {field.value}
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <span className="text-muted-foreground">-</span>
-                                )}
-                              </TableCell>
-                              <TableCell className="text-xs min-w-[220px] align-top">
-                                {g.diffs.length > 0 ? (
-                                  <div className="space-y-1">
-                                    {g.diffs.map((d, idx) => (
-                                      <div key={idx} className="p-1 rounded bg-destructive/10 border border-destructive/20">
-                                        <div className="font-medium text-destructive">{d.label}</div>
-                                        <div>System: <span className="font-mono">{d.systemValue}</span></div>
-                                        <div>Upload: <span className="font-mono">{d.uploadedValue}</span></div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <Badge variant="outline">✓ Match</Badge>
-                                )}
-                              </TableCell>
-                              <TableCell className="align-top">
-                                <Badge variant={g.status === "approved" ? "default" : g.status === "rejected" ? "destructive" : "secondary"}>
-                                  {g.status === "pending" ? "Ventende" : g.status === "approved" ? "Godkendt" : "Afvist"}
-                                </Badge>
-                              </TableCell>
-                              {statusFilter === "pending" && (
-                                <TableCell className="align-top">
-                                  <div className="flex gap-1">
-                                    <Button size="sm" variant="ghost" onClick={() => approveMutation.mutate({ queueItemIds: g.queueItemIds, saleIds: g.saleIds, uploadType: g.uploadType })} disabled={isPending}>
-                                      <Check className="h-4 w-4" />
-                                    </Button>
-                                    <Button size="sm" variant="ghost" onClick={() => rejectMutation.mutate(g.queueItemIds)} disabled={isPending}>
-                                      <X className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              )}
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-              )}
+            <Tabs value={subTab} onValueChange={(v) => setSubTab(v as "cancellation" | "basket_difference")}>
+              <TabsList>
+                <TabsTrigger value="cancellation">
+                  Annulleringer {cancellationCount > 0 && `(${cancellationCount})`}
+                </TabsTrigger>
+                <TabsTrigger value="basket_difference">
+                  Kurv-rettelser {basketCount > 0 && `(${basketCount})`}
+                </TabsTrigger>
+              </TabsList>
 
-              {filteredFlatItems.length > 0 && (
-                <div>
-                  {filteredOppGroups.length > 0 && (
-                    <h3 className="text-sm font-semibold mb-2 text-muted-foreground">Andre kunder — per salg</h3>
-                  )}
-                  <div className="rounded-md border max-h-[600px] overflow-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Salgsdato</TableHead>
-                          <TableHead>Sælger</TableHead>
-                          <TableHead>OPP</TableHead>
-                          <TableHead>Type</TableHead>
-                          <TableHead>System data</TableHead>
-                          <TableHead>Uploadet data</TableHead>
-                          <TableHead>Forskelle</TableHead>
-                          <TableHead>Status</TableHead>
-                          {statusFilter === "pending" && <TableHead>Handlinger</TableHead>}
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredFlatItems.map((item) => {
-                          const summarizedItems = summarizeSaleItems(item.saleItems);
-                          const uploadedPreview = buildUploadedPreview(item.uploadedData, item.mapping);
-                          return (
-                            <TableRow key={item.id}>
-                              <TableCell>{item.saleDate ? format(new Date(item.saleDate), "dd/MM/yyyy HH:mm") : "-"}</TableCell>
-                              <TableCell>{item.agentName}</TableCell>
-                              <TableCell>{item.oppNumber || "-"}</TableCell>
-                              <TableCell>
-                                <Badge variant={item.upload_type === "cancellation" ? "destructive" : "secondary"}>
-                                  {item.upload_type === "cancellation" ? "Annullering" : "Kurv diff."}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-xs min-w-[280px] align-top">
-                                {summarizedItems.length > 0 ? (
-                                  <div className="space-y-2">
-                                    <div className="font-medium">Produkter solgt</div>
-                                    <div className="flex flex-wrap gap-1.5">
-                                      {summarizedItems.map((si, idx) => (
-                                        <Badge key={`${si.product_name}-${idx}`} variant="outline" className="whitespace-normal break-words text-left h-auto py-1">
-                                          {si.product_name} ×{si.quantity}
-                                        </Badge>
-                                      ))}
-                                    </div>
-                                    <div className="text-muted-foreground">
-                                      Oms: {summarizedItems.reduce((s, si) => s + si.mapped_revenue, 0).toFixed(0)} kr
-                                      {" | "}
-                                      Provi: {summarizedItems.reduce((s, si) => s + si.mapped_commission, 0).toFixed(0)} kr
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <span className="text-muted-foreground">Ingen produkter</span>
-                                )}
-                              </TableCell>
-                              <TableCell className="text-xs min-w-[260px] align-top">
-                                {uploadedPreview.length > 0 ? (
-                                  <div className="space-y-1 max-h-32 overflow-auto">
-                                    {uploadedPreview.map((field) => (
-                                      <div key={field.label} className="leading-relaxed break-words">
-                                        <span className="text-muted-foreground">{field.label}:</span> {field.value}
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <span className="text-muted-foreground">-</span>
-                                )}
-                              </TableCell>
-                              <TableCell className="text-xs min-w-[220px] align-top">
-                                {item.diffs.length > 0 ? (
-                                  <div className="space-y-1">
-                                    {item.diffs.map((d, idx) => (
-                                      <div key={idx} className="p-1 rounded bg-destructive/10 border border-destructive/20">
-                                        <div className="font-medium text-destructive">{d.label}</div>
-                                        <div>System: <span className="font-mono">{d.systemValue}</span></div>
-                                        <div>Upload: <span className="font-mono">{d.uploadedValue}</span></div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <span className="text-muted-foreground">Ingen forskelle</span>
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant={item.status === "approved" ? "default" : item.status === "rejected" ? "destructive" : "secondary"}>
-                                  {item.status === "pending" ? "Ventende" : item.status === "approved" ? "Godkendt" : "Afvist"}
-                                </Badge>
-                              </TableCell>
-                              {statusFilter === "pending" && (
-                                <TableCell>
-                                  <div className="flex gap-1">
-                                    <Button size="sm" variant="ghost" onClick={() => approveMutation.mutate({ queueItemIds: [item.id], saleIds: [item.sale_id], uploadType: item.upload_type })} disabled={isPending}>
-                                      <Check className="h-4 w-4" />
-                                    </Button>
-                                    <Button size="sm" variant="ghost" onClick={() => rejectMutation.mutate([item.id])} disabled={isPending}>
-                                      <X className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              )}
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
+              <TabsContent value="cancellation" className="mt-4">
+                {statusFilter === "pending" && totalPending > 0 && (
+                  <div className="flex gap-2 mb-4">
+                    <Button size="sm" onClick={handleApproveAllPending} disabled={isPending}>
+                      {approveMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Check className="h-4 w-4 mr-2" />}
+                      Godkend alle ({totalPending})
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={handleRejectAllPending} disabled={isPending}>
+                      {rejectMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <X className="h-4 w-4 mr-2" />}
+                      Afvis alle ({totalPending})
+                    </Button>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+                {renderTable()}
+              </TabsContent>
+
+              <TabsContent value="basket_difference" className="mt-4">
+                {statusFilter === "pending" && totalPending > 0 && (
+                  <div className="flex gap-2 mb-4">
+                    <Button size="sm" onClick={handleApproveAllPending} disabled={isPending}>
+                      {approveMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Check className="h-4 w-4 mr-2" />}
+                      Godkend alle ({totalPending})
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={handleRejectAllPending} disabled={isPending}>
+                      {rejectMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <X className="h-4 w-4 mr-2" />}
+                      Afvis alle ({totalPending})
+                    </Button>
+                  </div>
+                )}
+                {renderTable()}
+              </TabsContent>
+            </Tabs>
           )}
         </CardContent>
       </Card>
