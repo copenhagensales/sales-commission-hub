@@ -32,6 +32,7 @@ interface PrizeShowcaseProps {
   prizeLeaders: PrizeLeaders | undefined;
   seasonStatus: string;
   isActive: boolean;
+  roundProvisionMap?: Record<string, number>;
 }
 
 type DialogType = "top3" | "bestRound" | "talent" | "comeback" | null;
