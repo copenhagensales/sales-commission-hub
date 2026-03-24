@@ -42,19 +42,8 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
         .not("unmatched_rows", "is", null)
         .order("created_at", { ascending: false });
 
-      // Filter by client: get config_ids for this client
       if (clientId) {
-        const { data: configs } = await supabase
-          .from("cancellation_upload_configs")
-          .select("id")
-          .eq("client_id", clientId);
-        const configIds = (configs || []).map(c => c.id);
-        if (configIds.length > 0) {
-          query = query.or(`config_id.in.(${configIds.join(",")}),config_id.is.null`);
-        } else {
-          // No configs for this client — still show imports with null config_id
-          query = query.is("config_id", null);
-        }
+        query = query.eq("client_id", clientId);
       }
 
       const { data, error } = await query;
