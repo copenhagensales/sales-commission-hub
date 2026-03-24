@@ -938,7 +938,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                   <SelectContent>
                     <SelectItem value="all">Alle sælgere</SelectItem>
                     {allSellers.map(name => (
-                      <SelectItem key={name} value={name}>{name}</SelectItem>
+                      <SelectItem key={name} value={name}>{resolve(name)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
