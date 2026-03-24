@@ -1,0 +1,1 @@
+ALTER TABLE cancellation_imports ALTER COLUMN client_id SET NOT NULL;

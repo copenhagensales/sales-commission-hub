@@ -1524,7 +1524,7 @@ export type Database = {
       }
       cancellation_imports: {
         Row: {
-          client_id: string | null
+          client_id: string
           config_id: string | null
           created_at: string
           error_message: string | null
@@ -1539,7 +1539,7 @@ export type Database = {
           uploaded_by: string
         }
         Insert: {
-          client_id?: string | null
+          client_id: string
           config_id?: string | null
           created_at?: string
           error_message?: string | null
@@ -1554,7 +1554,7 @@ export type Database = {
           uploaded_by: string
         }
         Update: {
-          client_id?: string | null
+          client_id?: string
           config_id?: string | null
           created_at?: string
           error_message?: string | null
