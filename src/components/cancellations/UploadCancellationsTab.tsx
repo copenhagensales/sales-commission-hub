@@ -1361,6 +1361,21 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
       {/* STEP 1: Choose type */}
       {step === "type" && (
+        activeImport ? (
+          <Card className="max-w-2xl mx-auto">
+            <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+              <AlertCircle className="h-12 w-12 text-warning mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Igangværende upload</h3>
+              <p className="text-sm text-muted-foreground mb-1">
+                Der er allerede en igangværende upload for denne kunde:
+              </p>
+              <p className="text-sm font-medium mb-4">"{activeImport.file_name}"</p>
+              <p className="text-sm text-muted-foreground">
+                Behandl den først i <strong>Godkendelseskøen</strong> før du uploader en ny fil.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
           <button
             onClick={() => { setUploadType("cancellation"); setStep("upload"); }}
@@ -1386,6 +1401,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             </p>
           </button>
         </div>
+        )
       )}
 
       {/* STEP 2: Upload file */}
