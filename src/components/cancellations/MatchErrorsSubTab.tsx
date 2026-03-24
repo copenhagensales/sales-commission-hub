@@ -314,8 +314,9 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
           </TableHeader>
           <TableBody>
             {processed.map((row, idx) => {
+              const localValue = localAssignments[idx];
               const sellerValue = sellerField ? String(row.rowData[sellerField] ?? "") : "";
-              const currentMapping = mappingsByName.get(sellerValue.toLowerCase());
+              const currentMapping = localValue ?? mappingsByName.get(sellerValue.toLowerCase()) ?? "";
 
               return (
                 <TableRow key={`${row.importId}-${idx}`}>
@@ -327,11 +328,10 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
                   {sellerField && (
                     <TableCell className="min-w-[200px]">
                       <Select
-                        value={currentMapping ?? ""}
+                        value={currentMapping}
                         onValueChange={(val) => {
-                          if (sellerValue) {
-                            upsertMapping.mutate({ excelName: sellerValue, employeeId: val });
-                          }
+                          setLocalAssignments(prev => ({ ...prev, [idx]: val }));
+                          upsertMapping.mutate({ row, rowIndex: idx, employeeId: val });
                         }}
                       >
                         <SelectTrigger className="h-8 text-xs">
