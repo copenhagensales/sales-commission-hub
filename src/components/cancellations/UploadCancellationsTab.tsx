@@ -511,6 +511,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       }));
 
       setMatchedSales(matched);
+      setMatchedRowIndices(matchedIndices);
       setStep("preview");
 
       toast({
