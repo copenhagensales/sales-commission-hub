@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format, formatDistanceToNow, parseISO, startOfDay, endOfDay, subDays, subWeeks, subMonths } from "date-fns";
+import { format, formatDistanceToNow, parseISO, startOfDay, endOfDay, subDays, subWeeks, subMonths, startOfWeek, endOfWeek } from "date-fns";
 import { da } from "date-fns/locale";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -42,6 +42,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { getPayrollPeriod } from "@/lib/calculations";
 
 // Type for leadResultData field
 interface LeadResultField {
@@ -96,15 +97,17 @@ interface Sale {
 
 const ITEMS_PER_PAGE = 20;
 
-type DatePreset = "all" | "today" | "yesterday" | "last7days" | "last30days" | "thisMonth" | "custom";
+type DatePreset = "all" | "today" | "yesterday" | "thisWeek" | "last7days" | "last30days" | "thisMonth" | "payroll" | "custom";
 
 const DATE_PRESETS: { value: DatePreset; label: string }[] = [
   { value: "all", label: "Alle datoer" },
   { value: "today", label: "I dag" },
   { value: "yesterday", label: "I går" },
-  { value: "last7days", label: "Sidste 7 dage" },
-  { value: "last30days", label: "Sidste 30 dage" },
+  { value: "thisWeek", label: "Denne uge" },
+  { value: "last7days", label: "7 dage" },
+  { value: "last30days", label: "30 dage" },
   { value: "thisMonth", label: "Denne måned" },
+  { value: "payroll", label: "Lønperiode" },
   { value: "custom", label: "Vælg periode..." },
 ];
 
@@ -116,6 +119,8 @@ function getDateRangeFromPreset(preset: DatePreset): { start: Date; end: Date } 
     case "yesterday":
       const yesterday = subDays(now, 1);
       return { start: startOfDay(yesterday), end: endOfDay(yesterday) };
+    case "thisWeek":
+      return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }) };
     case "last7days":
       return { start: startOfDay(subDays(now, 6)), end: endOfDay(now) };
     case "last30days":
@@ -123,6 +128,10 @@ function getDateRangeFromPreset(preset: DatePreset): { start: Date; end: Date } 
     case "thisMonth":
       const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       return { start: startOfDay(firstOfMonth), end: endOfDay(now) };
+    case "payroll": {
+      const period = getPayrollPeriod(now);
+      return { start: period.start, end: period.end };
+    }
     default:
       return null;
   }
@@ -715,28 +724,33 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
                 )}
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <div className="flex">
-                <div className="border-r p-2 space-y-0.5 min-w-[140px]">
-                  <p className="text-xs font-medium text-muted-foreground px-2 py-1.5">Hurtig valg</p>
-                  {DATE_PRESETS.filter(p => p.value !== "custom").map((preset) => (
-                    <Button
-                      key={preset.value}
-                      variant={datePreset === preset.value ? "secondary" : "ghost"}
-                      size="sm"
-                      className="w-full justify-start text-sm h-8"
-                      onClick={() => {
-                        setDatePreset(preset.value);
-                        setCustomDateRange({ from: undefined, to: undefined });
-                        setIsCalendarOpen(false);
-                      }}
-                    >
-                      {preset.label}
-                    </Button>
-                  ))}
-                </div>
+            <PopoverContent className="w-auto p-3" align="start">
+              <div className="space-y-3">
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground px-3 pt-3 pb-1">Eller vælg periode</p>
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Hurtig valg</p>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {DATE_PRESETS.filter(p => p.value !== "custom" && p.value !== "all").map((preset) => (
+                      <Button
+                        key={preset.value}
+                        variant={datePreset === preset.value ? "default" : "outline"}
+                        size="sm"
+                        className={cn(
+                          "text-xs h-7",
+                          datePreset === preset.value && "bg-primary text-primary-foreground"
+                        )}
+                        onClick={() => {
+                          setDatePreset(preset.value);
+                          setCustomDateRange({ from: undefined, to: undefined });
+                          setIsCalendarOpen(false);
+                        }}
+                      >
+                        {preset.label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+                <div className="border-t pt-3">
+                  <p className="text-xs font-medium text-muted-foreground mb-1">Eller vælg periode</p>
                   <Calendar
                     mode="range"
                     defaultMonth={customDateRange.from}
@@ -748,11 +762,27 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
                         setIsCalendarOpen(false);
                       }
                     }}
-                    numberOfMonths={2}
+                    numberOfMonths={1}
                     locale={da}
-                    className="pointer-events-auto p-3"
+                    className="pointer-events-auto p-0"
                   />
                 </div>
+                {datePreset !== "all" && (
+                  <div className="border-t pt-2 flex justify-end">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs h-7 text-muted-foreground"
+                      onClick={() => {
+                        setDatePreset("all");
+                        setCustomDateRange({ from: undefined, to: undefined });
+                        setIsCalendarOpen(false);
+                      }}
+                    >
+                      Nulstil
+                    </Button>
+                  </div>
+                )}
               </div>
             </PopoverContent>
           </Popover>
