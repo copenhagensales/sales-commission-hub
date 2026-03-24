@@ -1,34 +1,32 @@
 
 
-# Fix: Brug konfigureret sælger-kolonne i stedet for gæt
+# Forbedring: Søgbar medarbejder-vælger i Match Errors
 
 ## Problem
-Koden gætter sælger-kolonnen via `SELLER_FIELD_CANDIDATES`-listen. Excel-filen har både "Employee Name" (den rigtige sælger) og "Operator" (indeholder "Newly Created", "Call Me" osv.). Fordi "operator" står først i kandidat-listen, vælges den forkerte kolonne — og "Newly Created" gemmes som sælgernavn.
+Den nuværende Select-dropdown viser alle medarbejdere i en lang liste uden søgning. Det er svært at finde den rigtige medarbejder hurtigt.
 
 ## Løsning
-Databasen har allerede en `seller_column` i `cancellation_upload_configs`. Koden henter allerede upload-konfigurationen, men kun `date_column`. Rettelsen:
+Erstat Select med en Popover + Command (cmdk) komponent — en søgbar dropdown med fuzzy-filtrering. Projektet har allerede `command.tsx` og `popover.tsx` UI-komponenter.
 
 ### Ændringer i `MatchErrorsSubTab.tsx`
 
-1. **Udvid config-query** — Hent `seller_column` sammen med `date_column` fra `cancellation_upload_configs`.
+1. **Erstat Select med Popover + Command** — Hver række får en knap der åbner en popover med et søgefelt og filtreret medarbejderliste. Brugeren skriver navn og vælger fra den filtrerede liste.
 
-2. **Brug `uploadConfig.seller_column` som primær kilde** — `sellerField` skal sættes til `uploadConfig.seller_column` hvis den findes. Kun fald tilbage til `SELLER_FIELD_CANDIDATES`-gættet hvis `seller_column` ikke er konfigureret.
+2. **Vis valgt medarbejders fulde navn** på knappen efter valg, i stedet for truncated tekst.
 
-3. **Ingen andre ændringer** — Resten af logikken (per-row assignment, re-match, queue insertion) forbliver uændret.
+3. **Én åben popover ad gangen** — Track `openPopoverIdx` state så kun én popover er åben.
 
-## Teknisk ændring
+### UI-flow
 ```text
-// Før:
-.select("date_column")
-
-// Efter:
-.select("date_column, seller_column")
-
-// sellerField logic:
-const sellerField = useMemo(() => {
-  if (uploadConfig?.seller_column) return uploadConfig.seller_column;
-  return allKeys.find(k => SELLER_FIELD_CANDIDATES.includes(k.toLowerCase()));
-}, [allKeys, uploadConfig]);
+[Vælg medarbejder... ▼]  →  klik  →  Popover med:
+  ┌──────────────────────┐
+  │ 🔍 Søg medarbejder...│
+  │ ──────────────────── │
+  │ Adam Jensen           │
+  │ Noah Wichmann Duus    │
+  │ Silas Soelberg-Larsen │
+  │ ...                   │
+  └──────────────────────┘
 ```
 
 ## Fil
