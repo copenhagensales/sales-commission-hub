@@ -1617,6 +1617,7 @@ export type Database = {
           reviewed_by: string | null
           sale_id: string
           status: string
+          target_product_name: string | null
           upload_type: string
           uploaded_data: Json | null
         }
@@ -1630,6 +1631,7 @@ export type Database = {
           reviewed_by?: string | null
           sale_id: string
           status?: string
+          target_product_name?: string | null
           upload_type?: string
           uploaded_data?: Json | null
         }
@@ -1643,6 +1645,7 @@ export type Database = {
           reviewed_by?: string | null
           sale_id?: string
           status?: string
+          target_product_name?: string | null
           upload_type?: string
           uploaded_data?: Json | null
         }
@@ -1707,6 +1710,7 @@ export type Database = {
           phone_column: string | null
           product_columns: string[] | null
           product_match_mode: string
+          product_phone_mappings: Json | null
           revenue_column: string | null
         }
         Insert: {
@@ -1724,6 +1728,7 @@ export type Database = {
           phone_column?: string | null
           product_columns?: string[] | null
           product_match_mode?: string
+          product_phone_mappings?: Json | null
           revenue_column?: string | null
         }
         Update: {
@@ -1741,6 +1746,7 @@ export type Database = {
           phone_column?: string | null
           product_columns?: string[] | null
           product_match_mode?: string
+          product_phone_mappings?: Json | null
           revenue_column?: string | null
         }
         Relationships: [
