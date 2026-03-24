@@ -601,7 +601,12 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
   });
 
   const handleMatch = async () => {
-    if (phoneColumn === "__none__" && companyColumn === "__none__" && oppColumn === "__none__" && memberNumberColumn === "__none__") {
+    // Get the active config for product_phone_mappings
+    const activeConfig = clientConfigs.find(c => c.id === selectedConfigId) || clientConfigs.find(c => c.is_default) || clientConfigs[0];
+    const productPhoneMappings = activeConfig?.product_phone_mappings || [];
+    const hasProductPhoneMappings = productPhoneMappings.length > 0;
+
+    if (!hasProductPhoneMappings && phoneColumn === "__none__" && companyColumn === "__none__" && oppColumn === "__none__" && memberNumberColumn === "__none__") {
       toast({
         title: "Vælg kolonner",
         description: "Vælg mindst én kolonne at matche på (telefon, virksomhed, OPP-nummer eller medlemsnummer).",
@@ -635,7 +640,14 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
       filteredData.forEach(row => {
         if (phoneColumn !== "__none__" && row.originalRow[phoneColumn]) {
-          phones.push(String(row.originalRow[phoneColumn]).replace(/\D/g, ""));
+          phones.push(normalizePhone(String(row.originalRow[phoneColumn])));
+        }
+        // Also collect phones from product_phone_mappings
+        for (const mapping of productPhoneMappings) {
+          const val = row.originalRow[mapping.phoneColumn];
+          if (val) {
+            phones.push(normalizePhone(String(val)));
+          }
         }
         if (companyColumn !== "__none__" && row.originalRow[companyColumn]) {
           companies.push(String(row.originalRow[companyColumn]).toLowerCase().trim());
@@ -699,12 +711,71 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         ? await fetchCandidateSales()
         : [];
 
-      const phoneSet = new Set(phones.map(p => p.replace(/\D/g, "")));
+      // Use normalizePhone for phone matching
+      const phoneSet = new Set(phones.map(p => normalizePhone(p)));
       const companySet = new Set(companies);
 
+      // --- Product-phone mapping matching ---
+      if (hasProductPhoneMappings) {
+        // Build a map: normalized phone -> { saleId, productName }[] for each mapping column
+        // For each filtered row, check each mapping column's phone against candidate sales
+        const saleByNormalizedPhone = new Map<string, any[]>();
+        for (const sale of candidateSales) {
+          const salePhone = normalizePhone(sale.customer_phone || "");
+          if (salePhone) {
+            const arr = saleByNormalizedPhone.get(salePhone) || [];
+            arr.push(sale);
+            saleByNormalizedPhone.set(salePhone, arr);
+          }
+        }
+
+        const matchedIndicesLocal = new Set<number>();
+        const productMatched: MatchedSale[] = [];
+        const matchedSaleProductKeys = new Set<string>(); // saleId|productName dedup
+
+        filteredData.forEach((row, idx) => {
+          for (const mapping of productPhoneMappings) {
+            const rawPhone = row.originalRow[mapping.phoneColumn];
+            if (!rawPhone) continue;
+            const phone = normalizePhone(String(rawPhone));
+            if (!phone) continue;
+
+            const matchingSales = saleByNormalizedPhone.get(phone) || [];
+            for (const sale of matchingSales) {
+              const key = `${sale.id}|${mapping.productName}`;
+              if (matchedSaleProductKeys.has(key)) continue;
+              matchedSaleProductKeys.add(key);
+              matchedIndicesLocal.add(idx);
+              productMatched.push({
+                saleId: sale.id,
+                phone: sale.customer_phone || "",
+                company: sale.customer_company || "",
+                oppNumber: "",
+                saleDate: sale.sale_datetime || "",
+                employee: sale.agent_name || "Ukendt",
+                currentStatus: sale.validation_status || "pending",
+                uploadedRowData: row.originalRow,
+                targetProductName: mapping.productName,
+              });
+            }
+          }
+        });
+
+        setMatchedSales(productMatched);
+        setMatchedRowIndices(matchedIndicesLocal);
+        setStep("preview");
+
+        toast({
+          title: "Matching fuldført",
+          description: `${productMatched.length} produkt-matches fundet.`,
+        });
+        return;
+      }
+
+      // --- Standard matching (no product-phone mappings) ---
       for (const sale of candidateSales) {
         if (existingIds.has(sale.id)) continue;
-        const salePhone = (sale.customer_phone || "").replace(/\D/g, "");
+        const salePhone = normalizePhone(sale.customer_phone || "");
         const saleCompany = (sale.customer_company || "").toLowerCase().trim();
 
         let matched = false;
@@ -775,7 +846,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           uploadedRowsByOpp.set(key, arr);
         }
         if (phoneColumn !== "__none__" && row.originalRow[phoneColumn]) {
-          uploadedRowByPhone.set(String(row.originalRow[phoneColumn]).replace(/\D/g, ""), row.originalRow);
+          uploadedRowByPhone.set(normalizePhone(String(row.originalRow[phoneColumn])), row.originalRow);
         }
         if (companyColumn !== "__none__" && row.originalRow[companyColumn]) {
           uploadedRowByCompany.set(String(row.originalRow[companyColumn]).toLowerCase().trim(), row.originalRow);
@@ -814,7 +885,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           indexByOpp.set(key, arr);
         }
         if (phoneColumn !== "__none__" && row.originalRow[phoneColumn]) {
-          indexByPhone.set(String(row.originalRow[phoneColumn]).replace(/\D/g, ""), idx);
+          indexByPhone.set(normalizePhone(String(row.originalRow[phoneColumn])), idx);
         }
         if (companyColumn !== "__none__" && row.originalRow[companyColumn]) {
           indexByCompany.set(String(row.originalRow[companyColumn]).toLowerCase().trim(), idx);
@@ -832,7 +903,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           (indexByOpp.get(saleOpp) || []).forEach(i => matchedIndices.add(i));
           return consolidateOppRows(uploadedRowsByOpp.get(saleOpp)!);
         }
-        const salePhone = (sale.customer_phone || "").replace(/\D/g, "");
+        const salePhone = normalizePhone(sale.customer_phone || "");
         if (salePhone && uploadedRowByPhone.has(salePhone)) {
           const idx = indexByPhone.get(salePhone);
           if (idx !== undefined) matchedIndices.add(idx);
