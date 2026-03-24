@@ -2023,6 +2023,148 @@ export function EditBookingDialog({
             )}
           </TabsContent>
 
+          {/* Training Bonus Tab */}
+          <TabsContent value="training" className="space-y-4 mt-4">
+            {/* Existing training bonus assignments */}
+            {Object.keys(groupedTrainingAssignments).length > 0 && (
+              <div className="space-y-3 border-b pb-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium flex items-center gap-2">
+                    <GraduationCap className="h-4 w-4 text-indigo-600" />
+                    Tilknyttede oplæringsbonusser
+                  </p>
+                  <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                    {Object.keys(groupedTrainingAssignments).length} medarbejdere • {currentTrainingAssignments.length} dage
+                  </span>
+                </div>
+                <div className="grid gap-2">
+                  {Object.entries(groupedTrainingAssignments).map(([empId, { employeeName, dates, totalAmount }]) => {
+                    const sortedDates = [...dates].sort();
+                    const dateLabels = sortedDates.map((d: string) => {
+                      const dayIndex = Math.floor((parseISO(d).getTime() - weekStart.getTime()) / (1000 * 60 * 60 * 24));
+                      return DAY_NAMES[dayIndex]?.slice(0, 3) || format(parseISO(d), "d/M");
+                    });
+                    return (
+                      <div key={empId} className="flex items-center justify-between bg-card border rounded-lg px-3 py-2.5">
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center shrink-0">
+                            <GraduationCap className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-medium text-sm truncate">{employeeName}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {dateLabels.join(" • ")} • {totalAmount.toLocaleString('da-DK')} kr
+                            </p>
+                          </div>
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
+                          onClick={() => removeTrainingBonusMutation.mutate(empId)}
+                          disabled={removeTrainingBonusMutation.isPending}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Add training bonus section */}
+            {assignedEmployees.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <GraduationCap className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                <p className="text-sm">Tilføj først medarbejdere til bookingen under "Medarbejdere" fanen.</p>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Tilføj oplæringsbonus</p>
+                  <Select
+                    value={selectedTrainingEmployee || ""}
+                    onValueChange={setSelectedTrainingEmployee}
+                  >
+                    <SelectTrigger className="bg-background text-foreground">
+                      <SelectValue placeholder="Vælg medarbejder" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover">
+                      {assignedEmployees.map((employee) => (
+                        <SelectItem key={employee.id} value={employee.id} className="text-popover-foreground">
+                          <div className="flex items-center gap-2">
+                            <Users className="h-4 w-4" />
+                            <span>{employee.full_name}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Vælg dage:</p>
+                  <div className="space-y-1">
+                    {DAY_NAMES.map((dayName, index) => {
+                      const inRange = isDayInBookingRange(index);
+                      return (
+                        <div
+                          key={index}
+                          className={`flex items-center justify-between p-3 rounded-lg border ${
+                            inRange ? "hover:bg-muted/50 cursor-pointer" : "opacity-50"
+                          } ${selectedTrainingDays.has(index) ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950/20" : ""}`}
+                          onClick={() => inRange && toggleTrainingDay(index)}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Checkbox
+                              checked={selectedTrainingDays.has(index)}
+                              disabled={!inRange}
+                              onCheckedChange={() => inRange && toggleTrainingDay(index)}
+                            />
+                            <span className={selectedTrainingDays.has(index) ? "text-indigo-800 dark:text-indigo-200" : ""}>{dayName}</span>
+                          </div>
+                          <span className={`text-sm ${selectedTrainingDays.has(index) ? "text-indigo-600" : "text-muted-foreground"}`}>
+                            {getDateForDay(index)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Training bonus rate info */}
+                <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-lg px-3 py-2">
+                  <DollarSign className="h-4 w-4" />
+                  <span>Oplæringsbonussats: <span className="font-medium text-foreground">{(trainingBonusSalaryType?.amount || 0).toLocaleString('da-DK')} kr</span> per dag (fra lønart)</span>
+                </div>
+
+                {/* Summary of what will be added */}
+                {selectedTrainingEmployee && selectedTrainingDays.size > 0 && (
+                  <div className="bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-800 rounded-lg p-3">
+                    <p className="text-sm font-medium text-indigo-800 dark:text-indigo-200">Du er ved at tilføje:</p>
+                    <p className="mt-1 text-sm text-indigo-700 dark:text-indigo-300">
+                      • {assignedEmployees.find(e => e.id === selectedTrainingEmployee)?.full_name}: {Array.from(selectedTrainingDays).filter(d => isDayInBookingRange(d)).map(d => DAY_NAMES[d]).join(", ")}
+                    </p>
+                    <p className="mt-1 text-xs text-indigo-600 dark:text-indigo-400">
+                      Total: {(Array.from(selectedTrainingDays).filter(d => isDayInBookingRange(d)).length * (trainingBonusSalaryType?.amount || 0)).toLocaleString('da-DK')} kr
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button
+                    onClick={handleAddTrainingBonus}
+                    disabled={!selectedTrainingEmployee || selectedTrainingDays.size === 0 || addTrainingBonusMutation.isPending}
+                    className="bg-indigo-600 hover:bg-indigo-700"
+                  >
+                    {addTrainingBonusMutation.isPending ? "Tilføjer..." : `Tilføj oplæringsbonus til ${selectedTrainingDays.size} dag${selectedTrainingDays.size !== 1 ? "e" : ""}`}
+                  </Button>
+                </div>
+              </>
+            )}
+          </TabsContent>
+
           {/* Hotel Tab */}
           <TabsContent value="hotel" className="space-y-4 mt-4">
             <HotelTabContent booking={booking} />
