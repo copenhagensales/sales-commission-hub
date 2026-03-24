@@ -124,8 +124,24 @@ export function CancellationHistoryTable({ clientId }: CancellationHistoryTableP
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
+  if (!clientId) {
+    return (
+      <Card>
+        <CardContent className="py-8 text-center text-muted-foreground">
+          Vælg en kunde for at se tidligere uploads
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (imports.length === 0 && !isLoading) {
-    return null;
+    return (
+      <Card>
+        <CardContent className="py-8 text-center text-muted-foreground">
+          Ingen uploads fundet for denne kunde
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
