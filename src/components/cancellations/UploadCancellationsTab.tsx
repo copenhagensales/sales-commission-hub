@@ -249,7 +249,15 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       }
     };
     reader.readAsArrayBuffer(uploadedFile);
-  }, []);
+  }, [clientConfigs]);
+
+  // Auto-match when file is parsed and a default config was applied
+  useEffect(() => {
+    if (autoMatchPending.current && parsedData.length > 0) {
+      autoMatchPending.current = false;
+      handleMatch();
+    }
+  }, [parsedData]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
