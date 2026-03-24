@@ -142,6 +142,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
   const [filterColumn, setFilterColumn] = useState<string>("__none__");
   const [filterValue, setFilterValue] = useState<string>("");
   const [appliedConfigName, setAppliedConfigName] = useState<string>("");
+  const [showEditConfig, setShowEditConfig] = useState(false);
   const autoMatchPending = useRef(false);
 
   // Fetch configs for selected client
