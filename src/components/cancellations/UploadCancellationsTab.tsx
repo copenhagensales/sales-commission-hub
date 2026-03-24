@@ -386,9 +386,9 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           if (existingIds.has(sale.id)) continue;
           const nd = sale.normalized_data as Record<string, unknown> | null;
           const rp = sale.raw_payload as Record<string, unknown> | null;
-          const saleMemberNr = String(
+           const saleMemberNr = String(
             nd?.member_number ?? 
-            (rp?.data as Record<string, unknown> | undefined)?.Medlemsnummer ?? 
+            getCaseInsensitive(rp?.data as Record<string, unknown> | undefined, "medlemsnummer") ?? 
             ""
           ).trim();
           if (saleMemberNr && memberSet.has(saleMemberNr)) {
@@ -490,7 +490,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         // Match by member number
         const nd = sale.normalized_data as Record<string, unknown> | null;
         const rp = sale.raw_payload as Record<string, unknown> | null;
-        const saleMemberNr = String(nd?.member_number ?? (rp?.data as Record<string, unknown> | undefined)?.Medlemsnummer ?? "").trim();
+        const saleMemberNr = String(nd?.member_number ?? getCaseInsensitive(rp?.data as Record<string, unknown> | undefined, "medlemsnummer") ?? "").trim();
         if (saleMemberNr && uploadedRowByMemberNr.has(saleMemberNr)) {
           const idx = indexByMemberNr.get(saleMemberNr);
           if (idx !== undefined) matchedIndices.add(idx);
