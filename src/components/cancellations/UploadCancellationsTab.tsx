@@ -465,26 +465,38 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
   const [unmatchedSellerRows, setUnmatchedSellerRows] = useState<UnmatchedSellerRow[]>([]);
   const [sellerDropdownSelections, setSellerDropdownSelections] = useState<Record<string, string>>({});
 
-  // Check for active import blocking new uploads
+  // Check for active import blocking new uploads (includes orphan imports with NULL client_id)
   const { data: activeImport } = useQuery({
     queryKey: ["active-import-block", selectedClientId],
     enabled: !!selectedClientId,
     queryFn: async () => {
+      // First check imports for this client
       const { data: imports } = await supabase
         .from("cancellation_imports")
         .select("id, file_name")
         .eq("client_id", selectedClientId)
         .order("created_at", { ascending: false })
         .limit(10);
-      if (!imports?.length) return null;
+      
+      // Also check for orphan imports (NULL client_id) that might block the system
+      const { data: orphanImports } = await supabase
+        .from("cancellation_imports")
+        .select("id, file_name")
+        .is("client_id", null)
+        .order("created_at", { ascending: false })
+        .limit(10);
+
+      const allImports = [...(imports || []), ...(orphanImports || [])];
+      if (!allImports.length) return null;
+
       const { data: pending } = await supabase
         .from("cancellation_queue")
         .select("import_id")
-        .in("import_id", imports.map(d => d.id))
+        .in("import_id", allImports.map(d => d.id))
         .eq("status", "pending")
         .limit(1);
       if (pending?.length) {
-        const imp = imports.find(d => d.id === pending[0].import_id);
+        const imp = allImports.find(d => d.id === pending[0].import_id);
         return imp || null;
       }
       return null;
