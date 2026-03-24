@@ -9,6 +9,7 @@ import { UploadCancellationsTab } from "@/components/cancellations/UploadCancell
 import { DuplicatesTab } from "@/components/cancellations/DuplicatesTab";
 import { ApprovalQueueTab } from "@/components/cancellations/ApprovalQueueTab";
 import { ApprovedTab } from "@/components/cancellations/ApprovedTab";
+import { CancellationHistoryTable } from "@/components/cancellations/CancellationHistoryTable";
 
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
