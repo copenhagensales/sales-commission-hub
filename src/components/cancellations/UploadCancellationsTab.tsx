@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
+import { useAgentNameResolver } from "@/hooks/useAgentNameResolver";
 import { useDropzone } from "react-dropzone";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -117,6 +118,7 @@ function StepIndicator({ currentStep }: { currentStep: WizardStep }) {
 }
 
 export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCancellationsTabProps) {
+  const { resolve } = useAgentNameResolver();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const [file, setFile] = useState<File | null>(null);
@@ -1058,7 +1060,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                     {matchedSales.map((sale) => (
                       <TableRow key={sale.saleId}>
                         <TableCell>{sale.saleDate}</TableCell>
-                        <TableCell>{sale.employee}</TableCell>
+                        <TableCell>{resolve(sale.employee)}</TableCell>
                         <TableCell>{sale.phone || "-"}</TableCell>
                         <TableCell>{sale.company || "-"}</TableCell>
                         <TableCell>{sale.oppNumber || "-"}</TableCell>

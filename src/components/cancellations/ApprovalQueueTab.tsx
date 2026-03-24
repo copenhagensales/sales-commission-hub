@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useAgentNameResolver } from "@/hooks/useAgentNameResolver";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -284,6 +285,7 @@ interface ApprovalQueueTabProps {
 }
 
 export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
+  const { resolve } = useAgentNameResolver();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const [statusFilter, setStatusFilter] = useState<string>("pending");
@@ -694,7 +696,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                       <TableRow key={g.oppGroup}>
                         <TableCell className="font-mono text-xs">{g.oppGroup}</TableCell>
                         <TableCell className="text-xs align-top">
-                          {g.agents.join(", ")}
+                          {g.agents.map(a => resolve(a)).join(", ")}
                           <div className="text-muted-foreground">({g.saleCount} salg)</div>
                         </TableCell>
                         <TableCell className="align-top">
@@ -810,7 +812,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                     return (
                       <TableRow key={item.id}>
                         <TableCell>{item.saleDate ? format(new Date(item.saleDate), "dd/MM/yyyy HH:mm") : "-"}</TableCell>
-                        <TableCell>{item.agentName}</TableCell>
+                        <TableCell>{resolve(item.agentName)}</TableCell>
                         <TableCell>{item.oppNumber || "-"}</TableCell>
                         <TableCell>
                           <Badge variant={item.upload_type === "cancellation" ? "destructive" : "secondary"}>
@@ -936,7 +938,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                   <SelectContent>
                     <SelectItem value="all">Alle sælgere</SelectItem>
                     {allSellers.map(name => (
-                      <SelectItem key={name} value={name}>{name}</SelectItem>
+                      <SelectItem key={name} value={name}>{resolve(name)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
