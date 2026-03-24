@@ -270,13 +270,18 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     setIsMatching(true);
 
     try {
-      // Extract values from parsed data
+      // Apply row filter if configured
+      const filteredData = (filterColumn !== "__none__" && filterValue.trim())
+        ? parsedData.filter(row => String(row.originalRow[filterColumn] ?? "").trim() === filterValue.trim())
+        : parsedData;
+
+      // Extract values from filtered data
       const phones: string[] = [];
       const companies: string[] = [];
       const oppNumbers: string[] = [];
       const memberNumbers: string[] = [];
 
-      parsedData.forEach(row => {
+      filteredData.forEach(row => {
         if (phoneColumn !== "__none__" && row.originalRow[phoneColumn]) {
           phones.push(String(row.originalRow[phoneColumn]).replace(/\D/g, ""));
         }
