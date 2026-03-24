@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -228,7 +229,7 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
           await supabase
             .from("cancellation_imports")
             .update({
-              unmatched_rows: updatedRows.length > 0 ? updatedRows : null,
+              unmatched_rows: (updatedRows.length > 0 ? updatedRows : null) as Json,
               rows_matched: (importData.unmatched_rows.length - updatedRows.length),
             })
             .eq("id", row.importId);
