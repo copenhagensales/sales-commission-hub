@@ -96,15 +96,17 @@ interface Sale {
 
 const ITEMS_PER_PAGE = 20;
 
-type DatePreset = "all" | "today" | "yesterday" | "last7days" | "last30days" | "thisMonth" | "custom";
+type DatePreset = "all" | "today" | "yesterday" | "thisWeek" | "last7days" | "last30days" | "thisMonth" | "payroll" | "custom";
 
 const DATE_PRESETS: { value: DatePreset; label: string }[] = [
   { value: "all", label: "Alle datoer" },
   { value: "today", label: "I dag" },
   { value: "yesterday", label: "I går" },
-  { value: "last7days", label: "Sidste 7 dage" },
-  { value: "last30days", label: "Sidste 30 dage" },
+  { value: "thisWeek", label: "Denne uge" },
+  { value: "last7days", label: "7 dage" },
+  { value: "last30days", label: "30 dage" },
   { value: "thisMonth", label: "Denne måned" },
+  { value: "payroll", label: "Lønperiode" },
   { value: "custom", label: "Vælg periode..." },
 ];
 
