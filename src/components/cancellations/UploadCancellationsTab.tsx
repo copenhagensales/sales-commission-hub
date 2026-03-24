@@ -959,8 +959,6 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
   // Send to approval queue mutation
   const sendToQueueMutation = useMutation({
     mutationFn: async () => {
-      const saleIds = matchedSales.map(s => s.saleId);
-
       const filteredForQueue = (filterColumn !== "__none__" && filterValue.trim())
         ? parsedData.filter(row => String(row.originalRow[filterColumn] ?? "").trim() === filterValue.trim())
         : parsedData;
@@ -994,25 +992,21 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
       if (!importId) throw new Error("Kunne ikke oprette import-log");
 
-      const uploadedDataMap = new Map(matchedSales.map(s => [s.saleId, s.uploadedRowData]));
+      // Build queue items — each matchedSale entry becomes one queue item
+      // (for product-phone mappings, same saleId may appear multiple times with different targetProductName)
+      const queueItems = matchedSales.map(sale => ({
+        import_id: importId!,
+        sale_id: sale.saleId,
+        upload_type: uploadType,
+        status: "pending",
+        uploaded_data: sale.uploadedRowData || null,
+        opp_group: sale.oppNumber || null,
+        client_id: selectedClientId || null,
+        target_product_name: sale.targetProductName || null,
+      }));
 
-      const oppGroupMap = new Map<string, string>();
-      for (const sale of matchedSales) {
-        if (sale.oppNumber) {
-          oppGroupMap.set(sale.saleId, sale.oppNumber);
-        }
-      }
-
-      for (let i = 0; i < saleIds.length; i += 50) {
-        const batch = saleIds.slice(i, i + 50).map(saleId => ({
-          import_id: importId!,
-          sale_id: saleId,
-          upload_type: uploadType,
-          status: "pending",
-          uploaded_data: uploadedDataMap.get(saleId) || null,
-          opp_group: oppGroupMap.get(saleId) || null,
-          client_id: selectedClientId || null,
-        }));
+      for (let i = 0; i < queueItems.length; i += 50) {
+        const batch = queueItems.slice(i, i + 50);
         const { error } = await supabase
           .from("cancellation_queue")
           .insert(batch as any);
