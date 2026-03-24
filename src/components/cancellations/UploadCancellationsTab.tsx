@@ -971,11 +971,13 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     setStep("type");
   };
 
-  // Compute unmatched count for preview
+  // Compute unmatched rows for preview
   const filteredDataForPreview = (filterColumn !== "__none__" && filterValue.trim())
     ? parsedData.filter(row => String(row.originalRow[filterColumn] ?? "").trim() === filterValue.trim())
     : parsedData;
-  const unmatchedCount = filteredDataForPreview.length - matchedRowIndices.size;
+  const unmatchedRows = filteredDataForPreview.filter((_, idx) => !matchedRowIndices.has(idx));
+  const unmatchedCount = unmatchedRows.length;
+  const [previewTab, setPreviewTab] = useState<"matched" | "unmatched">("matched");
 
   return (
     <div className="space-y-6">
