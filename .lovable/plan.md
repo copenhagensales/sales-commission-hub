@@ -1,42 +1,71 @@
 
+Mest sandsynlige forklaring er ikke “data findes ikke”, men “vi henter dem på den forkerte måde”.
 
-# Fix: TDC OPP Backfill bruger forkert API-endpoint
+## Hvad jeg fandt
+- Der er lige nu **267** Lovablecph TDC Erhverv-salg fra **2026** uden OPP i databasen.
+- De ligger kun i **januar-februar**. **Marts har 0 manglende**.
+- **262/267** ligger på kampagne **99496**.
+- Den nuværende `tdc-opp-backfill` bruger stadig **`/v1/leads/{leadId}`** pr. salg.
+- Repoet har allerede en diagnostics-funktion, som direkte siger at den rigtige vej til OPP er bulk-listning via **`/v1/leads?filters=...`**, fordi den returnerer `resultData`.
+- Logs fra den tidligere test af **`/v1/sales/{id}`** viser, at den response **ikke** indeholder `resultData` for de problematiske salg.
 
-## Fund
+## Plan
+### 1. Skift strategi i backfill
+Opdatér `supabase/functions/tdc-opp-backfill/index.ts`, så den **ikke** prøver at hente OPP via enkelt-lead endpointet.
 
-De "failed" og "pending" salg mangler OPP-numre fordi backfill-funktionen kalder `/v1/leads/{leadId}` — men leads i Adversus bliver genbrugt/slettet, så API'en returnerer tomt data.
+I stedet:
+- hent alle manglende Lovablecph TDC Erhverv-salg fra **2026**
+- gruppér dem i mindre dato-vinduer (fx uge for uge)
+- hent leads fra Adversus via **bulk `/v1/leads` med filters** pr. kampagne + dato-vindue
+- byg et map `leadId -> { resultData, resultFields, opp }`
+- match tilbage på eksisterende `sales.raw_payload.leadId`
 
-De succesfuldt "healed" salg har en `raw_payload`-struktur der stammer fra `/v1/sales/{orderId}` endpointet, som inkluderer `leadResultData` med OPP-numre — også efter leads er genbrugt.
+### 2. Gem OPP normaliseret og robust
+Når et match findes:
+- opdatér `raw_payload.leadResultData`
+- opdatér `raw_payload.leadResultFields`
+- sæt evt. også et normaliseret felt i payloaden, fx `legacy_opp_number`, så rapporter og UI ikke er afhængige af én bestemt struktur
+- sæt `enrichment_status = 'healed'`
+- nulstil `enrichment_error`
 
-**Nøgletal:**
-| Status | Antal | Har OPP | Handling |
-|---|---|---|---|
-| failed + har OPP | 28 | Ja | Markér som "healed" (data er allerede der) |
-| failed + mangler OPP | 84 | Nej | Genhent via `/sales/{orderId}` |
-| pending + mangler OPP | 241 | Nej | Genhent via `/sales/{orderId}` |
-| **Total at fixe** | **353** | | |
+### 3. Lad umatchede blive tydelige i stedet for “falsk døde”
+For salg der stadig ikke matches:
+- behold dem ikke som generisk `failed`
+- skriv en mere præcis fejl, fx `bulk_lead_lookup_no_match`
+- log antal pr. kampagne og uge, så vi kan se præcis hvor der evt. stadig mangler noget
 
-## Løsning
+### 4. Begræns scope til “salg fra i år”
+Backfillen skal kun arbejde på:
+- `source = 'Lovablecph'`
+- TDC Erhverv client campaign
+- `sale_datetime >= '2026-01-01'`
 
-### 1. Ret backfill-funktionen: brug `/v1/sales/{orderId}` i stedet for `/v1/leads/{leadId}`
+Det matcher det du bad om og holder API-load nede.
 
-**Fil: `supabase/functions/tdc-opp-backfill/index.ts`**
+### 5. Kør og valider resultatet
+Efter implementering:
+- kør backfillen i batches
+- verificér at tallet **267** falder markant eller til 0
+- verificér at rådata-rapporten nu viser OPP for januar-februar
+- verificér at marts forbliver uændret
 
-- Ændr API-kaldet fra `GET /v1/leads/${leadId}` til `GET /v1/sales/${sale.adversus_external_id}` (ordre-ID)
-- `/v1/sales/{id}` returnerer hele ordren inkl. `leadResultData` med OPP-numre — selv når leadet er genbrugt
-- Fjern kravet om `leadId` i filtreringen (vi bruger `adversus_external_id` i stedet)
-- Bevar den eksisterende `leadResultFields`-mapping fra `leadResultData`
+## Tekniske detaljer
+```text
+Nuværende flow:
+sales -> raw_payload.leadId -> /v1/leads/{leadId} -> ofte tomt/404
 
-### 2. Inkludér "failed" salg i query'en
+Nyt flow:
+missing sales (2026)
+  -> group by week + campaign
+  -> /v1/leads?filters=campaign/date-window
+  -> resultData/resultFields
+  -> match by leadId
+  -> update sales.raw_payload + enrichment_status
+```
 
-- Udvid query til også at hente salg med `enrichment_status = 'failed'` (ikke kun "pending")
-- Skip salg der allerede har OPP i `leadResultFields` (de 28 stk markeres direkte som "healed")
+## Berørte filer
+- `supabase/functions/tdc-opp-backfill/index.ts`
+- evt. en ny migration kun hvis vi vil gemme et ekstra normaliseret OPP-felt permanent i databasen; ellers kan vi nøjes med `raw_payload`
 
-### 3. Migration: markér de 28 "failed" der allerede har OPP
-
-- Kør en SQL-migration der sætter `enrichment_status = 'healed'` for de 28 salg der fejlagtigt er markeret som "failed" men allerede har OPP-data
-
-## Estimeret kørselstid
-- 325 salg × 1.05s delay ≈ **6 minutter** med autoRun
-- Derefter invokering af funktionen
-
+## Forventet effekt
+Ja — baseret på koden i repoet er næste rigtige forsøg **ikke** manuel CSV først, men en målrettet bulk-backfill via `/v1/leads`-listing. Det er den mest sandsynlige måde at hente de manglende OPP-numre for årets Lovablecph TDC Erhverv-salg.
