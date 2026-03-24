@@ -78,6 +78,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
   const [memberNumberColumn, setMemberNumberColumn] = useState<string>("__none__");
   const [selectedConfigId, setSelectedConfigId] = useState<string>("__none__");
   const [matchedSales, setMatchedSales] = useState<MatchedSale[]>([]);
+  const [matchedRowIndices, setMatchedRowIndices] = useState<Set<number>>(new Set());
   const [isMatching, setIsMatching] = useState(false);
   const [uploadType, setUploadType] = useState<"cancellation" | "basket_difference">("cancellation");
   const [step, setStep] = useState<"upload" | "mapping" | "preview" | "done">("upload");
