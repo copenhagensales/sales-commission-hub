@@ -57,6 +57,8 @@ interface UploadConfig {
   commission_column: string | null;
   product_match_mode: string;
   is_default: boolean;
+  filter_column: string | null;
+  filter_value: string | null;
 }
 
 interface UploadCancellationsTabProps {
@@ -93,6 +95,8 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
   const [step, setStep] = useState<"upload" | "mapping" | "preview" | "done">("upload");
   const [configName, setConfigName] = useState("");
   const [showSaveConfig, setShowSaveConfig] = useState(false);
+  const [filterColumn, setFilterColumn] = useState<string>("__none__");
+  const [filterValue, setFilterValue] = useState<string>("");
 
   // Fetch configs for selected client
   const { data: clientConfigs = [] } = useQuery({
@@ -131,6 +135,8 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     setProductColumn(config.product_columns?.[0] || "__none__");
     setRevenueColumn(config.revenue_column || "__none__");
     setCommissionColumn(config.commission_column || "__none__");
+    setFilterColumn(config.filter_column || "__none__");
+    setFilterValue(config.filter_value || "");
   };
 
   const handleConfigChange = (configId: string) => {
@@ -160,6 +166,8 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           commission_column: commissionColumn !== "__none__" ? commissionColumn : null,
           product_match_mode: "strip_percent_suffix",
           is_default: clientConfigs.length === 0,
+          filter_column: filterColumn !== "__none__" ? filterColumn : null,
+          filter_value: filterValue.trim() || null,
         } as any);
       if (error) throw error;
     },
@@ -262,13 +270,18 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     setIsMatching(true);
 
     try {
-      // Extract values from parsed data
+      // Apply row filter if configured
+      const filteredData = (filterColumn !== "__none__" && filterValue.trim())
+        ? parsedData.filter(row => String(row.originalRow[filterColumn] ?? "").trim() === filterValue.trim())
+        : parsedData;
+
+      // Extract values from filtered data
       const phones: string[] = [];
       const companies: string[] = [];
       const oppNumbers: string[] = [];
       const memberNumbers: string[] = [];
 
-      parsedData.forEach(row => {
+      filteredData.forEach(row => {
         if (phoneColumn !== "__none__" && row.originalRow[phoneColumn]) {
           phones.push(String(row.originalRow[phoneColumn]).replace(/\D/g, ""));
         }
@@ -414,7 +427,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       const uploadedRowByCompany = new Map<string, Record<string, unknown>>();
       const uploadedRowByMemberNr = new Map<string, Record<string, unknown>>();
       
-      parsedData.forEach(row => {
+      filteredData.forEach(row => {
         if (oppColumn !== "__none__" && row.originalRow[oppColumn]) {
           const key = String(row.originalRow[oppColumn]).toUpperCase().trim();
           const arr = uploadedRowsByOpp.get(key) || [];
@@ -457,7 +470,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       const indexByPhone = new Map<string, number>();
       const indexByCompany = new Map<string, number>();
       const indexByMemberNr = new Map<string, number>();
-      parsedData.forEach((row, idx) => {
+      filteredData.forEach((row, idx) => {
         if (oppColumn !== "__none__" && row.originalRow[oppColumn]) {
           const key = String(row.originalRow[oppColumn]).toUpperCase().trim();
           const arr = indexByOpp.get(key) || [];
@@ -543,8 +556,13 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     mutationFn: async () => {
       const saleIds = matchedSales.map(s => s.saleId);
 
+      // Recompute filtered data to identify unmatched rows correctly
+      const filteredForQueue = (filterColumn !== "__none__" && filterValue.trim())
+        ? parsedData.filter(row => String(row.originalRow[filterColumn] ?? "").trim() === filterValue.trim())
+        : parsedData;
+
       // Identify unmatched uploaded rows using index-based tracking from handleMatch
-      const unmatchedRows = parsedData
+      const unmatchedRows = filteredForQueue
         .filter((_, idx) => !matchedRowIndices.has(idx))
         .map(r => r.originalRow);
 
@@ -632,6 +650,8 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     setProductColumn("__none__");
     setRevenueColumn("__none__");
     setCommissionColumn("__none__");
+    setFilterColumn("__none__");
+    setFilterValue("");
     setUploadType("cancellation");
     setSelectedConfigId("__none__");
     setMatchedSales([]);
@@ -787,6 +807,41 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                     {columns.map((col) => (<SelectItem key={col} value={col}>{col}</SelectItem>))}
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+
+            {/* Row filter section */}
+            <div className="border-t pt-4 space-y-3">
+              <Label className="text-sm font-medium">Filtrer rækker (valgfri)</Label>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Filterkolonne</Label>
+                  <Select value={filterColumn} onValueChange={setFilterColumn}>
+                    <SelectTrigger><SelectValue placeholder="Vælg kolonne..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Ingen</SelectItem>
+                      {columns.map((col) => (<SelectItem key={col} value={col}>{col}</SelectItem>))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Filterværdi</Label>
+                  <input
+                    type="text"
+                    placeholder="f.eks. 1"
+                    value={filterValue}
+                    onChange={(e) => setFilterValue(e.target.value)}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                    disabled={filterColumn === "__none__"}
+                  />
+                </div>
+                <div>
+                  {filterColumn !== "__none__" && filterValue.trim() && parsedData.length > 0 && (
+                    <Badge variant="secondary">
+                      {parsedData.filter(row => String(row.originalRow[filterColumn] ?? "").trim() === filterValue.trim()).length} af {parsedData.length} rækker inkluderet
+                    </Badge>
+                  )}
+                </div>
               </div>
             </div>
 

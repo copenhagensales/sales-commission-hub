@@ -1687,6 +1687,8 @@ export type Database = {
           commission_column: string | null
           company_column: string | null
           created_at: string
+          filter_column: string | null
+          filter_value: string | null
           id: string
           is_default: boolean | null
           member_number_column: string | null
@@ -1702,6 +1704,8 @@ export type Database = {
           commission_column?: string | null
           company_column?: string | null
           created_at?: string
+          filter_column?: string | null
+          filter_value?: string | null
           id?: string
           is_default?: boolean | null
           member_number_column?: string | null
@@ -1717,6 +1721,8 @@ export type Database = {
           commission_column?: string | null
           company_column?: string | null
           created_at?: string
+          filter_column?: string | null
+          filter_value?: string | null
           id?: string
           is_default?: boolean | null
           member_number_column?: string | null

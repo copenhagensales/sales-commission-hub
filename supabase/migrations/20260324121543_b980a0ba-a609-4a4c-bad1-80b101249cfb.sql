@@ -1,0 +1,1 @@
+ALTER TABLE public.cancellation_upload_configs ADD COLUMN filter_column TEXT, ADD COLUMN filter_value TEXT;
