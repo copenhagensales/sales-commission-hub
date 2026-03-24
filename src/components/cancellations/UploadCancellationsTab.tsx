@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
+import { formatCurrency } from "@/lib/calculations/formatting";
 import { useAgentNameResolver } from "@/hooks/useAgentNameResolver";
 import { useDropzone } from "react-dropzone";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -46,6 +47,9 @@ interface MatchedSale {
   currentStatus: string;
   uploadedRowData: Record<string, unknown>;
   targetProductName?: string;
+  realProductName?: string;
+  commission?: number;
+  revenue?: number;
 }
 
 interface ProductPhoneMapping {
@@ -767,6 +771,25 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       const phoneSet = new Set(phones.map(p => normalizePhone(p)));
       const companySet = new Set(companies);
 
+      // Pre-fetch sale_items for all candidate sales (used by both Pass 1 and Pass 2)
+      const candidateSaleIds = candidateSales.map(s => s.id);
+      const saleItemsMap = new Map<string, { adversus_product_title: string; mapped_commission: number | null; mapped_revenue: number | null }[]>();
+      
+      for (let i = 0; i < candidateSaleIds.length; i += 500) {
+        const batch = candidateSaleIds.slice(i, i + 500);
+        const { data: items } = await supabase
+          .from("sale_items")
+          .select("sale_id, adversus_product_title, mapped_commission, mapped_revenue")
+          .in("sale_id", batch);
+        if (items) {
+          for (const item of items) {
+            const arr = saleItemsMap.get(item.sale_id) || [];
+            arr.push({ adversus_product_title: item.adversus_product_title || "", mapped_commission: item.mapped_commission, mapped_revenue: item.mapped_revenue });
+            saleItemsMap.set(item.sale_id, arr);
+          }
+        }
+      }
+
       // --- Product-phone mapping matching (reversed: Excel phone → DB raw_payload fields) ---
       if (hasProductPhoneMappings) {
         const matchedIndicesLocal = new Set<number>();
@@ -802,6 +825,11 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                 if (matchedSaleProductKeys.has(key)) continue;
                 matchedSaleProductKeys.add(key);
                 matchedIndicesLocal.add(idx);
+                // Resolve real product name + pricing from sale_items
+                // payloadPhoneField "Telefon Abo1" → position index 1 → "Abonnement1"
+                const posIndex = parseInt(mapping.payloadPhoneField?.replace(/\D/g, "") || "0", 10) - 1;
+                const allItems = saleItemsMap.get(sale.id) || [];
+                const matchingItem = posIndex >= 0 && posIndex < allItems.length ? allItems[posIndex] : allItems[0];
                 productMatched.push({
                   saleId: sale.id,
                   phone: String(payloadPhoneRaw),
@@ -812,6 +840,9 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                   currentStatus: sale.validation_status || "pending",
                   uploadedRowData: row.originalRow,
                   targetProductName: mapping.productName,
+                  realProductName: matchingItem?.adversus_product_title || mapping.productName,
+                  commission: matchingItem?.mapped_commission ?? undefined,
+                  revenue: matchingItem?.mapped_revenue ?? undefined,
                 });
               }
             }
@@ -855,24 +886,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             }
           }
 
-          // Fetch sale_items for candidate sales to check product
-          const candidateSaleIds = candidateSales.map(s => s.id);
-          const saleItemsMap = new Map<string, { adversus_product_title: string }[]>();
-          
-          for (let i = 0; i < candidateSaleIds.length; i += 500) {
-            const batch = candidateSaleIds.slice(i, i + 500);
-            const { data: items } = await supabase
-              .from("sale_items")
-              .select("sale_id, adversus_product_title")
-              .in("sale_id", batch);
-            if (items) {
-              for (const item of items) {
-                const arr = saleItemsMap.get(item.sale_id) || [];
-                arr.push({ adversus_product_title: item.adversus_product_title || "" });
-                saleItemsMap.set(item.sale_id, arr);
-              }
-            }
-          }
+
 
           filteredData.forEach((row, idx) => {
             if (matchedIndicesLocal.has(idx)) return; // already matched in pass 1
@@ -948,6 +962,9 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               if (matchedSaleProductKeys.has(key)) continue;
               matchedSaleProductKeys.add(key);
               matchedIndicesLocal.add(idx);
+              const matchedItem = items.find(item => 
+                item.adversus_product_title?.toLowerCase() === matchingFallback.saleItemTitle.toLowerCase()
+              );
               productMatched.push({
                 saleId: sale.id,
                 phone: sale.customer_phone || "",
@@ -958,6 +975,9 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                 currentStatus: sale.validation_status || "pending",
                 uploadedRowData: row.originalRow,
                 targetProductName: matchingFallback.saleItemTitle,
+                realProductName: matchedItem?.adversus_product_title || matchingFallback.saleItemTitle,
+                commission: matchedItem?.mapped_commission ?? undefined,
+                revenue: matchedItem?.mapped_revenue ?? undefined,
               });
               break;
             }
@@ -1481,7 +1501,9 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                         <TableHead>Salgsdato</TableHead>
                         <TableHead>Sælger</TableHead>
                         <TableHead>Telefon</TableHead>
-                        {matchedSales.some(s => s.targetProductName) && <TableHead>Produkt</TableHead>}
+                        <TableHead>Produkt</TableHead>
+                        <TableHead>Provision</TableHead>
+                        <TableHead>Omsætning</TableHead>
                         <TableHead>Virksomhed</TableHead>
                         <TableHead>OPP-nummer</TableHead>
                         <TableHead>Status</TableHead>
@@ -1493,11 +1515,11 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                           <TableCell>{sale.saleDate}</TableCell>
                           <TableCell>{resolve(sale.employee)}</TableCell>
                           <TableCell>{sale.phone || "-"}</TableCell>
-                          {matchedSales.some(s => s.targetProductName) && (
-                            <TableCell>
-                              <Badge variant="outline">{sale.targetProductName || "-"}</Badge>
-                            </TableCell>
-                          )}
+                          <TableCell>
+                            <Badge variant="outline">{sale.realProductName || sale.targetProductName || "-"}</Badge>
+                          </TableCell>
+                          <TableCell>{sale.commission != null ? formatCurrency(sale.commission) : "-"}</TableCell>
+                          <TableCell>{sale.revenue != null ? formatCurrency(sale.revenue) : "-"}</TableCell>
                           <TableCell>{sale.company || "-"}</TableCell>
                           <TableCell>{sale.oppNumber || "-"}</TableCell>
                           <TableCell>
