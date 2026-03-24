@@ -536,7 +536,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
       // Identify unmatched uploaded rows using index-based tracking from handleMatch
       const unmatchedRows = parsedData
-        .filter((_, idx) => !matchedIndices.has(idx))
+        .filter((_, idx) => !matchedRowIndices.has(idx))
         .map(r => r.originalRow);
 
       // Log the import first
