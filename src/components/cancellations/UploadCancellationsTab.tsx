@@ -805,6 +805,41 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               </div>
             </div>
 
+            {/* Row filter section */}
+            <div className="border-t pt-4 space-y-3">
+              <Label className="text-sm font-medium">Filtrer rækker (valgfri)</Label>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Filterkolonne</Label>
+                  <Select value={filterColumn} onValueChange={setFilterColumn}>
+                    <SelectTrigger><SelectValue placeholder="Vælg kolonne..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Ingen</SelectItem>
+                      {columns.map((col) => (<SelectItem key={col} value={col}>{col}</SelectItem>))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Filterværdi</Label>
+                  <input
+                    type="text"
+                    placeholder="f.eks. 1"
+                    value={filterValue}
+                    onChange={(e) => setFilterValue(e.target.value)}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                    disabled={filterColumn === "__none__"}
+                  />
+                </div>
+                <div>
+                  {filterColumn !== "__none__" && filterValue.trim() && parsedData.length > 0 && (
+                    <Badge variant="secondary">
+                      {parsedData.filter(row => String(row.originalRow[filterColumn] ?? "").trim() === filterValue.trim()).length} af {parsedData.length} rækker inkluderet
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            </div>
+
             {/* Save config section */}
             <div className="flex items-center gap-2 pt-2 border-t">
               {!showSaveConfig ? (
