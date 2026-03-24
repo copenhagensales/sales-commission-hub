@@ -1,23 +1,31 @@
 
 
-# Fix: Status viser altid "approved" i Rådata-rapporten
+# TDC Erhverv Lovablecph — 418 salg mangler stadig OPP
+
+## Status
+| Enrichment status | Antal | Bemærkning |
+|---|---|---|
+| pending (mangler OPP) | **418** | Aldrig forsøgt (`enrichment_last_attempt = null`) |
+| failed | 34 | Allerede forsøgt, lead data udløbet i Adversus |
+| healed | 333 | Succesfuldt beriget i sidste kørsel |
 
 ## Problem
-`get_sales_report_raw` RPC'en refererer til `s.status` — en kolonne der **ikke eksisterer** på `sales`-tabellen. Den korrekte kolonne hedder `s.validation_status`. Fordi `s.status` altid er NULL, returnerer `COALESCE(s.status, 'approved')` altid `'approved'`.
+De 418 pending salg blev aldrig nået i den forrige kørsel — funktionen stoppede efter at have behandlet de første batches. Koden er korrekt og filtrerer allerede kun på `source = 'Lovablecph'` + TDC Erhverv campaign ID.
 
 ## Løsning
-Én migration der opdaterer begge versioner af `get_sales_report_raw` (3-param og 5-param):
+Ingen kodeændringer nødvendige. Funktionen skal blot køres igen:
 
-**Ændring** (linje 24 og 64):
-```sql
--- Fra:
-COALESCE(s.status, 'approved') AS status
--- Til:
-COALESCE(s.validation_status, 'pending') AS status
+```js
+await supabase.functions.invoke('tdc-opp-backfill', { 
+  body: { batchSize: 50, autoRun: true } 
+})
 ```
 
-Default ændres til `'pending'` da det er kolonnes faktiske default-værdi.
+- 418 salg × 1.05s delay ≈ **7-8 minutter** med autoRun
+- Funktionen fortsætter automatisk i batches af 50
+- Kun Lovablecph TDC Erhverv salg behandles
+- Salg hvor Adversus returnerer "empty lead data" markeres som `failed` (lead slettet/genbrugt i Adversus — kan ikke hentes automatisk)
 
-## Fil
-- **Migration**: Drop + recreate begge overloads af `get_sales_report_raw` med `s.validation_status`
+## Handling
+Kun invokering af den eksisterende edge function — ingen fil-ændringer.
 
