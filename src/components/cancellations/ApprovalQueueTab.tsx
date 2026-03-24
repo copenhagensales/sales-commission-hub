@@ -18,9 +18,11 @@ import { Input } from "@/components/ui/input";
 import { Check, X, Loader2, Clock, Filter, Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
+import { da } from "date-fns/locale";
 import { UnmatchedTab } from "@/components/cancellations/UnmatchedTab";
 import { MatchErrorsSubTab } from "@/components/cancellations/MatchErrorsSubTab";
 import { CLIENT_IDS } from "@/utils/clientIds";
+import { FileSpreadsheet, AlertTriangle } from "lucide-react";
 
 const TDC_ERHVERV_CLIENT_ID = CLIENT_IDS["TDC Erhverv"];
 
@@ -668,6 +670,68 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
     filteredFlatItems.filter((i) => i.upload_type === "basket_difference").length,
     [filteredOppGroups, filteredFlatItems]);
 
+  // Active import query — imports with pending queue items
+  const { data: activeImport } = useQuery({
+    queryKey: ["active-import-info", clientId],
+    enabled: !!clientId,
+    queryFn: async () => {
+      const { data: imports } = await supabase
+        .from("cancellation_imports")
+        .select("id, file_name, created_at")
+        .eq("client_id", clientId)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      if (!imports?.length) return null;
+      const { data: pendingItems } = await supabase
+        .from("cancellation_queue")
+        .select("import_id")
+        .in("import_id", imports.map(d => d.id))
+        .eq("status", "pending");
+      if (!pendingItems?.length) return null;
+      const pendingImportId = pendingItems[0].import_id;
+      const pendingCount = pendingItems.filter(p => p.import_id === pendingImportId).length;
+      const imp = imports.find(d => d.id === pendingImportId);
+      return imp ? { ...imp, pendingCount } : null;
+    },
+  });
+
+  // Count for "Afventer" (unmatched) tab
+  const { data: unmatchedCount = 0 } = useQuery({
+    queryKey: ["unmatched-count", clientId],
+    enabled: !!clientId,
+    queryFn: async () => {
+      const { data: campaigns } = await supabase
+        .from("client_campaigns")
+        .select("id")
+        .eq("client_id", clientId);
+      if (!campaigns?.length) return 0;
+      const { count } = await supabase
+        .from("sales")
+        .select("id", { count: "exact", head: true })
+        .eq("validation_status", "pending")
+        .in("client_campaign_id", campaigns.map(c => c.id));
+      return count || 0;
+    },
+  });
+
+  // Count for "Fejl i match" tab
+  const { data: matchErrorsCount = 0 } = useQuery({
+    queryKey: ["match-errors-count", clientId],
+    enabled: !!clientId,
+    queryFn: async () => {
+      const { data: imports } = await supabase
+        .from("cancellation_imports")
+        .select("unmatched_rows")
+        .eq("client_id", clientId)
+        .not("unmatched_rows", "is", null);
+      if (!imports?.length) return 0;
+      return imports.reduce((sum, imp) => {
+        const rows = imp.unmatched_rows as unknown[];
+        return sum + (Array.isArray(rows) ? rows.length : 0);
+      }, 0);
+    },
+  });
+
   const pendingOppGroups = processedOppGroups.filter((g) => g.status === "pending");
   const pendingFlatItems = processedFlatItems.filter((i) => i.status === "pending");
   const totalPending = pendingOppGroups.length + pendingFlatItems.length;
@@ -951,6 +1015,26 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
 
   return (
     <div className="space-y-6">
+      {/* Active import card */}
+      {activeImport && (
+        <Card className="border-primary/50 bg-primary/5">
+          <CardContent className="flex items-center gap-4 py-4">
+            <FileSpreadsheet className="h-8 w-8 text-primary shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm">Igangværende upload</p>
+              <p className="text-xs text-muted-foreground truncate">{activeImport.file_name}</p>
+              <p className="text-xs text-muted-foreground">
+                Uploadet {format(new Date(activeImport.created_at), "dd/MM/yyyy HH:mm", { locale: da })}
+              </p>
+            </div>
+            <Badge variant="secondary" className="shrink-0">
+              <AlertTriangle className="h-3 w-3 mr-1" />
+              {activeImport.pendingCount} rækker afventer
+            </Badge>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -1020,10 +1104,10 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                   Kurv-rettelser {basketCount > 0 && `(${basketCount})`}
                 </TabsTrigger>
                 <TabsTrigger value="unmatched">
-                  Afventer
+                  Afventer {unmatchedCount > 0 && `(${unmatchedCount})`}
                 </TabsTrigger>
                 <TabsTrigger value="match_errors">
-                  Fejl i match
+                  Fejl i match {matchErrorsCount > 0 && `(${matchErrorsCount})`}
                 </TabsTrigger>
               </TabsList>
 

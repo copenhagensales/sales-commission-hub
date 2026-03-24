@@ -50,7 +50,7 @@ export default function Cancellations() {
       tabs.push({ value: 'approval', label: 'Godkendelseskø' });
     if (isOwner || canView('tab_cancellations_approved'))
       tabs.push({ value: 'approved', label: 'Godkendte' });
-    tabs.push({ value: 'history', label: 'Tidligere uploads' });
+    tabs.push({ value: 'history', label: 'Afsluttede uploads' });
     tabs.push({ value: 'mapping', label: 'Mapping' });
     return tabs;
   }, [isOwner, canView]);
