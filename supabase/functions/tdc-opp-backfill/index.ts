@@ -25,7 +25,6 @@ async function getCredentials(supabase: any): Promise<{ authHeader: string } | n
     .ilike("name", "Lovablecph");
 
   if (!integrations || integrations.length === 0) return null;
-
   const integration = integrations[0];
   const encryptionKey = Deno.env.get("DB_ENCRYPTION_KEY");
 
@@ -41,7 +40,6 @@ async function getCredentials(supabase: any): Promise<{ authHeader: string } | n
   return { authHeader: "Basic " + btoa(`${user}:${pass}`) };
 }
 
-/** Check if a sale already has OPP data in its raw_payload */
 function hasOppData(rawPayload: any): boolean {
   if (!rawPayload) return false;
   const fields = rawPayload.leadResultFields;
@@ -85,6 +83,7 @@ serve(async (req) => {
         .in("client_campaign_id", TDC_ERHVERV_CAMPAIGN_IDS)
         .eq("enrichment_status", status)
         .not("raw_payload", "is", null)
+        .gte("sale_datetime", "2026-01-01")
         .limit(500);
 
       const alreadyHealedIds = (candidates || [])
@@ -96,6 +95,7 @@ serve(async (req) => {
           const chunk = alreadyHealedIds.slice(i, i + 50);
           await supabase.from("sales").update({
             enrichment_status: "healed",
+            enrichment_error: null,
             enrichment_last_attempt: new Date().toISOString(),
           }).in("id", chunk);
         }
@@ -103,7 +103,7 @@ serve(async (req) => {
       }
     }
 
-    // Find TDC Erhverv sales still missing OPP — both pending AND failed
+    // Find TDC Erhverv sales from 2026 still missing OPP
     const { data: sales, error } = await supabase
       .from("sales")
       .select("id, adversus_external_id, raw_payload, customer_phone")
@@ -111,6 +111,7 @@ serve(async (req) => {
       .in("client_campaign_id", TDC_ERHVERV_CAMPAIGN_IDS)
       .not("raw_payload", "is", null)
       .in("enrichment_status", ["pending", "failed"])
+      .gte("sale_datetime", "2026-01-01")
       .order("sale_datetime", { ascending: false })
       .limit(batchSize);
 
@@ -123,7 +124,6 @@ serve(async (req) => {
       return !!leadId;
     });
 
-    // Also identify sales without leadId (can't be healed automatically)
     const noLeadId = (sales || []).filter((s: any) => {
       if (hasOppData(s.raw_payload)) return false;
       const leadId = s.raw_payload?.leadId || s.raw_payload?.metadata?.leadId;
@@ -147,7 +147,8 @@ serve(async (req) => {
       .eq("source", "Lovablecph")
       .in("client_campaign_id", TDC_ERHVERV_CAMPAIGN_IDS)
       .not("raw_payload", "is", null)
-      .in("enrichment_status", ["pending", "failed"]);
+      .in("enrichment_status", ["pending", "failed"])
+      .gte("sale_datetime", "2026-01-01");
 
     log(`Starting batch: ${needsHealing.length} sales to process (est. total remaining: ~${totalRemaining})`);
 
@@ -157,7 +158,7 @@ serve(async (req) => {
       const leadId = sale.raw_payload.leadId || sale.raw_payload.metadata?.leadId;
 
       try {
-        // Fetch lead data from Adversus — this has resultData with OPP numbers
+        // Fetch lead data — Adversus returns { leads: [...] } format
         const response = await fetch(`https://api.adversus.io/v1/leads/${leadId}`, {
           headers: { Authorization: creds.authHeader },
         });
@@ -171,10 +172,21 @@ serve(async (req) => {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
 
-        const leadData = await response.json();
-        const leadResultData = leadData.resultData || leadData.leadResultData || [];
+        const data = await response.json();
 
+        // CRITICAL: Adversus wraps lead in { leads: [...] } array
+        let leadData: any = data;
+        if (data?.leads && Array.isArray(data.leads)) {
+          leadData = data.leads[0];
+        }
+
+        if (!leadData) {
+          throw new Error("Lead not found in response");
+        }
+
+        const leadResultData = leadData.resultData || [];
         const leadResultFields: Record<string, any> = {};
+
         if (Array.isArray(leadResultData)) {
           for (const field of leadResultData) {
             const fieldName = field?.name || field?.label;
@@ -184,8 +196,8 @@ serve(async (req) => {
           }
         }
 
-        if (leadResultData.length === 0 && Object.keys(leadResultFields).length === 0) {
-          throw new Error("Lead recycled — resultData empty");
+        if (leadResultData.length === 0) {
+          throw new Error("Lead has empty resultData");
         }
 
         const phone = leadData.phone || leadData.contactPhone || leadData.mobile || null;
