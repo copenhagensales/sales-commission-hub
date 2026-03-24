@@ -51,6 +51,7 @@ interface UploadConfig {
   phone_column: string | null;
   company_column: string | null;
   opp_column: string | null;
+  member_number_column: string | null;
   product_columns: string[];
   revenue_column: string | null;
   commission_column: string | null;
@@ -74,6 +75,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
   const [productColumn, setProductColumn] = useState<string>("__none__");
   const [revenueColumn, setRevenueColumn] = useState<string>("__none__");
   const [commissionColumn, setCommissionColumn] = useState<string>("__none__");
+  const [memberNumberColumn, setMemberNumberColumn] = useState<string>("__none__");
   const [selectedConfigId, setSelectedConfigId] = useState<string>("__none__");
   const [matchedSales, setMatchedSales] = useState<MatchedSale[]>([]);
   const [isMatching, setIsMatching] = useState(false);
@@ -115,6 +117,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     setPhoneColumn(config.phone_column || "__none__");
     setCompanyColumn(config.company_column || "__none__");
     setOppColumn(config.opp_column || "__none__");
+    setMemberNumberColumn(config.member_number_column || "__none__");
     setProductColumn(config.product_columns?.[0] || "__none__");
     setRevenueColumn(config.revenue_column || "__none__");
     setCommissionColumn(config.commission_column || "__none__");
@@ -227,10 +230,10 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
   });
 
   const handleMatch = async () => {
-    if (phoneColumn === "__none__" && companyColumn === "__none__" && oppColumn === "__none__") {
+    if (phoneColumn === "__none__" && companyColumn === "__none__" && oppColumn === "__none__" && memberNumberColumn === "__none__") {
       toast({
         title: "Vælg kolonner",
-        description: "Vælg mindst én kolonne at matche på (telefon, virksomhed eller OPP-nummer).",
+        description: "Vælg mindst én kolonne at matche på (telefon, virksomhed, OPP-nummer eller medlemsnummer).",
         variant: "destructive",
       });
       return;
@@ -252,6 +255,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       const phones: string[] = [];
       const companies: string[] = [];
       const oppNumbers: string[] = [];
+      const memberNumbers: string[] = [];
 
       parsedData.forEach(row => {
         if (phoneColumn !== "__none__" && row.originalRow[phoneColumn]) {
@@ -263,6 +267,9 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         if (oppColumn !== "__none__" && row.originalRow[oppColumn]) {
           const oppVal = String(row.originalRow[oppColumn]).trim();
           oppNumbers.push(oppVal);
+        }
+        if (memberNumberColumn !== "__none__" && row.originalRow[memberNumberColumn]) {
+          memberNumbers.push(String(row.originalRow[memberNumberColumn]).trim());
         }
       });
 
@@ -299,7 +306,8 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               customer_company,
               validation_status,
               agent_name,
-              raw_payload
+              raw_payload,
+              normalized_data
             `)
             .in("client_campaign_id", campaignIds)
             .neq("validation_status", "cancelled")
@@ -314,7 +322,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         return candidates;
       };
 
-      const candidateSales = (phones.length > 0 || companies.length > 0 || oppNumbers.length > 0)
+      const candidateSales = (phones.length > 0 || companies.length > 0 || oppNumbers.length > 0 || memberNumbers.length > 0)
         ? await fetchCandidateSales()
         : [];
 
