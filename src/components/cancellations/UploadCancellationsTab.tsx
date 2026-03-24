@@ -442,7 +442,10 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         .eq("client_id", selectedClientId)
         .order("is_default", { ascending: false });
       if (error) throw error;
-      return (data || []) as UploadConfig[];
+      return (data || []).map((d: any) => ({
+        ...d,
+        product_phone_mappings: Array.isArray(d.product_phone_mappings) ? d.product_phone_mappings : [],
+      })) as UploadConfig[];
     },
     enabled: !!selectedClientId,
   });
