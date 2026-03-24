@@ -1507,6 +1507,78 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                   </Table>
                 </div>
               )
+            ) : previewTab === "seller_unmatched" ? (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Disse rækker har intet telefonnummer og sælgernavnet er ikke genkendt. Vælg den korrekte medarbejder for at gemme en permanent mapping.
+                </p>
+                <div className="rounded-md border max-h-96 overflow-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Sælgernavn (Excel)</TableHead>
+                        <TableHead>Dato</TableHead>
+                        <TableHead>Produkt</TableHead>
+                        <TableHead className="min-w-[220px]">Vælg medarbejder</TableHead>
+                        <TableHead></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {unmatchedSellerRows.map((row, idx) => (
+                        <TableRow key={idx}>
+                          <TableCell>
+                            <Badge variant="outline">{row.excelSellerName}</Badge>
+                          </TableCell>
+                          <TableCell className="text-sm">{row.excelDate}</TableCell>
+                          <TableCell className="text-sm">{row.excelProduct}</TableCell>
+                          <TableCell>
+                            <Select
+                              value={sellerDropdownSelections[row.excelSellerName] || "__none__"}
+                              onValueChange={(val) => {
+                                if (val !== "__none__") {
+                                  setSellerDropdownSelections(prev => ({ ...prev, [row.excelSellerName]: val }));
+                                }
+                              }}
+                            >
+                              <SelectTrigger className="h-9">
+                                <SelectValue placeholder="Vælg medarbejder..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__none__">— Vælg —</SelectItem>
+                                {allEmployees.map(emp => (
+                                  <SelectItem key={emp.id} value={emp.id}>
+                                    {`${emp.first_name || ""} ${emp.last_name || ""}`.trim()}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              size="sm"
+                              variant="default"
+                              disabled={!sellerDropdownSelections[row.excelSellerName]}
+                              onClick={() => handleSellerMappingSave(row.excelSellerName, sellerDropdownSelections[row.excelSellerName])}
+                            >
+                              <Save className="h-3.5 w-3.5 mr-1" />
+                              Gem
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                {unmatchedSellerRows.length === 0 && (
+                  <div className="py-4 text-center text-muted-foreground text-sm">
+                    Alle sælgere er nu mappet. Kør matching igen for at finde matches.
+                  </div>
+                )}
+                <Button variant="outline" onClick={() => handleMatch()}>
+                  <ArrowRight className="h-4 w-4 mr-2" />
+                  Kør matching igen
+                </Button>
+              </div>
             ) : (
               <div className="rounded-md border max-h-96 overflow-auto">
                 <Table>
