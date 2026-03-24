@@ -49,7 +49,8 @@ interface MatchedSale {
 }
 
 interface ProductPhoneMapping {
-  phoneColumn: string;
+  phoneColumn?: string;        // Legacy: Excel column name (unused for reversed matching)
+  payloadPhoneField?: string;  // DB raw_payload.data field name (e.g. "Telefon Abo1")
   productName: string;
 }
 
