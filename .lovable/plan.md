@@ -1,34 +1,27 @@
 
 
-# Eesy TM annulleringsfil: Filtrér på "Annulled Sales" = 1
+# Auto-apply config og skjul mapping-felter
 
 ## Problem
-Excel-filen indeholder alle salg (bekræftede, afviste, annullerede). Kun rækker med `Annulled Sales = 1` skal behandles som annulleringer. Systemet har i dag ingen filtreringsfunktion — alle rækker sendes til matching.
+Når en kunde har en gemt opsætning, skal brugeren stadig manuelt vælge felter — selvom systemet allerede kender mappingen.
 
 ## Løsning
-Tilføj en **filterkolonne** og **filterværdi** til mapping-trinnet, så kun rækker der matcher filteret inkluderes i matching.
+Når en default config findes for den valgte kunde, spring mapping-trinnet over og gå direkte til matching efter filupload. Vis kun en kort opsummering af den anvendte config.
 
 | Fil | Ændring |
 |-----|---------|
-| `src/components/cancellations/UploadCancellationsTab.tsx` | Tilføj `filterColumn` og `filterValue` state. Filtrér `parsedData` i `handleMatch` så kun rækker med den valgte filterværdi behandles. Tilføj UI-selectors i mapping-trinnet. |
-| `cancellation_upload_configs` (DB) | Tilføj `filter_column TEXT` og `filter_value TEXT` kolonner, så filteret kan gemmes i opsætningen. |
+| `UploadCancellationsTab.tsx` | Efter filupload (`onDrop`): hvis der er en default config, anvend den og kør `handleMatch` automatisk — spring `mapping`-trinnet over. Behold mapping-trinnet som fallback kun hvis der **ikke** er en gemt config for kunden. Tilføj en "Rediger mapping" knap i preview/matching-stedet så brugeren kan gå tilbage ved behov. |
 
 ## Konkret flow
 
-1. **Mapping-trinnet**: Ny sektion "Filtrer rækker (valgfri)" med:
-   - Dropdown: vælg filterkolonne (f.eks. "Annulled Sales")
-   - Tekstfelt: angiv filterværdi (f.eks. "1")
-   - Badge der viser: "X af Y rækker inkluderet"
+1. **Fil uploades** → `onDrop` sætter `parsedData` og `columns`
+2. **Check**: Har kunden en default config?
+   - **Ja**: `applyConfig(defaultConfig)` → kald `handleMatch()` direkte → gå til `preview`
+   - **Nej**: Gå til `mapping` (nuværende flow)
+3. I mapping-trinnet: skjul alle felterne bag en collapsible/accordion hvis config er loaded — vis kun upload-type, filter-info og en "Rediger" link
 
-2. **Matching**: Før matching starter, filtreres `parsedData` så kun rækker hvor `row.originalRow[filterColumn] == filterValue` inkluderes. Umatchede rækker beregnes kun ud fra de filtrerede rækker.
-
-3. **Config**: `applyConfig` og `saveConfigMutation` udvides til at inkludere `filter_column` og `filter_value`.
-
-## For Eesy TM
-Brugeren sætter:
-- Telefonkolonne → "Phone Number"
-- Filterkolonne → "Annulled Sales"  
-- Filterværdi → "1"
-
-Gemmes som standard-opsætning for Eesy TM.
+## Implementeringsdetaljer
+- I `onDrop` callback: efter `setParsedData`/`setColumns`, check `clientConfigs` for default. Hvis fundet, sæt step til en ny intern "auto-matching" state og trigger `handleMatch`.
+- Fordi `clientConfigs` kan loade asynkront: brug en `useEffect` der lytter på `parsedData + clientConfigs` — når begge er klar og config er default, auto-match.
+- Tilføj en lille info-banner i preview: "Bruger opsætning: [config-name] for [client]" med en "Rediger mapping" knap.
 
