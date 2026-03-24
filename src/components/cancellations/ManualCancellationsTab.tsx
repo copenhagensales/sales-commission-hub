@@ -41,6 +41,7 @@ interface ManualCancellationsTabProps {
 }
 
 export function ManualCancellationsTab({ clientId: selectedClientId }: ManualCancellationsTabProps) {
+  const { resolve } = useAgentNameResolver();
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
@@ -206,7 +207,7 @@ export function ManualCancellationsTab({ clientId: selectedClientId }: ManualCan
               <SelectItem value="all">Alle medarbejdere</SelectItem>
               {agentsInResults.map((name) => (
                 <SelectItem key={name} value={name}>
-                  {name}
+                  {resolve(name)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -249,7 +250,7 @@ export function ManualCancellationsTab({ clientId: selectedClientId }: ManualCan
                       ? format(new Date(sale.sale_datetime), "dd/MM/yyyy", { locale: da })
                       : "-"}
                   </TableCell>
-                  <TableCell>{sale.agent_name || "-"}</TableCell>
+                  <TableCell>{resolve(sale.agent_name) || "-"}</TableCell>
                   <TableCell>{sale.customer_phone || "-"}</TableCell>
                   <TableCell>{getCompanyDisplay(sale)}</TableCell>
                   <TableCell>{getStatusBadge(sale.validation_status)}</TableCell>

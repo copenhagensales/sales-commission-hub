@@ -100,6 +100,7 @@ interface DuplicatesTabProps {
 }
 
 export function DuplicatesTab({ clientId: selectedClientId }: DuplicatesTabProps) {
+  const { resolve } = useAgentNameResolver();
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
   
@@ -270,7 +271,7 @@ export function DuplicatesTab({ clientId: selectedClientId }: DuplicatesTabProps
               <SelectItem value="all">Alle medarbejdere</SelectItem>
               {agentsWithDuplicates.map((name) => (
                 <SelectItem key={name} value={name}>
-                  {name}
+                  {resolve(name)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -358,7 +359,7 @@ export function DuplicatesTab({ clientId: selectedClientId }: DuplicatesTabProps
                                   ? format(new Date(sale.sale_datetime), "dd/MM/yyyy", { locale: da })
                                   : "-"}
                               </TableCell>
-                              <TableCell>{sale.agent_name || "-"}</TableCell>
+                              <TableCell>{resolve(sale.agent_name) || "-"}</TableCell>
                               <TableCell>{sale.customer_phone || "-"}</TableCell>
                               <TableCell>{sale.customer_company || "-"}</TableCell>
                               <TableCell>{sale.source || "-"}</TableCell>
