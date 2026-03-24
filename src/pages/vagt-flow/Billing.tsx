@@ -109,9 +109,9 @@ function BillingOverviewTab() {
     },
   });
 
-  const locationTypes = [...new Set(
-    bookings?.map((b: any) => b.location?.type).filter(Boolean) || []
-  )];
+  const staticLocationTypes = ["Coop butik", "Meny butik", "Danske Shoppingcentre", "Ocean Outdoor", "Markeder", "Messer", "Anden lokation"];
+  const dynamicTypes = bookings?.map((b: any) => b.location?.type).filter(Boolean) || [];
+  const locationTypes = [...new Set([...staticLocationTypes, ...dynamicTypes])];
 
   const filteredBookings = bookings?.filter((b: any) => {
     const matchesClient = clientFilter === "all" || b.client_id === clientFilter;
