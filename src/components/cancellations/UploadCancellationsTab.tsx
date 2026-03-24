@@ -623,6 +623,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             rows_matched: matchedSales.length,
             upload_type: uploadType,
             config_id: configId,
+            client_id: selectedClientId || null,
             unmatched_rows: unmatchedRows.length > 0 ? unmatchedRows : null,
           } as any)
           .select("id")
@@ -1123,7 +1124,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       )}
 
       {/* History section */}
-      <CancellationHistoryTable />
+      {/* History moved to separate tab */}
     </div>
   );
 }

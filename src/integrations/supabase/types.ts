@@ -1524,6 +1524,7 @@ export type Database = {
       }
       cancellation_imports: {
         Row: {
+          client_id: string | null
           config_id: string | null
           created_at: string
           error_message: string | null
@@ -1538,6 +1539,7 @@ export type Database = {
           uploaded_by: string
         }
         Insert: {
+          client_id?: string | null
           config_id?: string | null
           created_at?: string
           error_message?: string | null
@@ -1552,6 +1554,7 @@ export type Database = {
           uploaded_by: string
         }
         Update: {
+          client_id?: string | null
           config_id?: string | null
           created_at?: string
           error_message?: string | null
@@ -1566,6 +1569,13 @@ export type Database = {
           uploaded_by?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "cancellation_imports_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "cancellation_imports_config_id_fkey"
             columns: ["config_id"]
