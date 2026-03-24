@@ -942,7 +942,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                 </Button>
               </div>
             )}
-
+            {matchedSales.length === 0 ? (
               <div className="py-8 text-center text-muted-foreground">
                 <X className="h-12 w-12 mx-auto mb-4" />
                 <p>Ingen matchende salg fundet</p>
