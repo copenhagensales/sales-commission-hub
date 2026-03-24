@@ -63,6 +63,15 @@ interface UploadCancellationsTabProps {
   clientId: string;
 }
 
+function getCaseInsensitive(obj: Record<string, unknown> | undefined, key: string): unknown {
+  if (!obj) return undefined;
+  const lowerKey = key.toLowerCase();
+  for (const k of Object.keys(obj)) {
+    if (k.toLowerCase() === lowerKey) return obj[k];
+  }
+  return undefined;
+}
+
 export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCancellationsTabProps) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
