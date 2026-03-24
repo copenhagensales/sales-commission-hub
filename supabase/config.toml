@@ -231,3 +231,6 @@ verify_jwt = false
 
 [functions.send-meta-lead]
 verify_jwt = false
+
+[functions.notify-vehicle-returned]
+verify_jwt = false
