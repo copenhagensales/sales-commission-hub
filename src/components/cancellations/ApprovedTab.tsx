@@ -30,6 +30,7 @@ function extractOpp(rawPayload: any): string {
 
 export function ApprovedTab({ clientId }: ApprovedTabProps) {
   const { resolve } = useAgentNameResolver();
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [sellerFilter, setSellerFilter] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("reviewed_at");
@@ -41,7 +42,7 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
       let query = supabase
         .from("cancellation_queue")
         .select(`
-          id, status, upload_type, reviewed_at, reviewed_by, created_at, opp_group,
+          id, status, upload_type, reviewed_at, reviewed_by, created_at, opp_group, deduction_date,
           sale:sales!cancellation_queue_sale_id_fkey(id, sale_datetime, agent_name, agent_email, raw_payload),
           reviewer:employee_master_data!cancellation_queue_reviewed_by_fkey(first_name, last_name)
         `)
@@ -53,21 +54,46 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
 
       const { data, error } = await query.order("reviewed_at", { ascending: false });
       if (error) throw error;
-      return (data || []).map((item: any) => ({
-        id: item.id,
-        status: item.status,
-        uploadType: item.upload_type,
-        reviewedAt: item.reviewed_at,
-        oppGroup: item.opp_group,
-        agentName: item.sale?.agent_name || item.sale?.agent_email || "",
-        saleDate: item.sale?.sale_datetime || "",
-        opp: extractOpp(item.sale?.raw_payload) || item.opp_group || "",
-        reviewerName: item.reviewer
-          ? `${item.reviewer.first_name || ""} ${item.reviewer.last_name || ""}`.trim()
-          : "",
-      }));
+      return (data || []).map((item: any) => {
+        const deductionSource = item.deduction_date
+          ? new Date(item.deduction_date + "T00:00:00")
+          : item.reviewed_at ? new Date(item.reviewed_at) : null;
+        const period = item.status === "approved" && deductionSource
+          ? getPayrollPeriod(deductionSource)
+          : null;
+        return {
+          id: item.id,
+          status: item.status,
+          uploadType: item.upload_type,
+          reviewedAt: item.reviewed_at,
+          deductionDate: item.deduction_date,
+          deductionPeriod: period,
+          oppGroup: item.opp_group,
+          agentName: item.sale?.agent_name || item.sale?.agent_email || "",
+          saleDate: item.sale?.sale_datetime || "",
+          opp: extractOpp(item.sale?.raw_payload) || item.opp_group || "",
+          reviewerName: item.reviewer
+            ? `${item.reviewer.first_name || ""} ${item.reviewer.last_name || ""}`.trim()
+            : "",
+        };
+      });
     },
     enabled: !!clientId,
+  });
+
+  const updateDeductionDate = useMutation({
+    mutationFn: async ({ id, date }: { id: string; date: string }) => {
+      const { error } = await supabase
+        .from("cancellation_queue")
+        .update({ deduction_date: date } as any)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["approved-queue", clientId] });
+      toast.success("Fradragsdato opdateret");
+    },
+    onError: () => toast.error("Kunne ikke opdatere fradragsdato"),
   });
 
   const sellers = useMemo(() => {
