@@ -6,9 +6,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const DELAY_MS = 1050;
-const DEFAULT_BATCH = 50;
 const TDC_ERHVERV_CAMPAIGN_IDS = ["374ce55d-5b01-41b9-a009-aad5f0feb288"];
+// Adversus campaign IDs for TDC Erhverv (numeric IDs used in the Adversus API)
+const ADVERSUS_CAMPAIGN_IDS = [99496, 92498];
 
 function getSupabase() {
   return createClient(
@@ -25,7 +25,6 @@ async function getCredentials(supabase: any): Promise<{ authHeader: string } | n
     .ilike("name", "Lovablecph");
 
   if (!integrations || integrations.length === 0) return null;
-
   const integration = integrations[0];
   const encryptionKey = Deno.env.get("DB_ENCRYPTION_KEY");
 
@@ -58,13 +57,76 @@ function hasOppData(rawPayload: any): boolean {
   return false;
 }
 
+/** Fetch leads from Adversus bulk endpoint for a given campaign */
+async function fetchLeadsBulk(
+  authHeader: string,
+  adversusCampaignId: number,
+  pageSize = 500
+): Promise<any[]> {
+  const allLeads: any[] = [];
+  let page = 1;
+  let hasMore = true;
+
+  while (hasMore && page <= 50) {
+    const filters = JSON.stringify({ campaignId: { "$eq": adversusCampaignId } });
+    const url = `https://api.adversus.io/leads?filters=${encodeURIComponent(filters)}&pageSize=${pageSize}&page=${page}`;
+
+    const res = await fetch(url, {
+      headers: { Authorization: authHeader, "Content-Type": "application/json" },
+    });
+
+    if (res.status === 429) {
+      console.log(`[tdc-opp-backfill] Rate limited on page ${page}, waiting 10s...`);
+      await new Promise(r => setTimeout(r, 10000));
+      continue; // retry same page
+    }
+
+    if (!res.ok) {
+      console.log(`[tdc-opp-backfill] Failed to fetch leads page ${page}: ${res.status}`);
+      break;
+    }
+
+    const data = await res.json();
+    const pageLeads = data.leads || data || [];
+
+    if (pageLeads.length === 0) {
+      hasMore = false;
+    } else {
+      allLeads.push(...pageLeads);
+      console.log(`[tdc-opp-backfill] Campaign ${adversusCampaignId} page ${page}: ${pageLeads.length} leads (total: ${allLeads.length})`);
+      if (pageLeads.length < pageSize) {
+        hasMore = false;
+      } else {
+        page++;
+        await new Promise(r => setTimeout(r, 200));
+      }
+    }
+  }
+
+  return allLeads;
+}
+
+/** Extract resultData fields from a lead into a map */
+function extractResultFields(lead: any): { leadResultData: any[]; leadResultFields: Record<string, any> } {
+  const resultData = lead.resultData || lead.leadResultData || [];
+  const fields: Record<string, any> = {};
+
+  if (Array.isArray(resultData)) {
+    for (const field of resultData) {
+      const fieldName = field?.name || field?.label;
+      if (field && fieldName !== undefined) {
+        fields[fieldName] = field.value;
+      }
+    }
+  }
+
+  return { leadResultData: resultData, leadResultFields: fields };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const body = await req.json().catch(() => ({}));
-    const batchSize = body.batchSize || DEFAULT_BATCH;
-    const autoRun = body.autoRun === true;
     const supabase = getSupabase();
     const logs: string[] = [];
     const log = (msg: string) => { console.log(`[tdc-opp-backfill] ${msg}`); logs.push(msg); };
@@ -76,7 +138,7 @@ serve(async (req) => {
       });
     }
 
-    // Pre-heal: mark sales that already have OPP data as 'healed'
+    // Step 1: Pre-heal sales that already have OPP data but wrong status
     for (const status of ["pending", "failed"]) {
       const { data: candidates } = await supabase
         .from("sales")
@@ -85,7 +147,8 @@ serve(async (req) => {
         .in("client_campaign_id", TDC_ERHVERV_CAMPAIGN_IDS)
         .eq("enrichment_status", status)
         .not("raw_payload", "is", null)
-        .limit(500);
+        .gte("sale_datetime", "2026-01-01")
+        .limit(1000);
 
       const alreadyHealedIds = (candidates || [])
         .filter((s: any) => hasOppData(s.raw_payload))
@@ -96,6 +159,7 @@ serve(async (req) => {
           const chunk = alreadyHealedIds.slice(i, i + 50);
           await supabase.from("sales").update({
             enrichment_status: "healed",
+            enrichment_error: null,
             enrichment_last_attempt: new Date().toISOString(),
           }).in("id", chunk);
         }
@@ -103,36 +167,22 @@ serve(async (req) => {
       }
     }
 
-    // Find TDC Erhverv sales still missing OPP — both pending AND failed
-    const { data: sales, error } = await supabase
+    // Step 2: Get all missing sales (2026, Lovablecph, TDC Erhverv, no OPP)
+    const { data: missingSales, error } = await supabase
       .from("sales")
       .select("id, adversus_external_id, raw_payload, customer_phone")
       .eq("source", "Lovablecph")
       .in("client_campaign_id", TDC_ERHVERV_CAMPAIGN_IDS)
       .not("raw_payload", "is", null)
       .in("enrichment_status", ["pending", "failed"])
+      .gte("sale_datetime", "2026-01-01")
       .order("sale_datetime", { ascending: false })
-      .limit(batchSize);
+      .limit(1000);
 
     if (error) throw error;
 
-    // Filter: only those with leadId and missing OPP data
-    const needsHealing = (sales || []).filter((s: any) => {
-      if (hasOppData(s.raw_payload)) return false;
-      const leadId = s.raw_payload?.leadId || s.raw_payload?.metadata?.leadId;
-      return !!leadId;
-    });
-
-    // Also identify sales without leadId (can't be healed automatically)
-    const noLeadId = (sales || []).filter((s: any) => {
-      if (hasOppData(s.raw_payload)) return false;
-      const leadId = s.raw_payload?.leadId || s.raw_payload?.metadata?.leadId;
-      return !leadId;
-    });
-
-    if (noLeadId.length > 0) {
-      log(`${noLeadId.length} sales have no leadId — cannot fetch automatically`);
-    }
+    // Filter to only those truly missing OPP
+    const needsHealing = (missingSales || []).filter((s: any) => !hasOppData(s.raw_payload));
 
     if (needsHealing.length === 0) {
       log("No more TDC Erhverv sales need OPP backfill — done!");
@@ -141,59 +191,65 @@ serve(async (req) => {
       });
     }
 
-    const { count: totalRemaining } = await supabase
-      .from("sales")
-      .select("id", { count: "exact", head: true })
-      .eq("source", "Lovablecph")
-      .in("client_campaign_id", TDC_ERHVERV_CAMPAIGN_IDS)
-      .not("raw_payload", "is", null)
-      .in("enrichment_status", ["pending", "failed"]);
+    log(`Found ${needsHealing.length} sales needing OPP data. Fetching leads from Adversus bulk API...`);
 
-    log(`Starting batch: ${needsHealing.length} sales to process (est. total remaining: ~${totalRemaining})`);
-
-    let processed = 0, skipped = 0, failed = 0;
-
+    // Step 3: Build leadId -> sale mapping
+    const leadIdToSales = new Map<string, any[]>();
     for (const sale of needsHealing) {
-      const leadId = sale.raw_payload.leadId || sale.raw_payload.metadata?.leadId;
+      const leadId = String(sale.raw_payload?.leadId || sale.raw_payload?.metadata?.leadId || "");
+      if (leadId) {
+        if (!leadIdToSales.has(leadId)) leadIdToSales.set(leadId, []);
+        leadIdToSales.get(leadId)!.push(sale);
+      }
+    }
 
-      try {
-        // Fetch lead data from Adversus — this has resultData with OPP numbers
-        const response = await fetch(`https://api.adversus.io/v1/leads/${leadId}`, {
-          headers: { Authorization: creds.authHeader },
-        });
+    log(`${leadIdToSales.size} unique leadIds to match from ${needsHealing.length} sales`);
 
-        if (response.status === 429) {
-          log(`Rate limited at sale ${sale.adversus_external_id}, stopping batch early`);
-          break;
+    // Step 4: Fetch leads in bulk from Adversus for each campaign
+    const leadIdToData = new Map<string, { leadResultData: any[]; leadResultFields: Record<string, any>; phone?: string }>();
+
+    for (const campaignId of ADVERSUS_CAMPAIGN_IDS) {
+      log(`Fetching leads for Adversus campaign ${campaignId}...`);
+      const leads = await fetchLeadsBulk(creds.authHeader, campaignId, 500);
+      log(`Got ${leads.length} leads from campaign ${campaignId}`);
+
+      for (const lead of leads) {
+        const leadId = String(lead.id || lead.leadId || "");
+        if (leadId && leadIdToSales.has(leadId)) {
+          const { leadResultData, leadResultFields } = extractResultFields(lead);
+          const phone = lead.phone || lead.contactPhone || lead.mobile || null;
+          leadIdToData.set(leadId, { leadResultData, leadResultFields, phone });
         }
+      }
+    }
 
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    log(`Matched ${leadIdToData.size} leadIds out of ${leadIdToSales.size} needed`);
+
+    // Step 5: Update matched sales
+    let processed = 0;
+    let noMatch = 0;
+
+    for (const [leadId, sales] of leadIdToSales.entries()) {
+      const leadData = leadIdToData.get(leadId);
+
+      if (!leadData || (leadData.leadResultData.length === 0 && Object.keys(leadData.leadResultFields).length === 0)) {
+        // No match or empty data
+        for (const sale of sales) {
+          await supabase.from("sales").update({
+            enrichment_status: "failed",
+            enrichment_error: "bulk_lead_lookup_no_opp_data",
+            enrichment_last_attempt: new Date().toISOString(),
+          }).eq("id", sale.id);
         }
+        noMatch += sales.length;
+        continue;
+      }
 
-        const leadData = await response.json();
-        const leadResultData = leadData.resultData || leadData.leadResultData || [];
-
-        const leadResultFields: Record<string, any> = {};
-        if (Array.isArray(leadResultData)) {
-          for (const field of leadResultData) {
-            const fieldName = field?.name || field?.label;
-            if (field && fieldName !== undefined) {
-              leadResultFields[fieldName] = field.value;
-            }
-          }
-        }
-
-        if (leadResultData.length === 0 && Object.keys(leadResultFields).length === 0) {
-          throw new Error("Lead recycled — resultData empty");
-        }
-
-        const phone = leadData.phone || leadData.contactPhone || leadData.mobile || null;
-
+      for (const sale of sales) {
         const updatedPayload = {
           ...sale.raw_payload,
-          leadResultFields,
-          leadResultData,
+          leadResultFields: leadData.leadResultFields,
+          leadResultData: leadData.leadResultData,
         };
 
         await supabase.from("sales").update({
@@ -201,59 +257,43 @@ serve(async (req) => {
           enrichment_status: "healed",
           enrichment_error: null,
           enrichment_last_attempt: new Date().toISOString(),
-          ...(phone && !sale.customer_phone ? { customer_phone: phone } : {}),
+          ...(leadData.phone && !sale.customer_phone ? { customer_phone: leadData.phone } : {}),
         }).eq("id", sale.id);
 
         processed++;
-        if (processed % 10 === 0) log(`Progress: ${processed}/${needsHealing.length}`);
-
-        await new Promise(r => setTimeout(r, DELAY_MS));
-      } catch (err) {
-        const errMsg = err instanceof Error ? err.message : String(err);
-        await supabase.from("sales").update({
-          enrichment_status: "failed",
-          enrichment_error: `backfill: ${errMsg}`,
-          enrichment_last_attempt: new Date().toISOString(),
-        }).eq("id", sale.id);
-        failed++;
-        if (failed <= 5) log(`Failed sale ${sale.adversus_external_id} (lead ${leadId}): ${errMsg}`);
       }
     }
 
-    const remaining = (totalRemaining || 0) - processed;
-    const done = needsHealing.length < batchSize && failed === 0;
+    // Also handle sales without any leadId
+    const noLeadIdSales = needsHealing.filter((s: any) => {
+      const leadId = s.raw_payload?.leadId || s.raw_payload?.metadata?.leadId;
+      return !leadId;
+    });
 
-    log(`Batch done: processed=${processed}, failed=${failed}, skipped=${skipped}, remaining≈${remaining}, done=${done}`);
+    if (noLeadIdSales.length > 0) {
+      log(`${noLeadIdSales.length} sales have no leadId — marking as no_lead_id`);
+      for (const sale of noLeadIdSales) {
+        await supabase.from("sales").update({
+          enrichment_status: "failed",
+          enrichment_error: "no_lead_id_in_payload",
+          enrichment_last_attempt: new Date().toISOString(),
+        }).eq("id", sale.id);
+      }
+    }
+
+    const done = true;
+    log(`Done: healed=${processed}, no_match=${noMatch}, no_lead_id=${noLeadIdSales.length}`);
 
     await supabase.from("integration_logs").insert({
       integration_type: "backfill",
       integration_name: "tdc-opp-backfill",
-      status: failed > 0 ? "partial" : "success",
-      message: `Processed: ${processed}, Failed: ${failed}, Remaining: ~${remaining}`,
-      details: { processed, failed, skipped, remaining, done },
+      status: noMatch > 0 ? "partial" : "success",
+      message: `Healed: ${processed}, No match: ${noMatch}, No leadId: ${noLeadIdSales.length}`,
+      details: { processed, noMatch, noLeadId: noLeadIdSales.length, done },
     });
 
-    if (autoRun && !done && processed > 0) {
-      log("Auto-continuing in 5s...");
-      const selfUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/tdc-opp-backfill`;
-      setTimeout(async () => {
-        try {
-          await fetch(selfUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
-            },
-            body: JSON.stringify({ batchSize, autoRun: true }),
-          });
-        } catch (e) {
-          console.error("[tdc-opp-backfill] Auto-continue failed:", e);
-        }
-      }, 5000);
-    }
-
     return new Response(JSON.stringify({
-      success: true, processed, failed, skipped, remaining, done, logs,
+      success: true, processed, noMatch, noLeadId: noLeadIdSales.length, done, logs,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
