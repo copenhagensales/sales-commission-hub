@@ -1155,6 +1155,32 @@ export function EditBookingDialog({
     });
   };
 
+  // Training bonus tab handlers
+  const toggleTrainingDay = (dayIndex: number) => {
+    const newSet = new Set(selectedTrainingDays);
+    if (newSet.has(dayIndex)) {
+      newSet.delete(dayIndex);
+    } else {
+      newSet.add(dayIndex);
+    }
+    setSelectedTrainingDays(newSet);
+  };
+
+  const handleAddTrainingBonus = () => {
+    if (!selectedTrainingEmployee || selectedTrainingDays.size === 0) return;
+
+    const dates = Array.from(selectedTrainingDays)
+      .filter(dayIndex => isDayInBookingRange(dayIndex))
+      .map(dayIndex => format(addDays(weekStart, dayIndex), "yyyy-MM-dd"));
+
+    if (dates.length === 0) return;
+
+    addTrainingBonusMutation.mutate({
+      employeeId: selectedTrainingEmployee,
+      dates,
+    });
+  };
+
   // Group current diet assignments by employee for display
   const groupedDietAssignments = useMemo(() => {
     const grouped: Record<string, { employeeName: string; dates: string[]; totalAmount: number }> = {};
@@ -1168,6 +1194,20 @@ export function EditBookingDialog({
     });
     return grouped;
   }, [currentDietAssignments, employees]);
+
+  // Group current training bonus assignments by employee for display
+  const groupedTrainingAssignments = useMemo(() => {
+    const grouped: Record<string, { employeeName: string; dates: string[]; totalAmount: number }> = {};
+    currentTrainingAssignments.forEach((a: any) => {
+      if (!grouped[a.employee_id]) {
+        const emp = employees.find(e => e.id === a.employee_id);
+        grouped[a.employee_id] = { employeeName: emp?.full_name || "Ukendt", dates: [], totalAmount: 0 };
+      }
+      grouped[a.employee_id].dates.push(a.date);
+      grouped[a.employee_id].totalAmount += Number(a.amount) || 0;
+    });
+    return grouped;
+  }, [currentTrainingAssignments, employees]);
 
   // Get employees assigned to this booking (for diet selection)
   const assignedEmployeeIds = useMemo(() => {
