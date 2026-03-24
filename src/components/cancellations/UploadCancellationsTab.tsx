@@ -144,6 +144,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           phone_column: phoneColumn !== "__none__" ? phoneColumn : null,
           company_column: companyColumn !== "__none__" ? companyColumn : null,
           opp_column: oppColumn !== "__none__" ? oppColumn : null,
+          member_number_column: memberNumberColumn !== "__none__" ? memberNumberColumn : null,
           product_columns: productCols,
           revenue_column: revenueColumn !== "__none__" ? revenueColumn : null,
           commission_column: commissionColumn !== "__none__" ? commissionColumn : null,
