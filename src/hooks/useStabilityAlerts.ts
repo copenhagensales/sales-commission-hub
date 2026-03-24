@@ -148,6 +148,7 @@ export function useStabilityAlerts({
       const lastRuns = int.lastRuns || [];
       let consecutiveErrors = 0;
       for (const run of lastRuns) {
+        if (run.status === "skipped" || run.status === "skipped_locked") continue;
         if (run.status === "error") consecutiveErrors++;
         else break;
       }
