@@ -1215,8 +1215,17 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         </Card>
       )}
 
-      {/* History section */}
-      {/* History moved to separate tab */}
+      {/* Edit config dialog */}
+      {showEditConfig && clientConfigs.length > 0 && (
+        <EditConfigDialog
+          open={showEditConfig}
+          onOpenChange={setShowEditConfig}
+          config={clientConfigs.find(c => c.is_default) || clientConfigs[0]}
+          onSaved={() => {
+            queryClient.invalidateQueries({ queryKey: ["cancellation-upload-configs", selectedClientId] });
+          }}
+        />
+      )}
     </div>
   );
 }
