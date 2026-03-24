@@ -6,10 +6,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const DELAY_MS = 1050; // ~57 req/min, safely under 60/min limit
+const DELAY_MS = 1050;
 const DEFAULT_BATCH = 50;
-
-// TDC Erhverv client_campaigns ID
 const TDC_ERHVERV_CAMPAIGN_IDS = ["374ce55d-5b01-41b9-a009-aad5f0feb288"];
 
 function getSupabase() {
@@ -71,7 +69,6 @@ serve(async (req) => {
     const logs: string[] = [];
     const log = (msg: string) => { console.log(`[tdc-opp-backfill] ${msg}`); logs.push(msg); };
 
-    // 1. Get Adversus credentials for Lovablecph
     const creds = await getCredentials(supabase);
     if (!creds) {
       return new Response(JSON.stringify({ error: "No Lovablecph credentials found" }), {
@@ -79,7 +76,7 @@ serve(async (req) => {
       });
     }
 
-    // 2. Pre-heal: mark sales that already have OPP data as 'healed'
+    // Pre-heal: mark sales that already have OPP data as 'healed'
     for (const status of ["pending", "failed"]) {
       const { data: candidates } = await supabase
         .from("sales")
@@ -106,7 +103,7 @@ serve(async (req) => {
       }
     }
 
-    // 3. Find TDC Erhverv sales still missing OPP — both pending AND failed
+    // Find TDC Erhverv sales still missing OPP — both pending AND failed
     const { data: sales, error } = await supabase
       .from("sales")
       .select("id, adversus_external_id, raw_payload, customer_phone")
@@ -114,14 +111,28 @@ serve(async (req) => {
       .in("client_campaign_id", TDC_ERHVERV_CAMPAIGN_IDS)
       .not("raw_payload", "is", null)
       .in("enrichment_status", ["pending", "failed"])
-      .not("adversus_external_id", "is", null)
       .order("sale_datetime", { ascending: false })
       .limit(batchSize);
 
     if (error) throw error;
 
-    // Filter: only those still missing OPP data
-    const needsHealing = (sales || []).filter((s: any) => !hasOppData(s.raw_payload));
+    // Filter: only those with leadId and missing OPP data
+    const needsHealing = (sales || []).filter((s: any) => {
+      if (hasOppData(s.raw_payload)) return false;
+      const leadId = s.raw_payload?.leadId || s.raw_payload?.metadata?.leadId;
+      return !!leadId;
+    });
+
+    // Also identify sales without leadId (can't be healed automatically)
+    const noLeadId = (sales || []).filter((s: any) => {
+      if (hasOppData(s.raw_payload)) return false;
+      const leadId = s.raw_payload?.leadId || s.raw_payload?.metadata?.leadId;
+      return !leadId;
+    });
+
+    if (noLeadId.length > 0) {
+      log(`${noLeadId.length} sales have no leadId — cannot fetch automatically`);
+    }
 
     if (needsHealing.length === 0) {
       log("No more TDC Erhverv sales need OPP backfill — done!");
@@ -130,7 +141,6 @@ serve(async (req) => {
       });
     }
 
-    // 4. Count total remaining (for progress)
     const { count: totalRemaining } = await supabase
       .from("sales")
       .select("id", { count: "exact", head: true })
@@ -144,16 +154,16 @@ serve(async (req) => {
     let processed = 0, skipped = 0, failed = 0;
 
     for (const sale of needsHealing) {
-      const orderId = sale.adversus_external_id;
+      const leadId = sale.raw_payload.leadId || sale.raw_payload.metadata?.leadId;
 
       try {
-        // Use /v1/sales/{orderId} instead of /v1/leads/{leadId}
-        const response = await fetch(`https://api.adversus.io/v1/sales/${orderId}`, {
+        // Fetch lead data from Adversus — this has resultData with OPP numbers
+        const response = await fetch(`https://api.adversus.io/v1/leads/${leadId}`, {
           headers: { Authorization: creds.authHeader },
         });
 
         if (response.status === 429) {
-          log(`Rate limited at sale ${orderId}, stopping batch early`);
+          log(`Rate limited at sale ${sale.adversus_external_id}, stopping batch early`);
           break;
         }
 
@@ -161,21 +171,8 @@ serve(async (req) => {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
 
-        const orderData = await response.json();
-        
-        // Debug: log response structure for first sale
-        if (processed === 0 && failed === 0) {
-          log(`DEBUG: /v1/sales/${orderId} response keys: ${JSON.stringify(Object.keys(orderData))}`);
-          if (orderData.lead) log(`DEBUG: lead keys: ${JSON.stringify(Object.keys(orderData.lead))}`);
-          // Log first 500 chars of response
-          log(`DEBUG: response preview: ${JSON.stringify(orderData).substring(0, 500)}`);
-        }
-        
-        // Try multiple paths to find lead result data
-        const leadResultData = orderData.leadResultData 
-          || orderData.resultData 
-          || orderData.lead?.resultData 
-          || [];
+        const leadData = await response.json();
+        const leadResultData = leadData.resultData || leadData.leadResultData || [];
 
         const leadResultFields: Record<string, any> = {};
         if (Array.isArray(leadResultData)) {
@@ -188,14 +185,10 @@ serve(async (req) => {
         }
 
         if (leadResultData.length === 0 && Object.keys(leadResultFields).length === 0) {
-          // Don't fail — just skip and mark for manual review
-          if (processed === 0 && failed === 0) {
-            log(`DEBUG: No resultData found in sales response for order ${orderId}`);
-          }
-          throw new Error("Sales endpoint has no resultData — lead likely recycled");
+          throw new Error("Lead recycled — resultData empty");
         }
 
-        const phone = orderData.phone || orderData.contactPhone || orderData.mobile || null;
+        const phone = leadData.phone || leadData.contactPhone || leadData.mobile || null;
 
         const updatedPayload = {
           ...sale.raw_payload,
@@ -219,11 +212,11 @@ serve(async (req) => {
         const errMsg = err instanceof Error ? err.message : String(err);
         await supabase.from("sales").update({
           enrichment_status: "failed",
-          enrichment_error: `backfill-sales: ${errMsg}`,
+          enrichment_error: `backfill: ${errMsg}`,
           enrichment_last_attempt: new Date().toISOString(),
         }).eq("id", sale.id);
         failed++;
-        log(`Failed sale ${orderId}: ${errMsg}`);
+        if (failed <= 5) log(`Failed sale ${sale.adversus_external_id} (lead ${leadId}): ${errMsg}`);
       }
     }
 
@@ -232,7 +225,6 @@ serve(async (req) => {
 
     log(`Batch done: processed=${processed}, failed=${failed}, skipped=${skipped}, remaining≈${remaining}, done=${done}`);
 
-    // Log to integration_logs
     await supabase.from("integration_logs").insert({
       integration_type: "backfill",
       integration_name: "tdc-opp-backfill",
@@ -241,7 +233,6 @@ serve(async (req) => {
       details: { processed, failed, skipped, remaining, done },
     });
 
-    // Auto-continue if enabled and not done
     if (autoRun && !done && processed > 0) {
       log("Auto-continuing in 5s...");
       const selfUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/tdc-opp-backfill`;
