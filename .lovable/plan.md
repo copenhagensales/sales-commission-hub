@@ -1,71 +1,50 @@
 
-Mest sandsynlige forklaring er ikke “data findes ikke”, men “vi henter dem på den forkerte måde”.
 
-## Hvad jeg fandt
-- Der er lige nu **267** Lovablecph TDC Erhverv-salg fra **2026** uden OPP i databasen.
-- De ligger kun i **januar-februar**. **Marts har 0 manglende**.
-- **262/267** ligger på kampagne **99496**.
-- Den nuværende `tdc-opp-backfill` bruger stadig **`/v1/leads/{leadId}`** pr. salg.
-- Repoet har allerede en diagnostics-funktion, som direkte siger at den rigtige vej til OPP er bulk-listning via **`/v1/leads?filters=...`**, fordi den returnerer `resultData`.
-- Logs fra den tidligere test af **`/v1/sales/{id}`** viser, at den response **ikke** indeholder `resultData` for de problematiske salg.
+# Fix: "Skipped" natpause-runs trækker succes-raten ned og udløser falske alarmer
 
-## Plan
-### 1. Skift strategi i backfill
-Opdatér `supabase/functions/tdc-opp-backfill/index.ts`, så den **ikke** prøver at hente OPP via enkelt-lead endpointet.
+## Problem
+Alle integrationer viser "Kritisk" efter kl. 21 dansk tid, selvom der ingen fejl er. Årsag: sync-runs med `status = "skipped"` (natpause) tælles med i succes-rate beregningen men **ikke** som succesfulde — de trækker raten ned til 40-67%.
 
-I stedet:
-- hent alle manglende Lovablecph TDC Erhverv-salg fra **2026**
-- gruppér dem i mindre dato-vinduer (fx uge for uge)
-- hent leads fra Adversus via **bulk `/v1/leads` med filters** pr. kampagne + dato-vindue
-- byg et map `leadId -> { resultData, resultFields, opp }`
-- match tilbage på eksisterende `sales.raw_payload.leadId`
+Linje 163 i `SystemStability.tsx`:
+```ts
+const meaningfulRuns = runs1h.filter((r: any) => r.status !== "skipped_locked");
+```
+Filtrerer kun `skipped_locked` fra, men ikke `skipped`.
 
-### 2. Gem OPP normaliseret og robust
-Når et match findes:
-- opdatér `raw_payload.leadResultData`
-- opdatér `raw_payload.leadResultFields`
-- sæt evt. også et normaliseret felt i payloaden, fx `legacy_opp_number`, så rapporter og UI ikke er afhængige af én bestemt struktur
-- sæt `enrichment_status = 'healed'`
-- nulstil `enrichment_error`
+## Løsning
 
-### 3. Lad umatchede blive tydelige i stedet for “falsk døde”
-For salg der stadig ikke matches:
-- behold dem ikke som generisk `failed`
-- skriv en mere præcis fejl, fx `bulk_lead_lookup_no_match`
-- log antal pr. kampagne og uge, så vi kan se præcis hvor der evt. stadig mangler noget
+### 1. Ekskludér "skipped" fra succes-rate beregningen
+**Fil: `src/pages/SystemStability.tsx`** (linje 163)
 
-### 4. Begræns scope til “salg fra i år”
-Backfillen skal kun arbejde på:
-- `source = 'Lovablecph'`
-- TDC Erhverv client campaign
-- `sale_datetime >= '2026-01-01'`
-
-Det matcher det du bad om og holder API-load nede.
-
-### 5. Kør og valider resultatet
-Efter implementering:
-- kør backfillen i batches
-- verificér at tallet **267** falder markant eller til 0
-- verificér at rådata-rapporten nu viser OPP for januar-februar
-- verificér at marts forbliver uændret
-
-## Tekniske detaljer
-```text
-Nuværende flow:
-sales -> raw_payload.leadId -> /v1/leads/{leadId} -> ofte tomt/404
-
-Nyt flow:
-missing sales (2026)
-  -> group by week + campaign
-  -> /v1/leads?filters=campaign/date-window
-  -> resultData/resultFields
-  -> match by leadId
-  -> update sales.raw_payload + enrichment_status
+```ts
+// Fra:
+const meaningfulRuns = runs1h.filter((r: any) => r.status !== "skipped_locked");
+// Til:
+const meaningfulRuns = runs1h.filter((r: any) => r.status !== "skipped_locked" && r.status !== "skipped");
 ```
 
-## Berørte filer
-- `supabase/functions/tdc-opp-backfill/index.ts`
-- evt. en ny migration kun hvis vi vil gemme et ekstra normaliseret OPP-felt permanent i databasen; ellers kan vi nøjes med `raw_payload`
+Det er den eneste ændring. "Skipped" runs er neutrale (ligesom `skipped_locked`) og skal ikke påvirke succes-raten.
 
-## Forventet effekt
-Ja — baseret på koden i repoet er næste rigtige forsøg **ikke** manuel CSV først, men en målrettet bulk-backfill via `/v1/leads`-listing. Det er den mest sandsynlige måde at hente de manglende OPP-numre for årets Lovablecph TDC Erhverv-salg.
+### 2. Opdatér `useStabilityAlerts.ts` lastRuns consecutive-error check
+**Fil: `src/hooks/useStabilityAlerts.ts`** (linje ~130)
+
+Den eksisterende consecutive-error tæller bryder også på "skipped" — en `skipped` run er ikke en fejl men bryder heller ikke kæden:
+```ts
+// Fra:
+for (const run of lastRuns) {
+  if (run.status === "error") consecutiveErrors++;
+  else break;
+}
+// Til:
+for (const run of lastRuns) {
+  if (run.status === "skipped" || run.status === "skipped_locked") continue;
+  if (run.status === "error") consecutiveErrors++;
+  else break;
+}
+```
+
+## Effekt
+- Natpausen viser korrekt "info"-level badges (allerede implementeret i `useStabilityAlerts`)
+- Succes-raten forbliver baseret på **faktiske** sync-forsøg
+- Ingen falske "Kritisk" alarmer udenfor arbejdstid
+
