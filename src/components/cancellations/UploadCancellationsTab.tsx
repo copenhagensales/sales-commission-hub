@@ -1065,18 +1065,9 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                 </div>
               </>
             ) : (
-              <div className="flex items-center gap-3 p-4 rounded-md bg-muted/50 border">
-                <FileSpreadsheet className="h-8 w-8 text-primary shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">{file.name}</p>
-                  <p className="text-sm text-muted-foreground">{parsedData.length} rækker</p>
-                </div>
-                {isMatching && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Matcher...
-                  </div>
-                )}
+              <div className="flex flex-col items-center justify-center p-12 text-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
+                <p className="text-sm text-muted-foreground">Matcher {file.name}...</p>
               </div>
             )}
 
