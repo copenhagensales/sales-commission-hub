@@ -282,7 +282,7 @@ export function useSellerSalariesCached(
         team: teamName,
         teamId: teamId,
         commission,
-        cancellations: 0,
+        cancellations: cancellationMap[emp.id] || 0,
         vacationType,
         vacationPay,
         diet: dietMap[emp.id] || 0,
