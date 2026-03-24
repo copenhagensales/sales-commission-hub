@@ -672,6 +672,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     setCommissionColumn("__none__");
     setFilterColumn("__none__");
     setFilterValue("");
+    setAppliedConfigName("");
     setUploadType("cancellation");
     setSelectedConfigId("__none__");
     setMatchedSales([]);
