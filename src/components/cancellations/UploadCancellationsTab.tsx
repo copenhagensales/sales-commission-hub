@@ -427,7 +427,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       const uploadedRowByCompany = new Map<string, Record<string, unknown>>();
       const uploadedRowByMemberNr = new Map<string, Record<string, unknown>>();
       
-      parsedData.forEach(row => {
+      filteredData.forEach(row => {
         if (oppColumn !== "__none__" && row.originalRow[oppColumn]) {
           const key = String(row.originalRow[oppColumn]).toUpperCase().trim();
           const arr = uploadedRowsByOpp.get(key) || [];
@@ -470,7 +470,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       const indexByPhone = new Map<string, number>();
       const indexByCompany = new Map<string, number>();
       const indexByMemberNr = new Map<string, number>();
-      parsedData.forEach((row, idx) => {
+      filteredData.forEach((row, idx) => {
         if (oppColumn !== "__none__" && row.originalRow[oppColumn]) {
           const key = String(row.originalRow[oppColumn]).toUpperCase().trim();
           const arr = indexByOpp.get(key) || [];
@@ -645,6 +645,8 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     setProductColumn("__none__");
     setRevenueColumn("__none__");
     setCommissionColumn("__none__");
+    setFilterColumn("__none__");
+    setFilterValue("");
     setUploadType("cancellation");
     setSelectedConfigId("__none__");
     setMatchedSales([]);
