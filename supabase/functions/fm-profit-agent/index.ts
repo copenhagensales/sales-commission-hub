@@ -7,6 +7,24 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+interface AgentSettings {
+  target_db_pct: number;
+  seller_cost_pct: number;
+  data_window_weeks: number;
+  min_observations: number;
+  business_context: string;
+  focus_priority: string;
+}
+
+const DEFAULT_SETTINGS: AgentSettings = {
+  target_db_pct: 30,
+  seller_cost_pct: 12.5,
+  data_window_weeks: 12,
+  min_observations: 5,
+  business_context: "",
+  focus_priority: "profitability",
+};
+
 interface Observation {
   locationId: string;
   locationName: string;
@@ -59,7 +77,10 @@ function stdDev(values: number[]): number {
   return Math.sqrt(values.reduce((s, v) => s + (v - mean) ** 2, 0) / values.length);
 }
 
-function computeScores(observations: Observation[]) {
+function computeScores(observations: Observation[], settings: AgentSettings) {
+  const { min_observations, focus_priority } = settings;
+  const confidenceThreshold = min_observations;
+
   // Location scores
   const byLocation = new Map<string, Observation[]>();
   for (const o of observations) {
@@ -76,8 +97,8 @@ function computeScores(observations: Observation[]) {
     const avgDBPct = totalRevenue > 0 ? (totalDB / totalRevenue) * 100 : 0;
     const sellers = new Set(obs.map((o) => o.sellerId));
     const weeks = new Set(obs.map((o) => o.week));
+    const totalSales = obs.reduce((s, o) => s + o.salesCount, 0);
 
-    // Variance: group DB% by seller
     const sellerDBs: number[] = [];
     for (const sid of sellers) {
       const sellerObs = obs.filter((o) => o.sellerId === sid);
@@ -86,7 +107,7 @@ function computeScores(observations: Observation[]) {
       if (sRev > 0) sellerDBs.push((sDB / sRev) * 100);
     }
     const variance = stdDev(sellerDBs);
-    const confidence = Math.min(1, obs.length / 20);
+    const confidence = Math.min(1, obs.length / (confidenceThreshold * 4));
 
     let driver = "uncertain";
     if (confidence >= 0.3) {
@@ -95,7 +116,16 @@ function computeScores(observations: Observation[]) {
       else if (sellers.size >= 2) driver = "combination";
     }
 
-    const score = avgDBPct * confidence * (driver === "location" ? 1.2 : driver === "seller" ? 0.8 : 1);
+    // Focus-adjusted scoring
+    let baseScore = avgDBPct;
+    if (focus_priority === "volume") {
+      baseScore = avgDBPct * 0.4 + Math.min(totalSales, 100) * 0.6;
+    } else if (focus_priority === "consistency") {
+      const consistencyBonus = Math.max(0, 50 - variance);
+      baseScore = avgDBPct * 0.6 + consistencyBonus * 0.4;
+    }
+
+    const score = baseScore * confidence * (driver === "location" ? 1.2 : driver === "seller" ? 0.8 : 1);
 
     locationScores.push({
       id: locId,
@@ -161,10 +191,10 @@ function computeScores(observations: Observation[]) {
   // Risk flags
   const riskFlags: string[] = [];
   for (const loc of locationScores) {
-    if (loc.confidence < 30) riskFlags.push(`⚠️ ${loc.name}: For lidt data (${loc.observations} observationer)`);
+    if (loc.confidence < 30) riskFlags.push(`⚠️ ${loc.name}: For lidt data (${loc.observations} observationer, min. ${confidenceThreshold} anbefalet)`);
     if (loc.driver === "seller") riskFlags.push(`🔴 ${loc.name}: Sælger-afhængig — resultatet afhænger primært af hvem der står der`);
-    if (loc.totalRevenue > 50000 && loc.avgDBPct < 10)
-      riskFlags.push(`🟡 ${loc.name}: Høj omsætning (${Math.round(loc.totalRevenue).toLocaleString("da-DK")} kr) men svag DB (${loc.avgDBPct}%)`);
+    if (loc.totalRevenue > 50000 && loc.avgDBPct < settings.target_db_pct)
+      riskFlags.push(`🟡 ${loc.name}: Høj omsætning (${Math.round(loc.totalRevenue).toLocaleString("da-DK")} kr) men svag DB (${loc.avgDBPct}% < mål ${settings.target_db_pct}%)`);
   }
 
   // Combinations
@@ -192,13 +222,13 @@ function computeScores(observations: Observation[]) {
   return { locationScores, sellerScores, riskFlags, combos: combos.slice(0, 20) };
 }
 
-function formatDataContext(scores: ReturnType<typeof computeScores>, totalObs: number): string {
+function formatDataContext(scores: ReturnType<typeof computeScores>, totalObs: number, settings: AgentSettings): string {
   const { locationScores, sellerScores, riskFlags, combos } = scores;
 
   const locs = [...locationScores].sort((a, b) => b.totalDB - a.totalDB);
   const sellers = [...sellerScores].sort((a, b) => b.totalDB - a.totalDB);
 
-  let ctx = `## FM Profit Agent Data (seneste 12 uger)\n`;
+  let ctx = `## FM Profit Agent Data (seneste ${settings.data_window_weeks} uger)\n`;
   ctx += `Total observationer: ${totalObs}\n\n`;
 
   ctx += `### Top lokationer (efter DB)\n`;
@@ -237,7 +267,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { message, history } = await req.json();
+    const { message, history, settings: clientSettings } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
@@ -245,10 +275,23 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // 1. Fetch FM sales (last 12 weeks)
-    const twelveWeeksAgo = new Date();
-    twelveWeeksAgo.setDate(twelveWeeksAgo.getDate() - 84);
-    const since = twelveWeeksAgo.toISOString();
+    // Load settings: use client-provided or fetch from DB
+    let settings: AgentSettings = DEFAULT_SETTINGS;
+    if (clientSettings && typeof clientSettings === "object") {
+      settings = { ...DEFAULT_SETTINGS, ...clientSettings };
+    } else {
+      const { data: dbSettings } = await supabase
+        .from("fm_agent_settings")
+        .select("target_db_pct, seller_cost_pct, data_window_weeks, min_observations, business_context, focus_priority")
+        .limit(1)
+        .single();
+      if (dbSettings) settings = { ...DEFAULT_SETTINGS, ...dbSettings };
+    }
+
+    // 1. Fetch FM sales (configurable window)
+    const windowAgo = new Date();
+    windowAgo.setDate(windowAgo.getDate() - settings.data_window_weeks * 7);
+    const since = windowAgo.toISOString();
 
     const { data: sales } = await supabase
       .from("sales")
@@ -260,9 +303,8 @@ serve(async (req) => {
 
     // 2. Fetch sale_items for revenue/commission
     const saleIds = (sales || []).map((s: any) => s.id);
-    let saleItemsMap = new Map<string, { revenue: number; commission: number }>();
+    const saleItemsMap = new Map<string, { revenue: number; commission: number }>();
     if (saleIds.length > 0) {
-      // Batch in chunks of 200
       for (let i = 0; i < saleIds.length; i += 200) {
         const chunk = saleIds.slice(i, i + 200);
         const { data: items } = await supabase
@@ -284,7 +326,7 @@ serve(async (req) => {
 
     // 4. Fetch employee names
     const sellerIds = [...new Set((sales || []).map((s: any) => s.raw_payload?.fm_seller_id).filter(Boolean))];
-    let empMap = new Map<string, string>();
+    const empMap = new Map<string, string>();
     if (sellerIds.length > 0) {
       const { data: employees } = await supabase
         .from("employee_master_data")
@@ -295,7 +337,7 @@ serve(async (req) => {
       }
     }
 
-    // 5. Fetch booking costs (location costs, hotel, diet)
+    // 5. Fetch booking costs
     const { data: bookings } = await supabase
       .from("booking")
       .select(`
@@ -309,7 +351,6 @@ serve(async (req) => {
       .gte("start_date", since.split("T")[0])
       .limit(2000);
 
-    // Build booking cost map: bookingId -> costs
     const bookingCostMap = new Map<string, { locationCost: number; hotelCost: number; dietCost: number }>();
     for (const b of bookings || []) {
       const days = (b.booked_days as number[] || []).length || 5;
@@ -330,7 +371,6 @@ serve(async (req) => {
       bookingCostMap.set(b.id, { locationCost, hotelCost, dietCost });
     }
 
-    // Map location_id+week to booking costs
     const locWeekCostMap = new Map<string, { locationCost: number; hotelCost: number; dietCost: number }>();
     for (const b of bookings || []) {
       const key = `${b.location_id}|${b.year}-W${String(b.week_number).padStart(2, "0")}`;
@@ -342,7 +382,7 @@ serve(async (req) => {
       locWeekCostMap.set(key, existing);
     }
 
-    // 6. Build observations grouped by location+seller+week
+    // 6. Build observations
     const obsMap = new Map<string, { rev: number; comm: number; count: number; locId: string; locName: string; sellerId: string; sellerName: string; week: string }>();
 
     for (const sale of sales || []) {
@@ -352,7 +392,6 @@ serve(async (req) => {
 
       const dt = new Date(sale.sale_datetime);
       const yearNum = dt.getFullYear();
-      // ISO week calculation
       const jan4 = new Date(yearNum, 0, 4);
       const dayOfYear = Math.floor((dt.getTime() - new Date(yearNum, 0, 1).getTime()) / 86400000) + 1;
       const weekNum = Math.ceil((dayOfYear + jan4.getDay() - 1) / 7);
@@ -373,13 +412,13 @@ serve(async (req) => {
       obsMap.set(key, existing);
     }
 
-    // Convert to Observation[]
+    // Convert to Observation[] using configurable seller_cost_pct
+    const sellerCostMultiplier = 1 + settings.seller_cost_pct / 100;
     const observations: Observation[] = [];
     for (const [, o] of obsMap) {
       const costKey = `${o.locId}|${o.week}`;
       const costs = locWeekCostMap.get(costKey) || { locationCost: 0, hotelCost: 0, dietCost: 0 };
-      // Approximate seller cost as 12.5% feriepenge on commission
-      const sellerCost = o.comm * 1.125;
+      const sellerCost = o.comm * sellerCostMultiplier;
       const totalCost = sellerCost + costs.locationCost + costs.hotelCost + costs.dietCost;
       const db = o.rev - totalCost;
       observations.push({
@@ -401,13 +440,32 @@ serve(async (req) => {
     }
 
     // 7. Compute scores
-    const scores = computeScores(observations);
-    const dataContext = formatDataContext(scores, observations.length);
+    const scores = computeScores(observations, settings);
+    const dataContext = formatDataContext(scores, observations.length, settings);
 
-    // 8. Build system prompt
+    // 8. Build system prompt with settings
+    const focusLabels: Record<string, string> = {
+      profitability: "Profitabilitet (DB%)",
+      volume: "Volumen (antal salg)",
+      consistency: "Konsistens (lav varians)",
+    };
+
+    let settingsContext = `\n### Konfigurerede indstillinger\n`;
+    settingsContext += `- Mål-DB%: ${settings.target_db_pct}%\n`;
+    settingsContext += `- Sælgeromkostning: ${settings.seller_cost_pct}% oveni provision\n`;
+    settingsContext += `- Datavindue: ${settings.data_window_weeks} uger\n`;
+    settingsContext += `- Min. observationer for sikker konklusion: ${settings.min_observations}\n`;
+    settingsContext += `- Fokus-prioritet: ${focusLabels[settings.focus_priority] || settings.focus_priority}\n`;
+
+    if (settings.business_context && settings.business_context.trim()) {
+      settingsContext += `\n### Virksomhedens forretningskontekst\n`;
+      settingsContext += `${settings.business_context}\n`;
+      settingsContext += `\nBrug ovenstående kontekst aktivt i dine analyser og anbefalinger.\n`;
+    }
+
     const systemPrompt = `Du er FM Profit Agent — en analytisk AI-assistent for field marketing managers hos Copenhagen Sales.
 
-Du har adgang til reelle data fra de seneste 12 uger. Svar altid på dansk.
+Du har adgang til reelle data fra de seneste ${settings.data_window_weeks} uger. Svar altid på dansk.
 
 Din kerneopgave er at hjælpe managere med at forstå:
 - Hvilke lokationer er reelt profitable (ikke bare høj omsætning)
@@ -423,12 +481,15 @@ Når du svarer:
 - Angiv konfidensgrad når relevant
 - Brug konkrete tal fra dataen
 - Vær direkte og handlingsorienteret
+- Lokationer med DB% under ${settings.target_db_pct}% skal flagges som under mål
 
 Driver-klassifikation:
 - "location" = Stabil performance på tværs af forskellige sælgere → strukturelt stærk
 - "seller" = Stor forskel mellem sælgere → resultatet afhænger af hvem der står der
 - "combination" = Specifik sælger+lokation synergi
 - "uncertain" = For lidt data til at konkludere sikkert
+
+${settingsContext}
 
 ${dataContext}`;
 
