@@ -109,6 +109,11 @@ export default function Cancellations() {
                 <ApprovedTab clientId={selectedClientId} />
               </TabsContent>
             )}
+            {visibleTabs.some(t => t.value === 'history') && (
+              <TabsContent value="history" className="mt-6">
+                <CancellationHistoryTable clientId={selectedClientId} />
+              </TabsContent>
+            )}
           </Tabs>
         )}
       </div>
