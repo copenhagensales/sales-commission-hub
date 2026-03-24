@@ -1225,17 +1225,23 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                         <TableHead>Salgsdato</TableHead>
                         <TableHead>Sælger</TableHead>
                         <TableHead>Telefon</TableHead>
+                        {matchedSales.some(s => s.targetProductName) && <TableHead>Produkt</TableHead>}
                         <TableHead>Virksomhed</TableHead>
                         <TableHead>OPP-nummer</TableHead>
                         <TableHead>Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {matchedSales.map((sale) => (
-                        <TableRow key={sale.saleId}>
+                      {matchedSales.map((sale, idx) => (
+                        <TableRow key={`${sale.saleId}-${sale.targetProductName || idx}`}>
                           <TableCell>{sale.saleDate}</TableCell>
                           <TableCell>{resolve(sale.employee)}</TableCell>
                           <TableCell>{sale.phone || "-"}</TableCell>
+                          {matchedSales.some(s => s.targetProductName) && (
+                            <TableCell>
+                              <Badge variant="outline">{sale.targetProductName || "-"}</Badge>
+                            </TableCell>
+                          )}
                           <TableCell>{sale.company || "-"}</TableCell>
                           <TableCell>{sale.oppNumber || "-"}</TableCell>
                           <TableCell>

@@ -487,11 +487,63 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
       if (!currentEmployee?.id) throw new Error("Ingen medarbejder fundet");
       const newStatus = uploadType === "cancellation" ? "cancelled" : "basket_changed";
 
-      for (const saleId of saleIds) {
+      // Check if any queue items have target_product_name (product-level cancellation)
+      const { data: queueItems } = await supabase
+        .from("cancellation_queue")
+        .select("id, sale_id, target_product_name")
+        .in("id", queueItemIds) as any;
+
+      const productLevelItems = (queueItems || []).filter((qi: any) => qi.target_product_name);
+      const wholeSaleItems = (queueItems || []).filter((qi: any) => !qi.target_product_name);
+
+      // Handle product-level cancellations
+      for (const qi of productLevelItems) {
+        // Find matching sale_items by product name and cancel them
+        const { data: saleItems } = await supabase
+          .from("sale_items")
+          .select("id, product_id, adversus_product_title")
+          .eq("sale_id", qi.sale_id);
+
+        // Also fetch product names
+        const productIds = (saleItems || []).map((si: any) => si.product_id).filter(Boolean);
+        let productNamesMap = new Map<string, string>();
+        if (productIds.length > 0) {
+          const { data: products } = await supabase.from("products").select("id, name").in("id", productIds);
+          if (products) productNamesMap = new Map(products.map((p: any) => [p.id, p.name]));
+        }
+
+        const targetName = qi.target_product_name.toLowerCase().trim();
+        const matchingItem = (saleItems || []).find((si: any) => {
+          const name = (productNamesMap.get(si.product_id) || si.adversus_product_title || "").toLowerCase().trim();
+          return name === targetName;
+        });
+
+        if (matchingItem) {
+          await supabase.from("sale_items").update({
+            is_cancelled: true,
+          } as any).eq("id", matchingItem.id);
+        }
+
+        // Check if ALL sale_items are now cancelled
+        const { data: remainingItems } = await supabase
+          .from("sale_items")
+          .select("id, is_cancelled")
+          .eq("sale_id", qi.sale_id) as any;
+
+        const allCancelled = (remainingItems || []).every((si: any) => si.is_cancelled === true);
+        if (allCancelled) {
+          await supabase.from("sales").update({ validation_status: "cancelled" }).eq("id", qi.sale_id);
+        }
+      }
+
+      // Handle whole-sale cancellations (existing logic)
+      const wholeSaleIds = [...new Set(wholeSaleItems.map((qi: any) => qi.sale_id))];
+      for (const saleId of wholeSaleIds) {
         const { error } = await supabase.from("sales").update({ validation_status: newStatus }).eq("id", saleId);
         if (error) throw error;
       }
 
+      // Mark queue items as approved
       for (const id of queueItemIds) {
         const { error } = await supabase.from("cancellation_queue").update({
           status: "approved",
