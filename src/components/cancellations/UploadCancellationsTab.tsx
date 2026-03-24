@@ -1269,6 +1269,8 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     setSelectedConfigId("__none__");
     setMatchedSales([]);
     setMatchedRowIndices(new Set());
+    setUnmatchedSellerRows([]);
+    setSellerDropdownSelections({});
     setStep("type");
   };
 
