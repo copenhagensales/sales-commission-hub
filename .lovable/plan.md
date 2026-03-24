@@ -1,27 +1,33 @@
 
 
-# Auto-apply config og skjul mapping-felter
+# Redesign Upload/Match til 4-trins wizard
 
 ## Problem
-Når en kunde har en gemt opsætning, skal brugeren stadig manuelt vælge felter — selvom systemet allerede kender mappingen.
+Hele mapping-flowet vises som ét stort trin med mange felter. Brugeren vil have en klar step-by-step wizard.
 
-## Løsning
-Når en default config findes for den valgte kunde, spring mapping-trinnet over og gå direkte til matching efter filupload. Vis kun en kort opsummering af den anvendte config.
+## Nyt flow (4 steps)
 
-| Fil | Ændring |
-|-----|---------|
-| `UploadCancellationsTab.tsx` | Efter filupload (`onDrop`): hvis der er en default config, anvend den og kør `handleMatch` automatisk — spring `mapping`-trinnet over. Behold mapping-trinnet som fallback kun hvis der **ikke** er en gemt config for kunden. Tilføj en "Rediger mapping" knap i preview/matching-stedet så brugeren kan gå tilbage ved behov. |
+| Step | Navn | Indhold |
+|------|------|---------|
+| 1. `type` | **Vælg type** | Annullering eller Kurv difference. Kun to store knapper/cards. "Næste" knap. |
+| 2. `upload` | **Upload fil** | Drag-and-drop zone. Når fil er uploadet, vises filnavn + antal rækker. Hvis kunden har en default config, auto-apply den. "Næste" starter matching automatisk. |
+| 3. `preview` | **Forhåndsvisning** | Viser matchede salg i tabel + antal umatchede rækker. Samme tabel som nu. "Rediger mapping" link for edge cases. |
+| 4. `done` | **Sendt** | Bekræftelse. "Upload ny fil" knap. |
 
-## Konkret flow
-
-1. **Fil uploades** → `onDrop` sætter `parsedData` og `columns`
-2. **Check**: Har kunden en default config?
-   - **Ja**: `applyConfig(defaultConfig)` → kald `handleMatch()` direkte → gå til `preview`
-   - **Nej**: Gå til `mapping` (nuværende flow)
-3. I mapping-trinnet: skjul alle felterne bag en collapsible/accordion hvis config er loaded — vis kun upload-type, filter-info og en "Rediger" link
+## Stepper UI
+En visuel step-indikator øverst (1 → 2 → 3 → 4) med aktiv/færdig/kommende states.
 
 ## Implementeringsdetaljer
-- I `onDrop` callback: efter `setParsedData`/`setColumns`, check `clientConfigs` for default. Hvis fundet, sæt step til en ny intern "auto-matching" state og trigger `handleMatch`.
-- Fordi `clientConfigs` kan loade asynkront: brug en `useEffect` der lytter på `parsedData + clientConfigs` — når begge er klar og config er default, auto-match.
-- Tilføj en lille info-banner i preview: "Bruger opsætning: [config-name] for [client]" med en "Rediger mapping" knap.
+
+**Fil: `UploadCancellationsTab.tsx`**
+
+1. Ændr `step` type til `"type" | "upload" | "preview" | "done"`
+2. Default step = `"type"` (i stedet for `"upload"`)
+3. **Step 1 (type)**: Vis to kort/knapper for Annullering og Kurv difference. Klik sætter `uploadType` og går til step 2.
+4. **Step 2 (upload)**: Dropzone som nu. Når fil parses og der er en default config → auto-match og gå til step 3. Hvis ingen config → gå til `mapping` (beholdes som fallback, men skjult i normal flow).
+5. **Step 3 (preview)**: Nuværende preview-tabel med "Send til godkendelseskø" knap. Viser også umatchede rækker-tæller.
+6. **Step 4 (done)**: Nuværende done-card.
+7. Beholde `mapping` step som fallback for kunder uden gemt config, men det er ikke et af de 4 primære steps i stepper-UI'et.
+8. Tilføj en stepper-komponent øverst der viser progression: Type → Upload → Forhåndsvisning → Sendt.
+9. "Tilbage" knapper på hvert step.
 
