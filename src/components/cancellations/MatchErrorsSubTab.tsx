@@ -123,7 +123,7 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
       if (!clientId) return null;
       const { data, error } = await supabase
         .from("cancellation_upload_configs")
-        .select("date_column")
+        .select("date_column, seller_column")
         .eq("client_id", clientId)
         .eq("is_default", true)
         .maybeSingle();
@@ -257,8 +257,9 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
   }, [rows]);
 
   const sellerField = useMemo(() => {
+    if (uploadConfig?.seller_column) return uploadConfig.seller_column;
     return allKeys.find(k => SELLER_FIELD_CANDIDATES.includes(k.toLowerCase()));
-  }, [allKeys]);
+  }, [allKeys, uploadConfig]);
 
   const processed = useMemo(() => {
     let result = [...rows];
