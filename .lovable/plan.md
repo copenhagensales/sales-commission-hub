@@ -1,31 +1,42 @@
 
 
-# TDC Erhverv Lovablecph — 418 salg mangler stadig OPP
+# Fix: TDC OPP Backfill bruger forkert API-endpoint
 
-## Status
-| Enrichment status | Antal | Bemærkning |
-|---|---|---|
-| pending (mangler OPP) | **418** | Aldrig forsøgt (`enrichment_last_attempt = null`) |
-| failed | 34 | Allerede forsøgt, lead data udløbet i Adversus |
-| healed | 333 | Succesfuldt beriget i sidste kørsel |
+## Fund
 
-## Problem
-De 418 pending salg blev aldrig nået i den forrige kørsel — funktionen stoppede efter at have behandlet de første batches. Koden er korrekt og filtrerer allerede kun på `source = 'Lovablecph'` + TDC Erhverv campaign ID.
+De "failed" og "pending" salg mangler OPP-numre fordi backfill-funktionen kalder `/v1/leads/{leadId}` — men leads i Adversus bliver genbrugt/slettet, så API'en returnerer tomt data.
+
+De succesfuldt "healed" salg har en `raw_payload`-struktur der stammer fra `/v1/sales/{orderId}` endpointet, som inkluderer `leadResultData` med OPP-numre — også efter leads er genbrugt.
+
+**Nøgletal:**
+| Status | Antal | Har OPP | Handling |
+|---|---|---|---|
+| failed + har OPP | 28 | Ja | Markér som "healed" (data er allerede der) |
+| failed + mangler OPP | 84 | Nej | Genhent via `/sales/{orderId}` |
+| pending + mangler OPP | 241 | Nej | Genhent via `/sales/{orderId}` |
+| **Total at fixe** | **353** | | |
 
 ## Løsning
-Ingen kodeændringer nødvendige. Funktionen skal blot køres igen:
 
-```js
-await supabase.functions.invoke('tdc-opp-backfill', { 
-  body: { batchSize: 50, autoRun: true } 
-})
-```
+### 1. Ret backfill-funktionen: brug `/v1/sales/{orderId}` i stedet for `/v1/leads/{leadId}`
 
-- 418 salg × 1.05s delay ≈ **7-8 minutter** med autoRun
-- Funktionen fortsætter automatisk i batches af 50
-- Kun Lovablecph TDC Erhverv salg behandles
-- Salg hvor Adversus returnerer "empty lead data" markeres som `failed` (lead slettet/genbrugt i Adversus — kan ikke hentes automatisk)
+**Fil: `supabase/functions/tdc-opp-backfill/index.ts`**
 
-## Handling
-Kun invokering af den eksisterende edge function — ingen fil-ændringer.
+- Ændr API-kaldet fra `GET /v1/leads/${leadId}` til `GET /v1/sales/${sale.adversus_external_id}` (ordre-ID)
+- `/v1/sales/{id}` returnerer hele ordren inkl. `leadResultData` med OPP-numre — selv når leadet er genbrugt
+- Fjern kravet om `leadId` i filtreringen (vi bruger `adversus_external_id` i stedet)
+- Bevar den eksisterende `leadResultFields`-mapping fra `leadResultData`
+
+### 2. Inkludér "failed" salg i query'en
+
+- Udvid query til også at hente salg med `enrichment_status = 'failed'` (ikke kun "pending")
+- Skip salg der allerede har OPP i `leadResultFields` (de 28 stk markeres direkte som "healed")
+
+### 3. Migration: markér de 28 "failed" der allerede har OPP
+
+- Kør en SQL-migration der sætter `enrichment_status = 'healed'` for de 28 salg der fejlagtigt er markeret som "failed" men allerede har OPP-data
+
+## Estimeret kørselstid
+- 325 salg × 1.05s delay ≈ **6 minutter** med autoRun
+- Derefter invokering af funktionen
 
