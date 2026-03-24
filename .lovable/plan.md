@@ -1,24 +1,30 @@
 
 
-# Annulleringer fra godkendelsesfanen → Sælgerlønninger
+# Ny fane: Oplæringsbonus i EditBookingDialog
 
 ## Hvad
-Hent godkendte annulleringer fra `cancellation_queue` og vis den tabte provision per sælger i "Annulleringer"-kolonnen på Sælgerlønninger-tabellen, som i dag altid viser 0 kr.
+Tilføj en ny "Oplæringsbonus" fane i booking-dialogen der fungerer identisk med Diæt-fanen, men bruger lønarten "oplæringsbonus" fra `salary_types`.
 
-## Logik
-For den valgte lønperiode: hent alle `cancellation_queue`-rækker med `status = 'approved'`, hvor `deduction_date` (fallback til `reviewed_at`) falder inden for perioden. Join med `sales` (for `agent_email`) og `sale_items` (for `mapped_commission`). Aggregér provision per sælger.
+## Database
+**Opdater unique constraint** på `booking_diet` tabellen til at inkludere `salary_type_id`:
+- Drop eksisterende constraint `booking_diet_booking_id_employee_id_date_key`
+- Opret ny: `UNIQUE(booking_id, employee_id, date, salary_type_id)`
 
-## Ændringer
+Dette tillader at en medarbejder kan have både diæt OG oplæringsbonus på samme dag/booking.
 
-### `src/hooks/useSellerSalariesCached.ts`
-1. Tilføj en ny query (Query 7) der henter godkendte annulleringer for perioden:
-   - `cancellation_queue` → `status = 'approved'`
-   - Join `sales` for agent_email og `sale_items` for mapped_commission
-   - Filtrér på `deduction_date` (eller `reviewed_at`) inden for `periodStart`–`periodEnd`
-   - Aggregér total provision per employee_id (via agent_email → employee mapping)
-2. Byg et `cancellationMap: Record<string, number>` i useMemo
-3. Sæt `cancellations: cancellationMap[emp.id] || 0` i stedet for det nuværende hardcoded `0`
+## Ændringer i `EditBookingDialog.tsx`
 
-### Ingen ændringer i UI
-`SellerSalariesTab.tsx` viser allerede `seller.cancellations` — kolonnen er der, den mangler bare data.
+1. **Ny salary type query**: Hent "oplæringsbonus" fra `salary_types` (`.ilike("name", "%oplæringsbonus%")`)
+2. **Ny assignments query**: Hent fra `booking_diet` filtreret på `salary_type_id` = oplæringsbonus-typen
+3. **Ny state**: `selectedTrainingEmployee`, `selectedTrainingDays` (Set)
+4. **Ny mutation**: `addTrainingBonusMutation` og `removeTrainingBonusMutation` — identisk med diet men med oplæringsbonus salary_type_id
+5. **Ny TabsTrigger**: "Oplæring" med `GraduationCap` ikon
+6. **Ny TabsContent**: Kopi af diet-fanen med grøn/indigo farvetema i stedet for orange
+7. **Opdater TabsList**: `grid-cols-6` (fra 5)
+8. **Opdater diet queries**: Filtrér eksisterende diet-queries til kun at hente rækker med diæt salary_type_id (så de to ikke blandes)
+9. **Opdater upsert onConflict**: Tilføj `salary_type_id` til conflict-nøglen: `"booking_id,employee_id,date,salary_type_id"`
+
+## Filer
+- **Migration**: Opdater unique constraint på `booking_diet`
+- **`src/components/vagt-flow/EditBookingDialog.tsx`**: Tilføj fane + logik
 
