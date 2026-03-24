@@ -377,11 +377,32 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         }
       }
 
+      // Match by member number from normalized_data
+      if (memberNumbers.length > 0) {
+        const memberSet = new Set(memberNumbers.map(m => m.trim()));
+        
+        for (const sale of candidateSales) {
+          if (existingIds.has(sale.id)) continue;
+          const nd = sale.normalized_data as Record<string, unknown> | null;
+          const rp = sale.raw_payload as Record<string, unknown> | null;
+          const saleMemberNr = String(
+            nd?.member_number ?? 
+            (rp?.data as Record<string, unknown> | undefined)?.Medlemsnummer ?? 
+            ""
+          ).trim();
+          if (saleMemberNr && memberSet.has(saleMemberNr)) {
+            allMatched.push(sale);
+            existingIds.add(sale.id);
+          }
+        }
+      }
+
       // Build a lookup from OPP/phone/company → uploaded row for associating uploaded data
       // Collect ALL rows per OPP (not just last one) to preserve product details
       const uploadedRowsByOpp = new Map<string, Record<string, unknown>[]>();
       const uploadedRowByPhone = new Map<string, Record<string, unknown>>();
       const uploadedRowByCompany = new Map<string, Record<string, unknown>>();
+      const uploadedRowByMemberNr = new Map<string, Record<string, unknown>>();
       
       parsedData.forEach(row => {
         if (oppColumn !== "__none__" && row.originalRow[oppColumn]) {
@@ -395,6 +416,9 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         }
         if (companyColumn !== "__none__" && row.originalRow[companyColumn]) {
           uploadedRowByCompany.set(String(row.originalRow[companyColumn]).toLowerCase().trim(), row.originalRow);
+        }
+        if (memberNumberColumn !== "__none__" && row.originalRow[memberNumberColumn]) {
+          uploadedRowByMemberNr.set(String(row.originalRow[memberNumberColumn]).trim(), row.originalRow);
         }
       });
 
@@ -427,6 +451,11 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         if (salePhone && uploadedRowByPhone.has(salePhone)) return uploadedRowByPhone.get(salePhone)!;
         const saleCompany = (sale.customer_company || "").toLowerCase().trim();
         if (saleCompany && uploadedRowByCompany.has(saleCompany)) return uploadedRowByCompany.get(saleCompany)!;
+        // Match by member number
+        const nd = sale.normalized_data as Record<string, unknown> | null;
+        const rp = sale.raw_payload as Record<string, unknown> | null;
+        const saleMemberNr = String(nd?.member_number ?? (rp?.data as Record<string, unknown> | undefined)?.Medlemsnummer ?? "").trim();
+        if (saleMemberNr && uploadedRowByMemberNr.has(saleMemberNr)) return uploadedRowByMemberNr.get(saleMemberNr)!;
         return {};
       };
 
@@ -555,6 +584,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     setPhoneColumn("__none__");
     setCompanyColumn("__none__");
     setOppColumn("__none__");
+    setMemberNumberColumn("__none__");
     setProductColumn("__none__");
     setRevenueColumn("__none__");
     setCommissionColumn("__none__");
@@ -663,6 +693,17 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               <div className="space-y-2">
                 <Label>OPP-kolonne (valgfri)</Label>
                 <Select value={oppColumn} onValueChange={setOppColumn}>
+                  <SelectTrigger><SelectValue placeholder="Vælg kolonne..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Ingen</SelectItem>
+                    {columns.map((col) => (<SelectItem key={col} value={col}>{col}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Medlemsnr.-kolonne (valgfri)</Label>
+                <Select value={memberNumberColumn} onValueChange={setMemberNumberColumn}>
                   <SelectTrigger><SelectValue placeholder="Vælg kolonne..." /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">Ingen</SelectItem>
