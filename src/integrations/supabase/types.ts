@@ -3664,6 +3664,7 @@ export type Database = {
           company: string | null
           created_at: string
           email: string | null
+          fbclid: string | null
           id: string
           is_read: boolean
           message: string | null
@@ -3674,6 +3675,7 @@ export type Database = {
           company?: string | null
           created_at?: string
           email?: string | null
+          fbclid?: string | null
           id?: string
           is_read?: boolean
           message?: string | null
@@ -3684,6 +3686,7 @@ export type Database = {
           company?: string | null
           created_at?: string
           email?: string | null
+          fbclid?: string | null
           id?: string
           is_read?: boolean
           message?: string | null
