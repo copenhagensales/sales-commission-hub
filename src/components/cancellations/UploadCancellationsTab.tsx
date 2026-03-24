@@ -924,19 +924,9 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
             // Match against candidate sales by agent + date + product
             for (const sale of candidateSales) {
-              const saleAgentEmail = (sale.agent_name || "").toLowerCase();
-              // agent_name could be email or name, check both
-              const saleEmail = saleAgentEmail;
-              
-              // Check if agent matches (sale stores agent_email in the query but we selected agent_name)
-              // We need to also check raw_payload for agent info
-              const salePayload = sale.raw_payload as any;
-              const saleAgentEmails = [
-                saleEmail,
-                (salePayload?.agent_email || "").toLowerCase(),
-              ];
-
-              if (!saleAgentEmails.some(e => e === agentEmail)) continue;
+              // Check if agent matches via agent_email field
+              const saleAgentEmail = (sale.agent_email || "").toLowerCase();
+              if (saleAgentEmail !== agentEmail) continue;
 
               // Check date match (same day)
               const saleDateObj = new Date(sale.sale_datetime);
