@@ -1,21 +1,27 @@
 
 
-# Fix: "Ocean Outdoor" mangler i type-filter på Fakturering
+# Tilføj "Medlemsnummer" som matchningskolonne
 
 ## Problem
-Type-dropdown'en på Billing-siden er **dynamisk genereret** fra de bookinger der findes i den valgte periode (linje 112-114):
-```typescript
-const locationTypes = [...new Set(
-  bookings?.map((b: any) => b.location?.type).filter(Boolean) || []
-)];
-```
-Hvis der ingen Ocean Outdoor-bookinger er i den valgte måned, vises typen slet ikke i filteret.
+Ase's annulleringsfil bruger **Medlemsnummer** til at identificere salg, men upload/match-systemet understøtter kun telefon, virksomhed og OPP-nummer. Medlemsnummeret findes allerede i salgsdata (`raw_payload.data.Medlemsnummer` og `normalized_data.member_number`), men der er ingen UI eller matchningslogik til at bruge det.
 
 ## Løsning
 
-| Fil | Hvad |
-|-----|------|
-| `src/pages/vagt-flow/Billing.tsx` | Erstat den dynamiske `locationTypes` med en fast liste der matcher de kendte typer fra Locations-siden: `Coop butik`, `Meny butik`, `Danske Shoppingcentre`, `Ocean Outdoor`, `Markeder`, `Messer`, `Anden lokation`. Behold dynamiske typer som fallback (merge) så eventuelle nye typer også dukker op. |
+| Ændring | Hvad |
+|---------|------|
+| **Database migration** | Tilføj kolonne `member_number_column TEXT` til `cancellation_upload_configs` |
+| `src/components/cancellations/UploadCancellationsTab.tsx` | Tilføj state `memberNumberColumn`, vis dropdown i kolonnemapping-UI, inkluder i match-logik (slå op i `normalized_data->>'member_number'`), gem/læs fra config |
 
-Konkret: linje 112-114 ændres til en kombination af hardcodede typer + unikke typer fra data, så alle typer altid er synlige uanset om der er bookinger i perioden.
+## Matchningslogik
+Når `memberNumberColumn` er sat:
+1. Udtræk alle medlemsnumre fra Excel-filen
+2. For hver kandidat-sale: tjek `normalized_data->>'member_number'` mod det uploadede sæt
+3. Tilføj også lookup-map `uploadedRowByMemberNumber` så den matchede Excel-række kan associeres
+
+## UI-ændring
+Tilføj en ny dropdown **"Medlemsnr.-kolonne (valgfri)"** ved siden af de eksisterende kolonnevælgere (telefon, virksomhed, OPP, produkt, omsætning, provision).
+
+## Filer
+- `supabase/migrations/` — ny migration
+- `src/components/cancellations/UploadCancellationsTab.tsx` — state, UI, match-logik, config save/load
 
