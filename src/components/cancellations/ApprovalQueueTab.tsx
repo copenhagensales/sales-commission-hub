@@ -292,7 +292,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   const { user } = useAuth();
   const [statusFilter, setStatusFilter] = useState<string>("pending");
   const [onlyDifferences, setOnlyDifferences] = useState(false);
-  const [subTab, setSubTab] = useState<"cancellation" | "basket_difference" | "unmatched" | "match_errors">("cancellation");
+  const [subTab, setSubTab] = useState<"cancellation" | "basket_difference" | "match_errors">("cancellation");
   const [searchQuery, setSearchQuery] = useState("");
   const [sellerFilter, setSellerFilter] = useState("all");
   type QueueSortKey = "date" | "agent" | "opp" | "type";
@@ -1077,7 +1077,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
           {isLoading ? (
             <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
           ) : (
-            <Tabs value={subTab} onValueChange={(v) => setSubTab(v as "cancellation" | "basket_difference" | "unmatched" | "match_errors")}>
+            <Tabs value={subTab} onValueChange={(v) => setSubTab(v as "cancellation" | "basket_difference" | "match_errors")}>
               <TabsList>
                 <TabsTrigger value="cancellation">
                   Annulleringer {cancellationCount > 0 && `(${cancellationCount})`}
