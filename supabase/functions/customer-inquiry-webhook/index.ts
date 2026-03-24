@@ -116,7 +116,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { name, company, email, phone, message, _hp } = body;
+    const { name, company, email, phone, message, _hp, fbclid: rawFbclid, Fbclid } = body;
 
     // Honeypot
     if (_hp) {
