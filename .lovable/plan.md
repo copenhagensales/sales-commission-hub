@@ -1,27 +1,23 @@
 
 
-# Tilføj "Medlemsnummer" som matchningskolonne
+# Fix: Fejl i match viser ikke umatchede rækker
 
-## Problem
-Ase's annulleringsfil bruger **Medlemsnummer** til at identificere salg, men upload/match-systemet understøtter kun telefon, virksomhed og OPP-nummer. Medlemsnummeret findes allerede i salgsdata (`raw_payload.data.Medlemsnummer` og `normalized_data.member_number`), men der er ingen UI eller matchningslogik til at bruge det.
+## To problemer fundet
 
-## Løsning
+### Problem 1: Unmatched-detection er skrøbelig
+I `sendToQueueMutation` (linje 497-505) bruges `JSON.stringify` til at sammenligne uploadede rækker med matchede rækker. Hvis `findUploadedRow()` returnerer `{}` (fordi member number lookup fejler pga. formatforskelle), eller hvis rækkens nøglerækkefølge ændres, markeres rækker forkert som "matched". Derudover: hvis flere salg matcher samme medlemsnummer, deler de samme `uploadedRowData`, og den ene Excel-række tæller som "matched" — men de øvrige Excel-rækker der IKKE matchede nogen sale, burde stadig fanges.
 
-| Ændring | Hvad |
-|---------|------|
-| **Database migration** | Tilføj kolonne `member_number_column TEXT` til `cancellation_upload_configs` |
-| `src/components/cancellations/UploadCancellationsTab.tsx` | Tilføj state `memberNumberColumn`, vis dropdown i kolonnemapping-UI, inkluder i match-logik (slå op i `normalized_data->>'member_number'`), gem/læs fra config |
+**Fix:** Erstat JSON.stringify-sammenligningen med index-tracking. Hold styr på hvilke Excel-rækkeindekser der blev brugt i et match, og beregn unmatched ud fra det.
 
-## Matchningslogik
-Når `memberNumberColumn` er sat:
-1. Udtræk alle medlemsnumre fra Excel-filen
-2. For hver kandidat-sale: tjek `normalized_data->>'member_number'` mod det uploadede sæt
-3. Tilføj også lookup-map `uploadedRowByMemberNumber` så den matchede Excel-række kan associeres
+### Problem 2: MatchErrorsSubTab filtrerer for stramt
+Linje 52-53: `query.in("config_id", configIds)` — Supabase's `.in()` matcher kun eksakte værdier og inkluderer IKKE `null`. Hvis importen blev gemt med `config_id = null` (fx hvis brugeren ikke valgte en config), vises den aldrig i fejl-tabben, selvom den har unmatched_rows.
 
-## UI-ændring
-Tilføj en ny dropdown **"Medlemsnr.-kolonne (valgfri)"** ved siden af de eksisterende kolonnevælgere (telefon, virksomhed, OPP, produkt, omsætning, provision).
+**Fix:** Tilføj `or`-filter der inkluderer imports med null config_id.
 
-## Filer
-- `supabase/migrations/` — ny migration
-- `src/components/cancellations/UploadCancellationsTab.tsx` — state, UI, match-logik, config save/load
+## Ændringer
+
+| Fil | Hvad |
+|-----|------|
+| `src/components/cancellations/UploadCancellationsTab.tsx` | Erstat JSON.stringify-baseret unmatched-detection med index-baseret tracking. I `handleMatch`: gem hvilke `parsedData`-indekser der blev brugt. I `sendToQueueMutation`: brug indekser til at finde umatchede rækker. |
+| `src/components/cancellations/MatchErrorsSubTab.tsx` | Ret query til at inkludere imports med `config_id IS NULL` når en kunde er valgt: `.or(\`config_id.in.(${configIds.join(",")}),config_id.is.null\`)` |
 
