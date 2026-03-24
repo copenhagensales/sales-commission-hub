@@ -1,40 +1,20 @@
 
 
-# Vis medarbejdernavne i stedet for emails på alle annullerings-faner
+# Bloker upload uden gemt opsætning
 
 ## Problem
-Alle faner viser `agent_name` direkte fra `sales`-tabellen — dette er typisk en email eller dialer-brugernavn, ikke et rigtigt navn.
-
-## Løsning
-Opret en shared hook der resolver `agent_name` (email) → medarbejdernavn via `employee_agent_mapping` + `employee_master_data`. Anvend den i alle 5 berørte komponenter.
+Brugeren skal ikke kunne uploade filer hvis kunden ikke har en gemt opsætning (`cancellation_upload_configs`). Mapping-stedet skal fjernes helt.
 
 ## Ændringer
 
-| Fil | Ændring |
-|-----|---------|
-| **`src/hooks/useAgentNameResolver.ts`** (ny) | Hook der henter `employee_agent_mapping` + `employee_master_data`, bygger en `Map<string, string>` fra email/agent_name → "Fornavn Efternavn". Eksporterer `resolve(agentName: string): string`. |
-| **`ManualCancellationsTab.tsx`** | Brug resolver til at vise navne i tabel + agent-filter dropdown |
-| **`DuplicatesTab.tsx`** | Brug resolver til at vise navne i tabel + agent-filter |
-| **`ApprovalQueueTab.tsx`** | Brug resolver til at vise navne i tabel + sælger-filter |
-| **`ApprovedTab.tsx`** | Brug resolver til at vise navne i tabel + sælger-filter |
-| **`UploadCancellationsTab.tsx`** | Brug resolver til at vise navne i preview-tabel |
+**Fil: `src/components/cancellations/UploadCancellationsTab.tsx`**
 
-## Teknisk detalje: `useAgentNameResolver`
+1. **Step 2 (upload)**: Hvis `clientConfigs.length === 0`, vis en blokerings-besked i stedet for dropzone: "Denne kunde har ingen gemt opsætning. Kontakt en administrator for at oprette en." med et `AlertCircle`-ikon. Ingen fil-upload mulig.
+2. **Fjern mapping-step helt**: Slet hele `step === "mapping"` blokken (linje ~802-950+). Fjern `"mapping"` fra `WizardStep` type. Fjern alle `setStep("mapping")` kald.
+3. **Auto-match flow**: Når fil uploades og der **er** en default config, kør auto-match direkte og gå til preview. Ingen fallback til mapping.
+4. **Ryd op**: Fjern ubrugte config-selector og manuelle kolonne-selects da de ikke længere er relevante.
 
-```typescript
-// Henter agents + employee mappings, returnerer resolve-funktion
-// 1. Hent alle agents fra employee_agent_mapping (agent_id → employee_id)
-// 2. Hent alle employees (id → first_name, last_name, work_email)
-// 3. Byg map: agent_email.toLowerCase() → "FirstName LastName"
-//    + work_email.toLowerCase() → "FirstName LastName"
-//    + agent_name (if not email) → "FirstName LastName"
-export function useAgentNameResolver() {
-  // Returns { resolve: (agentName: string) => string, isLoading: boolean }
-}
-```
-
-Anvendelse i hver komponent:
-- `const { resolve } = useAgentNameResolver();`
-- I tabel: `{resolve(sale.agent_name) || "-"}` i stedet for `{sale.agent_name || "-"}`
-- I filter-dropdown: vis resolved navne, men filtrér stadig på original `agent_name`
+## Resultat
+- Kunde med gemt config → upload → auto-match → preview → send
+- Kunde uden config → besked om at config mangler, upload blokeret
 
