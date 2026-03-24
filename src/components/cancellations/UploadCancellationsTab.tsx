@@ -454,6 +454,32 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
   const [unmatchedSellerRows, setUnmatchedSellerRows] = useState<UnmatchedSellerRow[]>([]);
   const [sellerDropdownSelections, setSellerDropdownSelections] = useState<Record<string, string>>({});
 
+  // Check for active import blocking new uploads
+  const { data: activeImport } = useQuery({
+    queryKey: ["active-import-block", selectedClientId],
+    enabled: !!selectedClientId,
+    queryFn: async () => {
+      const { data: imports } = await supabase
+        .from("cancellation_imports")
+        .select("id, file_name")
+        .eq("client_id", selectedClientId)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      if (!imports?.length) return null;
+      const { data: pending } = await supabase
+        .from("cancellation_queue")
+        .select("import_id")
+        .in("import_id", imports.map(d => d.id))
+        .eq("status", "pending")
+        .limit(1);
+      if (pending?.length) {
+        const imp = imports.find(d => d.id === pending[0].import_id);
+        return imp || null;
+      }
+      return null;
+    },
+  });
+
   // Fetch all active employees for seller dropdown
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["employees-for-seller-dropdown"],
