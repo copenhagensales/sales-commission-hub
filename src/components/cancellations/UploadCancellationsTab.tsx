@@ -806,6 +806,11 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                 if (matchedSaleProductKeys.has(key)) continue;
                 matchedSaleProductKeys.add(key);
                 matchedIndicesLocal.add(idx);
+                // Resolve real product name + pricing from sale_items
+                // payloadPhoneField "Telefon Abo1" → position index 1 → "Abonnement1"
+                const posIndex = parseInt(mapping.payloadPhoneField?.replace(/\D/g, "") || "0", 10) - 1;
+                const allItems = saleItemsMap.get(sale.id) || [];
+                const matchingItem = posIndex >= 0 && posIndex < allItems.length ? allItems[posIndex] : allItems[0];
                 productMatched.push({
                   saleId: sale.id,
                   phone: String(payloadPhoneRaw),
@@ -816,6 +821,9 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                   currentStatus: sale.validation_status || "pending",
                   uploadedRowData: row.originalRow,
                   targetProductName: mapping.productName,
+                  realProductName: matchingItem?.adversus_product_title || mapping.productName,
+                  commission: matchingItem?.mapped_commission ?? undefined,
+                  revenue: matchingItem?.mapped_revenue ?? undefined,
                 });
               }
             }
@@ -952,6 +960,9 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               if (matchedSaleProductKeys.has(key)) continue;
               matchedSaleProductKeys.add(key);
               matchedIndicesLocal.add(idx);
+              const matchedItem = items.find(item => 
+                item.adversus_product_title?.toLowerCase() === matchingFallback.saleItemTitle.toLowerCase()
+              );
               productMatched.push({
                 saleId: sale.id,
                 phone: sale.customer_phone || "",
@@ -962,6 +973,9 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                 currentStatus: sale.validation_status || "pending",
                 uploadedRowData: row.originalRow,
                 targetProductName: matchingFallback.saleItemTitle,
+                realProductName: matchedItem?.adversus_product_title || matchingFallback.saleItemTitle,
+                commission: matchedItem?.mapped_commission ?? undefined,
+                revenue: matchedItem?.mapped_revenue ?? undefined,
               });
               break;
             }
@@ -1485,7 +1499,9 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                         <TableHead>Salgsdato</TableHead>
                         <TableHead>Sælger</TableHead>
                         <TableHead>Telefon</TableHead>
-                        {matchedSales.some(s => s.targetProductName) && <TableHead>Produkt</TableHead>}
+                        <TableHead>Produkt</TableHead>
+                        <TableHead>Provision</TableHead>
+                        <TableHead>Omsætning</TableHead>
                         <TableHead>Virksomhed</TableHead>
                         <TableHead>OPP-nummer</TableHead>
                         <TableHead>Status</TableHead>
@@ -1497,11 +1513,11 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                           <TableCell>{sale.saleDate}</TableCell>
                           <TableCell>{resolve(sale.employee)}</TableCell>
                           <TableCell>{sale.phone || "-"}</TableCell>
-                          {matchedSales.some(s => s.targetProductName) && (
-                            <TableCell>
-                              <Badge variant="outline">{sale.targetProductName || "-"}</Badge>
-                            </TableCell>
-                          )}
+                          <TableCell>
+                            <Badge variant="outline">{sale.realProductName || sale.targetProductName || "-"}</Badge>
+                          </TableCell>
+                          <TableCell>{sale.commission != null ? formatCurrency(sale.commission) : "-"}</TableCell>
+                          <TableCell>{sale.revenue != null ? formatCurrency(sale.revenue) : "-"}</TableCell>
                           <TableCell>{sale.company || "-"}</TableCell>
                           <TableCell>{sale.oppNumber || "-"}</TableCell>
                           <TableCell>
