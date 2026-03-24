@@ -745,9 +745,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               Upload {uploadType === "cancellation" ? "annulleringsfil" : "kurv-fil"}
             </CardTitle>
             <CardDescription>
-              Upload en Excel-fil (.xlsx). {clientConfigs.length > 0
-                ? "Systemet matcher automatisk baseret på gemt opsætning."
-                : "Du skal vælge kolonnemapping efter upload."}
+              Upload en Excel-fil (.xlsx). Systemet matcher automatisk baseret på gemt opsætning.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
