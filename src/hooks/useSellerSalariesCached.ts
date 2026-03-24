@@ -151,6 +151,38 @@ export function useSellerSalariesCached(
     staleTime: 60000,
   });
 
+  // Query 7: Approved cancellations for the period (deduction_date within period)
+  const { data: cancellationData, isLoading: cancellationLoading } = useQuery({
+    queryKey: ["seller-cancellations", periodStartISO, periodEndISO],
+    queryFn: async () => {
+      if (!periodStartISO || !periodEndISO) return [];
+      const { data, error } = await (supabase
+        .from("cancellation_queue") as any)
+        .select(`
+          id,
+          deduction_date,
+          reviewed_at,
+          sale_id,
+          sales!inner(
+            agent_email,
+            sale_items(mapped_commission)
+          )
+        `)
+        .eq("status", "approved");
+      
+      if (error) throw error;
+      
+      // Filter by deduction_date (fallback to reviewed_at) within period
+      return (data || []).filter((item: any) => {
+        const effectiveDate = item.deduction_date || (item.reviewed_at ? item.reviewed_at.split('T')[0] : null);
+        if (!effectiveDate) return false;
+        return effectiveDate >= periodStartISO && effectiveDate <= periodEndISO;
+      });
+    },
+    enabled: !!periodStartISO && !!periodEndISO,
+    staleTime: 60000,
+  });
+
   // Helper to find the correct vacation pay rate based on vacation type
   const getVacationPayRate = (vacationType: string | null): number => {
     if (!vacationType || !salaryTypes) return 0;
