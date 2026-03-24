@@ -121,6 +121,7 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
         case "opp": cmp = a.opp.localeCompare(b.opp); break;
         case "type": cmp = a.uploadType.localeCompare(b.uploadType); break;
         case "status": cmp = a.status.localeCompare(b.status); break;
+        case "deduction": cmp = (a.deductionDate || a.reviewedAt || "").localeCompare(b.deductionDate || b.reviewedAt || ""); break;
         case "reviewed_at": cmp = (a.reviewedAt || "").localeCompare(b.reviewedAt || ""); break;
       }
       return sortDir === "asc" ? cmp : -cmp;
