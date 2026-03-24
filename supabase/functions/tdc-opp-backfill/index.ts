@@ -70,6 +70,7 @@ serve(async (req) => {
       .eq("source", "Lovablecph")
       .in("client_campaign_id", TDC_ERHVERV_CAMPAIGN_IDS)
       .not("raw_payload", "is", null)
+      .eq("enrichment_status", "pending")
       .order("sale_datetime", { ascending: false })
       .limit(batchSize);
 
@@ -98,7 +99,8 @@ serve(async (req) => {
       .select("id", { count: "exact", head: true })
       .eq("source", "Lovablecph")
       .in("client_campaign_id", TDC_ERHVERV_CAMPAIGN_IDS)
-      .not("raw_payload", "is", null);
+      .not("raw_payload", "is", null)
+      .eq("enrichment_status", "pending");
 
     log(`Starting batch: ${needsHealing.length} sales to process (est. total remaining: ~${totalRemaining})`);
 
