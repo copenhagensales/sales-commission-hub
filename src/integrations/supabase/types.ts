@@ -1689,6 +1689,7 @@ export type Database = {
           created_at: string
           id: string
           is_default: boolean | null
+          member_number_column: string | null
           name: string
           opp_column: string | null
           phone_column: string | null
@@ -1703,6 +1704,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_default?: boolean | null
+          member_number_column?: string | null
           name: string
           opp_column?: string | null
           phone_column?: string | null
@@ -1717,6 +1719,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_default?: boolean | null
+          member_number_column?: string | null
           name?: string
           opp_column?: string | null
           phone_column?: string | null
