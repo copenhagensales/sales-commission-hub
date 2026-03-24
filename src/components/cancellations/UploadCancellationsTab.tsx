@@ -49,9 +49,14 @@ interface MatchedSale {
 }
 
 interface ProductPhoneMapping {
-  phoneColumn?: string;        // Legacy: Excel column name (unused for reversed matching)
-  payloadPhoneField?: string;  // DB raw_payload.data field name (e.g. "Telefon Abo1")
+  phoneColumn?: string;
+  payloadPhoneField?: string;
   productName: string;
+}
+
+interface FallbackProductMapping {
+  excelProductPattern: string;
+  saleItemTitle: string;
 }
 
 interface UploadConfig {
@@ -70,6 +75,17 @@ interface UploadConfig {
   filter_column: string | null;
   filter_value: string | null;
   product_phone_mappings?: ProductPhoneMapping[];
+  seller_column?: string | null;
+  date_column?: string | null;
+  fallback_product_mappings?: FallbackProductMapping[];
+}
+
+interface UnmatchedSellerRow {
+  rowIndex: number;
+  excelSellerName: string;
+  excelDate: string;
+  excelProduct: string;
+  originalRow: Record<string, unknown>;
 }
 
 interface UploadCancellationsTabProps {
