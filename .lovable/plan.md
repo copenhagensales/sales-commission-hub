@@ -1,34 +1,43 @@
 
 
-# Forbedring: Søgbar medarbejder-vælger i Match Errors
+# Forbedring af dato-vælger på Sales-siden
 
 ## Problem
-Den nuværende Select-dropdown viser alle medarbejdere i en lang liste uden søgning. Det er svært at finde den rigtige medarbejder hurtigt.
+Dato-vælgeren åbner en bred popover med presets + 2-måneders kalender side om side. Det er uoverskueligt og fylder meget — især på mindre skærme. Aktiv preset-markering er subtil.
 
 ## Løsning
-Erstat Select med en Popover + Command (cmdk) komponent — en søgbar dropdown med fuzzy-filtrering. Projektet har allerede `command.tsx` og `popover.tsx` UI-komponenter.
+Omstrukturér popover-layoutet til et mere kompakt og brugervenligt design:
 
-### Ændringer i `MatchErrorsSubTab.tsx`
+### Ændringer i `SalesFeed.tsx`
 
-1. **Erstat Select med Popover + Command** — Hver række får en knap der åbner en popover med et søgefelt og filtreret medarbejderliste. Brugeren skriver navn og vælger fra den filtrerede liste.
+1. **Responsiv kalender** — Vis kun 1 måned i kalenderen i stedet for 2. Det halverer bredden og er tilstrækkeligt til de fleste use cases.
 
-2. **Vis valgt medarbejders fulde navn** på knappen efter valg, i stedet for truncated tekst.
+2. **Vertikal layout i stedet for horisontal** — Placer presets øverst som en grid af chips/knapper (2-3 kolonner) og kalenderen nedenunder. Det giver bedre flow og fylder mindre i bredden.
 
-3. **Én åben popover ad gangen** — Track `openPopoverIdx` state så kun én popover er åben.
+3. **Tydeligere aktiv preset** — Brug `bg-primary text-primary-foreground` på den aktive preset-knap i stedet for subtil `secondary` variant.
 
-### UI-flow
+4. **Tilføj "Lønperiode" preset** — Tilføj som ekstra hurtig-valg da det bruges ofte i systemet.
+
+5. **"Ryd" knap i popover** — Tilføj en tydelig "Nulstil" knap nederst så brugeren kan fjerne dato-filteret inde fra popover'en.
+
+### Nyt layout
 ```text
-[Vælg medarbejder... ▼]  →  klik  →  Popover med:
-  ┌──────────────────────┐
-  │ 🔍 Søg medarbejder...│
-  │ ──────────────────── │
-  │ Adam Jensen           │
-  │ Noah Wichmann Duus    │
-  │ Silas Soelberg-Larsen │
-  │ ...                   │
-  └──────────────────────┘
+┌─────────────────────────────┐
+│ Hurtig valg                 │
+│ [I dag] [I går] [Denne uge] │
+│ [7 dage] [30 dage] [Måned]  │
+│ [Lønperiode]                │
+│ ─────────────────────────── │
+│ Eller vælg periode          │
+│ ┌─────────────────────────┐ │
+│ │    < marts 2026 >       │ │
+│ │  MA TI ON TO FR LØ SØ   │ │
+│ │  ...kalender...          │ │
+│ └─────────────────────────┘ │
+│               [Nulstil]     │
+└─────────────────────────────┘
 ```
 
 ## Fil
-`src/components/cancellations/MatchErrorsSubTab.tsx`
+`src/components/sales/SalesFeed.tsx`
 
