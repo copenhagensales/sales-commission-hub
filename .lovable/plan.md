@@ -1,83 +1,42 @@
 
 
-# Eesy TM: Produkt-niveau annullering via telefon-abo kolonner
+# Fix: 0 produkt-matches — Debug og robusthed
 
-## Problem
-Eesy TM filen har en struktur hvor hver række indeholder flere telefonnumre i separate kolonner:
-- "Telefon Abo1" -> produkt "Abonnement1"
-- "Telefon Abo2" -> produkt "Abonnement2"  
-- "Telefon Abo3" -> produkt "Abonnement3"
-- osv.
+## Analyse
 
-Når "Annulled Sales = 1", skal kun det specifikke produkt annulleres — ikke hele salget. Det nuværende system matcher kun på ét telefonnummer og annullerer hele salget.
+Jeg har undersøgt data og kode. Salg i databasen har `customer_phone` udfyldt (f.eks. `20971200`, `50399450`), og `raw_payload.data` indeholder `Telefon Abo1: 20971200` osv. Matchinglogikken ser korrekt ud i princippet.
 
-## Løsning
-Tilføj en **produkt-telefon-mapping** til upload-config, så systemet kan:
-1. For hver "Telefon AboX" kolonne → finde salget via telefonnummeret
-2. Annullere kun det tilhørende produkt ("AbonnementX") på det salg
+**Mest sandsynlige årsag**: Kolonnenavne i Excel-filen matcher ikke præcist konfigurationen. F.eks. kan filen have "Annulled sales" (lille s) mens config har "Annulled Sales", eller "Telefon abo1" i stedet for "Telefon Abo1". Når `row.originalRow["Annulled Sales"]` slås op og kolonnen hedder noget lidt anderledes, returnerer den `undefined` → alle rækker filtreres væk → 0 phones → 0 matches.
 
 ## Ændringer
 
-### 1. Database: Ny kolonne på `cancellation_upload_configs`
-Tilføj `product_phone_mappings JSONB` — et array af `{ phoneColumn: string, productName: string }`:
-```json
-[
-  { "phoneColumn": "Telefon Abo1", "productName": "Abonnement1" },
-  { "phoneColumn": "Telefon Abo2", "productName": "Abonnement2" },
-  { "phoneColumn": "Telefon Abo3", "productName": "Abonnement3" }
-]
+### UploadCancellationsTab.tsx
+
+1. **Case-insensitive kolonne-opslag**: Tilføj en hjælpefunktion `getColumnValue(row, columnName)` der laver case-insensitive + trim-match mod rækkens keys. Brug den i:
+   - Filtreringslogikken (linje ~632)
+   - Phone-indsamling fra `phoneColumn` (linje ~642)
+   - Phone-indsamling fra `product_phone_mappings` (linje ~647)
+   - Alle andre kolonne-opslag (company, opp, member number)
+
+2. **Debug console.log**: Tilføj midlertidig logging i `handleMatch`:
+   - Antal rækker efter filter
+   - Antal unikke telefonnumre indsamlet
+   - Antal kandidatsalg hentet fra DB
+   - Første par eksempler på telefonnumre fra fil vs. DB (for at se om de matcher)
+
+3. **Case-insensitive kolonne-matching i `applyConfig`**: Når config anvender kolonnenavne (f.eks. "Phone Number"), find den faktiske kolonne i `columns[]` via case-insensitive match.
+
+### Konkret hjælpefunktion
+```typescript
+function getColValue(row: Record<string, unknown>, colName: string): unknown {
+  if (row[colName] !== undefined) return row[colName];
+  const lower = colName.toLowerCase();
+  for (const k of Object.keys(row)) {
+    if (k.toLowerCase() === lower) return row[k];
+  }
+  return undefined;
+}
 ```
 
-Opdater Eesy TM config med disse mappings.
-
-### 2. UploadCancellationsTab.tsx — Ny matching-logik for produkt-telefon
-Når `product_phone_mappings` er konfigureret:
-
-- **Matching**: For hver filtreret række (Annulled Sales = 1), gennemgå hver mapping. For hver mapping:
-  - Hent telefonnummer fra den specifikke kolonne (f.eks. "Telefon Abo1")
-  - Find salget via telefonnummer-match
-  - I stedet for at markere hele salget, tilknyt det specifikke produktnavn ("Abonnement1") til matchet
-
-- **MatchedSale interface**: Udvid med et valgfrit `targetProductName?: string` felt
-
-- **Preview**: Vis hvilke specifikke produkter der vil blive annulleret per salg (ikke hele salget)
-
-### 3. ApprovalQueueTab.tsx — Produkt-niveau godkendelse
-Når godkendt:
-- I stedet for `validation_status = "cancelled"` på hele salget:
-  - Find `sale_items` der matcher produktnavnet
-  - Sæt `is_cancelled = true` og `cancelled_quantity = quantity` på kun det specifikke `sale_item`
-  - Kun sæt `validation_status = "cancelled"` hvis **alle** sale_items er annulleret
-
-### 4. cancellation_queue — Gem produkt-info
-Tilføj `target_product_name` til `cancellation_queue` tabellen, så godkendelses-flowet ved hvilket produkt der skal annulleres.
-
-### 5. Eesy TM Config (migration)
-Opdater den eksisterende Eesy TM config med:
-```sql
-UPDATE cancellation_upload_configs 
-SET product_phone_mappings = '[
-  {"phoneColumn": "Telefon Abo1", "productName": "Abonnement1"},
-  {"phoneColumn": "Telefon Abo2", "productName": "Abonnement2"},
-  {"phoneColumn": "Telefon Abo3", "productName": "Abonnement3"}
-]'::jsonb
-WHERE client_id = '81993a7b-ff24-46b8-8ffb-37a83138ddba';
-```
-
-### 6. Telefon-normalisering
-Tilføj `normalizePhone()` der fjerner +45/0045 prefix, så "69301969" matcher "+4569301969" i databasen.
-
-## Flow for Eesy TM
-1. Upload fil → filter "Annulled Sales = 1"
-2. For hver filtreret række: 
-   - Tjek "Telefon Abo1" → find salg → marker "Abonnement1" til annullering
-   - Tjek "Telefon Abo2" → find salg → marker "Abonnement2" til annullering
-   - osv.
-3. Preview viser: "Salg X — Annuller Abonnement1"
-4. Godkendelse: Kun det specifikke sale_item annulleres
-
-## DB migrationer
-1. `ALTER TABLE cancellation_upload_configs ADD COLUMN product_phone_mappings JSONB DEFAULT '[]'`
-2. `ALTER TABLE cancellation_queue ADD COLUMN target_product_name TEXT`
-3. UPDATE Eesy TM config med mappings
+Bruges overalt i stedet for direkte `row.originalRow[phoneColumn]`.
 
