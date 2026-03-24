@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { FileText, Users, Car, Trash2, AlertTriangle, Ban, Check, DollarSign, Utensils, Pencil, Building2 } from "lucide-react";
+import { FileText, Users, Car, Trash2, AlertTriangle, Ban, Check, DollarSign, Utensils, Pencil, Building2, GraduationCap } from "lucide-react";
 import { useBookingHotels, useUpdateBookingHotel, type BookingHotel } from "@/hooks/useBookingHotels";
 import { AssignHotelDialog } from "@/components/vagt-flow/AssignHotelDialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -243,6 +243,10 @@ export function EditBookingDialog({
   const [selectedDietEmployee, setSelectedDietEmployee] = useState<string | null>(null);
   const [selectedDietDays, setSelectedDietDays] = useState<Set<number>>(new Set());
 
+  // Training bonus tab state
+  const [selectedTrainingEmployee, setSelectedTrainingEmployee] = useState<string | null>(null);
+  const [selectedTrainingDays, setSelectedTrainingDays] = useState<Set<number>>(new Set());
+
   useEffect(() => {
     if (booking) {
       setClientId(booking.client_id || "");
@@ -269,6 +273,8 @@ export function EditBookingDialog({
       setSelectedVehicleDays(new Set());
       setSelectedDietEmployee(null);
       setSelectedDietDays(new Set());
+      setSelectedTrainingEmployee(null);
+      setSelectedTrainingDays(new Set());
     }
   }, [open]);
 
@@ -432,22 +438,60 @@ export function EditBookingDialog({
     enabled: open,
   });
 
-  // Fetch current diet assignments
-  const { data: currentDietAssignments = [], refetch: refetchDietAssignments } = useQuery({
-    queryKey: ["current-diet-assignments", booking?.id],
+  // Fetch training bonus salary type
+  const { data: trainingBonusSalaryType } = useQuery({
+    queryKey: ["training-bonus-salary-type"],
     queryFn: async () => {
-      if (!booking?.id) return [];
+      const { data, error } = await supabase
+        .from("salary_types")
+        .select("id, name, amount")
+        .ilike("name", "%oplæringsbonus%")
+        .eq("is_active", true)
+        .limit(1)
+        .maybeSingle();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: open,
+  });
+
+  // Fetch current diet assignments (filtered by diet salary type)
+  const { data: currentDietAssignments = [], refetch: refetchDietAssignments } = useQuery({
+    queryKey: ["current-diet-assignments", booking?.id, dietSalaryType?.id],
+    queryFn: async () => {
+      if (!booking?.id || !dietSalaryType?.id) return [];
       
       const { data, error } = await supabase
         .from("booking_diet")
         .select("id, employee_id, date, amount")
         .eq("booking_id", booking.id)
+        .eq("salary_type_id", dietSalaryType.id)
         .order("date");
       
       if (error) throw error;
       return data || [];
     },
-    enabled: open && !!booking?.id,
+    enabled: open && !!booking?.id && !!dietSalaryType?.id,
+  });
+
+  // Fetch current training bonus assignments
+  const { data: currentTrainingAssignments = [], refetch: refetchTrainingAssignments } = useQuery({
+    queryKey: ["current-training-assignments", booking?.id, trainingBonusSalaryType?.id],
+    queryFn: async () => {
+      if (!booking?.id || !trainingBonusSalaryType?.id) return [];
+      
+      const { data, error } = await supabase
+        .from("booking_diet")
+        .select("id, employee_id, date, amount")
+        .eq("booking_id", booking.id)
+        .eq("salary_type_id", trainingBonusSalaryType.id)
+        .order("date");
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: open && !!booking?.id && !!trainingBonusSalaryType?.id,
   });
 
   const { data: fieldmarketingTeam } = useQuery({
@@ -872,7 +916,7 @@ export function EditBookingDialog({
       
       const { error } = await supabase
         .from("booking_diet")
-        .upsert(inserts, { onConflict: "booking_id,employee_id,date" });
+        .upsert(inserts, { onConflict: "booking_id,employee_id,date,salary_type_id" });
       
       if (error) throw error;
     },
@@ -891,17 +935,72 @@ export function EditBookingDialog({
   // Remove diet assignment mutation
   const removeDietMutation = useMutation({
     mutationFn: async (employeeId: string) => {
+      if (!dietSalaryType?.id) throw new Error("Diæt lønart ikke fundet");
       const { error } = await supabase
         .from("booking_diet")
         .delete()
         .eq("booking_id", booking.id)
-        .eq("employee_id", employeeId);
+        .eq("employee_id", employeeId)
+        .eq("salary_type_id", dietSalaryType.id);
       if (error) throw error;
     },
     onSuccess: () => {
       refetchDietAssignments();
       queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
       toast.success("Diæt fjernet");
+    },
+    onError: (error: any) => {
+      toast.error("Fejl ved fjernelse: " + error.message);
+    },
+  });
+
+  // Add training bonus mutation
+  const addTrainingBonusMutation = useMutation({
+    mutationFn: async ({ employeeId, dates }: { employeeId: string; dates: string[] }) => {
+      if (!trainingBonusSalaryType) throw new Error("Oplæringsbonus lønart ikke fundet");
+      
+      const inserts = dates.map(date => ({
+        booking_id: booking.id,
+        employee_id: employeeId,
+        salary_type_id: trainingBonusSalaryType.id,
+        date,
+        amount: trainingBonusSalaryType.amount || 0,
+      }));
+      
+      const { error } = await supabase
+        .from("booking_diet")
+        .upsert(inserts, { onConflict: "booking_id,employee_id,date,salary_type_id" });
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      refetchTrainingAssignments();
+      queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      toast.success("Oplæringsbonus tilføjet");
+      setSelectedTrainingEmployee(null);
+      setSelectedTrainingDays(new Set());
+    },
+    onError: (error: any) => {
+      toast.error("Fejl ved tilføjelse: " + error.message);
+    },
+  });
+
+  // Remove training bonus mutation
+  const removeTrainingBonusMutation = useMutation({
+    mutationFn: async (employeeId: string) => {
+      if (!trainingBonusSalaryType?.id) throw new Error("Oplæringsbonus lønart ikke fundet");
+      const { error } = await supabase
+        .from("booking_diet")
+        .delete()
+        .eq("booking_id", booking.id)
+        .eq("employee_id", employeeId)
+        .eq("salary_type_id", trainingBonusSalaryType.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      refetchTrainingAssignments();
+      queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      toast.success("Oplæringsbonus fjernet");
     },
     onError: (error: any) => {
       toast.error("Fejl ved fjernelse: " + error.message);
@@ -1056,6 +1155,32 @@ export function EditBookingDialog({
     });
   };
 
+  // Training bonus tab handlers
+  const toggleTrainingDay = (dayIndex: number) => {
+    const newSet = new Set(selectedTrainingDays);
+    if (newSet.has(dayIndex)) {
+      newSet.delete(dayIndex);
+    } else {
+      newSet.add(dayIndex);
+    }
+    setSelectedTrainingDays(newSet);
+  };
+
+  const handleAddTrainingBonus = () => {
+    if (!selectedTrainingEmployee || selectedTrainingDays.size === 0) return;
+
+    const dates = Array.from(selectedTrainingDays)
+      .filter(dayIndex => isDayInBookingRange(dayIndex))
+      .map(dayIndex => format(addDays(weekStart, dayIndex), "yyyy-MM-dd"));
+
+    if (dates.length === 0) return;
+
+    addTrainingBonusMutation.mutate({
+      employeeId: selectedTrainingEmployee,
+      dates,
+    });
+  };
+
   // Group current diet assignments by employee for display
   const groupedDietAssignments = useMemo(() => {
     const grouped: Record<string, { employeeName: string; dates: string[]; totalAmount: number }> = {};
@@ -1069,6 +1194,20 @@ export function EditBookingDialog({
     });
     return grouped;
   }, [currentDietAssignments, employees]);
+
+  // Group current training bonus assignments by employee for display
+  const groupedTrainingAssignments = useMemo(() => {
+    const grouped: Record<string, { employeeName: string; dates: string[]; totalAmount: number }> = {};
+    currentTrainingAssignments.forEach((a: any) => {
+      if (!grouped[a.employee_id]) {
+        const emp = employees.find(e => e.id === a.employee_id);
+        grouped[a.employee_id] = { employeeName: emp?.full_name || "Ukendt", dates: [], totalAmount: 0 };
+      }
+      grouped[a.employee_id].dates.push(a.date);
+      grouped[a.employee_id].totalAmount += Number(a.amount) || 0;
+    });
+    return grouped;
+  }, [currentTrainingAssignments, employees]);
 
   // Get employees assigned to this booking (for diet selection)
   const assignedEmployeeIds = useMemo(() => {
@@ -1090,24 +1229,28 @@ export function EditBookingDialog({
         </DialogHeader>
         
         <Tabs defaultValue="booking" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="booking" className="flex items-center gap-2">
+          <TabsList className="grid w-full grid-cols-6">
+            <TabsTrigger value="booking" className="flex items-center gap-1 text-xs px-2">
               <FileText className="h-4 w-4" />
               Booking
             </TabsTrigger>
-            <TabsTrigger value="employees" className="flex items-center gap-2">
+            <TabsTrigger value="employees" className="flex items-center gap-1 text-xs px-2">
               <Users className="h-4 w-4" />
               Medarbejdere
             </TabsTrigger>
-            <TabsTrigger value="vehicles" className="flex items-center gap-2">
+            <TabsTrigger value="vehicles" className="flex items-center gap-1 text-xs px-2">
               <Car className="h-4 w-4" />
               Biler
             </TabsTrigger>
-            <TabsTrigger value="diet" className="flex items-center gap-2">
+            <TabsTrigger value="diet" className="flex items-center gap-1 text-xs px-2">
               <Utensils className="h-4 w-4" />
               Diæt
             </TabsTrigger>
-            <TabsTrigger value="hotel" className="flex items-center gap-2">
+            <TabsTrigger value="training" className="flex items-center gap-1 text-xs px-2">
+              <GraduationCap className="h-4 w-4" />
+              Oplæring
+            </TabsTrigger>
+            <TabsTrigger value="hotel" className="flex items-center gap-1 text-xs px-2">
               <Building2 className="h-4 w-4" />
               Hotel
             </TabsTrigger>
@@ -1874,6 +2017,148 @@ export function EditBookingDialog({
                     className="bg-orange-600 hover:bg-orange-700"
                   >
                     {addDietMutation.isPending ? "Tilføjer..." : `Tilføj diæt til ${selectedDietDays.size} dag${selectedDietDays.size !== 1 ? "e" : ""}`}
+                  </Button>
+                </div>
+              </>
+            )}
+          </TabsContent>
+
+          {/* Training Bonus Tab */}
+          <TabsContent value="training" className="space-y-4 mt-4">
+            {/* Existing training bonus assignments */}
+            {Object.keys(groupedTrainingAssignments).length > 0 && (
+              <div className="space-y-3 border-b pb-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium flex items-center gap-2">
+                    <GraduationCap className="h-4 w-4 text-indigo-600" />
+                    Tilknyttede oplæringsbonusser
+                  </p>
+                  <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                    {Object.keys(groupedTrainingAssignments).length} medarbejdere • {currentTrainingAssignments.length} dage
+                  </span>
+                </div>
+                <div className="grid gap-2">
+                  {Object.entries(groupedTrainingAssignments).map(([empId, { employeeName, dates, totalAmount }]) => {
+                    const sortedDates = [...dates].sort();
+                    const dateLabels = sortedDates.map((d: string) => {
+                      const dayIndex = Math.floor((parseISO(d).getTime() - weekStart.getTime()) / (1000 * 60 * 60 * 24));
+                      return DAY_NAMES[dayIndex]?.slice(0, 3) || format(parseISO(d), "d/M");
+                    });
+                    return (
+                      <div key={empId} className="flex items-center justify-between bg-card border rounded-lg px-3 py-2.5">
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center shrink-0">
+                            <GraduationCap className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-medium text-sm truncate">{employeeName}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {dateLabels.join(" • ")} • {totalAmount.toLocaleString('da-DK')} kr
+                            </p>
+                          </div>
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
+                          onClick={() => removeTrainingBonusMutation.mutate(empId)}
+                          disabled={removeTrainingBonusMutation.isPending}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Add training bonus section */}
+            {assignedEmployees.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <GraduationCap className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                <p className="text-sm">Tilføj først medarbejdere til bookingen under "Medarbejdere" fanen.</p>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Tilføj oplæringsbonus</p>
+                  <Select
+                    value={selectedTrainingEmployee || ""}
+                    onValueChange={setSelectedTrainingEmployee}
+                  >
+                    <SelectTrigger className="bg-background text-foreground">
+                      <SelectValue placeholder="Vælg medarbejder" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover">
+                      {assignedEmployees.map((employee) => (
+                        <SelectItem key={employee.id} value={employee.id} className="text-popover-foreground">
+                          <div className="flex items-center gap-2">
+                            <Users className="h-4 w-4" />
+                            <span>{employee.full_name}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Vælg dage:</p>
+                  <div className="space-y-1">
+                    {DAY_NAMES.map((dayName, index) => {
+                      const inRange = isDayInBookingRange(index);
+                      return (
+                        <div
+                          key={index}
+                          className={`flex items-center justify-between p-3 rounded-lg border ${
+                            inRange ? "hover:bg-muted/50 cursor-pointer" : "opacity-50"
+                          } ${selectedTrainingDays.has(index) ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950/20" : ""}`}
+                          onClick={() => inRange && toggleTrainingDay(index)}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Checkbox
+                              checked={selectedTrainingDays.has(index)}
+                              disabled={!inRange}
+                              onCheckedChange={() => inRange && toggleTrainingDay(index)}
+                            />
+                            <span className={selectedTrainingDays.has(index) ? "text-indigo-800 dark:text-indigo-200" : ""}>{dayName}</span>
+                          </div>
+                          <span className={`text-sm ${selectedTrainingDays.has(index) ? "text-indigo-600" : "text-muted-foreground"}`}>
+                            {getDateForDay(index)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Training bonus rate info */}
+                <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-lg px-3 py-2">
+                  <DollarSign className="h-4 w-4" />
+                  <span>Oplæringsbonussats: <span className="font-medium text-foreground">{(trainingBonusSalaryType?.amount || 0).toLocaleString('da-DK')} kr</span> per dag (fra lønart)</span>
+                </div>
+
+                {/* Summary of what will be added */}
+                {selectedTrainingEmployee && selectedTrainingDays.size > 0 && (
+                  <div className="bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-800 rounded-lg p-3">
+                    <p className="text-sm font-medium text-indigo-800 dark:text-indigo-200">Du er ved at tilføje:</p>
+                    <p className="mt-1 text-sm text-indigo-700 dark:text-indigo-300">
+                      • {assignedEmployees.find(e => e.id === selectedTrainingEmployee)?.full_name}: {Array.from(selectedTrainingDays).filter(d => isDayInBookingRange(d)).map(d => DAY_NAMES[d]).join(", ")}
+                    </p>
+                    <p className="mt-1 text-xs text-indigo-600 dark:text-indigo-400">
+                      Total: {(Array.from(selectedTrainingDays).filter(d => isDayInBookingRange(d)).length * (trainingBonusSalaryType?.amount || 0)).toLocaleString('da-DK')} kr
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button
+                    onClick={handleAddTrainingBonus}
+                    disabled={!selectedTrainingEmployee || selectedTrainingDays.size === 0 || addTrainingBonusMutation.isPending}
+                    className="bg-indigo-600 hover:bg-indigo-700"
+                  >
+                    {addTrainingBonusMutation.isPending ? "Tilføjer..." : `Tilføj oplæringsbonus til ${selectedTrainingDays.size} dag${selectedTrainingDays.size !== 1 ? "e" : ""}`}
                   </Button>
                 </div>
               </>
