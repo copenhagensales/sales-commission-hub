@@ -1,65 +1,42 @@
 
 
-# Sælger-mapping: Manuelt match + persistent mapping-tabel
+# Vis reelle produktnavne + provision & omsætning i preview
 
-## Overblik
-Når systemet ikke kan matche en sælger fra Excel-filen automatisk, skal brugeren kunne vælge den korrekte medarbejder fra en dropdown. Denne kobling gemmes permanent i en ny tabel, så fremtidige uploads matcher automatisk. En ny "Mapping"-fane viser og administrerer alle gemte mappings.
+## Problem
+Preview-tabellen viser "Abonnement1" som produktnavn — det er bare et internt mapping-navn. Brugeren vil se det faktiske produktnavn fra `sale_items.adversus_product_title` (f.eks. "Eesy 12 timer", "5GI"). Desuden mangler provision (commission) og omsætning (revenue) kolonner.
 
-## Database
+## Ændringer i `UploadCancellationsTab.tsx`
 
-### Ny tabel: `cancellation_seller_mappings`
-```sql
-CREATE TABLE public.cancellation_seller_mappings (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-  excel_seller_name TEXT NOT NULL,
-  employee_id UUID NOT NULL REFERENCES employee_master_data(id),
-  created_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE (client_id, excel_seller_name)
-);
-ALTER TABLE cancellation_seller_mappings ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Authenticated users can manage seller mappings"
-  ON cancellation_seller_mappings FOR ALL TO authenticated USING (true) WITH CHECK (true);
+### 1. Udvid `MatchedSale` interface
+Tilføj felter:
+- `realProductName?: string` — det faktiske produktnavn fra sale_items
+- `commission?: number` — mapped_commission fra sale_items  
+- `revenue?: number` — mapped_revenue fra sale_items
+
+### 2. Udvid sale_items fetch (linje ~860-875)
+Hent `mapped_commission`, `mapped_revenue` sammen med `adversus_product_title`:
+```typescript
+.select("sale_id, adversus_product_title, mapped_commission, mapped_revenue")
 ```
 
-## Kodeændringer
+Opdater `saleItemsMap` typen til at inkludere commission/revenue.
 
-### 1. `UploadCancellationsTab.tsx` — Sælger-matching med fallback til dropdown
+### 3. Resolve reelt produktnavn i matching-logikken
+**Pass 1 (telefon-match, linje ~800-815)**: Når et match findes via `payloadPhoneField`, slå sale_items op for det matchede salg og find det item der hører til den pågældende abo-position. Da "Telefon Abo1" korresponderer med det første abonnement osv., kan vi matche via positionen eller blot vise alle items for salget. Enklere: brug `saleItemsMap` til at finde items for salget og resolve det rigtige navn.
 
-**I `handleMatch`** (efter produkt-phone matching):
-- For rækker uden telefonnummer (5GI): hent sælgernavn fra Excel (`Employee Name`-kolonnen)
-- Slå op i `cancellation_seller_mappings` om der allerede findes en mapping for dette navn + client
-- Hvis ja → brug den mappede `employee_id` til at finde agent_email → match mod salg via agent + dato
-- Hvis nej → marker rækken som "umatched seller" og vis i preview
+Konkret: efter match, tilføj `realProductName` og `commission`/`revenue` fra sale_items der matcher positionen.
 
-**I preview-steget**:
-- Vis umatchede rækker med en dropdown der lister alle aktive medarbejdere (fra `employee_master_data`)
-- Når bruger vælger en medarbejder → gem mapping i `cancellation_seller_mappings` og kør re-match
-- Dropdown viser "Fornavn Efternavn" og gemmer `employee_id`
+**Pass 2 (seller+dato fallback)**: Allerede har `saleItemTitle` (f.eks. "5GI") — brug dette som `realProductName` og hent commission/revenue fra sale_items.
 
-### 2. Ny komponent: `SellerMappingTab.tsx`
-- Henter alle rækker fra `cancellation_seller_mappings` for den valgte client
-- Joiner med `employee_master_data` for at vise medarbejdernavn
-- Viser tabel: Excel-sælgernavn | Mappet medarbejder | Oprettet | Slet-knap
-- Mulighed for at slette/redigere mappings
+### 4. Opdater preview-tabel (linje ~1478-1510)
+- Vis `sale.realProductName` i stedet for `sale.targetProductName` i Produkt-kolonnen
+- Tilføj kolonne **Provision** med `sale.commission` formateret som DKK
+- Tilføj kolonne **Omsætning** med `sale.revenue` formateret som DKK
+- Vis altid Produkt-kolonnen (fjern conditional check)
 
-### 3. `Cancellations.tsx` — Ny fane
-- Tilføj `{ value: 'mapping', label: 'Mapping' }` i `autoTabs` efter 'history'
-- Render `<SellerMappingTab clientId={selectedClientId} />` i TabsContent
+### 5. Formattering
+Brug `formatCurrency` fra `@/lib/calculations/formatting` for DKK-visning.
 
-## Flow
-1. Upload fil → filter → matching kører
-2. Rækker med telefon → matches via produkt-phone (eksisterende)
-3. Rækker uden telefon → systemet slår `excel_seller_name` op i `cancellation_seller_mappings`
-   - Fundet → bruger employee_id til agent-lookup → matcher via sælger + dato + produkt
-   - Ikke fundet → vises som "umatched" med medarbejder-dropdown
-4. Bruger vælger medarbejder i dropdown → mapping gemmes → re-match køres
-5. Næste upload → automatisk match via den gemte mapping
-
-## Teknisk detalje: Sælger+dato+produkt matching
-Når en seller-mapping er resolved (enten automatisk eller manuelt):
-- Find medarbejderens agent_email via `employee_master_data.work_email` → `agents.email` → `sales.agent_email`
-- Match salg hvor `agent_email` matcher OG `sale_datetime` er samme dag som Excel-datoen
-- Tjek at salget har et `sale_item` med `adversus_product_title` der matcher (f.eks. "5GI" for "5G Internet")
-- Config bruges til at mappe Excel-produktnavne til DB-produktnavne via `fallback_product_mappings`
+## Teknisk detalje
+For Pass 1 matches: Vi ved at "Telefon Abo1" → position 1 i salgets produkter. Vi matcher sale_item ved at tjekke index/position eller ved at kigge på `adversus_product_title` patterns. Simplest: for hvert matched salg, hent alle sale_items og vis det item der matcher den abo-position (1/2/3) baseret på mapping-indekset. Alternativt vis alle items' navne som comma-separated hvis positional mapping er usikker.
 
