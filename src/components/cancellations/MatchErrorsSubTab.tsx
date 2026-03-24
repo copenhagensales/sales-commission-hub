@@ -7,10 +7,11 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import { Search, Loader2, AlertTriangle } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Button } from "@/components/ui/button";
+import { Search, Loader2, AlertTriangle, Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 
 interface UnmatchedRow {
@@ -52,6 +53,7 @@ function parseFlexibleDate(value: unknown): string | null {
 export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [localAssignments, setLocalAssignments] = useState<Record<number, string>>({});
+  const [openPopoverIdx, setOpenPopoverIdx] = useState<number | null>(null);
   const queryClient = useQueryClient();
 
   // Fetch unmatched rows
@@ -327,25 +329,54 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
                     </Badge>
                   </TableCell>
                   {sellerField && (
-                    <TableCell className="min-w-[200px]">
-                      <Select
-                        value={currentMapping}
-                        onValueChange={(val) => {
-                          setLocalAssignments(prev => ({ ...prev, [idx]: val }));
-                          upsertMapping.mutate({ row, rowIndex: idx, employeeId: val });
-                        }}
+                    <TableCell className="min-w-[220px]">
+                      <Popover
+                        open={openPopoverIdx === idx}
+                        onOpenChange={(open) => setOpenPopoverIdx(open ? idx : null)}
                       >
-                        <SelectTrigger className="h-8 text-xs">
-                          <SelectValue placeholder="Vælg medarbejder..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {employees.map(emp => (
-                            <SelectItem key={emp.id} value={emp.id}>
-                              {emp.first_name} {emp.last_name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            className="h-8 w-full justify-between text-xs font-normal"
+                          >
+                            <span className="truncate">
+                              {currentMapping
+                                ? (() => {
+                                    const emp = employees.find(e => e.id === currentMapping);
+                                    return emp ? `${emp.first_name} ${emp.last_name}` : "Vælg medarbejder...";
+                                  })()
+                                : "Vælg medarbejder..."}
+                            </span>
+                            <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[250px] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Søg medarbejder..." className="h-9 text-xs" />
+                            <CommandList>
+                              <CommandEmpty>Ingen medarbejder fundet.</CommandEmpty>
+                              <CommandGroup>
+                                {employees.map(emp => (
+                                  <CommandItem
+                                    key={emp.id}
+                                    value={`${emp.first_name} ${emp.last_name}`}
+                                    onSelect={() => {
+                                      setLocalAssignments(prev => ({ ...prev, [idx]: emp.id }));
+                                      upsertMapping.mutate({ row, rowIndex: idx, employeeId: emp.id });
+                                      setOpenPopoverIdx(null);
+                                    }}
+                                    className="text-xs"
+                                  >
+                                    <Check className={cn("mr-2 h-3 w-3", currentMapping === emp.id ? "opacity-100" : "opacity-0")} />
+                                    {emp.first_name} {emp.last_name}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                     </TableCell>
                   )}
                   {allKeys.map(key => (
