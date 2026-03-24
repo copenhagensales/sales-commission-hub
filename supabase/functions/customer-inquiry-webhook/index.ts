@@ -116,7 +116,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { name, company, email, phone, message, _hp } = body;
+    const { name, company, email, phone, message, _hp, fbclid: rawFbclid, Fbclid } = body;
 
     // Honeypot
     if (_hp) {
@@ -151,12 +151,15 @@ Deno.serve(async (req) => {
       }
     }
 
+    const fbclid = (rawFbclid || Fbclid) ? String(rawFbclid || Fbclid).trim().slice(0, 500) : null;
+
     const sanitized = {
       name: String(name).trim().slice(0, 200),
       company: company ? String(company).trim().slice(0, 200) : null,
       email: email ? String(email).trim().slice(0, 255) : null,
       phone: phone ? String(phone).trim().slice(0, 50) : null,
       message: message ? String(message).trim().slice(0, 5000) : null,
+      fbclid,
     };
 
     const { data, error } = await supabase.from("customer_inquiries").insert(sanitized).select().single();
