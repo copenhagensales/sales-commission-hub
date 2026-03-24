@@ -15,7 +15,18 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
-import { Check, X, Loader2, Clock, Filter, Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Check, X, Loader2, Clock, Filter, Search, ArrowUpDown, ArrowUp, ArrowDown, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
@@ -1013,6 +1024,49 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
               <AlertTriangle className="h-3 w-3 mr-1" />
               {activeImport.pendingCount} rækker afventer
             </Badge>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm">
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Slet
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Slet upload og rul alt tilbage?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Dette vil slette uploaden "{activeImport.file_name}" og rulle alle ændringer tilbage — inkl. godkendte annulleringer og kurvrettelser. Salg vil blive gendannet til deres oprindelige status.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Annuller</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    onClick={async () => {
+                      try {
+                        const { data, error } = await supabase.rpc("rollback_cancellation_import", {
+                          p_import_id: activeImport.id,
+                        });
+                        if (error) throw error;
+                        const result = data as any;
+                        toast({
+                          title: "Upload slettet og rullet tilbage",
+                          description: `${result?.reversed_approved || 0} godkendte blev rullet tilbage, ${result?.removed_pending || 0} afventende fjernet.`,
+                        });
+                        queryClient.invalidateQueries({ queryKey: ["active-import-info"] });
+                        queryClient.invalidateQueries({ queryKey: ["active-import-block"] });
+                        queryClient.invalidateQueries({ queryKey: ["cancellation-queue"] });
+                        queryClient.invalidateQueries({ queryKey: ["match-errors"] });
+                      } catch (err: any) {
+                        toast({ title: "Fejl", description: err.message, variant: "destructive" });
+                      }
+                    }}
+                  >
+                    Ja, slet og rul tilbage
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </CardContent>
         </Card>
       )}
