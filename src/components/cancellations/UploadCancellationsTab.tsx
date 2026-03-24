@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useDropzone } from "react-dropzone";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -97,6 +97,8 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
   const [showSaveConfig, setShowSaveConfig] = useState(false);
   const [filterColumn, setFilterColumn] = useState<string>("__none__");
   const [filterValue, setFilterValue] = useState<string>("");
+  const [appliedConfigName, setAppliedConfigName] = useState<string>("");
+  const autoMatchPending = useRef(false);
 
   // Fetch configs for selected client
   const { data: clientConfigs = [] } = useQuery({
@@ -222,7 +224,17 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
         setColumns(cols);
         setParsedData(jsonData.map(row => ({ originalRow: row })));
-        setStep("mapping");
+
+        // Check if a default config exists — if so, skip mapping step
+        const defaultConfig = clientConfigs.find(c => c.is_default) || (clientConfigs.length > 0 ? clientConfigs[0] : null);
+        if (defaultConfig) {
+          applyConfig(defaultConfig);
+          setSelectedConfigId(defaultConfig.id);
+          setAppliedConfigName(defaultConfig.name);
+          autoMatchPending.current = true;
+        } else {
+          setStep("mapping");
+        }
 
         toast({
           title: "Fil indlæst",
@@ -237,7 +249,15 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       }
     };
     reader.readAsArrayBuffer(uploadedFile);
-  }, []);
+  }, [clientConfigs]);
+
+  // Auto-match when file is parsed and a default config was applied
+  useEffect(() => {
+    if (autoMatchPending.current && parsedData.length > 0) {
+      autoMatchPending.current = false;
+      handleMatch();
+    }
+  }, [parsedData]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -652,6 +672,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     setCommissionColumn("__none__");
     setFilterColumn("__none__");
     setFilterValue("");
+    setAppliedConfigName("");
     setUploadType("cancellation");
     setSelectedConfigId("__none__");
     setMatchedSales([]);
@@ -685,6 +706,16 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                 </>
               )}
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {step === "upload" && isMatching && (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <Loader2 className="h-8 w-8 mx-auto mb-4 animate-spin text-primary" />
+            <p className="text-lg font-medium">Matcher automatisk...</p>
+            <p className="text-sm text-muted-foreground mt-1">Bruger opsætning: {appliedConfigName}</p>
           </CardContent>
         </Card>
       )}
@@ -908,6 +939,20 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {appliedConfigName && (
+              <div className="flex items-center gap-2 text-sm bg-muted/50 rounded-md px-3 py-2">
+                <Settings className="h-4 w-4 text-muted-foreground" />
+                <span>Bruger opsætning: <strong>{appliedConfigName}</strong></span>
+                {filterColumn !== "__none__" && filterValue.trim() && (
+                  <Badge variant="secondary" className="ml-2">
+                    Filter: {filterColumn} = {filterValue}
+                  </Badge>
+                )}
+                <Button variant="link" size="sm" className="ml-auto p-0 h-auto" onClick={() => setStep("mapping")}>
+                  Rediger mapping
+                </Button>
+              </div>
+            )}
             {matchedSales.length === 0 ? (
               <div className="py-8 text-center text-muted-foreground">
                 <X className="h-12 w-12 mx-auto mb-4" />
