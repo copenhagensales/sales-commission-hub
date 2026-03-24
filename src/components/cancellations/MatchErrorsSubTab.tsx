@@ -201,14 +201,14 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
         // Insert into cancellation_queue
         const { error: queueError } = await supabase
           .from("cancellation_queue")
-          .insert({
+          .insert([{
             import_id: row.importId,
             sale_id: sales[0].id,
             upload_type: row.uploadType,
             status: "pending",
-            uploaded_data: row.rowData,
+            uploaded_data: row.rowData as Record<string, unknown> as Record<string, Json>,
             client_id: clientId,
-          });
+          }]);
         if (queueError) {
           console.error("Failed to insert into cancellation_queue:", queueError);
           continue;
