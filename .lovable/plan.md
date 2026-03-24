@@ -1,16 +1,34 @@
 
 
-# Add fbclid to Customer Inquiries
+# Eesy TM annulleringsfil: Filtrér på "Annulled Sales" = 1
 
-## Changes
+## Problem
+Excel-filen indeholder alle salg (bekræftede, afviste, annullerede). Kun rækker med `Annulled Sales = 1` skal behandles som annulleringer. Systemet har i dag ingen filtreringsfunktion — alle rækker sendes til matching.
 
-| Change | What |
-|--------|------|
-| **Database migration** | `ALTER TABLE customer_inquiries ADD COLUMN fbclid TEXT;` |
-| **`supabase/functions/customer-inquiry-webhook/index.ts`** | Extract `fbclid` (or `Fbclid`) from request body, include in sanitized insert object |
+## Løsning
+Tilføj en **filterkolonne** og **filterværdi** til mapping-trinnet, så kun rækker der matcher filteret inkluderes i matching.
 
-## Edge Function Change (line ~113)
-- Destructure: add `fbclid: rawFbclid` and `Fbclid` from body
-- Resolve: `const fbclid = rawFbclid || Fbclid || null;`
-- Add `fbclid` to the `sanitized` object (trimmed, max 500 chars)
+| Fil | Ændring |
+|-----|---------|
+| `src/components/cancellations/UploadCancellationsTab.tsx` | Tilføj `filterColumn` og `filterValue` state. Filtrér `parsedData` i `handleMatch` så kun rækker med den valgte filterværdi behandles. Tilføj UI-selectors i mapping-trinnet. |
+| `cancellation_upload_configs` (DB) | Tilføj `filter_column TEXT` og `filter_value TEXT` kolonner, så filteret kan gemmes i opsætningen. |
+
+## Konkret flow
+
+1. **Mapping-trinnet**: Ny sektion "Filtrer rækker (valgfri)" med:
+   - Dropdown: vælg filterkolonne (f.eks. "Annulled Sales")
+   - Tekstfelt: angiv filterværdi (f.eks. "1")
+   - Badge der viser: "X af Y rækker inkluderet"
+
+2. **Matching**: Før matching starter, filtreres `parsedData` så kun rækker hvor `row.originalRow[filterColumn] == filterValue` inkluderes. Umatchede rækker beregnes kun ud fra de filtrerede rækker.
+
+3. **Config**: `applyConfig` og `saveConfigMutation` udvides til at inkludere `filter_column` og `filter_value`.
+
+## For Eesy TM
+Brugeren sætter:
+- Telefonkolonne → "Phone Number"
+- Filterkolonne → "Annulled Sales"  
+- Filterværdi → "1"
+
+Gemmes som standard-opsætning for Eesy TM.
 
