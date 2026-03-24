@@ -971,11 +971,13 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     setStep("type");
   };
 
-  // Compute unmatched count for preview
+  // Compute unmatched rows for preview
   const filteredDataForPreview = (filterColumn !== "__none__" && filterValue.trim())
     ? parsedData.filter(row => String(row.originalRow[filterColumn] ?? "").trim() === filterValue.trim())
     : parsedData;
-  const unmatchedCount = filteredDataForPreview.length - matchedRowIndices.size;
+  const unmatchedRows = filteredDataForPreview.filter((_, idx) => !matchedRowIndices.has(idx));
+  const unmatchedCount = unmatchedRows.length;
+  const [previewTab, setPreviewTab] = useState<"matched" | "unmatched">("matched");
 
   return (
     <div className="space-y-6">
@@ -1108,45 +1110,76 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
             {/* Stats */}
             <div className="flex gap-4">
-              <Badge variant="default" className="text-sm px-3 py-1">
+              <Badge
+                variant={previewTab === "matched" ? "default" : "outline"}
+                className="text-sm px-3 py-1 cursor-pointer"
+                onClick={() => setPreviewTab("matched")}
+              >
                 {matchedSales.length} matchede salg
               </Badge>
               {unmatchedCount > 0 && (
-                <Badge variant="destructive" className="text-sm px-3 py-1">
+                <Badge
+                  variant={previewTab === "unmatched" ? "destructive" : "outline"}
+                  className="text-sm px-3 py-1 cursor-pointer"
+                  onClick={() => setPreviewTab("unmatched")}
+                >
                   {unmatchedCount} umatchede rækker
                 </Badge>
               )}
             </div>
 
-            {matchedSales.length === 0 ? (
-              <div className="py-8 text-center text-muted-foreground">
-                <X className="h-12 w-12 mx-auto mb-4" />
-                <p>Ingen matchende salg fundet</p>
-              </div>
+            {previewTab === "matched" ? (
+              matchedSales.length === 0 ? (
+                <div className="py-8 text-center text-muted-foreground">
+                  <X className="h-12 w-12 mx-auto mb-4" />
+                  <p>Ingen matchende salg fundet</p>
+                </div>
+              ) : (
+                <div className="rounded-md border max-h-96 overflow-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Salgsdato</TableHead>
+                        <TableHead>Sælger</TableHead>
+                        <TableHead>Telefon</TableHead>
+                        <TableHead>Virksomhed</TableHead>
+                        <TableHead>OPP-nummer</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {matchedSales.map((sale) => (
+                        <TableRow key={sale.saleId}>
+                          <TableCell>{sale.saleDate}</TableCell>
+                          <TableCell>{resolve(sale.employee)}</TableCell>
+                          <TableCell>{sale.phone || "-"}</TableCell>
+                          <TableCell>{sale.company || "-"}</TableCell>
+                          <TableCell>{sale.oppNumber || "-"}</TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">{sale.currentStatus}</Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )
             ) : (
               <div className="rounded-md border max-h-96 overflow-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Salgsdato</TableHead>
-                      <TableHead>Sælger</TableHead>
-                      <TableHead>Telefon</TableHead>
-                      <TableHead>Virksomhed</TableHead>
-                      <TableHead>OPP-nummer</TableHead>
-                      <TableHead>Status</TableHead>
+                      {columns.map((col) => (
+                        <TableHead key={col}>{col}</TableHead>
+                      ))}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {matchedSales.map((sale) => (
-                      <TableRow key={sale.saleId}>
-                        <TableCell>{sale.saleDate}</TableCell>
-                        <TableCell>{resolve(sale.employee)}</TableCell>
-                        <TableCell>{sale.phone || "-"}</TableCell>
-                        <TableCell>{sale.company || "-"}</TableCell>
-                        <TableCell>{sale.oppNumber || "-"}</TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">{sale.currentStatus}</Badge>
-                        </TableCell>
+                    {unmatchedRows.map((row, idx) => (
+                      <TableRow key={idx}>
+                        {columns.map((col) => (
+                          <TableCell key={col}>{String(row.originalRow[col] ?? "-")}</TableCell>
+                        ))}
                       </TableRow>
                     ))}
                   </TableBody>
