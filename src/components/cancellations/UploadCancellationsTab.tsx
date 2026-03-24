@@ -928,7 +928,21 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {matchedSales.length === 0 ? (
+            {appliedConfigName && (
+              <div className="flex items-center gap-2 text-sm bg-muted/50 rounded-md px-3 py-2">
+                <Settings className="h-4 w-4 text-muted-foreground" />
+                <span>Bruger opsætning: <strong>{appliedConfigName}</strong></span>
+                {filterColumn !== "__none__" && filterValue.trim() && (
+                  <Badge variant="secondary" className="ml-2">
+                    Filter: {filterColumn} = {filterValue}
+                  </Badge>
+                )}
+                <Button variant="link" size="sm" className="ml-auto p-0 h-auto" onClick={() => setStep("mapping")}>
+                  Rediger mapping
+                </Button>
+              </div>
+            )}
+
               <div className="py-8 text-center text-muted-foreground">
                 <X className="h-12 w-12 mx-auto mb-4" />
                 <p>Ingen matchende salg fundet</p>
