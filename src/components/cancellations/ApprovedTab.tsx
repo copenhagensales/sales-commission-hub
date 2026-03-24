@@ -24,6 +24,7 @@ function extractOpp(rawPayload: any): string {
 }
 
 export function ApprovedTab({ clientId }: ApprovedTabProps) {
+  const { resolve } = useAgentNameResolver();
   const [searchQuery, setSearchQuery] = useState("");
   const [sellerFilter, setSellerFilter] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("reviewed_at");
@@ -130,7 +131,7 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
               <SelectContent>
                 <SelectItem value="all">Alle sælgere</SelectItem>
                 {sellers.map((s) => (
-                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                <SelectItem key={s} value={s}>{resolve(s)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -159,7 +160,7 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
               {filtered.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell>{item.saleDate ? format(new Date(item.saleDate), "dd-MM-yyyy") : "-"}</TableCell>
-                  <TableCell>{item.agentName || "-"}</TableCell>
+                  <TableCell>{resolve(item.agentName) || "-"}</TableCell>
                   <TableCell className="font-mono text-xs">{item.opp || "-"}</TableCell>
                   <TableCell>
                     <Badge variant="outline">

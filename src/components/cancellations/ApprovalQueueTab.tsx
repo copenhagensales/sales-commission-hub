@@ -285,6 +285,7 @@ interface ApprovalQueueTabProps {
 }
 
 export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
+  const { resolve } = useAgentNameResolver();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const [statusFilter, setStatusFilter] = useState<string>("pending");
@@ -695,7 +696,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                       <TableRow key={g.oppGroup}>
                         <TableCell className="font-mono text-xs">{g.oppGroup}</TableCell>
                         <TableCell className="text-xs align-top">
-                          {g.agents.join(", ")}
+                          {g.agents.map(a => resolve(a)).join(", ")}
                           <div className="text-muted-foreground">({g.saleCount} salg)</div>
                         </TableCell>
                         <TableCell className="align-top">
@@ -811,7 +812,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                     return (
                       <TableRow key={item.id}>
                         <TableCell>{item.saleDate ? format(new Date(item.saleDate), "dd/MM/yyyy HH:mm") : "-"}</TableCell>
-                        <TableCell>{item.agentName}</TableCell>
+                        <TableCell>{resolve(item.agentName)}</TableCell>
                         <TableCell>{item.oppNumber || "-"}</TableCell>
                         <TableCell>
                           <Badge variant={item.upload_type === "cancellation" ? "destructive" : "secondary"}>
