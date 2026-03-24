@@ -1,13 +1,16 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Search, ArrowUpDown, ArrowUp, ArrowDown, Loader2, AlertTriangle } from "lucide-react";
-import { useAgentNameResolver } from "@/hooks/useAgentNameResolver";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { Search, Loader2, AlertTriangle } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
 interface UnmatchedRow {
   [key: string]: unknown;
@@ -23,11 +26,11 @@ interface MatchErrorsSubTabProps {
   clientId: string;
 }
 
-const SELLER_FIELD_CANDIDATES = ["operator", "agent", "sælger", "agent_email", "seller", "agent_name"];
+const SELLER_FIELD_CANDIDATES = ["operator", "agent", "sælger", "agent_email", "seller", "agent_name", "employee name", "employee_name"];
 
 export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const { resolve } = useAgentNameResolver();
+  const queryClient = useQueryClient();
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["match-errors", clientId],
@@ -58,6 +61,60 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
         }
       }
       return flat;
+    },
+  });
+
+  const { data: employees = [] } = useQuery({
+    queryKey: ["active-employees-for-mapping"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name")
+        .eq("is_active", true)
+        .order("first_name");
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const { data: existingMappings = [] } = useQuery({
+    queryKey: ["cancellation-seller-mappings", clientId],
+    queryFn: async () => {
+      if (!clientId) return [];
+      const { data, error } = await supabase
+        .from("cancellation_seller_mappings")
+        .select("excel_seller_name, employee_id")
+        .eq("client_id", clientId);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!clientId,
+  });
+
+  const mappingsByName = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const m of existingMappings) {
+      map.set(m.excel_seller_name?.toLowerCase() ?? "", m.employee_id);
+    }
+    return map;
+  }, [existingMappings]);
+
+  const upsertMapping = useMutation({
+    mutationFn: async ({ excelName, employeeId }: { excelName: string; employeeId: string }) => {
+      const { error } = await supabase
+        .from("cancellation_seller_mappings")
+        .upsert(
+          { excel_seller_name: excelName, employee_id: employeeId, client_id: clientId },
+          { onConflict: "client_id,excel_seller_name" }
+        );
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: "Sælger-mapping gemt" });
+      queryClient.invalidateQueries({ queryKey: ["cancellation-seller-mappings", clientId] });
+    },
+    onError: () => {
+      toast({ title: "Fejl ved gemning af mapping", variant: "destructive" });
     },
   });
 
@@ -121,32 +178,55 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
           <TableHeader>
             <TableRow>
               <TableHead>Type</TableHead>
-              {sellerField && <TableHead>Sælger</TableHead>}
+              {sellerField && <TableHead className="whitespace-nowrap">Tildel sælger</TableHead>}
               {allKeys.map(key => (
                 <TableHead key={key} className="whitespace-nowrap">{key}</TableHead>
               ))}
             </TableRow>
           </TableHeader>
           <TableBody>
-            {processed.map((row, idx) => (
-              <TableRow key={`${row.importId}-${idx}`}>
-                <TableCell>
-                  <Badge variant={row.uploadType === "cancellation" ? "destructive" : "secondary"}>
-                    {row.uploadType === "cancellation" ? "Annullering" : "Kurvrettelse"}
-                  </Badge>
-                </TableCell>
-                {sellerField && (
-                  <TableCell className="text-xs whitespace-nowrap font-medium">
-                    {resolve(row.rowData[sellerField] as string | null)}
+            {processed.map((row, idx) => {
+              const sellerValue = sellerField ? String(row.rowData[sellerField] ?? "") : "";
+              const currentMapping = mappingsByName.get(sellerValue.toLowerCase());
+
+              return (
+                <TableRow key={`${row.importId}-${idx}`}>
+                  <TableCell>
+                    <Badge variant={row.uploadType === "cancellation" ? "destructive" : "secondary"}>
+                      {row.uploadType === "cancellation" ? "Annullering" : "Kurvrettelse"}
+                    </Badge>
                   </TableCell>
-                )}
-                {allKeys.map(key => (
-                  <TableCell key={key} className="text-xs whitespace-nowrap">
-                    {row.rowData[key] != null ? String(row.rowData[key]) : "-"}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))}
+                  {sellerField && (
+                    <TableCell className="min-w-[200px]">
+                      <Select
+                        value={currentMapping ?? ""}
+                        onValueChange={(val) => {
+                          if (sellerValue) {
+                            upsertMapping.mutate({ excelName: sellerValue, employeeId: val });
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="Vælg medarbejder..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {employees.map(emp => (
+                            <SelectItem key={emp.id} value={emp.id}>
+                              {emp.first_name} {emp.last_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                  )}
+                  {allKeys.map(key => (
+                    <TableCell key={key} className="text-xs whitespace-nowrap">
+                      {row.rowData[key] != null ? String(row.rowData[key]) : "-"}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </div>
