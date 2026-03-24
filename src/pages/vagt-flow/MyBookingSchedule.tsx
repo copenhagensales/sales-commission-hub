@@ -184,38 +184,32 @@ export default function MyBookingSchedule() {
         photoUrl = urlData.publicUrl;
       }
 
-      // Upsert confirmation (unique on booking_id + vehicle_id + booking_date)
-      const { data, error } = await (supabase as any)
-        .from("vehicle_return_confirmation")
-        .upsert({
+      // Call edge function that handles both DB upsert and email notification
+      const { data: fnData, error: fnError } = await supabase.functions.invoke("notify-vehicle-returned", {
+        body: {
           booking_id: bookingId,
           vehicle_id: vehicleId,
-          employee_id: employeeId,
           vehicle_name: vehicleName,
           booking_date: bookingDate,
-          ...(photoUrl ? { photo_url: photoUrl } : {}),
-        }, { onConflict: "booking_id,vehicle_id,booking_date" })
-        .select("id, confirmed_at")
-        .single();
-      if (error) throw error;
+          photo_url: photoUrl,
+          employee_id: employeeId,
+        },
+      });
 
-      // Always send notification on confirm action
-      try {
-        const { error: fnError } = await supabase.functions.invoke("notify-vehicle-returned", {
-          body: {
-            employee_name: employeeName,
-            vehicle_name: vehicleName,
-            booking_date: bookingDate,
-            photo_url: photoUrl,
-          },
-        });
-        if (fnError) console.error("Notification error:", fnError);
-      } catch (notifyErr) {
-        console.error("Failed to send vehicle return notification:", notifyErr);
-      }
+      if (fnError) throw new Error(fnError.message || "Funktionskald fejlede");
+
+      // Parse response for notification status
+      const result = typeof fnData === "string" ? JSON.parse(fnData) : fnData;
+      if (result?.error) throw new Error(result.error);
+
+      return result;
     },
-    onSuccess: () => {
-      toast.success("Nøgle aflevering bekræftet!");
+    onSuccess: (result: any) => {
+      if (result?.notified > 0) {
+        toast.success("Nøgle aflevering bekræftet og notifikation sendt!");
+      } else {
+        toast.success("Nøgle aflevering bekræftet!", { description: "Ingen FM-ledere fundet til notifikation." });
+      }
       queryClient.invalidateQueries({ queryKey: ["vehicle-return-confirmations"] });
     },
     onError: (err: any) => {

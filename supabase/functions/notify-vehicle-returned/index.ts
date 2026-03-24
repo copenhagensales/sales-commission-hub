@@ -76,20 +76,87 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
   try {
-    const { employee_name, vehicle_name, booking_date, photo_url } = await req.json();
+    const {
+      booking_id,
+      vehicle_id,
+      vehicle_name,
+      booking_date,
+      photo_url,
+      employee_id,
+    } = await req.json();
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    console.log("[notify-vehicle-returned] START", {
+      booking_id,
+      vehicle_id,
+      vehicle_name,
+      booking_date,
+      employee_id: employee_id?.slice(0, 8),
+      has_photo: !!photo_url,
+    });
 
-    // Find FM assistant team leaders via junction table
+    if (!booking_id || !vehicle_id || !vehicle_name || !booking_date || !employee_id) {
+      return new Response(
+        JSON.stringify({ error: "Missing required fields: booking_id, vehicle_id, vehicle_name, booking_date, employee_id" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // 1. Look up employee name
+    const { data: emp, error: empError } = await supabase
+      .from("employee_master_data")
+      .select("first_name, last_name")
+      .eq("id", employee_id)
+      .single();
+
+    if (empError || !emp) {
+      console.error("Employee lookup failed:", empError);
+      return new Response(
+        JSON.stringify({ error: "Employee not found" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const employeeName = `${emp.first_name} ${emp.last_name}`;
+    console.log("[notify-vehicle-returned] Employee:", employeeName);
+
+    // 2. Upsert vehicle_return_confirmation
+    const upsertPayload: Record<string, any> = {
+      booking_id,
+      vehicle_id,
+      employee_id,
+      vehicle_name,
+      booking_date,
+    };
+    if (photo_url) upsertPayload.photo_url = photo_url;
+
+    const { error: upsertError } = await supabase
+      .from("vehicle_return_confirmation")
+      .upsert(upsertPayload, { onConflict: "booking_id,vehicle_id,booking_date" });
+
+    if (upsertError) {
+      console.error("Upsert failed:", upsertError);
+      return new Response(
+        JSON.stringify({ error: "Failed to save confirmation: " + upsertError.message }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("[notify-vehicle-returned] Confirmation saved");
+
+    // 3. Find FM assistant team leaders via junction table
     const { data: fmTeams } = await supabase
       .from("teams")
       .select("id")
       .ilike("name", "%fieldmarketing%");
 
     const fmTeamIds = (fmTeams ?? []).map((t: any) => t.id);
+    console.log("[notify-vehicle-returned] FM teams found:", fmTeamIds.length);
 
     let recipientEmails: string[] = [];
 
@@ -100,6 +167,7 @@ serve(async (req) => {
         .in("team_id", fmTeamIds);
 
       const assistantIds = (assistants ?? []).map((a: any) => a.employee_id);
+      console.log("[notify-vehicle-returned] Assistant leader IDs:", assistantIds);
 
       if (assistantIds.length > 0) {
         const { data: employees } = await supabase
@@ -111,16 +179,20 @@ serve(async (req) => {
         recipientEmails = (employees ?? [])
           .map((e: any) => e.work_email || e.private_email)
           .filter(Boolean);
+
+        console.log("[notify-vehicle-returned] Recipient emails:", recipientEmails);
       }
     }
 
     if (recipientEmails.length === 0) {
-      console.warn("No FM leaders found to notify");
-      return new Response(JSON.stringify({ ok: true, notified: 0 }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      console.warn("[notify-vehicle-returned] No FM leaders found to notify");
+      return new Response(
+        JSON.stringify({ ok: true, confirmed: true, notified: 0, recipients: [] }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
+    // 4. Send email
     const accessToken = await getM365AccessToken();
 
     const photoHtml = photo_url
@@ -130,7 +202,7 @@ serve(async (req) => {
     const htmlBody = `
       <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
         <h2 style="color: #b45309;">🔑 Nøgle afleveret</h2>
-        <p><strong>${employee_name}</strong> har bekræftet aflevering af nøgle til <strong>${vehicle_name}</strong>.</p>
+        <p><strong>${employeeName}</strong> har bekræftet aflevering af nøgle til <strong>${vehicle_name}</strong>.</p>
         <p>Dato: <strong>${booking_date}</strong></p>
         ${photoHtml}
         <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 16px 0;" />
@@ -139,15 +211,17 @@ serve(async (req) => {
     `;
 
     await sendEmail(accessToken, recipientEmails, `Nøgle afleveret: ${vehicle_name} (${booking_date})`, htmlBody);
+    console.log("[notify-vehicle-returned] Email sent successfully to", recipientEmails.length, "recipients");
 
-    return new Response(JSON.stringify({ ok: true, notified: recipientEmails.length }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ ok: true, confirmed: true, notified: recipientEmails.length, recipients: recipientEmails }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   } catch (error) {
-    console.error("Error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    console.error("[notify-vehicle-returned] ERROR:", error);
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   }
 });
