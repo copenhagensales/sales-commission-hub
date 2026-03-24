@@ -151,6 +151,38 @@ export function useSellerSalariesCached(
     staleTime: 60000,
   });
 
+  // Query 7: Approved cancellations for the period (deduction_date within period)
+  const { data: cancellationData, isLoading: cancellationLoading } = useQuery({
+    queryKey: ["seller-cancellations", periodStartISO, periodEndISO],
+    queryFn: async () => {
+      if (!periodStartISO || !periodEndISO) return [];
+      const { data, error } = await (supabase
+        .from("cancellation_queue") as any)
+        .select(`
+          id,
+          deduction_date,
+          reviewed_at,
+          sale_id,
+          sales!inner(
+            agent_email,
+            sale_items(mapped_commission)
+          )
+        `)
+        .eq("status", "approved");
+      
+      if (error) throw error;
+      
+      // Filter by deduction_date (fallback to reviewed_at) within period
+      return (data || []).filter((item: any) => {
+        const effectiveDate = item.deduction_date || (item.reviewed_at ? item.reviewed_at.split('T')[0] : null);
+        if (!effectiveDate) return false;
+        return effectiveDate >= periodStartISO && effectiveDate <= periodEndISO;
+      });
+    },
+    enabled: !!periodStartISO && !!periodEndISO,
+    staleTime: 60000,
+  });
+
   // Helper to find the correct vacation pay rate based on vacation type
   const getVacationPayRate = (vacationType: string | null): number => {
     if (!vacationType || !salaryTypes) return 0;
@@ -210,6 +242,20 @@ export function useSellerSalariesCached(
       dailyBonusMap[db.employee_id] = (dailyBonusMap[db.employee_id] || 0) + (db.amount || 0);
     }
 
+    // Build cancellation map (agent_email → employee_id → total lost commission)
+    const cancellationMap: Record<string, number> = {};
+    for (const cq of cancellationData || []) {
+      const sale = cq.sales;
+      if (!sale?.agent_email) continue;
+      const agentEmail = sale.agent_email.toLowerCase();
+      const employeeId = emailToEmployeeId[agentEmail];
+      if (!employeeId) continue;
+      const totalCommission = (sale.sale_items || []).reduce(
+        (sum: number, si: any) => sum + (si.mapped_commission || 0), 0
+      );
+      cancellationMap[employeeId] = (cancellationMap[employeeId] || 0) + totalCommission;
+    }
+
     // Filter by team if needed
     let filteredEmployees = employees;
     if (selectedTeam && selectedTeam !== "all") {
@@ -236,7 +282,7 @@ export function useSellerSalariesCached(
         team: teamName,
         teamId: teamId,
         commission,
-        cancellations: 0,
+        cancellations: cancellationMap[emp.id] || 0,
         vacationType,
         vacationPay,
         diet: dietMap[emp.id] || 0,
@@ -251,11 +297,11 @@ export function useSellerSalariesCached(
     sellers.sort((a, b) => b.commission - a.commission);
 
     return { sellerData: sellers, lastUpdated: new Date() };
-  }, [employees, salesAggregates, selectedTeam, salaryTypes, dietData, sickData, dailyBonusData]);
+  }, [employees, salesAggregates, selectedTeam, salaryTypes, dietData, sickData, dailyBonusData, cancellationData]);
 
   return {
     sellerData,
-    isLoading: employeesLoading || commissionLoading || salaryTypesLoading || dietLoading || sickLoading || dailyBonusLoading,
+    isLoading: employeesLoading || commissionLoading || salaryTypesLoading || dietLoading || sickLoading || dailyBonusLoading || cancellationLoading,
     lastUpdated,
   };
 }
