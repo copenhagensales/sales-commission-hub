@@ -27,11 +27,16 @@ interface CancellationImport {
   hasApprovedItems?: boolean;
 }
 
-export function CancellationHistoryTable() {
+interface CancellationHistoryTableProps {
+  clientId: string;
+}
+
+export function CancellationHistoryTable({ clientId }: CancellationHistoryTableProps) {
   const queryClient = useQueryClient();
 
   const { data: imports = [], isLoading } = useQuery({
-    queryKey: ["cancellation-imports-history"],
+    queryKey: ["cancellation-imports-history", clientId],
+    enabled: !!clientId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("cancellation_imports")
@@ -46,6 +51,7 @@ export function CancellationHistoryTable() {
           error_message,
           uploaded_by:employee_master_data!cancellation_imports_uploaded_by_fkey(first_name, last_name)
         `)
+        .eq("client_id", clientId)
         .order("created_at", { ascending: false })
         .limit(20);
 

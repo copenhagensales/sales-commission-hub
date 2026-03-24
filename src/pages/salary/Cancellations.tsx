@@ -41,6 +41,7 @@ export default function Cancellations() {
       tabs.push({ value: 'approval', label: 'Godkendelseskø' });
     if (isOwner || canView('tab_cancellations_approved'))
       tabs.push({ value: 'approved', label: 'Godkendte' });
+    tabs.push({ value: 'history', label: 'Tidligere uploads' });
     return tabs;
   }, [isOwner, canView]);
 

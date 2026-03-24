@@ -623,6 +623,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             rows_matched: matchedSales.length,
             upload_type: uploadType,
             config_id: configId,
+            client_id: clientId || null,
             unmatched_rows: unmatchedRows.length > 0 ? unmatchedRows : null,
           } as any)
           .select("id")

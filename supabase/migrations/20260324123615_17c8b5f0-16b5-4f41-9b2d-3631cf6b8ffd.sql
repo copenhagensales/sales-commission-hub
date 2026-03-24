@@ -1,0 +1,1 @@
+ALTER TABLE public.cancellation_imports ADD COLUMN client_id UUID REFERENCES public.clients(id);
