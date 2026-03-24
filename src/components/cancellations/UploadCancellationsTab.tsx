@@ -45,6 +45,12 @@ interface MatchedSale {
   employee: string;
   currentStatus: string;
   uploadedRowData: Record<string, unknown>;
+  targetProductName?: string;
+}
+
+interface ProductPhoneMapping {
+  phoneColumn: string;
+  productName: string;
 }
 
 interface UploadConfig {
@@ -62,6 +68,7 @@ interface UploadConfig {
   is_default: boolean;
   filter_column: string | null;
   filter_value: string | null;
+  product_phone_mappings?: ProductPhoneMapping[];
 }
 
 interface UploadCancellationsTabProps {
@@ -75,6 +82,14 @@ function getCaseInsensitive(obj: Record<string, unknown> | undefined, key: strin
     if (k.toLowerCase() === lowerKey) return obj[k];
   }
   return undefined;
+}
+
+/** Normalize phone: strip non-digits + remove Danish country code prefix */
+function normalizePhone(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  if (digits.startsWith("0045")) return digits.slice(4);
+  if (digits.startsWith("45") && digits.length === 10) return digits.slice(2);
+  return digits;
 }
 
 type WizardStep = "type" | "upload" | "preview" | "done";
