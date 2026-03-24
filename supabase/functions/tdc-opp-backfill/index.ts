@@ -162,7 +162,20 @@ serve(async (req) => {
         }
 
         const orderData = await response.json();
-        const leadResultData = orderData.leadResultData || orderData.resultData || [];
+        
+        // Debug: log response structure for first sale
+        if (processed === 0 && failed === 0) {
+          log(`DEBUG: /v1/sales/${orderId} response keys: ${JSON.stringify(Object.keys(orderData))}`);
+          if (orderData.lead) log(`DEBUG: lead keys: ${JSON.stringify(Object.keys(orderData.lead))}`);
+          // Log first 500 chars of response
+          log(`DEBUG: response preview: ${JSON.stringify(orderData).substring(0, 500)}`);
+        }
+        
+        // Try multiple paths to find lead result data
+        const leadResultData = orderData.leadResultData 
+          || orderData.resultData 
+          || orderData.lead?.resultData 
+          || [];
 
         const leadResultFields: Record<string, any> = {};
         if (Array.isArray(leadResultData)) {
@@ -175,7 +188,11 @@ serve(async (req) => {
         }
 
         if (leadResultData.length === 0 && Object.keys(leadResultFields).length === 0) {
-          throw new Error("API returned empty lead result data");
+          // Don't fail — just skip and mark for manual review
+          if (processed === 0 && failed === 0) {
+            log(`DEBUG: No resultData found in sales response for order ${orderId}`);
+          }
+          throw new Error("Sales endpoint has no resultData — lead likely recycled");
         }
 
         const phone = orderData.phone || orderData.contactPhone || orderData.mobile || null;
