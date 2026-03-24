@@ -224,7 +224,17 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
         setColumns(cols);
         setParsedData(jsonData.map(row => ({ originalRow: row })));
-        setStep("mapping");
+
+        // Check if a default config exists — if so, skip mapping step
+        const defaultConfig = clientConfigs.find(c => c.is_default) || (clientConfigs.length > 0 ? clientConfigs[0] : null);
+        if (defaultConfig) {
+          applyConfig(defaultConfig);
+          setSelectedConfigId(defaultConfig.id);
+          setAppliedConfigName(defaultConfig.name);
+          autoMatchPending.current = true;
+        } else {
+          setStep("mapping");
+        }
 
         toast({
           title: "Fil indlæst",
