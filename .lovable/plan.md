@@ -1,59 +1,65 @@
 
 
-# Fix: Omvendt produkt-telefon matching
+# Sælger-mapping: Manuelt match + persistent mapping-tabel
 
-## Problem
-Logikken er vendt forkert. Den nuværende kode antager at **Excel-filen** har flere telefon-kolonner (Telefon Abo1/2/3). I virkeligheden:
+## Overblik
+Når systemet ikke kan matche en sælger fra Excel-filen automatisk, skal brugeren kunne vælge den korrekte medarbejder fra en dropdown. Denne kobling gemmes permanent i en ny tabel, så fremtidige uploads matcher automatisk. En ny "Mapping"-fane viser og administrerer alle gemte mappings.
 
-- **Excel-filen**: Har kun **én** telefonkolonne ("Phone Number") med ét nummer per række
-- **Databasen**: Hvert salg har flere telefonnumre i `raw_payload.data` under nøglerne "Telefon Abo1", "Telefon Abo2", "Telefon Abo3"
+## Database
 
-Matchingen skal derfor: Tag telefonnummeret fra Excel → søg i alle kandidatsalgs `raw_payload.data` → tjek om nummeret findes i "Telefon Abo1", "Abo2" eller "Abo3" → det felt der matcher bestemmer hvilket produkt ("Abonnement1", "Abonnement2", "Abonnement3") der skal annulleres.
-
-## Ændringer
-
-### 1. Database: Omdøb `product_phone_mappings` semantik
-Opdater Eesy TM config så mappings refererer til **raw_payload felter** i stedet for Excel-kolonner:
-
+### Ny tabel: `cancellation_seller_mappings`
 ```sql
-UPDATE cancellation_upload_configs 
-SET product_phone_mappings = '[
-  {"payloadPhoneField": "Telefon Abo1", "productName": "Abonnement1"},
-  {"payloadPhoneField": "Telefon Abo2", "productName": "Abonnement2"},
-  {"payloadPhoneField": "Telefon Abo3", "productName": "Abonnement3"}
-]'::jsonb
-WHERE client_id = '81993a7b-ff24-46b8-8ffb-37a83138ddba';
+CREATE TABLE public.cancellation_seller_mappings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  excel_seller_name TEXT NOT NULL,
+  employee_id UUID NOT NULL REFERENCES employee_master_data(id),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE (client_id, excel_seller_name)
+);
+ALTER TABLE cancellation_seller_mappings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Authenticated users can manage seller mappings"
+  ON cancellation_seller_mappings FOR ALL TO authenticated USING (true) WITH CHECK (true);
 ```
 
-### 2. `UploadCancellationsTab.tsx` — Ny matching-logik
+## Kodeændringer
 
-Erstat den nuværende produkt-matching blok (linje ~725-778) med omvendt logik:
+### 1. `UploadCancellationsTab.tsx` — Sælger-matching med fallback til dropdown
 
-1. For hver filtreret Excel-række: hent telefonnummeret fra den **ene** phoneColumn
-2. For hvert kandidatsalg: tjek `raw_payload.data["Telefon Abo1"]`, `["Telefon Abo2"]`, `["Telefon Abo3"]`
-3. Hvis Excel-telefonen matcher et af disse felter → match med det tilhørende produktnavn
+**I `handleMatch`** (efter produkt-phone matching):
+- For rækker uden telefonnummer (5GI): hent sælgernavn fra Excel (`Employee Name`-kolonnen)
+- Slå op i `cancellation_seller_mappings` om der allerede findes en mapping for dette navn + client
+- Hvis ja → brug den mappede `employee_id` til at finde agent_email → match mod salg via agent + dato
+- Hvis nej → marker rækken som "umatched seller" og vis i preview
 
-```typescript
-// Pseudokode for ny logik:
-for (const row of filteredData) {
-  const excelPhone = normalizePhone(row.originalRow[phoneColumn]);
-  
-  for (const sale of candidateSales) {
-    const payloadData = sale.raw_payload?.data || {};
-    
-    for (const mapping of productPhoneMappings) {
-      const salePhone = normalizePhone(payloadData[mapping.payloadPhoneField] || "");
-      if (excelPhone && salePhone && excelPhone === salePhone) {
-        // Match! Annuller mapping.productName på dette salg
-      }
-    }
-  }
-}
-```
+**I preview-steget**:
+- Vis umatchede rækker med en dropdown der lister alle aktive medarbejdere (fra `employee_master_data`)
+- Når bruger vælger en medarbejder → gem mapping i `cancellation_seller_mappings` og kør re-match
+- Dropdown viser "Fornavn Efternavn" og gemmer `employee_id`
 
-### 3. Telefon-indsamling til DB-query
-Telefoner til candidate-query hentes stadig fra Excel's ene phoneColumn (uændret). Men candidate sales skal IKKE filtreres på `customer_phone` alene — de skal hentes bredt per campaign og derefter matches via raw_payload felterne.
+### 2. Ny komponent: `SellerMappingTab.tsx`
+- Henter alle rækker fra `cancellation_seller_mappings` for den valgte client
+- Joiner med `employee_master_data` for at vise medarbejdernavn
+- Viser tabel: Excel-sælgernavn | Mappet medarbejder | Oprettet | Slet-knap
+- Mulighed for at slette/redigere mappings
 
-### Resultat
-Excel-telefon `60633480` → tjekker alle salg → finder at salg X har `raw_payload.data["Telefon Abo2"] = "60633480"` → matcher med produktnavn "Abonnement2" → kun det produkt annulleres.
+### 3. `Cancellations.tsx` — Ny fane
+- Tilføj `{ value: 'mapping', label: 'Mapping' }` i `autoTabs` efter 'history'
+- Render `<SellerMappingTab clientId={selectedClientId} />` i TabsContent
+
+## Flow
+1. Upload fil → filter → matching kører
+2. Rækker med telefon → matches via produkt-phone (eksisterende)
+3. Rækker uden telefon → systemet slår `excel_seller_name` op i `cancellation_seller_mappings`
+   - Fundet → bruger employee_id til agent-lookup → matcher via sælger + dato + produkt
+   - Ikke fundet → vises som "umatched" med medarbejder-dropdown
+4. Bruger vælger medarbejder i dropdown → mapping gemmes → re-match køres
+5. Næste upload → automatisk match via den gemte mapping
+
+## Teknisk detalje: Sælger+dato+produkt matching
+Når en seller-mapping er resolved (enten automatisk eller manuelt):
+- Find medarbejderens agent_email via `employee_master_data.work_email` → `agents.email` → `sales.agent_email`
+- Match salg hvor `agent_email` matcher OG `sale_datetime` er samme dag som Excel-datoen
+- Tjek at salget har et `sale_item` med `adversus_product_title` der matcher (f.eks. "5GI" for "5G Internet")
+- Config bruges til at mappe Excel-produktnavne til DB-produktnavne via `fallback_product_mappings`
 
