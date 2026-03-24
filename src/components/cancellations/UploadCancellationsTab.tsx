@@ -710,6 +710,16 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         </Card>
       )}
 
+      {step === "upload" && isMatching && (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <Loader2 className="h-8 w-8 mx-auto mb-4 animate-spin text-primary" />
+            <p className="text-lg font-medium">Matcher automatisk...</p>
+            <p className="text-sm text-muted-foreground mt-1">Bruger opsætning: {appliedConfigName}</p>
+          </CardContent>
+        </Card>
+      )}
+
       {step === "mapping" && (
         <Card>
           <CardHeader>
