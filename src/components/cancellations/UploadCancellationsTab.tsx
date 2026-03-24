@@ -447,6 +447,37 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
   const [appliedConfigName, setAppliedConfigName] = useState<string>("");
   const [showEditConfig, setShowEditConfig] = useState(false);
   const autoMatchPending = useRef(false);
+  const [unmatchedSellerRows, setUnmatchedSellerRows] = useState<UnmatchedSellerRow[]>([]);
+  const [sellerDropdownSelections, setSellerDropdownSelections] = useState<Record<string, string>>({});
+
+  // Fetch all active employees for seller dropdown
+  const { data: allEmployees = [] } = useQuery({
+    queryKey: ["employees-for-seller-dropdown"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name, work_email")
+        .eq("is_active", true)
+        .order("first_name");
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Fetch existing seller mappings for this client
+  const { data: sellerMappings = [], refetch: refetchSellerMappings } = useQuery({
+    queryKey: ["cancellation-seller-mappings", selectedClientId],
+    queryFn: async () => {
+      if (!selectedClientId) return [];
+      const { data, error } = await supabase
+        .from("cancellation_seller_mappings")
+        .select("id, excel_seller_name, employee_id")
+        .eq("client_id", selectedClientId);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!selectedClientId,
+  });
 
   // Fetch configs for selected client
   const { data: clientConfigs = [] } = useQuery({
