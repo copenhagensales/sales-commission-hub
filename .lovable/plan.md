@@ -1,27 +1,24 @@
 
 
-# Redigerbar fradragsdato for annulleringer
+# Annulleringer fra godkendelsesfanen → Sælgerlønninger
 
-## Problem
-Der er ingen kolonne der viser hvilken lønperiode en annullering trækkes i, og datoen kan ikke ændres.
+## Hvad
+Hent godkendte annulleringer fra `cancellation_queue` og vis den tabte provision per sælger i "Annulleringer"-kolonnen på Sælgerlønninger-tabellen, som i dag altid viser 0 kr.
 
-## Løsning
+## Logik
+For den valgte lønperiode: hent alle `cancellation_queue`-rækker med `status = 'approved'`, hvor `deduction_date` (fallback til `reviewed_at`) falder inden for perioden. Join med `sales` (for `agent_email`) og `sale_items` (for `mapped_commission`). Aggregér provision per sælger.
 
-### 1. Database: Tilføj `deduction_date` kolonne
-Tilføj en nullable `deduction_date` (type `date`) til `cancellation_queue`. Default til `reviewed_at::date` når den er null — så eksisterende data virker uden migration af gamle rækker.
+## Ændringer
 
-### 2. UI: Ny kolonne "Trækkes i" med redigerbar dato
+### `src/hooks/useSellerSalariesCached.ts`
+1. Tilføj en ny query (Query 7) der henter godkendte annulleringer for perioden:
+   - `cancellation_queue` → `status = 'approved'`
+   - Join `sales` for agent_email og `sale_items` for mapped_commission
+   - Filtrér på `deduction_date` (eller `reviewed_at`) inden for `periodStart`–`periodEnd`
+   - Aggregér total provision per employee_id (via agent_email → employee mapping)
+2. Byg et `cancellationMap: Record<string, number>` i useMemo
+3. Sæt `cancellations: cancellationMap[emp.id] || 0` i stedet for det nuværende hardcoded `0`
 
-**`src/components/cancellations/ApprovedTab.tsx`**:
-- Importér `getPayrollPeriod` fra `@/lib/calculations/dates`
-- Tilføj kolonne **"Trækkes i"** efter Status-kolonnen
-- For godkendte sager: vis lønperioden beregnet fra `deduction_date` (eller `reviewed_at` som fallback), f.eks. "15. mar – 14. apr"
-- Gør datoen klikbar med en date picker popover — ved valg af ny dato opdateres `deduction_date` i databasen og lønperioden genberegnes
-- For afviste sager: vis "-" (ingen fradrag)
-- Brug `useMutation` til at opdatere `cancellation_queue.deduction_date` og invalidér queryen
-
-### Teknisk flow
-1. Bruger klikker på lønperiode-teksten → popover med kalender åbner
-2. Bruger vælger ny dato → `UPDATE cancellation_queue SET deduction_date = '...' WHERE id = '...'`
-3. Lønperioden genberegnes og vises med det samme
+### Ingen ændringer i UI
+`SellerSalariesTab.tsx` viser allerede `seller.cancellations` — kolonnen er der, den mangler bare data.
 
