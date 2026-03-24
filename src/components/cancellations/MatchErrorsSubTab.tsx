@@ -7,7 +7,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Search, ArrowUpDown, ArrowUp, ArrowDown, Loader2, AlertTriangle } from "lucide-react";
-import { format } from "date-fns";
+import { useAgentNameResolver } from "@/hooks/useAgentNameResolver";
 
 interface UnmatchedRow {
   [key: string]: unknown;
@@ -15,8 +15,6 @@ interface UnmatchedRow {
 
 interface FlatUnmatchedRow {
   importId: string;
-  fileName: string;
-  uploadDate: string;
   uploadType: string;
   rowData: Record<string, unknown>;
 }
@@ -25,17 +23,15 @@ interface MatchErrorsSubTabProps {
   clientId: string;
 }
 
+const SELLER_FIELD_CANDIDATES = ["operator", "agent", "sælger", "agent_email", "seller", "agent_name"];
+
 export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  type SortKey = "date" | "file";
-  type SortDir = "asc" | "desc";
-  const [sortKey, setSortKey] = useState<SortKey>("date");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const { resolve } = useAgentNameResolver();
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["match-errors", clientId],
     queryFn: async () => {
-      // Get imports that have unmatched_rows, optionally filtered by client
       let query = supabase
         .from("cancellation_imports")
         .select("id, file_name, created_at, upload_type, unmatched_rows")
@@ -56,8 +52,6 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
         for (const row of unmatchedArr) {
           flat.push({
             importId: imp.id,
-            fileName: imp.file_name || "Ukendt fil",
-            uploadDate: imp.created_at || "",
             uploadType: imp.upload_type || "cancellation",
             rowData: row as Record<string, unknown>,
           });
@@ -67,7 +61,6 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
     },
   });
 
-  // Collect all unique keys across all row data
   const allKeys = useMemo(() => {
     const keys = new Set<string>();
     for (const r of rows) {
@@ -78,37 +71,21 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
     return [...keys];
   }, [rows]);
 
-  // Filter and sort
+  const sellerField = useMemo(() => {
+    return allKeys.find(k => SELLER_FIELD_CANDIDATES.includes(k.toLowerCase()));
+  }, [allKeys]);
+
   const processed = useMemo(() => {
     let result = [...rows];
-
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(r => {
-        const vals = [r.fileName, ...Object.values(r.rowData).map(v => String(v ?? ""))].join(" ").toLowerCase();
+        const vals = Object.values(r.rowData).map(v => String(v ?? "")).join(" ").toLowerCase();
         return vals.includes(q);
       });
     }
-
-    result.sort((a, b) => {
-      let cmp = 0;
-      if (sortKey === "date") cmp = a.uploadDate.localeCompare(b.uploadDate);
-      else if (sortKey === "file") cmp = a.fileName.localeCompare(b.fileName);
-      return sortDir === "asc" ? cmp : -cmp;
-    });
-
     return result;
-  }, [rows, searchQuery, sortKey, sortDir]);
-
-  const handleSort = (key: SortKey) => {
-    if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
-    else { setSortKey(key); setSortDir(key === "date" ? "desc" : "asc"); }
-  };
-
-  const SortIcon = ({ column }: { column: SortKey }) => {
-    if (sortKey !== column) return <ArrowUpDown className="h-3 w-3 ml-1 opacity-40" />;
-    return sortDir === "asc" ? <ArrowUp className="h-3 w-3 ml-1" /> : <ArrowDown className="h-3 w-3 ml-1" />;
-  };
+  }, [rows, searchQuery]);
 
   if (isLoading) {
     return <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
@@ -122,9 +99,6 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
       </div>
     );
   }
-
-  // Pick display columns (max 6 most common keys)
-  const displayKeys = allKeys.slice(0, 6);
 
   return (
     <div className="space-y-4">
@@ -146,32 +120,28 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="cursor-pointer select-none" onClick={() => handleSort("file")}>
-                <span className="flex items-center">Fil <SortIcon column="file" /></span>
-              </TableHead>
-              <TableHead className="cursor-pointer select-none" onClick={() => handleSort("date")}>
-                <span className="flex items-center">Upload dato <SortIcon column="date" /></span>
-              </TableHead>
               <TableHead>Type</TableHead>
-              {displayKeys.map(key => (
-                <TableHead key={key}>{key}</TableHead>
+              {sellerField && <TableHead>Sælger</TableHead>}
+              {allKeys.map(key => (
+                <TableHead key={key} className="whitespace-nowrap">{key}</TableHead>
               ))}
             </TableRow>
           </TableHeader>
           <TableBody>
             {processed.map((row, idx) => (
               <TableRow key={`${row.importId}-${idx}`}>
-                <TableCell className="text-xs max-w-[200px] truncate">{row.fileName}</TableCell>
-                <TableCell className="text-xs whitespace-nowrap">
-                  {row.uploadDate ? format(new Date(row.uploadDate), "dd/MM/yyyy HH:mm") : "-"}
-                </TableCell>
                 <TableCell>
                   <Badge variant={row.uploadType === "cancellation" ? "destructive" : "secondary"}>
                     {row.uploadType === "cancellation" ? "Annullering" : "Kurvrettelse"}
                   </Badge>
                 </TableCell>
-                {displayKeys.map(key => (
-                  <TableCell key={key} className="text-xs">
+                {sellerField && (
+                  <TableCell className="text-xs whitespace-nowrap font-medium">
+                    {resolve(row.rowData[sellerField] as string | null)}
+                  </TableCell>
+                )}
+                {allKeys.map(key => (
+                  <TableCell key={key} className="text-xs whitespace-nowrap">
                     {row.rowData[key] != null ? String(row.rowData[key]) : "-"}
                   </TableCell>
                 ))}
