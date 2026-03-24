@@ -1410,7 +1410,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             )}
 
             {/* Stats */}
-            <div className="flex gap-4">
+            <div className="flex gap-4 flex-wrap">
               <Badge
                 variant={previewTab === "matched" ? "default" : "outline"}
                 className="text-sm px-3 py-1 cursor-pointer"
@@ -1425,6 +1425,15 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                   onClick={() => setPreviewTab("unmatched")}
                 >
                   {unmatchedCount} umatchede rækker
+                </Badge>
+              )}
+              {unmatchedSellerRows.length > 0 && (
+                <Badge
+                  variant={previewTab === "seller_unmatched" as any ? "destructive" : "outline"}
+                  className="text-sm px-3 py-1 cursor-pointer"
+                  onClick={() => setPreviewTab("seller_unmatched" as any)}
+                >
+                  {unmatchedSellerRows.length} mangler sælger-mapping
                 </Badge>
               )}
             </div>
