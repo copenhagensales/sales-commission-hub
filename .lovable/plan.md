@@ -1,27 +1,47 @@
 
 
-# Tilføj manuel sælger-mapping i "Fejl i match"
+# Re-match efter sælger-mapping + flyt til godkendelseskø
 
 ## Overblik
-I "Fejl i match"-tabellen skal brugeren kunne vælge en medarbejder fra eesy (employee_master_data) og koble den til det sælgernavn ("Employee Name" eller lignende felt) der står i upload-rækken. Dette gemmes i `cancellation_seller_mappings`-tabellen, som allerede bruges af upload-matchingen.
+Når brugeren tildeler en medarbejder i "Fejl i match", skal systemet automatisk forsøge at re-matche alle rækker med det sælgernavn. Hvis et salg findes, flyttes rækken fra `unmatched_rows` til `cancellation_queue` (status: `pending`) — klar til godkendelse i Godkendelseskøen.
 
 ## Ændringer i `MatchErrorsSubTab.tsx`
 
-### 1. Hent aktive medarbejdere
-- Tilføj query til `employee_master_data` (id, first_name, last_name, is_active=true).
+### 1. Hent upload-konfiguration og kampagner
+- Fetch `cancellation_upload_configs` for `clientId` → `date_column`, `fallback_product_mappings`
+- Fetch `client_campaigns` for `clientId` → bruges til at scope salgs-søgningen
 
-### 2. Tilføj "Tildel sælger"-kolonne
-- For hver række: vis en `Select`-dropdown med alle aktive medarbejdere.
-- Hvis sælger-feltet allerede har en eksisterende mapping i `cancellation_seller_mappings`, vis den som forudvalgt.
+### 2. Udvid `upsertMapping` mutation med re-match logik
+Efter mapping er gemt:
+1. Slå `work_email` op for den valgte medarbejder
+2. For alle rækker i `rows` med det pågældende sælgernavn:
+   - Parse datoen fra `date_column` i rækkens `rowData`
+   - Søg i `sales` (via `agent_email` + dato + klientens kampagner)
+   - Hvis fallback_product_mappings findes: match også på produkt (ligesom PASS 2 i upload-flowet)
+3. For hvert match:
+   - Insert i `cancellation_queue` med `import_id`, `sale_id`, `upload_type`, `status: "pending"`, `uploaded_data`, `client_id`
+   - Fjern rækken fra `unmatched_rows` i `cancellation_imports` (opdater JSON-arrayet)
+4. Invalidér queries: `match-errors`, `cancellation-queue`, `active-import`
 
-### 3. Gem mapping ved valg
-- Når brugeren vælger en medarbejder fra dropdown: upsert i `cancellation_seller_mappings` med `excel_seller_name` = værdien fra sælger-feltet i rækken, `employee_id` = valgt medarbejder, `client_id` = clientId.
-- Vis toast ved succes.
-- Invalidér relevante queries (`cancellation-seller-mappings`, `match-errors`).
+### 3. UI feedback
+- Toast med antal rækker matchet: "3 rækker matchet og sendt til godkendelseskøen"
+- Rækker der matches forsvinder fra tabellen ved næste refetch
+- Rækker uden match forbliver med besked: "Ingen salg fundet"
 
-### 4. Vis eksisterende mappings
-- Hent eksisterende `cancellation_seller_mappings` for clientId.
-- Hvis sælgernavnet i en række allerede har en mapping, vis medarbejdernavnet og marker dropdown'en som forudvalgt.
+## Teknisk flow
+```text
+Bruger vælger medarbejder i dropdown
+  → upsert mapping i cancellation_seller_mappings
+  → hent work_email for medarbejder
+  → for hver row med samme sælgernavn:
+      → parse dato fra rowData[date_column]
+      → query sales WHERE agent_email = work_email AND sale_date = dato
+      → if match:
+          → INSERT cancellation_queue (pending)
+          → UPDATE cancellation_imports: fjern row fra unmatched_rows[]
+  → invalidér queries
+  → vis toast med resultat
+```
 
 ## Fil
 `src/components/cancellations/MatchErrorsSubTab.tsx`
