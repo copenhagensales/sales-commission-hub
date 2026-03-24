@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { FileText, Users, Car, Trash2, AlertTriangle, Ban, Check, DollarSign, Utensils, Pencil, Building2 } from "lucide-react";
+import { FileText, Users, Car, Trash2, AlertTriangle, Ban, Check, DollarSign, Utensils, Pencil, Building2, GraduationCap } from "lucide-react";
 import { useBookingHotels, useUpdateBookingHotel, type BookingHotel } from "@/hooks/useBookingHotels";
 import { AssignHotelDialog } from "@/components/vagt-flow/AssignHotelDialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -243,6 +243,10 @@ export function EditBookingDialog({
   const [selectedDietEmployee, setSelectedDietEmployee] = useState<string | null>(null);
   const [selectedDietDays, setSelectedDietDays] = useState<Set<number>>(new Set());
 
+  // Training bonus tab state
+  const [selectedTrainingEmployee, setSelectedTrainingEmployee] = useState<string | null>(null);
+  const [selectedTrainingDays, setSelectedTrainingDays] = useState<Set<number>>(new Set());
+
   useEffect(() => {
     if (booking) {
       setClientId(booking.client_id || "");
@@ -269,6 +273,8 @@ export function EditBookingDialog({
       setSelectedVehicleDays(new Set());
       setSelectedDietEmployee(null);
       setSelectedDietDays(new Set());
+      setSelectedTrainingEmployee(null);
+      setSelectedTrainingDays(new Set());
     }
   }, [open]);
 
@@ -432,22 +438,60 @@ export function EditBookingDialog({
     enabled: open,
   });
 
-  // Fetch current diet assignments
-  const { data: currentDietAssignments = [], refetch: refetchDietAssignments } = useQuery({
-    queryKey: ["current-diet-assignments", booking?.id],
+  // Fetch training bonus salary type
+  const { data: trainingBonusSalaryType } = useQuery({
+    queryKey: ["training-bonus-salary-type"],
     queryFn: async () => {
-      if (!booking?.id) return [];
+      const { data, error } = await supabase
+        .from("salary_types")
+        .select("id, name, amount")
+        .ilike("name", "%oplæringsbonus%")
+        .eq("is_active", true)
+        .limit(1)
+        .maybeSingle();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: open,
+  });
+
+  // Fetch current diet assignments (filtered by diet salary type)
+  const { data: currentDietAssignments = [], refetch: refetchDietAssignments } = useQuery({
+    queryKey: ["current-diet-assignments", booking?.id, dietSalaryType?.id],
+    queryFn: async () => {
+      if (!booking?.id || !dietSalaryType?.id) return [];
       
       const { data, error } = await supabase
         .from("booking_diet")
         .select("id, employee_id, date, amount")
         .eq("booking_id", booking.id)
+        .eq("salary_type_id", dietSalaryType.id)
         .order("date");
       
       if (error) throw error;
       return data || [];
     },
-    enabled: open && !!booking?.id,
+    enabled: open && !!booking?.id && !!dietSalaryType?.id,
+  });
+
+  // Fetch current training bonus assignments
+  const { data: currentTrainingAssignments = [], refetch: refetchTrainingAssignments } = useQuery({
+    queryKey: ["current-training-assignments", booking?.id, trainingBonusSalaryType?.id],
+    queryFn: async () => {
+      if (!booking?.id || !trainingBonusSalaryType?.id) return [];
+      
+      const { data, error } = await supabase
+        .from("booking_diet")
+        .select("id, employee_id, date, amount")
+        .eq("booking_id", booking.id)
+        .eq("salary_type_id", trainingBonusSalaryType.id)
+        .order("date");
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: open && !!booking?.id && !!trainingBonusSalaryType?.id,
   });
 
   const { data: fieldmarketingTeam } = useQuery({
@@ -872,7 +916,7 @@ export function EditBookingDialog({
       
       const { error } = await supabase
         .from("booking_diet")
-        .upsert(inserts, { onConflict: "booking_id,employee_id,date" });
+        .upsert(inserts, { onConflict: "booking_id,employee_id,date,salary_type_id" });
       
       if (error) throw error;
     },
@@ -891,17 +935,72 @@ export function EditBookingDialog({
   // Remove diet assignment mutation
   const removeDietMutation = useMutation({
     mutationFn: async (employeeId: string) => {
+      if (!dietSalaryType?.id) throw new Error("Diæt lønart ikke fundet");
       const { error } = await supabase
         .from("booking_diet")
         .delete()
         .eq("booking_id", booking.id)
-        .eq("employee_id", employeeId);
+        .eq("employee_id", employeeId)
+        .eq("salary_type_id", dietSalaryType.id);
       if (error) throw error;
     },
     onSuccess: () => {
       refetchDietAssignments();
       queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
       toast.success("Diæt fjernet");
+    },
+    onError: (error: any) => {
+      toast.error("Fejl ved fjernelse: " + error.message);
+    },
+  });
+
+  // Add training bonus mutation
+  const addTrainingBonusMutation = useMutation({
+    mutationFn: async ({ employeeId, dates }: { employeeId: string; dates: string[] }) => {
+      if (!trainingBonusSalaryType) throw new Error("Oplæringsbonus lønart ikke fundet");
+      
+      const inserts = dates.map(date => ({
+        booking_id: booking.id,
+        employee_id: employeeId,
+        salary_type_id: trainingBonusSalaryType.id,
+        date,
+        amount: trainingBonusSalaryType.amount || 0,
+      }));
+      
+      const { error } = await supabase
+        .from("booking_diet")
+        .upsert(inserts, { onConflict: "booking_id,employee_id,date,salary_type_id" });
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      refetchTrainingAssignments();
+      queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      toast.success("Oplæringsbonus tilføjet");
+      setSelectedTrainingEmployee(null);
+      setSelectedTrainingDays(new Set());
+    },
+    onError: (error: any) => {
+      toast.error("Fejl ved tilføjelse: " + error.message);
+    },
+  });
+
+  // Remove training bonus mutation
+  const removeTrainingBonusMutation = useMutation({
+    mutationFn: async (employeeId: string) => {
+      if (!trainingBonusSalaryType?.id) throw new Error("Oplæringsbonus lønart ikke fundet");
+      const { error } = await supabase
+        .from("booking_diet")
+        .delete()
+        .eq("booking_id", booking.id)
+        .eq("employee_id", employeeId)
+        .eq("salary_type_id", trainingBonusSalaryType.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      refetchTrainingAssignments();
+      queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      toast.success("Oplæringsbonus fjernet");
     },
     onError: (error: any) => {
       toast.error("Fejl ved fjernelse: " + error.message);
