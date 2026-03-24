@@ -825,9 +825,6 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                     Filter: {filterColumn} = {filterValue}
                   </Badge>
                 )}
-                <Button variant="link" size="sm" className="ml-auto p-0 h-auto" onClick={() => setStep("mapping")}>
-                  Rediger mapping
-                </Button>
               </div>
             )}
 
