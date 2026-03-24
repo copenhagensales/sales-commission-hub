@@ -19,7 +19,7 @@ interface ApprovedTabProps {
   clientId: string;
 }
 
-type SortKey = "date" | "agent" | "opp" | "type" | "status" | "reviewed_at";
+type SortKey = "date" | "agent" | "opp" | "type" | "status" | "deduction" | "reviewed_at";
 type SortDir = "asc" | "desc";
 
 function extractOpp(rawPayload: any): string {
