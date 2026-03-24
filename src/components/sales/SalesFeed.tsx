@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format, formatDistanceToNow, parseISO, startOfDay, endOfDay, subDays, subWeeks, subMonths } from "date-fns";
+import { format, formatDistanceToNow, parseISO, startOfDay, endOfDay, subDays, subWeeks, subMonths, startOfWeek, endOfWeek } from "date-fns";
 import { da } from "date-fns/locale";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -118,6 +118,8 @@ function getDateRangeFromPreset(preset: DatePreset): { start: Date; end: Date } 
     case "yesterday":
       const yesterday = subDays(now, 1);
       return { start: startOfDay(yesterday), end: endOfDay(yesterday) };
+    case "thisWeek":
+      return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }) };
     case "last7days":
       return { start: startOfDay(subDays(now, 6)), end: endOfDay(now) };
     case "last30days":
@@ -125,6 +127,22 @@ function getDateRangeFromPreset(preset: DatePreset): { start: Date; end: Date } 
     case "thisMonth":
       const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       return { start: startOfDay(firstOfMonth), end: endOfDay(now) };
+    case "payroll": {
+      // Use getPayrollPeriod if available, otherwise approximate
+      try {
+        const { getPayrollPeriod } = require("@/lib/calculations");
+        const period = getPayrollPeriod(now);
+        return { start: period.start, end: period.end };
+      } catch {
+        // Fallback: 21st prev month to 20th this month
+        const day = now.getDate();
+        if (day >= 21) {
+          return { start: new Date(now.getFullYear(), now.getMonth(), 21), end: new Date(now.getFullYear(), now.getMonth() + 1, 20) };
+        } else {
+          return { start: new Date(now.getFullYear(), now.getMonth() - 1, 21), end: new Date(now.getFullYear(), now.getMonth(), 20) };
+        }
+      }
+    }
     default:
       return null;
   }
