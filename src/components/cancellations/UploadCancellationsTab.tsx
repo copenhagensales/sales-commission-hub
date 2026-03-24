@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
+import { formatCurrency } from "@/lib/calculations/formatting";
 import { useAgentNameResolver } from "@/hooks/useAgentNameResolver";
 import { useDropzone } from "react-dropzone";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -46,6 +47,9 @@ interface MatchedSale {
   currentStatus: string;
   uploadedRowData: Record<string, unknown>;
   targetProductName?: string;
+  realProductName?: string;
+  commission?: number;
+  revenue?: number;
 }
 
 interface ProductPhoneMapping {
@@ -857,18 +861,18 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
           // Fetch sale_items for candidate sales to check product
           const candidateSaleIds = candidateSales.map(s => s.id);
-          const saleItemsMap = new Map<string, { adversus_product_title: string }[]>();
+          const saleItemsMap = new Map<string, { adversus_product_title: string; mapped_commission: number | null; mapped_revenue: number | null }[]>();
           
           for (let i = 0; i < candidateSaleIds.length; i += 500) {
             const batch = candidateSaleIds.slice(i, i + 500);
             const { data: items } = await supabase
               .from("sale_items")
-              .select("sale_id, adversus_product_title")
+              .select("sale_id, adversus_product_title, mapped_commission, mapped_revenue")
               .in("sale_id", batch);
             if (items) {
               for (const item of items) {
                 const arr = saleItemsMap.get(item.sale_id) || [];
-                arr.push({ adversus_product_title: item.adversus_product_title || "" });
+                arr.push({ adversus_product_title: item.adversus_product_title || "", mapped_commission: item.mapped_commission, mapped_revenue: item.mapped_revenue });
                 saleItemsMap.set(item.sale_id, arr);
               }
             }
