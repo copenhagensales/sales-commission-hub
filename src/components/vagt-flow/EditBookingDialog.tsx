@@ -1229,24 +1229,28 @@ export function EditBookingDialog({
         </DialogHeader>
         
         <Tabs defaultValue="booking" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="booking" className="flex items-center gap-2">
+          <TabsList className="grid w-full grid-cols-6">
+            <TabsTrigger value="booking" className="flex items-center gap-1 text-xs px-2">
               <FileText className="h-4 w-4" />
               Booking
             </TabsTrigger>
-            <TabsTrigger value="employees" className="flex items-center gap-2">
+            <TabsTrigger value="employees" className="flex items-center gap-1 text-xs px-2">
               <Users className="h-4 w-4" />
               Medarbejdere
             </TabsTrigger>
-            <TabsTrigger value="vehicles" className="flex items-center gap-2">
+            <TabsTrigger value="vehicles" className="flex items-center gap-1 text-xs px-2">
               <Car className="h-4 w-4" />
               Biler
             </TabsTrigger>
-            <TabsTrigger value="diet" className="flex items-center gap-2">
+            <TabsTrigger value="diet" className="flex items-center gap-1 text-xs px-2">
               <Utensils className="h-4 w-4" />
               Diæt
             </TabsTrigger>
-            <TabsTrigger value="hotel" className="flex items-center gap-2">
+            <TabsTrigger value="training" className="flex items-center gap-1 text-xs px-2">
+              <GraduationCap className="h-4 w-4" />
+              Oplæring
+            </TabsTrigger>
+            <TabsTrigger value="hotel" className="flex items-center gap-1 text-xs px-2">
               <Building2 className="h-4 w-4" />
               Hotel
             </TabsTrigger>
