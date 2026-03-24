@@ -57,24 +57,38 @@ export function CancellationHistoryTable({ clientId }: CancellationHistoryTableP
 
       if (error) throw error;
 
-      // Check which imports have approved queue items
+      // Check which imports have pending queue items (still active)
       const importIds = data.map((d: any) => d.id);
+      let pendingSet = new Set<string>();
       let approvedSet = new Set<string>();
       if (importIds.length > 0) {
-        const { data: approvedItems } = await supabase
-          .from("cancellation_queue")
-          .select("import_id")
-          .in("import_id", importIds)
-          .eq("status", "approved");
-        if (approvedItems) {
-          approvedSet = new Set(approvedItems.map((a) => a.import_id));
+        const [pendingResult, approvedResult] = await Promise.all([
+          supabase
+            .from("cancellation_queue")
+            .select("import_id")
+            .in("import_id", importIds)
+            .eq("status", "pending"),
+          supabase
+            .from("cancellation_queue")
+            .select("import_id")
+            .in("import_id", importIds)
+            .eq("status", "approved"),
+        ]);
+        if (pendingResult.data) {
+          pendingSet = new Set(pendingResult.data.map((a) => a.import_id));
+        }
+        if (approvedResult.data) {
+          approvedSet = new Set(approvedResult.data.map((a) => a.import_id));
         }
       }
 
-      return (data as unknown as CancellationImport[]).map((imp) => ({
-        ...imp,
-        hasApprovedItems: approvedSet.has(imp.id),
-      }));
+      // Only show imports that have NO pending queue items (completed or no queue items)
+      return (data as unknown as CancellationImport[])
+        .filter((imp) => !pendingSet.has(imp.id))
+        .map((imp) => ({
+          ...imp,
+          hasApprovedItems: approvedSet.has(imp.id),
+        }));
     },
   });
 
@@ -149,10 +163,10 @@ export function CancellationHistoryTable({ clientId }: CancellationHistoryTableP
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <History className="h-5 w-5" />
-          Upload-historik
+          Afsluttede uploads
         </CardTitle>
         <CardDescription>
-          Tidligere uploads af annulleringsfiler
+          Uploads hvor alle rækker er behandlet
         </CardDescription>
       </CardHeader>
       <CardContent>
