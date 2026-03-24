@@ -1,48 +1,19 @@
 
 
-# Tilføj opsætnings-administration + Eesy TM filter
+# Direkte til forhåndsvisning efter upload (når config eksisterer)
 
 ## Problem
-Vi fjernede mapping-trinnet, men nu er der ingen måde at oprette nye opsætninger. Eesy TM mangler en config, og filtreringsfunktionen (`filter_column`/`filter_value`) — som allerede er i DB og kode — kan ikke konfigureres.
+Når en klient allerede har en gemt opsætning, viser step 2 stadig filinformation efter upload i stedet for at gå direkte til preview. Auto-match kører, men brugeren ser fortsat upload-trinnet med "Matcher..." tekst.
 
 ## Løsning
-Tilføj en **opsætnings-sektion** i upload-trinnet, som vises når der ingen config er. Når der allerede er en config, viser vi den som nu (auto-match).
 
-## Ændringer
+**Fil: `src/components/cancellations/UploadCancellationsTab.tsx`**
 
-### 1. UploadCancellationsTab.tsx — Inline config-oprettelse
+1. **I `onDrop`**: Når en default config findes og filen er parsed, kald `handleMatch()` direkte (i stedet for at sætte `autoMatchPending` flag). `handleMatch` sætter allerede `setStep("preview")` ved afslutning.
 
-Erstat den nuværende blokerings-besked ("Ingen opsætning fundet") med en inline config-oprettelsesformular:
+2. **Fjern mellemtilstand**: Den tredje gren i step 2 (linje 1067-1081 — viser filnavn + "Matcher...") er unødvendig når config eksisterer, da brugeren aldrig skal se den. Auto-match bør ske umiddelbart og skifte direkte til preview.
 
-**Når `clientConfigs.length === 0`:**
-- Vis besked: "Ingen opsætning fundet — opret en herunder"
-- Vis en fil-upload dropzone (til at hente kolonnenavne fra filen)
-- Når filen er indlæst, vis mapping-felter:
-  - Telefonkolonne (dropdown med kolonner fra filen)
-  - OPP-kolonne
-  - Medlemsnummer-kolonne
-  - Virksomhedskolonne
-  - **Filterkolonne** (dropdown: vælg f.eks. "Annulled Sales")
-  - **Filterværdi** (tekstfelt: f.eks. "1")
-  - Badge: "X af Y rækker inkluderet" baseret på filter
-  - Config-navn (tekstfelt)
-  - "Gem opsætning" knap
-- Efter gem → invalidér query → configs reloades → nu vises normal upload-flow
+3. **Sikre `handleMatch` kører korrekt**: `handleMatch` afhænger af at `phoneColumn`/`oppColumn` etc. allerede er sat via `applyConfig`. Da `useEffect` for auto-match allerede håndterer dette via `autoMatchPending`, skal vi sikre at state er opdateret inden match starter. Behold `autoMatchPending` pattern men verificér at `setStep("preview")` altid kaldes i `handleMatch`.
 
-**Når `clientConfigs.length > 0`:**
-- Behold nuværende flow (dropzone → auto-match → preview)
-- Tilføj en lille "Rediger opsætning" knap der åbner en dialog med de samme felter, pre-filled fra den aktuelle config
-
-### 2. Flow for Eesy TM
-1. Bruger vælger Eesy TM → ser "Opret opsætning"
-2. Uploader eksempelfil → kolonner vises
-3. Sætter: Phone → "Phone Number", Filter → "Annulled Sales" = "1"
-4. Navngiver: "Eesy TM Standard", gemmer
-5. Næste gang: auto-match med filter aktiv
-
-## Tekniske detaljer
-- Ingen DB-migration nødvendig — `filter_column` og `filter_value` eksisterer allerede
-- `saveConfigMutation` eksisterer allerede i koden og bruges direkte
-- Preview-badge beregning: `parsedData.filter(row => String(row.originalRow[filterColumn]) === filterValue).length`
-- Genbrug eksisterende `applyConfig`, `handleMatch`, `saveConfigMutation`
+Resultatet: Upload fil → auto-match kører → preview vises. Brugeren ser aldrig step 2's "fil uploadet" tilstand.
 
