@@ -242,6 +242,20 @@ export function useSellerSalariesCached(
       dailyBonusMap[db.employee_id] = (dailyBonusMap[db.employee_id] || 0) + (db.amount || 0);
     }
 
+    // Build cancellation map (agent_email → employee_id → total lost commission)
+    const cancellationMap: Record<string, number> = {};
+    for (const cq of cancellationData || []) {
+      const sale = cq.sales;
+      if (!sale?.agent_email) continue;
+      const agentEmail = sale.agent_email.toLowerCase();
+      const employeeId = emailToEmployeeId[agentEmail];
+      if (!employeeId) continue;
+      const totalCommission = (sale.sale_items || []).reduce(
+        (sum: number, si: any) => sum + (si.mapped_commission || 0), 0
+      );
+      cancellationMap[employeeId] = (cancellationMap[employeeId] || 0) + totalCommission;
+    }
+
     // Filter by team if needed
     let filteredEmployees = employees;
     if (selectedTeam && selectedTeam !== "all") {
