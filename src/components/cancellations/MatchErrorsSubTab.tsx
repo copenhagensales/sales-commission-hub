@@ -28,10 +28,31 @@ interface MatchErrorsSubTabProps {
 
 const SELLER_FIELD_CANDIDATES = ["operator", "agent", "sælger", "agent_email", "seller", "agent_name", "employee name", "employee_name"];
 
+function parseFlexibleDate(value: unknown): string | null {
+  if (!value) return null;
+  const str = String(value).trim();
+  // Try ISO format first
+  const isoDate = new Date(str);
+  if (!isNaN(isoDate.getTime())) {
+    return isoDate.toISOString().split("T")[0];
+  }
+  // Try DD-MM-YYYY or DD/MM/YYYY
+  const parts = str.split(/[-/.]/);
+  if (parts.length === 3) {
+    const [a, b, c] = parts;
+    if (c.length === 4) {
+      const d = new Date(`${c}-${b.padStart(2, "0")}-${a.padStart(2, "0")}`);
+      if (!isNaN(d.getTime())) return d.toISOString().split("T")[0];
+    }
+  }
+  return null;
+}
+
 export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const queryClient = useQueryClient();
 
+  // Fetch unmatched rows
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["match-errors", clientId],
     queryFn: async () => {
@@ -64,12 +85,13 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
     },
   });
 
+  // Fetch active employees
   const { data: employees = [] } = useQuery({
     queryKey: ["active-employees-for-mapping"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name")
+        .select("id, first_name, last_name, work_email")
         .eq("is_active", true)
         .order("first_name");
       if (error) throw error;
@@ -77,6 +99,7 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
     },
   });
 
+  // Fetch existing seller mappings
   const { data: existingMappings = [] } = useQuery({
     queryKey: ["cancellation-seller-mappings", clientId],
     queryFn: async () => {
@@ -91,6 +114,38 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
     enabled: !!clientId,
   });
 
+  // Fetch upload config for date_column
+  const { data: uploadConfig } = useQuery({
+    queryKey: ["cancellation-upload-config", clientId],
+    queryFn: async () => {
+      if (!clientId) return null;
+      const { data, error } = await supabase
+        .from("cancellation_upload_configs")
+        .select("date_column")
+        .eq("client_id", clientId)
+        .eq("is_default", true)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!clientId,
+  });
+
+  // Fetch client campaigns for scoping sales search
+  const { data: campaignIds = [] } = useQuery({
+    queryKey: ["client-campaign-ids", clientId],
+    queryFn: async () => {
+      if (!clientId) return [];
+      const { data, error } = await supabase
+        .from("client_campaigns")
+        .select("id")
+        .eq("client_id", clientId);
+      if (error) throw error;
+      return (data || []).map(c => c.id);
+    },
+    enabled: !!clientId,
+  });
+
   const mappingsByName = useMemo(() => {
     const map = new Map<string, string>();
     for (const m of existingMappings) {
@@ -101,6 +156,7 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
 
   const upsertMapping = useMutation({
     mutationFn: async ({ excelName, employeeId }: { excelName: string; employeeId: string }) => {
+      // 1. Save the mapping
       const { error } = await supabase
         .from("cancellation_seller_mappings")
         .upsert(
@@ -108,10 +164,92 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
           { onConflict: "client_id,excel_seller_name" }
         );
       if (error) throw error;
+
+      // 2. Get employee work_email
+      const emp = employees.find(e => e.id === employeeId);
+      const workEmail = emp?.work_email;
+      if (!workEmail) return { matched: 0 };
+
+      // 3. Find date column
+      const dateCol = uploadConfig?.date_column;
+      if (!dateCol || campaignIds.length === 0) return { matched: 0 };
+
+      // 4. Find all rows with this seller name and try to match
+      const matchingRows = rows.filter(r => {
+        if (!sellerField) return false;
+        return String(r.rowData[sellerField] ?? "").toLowerCase() === excelName.toLowerCase();
+      });
+
+      let matchedCount = 0;
+
+      for (const row of matchingRows) {
+        const dateValue = parseFlexibleDate(row.rowData[dateCol]);
+        if (!dateValue) continue;
+
+        // Search for matching sale
+        const { data: sales } = await supabase
+          .from("sales")
+          .select("id")
+          .eq("agent_email", workEmail.toLowerCase())
+          .gte("sale_datetime", `${dateValue}T00:00:00`)
+          .lte("sale_datetime", `${dateValue}T23:59:59`)
+          .in("client_campaign_id", campaignIds)
+          .limit(1);
+
+        if (!sales || sales.length === 0) continue;
+
+        // Insert into cancellation_queue
+        const { error: queueError } = await supabase
+          .from("cancellation_queue")
+          .insert({
+            import_id: row.importId,
+            sale_id: sales[0].id,
+            upload_type: row.uploadType,
+            status: "pending",
+            uploaded_data: row.rowData,
+            client_id: clientId,
+          });
+        if (queueError) {
+          console.error("Failed to insert into cancellation_queue:", queueError);
+          continue;
+        }
+
+        // Remove this row from unmatched_rows in cancellation_imports
+        const { data: importData } = await supabase
+          .from("cancellation_imports")
+          .select("unmatched_rows")
+          .eq("id", row.importId)
+          .single();
+
+        if (importData?.unmatched_rows && Array.isArray(importData.unmatched_rows)) {
+          const updatedRows = (importData.unmatched_rows as Record<string, unknown>[]).filter(
+            (ur) => JSON.stringify(ur) !== JSON.stringify(row.rowData)
+          );
+          await supabase
+            .from("cancellation_imports")
+            .update({
+              unmatched_rows: updatedRows.length > 0 ? updatedRows : null,
+              rows_matched: (importData.unmatched_rows.length - updatedRows.length),
+            })
+            .eq("id", row.importId);
+        }
+
+        matchedCount++;
+      }
+
+      return { matched: matchedCount };
     },
-    onSuccess: () => {
-      toast({ title: "Sælger-mapping gemt" });
+    onSuccess: (result) => {
+      if (result && result.matched > 0) {
+        toast({
+          title: `${result.matched} ${result.matched === 1 ? "række" : "rækker"} matchet og sendt til godkendelseskøen`,
+        });
+      } else {
+        toast({ title: "Sælger-mapping gemt" });
+      }
       queryClient.invalidateQueries({ queryKey: ["cancellation-seller-mappings", clientId] });
+      queryClient.invalidateQueries({ queryKey: ["match-errors", clientId] });
+      queryClient.invalidateQueries({ queryKey: ["cancellation-queue"] });
     },
     onError: () => {
       toast({ title: "Fejl ved gemning af mapping", variant: "destructive" });
