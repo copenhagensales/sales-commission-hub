@@ -184,6 +184,7 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
                 <TableHead className="cursor-pointer" onClick={() => toggleSort("opp")}>OPP <SortIcon col="opp" /></TableHead>
                 <TableHead className="cursor-pointer" onClick={() => toggleSort("type")}>Type <SortIcon col="type" /></TableHead>
                 <TableHead className="cursor-pointer" onClick={() => toggleSort("status")}>Status <SortIcon col="status" /></TableHead>
+                <TableHead className="cursor-pointer" onClick={() => toggleSort("deduction")}>Trækkes i <SortIcon col="deduction" /></TableHead>
                 <TableHead>Behandlet af</TableHead>
                 <TableHead className="cursor-pointer" onClick={() => toggleSort("reviewed_at")}>Behandlet dato <SortIcon col="reviewed_at" /></TableHead>
               </TableRow>
@@ -203,6 +204,31 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
                     <Badge variant={item.status === "approved" ? "default" : "destructive"}>
                       {item.status === "approved" ? "Godkendt" : "Afvist"}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {item.status === "approved" && item.deductionPeriod ? (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button className="inline-flex items-center gap-1 text-sm hover:underline text-primary cursor-pointer bg-transparent border-none p-0">
+                            <CalendarIcon className="h-3 w-3" />
+                            {format(item.deductionPeriod.start, "d. MMM", { locale: da })} – {format(item.deductionPeriod.end, "d. MMM", { locale: da })}
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={item.deductionDate ? new Date(item.deductionDate + "T00:00:00") : item.reviewedAt ? new Date(item.reviewedAt) : undefined}
+                            onSelect={(date) => {
+                              if (date) {
+                                updateDeductionDate.mutate({ id: item.id, date: format(date, "yyyy-MM-dd") });
+                              }
+                            }}
+                            className="pointer-events-auto"
+                            locale={da}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    ) : "-"}
                   </TableCell>
                   <TableCell>{item.reviewerName || "-"}</TableCell>
                   <TableCell>{item.reviewedAt ? format(new Date(item.reviewedAt), "dd-MM-yyyy HH:mm") : "-"}</TableCell>
