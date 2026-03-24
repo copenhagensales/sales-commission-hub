@@ -1013,7 +1013,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         if (error) throw error;
       }
 
-      return { count: saleIds.length };
+      return { count: queueItems.length };
     },
     onSuccess: ({ count }) => {
       toast({
