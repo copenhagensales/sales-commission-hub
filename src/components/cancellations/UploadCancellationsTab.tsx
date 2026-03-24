@@ -645,11 +645,8 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           const pv = getCaseInsensitive(row.originalRow, phoneColumn);
           if (pv) phones.push(normalizePhone(String(pv)));
         }
-        // Also collect phones from product_phone_mappings
-        for (const mapping of productPhoneMappings) {
-          const val = getCaseInsensitive(row.originalRow, mapping.phoneColumn);
-          if (val) phones.push(normalizePhone(String(val)));
-        }
+        // Note: product_phone_mappings now refer to raw_payload fields in DB, not Excel columns
+        // Phones are collected from the single phoneColumn above
         if (companyColumn !== "__none__") {
           const cv = getCaseInsensitive(row.originalRow, companyColumn);
           if (cv) companies.push(String(cv).toLowerCase().trim());
@@ -713,7 +710,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         return candidates;
       };
 
-      const candidateSales = (phones.length > 0 || companies.length > 0 || oppNumbers.length > 0 || memberNumbers.length > 0)
+      const candidateSales = (phones.length > 0 || companies.length > 0 || oppNumbers.length > 0 || memberNumbers.length > 0 || hasProductPhoneMappings)
         ? await fetchCandidateSales()
         : [];
 
@@ -721,51 +718,58 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       const phoneSet = new Set(phones.map(p => normalizePhone(p)));
       const companySet = new Set(companies);
 
-      // --- Product-phone mapping matching ---
+      // --- Product-phone mapping matching (reversed: Excel phone → DB raw_payload fields) ---
       if (hasProductPhoneMappings) {
-        // Build a map: normalized phone -> { saleId, productName }[] for each mapping column
-        // For each filtered row, check each mapping column's phone against candidate sales
-        const saleByNormalizedPhone = new Map<string, any[]>();
-        for (const sale of candidateSales) {
-          const salePhone = normalizePhone(sale.customer_phone || "");
-          if (salePhone) {
-            const arr = saleByNormalizedPhone.get(salePhone) || [];
-            arr.push(sale);
-            saleByNormalizedPhone.set(salePhone, arr);
-          }
-        }
-
         const matchedIndicesLocal = new Set<number>();
         const productMatched: MatchedSale[] = [];
         const matchedSaleProductKeys = new Set<string>(); // saleId|productName dedup
 
-        filteredData.forEach((row, idx) => {
-          for (const mapping of productPhoneMappings) {
-            const rawPhone = getCaseInsensitive(row.originalRow, mapping.phoneColumn);
-            if (!rawPhone) continue;
-            const phone = normalizePhone(String(rawPhone));
-            if (!phone) continue;
+        console.log("[handleMatch] PRODUCT-PHONE MATCHING (reversed)");
+        console.log("[handleMatch] candidateSales:", candidateSales.length, "filteredRows:", filteredData.length);
+        console.log("[handleMatch] mappings:", productPhoneMappings);
 
-            const matchingSales = saleByNormalizedPhone.get(phone) || [];
-            for (const sale of matchingSales) {
-              const key = `${sale.id}|${mapping.productName}`;
-              if (matchedSaleProductKeys.has(key)) continue;
-              matchedSaleProductKeys.add(key);
-              matchedIndicesLocal.add(idx);
-              productMatched.push({
-                saleId: sale.id,
-                phone: sale.customer_phone || "",
-                company: sale.customer_company || "",
-                oppNumber: "",
-                saleDate: sale.sale_datetime || "",
-                employee: sale.agent_name || "Ukendt",
-                currentStatus: sale.validation_status || "pending",
-                uploadedRowData: row.originalRow,
-                targetProductName: mapping.productName,
-              });
+        filteredData.forEach((row, idx) => {
+          // Get the single phone from Excel's phoneColumn
+          const rawExcelPhone = phoneColumn !== "__none__" ? getCaseInsensitive(row.originalRow, phoneColumn) : null;
+          if (!rawExcelPhone) return;
+          const excelPhone = normalizePhone(String(rawExcelPhone));
+          if (!excelPhone) return;
+
+          if (idx < 3) console.log(`[handleMatch] row ${idx}: excelPhone="${excelPhone}"`);
+
+          // Check each candidate sale's raw_payload.data for matching phone
+          for (const sale of candidateSales) {
+            if (existingIds.has(sale.id)) continue;
+            const payloadData = (sale.raw_payload as any)?.data || {};
+
+            for (const mapping of productPhoneMappings) {
+              const payloadPhoneRaw = payloadData[mapping.payloadPhoneField];
+              if (!payloadPhoneRaw) continue;
+              const payloadPhone = normalizePhone(String(payloadPhoneRaw));
+              if (!payloadPhone) continue;
+
+              if (excelPhone === payloadPhone) {
+                const key = `${sale.id}|${mapping.productName}`;
+                if (matchedSaleProductKeys.has(key)) continue;
+                matchedSaleProductKeys.add(key);
+                matchedIndicesLocal.add(idx);
+                productMatched.push({
+                  saleId: sale.id,
+                  phone: String(payloadPhoneRaw),
+                  company: sale.customer_company || "",
+                  oppNumber: "",
+                  saleDate: sale.sale_datetime || "",
+                  employee: sale.agent_name || "Ukendt",
+                  currentStatus: sale.validation_status || "pending",
+                  uploadedRowData: row.originalRow,
+                  targetProductName: mapping.productName,
+                });
+              }
             }
           }
         });
+
+        console.log("[handleMatch] productMatched:", productMatched.length);
 
         setMatchedSales(productMatched);
         setMatchedRowIndices(matchedIndicesLocal);
