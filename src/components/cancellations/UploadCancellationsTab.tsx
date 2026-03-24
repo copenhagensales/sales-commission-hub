@@ -779,7 +779,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         filteredData.forEach((row, idx) => {
           // Get the single phone from Excel's phoneColumn
           const rawExcelPhone = phoneColumn !== "__none__" ? getCaseInsensitive(row.originalRow, phoneColumn) : null;
-          if (!rawExcelPhone) return;
+          if (!rawExcelPhone) return; // phone-less rows handled in pass 2
           const excelPhone = normalizePhone(String(rawExcelPhone));
           if (!excelPhone) return;
 
@@ -817,15 +817,172 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           }
         });
 
-        console.log("[handleMatch] productMatched:", productMatched.length);
+        console.log("[handleMatch] productMatched (pass 1):", productMatched.length);
 
+        // --- PASS 2: Seller + Date + Product fallback for phone-less rows ---
+        const sellerCol = activeConfig?.seller_column;
+        const dateCol = activeConfig?.date_column;
+        const fallbackMappings: FallbackProductMapping[] = (activeConfig as any)?.fallback_product_mappings || [];
+        const unmatchedSellers: UnmatchedSellerRow[] = [];
+
+        if (sellerCol && dateCol && fallbackMappings.length > 0) {
+          console.log("[handleMatch] PASS 2: seller+date fallback", { sellerCol, dateCol, fallbackMappings });
+
+          // Build seller name → employee work_email map from persistent mappings
+          const sellerToEmployeeId = new Map<string, string>();
+          for (const sm of sellerMappings) {
+            sellerToEmployeeId.set(sm.excel_seller_name.toLowerCase(), sm.employee_id);
+          }
+
+          // Build employee_id → work_email map
+          const employeeIdToEmail = new Map<string, string>();
+          for (const emp of allEmployees) {
+            if (emp.work_email) employeeIdToEmail.set(emp.id, emp.work_email.toLowerCase());
+          }
+
+          // Also try auto-matching by first name from employee_master_data
+          const firstNameToEmployeeId = new Map<string, string>();
+          for (const emp of allEmployees) {
+            if (emp.first_name) {
+              const key = emp.first_name.toLowerCase();
+              // Only use if unique first name
+              if (!firstNameToEmployeeId.has(key)) {
+                firstNameToEmployeeId.set(key, emp.id);
+              } else {
+                firstNameToEmployeeId.set(key, "__ambiguous__");
+              }
+            }
+          }
+
+          // Fetch sale_items for candidate sales to check product
+          const candidateSaleIds = candidateSales.map(s => s.id);
+          const saleItemsMap = new Map<string, { adversus_product_title: string }[]>();
+          
+          for (let i = 0; i < candidateSaleIds.length; i += 500) {
+            const batch = candidateSaleIds.slice(i, i + 500);
+            const { data: items } = await supabase
+              .from("sale_items")
+              .select("sale_id, adversus_product_title")
+              .in("sale_id", batch);
+            if (items) {
+              for (const item of items) {
+                const arr = saleItemsMap.get(item.sale_id) || [];
+                arr.push({ adversus_product_title: item.adversus_product_title || "" });
+                saleItemsMap.set(item.sale_id, arr);
+              }
+            }
+          }
+
+          filteredData.forEach((row, idx) => {
+            if (matchedIndicesLocal.has(idx)) return; // already matched in pass 1
+
+            const rawExcelPhone = phoneColumn !== "__none__" ? getCaseInsensitive(row.originalRow, phoneColumn) : null;
+            const excelPhone = rawExcelPhone ? normalizePhone(String(rawExcelPhone)) : "";
+            if (excelPhone) return; // has phone → should have been matched in pass 1
+
+            const excelSeller = String(getCaseInsensitive(row.originalRow, sellerCol) || "").trim();
+            const excelDate = String(getCaseInsensitive(row.originalRow, dateCol) || "").trim();
+            
+            // Find which fallback product this row matches
+            const excelSubName = String(getCaseInsensitive(row.originalRow, "Subscription Name") || "").trim();
+            const matchingFallback = fallbackMappings.find(fm => 
+              excelSubName.toLowerCase().includes(fm.excelProductPattern.toLowerCase())
+            );
+            if (!matchingFallback) return; // not a fallback-eligible product
+
+            if (!excelSeller || !excelDate) return;
+
+            // Resolve seller to employee_id
+            let employeeId = sellerToEmployeeId.get(excelSeller.toLowerCase());
+            if (!employeeId) {
+              // Try auto-match by first name
+              const autoMatch = firstNameToEmployeeId.get(excelSeller.toLowerCase());
+              if (autoMatch && autoMatch !== "__ambiguous__") {
+                employeeId = autoMatch;
+              }
+            }
+
+            if (!employeeId) {
+              // Unmatched seller — needs manual resolution
+              unmatchedSellers.push({
+                rowIndex: idx,
+                excelSellerName: excelSeller,
+                excelDate,
+                excelProduct: excelSubName,
+                originalRow: row.originalRow,
+              });
+              return;
+            }
+
+            // Find agent_email for this employee
+            const agentEmail = employeeIdToEmail.get(employeeId);
+            if (!agentEmail) return;
+
+            // Parse Excel date for comparison
+            const excelDateObj = new Date(excelDate);
+
+            // Match against candidate sales by agent + date + product
+            for (const sale of candidateSales) {
+              const saleAgentEmail = (sale.agent_name || "").toLowerCase();
+              // agent_name could be email or name, check both
+              const saleEmail = saleAgentEmail;
+              
+              // Check if agent matches (sale stores agent_email in the query but we selected agent_name)
+              // We need to also check raw_payload for agent info
+              const salePayload = sale.raw_payload as any;
+              const saleAgentEmails = [
+                saleEmail,
+                (salePayload?.agent_email || "").toLowerCase(),
+              ];
+
+              if (!saleAgentEmails.some(e => e === agentEmail)) continue;
+
+              // Check date match (same day)
+              const saleDateObj = new Date(sale.sale_datetime);
+              if (
+                excelDateObj.getFullYear() !== saleDateObj.getFullYear() ||
+                excelDateObj.getMonth() !== saleDateObj.getMonth() ||
+                excelDateObj.getDate() !== saleDateObj.getDate()
+              ) continue;
+
+              // Check product match via sale_items
+              const items = saleItemsMap.get(sale.id) || [];
+              const hasProduct = items.some(item => 
+                item.adversus_product_title?.toLowerCase() === matchingFallback.saleItemTitle.toLowerCase()
+              );
+              if (!hasProduct) continue;
+
+              // Match found!
+              const key = `${sale.id}|${matchingFallback.saleItemTitle}`;
+              if (matchedSaleProductKeys.has(key)) continue;
+              matchedSaleProductKeys.add(key);
+              matchedIndicesLocal.add(idx);
+              productMatched.push({
+                saleId: sale.id,
+                phone: sale.customer_phone || "",
+                company: sale.customer_company || "",
+                oppNumber: "",
+                saleDate: sale.sale_datetime || "",
+                employee: sale.agent_name || "Ukendt",
+                currentStatus: sale.validation_status || "pending",
+                uploadedRowData: row.originalRow,
+                targetProductName: matchingFallback.saleItemTitle,
+              });
+              break;
+            }
+          });
+
+          console.log("[handleMatch] pass 2 additional matches:", productMatched.length, "unmatched sellers:", unmatchedSellers.length);
+        }
+
+        setUnmatchedSellerRows(unmatchedSellers);
         setMatchedSales(productMatched);
         setMatchedRowIndices(matchedIndicesLocal);
         setStep("preview");
 
         toast({
           title: "Matching fuldført",
-          description: `${productMatched.length} produkt-matches fundet.`,
+          description: `${productMatched.length} produkt-matches fundet.${unmatchedSellers.length > 0 ? ` ${unmatchedSellers.length} rækker mangler sælger-mapping.` : ""}`,
         });
         return;
       }
