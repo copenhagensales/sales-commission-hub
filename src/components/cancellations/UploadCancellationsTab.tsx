@@ -1278,7 +1278,34 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     : parsedData;
   const unmatchedRows = filteredDataForPreview.filter((_, idx) => !matchedRowIndices.has(idx));
   const unmatchedCount = unmatchedRows.length;
-  const [previewTab, setPreviewTab] = useState<"matched" | "unmatched">("matched");
+  const [previewTab, setPreviewTab] = useState<"matched" | "unmatched" | "seller_unmatched">("matched");
+
+  // Handle saving a seller mapping and re-running match
+  const handleSellerMappingSave = async (excelSellerName: string, employeeId: string) => {
+    try {
+      const { error } = await supabase
+        .from("cancellation_seller_mappings")
+        .upsert({
+          client_id: selectedClientId,
+          excel_seller_name: excelSellerName,
+          employee_id: employeeId,
+        } as any, { onConflict: "client_id,excel_seller_name" });
+      if (error) throw error;
+
+      toast({ title: "Mapping gemt", description: `"${excelSellerName}" er nu koblet til en medarbejder.` });
+      
+      // Update local selections
+      setSellerDropdownSelections(prev => ({ ...prev, [excelSellerName]: employeeId }));
+      
+      // Refetch seller mappings
+      await refetchSellerMappings();
+      
+      // Remove from unmatched list
+      setUnmatchedSellerRows(prev => prev.filter(r => r.excelSellerName.toLowerCase() !== excelSellerName.toLowerCase()));
+    } catch (err: any) {
+      toast({ title: "Fejl", description: err.message, variant: "destructive" });
+    }
+  };
 
   return (
     <div className="space-y-6">
