@@ -62,8 +62,36 @@ serve(async (req) => {
       });
     }
 
-    // 2. Find TDC Erhverv sales missing leadResultFields
-    // Sales that have a leadId but no/empty leadResultFields in raw_payload
+    // 2. First, mark any 'pending' sales that already have leadResultFields as 'healed'
+    // This prevents them from clogging the batch query
+    const { data: pendingSales } = await supabase
+      .from("sales")
+      .select("id, raw_payload")
+      .eq("source", "Lovablecph")
+      .in("client_campaign_id", TDC_ERHVERV_CAMPAIGN_IDS)
+      .eq("enrichment_status", "pending")
+      .not("raw_payload", "is", null)
+      .limit(500);
+
+    const alreadyHealedIds = (pendingSales || [])
+      .filter((s: any) => {
+        const fields = s.raw_payload?.leadResultFields;
+        return fields && typeof fields === "object" && Object.keys(fields).length > 0;
+      })
+      .map((s: any) => s.id);
+
+    if (alreadyHealedIds.length > 0) {
+      for (let i = 0; i < alreadyHealedIds.length; i += 50) {
+        const chunk = alreadyHealedIds.slice(i, i + 50);
+        await supabase.from("sales").update({
+          enrichment_status: "healed",
+          enrichment_last_attempt: new Date().toISOString(),
+        }).in("id", chunk);
+      }
+      log(`Marked ${alreadyHealedIds.length} already-enriched sales as 'healed'`);
+    }
+
+    // 3. Find TDC Erhverv sales still missing leadResultFields
     const { data: sales, error } = await supabase
       .from("sales")
       .select("id, adversus_external_id, raw_payload, customer_phone")
@@ -76,7 +104,7 @@ serve(async (req) => {
 
     if (error) throw error;
 
-    // Filter in-memory: only those missing leadResultFields or with empty object
+    // Filter in-memory: only those with leadId and missing/empty leadResultFields
     const needsHealing = (sales || []).filter((s: any) => {
       const payload = s.raw_payload || {};
       const leadId = payload.leadId || payload.metadata?.leadId;
