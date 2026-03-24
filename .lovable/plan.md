@@ -1,23 +1,38 @@
 
 
-# Fix: Fejl i match viser ikke umatchede rækker
+# Fix: Case-insensitiv medlemsnummer-lookup i cancellation matching
 
-## To problemer fundet
+## Problem
+`raw_payload.data` kan indeholde enten `medlemsnummer` (lowercase, ældre salg) eller `Medlemsnummer` (Title Case, nyere salg efter normalisering). Koden søger kun efter `Medlemsnummer` — og misser alle salg med lowercase nøgle.
 
-### Problem 1: Unmatched-detection er skrøbelig
-I `sendToQueueMutation` (linje 497-505) bruges `JSON.stringify` til at sammenligne uploadede rækker med matchede rækker. Hvis `findUploadedRow()` returnerer `{}` (fordi member number lookup fejler pga. formatforskelle), eller hvis rækkens nøglerækkefølge ændres, markeres rækker forkert som "matched". Derudover: hvis flere salg matcher samme medlemsnummer, deler de samme `uploadedRowData`, og den ene Excel-række tæller som "matched" — men de øvrige Excel-rækker der IKKE matchede nogen sale, burde stadig fanges.
+## Løsning
 
-**Fix:** Erstat JSON.stringify-sammenligningen med index-tracking. Hold styr på hvilke Excel-rækkeindekser der blev brugt i et match, og beregn unmatched ud fra det.
+| Fil | Ændring |
+|-----|---------|
+| `src/components/cancellations/UploadCancellationsTab.tsx` | Erstat direkte property-access `rp?.data?.Medlemsnummer` med en case-insensitiv lookup-funktion. Anvend på begge steder (linje ~389-393 og ~491-493). |
 
-### Problem 2: MatchErrorsSubTab filtrerer for stramt
-Linje 52-53: `query.in("config_id", configIds)` — Supabase's `.in()` matcher kun eksakte værdier og inkluderer IKKE `null`. Hvis importen blev gemt med `config_id = null` (fx hvis brugeren ikke valgte en config), vises den aldrig i fejl-tabben, selvom den har unmatched_rows.
+## Konkret ændring
 
-**Fix:** Tilføj `or`-filter der inkluderer imports med null config_id.
+Tilføj en hjælpefunktion:
+```typescript
+function getCaseInsensitive(obj: Record<string, unknown> | undefined, key: string): unknown {
+  if (!obj) return undefined;
+  const lowerKey = key.toLowerCase();
+  for (const k of Object.keys(obj)) {
+    if (k.toLowerCase() === lowerKey) return obj[k];
+  }
+  return undefined;
+}
+```
 
-## Ændringer
+Erstat:
+```typescript
+(rp?.data as ...)?.Medlemsnummer
+```
+Med:
+```typescript
+getCaseInsensitive(rp?.data as Record<string, unknown> | undefined, "medlemsnummer")
+```
 
-| Fil | Hvad |
-|-----|------|
-| `src/components/cancellations/UploadCancellationsTab.tsx` | Erstat JSON.stringify-baseret unmatched-detection med index-baseret tracking. I `handleMatch`: gem hvilke `parsedData`-indekser der blev brugt. I `sendToQueueMutation`: brug indekser til at finde umatchede rækker. |
-| `src/components/cancellations/MatchErrorsSubTab.tsx` | Ret query til at inkludere imports med `config_id IS NULL` når en kunde er valgt: `.or(\`config_id.in.(${configIds.join(",")}),config_id.is.null\`)` |
+Dette sikrer at både `medlemsnummer`, `Medlemsnummer` og evt. andre varianter matches korrekt.
 
