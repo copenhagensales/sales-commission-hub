@@ -51,6 +51,7 @@ function parseFlexibleDate(value: unknown): string | null {
 
 export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [localAssignments, setLocalAssignments] = useState<Record<number, string>>({});
   const queryClient = useQueryClient();
 
   // Fetch unmatched rows
@@ -156,15 +157,17 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
   }, [existingMappings]);
 
   const upsertMapping = useMutation({
-    mutationFn: async ({ excelName, employeeId }: { excelName: string; employeeId: string }) => {
-      // 1. Save the mapping
-      const { error } = await supabase
-        .from("cancellation_seller_mappings")
-        .upsert(
-          { excel_seller_name: excelName, employee_id: employeeId, client_id: clientId },
-          { onConflict: "client_id,excel_seller_name" }
-        );
-      if (error) throw error;
+    mutationFn: async ({ row, rowIndex, employeeId }: { row: FlatUnmatchedRow; rowIndex: number; employeeId: string }) => {
+      // 1. Save global mapping for future uploads
+      const sellerValue = sellerField ? String(row.rowData[sellerField] ?? "") : "";
+      if (sellerValue) {
+        await supabase
+          .from("cancellation_seller_mappings")
+          .upsert(
+            { excel_seller_name: sellerValue, employee_id: employeeId, client_id: clientId },
+            { onConflict: "client_id,excel_seller_name" }
+          );
+      }
 
       // 2. Get employee work_email
       const emp = employees.find(e => e.id === employeeId);
@@ -175,78 +178,64 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
       const dateCol = uploadConfig?.date_column;
       if (!dateCol || campaignIds.length === 0) return { matched: 0 };
 
-      // 4. Find all rows with this seller name and try to match
-      const matchingRows = rows.filter(r => {
-        if (!sellerField) return false;
-        return String(r.rowData[sellerField] ?? "").toLowerCase() === excelName.toLowerCase();
-      });
+      // 4. Re-match ONLY this specific row
+      const dateValue = parseFlexibleDate(row.rowData[dateCol]);
+      if (!dateValue) return { matched: 0 };
 
-      let matchedCount = 0;
+      const { data: sales } = await supabase
+        .from("sales")
+        .select("id")
+        .eq("agent_email", workEmail.toLowerCase())
+        .gte("sale_datetime", `${dateValue}T00:00:00`)
+        .lte("sale_datetime", `${dateValue}T23:59:59`)
+        .in("client_campaign_id", campaignIds)
+        .limit(1);
 
-      for (const row of matchingRows) {
-        const dateValue = parseFlexibleDate(row.rowData[dateCol]);
-        if (!dateValue) continue;
+      if (!sales || sales.length === 0) return { matched: 0 };
 
-        // Search for matching sale
-        const { data: sales } = await supabase
-          .from("sales")
-          .select("id")
-          .eq("agent_email", workEmail.toLowerCase())
-          .gte("sale_datetime", `${dateValue}T00:00:00`)
-          .lte("sale_datetime", `${dateValue}T23:59:59`)
-          .in("client_campaign_id", campaignIds)
-          .limit(1);
-
-        if (!sales || sales.length === 0) continue;
-
-        // Insert into cancellation_queue
-        const { error: queueError } = await supabase
-          .from("cancellation_queue")
-          .insert([{
-            import_id: row.importId,
-            sale_id: sales[0].id,
-            upload_type: row.uploadType,
-            status: "pending",
-            uploaded_data: row.rowData as unknown as Json,
-            client_id: clientId,
-          }]);
-        if (queueError) {
-          console.error("Failed to insert into cancellation_queue:", queueError);
-          continue;
-        }
-
-        // Remove this row from unmatched_rows in cancellation_imports
-        const { data: importData } = await supabase
-          .from("cancellation_imports")
-          .select("unmatched_rows")
-          .eq("id", row.importId)
-          .single();
-
-        if (importData?.unmatched_rows && Array.isArray(importData.unmatched_rows)) {
-          const updatedRows = (importData.unmatched_rows as Record<string, unknown>[]).filter(
-            (ur) => JSON.stringify(ur) !== JSON.stringify(row.rowData)
-          );
-          await supabase
-            .from("cancellation_imports")
-            .update({
-              unmatched_rows: (updatedRows.length > 0 ? updatedRows : null) as Json,
-              rows_matched: (importData.unmatched_rows.length - updatedRows.length),
-            })
-            .eq("id", row.importId);
-        }
-
-        matchedCount++;
+      // Insert into cancellation_queue
+      const { error: queueError } = await supabase
+        .from("cancellation_queue")
+        .insert([{
+          import_id: row.importId,
+          sale_id: sales[0].id,
+          upload_type: row.uploadType,
+          status: "pending",
+          uploaded_data: row.rowData as unknown as Json,
+          client_id: clientId,
+        }]);
+      if (queueError) {
+        console.error("Failed to insert into cancellation_queue:", queueError);
+        return { matched: 0 };
       }
 
-      return { matched: matchedCount };
+      // Remove this row from unmatched_rows in cancellation_imports
+      const { data: importData } = await supabase
+        .from("cancellation_imports")
+        .select("unmatched_rows")
+        .eq("id", row.importId)
+        .single();
+
+      if (importData?.unmatched_rows && Array.isArray(importData.unmatched_rows)) {
+        const updatedRows = (importData.unmatched_rows as Record<string, unknown>[]).filter(
+          (ur) => JSON.stringify(ur) !== JSON.stringify(row.rowData)
+        );
+        await supabase
+          .from("cancellation_imports")
+          .update({
+            unmatched_rows: (updatedRows.length > 0 ? updatedRows : null) as Json,
+            rows_matched: (importData.unmatched_rows.length - updatedRows.length),
+          })
+          .eq("id", row.importId);
+      }
+
+      return { matched: 1 };
     },
     onSuccess: (result) => {
       if (result && result.matched > 0) {
-        toast({
-          title: `${result.matched} ${result.matched === 1 ? "række" : "rækker"} matchet og sendt til godkendelseskøen`,
-        });
+        toast({ title: "Rækken matchet og sendt til godkendelseskøen" });
       } else {
-        toast({ title: "Sælger-mapping gemt" });
+        toast({ title: "Sælger-mapping gemt — ingen salg fundet for denne række" });
       }
       queryClient.invalidateQueries({ queryKey: ["cancellation-seller-mappings", clientId] });
       queryClient.invalidateQueries({ queryKey: ["match-errors", clientId] });
@@ -325,8 +314,9 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
           </TableHeader>
           <TableBody>
             {processed.map((row, idx) => {
+              const localValue = localAssignments[idx];
               const sellerValue = sellerField ? String(row.rowData[sellerField] ?? "") : "";
-              const currentMapping = mappingsByName.get(sellerValue.toLowerCase());
+              const currentMapping = localValue ?? mappingsByName.get(sellerValue.toLowerCase()) ?? "";
 
               return (
                 <TableRow key={`${row.importId}-${idx}`}>
@@ -338,11 +328,10 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
                   {sellerField && (
                     <TableCell className="min-w-[200px]">
                       <Select
-                        value={currentMapping ?? ""}
+                        value={currentMapping}
                         onValueChange={(val) => {
-                          if (sellerValue) {
-                            upsertMapping.mutate({ excelName: sellerValue, employeeId: val });
-                          }
+                          setLocalAssignments(prev => ({ ...prev, [idx]: val }));
+                          upsertMapping.mutate({ row, rowIndex: idx, employeeId: val });
                         }}
                       >
                         <SelectTrigger className="h-8 text-xs">
