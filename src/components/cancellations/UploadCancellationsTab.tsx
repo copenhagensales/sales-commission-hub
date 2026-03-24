@@ -1024,14 +1024,13 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           </CardHeader>
           <CardContent className="space-y-4">
             {clientConfigs.length === 0 ? (
-              <ConfigCreationForm
-                clientId={selectedClientId}
-                columns={columns}
-                setColumns={setColumns}
-                onConfigSaved={() => {
-                  queryClient.invalidateQueries({ queryKey: ["cancellation-upload-configs", selectedClientId] });
-                }}
-              />
+              <div className="flex flex-col items-center justify-center p-12 text-center">
+                <AlertCircle className="h-12 w-12 text-destructive mb-4" />
+                <p className="text-lg font-medium">Ingen opsætning fundet</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Denne kunde har ingen gemt opsætning for annulleringsupload. Kontakt en administrator.
+                </p>
+              </div>
             ) : !file ? (
               <>
                 <div
