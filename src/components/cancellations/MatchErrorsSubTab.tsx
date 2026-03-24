@@ -51,6 +51,7 @@ function parseFlexibleDate(value: unknown): string | null {
 
 export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [localAssignments, setLocalAssignments] = useState<Record<number, string>>({});
   const queryClient = useQueryClient();
 
   // Fetch unmatched rows
