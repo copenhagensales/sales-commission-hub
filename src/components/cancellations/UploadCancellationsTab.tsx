@@ -442,20 +442,59 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         };
       };
 
+      // Build reverse lookup: value → parsedData index for tracking which rows got consumed
+      const indexByOpp = new Map<string, number[]>();
+      const indexByPhone = new Map<string, number>();
+      const indexByCompany = new Map<string, number>();
+      const indexByMemberNr = new Map<string, number>();
+      parsedData.forEach((row, idx) => {
+        if (oppColumn !== "__none__" && row.originalRow[oppColumn]) {
+          const key = String(row.originalRow[oppColumn]).toUpperCase().trim();
+          const arr = indexByOpp.get(key) || [];
+          arr.push(idx);
+          indexByOpp.set(key, arr);
+        }
+        if (phoneColumn !== "__none__" && row.originalRow[phoneColumn]) {
+          indexByPhone.set(String(row.originalRow[phoneColumn]).replace(/\D/g, ""), idx);
+        }
+        if (companyColumn !== "__none__" && row.originalRow[companyColumn]) {
+          indexByCompany.set(String(row.originalRow[companyColumn]).toLowerCase().trim(), idx);
+        }
+        if (memberNumberColumn !== "__none__" && row.originalRow[memberNumberColumn]) {
+          indexByMemberNr.set(String(row.originalRow[memberNumberColumn]).trim(), idx);
+        }
+      });
+
+      const matchedIndices = new Set<number>();
+
       const findUploadedRow = (sale: any): Record<string, unknown> => {
         const saleOpp = extractOpp(sale.raw_payload).toUpperCase().trim();
         if (saleOpp && uploadedRowsByOpp.has(saleOpp)) {
+          // Mark all indices for this OPP as matched
+          (indexByOpp.get(saleOpp) || []).forEach(i => matchedIndices.add(i));
           return consolidateOppRows(uploadedRowsByOpp.get(saleOpp)!);
         }
         const salePhone = (sale.customer_phone || "").replace(/\D/g, "");
-        if (salePhone && uploadedRowByPhone.has(salePhone)) return uploadedRowByPhone.get(salePhone)!;
+        if (salePhone && uploadedRowByPhone.has(salePhone)) {
+          const idx = indexByPhone.get(salePhone);
+          if (idx !== undefined) matchedIndices.add(idx);
+          return uploadedRowByPhone.get(salePhone)!;
+        }
         const saleCompany = (sale.customer_company || "").toLowerCase().trim();
-        if (saleCompany && uploadedRowByCompany.has(saleCompany)) return uploadedRowByCompany.get(saleCompany)!;
+        if (saleCompany && uploadedRowByCompany.has(saleCompany)) {
+          const idx = indexByCompany.get(saleCompany);
+          if (idx !== undefined) matchedIndices.add(idx);
+          return uploadedRowByCompany.get(saleCompany)!;
+        }
         // Match by member number
         const nd = sale.normalized_data as Record<string, unknown> | null;
         const rp = sale.raw_payload as Record<string, unknown> | null;
         const saleMemberNr = String(nd?.member_number ?? (rp?.data as Record<string, unknown> | undefined)?.Medlemsnummer ?? "").trim();
-        if (saleMemberNr && uploadedRowByMemberNr.has(saleMemberNr)) return uploadedRowByMemberNr.get(saleMemberNr)!;
+        if (saleMemberNr && uploadedRowByMemberNr.has(saleMemberNr)) {
+          const idx = indexByMemberNr.get(saleMemberNr);
+          if (idx !== undefined) matchedIndices.add(idx);
+          return uploadedRowByMemberNr.get(saleMemberNr)!;
+        }
         return {};
       };
 
@@ -493,16 +532,10 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     mutationFn: async () => {
       const saleIds = matchedSales.map(s => s.saleId);
 
-      // Identify unmatched uploaded rows (rows not linked to any matched sale)
-      const matchedUploadedRows = new Set<string>();
-      matchedSales.forEach(s => {
-        if (s.uploadedRowData && Object.keys(s.uploadedRowData).length > 0) {
-          matchedUploadedRows.add(JSON.stringify(s.uploadedRowData));
-        }
-      });
+      // Identify unmatched uploaded rows using index-based tracking from handleMatch
       const unmatchedRows = parsedData
-        .map(r => r.originalRow)
-        .filter(row => !matchedUploadedRows.has(JSON.stringify(row)));
+        .filter((_, idx) => !matchedIndices.has(idx))
+        .map(r => r.originalRow);
 
       // Log the import first
       let importId: string | null = null;

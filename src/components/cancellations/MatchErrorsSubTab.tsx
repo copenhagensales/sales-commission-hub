@@ -50,9 +50,10 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
           .eq("client_id", clientId);
         const configIds = (configs || []).map(c => c.id);
         if (configIds.length > 0) {
-          query = query.in("config_id", configIds);
+          query = query.or(`config_id.in.(${configIds.join(",")}),config_id.is.null`);
         } else {
-          return [];
+          // No configs for this client — still show imports with null config_id
+          query = query.is("config_id", null);
         }
       }
 
