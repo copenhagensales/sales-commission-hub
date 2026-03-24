@@ -10,6 +10,7 @@ import { DuplicatesTab } from "@/components/cancellations/DuplicatesTab";
 import { ApprovalQueueTab } from "@/components/cancellations/ApprovalQueueTab";
 import { ApprovedTab } from "@/components/cancellations/ApprovedTab";
 import { CancellationHistoryTable } from "@/components/cancellations/CancellationHistoryTable";
+import { SellerMappingTab } from "@/components/cancellations/SellerMappingTab";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
 import { Building2, AlertCircle } from "lucide-react";
@@ -50,6 +51,7 @@ export default function Cancellations() {
     if (isOwner || canView('tab_cancellations_approved'))
       tabs.push({ value: 'approved', label: 'Godkendte' });
     tabs.push({ value: 'history', label: 'Tidligere uploads' });
+    tabs.push({ value: 'mapping', label: 'Mapping' });
     return tabs;
   }, [isOwner, canView]);
 
@@ -159,6 +161,11 @@ export default function Cancellations() {
                   {autoTabs.some(t => t.value === 'history') && (
                     <TabsContent value="history" className="mt-6">
                       <CancellationHistoryTable clientId={selectedClientId} />
+                    </TabsContent>
+                  )}
+                  {autoTabs.some(t => t.value === 'mapping') && (
+                    <TabsContent value="mapping" className="mt-6">
+                      <SellerMappingTab clientId={selectedClientId} />
                     </TabsContent>
                   )}
                 </Tabs>
