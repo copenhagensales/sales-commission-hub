@@ -11,6 +11,7 @@ import { ApprovalQueueTab } from "@/components/cancellations/ApprovalQueueTab";
 import { ApprovedTab } from "@/components/cancellations/ApprovedTab";
 import { CancellationHistoryTable } from "@/components/cancellations/CancellationHistoryTable";
 import { SellerMappingTab } from "@/components/cancellations/SellerMappingTab";
+import { UnmatchedTab } from "@/components/cancellations/UnmatchedTab";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
 import { Building2, AlertCircle } from "lucide-react";
@@ -52,6 +53,7 @@ export default function Cancellations() {
       tabs.push({ value: 'approved', label: 'Godkendte' });
     tabs.push({ value: 'history', label: 'Afsluttede uploads' });
     tabs.push({ value: 'mapping', label: 'Mapping' });
+    tabs.push({ value: 'unmatched', label: 'Afventer' });
     return tabs;
   }, [isOwner, canView]);
 
@@ -166,6 +168,11 @@ export default function Cancellations() {
                   {autoTabs.some(t => t.value === 'mapping') && (
                     <TabsContent value="mapping" className="mt-6">
                       <SellerMappingTab clientId={selectedClientId} />
+                    </TabsContent>
+                  )}
+                  {autoTabs.some(t => t.value === 'unmatched') && (
+                    <TabsContent value="unmatched" className="mt-6">
+                      <UnmatchedTab clientId={selectedClientId} />
                     </TabsContent>
                   )}
                 </Tabs>

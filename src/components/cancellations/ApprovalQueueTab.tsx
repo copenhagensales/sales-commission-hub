@@ -19,7 +19,7 @@ import { Check, X, Loader2, Clock, Filter, Search, ArrowUpDown, ArrowUp, ArrowDo
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
-import { UnmatchedTab } from "@/components/cancellations/UnmatchedTab";
+
 import { MatchErrorsSubTab } from "@/components/cancellations/MatchErrorsSubTab";
 import { CLIENT_IDS } from "@/utils/clientIds";
 import { FileSpreadsheet, AlertTriangle } from "lucide-react";
@@ -292,7 +292,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   const { user } = useAuth();
   const [statusFilter, setStatusFilter] = useState<string>("pending");
   const [onlyDifferences, setOnlyDifferences] = useState(false);
-  const [subTab, setSubTab] = useState<"cancellation" | "basket_difference" | "unmatched" | "match_errors">("cancellation");
+  const [subTab, setSubTab] = useState<"cancellation" | "basket_difference" | "match_errors">("cancellation");
   const [searchQuery, setSearchQuery] = useState("");
   const [sellerFilter, setSellerFilter] = useState("all");
   type QueueSortKey = "date" | "agent" | "opp" | "type";
@@ -695,24 +695,6 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
     },
   });
 
-  // Count for "Afventer" (unmatched) tab
-  const { data: unmatchedCount = 0 } = useQuery({
-    queryKey: ["unmatched-count", clientId],
-    enabled: !!clientId,
-    queryFn: async () => {
-      const { data: campaigns } = await supabase
-        .from("client_campaigns")
-        .select("id")
-        .eq("client_id", clientId);
-      if (!campaigns?.length) return 0;
-      const { count } = await supabase
-        .from("sales")
-        .select("id", { count: "exact", head: true })
-        .eq("validation_status", "pending")
-        .in("client_campaign_id", campaigns.map(c => c.id));
-      return count || 0;
-    },
-  });
 
   // Count for "Fejl i match" tab
   const { data: matchErrorsCount = 0 } = useQuery({
@@ -1095,16 +1077,13 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
           {isLoading ? (
             <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
           ) : (
-            <Tabs value={subTab} onValueChange={(v) => setSubTab(v as "cancellation" | "basket_difference" | "unmatched" | "match_errors")}>
+            <Tabs value={subTab} onValueChange={(v) => setSubTab(v as "cancellation" | "basket_difference" | "match_errors")}>
               <TabsList>
                 <TabsTrigger value="cancellation">
                   Annulleringer {cancellationCount > 0 && `(${cancellationCount})`}
                 </TabsTrigger>
                 <TabsTrigger value="basket_difference">
                   Kurv-rettelser {basketCount > 0 && `(${basketCount})`}
-                </TabsTrigger>
-                <TabsTrigger value="unmatched">
-                  Afventer {unmatchedCount > 0 && `(${unmatchedCount})`}
                 </TabsTrigger>
                 <TabsTrigger value="match_errors">
                   Fejl i match {matchErrorsCount > 0 && `(${matchErrorsCount})`}
@@ -1139,9 +1118,6 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                 {renderTable()}
               </TabsContent>
 
-              <TabsContent value="unmatched" className="mt-4">
-                <UnmatchedTab clientId={clientId} />
-              </TabsContent>
 
               <TabsContent value="match_errors" className="mt-4">
                 <MatchErrorsSubTab clientId={clientId} />
