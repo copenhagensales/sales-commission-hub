@@ -1,19 +1,35 @@
 
 
-# Direkte til forhåndsvisning efter upload (når config eksisterer)
+# Opret Eesy TM config + bloker upload uden opsætning
 
 ## Problem
-Når en klient allerede har en gemt opsætning, viser step 2 stadig filinformation efter upload i stedet for at gå direkte til preview. Auto-match kører, men brugeren ser fortsat upload-trinnet med "Matcher..." tekst.
+1. Eesy TM har ingen gemt upload-config i databasen — den skal oprettes direkte
+2. Config-oprettelsesformularen vises stadig i upload-trinnet. Brugeren vil have at upload er **helt blokeret** uden config (den originale adfærd vi lavede før).
 
-## Løsning
+## Ændringer
 
-**Fil: `src/components/cancellations/UploadCancellationsTab.tsx`**
+### 1. Database: Indsæt Eesy TM config
+Opret en migration der inserter:
+```sql
+INSERT INTO cancellation_upload_configs (
+  client_id, name, phone_column, opp_column, member_number_column,
+  company_column, product_columns, product_match_mode,
+  is_default, filter_column, filter_value
+) VALUES (
+  '81993a7b-ff24-46b8-8ffb-37a83138ddba',
+  'Eesy TM Standard',
+  'Phone Number', NULL, NULL, NULL,
+  '{}', 'strip_percent_suffix',
+  true, 'Annulled Sales', '1'
+);
+```
 
-1. **I `onDrop`**: Når en default config findes og filen er parsed, kald `handleMatch()` direkte (i stedet for at sætte `autoMatchPending` flag). `handleMatch` sætter allerede `setStep("preview")` ved afslutning.
+### 2. UploadCancellationsTab.tsx — Fjern inline config-oprettelse
+Erstat `ConfigCreationForm`-visningen med den **originale blokerings-besked** (AlertCircle + "Ingen opsætning fundet. Kontakt en administrator."). Behold `ConfigCreationForm` komponenten og `EditConfigDialog` til redigering af eksisterende configs, men fjern den fra upload-trinnet.
 
-2. **Fjern mellemtilstand**: Den tredje gren i step 2 (linje 1067-1081 — viser filnavn + "Matcher...") er unødvendig når config eksisterer, da brugeren aldrig skal se den. Auto-match bør ske umiddelbart og skifte direkte til preview.
+Konkret: Linje ~1026-1034 ændres fra `ConfigCreationForm` tilbage til en simpel blokerings-besked med `AlertCircle`.
 
-3. **Sikre `handleMatch` kører korrekt**: `handleMatch` afhænger af at `phoneColumn`/`oppColumn` etc. allerede er sat via `applyConfig`. Da `useEffect` for auto-match allerede håndterer dette via `autoMatchPending`, skal vi sikre at state er opdateret inden match starter. Behold `autoMatchPending` pattern men verificér at `setStep("preview")` altid kaldes i `handleMatch`.
-
-Resultatet: Upload fil → auto-match kører → preview vises. Brugeren ser aldrig step 2's "fil uploadet" tilstand.
+### Resultat
+- Eesy TM får sin config → upload → auto-filter (Annulled Sales = 1) → match → preview
+- Kunder uden config → blokeret med besked, ingen mulighed for at uploade
 
