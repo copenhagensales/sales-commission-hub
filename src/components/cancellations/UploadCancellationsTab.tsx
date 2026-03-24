@@ -57,6 +57,8 @@ interface UploadConfig {
   commission_column: string | null;
   product_match_mode: string;
   is_default: boolean;
+  filter_column: string | null;
+  filter_value: string | null;
 }
 
 interface UploadCancellationsTabProps {
@@ -93,6 +95,8 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
   const [step, setStep] = useState<"upload" | "mapping" | "preview" | "done">("upload");
   const [configName, setConfigName] = useState("");
   const [showSaveConfig, setShowSaveConfig] = useState(false);
+  const [filterColumn, setFilterColumn] = useState<string>("__none__");
+  const [filterValue, setFilterValue] = useState<string>("");
 
   // Fetch configs for selected client
   const { data: clientConfigs = [] } = useQuery({
@@ -131,6 +135,8 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     setProductColumn(config.product_columns?.[0] || "__none__");
     setRevenueColumn(config.revenue_column || "__none__");
     setCommissionColumn(config.commission_column || "__none__");
+    setFilterColumn(config.filter_column || "__none__");
+    setFilterValue(config.filter_value || "");
   };
 
   const handleConfigChange = (configId: string) => {
@@ -160,6 +166,8 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           commission_column: commissionColumn !== "__none__" ? commissionColumn : null,
           product_match_mode: "strip_percent_suffix",
           is_default: clientConfigs.length === 0,
+          filter_column: filterColumn !== "__none__" ? filterColumn : null,
+          filter_value: filterValue.trim() || null,
         } as any);
       if (error) throw error;
     },
