@@ -49,9 +49,14 @@ interface MatchedSale {
 }
 
 interface ProductPhoneMapping {
-  phoneColumn?: string;        // Legacy: Excel column name (unused for reversed matching)
-  payloadPhoneField?: string;  // DB raw_payload.data field name (e.g. "Telefon Abo1")
+  phoneColumn?: string;
+  payloadPhoneField?: string;
   productName: string;
+}
+
+interface FallbackProductMapping {
+  excelProductPattern: string;
+  saleItemTitle: string;
 }
 
 interface UploadConfig {
@@ -70,6 +75,17 @@ interface UploadConfig {
   filter_column: string | null;
   filter_value: string | null;
   product_phone_mappings?: ProductPhoneMapping[];
+  seller_column?: string | null;
+  date_column?: string | null;
+  fallback_product_mappings?: FallbackProductMapping[];
+}
+
+interface UnmatchedSellerRow {
+  rowIndex: number;
+  excelSellerName: string;
+  excelDate: string;
+  excelProduct: string;
+  originalRow: Record<string, unknown>;
 }
 
 interface UploadCancellationsTabProps {
@@ -431,6 +447,37 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
   const [appliedConfigName, setAppliedConfigName] = useState<string>("");
   const [showEditConfig, setShowEditConfig] = useState(false);
   const autoMatchPending = useRef(false);
+  const [unmatchedSellerRows, setUnmatchedSellerRows] = useState<UnmatchedSellerRow[]>([]);
+  const [sellerDropdownSelections, setSellerDropdownSelections] = useState<Record<string, string>>({});
+
+  // Fetch all active employees for seller dropdown
+  const { data: allEmployees = [] } = useQuery({
+    queryKey: ["employees-for-seller-dropdown"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name, work_email")
+        .eq("is_active", true)
+        .order("first_name");
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Fetch existing seller mappings for this client
+  const { data: sellerMappings = [], refetch: refetchSellerMappings } = useQuery({
+    queryKey: ["cancellation-seller-mappings", selectedClientId],
+    queryFn: async () => {
+      if (!selectedClientId) return [];
+      const { data, error } = await supabase
+        .from("cancellation_seller_mappings")
+        .select("id, excel_seller_name, employee_id")
+        .eq("client_id", selectedClientId);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!selectedClientId,
+  });
 
   // Fetch configs for selected client
   const { data: clientConfigs = [] } = useQuery({
@@ -695,6 +742,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               customer_company,
               validation_status,
               agent_name,
+              agent_email,
               raw_payload,
               normalized_data
             `)
@@ -732,7 +780,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         filteredData.forEach((row, idx) => {
           // Get the single phone from Excel's phoneColumn
           const rawExcelPhone = phoneColumn !== "__none__" ? getCaseInsensitive(row.originalRow, phoneColumn) : null;
-          if (!rawExcelPhone) return;
+          if (!rawExcelPhone) return; // phone-less rows handled in pass 2
           const excelPhone = normalizePhone(String(rawExcelPhone));
           if (!excelPhone) return;
 
@@ -770,15 +818,162 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           }
         });
 
-        console.log("[handleMatch] productMatched:", productMatched.length);
+        console.log("[handleMatch] productMatched (pass 1):", productMatched.length);
 
+        // --- PASS 2: Seller + Date + Product fallback for phone-less rows ---
+        const sellerCol = activeConfig?.seller_column;
+        const dateCol = activeConfig?.date_column;
+        const fallbackMappings: FallbackProductMapping[] = (activeConfig as any)?.fallback_product_mappings || [];
+        const unmatchedSellers: UnmatchedSellerRow[] = [];
+
+        if (sellerCol && dateCol && fallbackMappings.length > 0) {
+          console.log("[handleMatch] PASS 2: seller+date fallback", { sellerCol, dateCol, fallbackMappings });
+
+          // Build seller name → employee work_email map from persistent mappings
+          const sellerToEmployeeId = new Map<string, string>();
+          for (const sm of sellerMappings) {
+            sellerToEmployeeId.set(sm.excel_seller_name.toLowerCase(), sm.employee_id);
+          }
+
+          // Build employee_id → work_email map
+          const employeeIdToEmail = new Map<string, string>();
+          for (const emp of allEmployees) {
+            if (emp.work_email) employeeIdToEmail.set(emp.id, emp.work_email.toLowerCase());
+          }
+
+          // Also try auto-matching by first name from employee_master_data
+          const firstNameToEmployeeId = new Map<string, string>();
+          for (const emp of allEmployees) {
+            if (emp.first_name) {
+              const key = emp.first_name.toLowerCase();
+              // Only use if unique first name
+              if (!firstNameToEmployeeId.has(key)) {
+                firstNameToEmployeeId.set(key, emp.id);
+              } else {
+                firstNameToEmployeeId.set(key, "__ambiguous__");
+              }
+            }
+          }
+
+          // Fetch sale_items for candidate sales to check product
+          const candidateSaleIds = candidateSales.map(s => s.id);
+          const saleItemsMap = new Map<string, { adversus_product_title: string }[]>();
+          
+          for (let i = 0; i < candidateSaleIds.length; i += 500) {
+            const batch = candidateSaleIds.slice(i, i + 500);
+            const { data: items } = await supabase
+              .from("sale_items")
+              .select("sale_id, adversus_product_title")
+              .in("sale_id", batch);
+            if (items) {
+              for (const item of items) {
+                const arr = saleItemsMap.get(item.sale_id) || [];
+                arr.push({ adversus_product_title: item.adversus_product_title || "" });
+                saleItemsMap.set(item.sale_id, arr);
+              }
+            }
+          }
+
+          filteredData.forEach((row, idx) => {
+            if (matchedIndicesLocal.has(idx)) return; // already matched in pass 1
+
+            const rawExcelPhone = phoneColumn !== "__none__" ? getCaseInsensitive(row.originalRow, phoneColumn) : null;
+            const excelPhone = rawExcelPhone ? normalizePhone(String(rawExcelPhone)) : "";
+            if (excelPhone) return; // has phone → should have been matched in pass 1
+
+            const excelSeller = String(getCaseInsensitive(row.originalRow, sellerCol) || "").trim();
+            const excelDate = String(getCaseInsensitive(row.originalRow, dateCol) || "").trim();
+            
+            // Find which fallback product this row matches
+            const excelSubName = String(getCaseInsensitive(row.originalRow, "Subscription Name") || "").trim();
+            const matchingFallback = fallbackMappings.find(fm => 
+              excelSubName.toLowerCase().includes(fm.excelProductPattern.toLowerCase())
+            );
+            if (!matchingFallback) return; // not a fallback-eligible product
+
+            if (!excelSeller || !excelDate) return;
+
+            // Resolve seller to employee_id
+            let employeeId = sellerToEmployeeId.get(excelSeller.toLowerCase());
+            if (!employeeId) {
+              // Try auto-match by first name
+              const autoMatch = firstNameToEmployeeId.get(excelSeller.toLowerCase());
+              if (autoMatch && autoMatch !== "__ambiguous__") {
+                employeeId = autoMatch;
+              }
+            }
+
+            if (!employeeId) {
+              // Unmatched seller — needs manual resolution
+              unmatchedSellers.push({
+                rowIndex: idx,
+                excelSellerName: excelSeller,
+                excelDate,
+                excelProduct: excelSubName,
+                originalRow: row.originalRow,
+              });
+              return;
+            }
+
+            // Find agent_email for this employee
+            const agentEmail = employeeIdToEmail.get(employeeId);
+            if (!agentEmail) return;
+
+            // Parse Excel date for comparison
+            const excelDateObj = new Date(excelDate);
+
+            // Match against candidate sales by agent + date + product
+            for (const sale of candidateSales) {
+              // Check if agent matches via agent_email field
+              const saleAgentEmail = (sale.agent_email || "").toLowerCase();
+              if (saleAgentEmail !== agentEmail) continue;
+
+              // Check date match (same day)
+              const saleDateObj = new Date(sale.sale_datetime);
+              if (
+                excelDateObj.getFullYear() !== saleDateObj.getFullYear() ||
+                excelDateObj.getMonth() !== saleDateObj.getMonth() ||
+                excelDateObj.getDate() !== saleDateObj.getDate()
+              ) continue;
+
+              // Check product match via sale_items
+              const items = saleItemsMap.get(sale.id) || [];
+              const hasProduct = items.some(item => 
+                item.adversus_product_title?.toLowerCase() === matchingFallback.saleItemTitle.toLowerCase()
+              );
+              if (!hasProduct) continue;
+
+              // Match found!
+              const key = `${sale.id}|${matchingFallback.saleItemTitle}`;
+              if (matchedSaleProductKeys.has(key)) continue;
+              matchedSaleProductKeys.add(key);
+              matchedIndicesLocal.add(idx);
+              productMatched.push({
+                saleId: sale.id,
+                phone: sale.customer_phone || "",
+                company: sale.customer_company || "",
+                oppNumber: "",
+                saleDate: sale.sale_datetime || "",
+                employee: sale.agent_name || "Ukendt",
+                currentStatus: sale.validation_status || "pending",
+                uploadedRowData: row.originalRow,
+                targetProductName: matchingFallback.saleItemTitle,
+              });
+              break;
+            }
+          });
+
+          console.log("[handleMatch] pass 2 additional matches:", productMatched.length, "unmatched sellers:", unmatchedSellers.length);
+        }
+
+        setUnmatchedSellerRows(unmatchedSellers);
         setMatchedSales(productMatched);
         setMatchedRowIndices(matchedIndicesLocal);
         setStep("preview");
 
         toast({
           title: "Matching fuldført",
-          description: `${productMatched.length} produkt-matches fundet.`,
+          description: `${productMatched.length} produkt-matches fundet.${unmatchedSellers.length > 0 ? ` ${unmatchedSellers.length} rækker mangler sælger-mapping.` : ""}`,
         });
         return;
       }
@@ -1074,6 +1269,8 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     setSelectedConfigId("__none__");
     setMatchedSales([]);
     setMatchedRowIndices(new Set());
+    setUnmatchedSellerRows([]);
+    setSellerDropdownSelections({});
     setStep("type");
   };
 
@@ -1083,7 +1280,34 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     : parsedData;
   const unmatchedRows = filteredDataForPreview.filter((_, idx) => !matchedRowIndices.has(idx));
   const unmatchedCount = unmatchedRows.length;
-  const [previewTab, setPreviewTab] = useState<"matched" | "unmatched">("matched");
+  const [previewTab, setPreviewTab] = useState<"matched" | "unmatched" | "seller_unmatched">("matched");
+
+  // Handle saving a seller mapping and re-running match
+  const handleSellerMappingSave = async (excelSellerName: string, employeeId: string) => {
+    try {
+      const { error } = await supabase
+        .from("cancellation_seller_mappings")
+        .upsert({
+          client_id: selectedClientId,
+          excel_seller_name: excelSellerName,
+          employee_id: employeeId,
+        } as any, { onConflict: "client_id,excel_seller_name" });
+      if (error) throw error;
+
+      toast({ title: "Mapping gemt", description: `"${excelSellerName}" er nu koblet til en medarbejder.` });
+      
+      // Update local selections
+      setSellerDropdownSelections(prev => ({ ...prev, [excelSellerName]: employeeId }));
+      
+      // Refetch seller mappings
+      await refetchSellerMappings();
+      
+      // Remove from unmatched list
+      setUnmatchedSellerRows(prev => prev.filter(r => r.excelSellerName.toLowerCase() !== excelSellerName.toLowerCase()));
+    } catch (err: any) {
+      toast({ title: "Fejl", description: err.message, variant: "destructive" });
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -1215,7 +1439,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             )}
 
             {/* Stats */}
-            <div className="flex gap-4">
+            <div className="flex gap-4 flex-wrap">
               <Badge
                 variant={previewTab === "matched" ? "default" : "outline"}
                 className="text-sm px-3 py-1 cursor-pointer"
@@ -1230,6 +1454,15 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                   onClick={() => setPreviewTab("unmatched")}
                 >
                   {unmatchedCount} umatchede rækker
+                </Badge>
+              )}
+              {unmatchedSellerRows.length > 0 && (
+                <Badge
+                  variant={previewTab === "seller_unmatched" as any ? "destructive" : "outline"}
+                  className="text-sm px-3 py-1 cursor-pointer"
+                  onClick={() => setPreviewTab("seller_unmatched" as any)}
+                >
+                  {unmatchedSellerRows.length} mangler sælger-mapping
                 </Badge>
               )}
             </div>
@@ -1276,6 +1509,78 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                   </Table>
                 </div>
               )
+            ) : previewTab === "seller_unmatched" ? (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Disse rækker har intet telefonnummer og sælgernavnet er ikke genkendt. Vælg den korrekte medarbejder for at gemme en permanent mapping.
+                </p>
+                <div className="rounded-md border max-h-96 overflow-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Sælgernavn (Excel)</TableHead>
+                        <TableHead>Dato</TableHead>
+                        <TableHead>Produkt</TableHead>
+                        <TableHead className="min-w-[220px]">Vælg medarbejder</TableHead>
+                        <TableHead></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {unmatchedSellerRows.map((row, idx) => (
+                        <TableRow key={idx}>
+                          <TableCell>
+                            <Badge variant="outline">{row.excelSellerName}</Badge>
+                          </TableCell>
+                          <TableCell className="text-sm">{row.excelDate}</TableCell>
+                          <TableCell className="text-sm">{row.excelProduct}</TableCell>
+                          <TableCell>
+                            <Select
+                              value={sellerDropdownSelections[row.excelSellerName] || "__none__"}
+                              onValueChange={(val) => {
+                                if (val !== "__none__") {
+                                  setSellerDropdownSelections(prev => ({ ...prev, [row.excelSellerName]: val }));
+                                }
+                              }}
+                            >
+                              <SelectTrigger className="h-9">
+                                <SelectValue placeholder="Vælg medarbejder..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__none__">— Vælg —</SelectItem>
+                                {allEmployees.map(emp => (
+                                  <SelectItem key={emp.id} value={emp.id}>
+                                    {`${emp.first_name || ""} ${emp.last_name || ""}`.trim()}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              size="sm"
+                              variant="default"
+                              disabled={!sellerDropdownSelections[row.excelSellerName]}
+                              onClick={() => handleSellerMappingSave(row.excelSellerName, sellerDropdownSelections[row.excelSellerName])}
+                            >
+                              <Save className="h-3.5 w-3.5 mr-1" />
+                              Gem
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                {unmatchedSellerRows.length === 0 && (
+                  <div className="py-4 text-center text-muted-foreground text-sm">
+                    Alle sælgere er nu mappet. Kør matching igen for at finde matches.
+                  </div>
+                )}
+                <Button variant="outline" onClick={() => handleMatch()}>
+                  <ArrowRight className="h-4 w-4 mr-2" />
+                  Kør matching igen
+                </Button>
+              </div>
             ) : (
               <div className="rounded-md border max-h-96 overflow-auto">
                 <Table>
