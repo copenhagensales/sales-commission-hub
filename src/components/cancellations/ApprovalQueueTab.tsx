@@ -539,7 +539,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
       // Handle whole-sale cancellations (existing logic)
       const wholeSaleIds = [...new Set(wholeSaleItems.map((qi: any) => qi.sale_id as string))];
       for (const saleId of wholeSaleIds) {
-        const { error } = await supabase.from("sales").update({ validation_status: newStatus }).eq("id", saleId);
+        const { error } = await supabase.from("sales").update({ validation_status: newStatus } as any).eq("id", saleId);
         if (error) throw error;
       }
 
