@@ -3,9 +3,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Brain, Send, Loader2, Sparkles } from "lucide-react";
+import { Brain, Send, Loader2, Sparkles, Settings } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
+import AgentSettingsDrawer, { type FmAgentSettings } from "@/components/fm-agent/AgentSettingsDrawer";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -23,12 +24,14 @@ const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fm-profit-ag
 async function streamChat({
   message,
   history,
+  settings,
   onDelta,
   onDone,
   onError,
 }: {
   message: string;
   history: Msg[];
+  settings?: FmAgentSettings | null;
   onDelta: (text: string) => void;
   onDone: () => void;
   onError: (err: string) => void;
@@ -40,7 +43,7 @@ async function streamChat({
         "Content-Type": "application/json",
         Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
       },
-      body: JSON.stringify({ message, history }),
+      body: JSON.stringify({ message, history, settings }),
     });
 
     if (!resp.ok) {
@@ -109,6 +112,8 @@ export default function FmProfitAgentContent() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [agentSettings, setAgentSettings] = useState<FmAgentSettings | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -143,6 +148,7 @@ export default function FmProfitAgentContent() {
     await streamChat({
       message: text.trim(),
       history: messages,
+      settings: agentSettings,
       onDelta: upsertAssistant,
       onDone: () => setIsLoading(false),
       onError: (err) => {
@@ -163,6 +169,13 @@ export default function FmProfitAgentContent() {
 
   return (
     <div className="h-[calc(100vh-12rem)] flex flex-col">
+      {/* Settings drawer */}
+      <AgentSettingsDrawer
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        onSettingsLoaded={setAgentSettings}
+      />
+
       {/* Chat area */}
       <ScrollArea className="flex-1 px-4" ref={scrollRef}>
         {isEmpty ? (
@@ -173,7 +186,7 @@ export default function FmProfitAgentContent() {
             <div className="text-center max-w-md">
               <h2 className="text-xl font-semibold mb-2">FM Profit Agent</h2>
               <p className="text-muted-foreground text-sm">
-                Stil spørgsmål om lokationer, sælgere og profitabilitet. AI'en analyserer rigtige data fra de seneste 12 uger og forklarer hvad der driver performance.
+                Stil spørgsmål om lokationer, sælgere og profitabilitet. AI'en analyserer rigtige data fra de seneste {agentSettings?.data_window_weeks ?? 12} uger og forklarer hvad der driver performance.
               </p>
             </div>
             <div className="flex flex-wrap gap-2 max-w-lg justify-center">
@@ -252,6 +265,14 @@ export default function FmProfitAgentContent() {
       {/* Input */}
       <div className="p-4 border-t">
         <div className="flex gap-2 max-w-3xl mx-auto">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setSettingsOpen(true)}
+            title="Agent indstillinger"
+          >
+            <Settings className="h-4 w-4" />
+          </Button>
           <Input
             ref={inputRef}
             value={input}
