@@ -1,73 +1,43 @@
 
-# Fix: bil-aflevering gemmer, men Thomas-notifikation bliver ikke sendt
 
-## Hvad jeg har fundet
-- Afleveringen bliver faktisk gemt i databasen (seneste række er oprettet kl. 09:04 med foto)
-- Thomas Wehage er korrekt sat op som assistant leader for **Fieldmarketing**
-- M365-secrets findes
-- Der er stadig **ingen request-logs** til `notify-vehicle-returned`
+# Indstillinger til FM Profit Agent
 
-Det peger på, at problemet sandsynligvis er i selve browser-kaldet til funktionen — og at fejlen lige nu bliver skjult, fordi UI’et gemmer afleveringen og derefter **sluger mail-fejlen stille**
+## Hvad
+Tilføj en indstillingspanel (Settings drawer) til FM Profit Agent, hvor managere kan konfigurere AI'ens forretningsforståelse. Indstillingerne gemmes i en ny database-tabel og sendes med til edge-funktionen, som bruger dem i system-prompten og beregningerne.
 
-## Løsning
-Jeg vil gøre flowet robust ved at flytte den kritiske logik væk fra “gem først, prøv så mail bagefter i stilhed”.
+## Smarte indstillinger
 
-### Filer
-- `src/pages/vagt-flow/MyBookingSchedule.tsx`
-- `supabase/functions/notify-vehicle-returned/index.ts`
-- `supabase/config.toml`
+| Indstilling | Beskrivelse | Default |
+|---|---|---|
+| **Mål-DB%** | Minimumskrav til dækningsbidrag — AI'en flagger lokationer under denne grænse | 30% |
+| **Sælgeromkostning %** | Feriepenge/tillæg på provision (nu hardcodet 12.5%) | 12.5% |
+| **Datavindue (uger)** | Hvor mange uger bagud AI'en analyserer | 12 |
+| **Min. observationer** | Minimum datapunkter før AI'en udtaler sig med sikkerhed | 5 |
+| **Forretningskontekst** | Fritekst med virksomhedsspecifik viden (fx "Vi prioriterer Eesy-produkter", "Aarhus-lokationer har sæsonudsving", "Nye sælgere skal altid starte på X") | Tom |
+| **Fokus-prioritet** | Hvad AI'en vægter højest: Profitabilitet / Volumen / Konsistens | Profitabilitet |
 
-## Plan
-1. **Gør `notify-vehicle-returned` til det primære backend-kald**
-   - Funktionen skal modtage booking/vehicle/date/photo_url
-   - Den skal selv slå den aktuelle medarbejder op via auth
-   - Den skal selv oprette/upserte `vehicle_return_confirmation`
-   - Derefter sende mail til Thomas/øvrige FM-assistant leaders i samme flow
+## Ændringer
 
-2. **Fjern den stille fejl i frontend**
-   - `MyBookingSchedule.tsx` skal ikke længere gemme afleveringen direkte og bagefter ignorere mail-fejl
-   - Frontend skal i stedet kalde funktionen og kun vise fuld succes når både backend-oprettelse og notifikation er håndteret
-   - Hvis afleveringen er gemt men mail fejler, skal brugeren få en tydelig advarsel i stedet for et falsk grønt succes-signal
-
-3. **Tilføj rigtig observability i edge-funktionen**
-   - Log start, input, fundne modtagere, og om Graph-mailen blev accepteret
-   - Returnér struktureret svar som fx `{ ok, confirmed, notified, recipients }`
-   - Så vi fremover kan se præcist om problemet er auth, recipient lookup eller mail-send
-
-4. **Gør funktionen eksplicit beskyttet**
-   - Tilføj en tydelig config for funktionen i `supabase/config.toml`
-   - Så auth-adfærd ikke er implicit/tvetydig
+| Fil | Hvad |
+|---|---|
+| **Database migration** | Ny tabel `fm_agent_settings` med kolonnerne: `id`, `target_db_pct`, `seller_cost_pct`, `data_window_weeks`, `min_observations`, `business_context`, `focus_priority`, `updated_at`, `updated_by`. Én række (singleton). RLS: authenticated kan select/update. |
+| `src/components/fm-agent/AgentSettingsDrawer.tsx` | **Ny fil.** Sheet/drawer med formular for alle indstillinger. Henter og gemmer til `fm_agent_settings`. Fritekst-felt til forretningskontekst med placeholder-eksempler. |
+| `src/pages/vagt-flow/FmProfitAgentContent.tsx` | Tilføj tandhjuls-ikon (Settings) der åbner draweren. Send `settings` med i request body til edge-funktionen. |
+| `supabase/functions/fm-profit-agent/index.ts` | Læs `settings` fra request body (eller hent fra DB som fallback). Brug `target_db_pct` i risikoflag, `seller_cost_pct` i beregninger, `data_window_weeks` for dataperiode, `min_observations` for konfidenstærskel, `business_context` i system-prompten, `focus_priority` til at justere scoring-vægtning. |
 
 ## Teknisk detalje
-Den nuværende kode gør dette:
 
-```text
-UI:
-1. upload foto
-2. upsert vehicle_return_confirmation
-3. prøv notify-vehicle-returned
-4. slug fejl
-5. vis succes-toast alligevel
+**System-prompt tilføjelse:**
+```
+Virksomhedens forretningskontekst:
+{business_context}
+
+Mål-DB%: {target_db_pct}% — flagger lokationer under dette.
+Fokus: {focus_priority} — vægt dine anbefalinger derefter.
 ```
 
-Jeg vil ændre det til:
+**Scoring-justering baseret på fokus:**
+- Profitabilitet: nuværende adfærd (DB%-baseret)
+- Volumen: vægt salesCount højere i score
+- Konsistens: vægt lav varians højere
 
-```text
-UI:
-1. upload foto
-2. kald notify-vehicle-returned
-
-Backend-funktion:
-1. validér auth
-2. find employee + navn
-3. upsert vehicle_return_confirmation
-4. find FM assistant leaders
-5. send mail
-6. returnér status til UI
-```
-
-## Resultat
-- Thomas-notifikationen bliver en del af samme sikre backend-flow
-- Vi undgår “afleveret = ja, men mail = måske”
-- Brugeren får korrekt feedback, hvis mailen fejler
-- Fejlen kan spores hurtigt næste gang i logs
