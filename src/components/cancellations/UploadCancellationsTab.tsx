@@ -742,6 +742,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               customer_company,
               validation_status,
               agent_name,
+              agent_email,
               raw_payload,
               normalized_data
             `)
