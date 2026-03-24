@@ -75,7 +75,7 @@ function getCaseInsensitive(obj: Record<string, unknown> | undefined, key: strin
   return undefined;
 }
 
-type WizardStep = "type" | "upload" | "mapping" | "preview" | "done";
+type WizardStep = "type" | "upload" | "preview" | "done";
 
 const WIZARD_STEPS = [
   { key: "type" as const, label: "Vælg type", number: 1 },
@@ -85,9 +85,7 @@ const WIZARD_STEPS = [
 ];
 
 function StepIndicator({ currentStep }: { currentStep: WizardStep }) {
-  const currentIdx = currentStep === "mapping"
-    ? 1 // mapping counts as part of step 2
-    : WIZARD_STEPS.findIndex(s => s.key === currentStep);
+  const currentIdx = WIZARD_STEPS.findIndex(s => s.key === currentStep);
 
   return (
     <div className="flex items-center justify-center gap-2 mb-6">
@@ -276,9 +274,6 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           setSelectedConfigId(defaultConfig.id);
           setAppliedConfigName(defaultConfig.name);
           autoMatchPending.current = true;
-        } else {
-          // No config — go to manual mapping
-          setStep("mapping");
         }
 
         toast({
@@ -756,7 +751,15 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {!file ? (
+            {clientConfigs.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <AlertCircle className="h-12 w-12 text-destructive/60 mb-4" />
+                <h3 className="text-lg font-semibold text-foreground mb-1">Ingen opsætning fundet</h3>
+                <p className="text-sm text-muted-foreground max-w-md">
+                  Denne kunde har ingen gemt upload-opsætning. Kontakt en administrator for at oprette en, før du kan uploade filer.
+                </p>
+              </div>
+            ) : !file ? (
               <div
                 {...getRootProps()}
                 className={`border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors
@@ -799,204 +802,6 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         </Card>
       )}
 
-      {/* MAPPING FALLBACK (for clients without saved config) */}
-      {step === "mapping" && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileSpreadsheet className="h-5 w-5" />
-              Kolonnemapping
-            </CardTitle>
-            <CardDescription>
-              Ingen gemt opsætning fundet for denne kunde. Vælg kolonner manuelt.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {clientConfigs.length > 0 && (
-                <div className="space-y-2">
-                  <Label>Opsætning</Label>
-                  <Select value={selectedConfigId} onValueChange={handleConfigChange}>
-                    <SelectTrigger><SelectValue placeholder="Vælg opsætning..." /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">Manuel</SelectItem>
-                      {clientConfigs.map((cfg) => (
-                        <SelectItem key={cfg.id} value={cfg.id}>
-                          {cfg.name} {cfg.is_default ? "(standard)" : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label>Telefonkolonne (valgfri)</Label>
-                <Select value={phoneColumn} onValueChange={setPhoneColumn}>
-                  <SelectTrigger><SelectValue placeholder="Vælg kolonne..." /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Ingen</SelectItem>
-                    {columns.map((col) => (<SelectItem key={col} value={col}>{col}</SelectItem>))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Virksomhedskolonne (valgfri)</Label>
-                <Select value={companyColumn} onValueChange={setCompanyColumn}>
-                  <SelectTrigger><SelectValue placeholder="Vælg kolonne..." /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Ingen</SelectItem>
-                    {columns.map((col) => (<SelectItem key={col} value={col}>{col}</SelectItem>))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>OPP-kolonne (valgfri)</Label>
-                <Select value={oppColumn} onValueChange={setOppColumn}>
-                  <SelectTrigger><SelectValue placeholder="Vælg kolonne..." /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Ingen</SelectItem>
-                    {columns.map((col) => (<SelectItem key={col} value={col}>{col}</SelectItem>))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Medlemsnr.-kolonne (valgfri)</Label>
-                <Select value={memberNumberColumn} onValueChange={setMemberNumberColumn}>
-                  <SelectTrigger><SelectValue placeholder="Vælg kolonne..." /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Ingen</SelectItem>
-                    {columns.map((col) => (<SelectItem key={col} value={col}>{col}</SelectItem>))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Produktkolonne (valgfri)</Label>
-                <Select value={productColumn} onValueChange={setProductColumn}>
-                  <SelectTrigger><SelectValue placeholder="Vælg kolonne..." /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Ingen</SelectItem>
-                    {columns.map((col) => (<SelectItem key={col} value={col}>{col}</SelectItem>))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Omsætningskolonne (valgfri)</Label>
-                <Select value={revenueColumn} onValueChange={setRevenueColumn}>
-                  <SelectTrigger><SelectValue placeholder="Vælg kolonne..." /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Ingen</SelectItem>
-                    {columns.map((col) => (<SelectItem key={col} value={col}>{col}</SelectItem>))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Provisionskolonne (valgfri)</Label>
-                <Select value={commissionColumn} onValueChange={setCommissionColumn}>
-                  <SelectTrigger><SelectValue placeholder="Vælg kolonne..." /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Ingen</SelectItem>
-                    {columns.map((col) => (<SelectItem key={col} value={col}>{col}</SelectItem>))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Row filter section */}
-            <div className="border-t pt-4 space-y-3">
-              <Label className="text-sm font-medium">Filtrer rækker (valgfri)</Label>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">Filterkolonne</Label>
-                  <Select value={filterColumn} onValueChange={setFilterColumn}>
-                    <SelectTrigger><SelectValue placeholder="Vælg kolonne..." /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">Ingen</SelectItem>
-                      {columns.map((col) => (<SelectItem key={col} value={col}>{col}</SelectItem>))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">Filterværdi</Label>
-                  <input
-                    type="text"
-                    placeholder="f.eks. 1"
-                    value={filterValue}
-                    onChange={(e) => setFilterValue(e.target.value)}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                    disabled={filterColumn === "__none__"}
-                  />
-                </div>
-                <div>
-                  {filterColumn !== "__none__" && filterValue.trim() && parsedData.length > 0 && (
-                    <Badge variant="secondary">
-                      {parsedData.filter(row => String(row.originalRow[filterColumn] ?? "").trim() === filterValue.trim()).length} af {parsedData.length} rækker inkluderet
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Save config section */}
-            <div className="flex items-center gap-2 pt-2 border-t">
-              {!showSaveConfig ? (
-                <Button variant="outline" size="sm" onClick={() => setShowSaveConfig(true)} disabled={!selectedClientId}>
-                  <Save className="h-4 w-4 mr-2" />
-                  Gem som opsætning
-                </Button>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    placeholder="Navn på opsætning..."
-                    value={configName}
-                    onChange={(e) => setConfigName(e.target.value)}
-                    className="border rounded px-3 py-1.5 text-sm bg-background"
-                  />
-                  <Button size="sm" onClick={() => saveConfigMutation.mutate()} disabled={saveConfigMutation.isPending || !configName.trim()}>
-                    {saveConfigMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Gem"}
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => { setShowSaveConfig(false); setConfigName(""); }}>
-                    Annuller
-                  </Button>
-                </div>
-              )}
-            </div>
-
-            <div className="flex gap-2">
-              <Button onClick={handleMatch} disabled={isMatching}>
-                {isMatching ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Matcher...
-                  </>
-                ) : (
-                  <>
-                    <ArrowRight className="h-4 w-4 mr-2" />
-                    Find matchende salg
-                  </>
-                )}
-              </Button>
-              <Button variant="outline" onClick={() => setStep("upload")}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Tilbage
-              </Button>
-            </div>
-
-            {parsedData.length > 0 && (
-              <div className="text-sm text-muted-foreground">
-                {parsedData.length} rækker i filen
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
       {/* STEP 3: Preview */}
       {step === "preview" && (
