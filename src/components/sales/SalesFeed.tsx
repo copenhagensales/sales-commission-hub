@@ -735,28 +735,33 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
                 )}
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <div className="flex">
-                <div className="border-r p-2 space-y-0.5 min-w-[140px]">
-                  <p className="text-xs font-medium text-muted-foreground px-2 py-1.5">Hurtig valg</p>
-                  {DATE_PRESETS.filter(p => p.value !== "custom").map((preset) => (
-                    <Button
-                      key={preset.value}
-                      variant={datePreset === preset.value ? "secondary" : "ghost"}
-                      size="sm"
-                      className="w-full justify-start text-sm h-8"
-                      onClick={() => {
-                        setDatePreset(preset.value);
-                        setCustomDateRange({ from: undefined, to: undefined });
-                        setIsCalendarOpen(false);
-                      }}
-                    >
-                      {preset.label}
-                    </Button>
-                  ))}
-                </div>
+            <PopoverContent className="w-auto p-3" align="start">
+              <div className="space-y-3">
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground px-3 pt-3 pb-1">Eller vælg periode</p>
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Hurtig valg</p>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {DATE_PRESETS.filter(p => p.value !== "custom" && p.value !== "all").map((preset) => (
+                      <Button
+                        key={preset.value}
+                        variant={datePreset === preset.value ? "default" : "outline"}
+                        size="sm"
+                        className={cn(
+                          "text-xs h-7",
+                          datePreset === preset.value && "bg-primary text-primary-foreground"
+                        )}
+                        onClick={() => {
+                          setDatePreset(preset.value);
+                          setCustomDateRange({ from: undefined, to: undefined });
+                          setIsCalendarOpen(false);
+                        }}
+                      >
+                        {preset.label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+                <div className="border-t pt-3">
+                  <p className="text-xs font-medium text-muted-foreground mb-1">Eller vælg periode</p>
                   <Calendar
                     mode="range"
                     defaultMonth={customDateRange.from}
@@ -768,11 +773,27 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
                         setIsCalendarOpen(false);
                       }
                     }}
-                    numberOfMonths={2}
+                    numberOfMonths={1}
                     locale={da}
-                    className="pointer-events-auto p-3"
+                    className="pointer-events-auto p-0"
                   />
                 </div>
+                {datePreset !== "all" && (
+                  <div className="border-t pt-2 flex justify-end">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs h-7 text-muted-foreground"
+                      onClick={() => {
+                        setDatePreset("all");
+                        setCustomDateRange({ from: undefined, to: undefined });
+                        setIsCalendarOpen(false);
+                      }}
+                    >
+                      Nulstil
+                    </Button>
+                  </div>
+                )}
               </div>
             </PopoverContent>
           </Popover>
