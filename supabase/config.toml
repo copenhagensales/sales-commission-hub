@@ -234,3 +234,6 @@ verify_jwt = false
 
 [functions.notify-vehicle-returned]
 verify_jwt = false
+
+[functions.tdc-opp-backfill]
+verify_jwt = false
