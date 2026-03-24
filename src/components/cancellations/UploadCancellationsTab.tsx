@@ -117,6 +117,277 @@ function StepIndicator({ currentStep }: { currentStep: WizardStep }) {
   );
 }
 
+// Inline config creation form for clients without a saved config
+function ConfigCreationForm({ clientId, columns: parentColumns, setColumns: setParentColumns, onConfigSaved }: {
+  clientId: string;
+  columns: string[];
+  setColumns: (cols: string[]) => void;
+  onConfigSaved: () => void;
+}) {
+  const [sampleFile, setSampleFile] = useState<File | null>(null);
+  const [sampleColumns, setSampleColumns] = useState<string[]>([]);
+  const [sampleData, setSampleData] = useState<Record<string, unknown>[]>([]);
+  const [cfgName, setCfgName] = useState("");
+  const [cfgPhone, setCfgPhone] = useState("__none__");
+  const [cfgOpp, setCfgOpp] = useState("__none__");
+  const [cfgMemberNr, setCfgMemberNr] = useState("__none__");
+  const [cfgCompany, setCfgCompany] = useState("__none__");
+  const [cfgFilterCol, setCfgFilterCol] = useState("__none__");
+  const [cfgFilterVal, setCfgFilterVal] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const filteredCount = (cfgFilterCol !== "__none__" && cfgFilterVal.trim())
+    ? sampleData.filter(row => String(row[cfgFilterCol] ?? "").trim() === cfgFilterVal.trim()).length
+    : sampleData.length;
+
+  const onSampleDrop = useCallback((files: File[]) => {
+    const f = files[0];
+    if (!f) return;
+    setSampleFile(f);
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const buffer = e.target?.result as ArrayBuffer;
+        const { rows, columns: cols } = await parseExcelFile(buffer, { defval: "" });
+        setSampleColumns(cols);
+        setSampleData(rows);
+        setParentColumns(cols);
+      } catch {
+        toast({ title: "Fejl", description: "Kunne ikke læse filen.", variant: "destructive" });
+      }
+    };
+    reader.readAsArrayBuffer(f);
+  }, []);
+
+  const { getRootProps: getSampleRootProps, getInputProps: getSampleInputProps, isDragActive: isSampleDragActive } = useDropzone({
+    onDrop: onSampleDrop,
+    accept: {
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+      "application/vnd.ms-excel": [".xls"],
+    },
+    maxFiles: 1,
+  });
+
+  const handleSave = async () => {
+    if (!cfgName.trim()) {
+      toast({ title: "Angiv navn", description: "Opsætningen skal have et navn.", variant: "destructive" });
+      return;
+    }
+    if (cfgPhone === "__none__" && cfgOpp === "__none__" && cfgMemberNr === "__none__") {
+      toast({ title: "Vælg kolonne", description: "Vælg mindst én match-kolonne.", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    try {
+      const { error } = await supabase.from("cancellation_upload_configs").insert({
+        client_id: clientId,
+        name: cfgName.trim(),
+        phone_column: cfgPhone !== "__none__" ? cfgPhone : null,
+        company_column: cfgCompany !== "__none__" ? cfgCompany : null,
+        opp_column: cfgOpp !== "__none__" ? cfgOpp : null,
+        member_number_column: cfgMemberNr !== "__none__" ? cfgMemberNr : null,
+        product_columns: [],
+        product_match_mode: "strip_percent_suffix",
+        is_default: true,
+        filter_column: cfgFilterCol !== "__none__" ? cfgFilterCol : null,
+        filter_value: cfgFilterVal.trim() || null,
+      } as any);
+      if (error) throw error;
+      toast({ title: "Gemt!", description: `Opsætning "${cfgName}" oprettet.` });
+      onConfigSaved();
+    } catch (err: any) {
+      toast({ title: "Fejl", description: err.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const colSelect = (label: string, value: string, onChange: (v: string) => void) => (
+    <div className="space-y-1.5">
+      <Label className="text-sm">{label}</Label>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger><SelectValue placeholder="Vælg kolonne" /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__none__">— Ingen —</SelectItem>
+          {sampleColumns.map(col => <SelectItem key={col} value={col}>{col}</SelectItem>)}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Plus className="h-4 w-4" />
+        <span className="font-medium text-foreground">Opret opsætning for denne kunde</span>
+      </div>
+
+      {!sampleFile ? (
+        <div
+          {...getSampleRootProps()}
+          className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors
+            ${isSampleDragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"}`}
+        >
+          <input {...getSampleInputProps()} />
+          <Upload className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+          <p className="text-sm mb-1">Upload en eksempelfil for at hente kolonnenavne</p>
+          <p className="text-xs text-muted-foreground">Excel (.xlsx / .xls)</p>
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center gap-2 p-3 rounded-md bg-muted/50 border text-sm">
+            <FileSpreadsheet className="h-5 w-5 text-primary shrink-0" />
+            <span className="truncate">{sampleFile.name}</span>
+            <Badge variant="secondary">{sampleData.length} rækker</Badge>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {colSelect("Telefonkolonne", cfgPhone, setCfgPhone)}
+            {colSelect("OPP-kolonne", cfgOpp, setCfgOpp)}
+            {colSelect("Medlemsnummer", cfgMemberNr, setCfgMemberNr)}
+            {colSelect("Virksomhed", cfgCompany, setCfgCompany)}
+          </div>
+
+          <div className="border-t pt-3 space-y-3">
+            <Label className="text-sm font-medium">Filter rækker (valgfri)</Label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {colSelect("Filterkolonne", cfgFilterCol, setCfgFilterCol)}
+              <div className="space-y-1.5">
+                <Label className="text-sm">Filterværdi</Label>
+                <Input
+                  value={cfgFilterVal}
+                  onChange={(e) => setCfgFilterVal(e.target.value)}
+                  placeholder="f.eks. 1"
+                />
+              </div>
+            </div>
+            {cfgFilterCol !== "__none__" && cfgFilterVal.trim() && (
+              <Badge variant="secondary">
+                {filteredCount} af {sampleData.length} rækker inkluderet
+              </Badge>
+            )}
+          </div>
+
+          <div className="border-t pt-3 space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-sm">Opsætningsnavn</Label>
+              <Input
+                value={cfgName}
+                onChange={(e) => setCfgName(e.target.value)}
+                placeholder="f.eks. Eesy TM Standard"
+              />
+            </div>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+              Gem opsætning
+            </Button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// Edit config dialog
+function EditConfigDialog({ open, onOpenChange, config, onSaved }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  config: UploadConfig;
+  onSaved: () => void;
+}) {
+  const [cfgPhone, setCfgPhone] = useState(config.phone_column || "__none__");
+  const [cfgOpp, setCfgOpp] = useState(config.opp_column || "__none__");
+  const [cfgMemberNr, setCfgMemberNr] = useState(config.member_number_column || "__none__");
+  const [cfgCompany, setCfgCompany] = useState(config.company_column || "__none__");
+  const [cfgFilterCol, setCfgFilterCol] = useState(config.filter_column || "__none__");
+  const [cfgFilterVal, setCfgFilterVal] = useState(config.filter_value || "");
+  const [cfgName, setCfgName] = useState(config.name);
+  const [saving, setSaving] = useState(false);
+
+  // We don't have file columns in edit mode, so we use known column names from config
+  const knownCols = Array.from(new Set([
+    config.phone_column, config.opp_column, config.member_number_column,
+    config.company_column, config.filter_column, config.revenue_column,
+    config.commission_column, ...(config.product_columns || []),
+  ].filter(Boolean) as string[]));
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from("cancellation_upload_configs")
+        .update({
+          name: cfgName.trim(),
+          phone_column: cfgPhone !== "__none__" ? cfgPhone : null,
+          company_column: cfgCompany !== "__none__" ? cfgCompany : null,
+          opp_column: cfgOpp !== "__none__" ? cfgOpp : null,
+          member_number_column: cfgMemberNr !== "__none__" ? cfgMemberNr : null,
+          filter_column: cfgFilterCol !== "__none__" ? cfgFilterCol : null,
+          filter_value: cfgFilterVal.trim() || null,
+        } as any)
+        .eq("id", config.id);
+      if (error) throw error;
+      toast({ title: "Opdateret", description: `Opsætning "${cfgName}" er gemt.` });
+      onSaved();
+      onOpenChange(false);
+    } catch (err: any) {
+      toast({ title: "Fejl", description: err.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const colSelect = (label: string, value: string, onChange: (v: string) => void) => (
+    <div className="space-y-1.5">
+      <Label className="text-sm">{label}</Label>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger><SelectValue /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__none__">— Ingen —</SelectItem>
+          {knownCols.map(col => <SelectItem key={col} value={col}>{col}</SelectItem>)}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Rediger opsætning</DialogTitle>
+          <DialogDescription>Opdater kolonne-mapping og filter for denne opsætning.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <Label className="text-sm">Navn</Label>
+            <Input value={cfgName} onChange={(e) => setCfgName(e.target.value)} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {colSelect("Telefon", cfgPhone, setCfgPhone)}
+            {colSelect("OPP", cfgOpp, setCfgOpp)}
+            {colSelect("Medlemsnr.", cfgMemberNr, setCfgMemberNr)}
+            {colSelect("Virksomhed", cfgCompany, setCfgCompany)}
+          </div>
+          <div className="border-t pt-3 space-y-3">
+            <Label className="text-sm font-medium">Filter</Label>
+            <div className="grid grid-cols-2 gap-3">
+              {colSelect("Filterkolonne", cfgFilterCol, setCfgFilterCol)}
+              <div className="space-y-1.5">
+                <Label className="text-sm">Filterværdi</Label>
+                <Input value={cfgFilterVal} onChange={(e) => setCfgFilterVal(e.target.value)} placeholder="f.eks. 1" />
+              </div>
+            </div>
+          </div>
+          <Button onClick={handleSave} disabled={saving} className="w-full">
+            {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+            Gem ændringer
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCancellationsTabProps) {
   const { resolve } = useAgentNameResolver();
   const queryClient = useQueryClient();
