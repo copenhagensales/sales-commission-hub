@@ -1,14 +1,19 @@
 import { useState, useMemo } from "react";
 import { useAgentNameResolver } from "@/hooks/useAgentNameResolver";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowUpDown, ArrowUp, ArrowDown, Search } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { ArrowUpDown, ArrowUp, ArrowDown, Search, CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
+import { da } from "date-fns/locale";
+import { getPayrollPeriod } from "@/lib/calculations/dates";
+import { toast } from "sonner";
 
 interface ApprovedTabProps {
   clientId: string;
