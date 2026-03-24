@@ -1,0 +1,1 @@
+ALTER TABLE public.cancellation_upload_configs ADD COLUMN member_number_column TEXT;
