@@ -1694,12 +1694,67 @@ export type Database = {
           },
         ]
       }
+      cancellation_seller_mappings: {
+        Row: {
+          client_id: string
+          created_at: string | null
+          employee_id: string
+          excel_seller_name: string
+          id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string | null
+          employee_id: string
+          excel_seller_name: string
+          id?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string | null
+          employee_id?: string
+          excel_seller_name?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cancellation_seller_mappings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cancellation_seller_mappings_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cancellation_seller_mappings_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cancellation_seller_mappings_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cancellation_upload_configs: {
         Row: {
           client_id: string
           commission_column: string | null
           company_column: string | null
           created_at: string
+          date_column: string | null
+          fallback_product_mappings: Json | null
           filter_column: string | null
           filter_value: string | null
           id: string
@@ -1712,12 +1767,15 @@ export type Database = {
           product_match_mode: string
           product_phone_mappings: Json | null
           revenue_column: string | null
+          seller_column: string | null
         }
         Insert: {
           client_id: string
           commission_column?: string | null
           company_column?: string | null
           created_at?: string
+          date_column?: string | null
+          fallback_product_mappings?: Json | null
           filter_column?: string | null
           filter_value?: string | null
           id?: string
@@ -1730,12 +1788,15 @@ export type Database = {
           product_match_mode?: string
           product_phone_mappings?: Json | null
           revenue_column?: string | null
+          seller_column?: string | null
         }
         Update: {
           client_id?: string
           commission_column?: string | null
           company_column?: string | null
           created_at?: string
+          date_column?: string | null
+          fallback_product_mappings?: Json | null
           filter_column?: string | null
           filter_value?: string | null
           id?: string
@@ -1748,6 +1809,7 @@ export type Database = {
           product_match_mode?: string
           product_phone_mappings?: Json | null
           revenue_column?: string | null
+          seller_column?: string | null
         }
         Relationships: [
           {
