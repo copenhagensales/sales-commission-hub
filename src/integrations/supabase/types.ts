@@ -12719,6 +12719,10 @@ export type Database = {
         Returns: number
       }
       remove_role_by_email: { Args: { _email: string }; Returns: undefined }
+      rollback_cancellation_import: {
+        Args: { p_import_id: string }
+        Returns: Json
+      }
       save_integration_secret: {
         Args: {
           p_api_url: string
