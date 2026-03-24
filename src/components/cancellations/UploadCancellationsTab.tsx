@@ -629,8 +629,10 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     try {
       // Apply row filter if configured
       const filteredData = (filterColumn !== "__none__" && filterValue.trim())
-        ? parsedData.filter(row => String(row.originalRow[filterColumn] ?? "").trim() === filterValue.trim())
+        ? parsedData.filter(row => String(getCaseInsensitive(row.originalRow, filterColumn) ?? "").trim() === filterValue.trim())
         : parsedData;
+
+      console.log("[handleMatch] total rows:", parsedData.length, "after filter:", filteredData.length, "filterCol:", filterColumn, "filterVal:", filterValue);
 
       // Extract values from filtered data
       const phones: string[] = [];
@@ -639,27 +641,31 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       const memberNumbers: string[] = [];
 
       filteredData.forEach(row => {
-        if (phoneColumn !== "__none__" && row.originalRow[phoneColumn]) {
-          phones.push(normalizePhone(String(row.originalRow[phoneColumn])));
+        if (phoneColumn !== "__none__") {
+          const pv = getCaseInsensitive(row.originalRow, phoneColumn);
+          if (pv) phones.push(normalizePhone(String(pv)));
         }
         // Also collect phones from product_phone_mappings
         for (const mapping of productPhoneMappings) {
-          const val = row.originalRow[mapping.phoneColumn];
-          if (val) {
-            phones.push(normalizePhone(String(val)));
-          }
+          const val = getCaseInsensitive(row.originalRow, mapping.phoneColumn);
+          if (val) phones.push(normalizePhone(String(val)));
         }
-        if (companyColumn !== "__none__" && row.originalRow[companyColumn]) {
-          companies.push(String(row.originalRow[companyColumn]).toLowerCase().trim());
+        if (companyColumn !== "__none__") {
+          const cv = getCaseInsensitive(row.originalRow, companyColumn);
+          if (cv) companies.push(String(cv).toLowerCase().trim());
         }
-        if (oppColumn !== "__none__" && row.originalRow[oppColumn]) {
-          const oppVal = String(row.originalRow[oppColumn]).trim();
-          oppNumbers.push(oppVal);
+        if (oppColumn !== "__none__") {
+          const ov = getCaseInsensitive(row.originalRow, oppColumn);
+          if (ov) oppNumbers.push(String(ov).trim());
         }
-        if (memberNumberColumn !== "__none__" && row.originalRow[memberNumberColumn]) {
-          memberNumbers.push(String(row.originalRow[memberNumberColumn]).trim());
+        if (memberNumberColumn !== "__none__") {
+          const mv = getCaseInsensitive(row.originalRow, memberNumberColumn);
+          if (mv) memberNumbers.push(String(mv).trim());
         }
       });
+
+      console.log("[handleMatch] phones:", phones.length, "companies:", companies.length, "oppNumbers:", oppNumbers.length, "memberNumbers:", memberNumbers.length);
+      if (phones.length > 0) console.log("[handleMatch] sample phones from file:", phones.slice(0, 5));
 
       // First get client_campaign_ids for this client
       const { data: campaigns } = await supabase
@@ -735,7 +741,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
         filteredData.forEach((row, idx) => {
           for (const mapping of productPhoneMappings) {
-            const rawPhone = row.originalRow[mapping.phoneColumn];
+            const rawPhone = getCaseInsensitive(row.originalRow, mapping.phoneColumn);
             if (!rawPhone) continue;
             const phone = normalizePhone(String(rawPhone));
             if (!phone) continue;
@@ -839,20 +845,26 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       const uploadedRowByMemberNr = new Map<string, Record<string, unknown>>();
       
       filteredData.forEach(row => {
-        if (oppColumn !== "__none__" && row.originalRow[oppColumn]) {
-          const key = String(row.originalRow[oppColumn]).toUpperCase().trim();
-          const arr = uploadedRowsByOpp.get(key) || [];
-          arr.push(row.originalRow);
-          uploadedRowsByOpp.set(key, arr);
+        if (oppColumn !== "__none__") {
+          const ov = getCaseInsensitive(row.originalRow, oppColumn);
+          if (ov) {
+            const key = String(ov).toUpperCase().trim();
+            const arr = uploadedRowsByOpp.get(key) || [];
+            arr.push(row.originalRow);
+            uploadedRowsByOpp.set(key, arr);
+          }
         }
-        if (phoneColumn !== "__none__" && row.originalRow[phoneColumn]) {
-          uploadedRowByPhone.set(normalizePhone(String(row.originalRow[phoneColumn])), row.originalRow);
+        if (phoneColumn !== "__none__") {
+          const pv = getCaseInsensitive(row.originalRow, phoneColumn);
+          if (pv) uploadedRowByPhone.set(normalizePhone(String(pv)), row.originalRow);
         }
-        if (companyColumn !== "__none__" && row.originalRow[companyColumn]) {
-          uploadedRowByCompany.set(String(row.originalRow[companyColumn]).toLowerCase().trim(), row.originalRow);
+        if (companyColumn !== "__none__") {
+          const cv = getCaseInsensitive(row.originalRow, companyColumn);
+          if (cv) uploadedRowByCompany.set(String(cv).toLowerCase().trim(), row.originalRow);
         }
-        if (memberNumberColumn !== "__none__" && row.originalRow[memberNumberColumn]) {
-          uploadedRowByMemberNr.set(String(row.originalRow[memberNumberColumn]).trim(), row.originalRow);
+        if (memberNumberColumn !== "__none__") {
+          const mv = getCaseInsensitive(row.originalRow, memberNumberColumn);
+          if (mv) uploadedRowByMemberNr.set(String(mv).trim(), row.originalRow);
         }
       });
 
@@ -878,20 +890,26 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       const indexByCompany = new Map<string, number>();
       const indexByMemberNr = new Map<string, number>();
       filteredData.forEach((row, idx) => {
-        if (oppColumn !== "__none__" && row.originalRow[oppColumn]) {
-          const key = String(row.originalRow[oppColumn]).toUpperCase().trim();
-          const arr = indexByOpp.get(key) || [];
-          arr.push(idx);
-          indexByOpp.set(key, arr);
+        if (oppColumn !== "__none__") {
+          const ov = getCaseInsensitive(row.originalRow, oppColumn);
+          if (ov) {
+            const key = String(ov).toUpperCase().trim();
+            const arr = indexByOpp.get(key) || [];
+            arr.push(idx);
+            indexByOpp.set(key, arr);
+          }
         }
-        if (phoneColumn !== "__none__" && row.originalRow[phoneColumn]) {
-          indexByPhone.set(normalizePhone(String(row.originalRow[phoneColumn])), idx);
+        if (phoneColumn !== "__none__") {
+          const pv = getCaseInsensitive(row.originalRow, phoneColumn);
+          if (pv) indexByPhone.set(normalizePhone(String(pv)), idx);
         }
-        if (companyColumn !== "__none__" && row.originalRow[companyColumn]) {
-          indexByCompany.set(String(row.originalRow[companyColumn]).toLowerCase().trim(), idx);
+        if (companyColumn !== "__none__") {
+          const cv = getCaseInsensitive(row.originalRow, companyColumn);
+          if (cv) indexByCompany.set(String(cv).toLowerCase().trim(), idx);
         }
-        if (memberNumberColumn !== "__none__" && row.originalRow[memberNumberColumn]) {
-          indexByMemberNr.set(String(row.originalRow[memberNumberColumn]).trim(), idx);
+        if (memberNumberColumn !== "__none__") {
+          const mv = getCaseInsensitive(row.originalRow, memberNumberColumn);
+          if (mv) indexByMemberNr.set(String(mv).trim(), idx);
         }
       });
 
