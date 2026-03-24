@@ -207,7 +207,7 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
             sale_id: sales[0].id,
             upload_type: row.uploadType,
             status: "pending",
-            uploaded_data: row.rowData as Record<string, unknown> as Record<string, Json>,
+            uploaded_data: row.rowData as unknown as Json,
             client_id: clientId,
           }]);
         if (queueError) {
