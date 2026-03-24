@@ -771,6 +771,25 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       const phoneSet = new Set(phones.map(p => normalizePhone(p)));
       const companySet = new Set(companies);
 
+      // Pre-fetch sale_items for all candidate sales (used by both Pass 1 and Pass 2)
+      const candidateSaleIds = candidateSales.map(s => s.id);
+      const saleItemsMap = new Map<string, { adversus_product_title: string; mapped_commission: number | null; mapped_revenue: number | null }[]>();
+      
+      for (let i = 0; i < candidateSaleIds.length; i += 500) {
+        const batch = candidateSaleIds.slice(i, i + 500);
+        const { data: items } = await supabase
+          .from("sale_items")
+          .select("sale_id, adversus_product_title, mapped_commission, mapped_revenue")
+          .in("sale_id", batch);
+        if (items) {
+          for (const item of items) {
+            const arr = saleItemsMap.get(item.sale_id) || [];
+            arr.push({ adversus_product_title: item.adversus_product_title || "", mapped_commission: item.mapped_commission, mapped_revenue: item.mapped_revenue });
+            saleItemsMap.set(item.sale_id, arr);
+          }
+        }
+      }
+
       // --- Product-phone mapping matching (reversed: Excel phone → DB raw_payload fields) ---
       if (hasProductPhoneMappings) {
         const matchedIndicesLocal = new Set<number>();
