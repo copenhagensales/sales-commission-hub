@@ -556,8 +556,13 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     mutationFn: async () => {
       const saleIds = matchedSales.map(s => s.saleId);
 
+      // Recompute filtered data to identify unmatched rows correctly
+      const filteredForQueue = (filterColumn !== "__none__" && filterValue.trim())
+        ? parsedData.filter(row => String(row.originalRow[filterColumn] ?? "").trim() === filterValue.trim())
+        : parsedData;
+
       // Identify unmatched uploaded rows using index-based tracking from handleMatch
-      const unmatchedRows = parsedData
+      const unmatchedRows = filteredForQueue
         .filter((_, idx) => !matchedRowIndices.has(idx))
         .map(r => r.originalRow);
 
