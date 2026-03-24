@@ -23,7 +23,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
-import { Upload, FileSpreadsheet, Check, X, Loader2, AlertCircle, Save, Settings } from "lucide-react";
+import { Upload, FileSpreadsheet, Check, X, Loader2, AlertCircle, Save, Settings, ArrowLeft, ArrowRight, Ban, ShoppingCart } from "lucide-react";
 import { CancellationHistoryTable } from "./CancellationHistoryTable";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -74,6 +74,48 @@ function getCaseInsensitive(obj: Record<string, unknown> | undefined, key: strin
   return undefined;
 }
 
+type WizardStep = "type" | "upload" | "mapping" | "preview" | "done";
+
+const WIZARD_STEPS = [
+  { key: "type" as const, label: "Vælg type", number: 1 },
+  { key: "upload" as const, label: "Upload fil", number: 2 },
+  { key: "preview" as const, label: "Forhåndsvisning", number: 3 },
+  { key: "done" as const, label: "Sendt", number: 4 },
+];
+
+function StepIndicator({ currentStep }: { currentStep: WizardStep }) {
+  const currentIdx = currentStep === "mapping"
+    ? 1 // mapping counts as part of step 2
+    : WIZARD_STEPS.findIndex(s => s.key === currentStep);
+
+  return (
+    <div className="flex items-center justify-center gap-2 mb-6">
+      {WIZARD_STEPS.map((step, idx) => {
+        const isActive = idx === currentIdx;
+        const isDone = idx < currentIdx;
+        return (
+          <div key={step.key} className="flex items-center gap-2">
+            {idx > 0 && (
+              <div className={`h-px w-8 ${isDone ? "bg-primary" : "bg-border"}`} />
+            )}
+            <div className="flex items-center gap-1.5">
+              <div
+                className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-medium transition-colors
+                  ${isDone ? "bg-primary text-primary-foreground" : isActive ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
+              >
+                {isDone ? <Check className="h-3.5 w-3.5" /> : step.number}
+              </div>
+              <span className={`text-sm hidden sm:inline ${isActive ? "font-medium text-foreground" : "text-muted-foreground"}`}>
+                {step.label}
+              </span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCancellationsTabProps) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -92,7 +134,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
   const [matchedRowIndices, setMatchedRowIndices] = useState<Set<number>>(new Set());
   const [isMatching, setIsMatching] = useState(false);
   const [uploadType, setUploadType] = useState<"cancellation" | "basket_difference">("cancellation");
-  const [step, setStep] = useState<"upload" | "mapping" | "preview" | "done">("upload");
+  const [step, setStep] = useState<WizardStep>("type");
   const [configName, setConfigName] = useState("");
   const [showSaveConfig, setShowSaveConfig] = useState(false);
   const [filterColumn, setFilterColumn] = useState<string>("__none__");
@@ -225,7 +267,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         setColumns(cols);
         setParsedData(jsonData.map(row => ({ originalRow: row })));
 
-        // Check if a default config exists — if so, skip mapping step
+        // Check if a default config exists — if so, auto-match
         const defaultConfig = clientConfigs.find(c => c.is_default) || (clientConfigs.length > 0 ? clientConfigs[0] : null);
         if (defaultConfig) {
           applyConfig(defaultConfig);
@@ -233,6 +275,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           setAppliedConfigName(defaultConfig.name);
           autoMatchPending.current = true;
         } else {
+          // No config — go to manual mapping
           setStep("mapping");
         }
 
@@ -330,12 +373,9 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         return;
       }
 
-      // Fetch all non-cancelled sales for this client and match client-side
-      // (avoids PostgREST URL length limits with large OR condition lists)
       let allMatched: any[] = [];
       const existingIds = new Set<string>();
 
-      // Fetch candidate sales in pages (Supabase default limit = 1000)
       const fetchCandidateSales = async () => {
         const candidates: any[] = [];
         let from = 0;
@@ -370,11 +410,9 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         ? await fetchCandidateSales()
         : [];
 
-      // Build lookup sets for client-side matching
       const phoneSet = new Set(phones.map(p => p.replace(/\D/g, "")));
       const companySet = new Set(companies);
 
-      // Match by phone or company client-side
       for (const sale of candidateSales) {
         if (existingIds.has(sale.id)) continue;
         const salePhone = (sale.customer_phone || "").replace(/\D/g, "");
@@ -390,7 +428,6 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         }
       }
 
-      // Helper to extract OPP number from raw_payload
       const extractOpp = (rawPayload: unknown): string => {
         if (!rawPayload || typeof rawPayload !== 'object') return "";
         const rp = rawPayload as Record<string, unknown>;
@@ -406,10 +443,8 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         return "";
       };
 
-      // If OPP numbers specified, fetch recent sales and match OPP client-side from raw_payload
       if (oppNumbers.length > 0) {
         const oppSet = new Set(oppNumbers.map(o => o.toUpperCase().trim()));
-        
         for (const sale of candidateSales) {
           if (existingIds.has(sale.id)) continue;
           const saleOpp = extractOpp(sale.raw_payload).toUpperCase().trim();
@@ -420,15 +455,13 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         }
       }
 
-      // Match by member number from normalized_data
       if (memberNumbers.length > 0) {
         const memberSet = new Set(memberNumbers.map(m => m.trim()));
-        
         for (const sale of candidateSales) {
           if (existingIds.has(sale.id)) continue;
           const nd = sale.normalized_data as Record<string, unknown> | null;
           const rp = sale.raw_payload as Record<string, unknown> | null;
-           const saleMemberNr = String(
+          const saleMemberNr = String(
             nd?.member_number ?? 
             getCaseInsensitive(rp?.data as Record<string, unknown> | undefined, "medlemsnummer") ?? 
             ""
@@ -440,8 +473,6 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         }
       }
 
-      // Build a lookup from OPP/phone/company → uploaded row for associating uploaded data
-      // Collect ALL rows per OPP (not just last one) to preserve product details
       const uploadedRowsByOpp = new Map<string, Record<string, unknown>[]>();
       const uploadedRowByPhone = new Map<string, Record<string, unknown>>();
       const uploadedRowByCompany = new Map<string, Record<string, unknown>>();
@@ -465,15 +496,12 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         }
       });
 
-      // Consolidate all rows for an OPP into one object with _product_rows
       const consolidateOppRows = (rows: Record<string, unknown>[]): Record<string, unknown> => {
-        // Find the "Total" row (if any) for financial totals, otherwise use the last row
         const totalRow = rows.find(r => {
           const produktVal = String(r["Produkt"] || r["produkt"] || "").trim();
           return produktVal.toLowerCase() === "total";
         }) || rows[rows.length - 1];
 
-        // Product rows = all rows except the Total row
         const productRows = rows.filter(r => {
           const produktVal = String(r["Produkt"] || r["produkt"] || "").trim();
           return produktVal.toLowerCase() !== "total" && produktVal !== "";
@@ -485,7 +513,6 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         };
       };
 
-      // Build reverse lookup: value → parsedData index for tracking which rows got consumed
       const indexByOpp = new Map<string, number[]>();
       const indexByPhone = new Map<string, number>();
       const indexByCompany = new Map<string, number>();
@@ -513,7 +540,6 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       const findUploadedRow = (sale: any): Record<string, unknown> => {
         const saleOpp = extractOpp(sale.raw_payload).toUpperCase().trim();
         if (saleOpp && uploadedRowsByOpp.has(saleOpp)) {
-          // Mark all indices for this OPP as matched
           (indexByOpp.get(saleOpp) || []).forEach(i => matchedIndices.add(i));
           return consolidateOppRows(uploadedRowsByOpp.get(saleOpp)!);
         }
@@ -529,7 +555,6 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           if (idx !== undefined) matchedIndices.add(idx);
           return uploadedRowByCompany.get(saleCompany)!;
         }
-        // Match by member number
         const nd = sale.normalized_data as Record<string, unknown> | null;
         const rp = sale.raw_payload as Record<string, unknown> | null;
         const saleMemberNr = String(nd?.member_number ?? getCaseInsensitive(rp?.data as Record<string, unknown> | undefined, "medlemsnummer") ?? "").trim();
@@ -576,17 +601,14 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     mutationFn: async () => {
       const saleIds = matchedSales.map(s => s.saleId);
 
-      // Recompute filtered data to identify unmatched rows correctly
       const filteredForQueue = (filterColumn !== "__none__" && filterValue.trim())
         ? parsedData.filter(row => String(row.originalRow[filterColumn] ?? "").trim() === filterValue.trim())
         : parsedData;
 
-      // Identify unmatched uploaded rows using index-based tracking from handleMatch
       const unmatchedRows = filteredForQueue
         .filter((_, idx) => !matchedRowIndices.has(idx))
         .map(r => r.originalRow);
 
-      // Log the import first
       let importId: string | null = null;
       if (currentEmployee?.id && file) {
         const configId = selectedConfigId !== "__none__" ? selectedConfigId : null;
@@ -611,10 +633,8 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
       if (!importId) throw new Error("Kunne ikke oprette import-log");
 
-      // Build a map of saleId → uploadedRowData
       const uploadedDataMap = new Map(matchedSales.map(s => [s.saleId, s.uploadedRowData]));
 
-      // Build OPP group lookup for each sale
       const oppGroupMap = new Map<string, string>();
       for (const sale of matchedSales) {
         if (sale.oppNumber) {
@@ -622,7 +642,6 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         }
       }
 
-      // Insert queue items in batches of 50
       for (let i = 0; i < saleIds.length; i += 50) {
         const batch = saleIds.slice(i, i + 50).map(saleId => ({
           import_id: importId!,
@@ -676,50 +695,108 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     setUploadType("cancellation");
     setSelectedConfigId("__none__");
     setMatchedSales([]);
-    setStep("upload");
+    setMatchedRowIndices(new Set());
+    setStep("type");
   };
+
+  // Compute unmatched count for preview
+  const filteredDataForPreview = (filterColumn !== "__none__" && filterValue.trim())
+    ? parsedData.filter(row => String(row.originalRow[filterColumn] ?? "").trim() === filterValue.trim())
+    : parsedData;
+  const unmatchedCount = filteredDataForPreview.length - matchedRowIndices.size;
 
   return (
     <div className="space-y-6">
+      <StepIndicator currentStep={step} />
+
+      {/* STEP 1: Choose type */}
+      {step === "type" && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
+          <button
+            onClick={() => { setUploadType("cancellation"); setStep("upload"); }}
+            className={`group relative rounded-lg border-2 p-6 text-left transition-all hover:border-primary hover:shadow-md
+              ${uploadType === "cancellation" ? "border-primary bg-primary/5" : "border-border"}`}
+          >
+            <Ban className="h-8 w-8 mb-3 text-destructive" />
+            <h3 className="font-semibold text-lg">Annullering</h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              Annuller salg helt fra kundens fil
+            </p>
+          </button>
+
+          <button
+            onClick={() => { setUploadType("basket_difference"); setStep("upload"); }}
+            className={`group relative rounded-lg border-2 p-6 text-left transition-all hover:border-primary hover:shadow-md
+              ${uploadType === "basket_difference" ? "border-primary bg-primary/5" : "border-border"}`}
+          >
+            <ShoppingCart className="h-8 w-8 mb-3 text-warning" />
+            <h3 className="font-semibold text-lg">Kurv difference</h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              Opdater kurv-værdi baseret på kundens fil
+            </p>
+          </button>
+        </div>
+      )}
+
+      {/* STEP 2: Upload file */}
       {step === "upload" && (
         <Card>
           <CardHeader>
-            <CardTitle>Upload annulleringsfil</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Upload className="h-5 w-5" />
+              Upload {uploadType === "cancellation" ? "annulleringsfil" : "kurv-fil"}
+            </CardTitle>
             <CardDescription>
-              Upload en Excel-fil (.xlsx) med annulleringer. Filen skal indeholde telefonnumre eller virksomhedsnavne.
+              Upload en Excel-fil (.xlsx). {clientConfigs.length > 0
+                ? "Systemet matcher automatisk baseret på gemt opsætning."
+                : "Du skal vælge kolonnemapping efter upload."}
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div
-              {...getRootProps()}
-              className={`border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors
-                ${isDragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"}`}
-            >
-              <input {...getInputProps()} />
-              <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              {isDragActive ? (
-                <p className="text-lg">Slip filen her...</p>
-              ) : (
-                <>
-                  <p className="text-lg mb-2">Træk og slip en Excel-fil her</p>
-                  <p className="text-sm text-muted-foreground">eller klik for at vælge</p>
-                </>
-              )}
+          <CardContent className="space-y-4">
+            {!file ? (
+              <div
+                {...getRootProps()}
+                className={`border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors
+                  ${isDragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"}`}
+              >
+                <input {...getInputProps()} />
+                <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                {isDragActive ? (
+                  <p className="text-lg">Slip filen her...</p>
+                ) : (
+                  <>
+                    <p className="text-lg mb-2">Træk og slip en Excel-fil her</p>
+                    <p className="text-sm text-muted-foreground">eller klik for at vælge</p>
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 p-4 rounded-md bg-muted/50 border">
+                <FileSpreadsheet className="h-8 w-8 text-primary shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium truncate">{file.name}</p>
+                  <p className="text-sm text-muted-foreground">{parsedData.length} rækker</p>
+                </div>
+                {isMatching && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Matcher...
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => { setFile(null); setParsedData([]); setColumns([]); setStep("type"); }}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Tilbage
+              </Button>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {step === "upload" && isMatching && (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <Loader2 className="h-8 w-8 mx-auto mb-4 animate-spin text-primary" />
-            <p className="text-lg font-medium">Matcher automatisk...</p>
-            <p className="text-sm text-muted-foreground mt-1">Bruger opsætning: {appliedConfigName}</p>
-          </CardContent>
-        </Card>
-      )}
-
+      {/* MAPPING FALLBACK (for clients without saved config) */}
       {step === "mapping" && (
         <Card>
           <CardHeader>
@@ -728,24 +805,11 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               Kolonnemapping
             </CardTitle>
             <CardDescription>
-              Vælg hvilke kolonner der indeholder telefonnumre og/eller virksomhedsnavne til matching.
+              Ingen gemt opsætning fundet for denne kunde. Vælg kolonner manuelt.
             </CardDescription>
           </CardHeader>
-           <CardContent className="space-y-4">
+          <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="space-y-2">
-                <Label>Upload-type</Label>
-                <Select value={uploadType} onValueChange={(v) => setUploadType(v as "cancellation" | "basket_difference")}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cancellation">Annullering</SelectItem>
-                    <SelectItem value="basket_difference">Kurv difference</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-
-
               {clientConfigs.length > 0 && (
                 <div className="space-y-2">
                   <Label>Opsætning</Label>
@@ -910,11 +974,15 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                     Matcher...
                   </>
                 ) : (
-                  "Find matchende salg"
+                  <>
+                    <ArrowRight className="h-4 w-4 mr-2" />
+                    Find matchende salg
+                  </>
                 )}
               </Button>
-              <Button variant="outline" onClick={handleReset}>
-                Start forfra
+              <Button variant="outline" onClick={() => setStep("upload")}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Tilbage
               </Button>
             </div>
 
@@ -927,22 +995,23 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         </Card>
       )}
 
+      {/* STEP 3: Preview */}
       {step === "preview" && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-warning" />
-              Bekræft og send til godkendelse
+              Forhåndsvisning — {matchedSales.length} match
             </CardTitle>
             <CardDescription>
-              Følgende {matchedSales.length} salg vil blive sendt til godkendelseskøen som "{uploadType === 'cancellation' ? 'Annullering' : 'Kurv difference'}".
+              {uploadType === "cancellation" ? "Annullering" : "Kurv difference"} — gennemgå matchede salg før afsendelse til godkendelseskøen.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {appliedConfigName && (
               <div className="flex items-center gap-2 text-sm bg-muted/50 rounded-md px-3 py-2">
                 <Settings className="h-4 w-4 text-muted-foreground" />
-                <span>Bruger opsætning: <strong>{appliedConfigName}</strong></span>
+                <span>Opsætning: <strong>{appliedConfigName}</strong></span>
                 {filterColumn !== "__none__" && filterValue.trim() && (
                   <Badge variant="secondary" className="ml-2">
                     Filter: {filterColumn} = {filterValue}
@@ -953,72 +1022,87 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                 </Button>
               </div>
             )}
+
+            {/* Stats */}
+            <div className="flex gap-4">
+              <Badge variant="default" className="text-sm px-3 py-1">
+                {matchedSales.length} matchede salg
+              </Badge>
+              {unmatchedCount > 0 && (
+                <Badge variant="destructive" className="text-sm px-3 py-1">
+                  {unmatchedCount} umatchede rækker
+                </Badge>
+              )}
+            </div>
+
             {matchedSales.length === 0 ? (
               <div className="py-8 text-center text-muted-foreground">
                 <X className="h-12 w-12 mx-auto mb-4" />
                 <p>Ingen matchende salg fundet</p>
               </div>
             ) : (
-              <>
-                <div className="rounded-md border max-h-96 overflow-auto">
-                  <Table>
-                    <TableHeader>
-                     <TableRow>
-                         <TableHead>Salgsdato</TableHead>
-                         <TableHead>Sælger</TableHead>
-                         <TableHead>Telefon</TableHead>
-                         <TableHead>Virksomhed</TableHead>
-                         <TableHead>OPP-nummer</TableHead>
-                         <TableHead>Status</TableHead>
-                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {matchedSales.map((sale) => (
-                        <TableRow key={sale.saleId}>
-                          <TableCell>{sale.saleDate}</TableCell>
-                          <TableCell>{sale.employee}</TableCell>
-                          <TableCell>{sale.phone || "-"}</TableCell>
-                          <TableCell>{sale.company || "-"}</TableCell>
-                          <TableCell>{sale.oppNumber || "-"}</TableCell>
-                          <TableCell>
-                            <Badge variant="secondary">{sale.currentStatus}</Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => sendToQueueMutation.mutate()}
-                    disabled={sendToQueueMutation.isPending}
-                  >
-                    {sendToQueueMutation.isPending ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Sender til kø...
-                      </>
-                    ) : (
-                      <>
-                        <Check className="h-4 w-4 mr-2" />
-                        Send {matchedSales.length} salg til godkendelse
-                      </>
-                    )}
-                  </Button>
-                  <Button variant="outline" onClick={() => setStep("mapping")}>
-                    Tilbage
-                  </Button>
-                  <Button variant="outline" onClick={handleReset}>
-                    Start forfra
-                  </Button>
-                </div>
-              </>
+              <div className="rounded-md border max-h-96 overflow-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Salgsdato</TableHead>
+                      <TableHead>Sælger</TableHead>
+                      <TableHead>Telefon</TableHead>
+                      <TableHead>Virksomhed</TableHead>
+                      <TableHead>OPP-nummer</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {matchedSales.map((sale) => (
+                      <TableRow key={sale.saleId}>
+                        <TableCell>{sale.saleDate}</TableCell>
+                        <TableCell>{sale.employee}</TableCell>
+                        <TableCell>{sale.phone || "-"}</TableCell>
+                        <TableCell>{sale.company || "-"}</TableCell>
+                        <TableCell>{sale.oppNumber || "-"}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">{sale.currentStatus}</Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
+
+            <div className="flex gap-2">
+              {matchedSales.length > 0 && (
+                <Button
+                  onClick={() => sendToQueueMutation.mutate()}
+                  disabled={sendToQueueMutation.isPending}
+                >
+                  {sendToQueueMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Sender til kø...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="h-4 w-4 mr-2" />
+                      Send {matchedSales.length} til godkendelse
+                    </>
+                  )}
+                </Button>
+              )}
+              <Button variant="outline" onClick={() => setStep("upload")}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Tilbage
+              </Button>
+              <Button variant="outline" onClick={handleReset}>
+                Start forfra
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
 
+      {/* STEP 4: Done */}
       {step === "done" && (
         <Card>
           <CardHeader>
