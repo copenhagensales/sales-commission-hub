@@ -99,6 +99,21 @@ export default function Forecast() {
   // Real vs actual data
   const { data: vsActual = [], isLoading: vsActualLoading } = useForecastVsActual(selectedClient);
 
+  // FM Weekly forecast - compute month/year for the period
+  const fmPeriod = useMemo(() => {
+    const now = new Date();
+    const target = period === "current"
+      ? now
+      : new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    return { month: target.getMonth() + 1, year: target.getFullYear() };
+  }, [period]);
+
+  const { weeklyData: fmWeeks, isLoading: fmWeeksLoading, upsertOverride: upsertFmOverride, deleteOverride: deleteFmOverride } =
+    useFmWeeklyForecast(selectedClient, fmPeriod.month, fmPeriod.year);
+
+  // Check if client has FM bookings (to show weekly section)
+  const showFmWeekly = fmWeeks.length > 0;
+
 
   // Add cohort mutation
   const addCohort = useMutation({
