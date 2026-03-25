@@ -15,7 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
-import { Check, X, Loader2, Clock, Filter, Search, ArrowUpDown, ArrowUp, ArrowDown, Trash2 } from "lucide-react";
+import { Check, X, Loader2, Clock, Filter, Search, ArrowUpDown, ArrowUp, ArrowDown, Trash2, RotateCcw } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1024,6 +1024,58 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
               <AlertTriangle className="h-3 w-3 mr-1" />
               {activeImport.pendingCount} rækker afventer
             </Badge>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <RotateCcw className="h-4 w-4 mr-1" />
+                  Nulstil
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Nulstil upload?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Er du sikker på at du vil nulstille dette upload? Alle ventende rækker og fejl i match vil blive fjernet. Allerede godkendte ændringer bevares.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Annuller</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={async () => {
+                      try {
+                        const importId = activeImport.id;
+                        const { error: deleteError } = await supabase
+                          .from("cancellation_queue")
+                          .delete()
+                          .eq("import_id", importId)
+                          .eq("status", "pending");
+                        if (deleteError) throw deleteError;
+
+                        const { error: updateError } = await supabase
+                          .from("cancellation_imports")
+                          .update({ unmatched_rows: null })
+                          .eq("id", importId);
+                        if (updateError) throw updateError;
+
+                        toast({
+                          title: "Upload nulstillet",
+                          description: "Alle ventende rækker og fejl i match er fjernet. Du kan nu uploade en ny fil.",
+                        });
+                        queryClient.invalidateQueries({ queryKey: ["active-import-info"] });
+                        queryClient.invalidateQueries({ queryKey: ["active-import-block"] });
+                        queryClient.invalidateQueries({ queryKey: ["cancellation-queue"] });
+                        queryClient.invalidateQueries({ queryKey: ["match-errors"] });
+                        queryClient.invalidateQueries({ queryKey: ["match-errors-count"] });
+                      } catch (err: any) {
+                        toast({ title: "Fejl", description: err.message, variant: "destructive" });
+                      }
+                    }}
+                  >
+                    Ja, nulstil
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="destructive" size="sm">
