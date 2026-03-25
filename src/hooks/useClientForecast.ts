@@ -601,6 +601,28 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         });
       }
 
+      // 6a-fallback. For established employees with no valid EWMA weeks, use team average SPH
+      const teamSphSums = new Map<string, { total: number; count: number }>();
+      for (const ep of employeePerformances) {
+        if (!ep.isEstablished || ep.weeklySalesPerHour.length === 0 || !ep.teamName) continue;
+        const avgSph = ep.weeklySalesPerHour.reduce((a, b) => a + b, 0) / ep.weeklySalesPerHour.length;
+        if (avgSph > 0) {
+          const entry = teamSphSums.get(ep.teamName) || { total: 0, count: 0 };
+          entry.total += avgSph;
+          entry.count++;
+          teamSphSums.set(ep.teamName, entry);
+        }
+      }
+      for (const ep of employeePerformances) {
+        if (ep.isEstablished && ep.weeklySalesPerHour.length === 0 && ep.teamName) {
+          const teamAvg = teamSphSums.get(ep.teamName);
+          if (teamAvg && teamAvg.count > 0) {
+            // Use team average as a single-entry fallback SPH
+            ep.weeklySalesPerHour = [teamAvg.total / teamAvg.count];
+          }
+        }
+      }
+
       // 6b. Fetch team churn rates from historical_employment (last 12 months)
       const twelveMonthsAgo = format(subMonths(now, 12), "yyyy-MM-dd");
       const { data: histData } = await supabase
