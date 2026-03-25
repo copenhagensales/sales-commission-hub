@@ -1,32 +1,22 @@
 
 
-# Fix: Totaler opdateres ikke ved manuelle overrides
+# Fix: ForecastSummary skal bruge override-justeret total
 
 ## Problem
-Når du manuelt justerer forecast-tal for individuelle medarbejdere, opdateres hverken:
-1. **Total-rækken** i bunden af etablerede sælgere-tabellen (bruger `e.forecastSales` i stedet for override-værdien)
-2. **KPI-kortet "Forventet salg"** i toppen (bruger `forecast.totalSalesExpected` som ikke kender til overrides)
+`ForecastSummary` (linje 20) bruger `forecast.totalSalesExpected` direkte og kender ikke til manuelle overrides. Tallet i toppen ("forventede salg") matcher derfor ikke totalen i bunden af tabellen efter justeringer.
 
 ## Løsning
 
-### 1. `ForecastBreakdownTable.tsx` — Total-rækken (linje 288-300)
-Erstat `e.forecastSales` med override-aware logik:
-```
-const getDisplayForecast = (e) => overrides?.get(e.employeeId)?.override_sales ?? e.forecastSales;
-```
-Brug denne i alle `reduce()` kald i footer-rækken.
+### 1. `ForecastSummary.tsx`
+- Tilføj optional `overrideTotal?: number` prop
+- Brug `overrideTotal ?? forecast.totalSalesExpected` som `totalSales` (linje 20)
+- Samme for target-diff beregningen (linje 122)
 
-### 2. `ForecastKpiCards.tsx` — Modtag override-justeret total
-Tilføj en optional `overrideTotal` prop. Når sat, brug den i stedet for `forecast.totalSalesExpected`.
-
-### 3. `Forecast.tsx` — Beregn og send justeret total
-Beregn en `adjustedTotal` baseret på `forecast.totalSalesExpected` + summen af alle override-forskelle (override - original). Send som prop til `ForecastKpiCards`.
-
-## Berørte filer
+### 2. `Forecast.tsx`
+- Send `overrideAdjustedTotal` (allerede beregnet) som prop til `ForecastSummary`
 
 | Fil | Ændring |
 |-----|---------|
-| `src/components/forecast/ForecastBreakdownTable.tsx` | Footer bruger override-værdier i totaler |
-| `src/components/forecast/ForecastKpiCards.tsx` | Ny optional `overrideTotal` prop |
-| `src/pages/Forecast.tsx` | Beregn justeret total og send til KPI-kort |
+| `src/components/forecast/ForecastSummary.tsx` | Ny `overrideTotal` prop, brug den i visning + target-diff |
+| `src/pages/Forecast.tsx` | Send `overrideAdjustedTotal` til `ForecastSummary` |
 
