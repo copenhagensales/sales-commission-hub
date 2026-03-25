@@ -87,6 +87,7 @@ export default function Logikker() {
                 <li>Dashboard, Wallboard, Codan og TDC Erhverv bruger alle <strong>sale_items</strong> og <strong>quantity</strong> til at tælle salg.</li>
                 <li>Salg vises kun på kundespecifikke dashboards, hvis <strong>client_campaign_id</strong> er sat korrekt via kampagnemapping.</li>
                 <li>Seneste TDC Erhverv-salg viser produktnavn sammen med <strong>(x quantity)</strong> pr. linje.</li>
+                <li>Forecast SPH beregnes som <strong>4-ugers EWMA</strong> (Exponential Weighted Moving Average) med decay 0.85 pr. uge.</li>
               </ul>
             </CardContent>
           </Card>

@@ -19,7 +19,7 @@ import type {
 } from "@/types/forecast";
 
 const HOURS_PER_SHIFT = 7.5;
-const EWMA_WEEKS = 8;
+const EWMA_WEEKS = 4;
 const DEFAULT_WEEKLY_HOURS = 37;
 
 /**
