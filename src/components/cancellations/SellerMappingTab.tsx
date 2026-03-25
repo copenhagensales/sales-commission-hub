@@ -268,9 +268,13 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
 
   // Combine all sources and filter out already-mapped names
   const mappedNames = new Set(mappings.map(m => m.excel_product_name));
+  // For the dropdown, include both upload names and sale_item titles for flexibility
   const allExcelNames = [...new Set([...excelProductNames, ...saleItemNames])]
     .sort((a, b) => a.localeCompare(b, "da"));
   const availableExcelNames = allExcelNames.filter(n => !mappedNames.has(n));
+  // For the "unmapped from uploads" chips, only show names actually from uploads
+  const unmappedUploadNames = excelProductNames.filter(n => !mappedNames.has(n))
+    .sort((a, b) => a.localeCompare(b, "da"));
 
   const productMap = new Map(products.map(p => [p.id, p.name]));
 
