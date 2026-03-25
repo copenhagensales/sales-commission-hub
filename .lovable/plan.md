@@ -1,80 +1,33 @@
 
 
-# Uge-forecast for Eesy FM med markeder/centre
+# Fix: Faktiske salg mangler FM-salg i forecast
 
-## Hvad
-En ny sektion/side der viser **uge-for-uge forecast** for Eesy FM, baseret på faktiske bookinger. Hver uge viser:
-- Antal bookede lokationer (opdelt i centre vs. markeder)
-- Antal bookede dage (inkl. weekender)
-- Bemanding pr. uge
-- Forventet salg pr. uge (baseret på medarbejder-performance × bookede dage)
-- Faktiske salg (når ugen er i gang/afsluttet)
+## Problem
+Forecast-sidens "faktiske salg" (1.000) er lavere end det reelle tal (1.161) fordi:
 
-## Hvorfor
-FM-arbejdet er uge-drevet og afhænger af hvad der er booket (centre har anden performance end markeder). Weekendarbejde er normalt. Et månedligt forecast fanger ikke denne dynamik.
+1. **FM-salg via `fm_seller_id` tælles ikke med** i "actual sales to date" (sektion 8 i `useClientForecast.ts`, linje 772-800). Den henter kun salg matchet via `agent_email`, men FM-salg registreres via `raw_payload.fm_seller_id` -- precis som EWMA-sektionen gør (linje 213-229), men det er glemt i actual-sektionen.
 
-## Teknisk plan
+2. **Samme problem i `useForecastVsActual.ts`** -- den tæller kun via `agent_email`, ikke `fm_seller_id`.
 
-### 1. Ny hook: `useFmWeeklyForecast.ts`
-- Input: `clientId`, `month`/`year` (eller en dato-range)
-- Henter bookinger fra `booking`-tabellen for Eesy FM klienten, joinet med `location` (for `type`) og `booking_assignment` (for faktisk bemanding)
-- Grupperer pr. `week_number` + `year`
-- For hver uge:
-  - Tæller bookede dage (`booked_days` array-længde), opdelt efter `location.type` (centre vs. markeder)
-  - Tæller unikke medarbejdere fra `booking_assignment`
-  - Beregner forventet salg: henter SPH/salg-pr-dag fra `useClientForecast` eller beregner direkte fra historisk data
-  - Henter faktiske salg fra `sales`-tabellen for den uge
-- Returnerer `WeekForecast[]` med alle metrics
+3. **`.limit(10000)`** kan potentielt afskære data hvis der er mange salg.
 
-### 2. Ny komponent: `FmWeeklyForecastTable.tsx`
-- Tabel med én række pr. uge i den valgte måned
-- Kolonner: Uge nr., Dage (centre), Dage (markeder), Total dage, Medarbejdere, Forventet salg, Faktisk salg, Afvigelse
-- Farvekodning: grøn/rød baseret på actual vs. forecast
-- Mulighed for at **manuelt overskrive forventet salg pr. uge** (genbruger `employee_forecast_overrides`-konceptet, men på ugeniveau)
-- Sumrække i bunden
+## Løsning
 
-### 3. Ny tabel: `fm_weekly_forecast_overrides` (migration)
-```sql
-CREATE TABLE public.fm_weekly_forecast_overrides (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  client_id uuid REFERENCES clients(id) ON DELETE CASCADE,
-  week_number integer NOT NULL,
-  year integer NOT NULL,
-  override_sales integer,
-  note text,
-  created_by uuid REFERENCES auth.users(id),
-  created_at timestamptz DEFAULT now(),
-  UNIQUE(client_id, week_number, year)
-);
-ALTER TABLE public.fm_weekly_forecast_overrides ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Auth can manage fm weekly overrides"
-  ON public.fm_weekly_forecast_overrides FOR ALL TO authenticated
-  USING (true) WITH CHECK (true);
-```
+### 1. `useClientForecast.ts` -- Sektion 8 (actual sales, linje 772-812)
+- Tilføj en **FM-specifik query** (ligesom linje 213-229) der henter salg med `source = "fieldmarketing"` og matcher via `raw_payload.fm_seller_id`
+- Brug samme dedup-logik (track sale IDs) så salg ikke tælles dobbelt
+- Fjern eller hæv `.limit(10000)`
 
-### 4. Integration i Forecast-siden
-- Når Eesy FM er valgt som kunde på `/forecast`, vis en ny sektion **"Ugefordeling"** mellem KPI-kort og breakdown-tabellen
-- Viser `FmWeeklyForecastTable` med data fra hooken
-- Periode-toggle (denne/næste måned) genbruges
+### 2. `useForecastVsActual.ts`
+- Tilføj FM-salg via `fm_seller_id`-logik, eller brug en samlet query der tæller alle salg for kampagnens campaigns uanset attribution-metode (da denne hook ikke behøver per-employee breakdown)
 
-### 5. Data-flow
-```text
-booking (week_number, year, location_id, booked_days, client_id)
-  → JOIN location (type: "Coop butik" | "Markeder" | ...)
-  → JOIN booking_assignment (employee_id, date)
-  → GROUP BY week_number
-  
-sales (sale_datetime, client_campaign_id)
-  → filtrer på Eesy FM campaigns
-  → GROUP BY ISO week
-```
+### 3. Øg limit
+- Brug pagination eller fjern `.limit()` for actual-queries der skal tælle alle salg i en måned
 
 ## Berørte filer
 
 | Fil | Ændring |
 |-----|---------|
-| Migration | Ny `fm_weekly_forecast_overrides` tabel |
-| `src/hooks/useFmWeeklyForecast.ts` | Nyt hook: bookinger + salg pr. uge |
-| `src/components/forecast/FmWeeklyForecastTable.tsx` | Ny komponent: uge-tabel med override |
-| `src/pages/Forecast.tsx` | Vis ugefordeling når FM-kunde er valgt |
+| `src/hooks/useClientForecast.ts` | Tilføj FM actual sales query med `fm_seller_id` dedup i sektion 8 |
+| `src/hooks/useForecastVsActual.ts` | Inkluder FM-salg i historisk actual-optælling |
 
