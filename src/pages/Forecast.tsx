@@ -97,16 +97,6 @@ export default function Forecast() {
   // Real vs actual data
   const { data: vsActual = [], isLoading: vsActualLoading } = useForecastVsActual(selectedClient);
 
-  // Forecast overrides per employee
-  const { overrides, upsertOverride, deleteOverride: deleteOverrideMutation } = useEmployeeForecastOverrides(selectedClient, periodStart);
-
-  const handleOverride = (employeeId: string, value: number | null) => {
-    if (value === null) {
-      deleteOverrideMutation.mutate(employeeId);
-    } else {
-      upsertOverride.mutate({ employeeId, overrideSales: value });
-    }
-  };
 
   // Add cohort mutation
   const addCohort = useMutation({
