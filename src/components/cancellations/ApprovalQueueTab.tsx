@@ -1020,10 +1020,18 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                 Uploadet {format(new Date(activeImport.created_at), "dd/MM/yyyy HH:mm", { locale: da })}
               </p>
             </div>
-            <Badge variant="secondary" className="shrink-0">
-              <AlertTriangle className="h-3 w-3 mr-1" />
-              {activeImport.pendingCount} rækker afventer
-            </Badge>
+            <div className="flex items-center gap-2 shrink-0">
+              <Badge variant="secondary">
+                <AlertTriangle className="h-3 w-3 mr-1" />
+                {activeImport.pendingCount} rækker afventer
+              </Badge>
+              {matchErrorsCount > 0 && (
+                <Badge variant="outline" className="border-orange-400 text-orange-600 bg-orange-50">
+                  <AlertTriangle className="h-3 w-3 mr-1" />
+                  {matchErrorsCount} fejl i match
+                </Badge>
+              )}
+            </div>
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="outline" size="sm">
