@@ -893,7 +893,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
               const rows = fmData || [];
               rows.forEach((s: any) => {
                 const sellerId = s.raw_payload?.fm_seller_id;
-                if (sellerId && activeIds.includes(sellerId)) {
+                if (sellerId && allEmployeeIds.has(sellerId)) {
                   (s.sale_items || []).forEach((si: any) => {
                     if (si.products?.counts_as_sale !== false) {
                       addActualSale(sellerId, s.id, si.quantity || 1, is5GProduct(si));
