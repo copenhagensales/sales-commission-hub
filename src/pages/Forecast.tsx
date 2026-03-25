@@ -345,6 +345,20 @@ export default function Forecast() {
             {/* KPI Cards */}
             <ForecastKpiCards forecast={forecast} clientTarget={targetData ?? undefined} danishHolidays={danishHolidays} />
 
+            {/* FM Weekly Forecast */}
+            {showFmWeekly && (
+              <FmWeeklyForecastTable
+                weeks={fmWeeks}
+                onOverride={(weekNumber, year, sales) => {
+                  if (sales === null) {
+                    deleteFmOverride.mutate({ weekNumber, year });
+                  } else {
+                    upsertFmOverride.mutate({ weekNumber, year, sales });
+                  }
+                }}
+              />
+            )}
+
 
             {/* Main content grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
