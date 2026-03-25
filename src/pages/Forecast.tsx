@@ -361,6 +361,8 @@ export default function Forecast() {
                   employees={forecast.establishedEmployees}
                   cohorts={forecast.cohorts}
                   isCurrentPeriod={period === "current"}
+                  overrides={selectedClient !== "all" ? overrides : undefined}
+                  onOverride={selectedClient !== "all" ? handleOverride : undefined}
                 />
                 <ForecastVsActualChart data={vsActual} />
               </div>
