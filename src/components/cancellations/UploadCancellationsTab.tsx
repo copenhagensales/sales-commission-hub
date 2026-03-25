@@ -181,6 +181,7 @@ function ConfigCreationForm({ clientId, columns: parentColumns, setColumns: setP
   const [cfgCompany, setCfgCompany] = useState("__none__");
   const [cfgFilterCol, setCfgFilterCol] = useState("__none__");
   const [cfgFilterVal, setCfgFilterVal] = useState("");
+  const [cfgProductCol, setCfgProductCol] = useState("__none__");
   const [saving, setSaving] = useState(false);
 
   const filteredCount = (cfgFilterCol !== "__none__" && cfgFilterVal.trim())
@@ -233,7 +234,7 @@ function ConfigCreationForm({ clientId, columns: parentColumns, setColumns: setP
         company_column: cfgCompany !== "__none__" ? cfgCompany : null,
         opp_column: cfgOpp !== "__none__" ? cfgOpp : null,
         member_number_column: cfgMemberNr !== "__none__" ? cfgMemberNr : null,
-        product_columns: [],
+        product_columns: cfgProductCol !== "__none__" ? [cfgProductCol] : [],
         product_match_mode: "strip_percent_suffix",
         is_default: true,
         filter_column: cfgFilterCol !== "__none__" ? cfgFilterCol : null,
@@ -293,6 +294,7 @@ function ConfigCreationForm({ clientId, columns: parentColumns, setColumns: setP
             {colSelect("OPP-kolonne", cfgOpp, setCfgOpp)}
             {colSelect("Medlemsnummer", cfgMemberNr, setCfgMemberNr)}
             {colSelect("Virksomhed", cfgCompany, setCfgCompany)}
+            {colSelect("Produktkolonne", cfgProductCol, setCfgProductCol)}
           </div>
 
           <div className="border-t pt-3 space-y-3">
