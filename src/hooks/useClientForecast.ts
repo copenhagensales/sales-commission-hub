@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfMonth, endOfMonth, subWeeks, subMonths, startOfWeek, endOfWeek } from "date-fns";
+import { getKpiFeatureFlags } from "@/config/kpiRuntime";
 import {
   calculateFullForecast,
   MOCK_RAMP_PROFILE,
@@ -498,6 +499,9 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         // Weekly SPH (most recent first) — use absence-adjusted shifts
         const weeklySph: number[] = [];
         const normalWeeklyShifts = getNormalWeeklyShifts(emp.id);
+        let totalHoursWorked = 0;
+        let totalSalesCount = 0;
+        let validWeekCount = 0;
         for (const ws of weekStarts) {
           const we = endOfWeek(ws, { weekStartsOn: 1 });
           const shiftsInWeek = countShifts(emp.id, ws, we, true); // exclude absences
@@ -520,7 +524,10 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           if (salesInWeek === 0 && shiftsInWeek <= 2) continue;
 
           const sph = hoursInWeek > 0 ? salesInWeek / hoursInWeek : 0;
-        weeklySph.push(sph);
+          weeklySph.push(sph);
+          totalHoursWorked += hoursInWeek;
+          totalSalesCount += salesInWeek;
+          validWeekCount++;
         }
 
         // Planned hours for forecast month (gross = full capacity, net = minus absences)
@@ -559,6 +566,9 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           missingAgentMapping,
           plannedEndDate: (emp as any).employment_end_date || undefined,
           isOnCall: false,
+          totalHoursWorked,
+          totalSalesCount,
+          validWeekCount,
         });
       }
 
