@@ -1,88 +1,54 @@
 
 
-## Optimering af annulleringssystemet — samlet plan
+## Fix: Udvid produkt-dropdown med navne fra både annulleringer og kurv-rettelser
 
-### Identificerede flaskehalse
+### Problem
+Dropdown'en for Excel-produktnavne henter kun fra `cancellation_queue.target_product_name`, men den filtrerer ikke på `upload_type`. Hvis klienten primært har haft kurv-rettelser eller slet ingen uploads, er listen tom eller ufuldstændig.
 
-**1. Dobbelt-query på `cancellation_queue` (linje 330-361)**
-Systemet henter alle felter i ét kald, derefter henter `uploaded_data`, `opp_group`, `client_id` for de **samme rækker** via `.in("id", queueIds)`. Det er en komplet unødvendig roundtrip med tungt JSON-payload.
+### Løsning
+**Fil:** `src/components/cancellations/SellerMappingTab.tsx`
 
-**2. `raw_payload` hentes for alle salg (linje 368)**
-Det tunge JSON-felt hentes for samtlige salg, men bruges kun til `extractOpp()`. OPP-nummer kan i stedet tages fra `opp_group` som allerede hentes fra queue.
+Udvid den eksisterende `excelProductNames`-query til at hente `target_product_name` fra **alle** queue-rækker for klienten — uanset `upload_type` (både `cancellation` og `basket_difference`) og uanset `status` (pending, cancelled, basket_changed, rejected). Det dækker både igangværende og historiske uploads.
 
-**3. Sekventielle database-kald**
-`configs`-queryen (linje 380-395) venter på `importsResult`, men kunne paralleliseres bedre. `products`-queryen (linje 397-402) venter på `saleItemsResult`.
+Derudover tilføjes en ekstra datakilde: unikke `adversus_product_title` fra `sale_items` for klientens kampagner, som fallback for klienter helt uden uploads.
 
-**4. Ingen pagination i UI**
-Op til 500 rækker hentes og renderes på én gang — ingen client-side pagination.
+### Ændringer
 
-**5. `approveMutation` laver N+1 queries (linje 498-567)**
-Ved godkendelse af produkt-level items loopes der med individuelle database-kald per queue item — henter `sale_items`, `products`, updater items, checker remaining items. Alt sekventielt.
+1. **Behold den eksisterende queue-query**, men fjern evt. implicit filtrering — den nuværende query henter allerede alle statuser og upload_types, men listen kan være tom hvis `target_product_name` ikke blev sat ved upload. Ingen ændring nødvendig her.
 
-**6. `matchErrorsCount`-query henter alle imports (linje 711-727)**
-Henter `unmatched_rows` (JSON array) for **alle** imports for kunden bare for at tælle. Tungt payload for en simpel count.
-
-**7. `activeImport`-query laver to separate kald (linje 685-707)**
-Henter 10 imports, derefter checker pending items — kunne kombineres.
-
----
-
-### Plan
-
-#### Ændring 1: Kombiner de to `cancellation_queue`-kald
-**Fil:** `ApprovalQueueTab.tsx` (linje 333-361)
-
-Inkluder `uploaded_data, opp_group, client_id` i den første `.select()`. Fjern hele den anden forespørgsel og `extendedDataMap`.
-
-```text
-FØR: 2 roundtrips (basis + extended)
-EFTER: 1 roundtrip med alle felter
+2. **Tilføj ny query** der henter unikke `adversus_product_title` fra `sale_items` via klientens kampagner (genbruger eksisterende `campaignIds`-query):
+```typescript
+const { data: saleItemNames = [] } = useQuery({
+  queryKey: ["sale-item-product-names", campaignIds],
+  queryFn: async () => {
+    if (campaignIds.length === 0) return [];
+    const { data, error } = await supabase
+      .from("sale_items")
+      .select("adversus_product_title")
+      .in("sale_id", 
+        supabase.from("sales").select("id").in("client_campaign_id", campaignIds)
+      )
+      .not("adversus_product_title", "is", null);
+    if (error) throw error;
+    return [...new Set(data.map(d => d.adversus_product_title).filter(Boolean))];
+  },
+  enabled: campaignIds.length > 0,
+});
 ```
 
-#### Ændring 2: Fjern `raw_payload` fra sales-query
-**Fil:** `ApprovalQueueTab.tsx` (linje 368)
+   Da Supabase JS-klienten ikke understøtter sub-selects i `.in()`, bruges i stedet en to-trins tilgang: først hentes salgs-IDs for kampagnerne, derefter hentes unikke produktnavne fra sale_items.
 
-Fjern `raw_payload` fra select. I mapping-logikken (linje 437), brug `opp_group` fra queue i stedet for `extractOpp(sale?.raw_payload)`.
-
-```text
-FØR: Henter stort JSON for alle salg
-EFTER: Bruger opp_group som allerede er tilgængeligt
+3. **Kombiner begge lister** og fjern allerede mappede navne:
+```typescript
+const allExcelNames = [...new Set([...excelProductNames, ...saleItemNames])]
+  .sort((a, b) => a.localeCompare(b, "da"));
+const availableExcelNames = allExcelNames.filter(n => !mappedNames.has(n));
 ```
 
-#### Ændring 3: Paralleliser configs + products med sales
-**Fil:** `ApprovalQueueTab.tsx` (linje 366-402)
-
-Flyt `configIds`-udledning og configs-fetch ind i Promise.all ved at lave en to-trins tilgang: først hent queue + imports parallelt, udled IDs, derefter hent sales + saleItems + configs + products parallelt.
-
-#### Ændring 4: Chunk store `.in()`-kald
-**Fil:** `ApprovalQueueTab.tsx`
-
-Brug `fetchByIds` fra `supabasePagination.ts` for sales og sale_items queries, så vi undgår URI-længde-problemer ved mange IDs.
-
-#### Ændring 5: Client-side pagination
-**Fil:** `ApprovalQueueTab.tsx`
-
-Tilføj simpel client-side pagination (50 rækker per side) til tabellen med `Pagination`-komponent fra `@/components/ui/pagination`. Reducer `.limit(500)` til `.limit(200)` da brugeren aldrig ser 500 på én gang.
-
-#### Ændring 6: Optimer `approveMutation` med batch-updates
-**Fil:** `ApprovalQueueTab.tsx` (linje 498-567)
-
-Samle alle queue item IDs og hent sale_items + products i ét kald i stedet for N individuelle kald. Brug `.in()` til batch-updates i stedet for loops.
-
-#### Ændring 7: Optimer `matchErrorsCount` med count-query
-**Fil:** `ApprovalQueueTab.tsx` (linje 711-727)
-
-I stedet for at hente alle `unmatched_rows` JSON og tælle client-side, brug en mere effektiv tilgang: hent kun imports der har non-null unmatched_rows og brug array_length eller lignende.
-
----
+4. **Forbedre fritekst-UX**: Tillad Enter-tast til at bekræfte manuelt skrevet navn og gør "Brug [navn]"-knappen tydeligere.
 
 ### Forventet resultat
-- **~50-60% hurtigere** initial load (fjerner dobbelt-query + raw_payload + bedre parallelisering)
-- **Bedre UX** med pagination (hurtigere rendering, mindre DOM)
-- **Mere robust** ved store datasæt (chunked queries)
-- **Hurtigere godkendelse** (batch i stedet for N+1)
-- Ingen funktionelle ændringer i UI
-
-### Filer der ændres
-- `src/components/cancellations/ApprovalQueueTab.tsx`
+- Dropdown viser produktnavne fra **alle** uploads (annulleringer + kurv-rettelser, aktive + historiske)
+- Suppleret med produktnavne fra faktiske salg som fallback
+- Klarere UX for manuel indtastning af nye navne
 
