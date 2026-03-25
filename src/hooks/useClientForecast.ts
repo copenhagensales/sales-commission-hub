@@ -234,7 +234,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         for (const campaignBatch of campaignChunks) {
           const { data: fmSalesData } = await supabase
             .from("sales")
-            .select("id, raw_payload, agent_email, sale_datetime, sale_items!inner(quantity, product_id, products(counts_as_sale))")
+            .select("id, raw_payload, agent_email, sale_datetime, sale_items!inner(quantity, product_id, products(counts_as_sale, name))")
             .eq("source", "fieldmarketing")
             .gte("sale_datetime", salesStartStr)
             .lte("sale_datetime", salesEndStr + "T23:59:59")
@@ -256,7 +256,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
             for (const campaignBatch of campaignChunks) {
               const { data: salesData } = await supabase
                 .from("sales")
-                .select("id, agent_email, sale_datetime, sale_items!inner(quantity, product_id, products(counts_as_sale))")
+                .select("id, agent_email, sale_datetime, sale_items!inner(quantity, product_id, products(counts_as_sale, name))")
                 .gte("sale_datetime", salesStartStr)
                 .lte("sale_datetime", salesEndStr + "T23:59:59")
                 .in("agent_email", emailBatch)
@@ -861,7 +861,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
             while (true) {
               const { data: fmData } = await supabase
                 .from("sales")
-                .select("id, raw_payload, sale_items!inner(quantity, products(counts_as_sale))")
+                .select("id, raw_payload, sale_items!inner(quantity, products(counts_as_sale, name))")
                 .eq("source", "fieldmarketing")
                 .gte("sale_datetime", forecastStartStr)
                 .lte("sale_datetime", todayStr + "T23:59:59")
@@ -895,7 +895,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
                 while (true) {
                   const { data: actualSalesData } = await supabase
                     .from("sales")
-                    .select("id, agent_email, sale_items!inner(quantity, products(counts_as_sale))")
+                    .select("id, agent_email, sale_items!inner(quantity, products(counts_as_sale, name))")
                     .gte("sale_datetime", forecastStartStr)
                     .lte("sale_datetime", todayStr + "T23:59:59")
                     .in("agent_email", emailBatch)
