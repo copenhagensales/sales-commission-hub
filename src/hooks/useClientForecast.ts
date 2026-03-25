@@ -122,16 +122,19 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
       // 3. Employee info + agent emails + team names
       // Also fetch inactive employees who stopped during/after the forecast period
       // so their actual sales are counted in "actual sales to date"
+      // NOTE: Inactive employees are NO LONGER in team_members (removed on deactivation),
+      // so we query employee_master_data directly using last_team_id / team_id.
       const [empRes, inactiveEmpRes, agentRes, teamsRes] = await Promise.all([
         supabase
           .from("employee_master_data")
           .select("id, first_name, last_name, team_id, avatar_url, employment_start_date, work_email, employment_end_date, expected_monthly_shifts")
           .in("id", employeeIds)
           .eq("is_active", true),
+        // Fetch stopped employees via last_team_id (set by trigger on deactivation)
+        // or team_id, filtering by teams relevant to this client
         supabase
           .from("employee_master_data")
-          .select("id, first_name, last_name, team_id, work_email, employment_end_date")
-          .in("id", employeeIds)
+          .select("id, first_name, last_name, team_id, last_team_id, work_email, employment_end_date")
           .eq("is_active", false)
           .gte("employment_end_date", forecastStartStr),
         supabase
@@ -142,7 +145,12 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
       ]);
 
       const employees = empRes.data || [];
-      const inactiveEmployees = inactiveEmpRes.data || [];
+      // Filter inactive employees: their last_team_id or team_id must match one of our teamIds
+      const teamIdSet = new Set(teamIds);
+      const inactiveEmployees = (inactiveEmpRes.data || []).filter((e: any) => {
+        const relevantTeam = e.last_team_id || e.team_id;
+        return relevantTeam && teamIdSet.has(relevantTeam);
+      });
       if (!employees.length && !inactiveEmployees.length) {
         return {
           forecast: emptyForecast(forecastStartStr, forecastEndStr, clientId),
