@@ -536,6 +536,29 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           validWeekCount++;
         }
 
+        // Fallback: if no valid weeks in standard window, try extended lookback (up to 12 weeks)
+        if (weeklySph.length === 0) {
+          for (const ws of extendedWeekStarts) {
+            const we = endOfWeek(ws, { weekStartsOn: 1 });
+            const shiftsInWeek = countShifts(emp.id, ws, we, true);
+            if (shiftsInWeek < normalWeeklyShifts * 0.5) continue;
+            const hoursInWeek = shiftsInWeek * HOURS_PER_SHIFT;
+            let salesInWeek = 0;
+            const empWeekMap = salesByEmployeeByWeek.get(emp.id);
+            if (empWeekMap) {
+              salesInWeek = empWeekMap.get(ws.getTime()) || 0;
+            }
+            const concreteShiftsInWeek = countConcreteShifts(emp.id, ws, we);
+            if (salesInWeek === 0 && concreteShiftsInWeek === 0) continue;
+            if (salesInWeek === 0 && shiftsInWeek <= 2) continue;
+            const sph = hoursInWeek > 0 ? salesInWeek / hoursInWeek : 0;
+            weeklySph.push(sph);
+            totalHoursWorked += hoursInWeek;
+            totalSalesCount += salesInWeek;
+            validWeekCount++;
+          }
+        }
+
         // Planned hours for forecast month (gross = full capacity, net = minus absences)
         // Use empForecastEnd to cap hours for employees with planned departure
         let grossShifts = countShifts(emp.id, forecastStart, empForecastEnd, false);
