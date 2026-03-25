@@ -252,6 +252,40 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
     },
   });
 
+  const ignoreAllMutation = useMutation({
+    mutationFn: async () => {
+      const grouped = new Map<string, Record<string, unknown>[]>();
+      for (const row of processed) {
+        const existing = grouped.get(row.importId) || [];
+        existing.push(row.rowData);
+        grouped.set(row.importId, existing);
+      }
+      for (const [importId, rowsToRemove] of grouped) {
+        const { data: importData } = await supabase
+          .from("cancellation_imports")
+          .select("unmatched_rows")
+          .eq("id", importId)
+          .single();
+        if (!importData?.unmatched_rows || !Array.isArray(importData.unmatched_rows)) continue;
+        const removeSet = new Set(rowsToRemove.map(r => JSON.stringify(r)));
+        const updated = (importData.unmatched_rows as Record<string, unknown>[]).filter(
+          ur => !removeSet.has(JSON.stringify(ur))
+        );
+        await supabase
+          .from("cancellation_imports")
+          .update({ unmatched_rows: (updated.length > 0 ? updated : null) as unknown as Json })
+          .eq("id", importId);
+      }
+    },
+    onSuccess: () => {
+      toast({ title: "Alle fejlede rækker er blevet ignoreret og fjernet" });
+      queryClient.invalidateQueries({ queryKey: ["match-errors", clientId] });
+    },
+    onError: () => {
+      toast({ title: "Fejl ved ignorering af rækker", variant: "destructive" });
+    },
+  });
+
   const allKeys = useMemo(() => {
     const keys = new Set<string>();
     for (const r of rows) {
