@@ -478,7 +478,7 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
             </p>
 
             {/* Available names from uploads */}
-            <div className="space-y-2 max-h-60 overflow-auto">
+            <div className="space-y-2 max-h-[400px] overflow-auto">
               {availableExcelNames.map(name => (
                 <label key={name} className="flex items-center gap-3 rounded-md border px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors">
                   <Checkbox
