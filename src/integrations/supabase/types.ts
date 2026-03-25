@@ -5096,6 +5096,71 @@ export type Database = {
           },
         ]
       }
+      employee_forecast_overrides: {
+        Row: {
+          client_id: string | null
+          created_at: string | null
+          created_by: string | null
+          employee_id: string
+          id: string
+          note: string | null
+          override_sales: number
+          period_start: string
+          updated_at: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          employee_id: string
+          id?: string
+          note?: string | null
+          override_sales: number
+          period_start: string
+          updated_at?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          employee_id?: string
+          id?: string
+          note?: string | null
+          override_sales?: number
+          period_start?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_forecast_overrides_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_forecast_overrides_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_forecast_overrides_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_forecast_overrides_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_identity: {
         Row: {
           created_at: string | null
