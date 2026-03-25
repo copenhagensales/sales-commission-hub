@@ -1,24 +1,59 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Users, UserPlus, ArrowUpDown, GraduationCap, CalendarOff, PhoneCall } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Users, UserPlus, ArrowUpDown, GraduationCap, CalendarOff, PhoneCall, Pencil, X, Check } from "lucide-react";
 import type { EmployeeForecastResult, CohortForecastResult } from "@/types/forecast";
 import { ForecastIntervalBadge } from "./ForecastIntervalBadge";
 import { SetPlannedDepartureDialog } from "./SetPlannedDepartureDialog";
+import type { ForecastOverride } from "@/hooks/useEmployeeForecastOverrides";
 
 interface Props {
   employees: EmployeeForecastResult[];
   cohorts: CohortForecastResult[];
   isCurrentPeriod?: boolean;
+  overrides?: Map<string, ForecastOverride>;
+  onOverride?: (employeeId: string, value: number | null) => void;
 }
 
-export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = false }: Props) {
+export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = false, overrides, onOverride }: Props) {
   const [sortKey, setSortKey] = useState<'name' | 'sph' | 'forecast' | 'total'>('total');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [departureDialog, setDepartureDialog] = useState<{ id: string; name: string; endDate?: string | null } | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const editInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editingId && editInputRef.current) {
+      editInputRef.current.focus();
+      editInputRef.current.select();
+    }
+  }, [editingId]);
+
+  const startEdit = (empId: string, currentValue: number) => {
+    setEditingId(empId);
+    setEditValue(String(currentValue));
+  };
+
+  const confirmEdit = () => {
+    if (!editingId || !onOverride) return;
+    const val = parseInt(editValue, 10);
+    if (!isNaN(val) && val >= 0) {
+      onOverride(editingId, val);
+    }
+    setEditingId(null);
+  };
+
+  const cancelEdit = () => setEditingId(null);
+
+  const removeOverride = (empId: string) => {
+    if (onOverride) onOverride(empId, null);
+  };
 
   // Split into: new (ramp-up), active (established with data)
   const mappedEmployees = employees.filter(e => !e.missingAgentMapping);
