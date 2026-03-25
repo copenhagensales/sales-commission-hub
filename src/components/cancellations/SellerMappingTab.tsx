@@ -159,7 +159,7 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
     enabled: !!clientId,
   });
 
-  // Get unique Excel product names from previous uploads
+  // Get unique Excel product names from previous uploads (all types: cancellations + basket corrections)
   const { data: excelProductNames = [] } = useQuery({
     queryKey: ["excel-product-names", clientId],
     queryFn: async () => {
@@ -170,14 +170,10 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
         .not("target_product_name", "is", null);
       if (error) throw error;
       const unique = [...new Set((data || []).map(d => d.target_product_name).filter(Boolean))] as string[];
-      return unique.sort((a, b) => a.localeCompare(b, "da"));
+      return unique;
     },
     enabled: !!clientId,
   });
-
-  // Filter out names that already have a mapping
-  const mappedNames = new Set(mappings.map(m => m.excel_product_name));
-  const availableExcelNames = excelProductNames.filter(n => !mappedNames.has(n));
 
   // Get campaign IDs for client, then products for those campaigns
   const { data: campaignIds = [] } = useQuery({
@@ -206,6 +202,35 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
     },
     enabled: campaignIds.length > 0,
   });
+
+  // Fetch unique product titles from sale_items as fallback
+  const { data: saleItemNames = [] } = useQuery({
+    queryKey: ["sale-item-product-names", campaignIds],
+    queryFn: async () => {
+      if (campaignIds.length === 0) return [] as string[];
+      const { data: sales, error: salesErr } = await supabase
+        .from("sales")
+        .select("id")
+        .in("client_campaign_id", campaignIds);
+      if (salesErr) throw salesErr;
+      const saleIds = (sales || []).map(s => s.id);
+      if (saleIds.length === 0) return [] as string[];
+      const { data, error } = await supabase
+        .from("sale_items")
+        .select("adversus_product_title")
+        .in("sale_id", saleIds)
+        .not("adversus_product_title", "is", null);
+      if (error) throw error;
+      return [...new Set((data || []).map(d => d.adversus_product_title).filter(Boolean))] as string[];
+    },
+    enabled: campaignIds.length > 0,
+  });
+
+  // Combine all sources and filter out already-mapped names
+  const mappedNames = new Set(mappings.map(m => m.excel_product_name));
+  const allExcelNames = [...new Set([...excelProductNames, ...saleItemNames])]
+    .sort((a, b) => a.localeCompare(b, "da"));
+  const availableExcelNames = allExcelNames.filter(n => !mappedNames.has(n));
 
   const productMap = new Map(products.map(p => [p.id, p.name]));
 
@@ -269,16 +294,20 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-[300px] p-0" align="start">
-                <Command>
+                <Command onKeyDown={(e) => {
+                  if (e.key === "Enter" && newExcelName.trim() && availableExcelNames.every(n => n.toLowerCase() !== newExcelName.trim().toLowerCase())) {
+                    setExcelPopoverOpen(false);
+                  }
+                }}>
                   <CommandInput placeholder="Søg eller skriv nyt navn..." className="h-9 text-xs" onValueChange={v => setNewExcelName(v)} />
                   <CommandList>
                     <CommandEmpty>
                       {newExcelName.trim() ? (
                         <button
-                          className="w-full px-2 py-1.5 text-xs text-left hover:bg-accent rounded-sm cursor-pointer"
+                          className="w-full px-3 py-2 text-xs text-left hover:bg-accent rounded-sm cursor-pointer flex items-center gap-2 font-medium"
                           onClick={() => { setExcelPopoverOpen(false); }}
                         >
-                          Brug "{newExcelName.trim()}"
+                          <Plus className="h-3 w-3" /> Opret ny: "{newExcelName.trim()}"
                         </button>
                       ) : "Ingen produktnavne fundet."}
                     </CommandEmpty>
