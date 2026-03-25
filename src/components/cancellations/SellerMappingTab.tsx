@@ -400,7 +400,7 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
           {unmappedUploadNames.length > 0 && (
             <div className="rounded-md border border-dashed border-primary/30 bg-primary/5 p-4 space-y-2">
               <p className="text-sm font-medium text-foreground">
-                {unmappedUploadNames.length} umappede kolonner fundet fra uploads:
+                {unmappedUploadNames.length} umappede værdier fundet fra uploads:
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {unmappedUploadNames.map((name: string) => (
@@ -425,7 +425,7 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Internt produkt</TableHead>
-                    <TableHead>Excel-kolonner</TableHead>
+                    <TableHead>Excel-værdier</TableHead>
                     <TableHead>Oprettet</TableHead>
                     <TableHead className="w-16"></TableHead>
                   </TableRow>
