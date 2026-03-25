@@ -14,6 +14,7 @@ interface Props {
   forecast: ForecastResult;
   clientTarget?: number;
   danishHolidays?: string[];
+  overrideTotal?: number;
 }
 
 function getWorkingDays(start: string, end: string, holidays: string[] = []): number {
@@ -26,7 +27,8 @@ function getWorkingDays(start: string, end: string, holidays: string[] = []): nu
   }
 }
 
-export function ForecastKpiCards({ forecast, clientTarget, danishHolidays = [] }: Props) {
+export function ForecastKpiCards({ forecast, clientTarget, danishHolidays = [], overrideTotal }: Props) {
+  const effectiveTotal = overrideTotal ?? forecast.totalSalesExpected;
   const hasActualData = forecast.actualSalesToDate !== undefined && forecast.actualSalesToDate > 0;
 
   const workingDays = useMemo(
