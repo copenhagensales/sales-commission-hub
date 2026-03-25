@@ -769,46 +769,88 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           cur2.setDate(cur2.getDate() + 1);
         }
         
-        // Fetch actual sales this month — per agent email
-        const actualSalesPerEmail = new Map<string, number>();
-        if (allEmails.length > 0 && campaignIds.length > 0) {
-          const emailChunks2 = chunk(allEmails, 200);
+        // Fetch actual sales this month — FM + email based with dedup
+        const actualSalesPerEmployee = new Map<string, number>();
+        const countedSaleIds = new Set<string>();
+
+        const addActualSale = (empId: string, saleId: string, qty: number) => {
+          if (countedSaleIds.has(saleId)) return;
+          countedSaleIds.add(saleId);
+          actualSalesToDate += qty;
+          actualSalesPerEmployee.set(empId, (actualSalesPerEmployee.get(empId) || 0) + qty);
+        };
+
+        if (campaignIds.length > 0) {
           const campaignChunks2 = chunk(campaignIds, 200);
-          for (const emailBatch of emailChunks2) {
-            for (const campaignBatch of campaignChunks2) {
-              const { data: actualSalesData } = await supabase
+
+          // Pass 1: FM sales via fm_seller_id
+          for (const campaignBatch of campaignChunks2) {
+            let offset = 0;
+            const PAGE = 5000;
+            while (true) {
+              const { data: fmData } = await supabase
                 .from("sales")
-                .select("agent_email, sale_items!inner(quantity, products(counts_as_sale))")
+                .select("id, raw_payload, sale_items!inner(quantity, products(counts_as_sale))")
+                .eq("source", "fieldmarketing")
                 .gte("sale_datetime", forecastStartStr)
                 .lte("sale_datetime", todayStr + "T23:59:59")
-                .in("agent_email", emailBatch)
                 .in("client_campaign_id", campaignBatch)
-                .limit(10000);
-              
-              (actualSalesData || []).forEach((s: any) => {
-                const email = s.agent_email?.toLowerCase();
-                if (!email) return;
-                (s.sale_items || []).forEach((si: any) => {
-                  if (si.products?.counts_as_sale !== false) {
-                    const qty = si.quantity || 1;
-                    actualSalesToDate += qty;
-                    actualSalesPerEmail.set(email, (actualSalesPerEmail.get(email) || 0) + qty);
-                  }
-                });
+                .neq("validation_status", "rejected")
+                .range(offset, offset + PAGE - 1);
+
+              const rows = fmData || [];
+              rows.forEach((s: any) => {
+                const sellerId = s.raw_payload?.fm_seller_id;
+                if (sellerId && activeIds.includes(sellerId)) {
+                  (s.sale_items || []).forEach((si: any) => {
+                    if (si.products?.counts_as_sale !== false) {
+                      addActualSale(sellerId, s.id, si.quantity || 1);
+                    }
+                  });
+                }
               });
+              if (rows.length < PAGE) break;
+              offset += PAGE;
             }
           }
-        }
-        
-        // Map actual sales back to employees
-        const actualSalesPerEmployee = new Map<string, number>();
-        for (const emp of employees) {
-          const emails = empEmailMap.get(emp.id) || [];
-          let empActual = 0;
-          for (const email of emails) {
-            empActual += actualSalesPerEmail.get(email) || 0;
+
+          // Pass 2: Sales by agent_email (dedup with FM)
+          if (allEmails.length > 0) {
+            const emailChunks2 = chunk(allEmails, 200);
+            for (const emailBatch of emailChunks2) {
+              for (const campaignBatch of campaignChunks2) {
+                let offset = 0;
+                const PAGE = 5000;
+                while (true) {
+                  const { data: actualSalesData } = await supabase
+                    .from("sales")
+                    .select("id, agent_email, sale_items!inner(quantity, products(counts_as_sale))")
+                    .gte("sale_datetime", forecastStartStr)
+                    .lte("sale_datetime", todayStr + "T23:59:59")
+                    .in("agent_email", emailBatch)
+                    .in("client_campaign_id", campaignBatch)
+                    .neq("validation_status", "rejected")
+                    .range(offset, offset + PAGE - 1);
+                  
+                  const rows = actualSalesData || [];
+                  rows.forEach((s: any) => {
+                    const email = s.agent_email?.toLowerCase();
+                    if (!email) return;
+                    // Find employee for this email
+                    const empId = employees.find(e => (empEmailMap.get(e.id) || []).includes(email))?.id;
+                    if (!empId) return;
+                    (s.sale_items || []).forEach((si: any) => {
+                      if (si.products?.counts_as_sale !== false) {
+                        addActualSale(empId, s.id, si.quantity || 1);
+                      }
+                    });
+                  });
+                  if (rows.length < PAGE) break;
+                  offset += PAGE;
+                }
+              }
+            }
           }
-          if (empActual > 0) actualSalesPerEmployee.set(emp.id, empActual);
         }
         
         // Recalculate forecast for REMAINING days only
