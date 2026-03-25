@@ -232,7 +232,7 @@ export function forecastNewEmployee(
  * applying the correct ramp and survival factor for each day.
  */
 export function forecastCohort(input: CohortForecastInput): CohortForecastResult {
-  const { cohort, rampProfile, survivalProfile, campaignBaselineSph, weeklyHoursPerHead, attendanceFactor, periodStart, periodEnd } = input;
+  const { cohort, rampProfile, survivalProfile, campaignBaselineSph, weeklyHoursPerHead, attendanceFactor, periodStart, periodEnd, holidays } = input;
   
   const cohortStart = new Date(cohort.start_date);
   const pStart = new Date(periodStart);
@@ -242,10 +242,10 @@ export function forecastCohort(input: CohortForecastInput): CohortForecastResult
   const effectiveStart = cohortStart > pStart ? cohortStart : pStart;
   const effectiveEnd = pEnd;
   
-  // Days the cohort actually works within this period
-  const activeDays = Math.max(0, Math.floor((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)));
+  // Total calendar days in active window
+  const totalCalendarDays = Math.max(0, Math.floor((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)));
   
-  if (activeDays <= 0) {
+  if (totalCalendarDays <= 0) {
     return {
       cohortId: cohort.id,
       startDate: cohort.start_date,
@@ -265,16 +265,32 @@ export function forecastCohort(input: CohortForecastInput): CohortForecastResult
     };
   }
   
-  // Day-by-day simulation
-  const dailyHours = (weeklyHoursPerHead / 7); // hours per head per calendar day
+  // Day-by-day simulation — only count workdays (Mon-Fri, skip holidays)
+  const dailyHours = weeklyHoursPerHead / 5; // hours per head per WORKDAY
   let totalSales = 0;
   let totalHours = 0;
   let rampSum = 0;
   let survivalSum = 0;
+  let workDays = 0;
   
-  for (let d = 0; d < activeDays; d++) {
-    // How many days since cohort started for this particular day
-    const daysSinceCohortStart = Math.max(0, Math.floor((effectiveStart.getTime() - cohortStart.getTime()) / (1000 * 60 * 60 * 24))) + d;
+  for (let d = 0; d < totalCalendarDays; d++) {
+    const currentDate = new Date(effectiveStart);
+    currentDate.setDate(currentDate.getDate() + d);
+    
+    // Skip weekends
+    const dow = currentDate.getDay();
+    if (dow === 0 || dow === 6) continue;
+    
+    // Skip holidays
+    if (holidays) {
+      const dateStr = currentDate.toISOString().split('T')[0];
+      if (holidays.has(dateStr)) continue;
+    }
+    
+    workDays++;
+    
+    // How many calendar days since cohort started (for ramp/survival lookup)
+    const daysSinceCohortStart = Math.max(0, Math.floor((currentDate.getTime() - cohortStart.getTime()) / (1000 * 60 * 60 * 24)));
     
     const dayRamp = getRampFactor(daysSinceCohortStart, rampProfile);
     const daySurvival = getSurvivalFactor(daysSinceCohortStart, survivalProfile);
@@ -290,8 +306,28 @@ export function forecastCohort(input: CohortForecastInput): CohortForecastResult
     totalSales += salesToday;
   }
   
-  const weightedRampFactor = rampSum / activeDays;
-  const weightedSurvivalFactor = survivalSum / activeDays;
+  if (workDays === 0) {
+    return {
+      cohortId: cohort.id,
+      startDate: cohort.start_date,
+      plannedHeadcount: cohort.planned_headcount,
+      effectiveHeads: 0,
+      rampFactor: 0,
+      survivalFactor: 1,
+      forecastHours: 0,
+      forecastSales: 0,
+      forecastSalesLow: 0,
+      forecastSalesHigh: 0,
+      note: cohort.note,
+      activeDays: 0,
+      weightedRampFactor: 0,
+      weightedSurvivalFactor: 1,
+      baselineSph: campaignBaselineSph,
+    };
+  }
+  
+  const weightedRampFactor = rampSum / workDays;
+  const weightedSurvivalFactor = survivalSum / workDays;
   const effectiveHeads = cohort.planned_headcount * weightedSurvivalFactor;
   
   return {
@@ -306,7 +342,7 @@ export function forecastCohort(input: CohortForecastInput): CohortForecastResult
     forecastSalesLow: Math.round(totalSales * LOW_FACTOR),
     forecastSalesHigh: Math.round(totalSales * HIGH_FACTOR),
     note: cohort.note,
-    activeDays,
+    activeDays: workDays,
     weightedRampFactor,
     weightedSurvivalFactor,
     baselineSph: campaignBaselineSph,

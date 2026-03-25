@@ -91,6 +91,7 @@ export interface CohortForecastInput {
   attendanceFactor: number;
   periodStart: string;
   periodEnd: string;
+  holidays?: Set<string>;
 }
 
 export interface EmployeeForecastResult {
