@@ -58,6 +58,11 @@ export function ForecastKpiCards({ forecast, clientTarget, danishHolidays = [], 
     return remaining / forecast.daysRemaining;
   }, [hasActualData, clientTarget, forecast.actualSalesToDate, forecast.daysRemaining]);
 
+  const hasProductSplit = forecast.totalSales5G !== undefined && forecast.totalSalesSubs !== undefined;
+  // Scale split values proportionally with override
+  const effectiveSubs = hasProductSplit ? Math.round((forecast.totalSalesSubs || 0) * scaleFactor) : undefined;
+  const effective5G = hasProductSplit ? Math.round((forecast.totalSales5G || 0) * scaleFactor) : undefined;
+
   const cards = [
     {
       label: "Forventet salg",
@@ -75,6 +80,10 @@ export function ForecastKpiCards({ forecast, clientTarget, danishHolidays = [], 
         remaining: forecast.remainingForecast!,
         daysElapsed: forecast.daysElapsed!,
         daysRemaining: forecast.daysRemaining!,
+      } : undefined,
+      productSplit: hasProductSplit ? {
+        subs: effectiveSubs!,
+        fiveG: effective5G!,
       } : undefined,
     },
     {
@@ -181,9 +190,15 @@ export function ForecastKpiCards({ forecast, clientTarget, danishHolidays = [], 
                               <span className="ml-1">({card.actualBreakdown.daysRemaining} dage tilbage)</span>
                             </p>
                           )}
+                          {'productSplit' in card && card.productSplit && (
+                            <p className="text-xs text-muted-foreground">
+                              heraf <span className="font-medium">{card.productSplit.subs.toLocaleString('da-DK')} abon.</span>
+                              {' + '}
+                              <span className="font-medium">{card.productSplit.fiveG.toLocaleString('da-DK')} 5G</span>
+                            </p>
+                          )}
                           {'subtitle' in card && card.subtitle && (
                             <p className="text-xs text-muted-foreground">{card.subtitle}</p>
-                          )}
                         </>
                       )}
                       {!card.isInterval && card.low !== undefined && !card.actualBreakdown && (
