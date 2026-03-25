@@ -11,7 +11,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/hooks/use-toast";
-import { Trash2, Users, Loader2, Package, Plus, Check, ChevronsUpDown } from "lucide-react";
+import { Trash2, Users, Loader2, Package, Plus, Check, ChevronsUpDown, ChevronRight, ArrowLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { ProductAutoMatch } from "./ProductAutoMatch";
@@ -148,6 +148,9 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [checkedNames, setCheckedNames] = useState<Set<string>>(new Set());
   const [customName, setCustomName] = useState("");
+  const [selectedColumn, setSelectedColumn] = useState<string | null>(null);
+
+  const ALLOWED_COLUMNS = ["Operator", "Subscription Name", "Sales Department"] as const;
 
   const { data: mappings = [], isLoading } = useQuery({
     queryKey: ["cancellation-product-mappings", clientId],
