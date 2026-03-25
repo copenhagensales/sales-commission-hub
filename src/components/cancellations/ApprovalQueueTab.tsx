@@ -474,10 +474,58 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
       if (!currentEmployee?.id) throw new Error("Ingen medarbejder fundet");
       const newStatus = uploadType === "cancellation" ? "cancelled" : "basket_changed";
 
-      const queueItems = await fetchByIds<any>("cancellation_queue", "id", queueItemIds, "id, sale_id, target_product_name");
+      const queueItems = await fetchByIds<any>("cancellation_queue", "id", queueItemIds, "id, sale_id, target_product_name, uploaded_data, client_id");
 
-      const productLevelItems = queueItems.filter((qi: any) => qi.target_product_name);
-      const wholeSaleItems = queueItems.filter((qi: any) => !qi.target_product_name);
+      // For items without target_product_name, try to resolve from uploaded_data via cancellation_product_mappings
+      const PRODUCT_KEYS = ["Subscription Name", "Product", "Produkt", "Abonnement", "Product Name", "Produktnavn"];
+      const resolvedQueueItems = [...queueItems];
+
+      const itemsNeedingResolution = resolvedQueueItems.filter((qi: any) => !qi.target_product_name && qi.uploaded_data);
+      if (itemsNeedingResolution.length > 0) {
+        // Get product mappings for the client
+        const cId = itemsNeedingResolution[0]?.client_id || clientId;
+        const { data: productMappings } = await supabase
+          .from("cancellation_product_mappings")
+          .select("excel_product_name, product_id")
+          .eq("client_id", cId);
+
+        if (productMappings && productMappings.length > 0) {
+          // Get product names for the mapped product IDs
+          const mappedProductIds = [...new Set(productMappings.map(m => m.product_id))];
+          const mappedProducts = await fetchByIds<any>("products", "id", mappedProductIds, "id, name");
+          const mappedProductNames = new Map<string, string>(mappedProducts.map((p: any) => [p.id, p.name]));
+
+          const excelToProductName = new Map<string, string>();
+          for (const pm of productMappings) {
+            const productName = mappedProductNames.get(pm.product_id);
+            if (productName) excelToProductName.set(pm.excel_product_name.toLowerCase().trim(), productName);
+          }
+
+          for (const qi of itemsNeedingResolution) {
+            const ud = qi.uploaded_data as Record<string, unknown>;
+            let excelName: string | null = null;
+            for (const key of PRODUCT_KEYS) {
+              const val = ud[key];
+              if (val && typeof val === "string" && val.trim()) { excelName = val.trim(); break; }
+            }
+            if (!excelName) {
+              for (const [k, v] of Object.entries(ud)) {
+                const lower = k.toLowerCase();
+                if ((lower.includes("subscription") || lower.includes("product") || lower.includes("produkt")) && v && typeof v === "string" && v.trim()) {
+                  excelName = v.trim(); break;
+                }
+              }
+            }
+            if (excelName) {
+              const resolvedName = excelToProductName.get(excelName.toLowerCase().trim());
+              if (resolvedName) qi.target_product_name = resolvedName;
+            }
+          }
+        }
+      }
+
+      const productLevelItems = resolvedQueueItems.filter((qi: any) => qi.target_product_name);
+      const wholeSaleItems = resolvedQueueItems.filter((qi: any) => !qi.target_product_name);
 
       if (productLevelItems.length > 0) {
         const productSaleIds = [...new Set(productLevelItems.map((qi: any) => qi.sale_id))];
