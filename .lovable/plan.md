@@ -1,45 +1,52 @@
 
-Mest sandsynlige årsag er, at der er to fejl samtidig i forecast-hooken:
 
-1. Stoppede medarbejdere bliver stadig ikke hentet rigtigt  
-   I `src/hooks/useClientForecast.ts` hentes inaktive medarbejdere med `id in employeeIds`, hvor `employeeIds` kommer fra `team_members`. Når en medarbejder er fjernet fra `team_members`, returnerer den query tomt resultat. Det passer med netværksloggen, hvor den inaktive query gav `[]`, selv om der findes stoppede Eesy TM-medarbejdere med marts-salg.
+## Analyse: William Bornaks adgang til "Oplæring"-fanen
 
-2. “Actual sales to date” tæller ikke alle sale items  
-   I current-period logikken deduplikeres der på `saleId`, mens der itereres over `sale_items`. Derfor tælles kun første linje pr. sale med, i stedet for summen af alle `quantity` for linjer med `counts_as_sale = true`. Det forklarer, hvorfor UI ligger omkring 603 i stedet for den fulde item-mængde.
+### Konklusion fra undersøgelsen
 
-Plan for rettelsen:
+Der er **ingen adgangsbegrænsning** på "Oplæring"-fanen i koden. Fanen vises altid for alle, der kan åbne "Rediger booking"-dialogen.
 
-1. Ret datakilden for stoppede medarbejdere
-   - I `src/hooks/useClientForecast.ts`
-   - Hent inaktive medarbejdere via `employee_master_data.team_id in teamIds` + `employment_end_date >= forecastStartStr`
-   - Ikke via `team_members`
-   - Hent også deres agent-mappings, så vi ikke kun er afhængige af `work_email`
+**Fakta:**
+- William Bornak er `fm_leder` med `can_view: true` + `can_edit: true` for alle FM-bookings
+- EditBookingDialog viser altid alle 6 faner (Booking, Medarbejdere, Biler, Diæt, Oplæring, Hotel) — ingen permission-check per fane
+- RLS på `booking_diet`-tabellen (hvor oplæringsbonusser gemmes) er åben for alle autentificerede brugere
+- Ingen kode i dialogen tjekker rolle eller position for at skjule faner
 
-2. Ret actual-sales optællingen til item-niveau
-   - Skift deduplikering i sektion 8 fra `saleId` til `sale_item`-niveau
-   - Brug `sale_items.id` hvis muligt, ellers fallback til `saleId:itemIndex`
-   - Summér `quantity` for alle linjer, der tæller som salg
-   - Behold FM-pass først og email-pass bagefter, men dedup korrekt på item-niveau på tværs af begge passes
+### Mulige forklaringer
 
-3. Behold forecast for fremtiden aktiv-only
-   - Kun “actual sales to date” skal udvides
-   - Remaining forecast, timer, churn og kapacitet skal stadig kun bygges på aktive medarbejdere
+1. **Browser-cache / stale version** — William ser en ældre version uden fanen
+2. **Forveksling med en anden side** — fanen eksisterer kun inde i "Rediger booking"-dialogen, ikke som en selvstændig fane i BookingManagement
+3. **Fanen er der, men indholdet er tomt** — hvis bookingen ingen tildelte medarbejdere har, viser fanen kun "Tilføj først medarbejdere"
 
-4. Gør UI totals konsistente
-   - Når tidligere medarbejdere tæller med i `actualSalesToDate`, vil summary/KPI-toppen ellers kunne afvige fra breakdown-tabellen
-   - Tilføj en lille reconciliation-linje eller metadata for “salg fra stoppede medarbejdere”, så totalerne giver mening uden at vise dem som aktive sælgere
+### Anbefalet plan: Tilføj permission-check til Oplæring-fanen
 
-5. Tving ny beregning i klienten
-   - Bump `FORECAST_LOGIC_VERSION`, så eksisterende cache ikke skjuler rettelsen
+Hvis du vil styre adgangen granulært:
 
-Tekniske detaljer
-- Primær fil: `src/hooks/useClientForecast.ts`
-- Sandsynlige følgefiler hvis totaler skal vises konsistent:
-  - `src/types/forecast.ts`
-  - `src/components/forecast/ForecastBreakdownTable.tsx`
-  - evt. `src/components/forecast/ForecastSummary.tsx` hvis vi vil vise en note om tidligere medarbejdere
+**Fil: `src/config/permissionKeys.ts`**
+- Tilføj ny permission-nøgle: `tab_fm_training` med label "FM Oplæring"
 
-Forventet effekt efter fix
-- Topkortet skal ikke længere stå fast på ~860, hvis actuals alene allerede er højere
-- “Der er allerede lavet X salg” skal matche den autoritative sale-item optælling
-- Stoppede medarbejdere med marts-salg for Eesy TM skal tælle med i actuals, selv om de ikke længere findes i `team_members`
+**Fil: `src/config/permissionGroups.ts`**
+- Tilføj `tab_fm_training` som child under `menu_fm_booking`
+
+**Fil: `src/components/vagt-flow/EditBookingDialog.tsx`**
+- Importér `usePermissions` 
+- Tilføj `canView("tab_fm_training")` check
+- Kun vis "Oplæring" TabsTrigger og TabsContent hvis brugeren har rettigheden
+- Juster `grid-cols-6` dynamisk baseret på antal synlige faner
+
+**Database migration**
+- Indsæt `tab_fm_training` rettigheden for alle relevante roller (inkl. `fm_leder` med `can_view: true`)
+
+### Tekniske detaljer
+
+```text
+EditBookingDialog.tsx ændringer:
+1. Import usePermissions hook
+2. const { canView } = usePermissions()
+3. const showTrainingTab = canView("tab_fm_training")
+4. Conditional render af TabsTrigger + TabsContent
+5. Dynamic grid-cols baseret på antal synlige tabs
+```
+
+Totalt berørte filer: 4 (permissionKeys.ts, permissionGroups.ts, EditBookingDialog.tsx, migration SQL)
+
