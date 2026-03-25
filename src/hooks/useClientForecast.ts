@@ -963,11 +963,26 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         // Combine: actual + remaining
         const totalExpected = actualSalesToDate + remainingForecast.totalSalesExpected;
         
-        // Enrich established employees with actual sales
-        const enrichedEmployees = remainingForecast.establishedEmployees.map(emp => ({
-          ...emp,
-          actualSales: actualSalesPerEmployee.get(emp.employeeId) || 0,
-        }));
+        // Enrich established employees with actual sales + product split
+        const enrichedEmployees = remainingForecast.establishedEmployees.map(emp => {
+          const actualTotal = actualSalesPerEmployee.get(emp.employeeId) || 0;
+          const actual5G = actual5GPerEmployee.get(emp.employeeId) || 0;
+          const empResult: any = {
+            ...emp,
+            actualSales: actualTotal,
+          };
+          if (isEesyFm) {
+            // Compute 5G ratio from historical data for this employee
+            const histTotal = salesTotalByEmployee.get(emp.employeeId) || 0;
+            const hist5G = sales5GByEmployee.get(emp.employeeId) || 0;
+            const ratio5G = histTotal > 0 ? hist5G / histTotal : 0;
+            empResult.forecastSales5G = Math.round(emp.forecastSales * ratio5G);
+            empResult.forecastSalesSubs = emp.forecastSales - empResult.forecastSales5G;
+            empResult.actualSales5G = actual5G;
+            empResult.actualSalesSubs = actualTotal - actual5G;
+          }
+          return empResult;
+        });
         
         const combinedForecast: ForecastResult = {
           ...remainingForecast,
@@ -983,6 +998,21 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           daysElapsed,
           daysRemaining,
         };
+
+        // Add product split totals for Eesy FM
+        if (isEesyFm) {
+          const totalActual5G = Array.from(actual5GPerEmployee.values()).reduce((s, v) => s + v, 0);
+          const totalActualSubs = actualSalesToDate - totalActual5G;
+          // Use global historical ratio for forecast split
+          const globalHistTotal = Array.from(salesTotalByEmployee.values()).reduce((s, v) => s + v, 0);
+          const globalHist5G = Array.from(sales5GByEmployee.values()).reduce((s, v) => s + v, 0);
+          const globalRatio5G = globalHistTotal > 0 ? globalHist5G / globalHistTotal : 0;
+          const forecast5G = Math.round(remainingForecast.totalSalesExpected * globalRatio5G);
+          combinedForecast.totalSales5G = totalActual5G + forecast5G;
+          combinedForecast.totalSalesSubs = totalExpected - combinedForecast.totalSales5G;
+          combinedForecast.actualSales5G = totalActual5G;
+          combinedForecast.actualSalesSubs = totalActualSubs;
+        }
         
         // Calculate full-month absence loss for drivers
         let fullMonthKnownAbsenceLoss = 0;
