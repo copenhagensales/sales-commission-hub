@@ -6,17 +6,25 @@ import { UserPlus, Plus, Calendar, Users, Trash2, Pencil } from "lucide-react";
 import { CreateCohortDialog } from "./CreateCohortDialog";
 import { EditForecastCohortDialog } from "./EditForecastCohortDialog";
 import type { ClientForecastCohort } from "@/types/forecast";
+import type { CampaignOption } from "./CreateCohortDialog";
 
 interface Props {
   cohorts: ClientForecastCohort[];
   onAdd: (cohort: Omit<ClientForecastCohort, 'id' | 'created_at' | 'created_by'>) => void;
   onDelete?: (cohortId: string) => void;
-  onEdit?: (id: string, data: { start_date: string; planned_headcount: number; note: string | null }) => void;
+  onEdit?: (id: string, data: { start_date: string; planned_headcount: number; note: string | null; client_campaign_id: string | null }) => void;
+  campaigns?: CampaignOption[];
 }
 
-export function ForecastCohortManager({ cohorts, onAdd, onDelete, onEdit }: Props) {
+export function ForecastCohortManager({ cohorts, onAdd, onDelete, onEdit, campaigns = [] }: Props) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCohort, setEditingCohort] = useState<ClientForecastCohort | null>(null);
+
+  const getCampaignName = (campaignId: string | null) => {
+    if (!campaignId) return null;
+    const c = campaigns.find(c => c.id === campaignId);
+    return c ? `${c.clientName} — ${c.name}` : null;
+  };
 
   return (
     <>
@@ -42,49 +50,57 @@ export function ForecastCohortManager({ cohorts, onAdd, onDelete, onEdit }: Prop
             </div>
           ) : (
             <div className="space-y-2">
-              {cohorts.map((cohort) => (
-                <div key={cohort.id} className="flex items-center justify-between p-3 rounded-lg border bg-muted/20 hover:bg-muted/40 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-primary/10">
-                      <Users className="h-4 w-4 text-primary" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">{cohort.planned_headcount} personer</span>
-                        <Badge variant="outline" className="text-xs">
-                          <Calendar className="h-3 w-3 mr-1" />
-                          {new Date(cohort.start_date).toLocaleDateString('da-DK', { day: 'numeric', month: 'short', year: 'numeric' })}
-                        </Badge>
+              {cohorts.map((cohort) => {
+                const campaignLabel = getCampaignName(cohort.client_campaign_id);
+                return (
+                  <div key={cohort.id} className="flex items-center justify-between p-3 rounded-lg border bg-muted/20 hover:bg-muted/40 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-primary/10">
+                        <Users className="h-4 w-4 text-primary" />
                       </div>
-                      {cohort.note && (
-                        <p className="text-xs text-muted-foreground mt-0.5">{cohort.note}</p>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-medium">{cohort.planned_headcount} personer</span>
+                          <Badge variant="outline" className="text-xs">
+                            <Calendar className="h-3 w-3 mr-1" />
+                            {new Date(cohort.start_date).toLocaleDateString('da-DK', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </Badge>
+                          {campaignLabel && (
+                            <Badge variant="secondary" className="text-xs">
+                              {campaignLabel}
+                            </Badge>
+                          )}
+                        </div>
+                        {cohort.note && (
+                          <p className="text-xs text-muted-foreground mt-0.5">{cohort.note}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {onEdit && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                          onClick={() => setEditingCohort(cohort)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                      {onDelete && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          onClick={() => onDelete(cohort.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    {onEdit && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                        onClick={() => setEditingCohort(cohort)}
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-                    {onDelete && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                        onClick={() => onDelete(cohort.id)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
@@ -93,6 +109,7 @@ export function ForecastCohortManager({ cohorts, onAdd, onDelete, onEdit }: Prop
       <CreateCohortDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
+        campaigns={campaigns}
         onSubmit={(data) => {
           onAdd(data);
           setDialogOpen(false);
@@ -103,6 +120,7 @@ export function ForecastCohortManager({ cohorts, onAdd, onDelete, onEdit }: Prop
         open={!!editingCohort}
         onOpenChange={(open) => { if (!open) setEditingCohort(null); }}
         cohort={editingCohort}
+        campaigns={campaigns}
         onSubmit={(id, data) => {
           onEdit?.(id, data);
           setEditingCohort(null);

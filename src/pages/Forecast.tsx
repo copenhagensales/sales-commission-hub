@@ -46,6 +46,23 @@ export default function Forecast() {
     },
   });
 
+  // Fetch campaigns for cohort dialog
+  const { data: campaigns = [] } = useQuery({
+    queryKey: ["forecast-campaigns"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("client_campaigns")
+        .select("id, name, client_id, clients(name)")
+        .order("name");
+      if (error) throw error;
+      return (data || []).map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        clientName: c.clients?.name || '',
+      }));
+    },
+  });
+
   // Real forecast data
   const { data: forecastData, isLoading: forecastLoading, refetch } = useClientForecast(selectedClient, period);
   const forecast = forecastData?.forecast;
@@ -84,13 +101,14 @@ export default function Forecast() {
 
   // Update cohort mutation
   const updateCohort = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: { start_date: string; planned_headcount: number; note: string | null } }) => {
+    mutationFn: async ({ id, data }: { id: string; data: { start_date: string; planned_headcount: number; note: string | null; client_campaign_id: string | null } }) => {
       const { error } = await supabase
         .from("client_forecast_cohorts")
         .update({
           start_date: data.start_date,
           planned_headcount: data.planned_headcount,
           note: data.note,
+          client_campaign_id: data.client_campaign_id,
         })
         .eq("id", id);
       if (error) throw error;
@@ -284,6 +302,7 @@ export default function Forecast() {
                 <ForecastInsights forecast={forecast} />
                 <ForecastCohortManager
                   cohorts={cohorts}
+                  campaigns={campaigns}
                   onAdd={(data) => {
                     addCohort.mutate({
                       ...data,
