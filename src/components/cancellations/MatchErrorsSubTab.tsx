@@ -175,10 +175,11 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
           );
       }
 
-      // 2. Get employee work_email
+      // 2. Get employee work_email and name
       const emp = employees.find(e => e.id === employeeId);
       const workEmail = emp?.work_email;
-      if (!workEmail) return { matched: 0 };
+      const empFullName = emp ? `${emp.first_name} ${emp.last_name}`.trim().toLowerCase() : "";
+      if (!workEmail && !empFullName) return { matched: 0 };
 
       // 3. Find date column
       const dateCol = uploadConfig?.date_column;
@@ -188,14 +189,33 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
       const dateValue = parseFlexibleDate(row.rowData[dateCol]);
       if (!dateValue) return { matched: 0 };
 
-      const { data: sales } = await supabase
-        .from("sales")
-        .select("id")
-        .eq("agent_email", workEmail.toLowerCase())
-        .gte("sale_datetime", `${dateValue}T00:00:00`)
-        .lte("sale_datetime", `${dateValue}T23:59:59`)
-        .in("client_campaign_id", campaignIds)
-        .limit(1);
+      // Try matching by agent_email first, then by agent_name for FM sales
+      let sales: { id: string }[] | null = null;
+
+      if (workEmail) {
+        const { data } = await supabase
+          .from("sales")
+          .select("id")
+          .eq("agent_email", workEmail.toLowerCase())
+          .gte("sale_datetime", `${dateValue}T00:00:00`)
+          .lte("sale_datetime", `${dateValue}T23:59:59`)
+          .in("client_campaign_id", campaignIds)
+          .limit(1);
+        sales = data;
+      }
+
+      // Fallback: match by agent_name (FM sales often use name, not email)
+      if ((!sales || sales.length === 0) && empFullName) {
+        const { data } = await supabase
+          .from("sales")
+          .select("id")
+          .ilike("agent_name", empFullName)
+          .gte("sale_datetime", `${dateValue}T00:00:00`)
+          .lte("sale_datetime", `${dateValue}T23:59:59`)
+          .in("client_campaign_id", campaignIds)
+          .limit(1);
+        sales = data;
+      }
 
       if (!sales || sales.length === 0) return { matched: 0 };
 
