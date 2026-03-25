@@ -1,88 +1,55 @@
 
 
-# Hybrid forecast-model for nye sælgere (≤60 dage)
+# Problem: Guardrails clamper mod forkert reference
 
-## Vurdering af Codex-forslaget
-Forslaget er gennemtænkt og passer godt ind i den eksisterende arkitektur. Kerneidéen — at blende ramp-modellen med empirisk SPH baseret på datakvalitet — løser et reelt problem: nye sælgere med faktiske data bliver i dag ignoreret til fordel for en ren ramp-kurve.
+## Årsag
+Jacob Cenni er sandsynligvis klassificeret som "ny" (≤60 dage). Hybrid-modellen (linje 271-274 i `forecast.ts`) clamper hans empiriske SPH mod `rampedSph`:
 
-Et par justeringer i forhold til konteksten:
-- Guardrail-clamp `[0.6x, 1.4x]` af team baseline giver god mening — men bør bruge **kampagne-specifik** baseline (vi har allerede `getCampaignBaselineSph`)
-- Momentum-cap på ±15% for nye er konservativ og fornuftig
-- Feature-flaget bør ligge i `src/config/kpiRuntime.ts` sammen med de andre feature flags
-
-## Ændringer
-
-### 1. `src/config/kpiRuntime.ts` — Feature flag
-Tilføj `enableHybridNewHireForecast: boolean` til `KpiFeatureFlags`, default `true`.
-
-### 2. `src/lib/calculations/forecast.ts` — Hybrid-logik
-
-**Ny funktion: `calculateReliabilityWeight()`**
 ```ts
-function calculateReliabilityWeight(
-  totalHours: number, totalSales: number, validWeeks: number
-): number {
-  if (validWeeks < 2 || totalHours < 20) return 0;
-  // w scales 0→1 as data grows: ramp at 2 weeks, plateau ~6 weeks
-  const weekFactor = Math.min((validWeeks - 1) / 5, 1);
-  const hourFactor = Math.min(totalHours / 80, 1);
-  return Math.min(weekFactor * hourFactor, 1);
-}
+const clampLow = rampedSph * 0.6;
+const clampHigh = rampedSph * 1.4;
 ```
 
-**Ny funktion: `forecastNewEmployeeHybrid()`**
-- Beregner `rampSph = baselineSph * rampFactor` (eksisterende)
-- Beregner `empiricalSph = calculateEwmaSph(emp.weeklySalesPerHour)`
-- Beregner `w = calculateReliabilityWeight(...)`
-- Clamper `empiricalSph` til `[0.6, 1.4] * baselineSph * rampFactor` (guardrail)
-- `finalSph = (1 - w) * rampSph + w * clampedEmpiricalSph`
-- Momentum: kun hvis `validWeeks >= 3`, cap ±15% i stedet for +25%
-- Returnerer `EmployeeForecastResult` med ekstra metadata (`reliabilityWeight`, `empiricalSph`)
+Med de recalibrerede Eesy TM ramp-faktorer er `rampedSph` nu meget lav:
+- `baselineSph` ≈ 0.83 (etablerede Eesy TM-sælgere)
+- `rampFactor` ≈ 0.31 (steady state for nye)
+- `rampedSph` = 0.83 × 0.31 ≈ **0.26**
+- `clampHigh` = 0.26 × 1.4 = **0.36**
 
-**Opdatér `calculateFullForecast()`**
-- Modtag feature-flag som parameter
-- Hvis `enableHybrid`: brug `forecastNewEmployeeHybrid()` for nye sælgere
-- Ellers: brug eksisterende `forecastNewEmployee()` (fallback)
+Jacobs faktiske SPH ≈ 108 salg / ~150 timer ≈ **0.72** — men guardrail capper ham ved 0.36.
 
-### 3. `src/types/forecast.ts` — Udvid typer
-Tilføj til `EmployeeForecastResult`:
-- `reliabilityWeight?: number`
-- `empiricalSph?: number`
-- `hybridBlend?: boolean`
+Resultat: `finalSph ≈ 0.36 × ~140 timer × 0.92 ≈ 46 salg`. Det matcher præcis.
 
-Tilføj til `EmployeePerformance`:
-- `totalHoursWorked?: number`
-- `totalSalesCount?: number`
-- `validWeekCount?: number`
+## Fejlen
+Guardrails bør **ikke** clampe mod `rampedSph` (som er kunstigt lav pga. ramp-faktoren). De bør clampe mod `baselineSph` — den fulde etablerede SPH. Formålet med guardrails er at forhindre at nye sælgere forecaster vildt over/under etableret niveau, ikke at tvinge dem ned til ramp-niveau.
 
-### 4. `src/hooks/useClientForecast.ts` — Berig data
-- I EWMA-loopet (linje 501-524): tæl `totalHoursWorked`, `totalSalesCount`, `validWeekCount` op per medarbejder
-- Send dem med i `EmployeePerformance`
-- Læs feature-flag og videregiv til `calculateFullForecast()`
+## Fix
 
-### 5. `src/components/forecast/ForecastBreakdownTable.tsx` — Vis blend-info
-For nye sælgere med `hybridBlend = true`: vis reliability-weight og empirisk vs. ramp SPH i tooltip.
+**Fil: `src/lib/calculations/forecast.ts`** (linje 271-274)
 
-### 6. Unit tests
-Små tests i `src/lib/calculations/__tests__/forecast.test.ts`:
-- Ramp-only fallback (w=0 når < 2 uger)
-- Blending ved lav/mellem/høj reliability
-- Momentum-cap ±15% for nye
-- Guardrail clamp virker
+Ændr clamp-reference fra `rampedSph` til `baselineSph`:
+
+```ts
+// Før (forkert):
+const clampLow = rampedSph * 0.6;
+const clampHigh = rampedSph * 1.4;
+
+// Efter (korrekt):
+const clampLow = baselineSph * 0.6;
+const clampHigh = baselineSph * 1.4;
+```
+
+## Effekt
+- Jacob med empirisk SPH 0.72: clampes til `min(0.72, 0.83 × 1.4) = 0.72` (ingen clamp, da han er under 1.4× baseline)
+- `finalSph` ≈ blending af 0.26 og 0.72 baseret på reliability weight
+- Med f.eks. w=0.8: `finalSph ≈ 0.2 × 0.26 + 0.8 × 0.72 ≈ 0.63`
+- Forecast ≈ 0.63 × 140 × 0.92 ≈ **81 salg** — langt mere realistisk for en sælger der laver 108 i denne måned
+
+Opdatér også unit tests til at bruge `baselineSph` som clamp-reference.
 
 ## Berørte filer
 | Fil | Ændring |
 |-----|---------|
-| `src/config/kpiRuntime.ts` | +1 feature flag |
-| `src/types/forecast.ts` | +5 felter på interfaces |
-| `src/lib/calculations/forecast.ts` | +2 funktioner, opdatér `calculateFullForecast` |
-| `src/hooks/useClientForecast.ts` | Berig `EmployeePerformance` med timetal/ugetal |
-| `src/components/forecast/ForecastBreakdownTable.tsx` | Vis hybrid-info |
-| `src/lib/calculations/__tests__/forecast.test.ts` | +4 tests |
-
-## Effekt
-- Nye sælgere **uden** historik → ren ramp-up (uændret)
-- Nye sælgere **med** 2+ gyldige uger → gradvis blending mod faktisk performance
-- Guardrails forhindrer outlier-dominans
-- Feature-flag gør det risikofrit at rulle ud
+| `src/lib/calculations/forecast.ts` | 2 linjer: clamp mod `baselineSph` i stedet for `rampedSph` |
+| `src/lib/calculations/__tests__/forecast-hybrid.test.ts` | Opdatér guardrail-test |
 
