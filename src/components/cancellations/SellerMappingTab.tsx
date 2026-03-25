@@ -163,59 +163,45 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
     enabled: !!clientId,
   });
 
-  const { data: excelProductNames = [] } = useQuery({
-    queryKey: ["excel-product-names", clientId],
+  // Fetch all unique column headers from uploaded Excel data
+  const { data: excelColumns = [] } = useQuery({
+    queryKey: ["excel-column-headers", clientId],
     queryFn: async () => {
       const [queueResult, importsResult] = await Promise.all([
         supabase
           .from("cancellation_queue")
-          .select("target_product_name, uploaded_data")
-          .eq("client_id", clientId),
+          .select("uploaded_data")
+          .eq("client_id", clientId)
+          .limit(50),
         supabase
           .from("cancellation_imports")
           .select("unmatched_rows")
           .eq("client_id", clientId)
-          .not("unmatched_rows", "is", null),
+          .not("unmatched_rows", "is", null)
+          .limit(10),
       ]);
 
       if (queueResult.error) throw queueResult.error;
       if (importsResult.error) throw importsResult.error;
 
-      const names = new Set<string>();
-      const PRODUCT_KEYS = ["Subscription Name", "Product", "Produkt", "Abonnement", "Product Name", "Produktnavn"];
-
-      const extractName = (row: Record<string, unknown>) => {
-        for (const key of PRODUCT_KEYS) {
-          const val = row[key];
-          if (typeof val === "string" && val.trim()) {
-            names.add(val.trim());
-            return;
-          }
-        }
-        for (const [k, v] of Object.entries(row)) {
-          const lower = k.toLowerCase();
-          if ((lower.includes("subscription") || lower.includes("product") || lower.includes("produkt") || lower.includes("abonnement")) && typeof v === "string" && v.trim()) {
-            names.add(v.trim());
-            return;
-          }
-        }
-      };
+      const columns = new Set<string>();
 
       for (const row of queueResult.data || []) {
-        if (row.target_product_name) { names.add(row.target_product_name); continue; }
         if (row.uploaded_data && typeof row.uploaded_data === "object") {
-          extractName(row.uploaded_data as Record<string, unknown>);
+          Object.keys(row.uploaded_data as Record<string, unknown>).forEach(k => columns.add(k));
         }
       }
 
       for (const imp of importsResult.data || []) {
         if (!Array.isArray(imp.unmatched_rows)) continue;
         for (const row of imp.unmatched_rows) {
-          if (row && typeof row === "object") extractName(row as Record<string, unknown>);
+          if (row && typeof row === "object") {
+            Object.keys(row as Record<string, unknown>).forEach(k => columns.add(k));
+          }
         }
       }
 
-      return [...names];
+      return [...columns].sort((a, b) => a.localeCompare(b, "da"));
     },
     enabled: !!clientId,
   });
@@ -248,9 +234,8 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
   });
 
   const mappedNames = new Set(mappings.map(m => m.excel_product_name));
-  const availableExcelNames = [...new Set(excelProductNames)]
-    .sort((a, b) => a.localeCompare(b, "da"));
-  const unmappedUploadNames = availableExcelNames.filter(n => !mappedNames.has(n));
+  const availableExcelNames = excelColumns.filter((n: string) => !mappedNames.has(n));
+  const unmappedUploadNames = availableExcelNames;
 
   const productMap = new Map(products.map(p => [p.id, p.name]));
 
@@ -393,14 +378,14 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
             <ProductAutoMatch clientId={clientId} availableExcelNames={unmappedUploadNames} products={products} />
           </div>
 
-          {/* Show unmatched Excel product names */}
+          {/* Show unmapped Excel columns */}
           {unmappedUploadNames.length > 0 && (
             <div className="rounded-md border border-dashed border-primary/30 bg-primary/5 p-4 space-y-2">
               <p className="text-sm font-medium text-foreground">
-                {unmappedUploadNames.length} umappede produktnavne fundet fra uploads:
+                {unmappedUploadNames.length} umappede kolonner fundet fra uploads:
               </p>
               <div className="flex flex-wrap gap-1.5">
-                {unmappedUploadNames.map(name => (
+                {unmappedUploadNames.map((name: string) => (
                   <Badge key={name} variant="outline" className="text-xs">
                     {name}
                   </Badge>
@@ -422,7 +407,7 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Internt produkt</TableHead>
-                    <TableHead>Excel-navne</TableHead>
+                    <TableHead>Excel-kolonner</TableHead>
                     <TableHead>Oprettet</TableHead>
                     <TableHead className="w-16"></TableHead>
                   </TableRow>
@@ -469,17 +454,17 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
-              Tilknyt Excel-navne til "{selectedProduct?.name}"
+              Tilknyt Excel-kolonner til "{selectedProduct?.name}"
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <p className="text-sm text-muted-foreground">
-              Vælg hvilke produktnavne fra Excel-filer der skal mappes til dette produkt.
+              Vælg hvilke kolonner fra Excel-filen der skal mappes til dette produkt. Et produkt kan have flere kolonner.
             </p>
 
-            {/* Available names from uploads */}
+            {/* All Excel columns */}
             <div className="space-y-2 max-h-[400px] overflow-auto">
-              {availableExcelNames.map(name => (
+              {excelColumns.map((name: string) => (
                 <label key={name} className="flex items-center gap-3 rounded-md border px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors">
                   <Checkbox
                     checked={checkedNames.has(name)}
@@ -492,7 +477,7 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
                 </label>
               ))}
               {/* Show custom-added names not in available list */}
-              {[...checkedNames].filter(n => !availableExcelNames.includes(n)).map(name => (
+              {[...checkedNames].filter(n => !excelColumns.includes(n)).map((name: string) => (
                 <label key={name} className="flex items-center gap-3 rounded-md border px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors border-primary/30">
                   <Checkbox checked onCheckedChange={() => toggleName(name)} />
                   <span className="text-sm">{name}</span>
