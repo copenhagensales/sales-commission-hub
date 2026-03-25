@@ -378,14 +378,14 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
             <ProductAutoMatch clientId={clientId} availableExcelNames={unmappedUploadNames} products={products} />
           </div>
 
-          {/* Show unmatched Excel product names */}
+          {/* Show unmapped Excel columns */}
           {unmappedUploadNames.length > 0 && (
             <div className="rounded-md border border-dashed border-primary/30 bg-primary/5 p-4 space-y-2">
               <p className="text-sm font-medium text-foreground">
-                {unmappedUploadNames.length} umappede produktnavne fundet fra uploads:
+                {unmappedUploadNames.length} umappede kolonner fundet fra uploads:
               </p>
               <div className="flex flex-wrap gap-1.5">
-                {unmappedUploadNames.map(name => (
+                {unmappedUploadNames.map((name: string) => (
                   <Badge key={name} variant="outline" className="text-xs">
                     {name}
                   </Badge>
