@@ -10,7 +10,11 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
-import { Search, Loader2, AlertTriangle, Check, ChevronsUpDown } from "lucide-react";
+import { Search, Loader2, AlertTriangle, Check, ChevronsUpDown, Trash2 } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 
@@ -248,6 +252,40 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
     },
   });
 
+  const ignoreAllMutation = useMutation({
+    mutationFn: async () => {
+      const grouped = new Map<string, Record<string, unknown>[]>();
+      for (const row of processed) {
+        const existing = grouped.get(row.importId) || [];
+        existing.push(row.rowData);
+        grouped.set(row.importId, existing);
+      }
+      for (const [importId, rowsToRemove] of grouped) {
+        const { data: importData } = await supabase
+          .from("cancellation_imports")
+          .select("unmatched_rows")
+          .eq("id", importId)
+          .single();
+        if (!importData?.unmatched_rows || !Array.isArray(importData.unmatched_rows)) continue;
+        const removeSet = new Set(rowsToRemove.map(r => JSON.stringify(r)));
+        const updated = (importData.unmatched_rows as Record<string, unknown>[]).filter(
+          ur => !removeSet.has(JSON.stringify(ur))
+        );
+        await supabase
+          .from("cancellation_imports")
+          .update({ unmatched_rows: (updated.length > 0 ? updated : null) as unknown as Json })
+          .eq("id", importId);
+      }
+    },
+    onSuccess: () => {
+      toast({ title: "Alle fejlede rækker er blevet ignoreret og fjernet" });
+      queryClient.invalidateQueries({ queryKey: ["match-errors", clientId] });
+    },
+    onError: () => {
+      toast({ title: "Fejl ved ignorering af rækker", variant: "destructive" });
+    },
+  });
+
   const allKeys = useMemo(() => {
     const keys = new Set<string>();
     for (const r of rows) {
@@ -389,6 +427,28 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
             })}
           </TableBody>
         </Table>
+      </div>
+
+      <div className="flex justify-end">
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button size="sm" variant="destructive" disabled={ignoreAllMutation.isPending || processed.length === 0}>
+              <Trash2 className="h-4 w-4 mr-1" /> Ignorer alle
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Bekræft ignorering</AlertDialogTitle>
+              <AlertDialogDescription>
+                Er du sikker på at du vil ignorere alle fejlede rækker? De vil blive fjernet permanent.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annuller</AlertDialogCancel>
+              <AlertDialogAction onClick={() => ignoreAllMutation.mutate()}>Ignorer alle</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );
