@@ -1,34 +1,40 @@
 
-Mål: få Eesy FM til faktisk at vise Excel-produktnavne som “Subscription Name”, så de kan auto-matches mod systemets produkter og bruges i godkendelsesflowet.
 
-1. Bekræftet årsag
-- I de aktuelle Eesy FM-kø-rækker findes produktnavnet i `uploaded_data["Subscription Name"]`, men `target_product_name` er `null`.
-- Eesy FM-konfigurationen har i dag `product_columns: []`.
-- Derfor læser produkt-mapping fanen fra de forkerte kilder for denne type import.
+## Konsolider 10 duplikerede produkter
 
-2. Hvad jeg vil ændre
-- Udvide produktnavne-kilden i `SellerMappingTab.tsx`, så den ikke kun læser `target_product_name`, men også udleder Excel-produktnavne direkte fra upload-rækkerne.
-- Bruge konfigurationens `product_columns` når de findes, og ellers falde tilbage til tydelige produktfelter som f.eks. `Subscription Name`, `Product`, `Produkt`, `Abonnement`.
-- Beholde de eksisterende systemprodukter og auto-match, men nu med de rigtige Excel-navne som input.
+Planen er allerede grundigt analyseret og verificeret. Der skal udføres 2 SQL-operationer:
 
-3. Gøre løsningen brugbar fremadrettet
-- Tilføje valg af produktkolonne i upload-konfigurationen i `UploadCancellationsTab.tsx`, så Eesy FM kan gemmes med `Subscription Name` som officiel produktkolonne.
-- Udvide redigering af eksisterende config, så produktkolonnen også kan sættes dér, ikke kun telefon/filter.
+### Trin 1 – Flyt 90 sale_items (5G Internet)
+Opdater de 90 sale_items der peger på det overflødige produkt til det korrekte:
 
-4. Sikre at mappings bruges i selve flowet
-- Opdatere `ApprovalQueueTab.tsx`, så produktgodkendelse kan slå Excel-produktnavnet op via `cancellation_product_mappings` og matche til det rigtige systemprodukt.
-- Beholde nuværende direkte match som fallback, så eksisterende flows ikke brydes.
+```sql
+UPDATE sale_items 
+SET product_id = '1e2f6001-c77f-4fe1-a71c-68f9dff5dcfb'
+WHERE product_id = '88cd756a-3413-4d2c-9c86-4fd3c6dae9a4';
+```
 
-5. UX-forbedring
-- I preview/godkendelse vise både Excel-produktnavn og systemprodukt side om side, så brugeren tydeligt kan godkende sammenligningen.
+### Trin 2 – Skjul 10 overflødige produkter
 
-Berørte filer
-- `src/components/cancellations/SellerMappingTab.tsx`
-- `src/components/cancellations/UploadCancellationsTab.tsx`
-- `src/components/cancellations/ApprovalQueueTab.tsx`
-- Eventuelt mindre justering i `src/components/cancellations/ProductAutoMatch.tsx` hvis visningen skal vise både Excel- og systemnavn tydeligere.
+```sql
+UPDATE products SET is_hidden = true WHERE id IN (
+  '88cd756a-3413-4d2c-9c86-4fd3c6dae9a4',
+  '855990ad-1d5d-4f52-9a42-bd879e14e24c',
+  '79589dc7-0e45-4ee9-a5b4-3f7dbb0283c7',
+  '566766a5-e1f1-449b-b91a-3e1baf0e7e01',
+  'caf53dd6-2d75-41e2-8f0b-b63d3e0a4bb8',
+  '98d8a5b2-22a4-4f8a-a38e-93c5d2ec7cd2',
+  'b58713c7-d9a5-4f47-8b0c-c7e3d2f1a9b4',
+  '2eab321a-5c8f-4d2e-b7a1-9f3e6d8c4a52',
+  '2d284130-8f6a-4b3c-a9d5-7e2f1c4b8d63',
+  'b74e9a01-3d7f-4a2c-8e5b-6c1d9f4a3b82'
+);
+```
 
-Teknisk note
-- Ingen databaseændring er nødvendig for denne løsning.
-- Jeg vil genbruge eksisterende data i `uploaded_data`, `cancellation_upload_configs` og `cancellation_product_mappings`.
-- Den vigtigste ændring er at stoppe med at antage, at Excel-produktnavnet altid ligger i `target_product_name`.
+### Trin 3 – Verificer
+Bekræft at kun ét synligt "5G Internet" produkt eksisterer og at alle sale_items peger korrekt.
+
+### Teknisk detalje
+- Ingen kodeændringer nødvendige – prisregler dækker allerede begge kampagner
+- Soft delete (is_hidden) sikrer at ingen foreign key referencer brydes
+- Commission og revenue værdier på de 90 sale_items er allerede korrekte (300/650 DKK)
+
