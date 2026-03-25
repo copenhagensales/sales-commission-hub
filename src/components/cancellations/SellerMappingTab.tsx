@@ -161,45 +161,61 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
   });
 
   // Get unique Excel product names from previous uploads
-  // Reads both target_product_name and uploaded_data for imports where target_product_name is null (e.g. Eesy FM)
+  // Reads both queued rows and unmatched import rows so failed upload names also appear here
   const { data: excelProductNames = [] } = useQuery({
     queryKey: ["excel-product-names", clientId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("cancellation_queue")
-        .select("target_product_name, uploaded_data")
-        .eq("client_id", clientId);
-      if (error) throw error;
+      const [queueResult, importsResult] = await Promise.all([
+        supabase
+          .from("cancellation_queue")
+          .select("target_product_name, uploaded_data")
+          .eq("client_id", clientId),
+        supabase
+          .from("cancellation_imports")
+          .select("unmatched_rows")
+          .eq("client_id", clientId)
+          .not("unmatched_rows", "is", null),
+      ]);
+
+      if (queueResult.error) throw queueResult.error;
+      if (importsResult.error) throw importsResult.error;
 
       const names = new Set<string>();
       const PRODUCT_KEYS = ["Subscription Name", "Product", "Produkt", "Abonnement", "Product Name", "Produktnavn"];
 
-      for (const row of data || []) {
+      const extractName = (row: Record<string, unknown>) => {
+        for (const key of PRODUCT_KEYS) {
+          const val = row[key];
+          if (typeof val === "string" && val.trim()) {
+            names.add(val.trim());
+            return;
+          }
+        }
+
+        for (const [k, v] of Object.entries(row)) {
+          const lower = k.toLowerCase();
+          if ((lower.includes("subscription") || lower.includes("product") || lower.includes("produkt") || lower.includes("abonnement")) && typeof v === "string" && v.trim()) {
+            names.add(v.trim());
+            return;
+          }
+        }
+      };
+
+      for (const row of queueResult.data || []) {
         if (row.target_product_name) {
           names.add(row.target_product_name);
           continue;
         }
         if (row.uploaded_data && typeof row.uploaded_data === "object") {
-          const ud = row.uploaded_data as Record<string, unknown>;
-          // Try well-known keys first
-          let found = false;
-          for (const key of PRODUCT_KEYS) {
-            const val = ud[key];
-            if (val && typeof val === "string" && val.trim()) {
-              names.add(val.trim());
-              found = true;
-              break;
-            }
-          }
-          // Case-insensitive fallback
-          if (!found) {
-            for (const [k, v] of Object.entries(ud)) {
-              const lower = k.toLowerCase();
-              if ((lower.includes("subscription") || lower.includes("product") || lower.includes("produkt") || lower.includes("abonnement")) && v && typeof v === "string" && v.trim()) {
-                names.add((v as string).trim());
-                break;
-              }
-            }
+          extractName(row.uploaded_data as Record<string, unknown>);
+        }
+      }
+
+      for (const imp of importsResult.data || []) {
+        if (!Array.isArray(imp.unmatched_rows)) continue;
+        for (const row of imp.unmatched_rows) {
+          if (row && typeof row === "object") {
+            extractName(row as Record<string, unknown>);
           }
         }
       }
