@@ -1,32 +1,45 @@
 
+Mest sandsynlige årsag er, at der er to fejl samtidig i forecast-hooken:
 
-# Ret forecast: Inkluder salg fra stoppede medarbejdere i "faktisk salg til dato"
+1. Stoppede medarbejdere bliver stadig ikke hentet rigtigt  
+   I `src/hooks/useClientForecast.ts` hentes inaktive medarbejdere med `id in employeeIds`, hvor `employeeIds` kommer fra `team_members`. Når en medarbejder er fjernet fra `team_members`, returnerer den query tomt resultat. Det passer med netværksloggen, hvor den inaktive query gav `[]`, selv om der findes stoppede Eesy TM-medarbejdere med marts-salg.
 
-## Problem
-Forecastets "faktisk salg til dato" tæller kun salg fra **aktive** medarbejdere (`is_active = true`). Medarbejdere der er stoppet i løbet af perioden har stadig lavet salg, men de tælles ikke med. Det forklarer forskellen mellem de viste 601 salg og det reelle tal.
+2. “Actual sales to date” tæller ikke alle sale items  
+   I current-period logikken deduplikeres der på `saleId`, mens der itereres over `sale_items`. Derfor tælles kun første linje pr. sale med, i stedet for summen af alle `quantity` for linjer med `counts_as_sale = true`. Det forklarer, hvorfor UI ligger omkring 603 i stedet for den fulde item-mængde.
 
-## Løsning
-I den del af `useClientForecast.ts` der henter **faktiske salg til dato** (sektion 8, linje ~858-930), skal vi udvide salgs-attribueringen til også at inkludere inaktive medarbejdere. Forecasting af fremtidige salg skal stadig kun bruge aktive medarbejdere.
+Plan for rettelsen:
 
-## Ændringer
+1. Ret datakilden for stoppede medarbejdere
+   - I `src/hooks/useClientForecast.ts`
+   - Hent inaktive medarbejdere via `employee_master_data.team_id in teamIds` + `employment_end_date >= forecastStartStr`
+   - Ikke via `team_members`
+   - Hent også deres agent-mappings, så vi ikke kun er afhængige af `work_email`
 
-| Fil | Ændring |
-|-----|---------|
-| `src/hooks/useClientForecast.ts` | Hent også inaktive medarbejderes emails til brug i actual-sales-sektionen |
+2. Ret actual-sales optællingen til item-niveau
+   - Skift deduplikering i sektion 8 fra `saleId` til `sale_item`-niveau
+   - Brug `sale_items.id` hvis muligt, ellers fallback til `saleId:itemIndex`
+   - Summér `quantity` for alle linjer, der tæller som salg
+   - Behold FM-pass først og email-pass bagefter, men dedup korrekt på item-niveau på tværs af begge passes
 
-## Detaljer
+3. Behold forecast for fremtiden aktiv-only
+   - Kun “actual sales to date” skal udvides
+   - Remaining forecast, timer, churn og kapacitet skal stadig kun bygges på aktive medarbejdere
 
-1. **Hent alle (også inaktive) medarbejderes agent-emails** ved at lave en separat query for inaktive medarbejdere der har `employment_end_date` inden for forecast-perioden (dvs. stoppet i denne måned eller senere end periodens start).
+4. Gør UI totals konsistente
+   - Når tidligere medarbejdere tæller med i `actualSalesToDate`, vil summary/KPI-toppen ellers kunne afvige fra breakdown-tabellen
+   - Tilføj en lille reconciliation-linje eller metadata for “salg fra stoppede medarbejdere”, så totalerne giver mening uden at vise dem som aktive sælgere
 
-2. **Udvid actual-sales logikken** (linje 858-930):
-   - FM Pass 1 (linje 879): Fjern `activeIds.includes(sellerId)` checket — tæl salget med uanset om sellerId er aktiv, men tilskriv det til en "stopped employees" bucket i stedet.
-   - Email Pass 2 (linje 915): Udvid email-listen til også at inkludere emails fra stoppede medarbejdere.
-   - Salg fra stoppede medarbejdere tælles med i `actualSalesToDate` totalen, men **ikke** i de individuelle forecast-beregninger for fremtiden.
+5. Tving ny beregning i klienten
+   - Bump `FORECAST_LOGIC_VERSION`, så eksisterende cache ikke skjuler rettelsen
 
-3. **Konkret implementation**:
-   - Tilføj en query for inaktive medarbejdere med `employment_end_date >= forecastStartStr`
-   - Byg et `allEmployeeEmailMap` der inkluderer både aktive og stoppede
-   - Byg et `allEmployeeIds` set der inkluderer begge grupper
-   - Brug `allEmployeeIds` og `allEmployeeEmailMap` i actual-sales sektionen
-   - Bevar `activeIds` og `employees` til forecast-beregninger
+Tekniske detaljer
+- Primær fil: `src/hooks/useClientForecast.ts`
+- Sandsynlige følgefiler hvis totaler skal vises konsistent:
+  - `src/types/forecast.ts`
+  - `src/components/forecast/ForecastBreakdownTable.tsx`
+  - evt. `src/components/forecast/ForecastSummary.tsx` hvis vi vil vise en note om tidligere medarbejdere
 
+Forventet effekt efter fix
+- Topkortet skal ikke længere stå fast på ~860, hvis actuals alene allerede er højere
+- “Der er allerede lavet X salg” skal matche den autoritative sale-item optælling
+- Stoppede medarbejdere med marts-salg for Eesy TM skal tælle med i actuals, selv om de ikke længere findes i `team_members`
