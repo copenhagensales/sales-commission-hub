@@ -418,6 +418,7 @@ function EditConfigDialog({ open, onOpenChange, config, onSaved }: {
             {colSelect("OPP", cfgOpp, setCfgOpp)}
             {colSelect("Medlemsnr.", cfgMemberNr, setCfgMemberNr)}
             {colSelect("Virksomhed", cfgCompany, setCfgCompany)}
+            {colSelect("Produktkolonne", cfgProductCol, setCfgProductCol)}
           </div>
           <div className="border-t pt-3 space-y-3">
             <Label className="text-sm font-medium">Filter</Label>
