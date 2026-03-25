@@ -350,6 +350,7 @@ function EditConfigDialog({ open, onOpenChange, config, onSaved }: {
   const [cfgCompany, setCfgCompany] = useState(config.company_column || "__none__");
   const [cfgFilterCol, setCfgFilterCol] = useState(config.filter_column || "__none__");
   const [cfgFilterVal, setCfgFilterVal] = useState(config.filter_value || "");
+  const [cfgProductCol, setCfgProductCol] = useState(config.product_columns?.[0] || "__none__");
   const [cfgName, setCfgName] = useState(config.name);
   const [saving, setSaving] = useState(false);
 
@@ -373,6 +374,7 @@ function EditConfigDialog({ open, onOpenChange, config, onSaved }: {
           member_number_column: cfgMemberNr !== "__none__" ? cfgMemberNr : null,
           filter_column: cfgFilterCol !== "__none__" ? cfgFilterCol : null,
           filter_value: cfgFilterVal.trim() || null,
+          product_columns: cfgProductCol !== "__none__" ? [cfgProductCol] : [],
         } as any)
         .eq("id", config.id);
       if (error) throw error;
