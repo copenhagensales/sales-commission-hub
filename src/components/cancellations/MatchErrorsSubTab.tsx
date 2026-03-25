@@ -400,6 +400,7 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
           <TableHeader>
             <TableRow>
               <TableHead>Type</TableHead>
+              <TableHead className="whitespace-nowrap">Handlinger</TableHead>
               {sellerField && <TableHead className="whitespace-nowrap">Tildel sælger</TableHead>}
               {allKeys.map(key => (
                 <TableHead key={key} className="whitespace-nowrap">{key}</TableHead>
@@ -418,6 +419,48 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
                     <Badge variant={row.uploadType === "cancellation" ? "destructive" : "secondary"}>
                       {row.uploadType === "cancellation" ? "Annullering" : "Kurvrettelse"}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="min-w-[180px]">
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        onClick={() => setLocateDialogRow({ row, idx })}
+                      >
+                        <SearchCheck className="h-3 w-3 mr-1" /> Lokaliser salg
+                      </Button>
+                      {ignorePendingIdx === idx ? (
+                        <div className="flex items-center gap-1">
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="h-7 text-xs"
+                            disabled={ignoreRowMutation.isPending}
+                            onClick={() => ignoreRowMutation.mutate(row)}
+                          >
+                            Bekræft?
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 p-0"
+                            onClick={() => setIgnorePendingIdx(null)}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs text-muted-foreground"
+                          onClick={() => setIgnorePendingIdx(idx)}
+                        >
+                          <Trash2 className="h-3 w-3 mr-1" /> Ignorer
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                   {sellerField && (
                     <TableCell className="min-w-[220px]">
