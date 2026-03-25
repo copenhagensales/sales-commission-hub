@@ -879,7 +879,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
                 if (sellerId && activeIds.includes(sellerId)) {
                   (s.sale_items || []).forEach((si: any) => {
                     if (si.products?.counts_as_sale !== false) {
-                      addActualSale(sellerId, s.id, si.quantity || 1);
+                      addActualSale(sellerId, s.id, si.quantity || 1, is5GProduct(si));
                     }
                   });
                 }
@@ -916,7 +916,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
                     if (!empId) return;
                     (s.sale_items || []).forEach((si: any) => {
                       if (si.products?.counts_as_sale !== false) {
-                        addActualSale(empId, s.id, si.quantity || 1);
+                        addActualSale(empId, s.id, si.quantity || 1, is5GProduct(si));
                       }
                     });
                   });
