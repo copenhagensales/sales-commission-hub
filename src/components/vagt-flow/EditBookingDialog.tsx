@@ -2029,6 +2029,7 @@ export function EditBookingDialog({
           </TabsContent>
 
           {/* Training Bonus Tab */}
+          {showTrainingTab && (
           <TabsContent value="training" className="space-y-4 mt-4">
             {/* Existing training bonus assignments */}
             {Object.keys(groupedTrainingAssignments).length > 0 && (
