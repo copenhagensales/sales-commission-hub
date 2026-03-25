@@ -19,6 +19,7 @@ import { ForecastProgressBar } from "@/components/forecast/ForecastProgressBar";
 import { ForecastTeamOverview } from "@/components/forecast/ForecastTeamOverview";
 
 import { ForecastInsights } from "@/components/forecast/ForecastInsights";
+import { FmWeeklyForecastTable } from "@/components/forecast/FmWeeklyForecastTable";
 import { DataFreshnessBadge } from "@/components/ui/DataFreshnessBadge";
 import { MOCK_RAMP_PROFILE, MOCK_SURVIVAL_PROFILE } from "@/lib/calculations/forecast";
 import { useClientForecast } from "@/hooks/useClientForecast";
