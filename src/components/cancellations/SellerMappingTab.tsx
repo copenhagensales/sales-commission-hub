@@ -166,32 +166,42 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
     enabled: !!clientId,
   });
 
-  // Fetch all unique column headers from uploaded Excel data
-  const { data: excelColumns = [] } = useQuery({
-    queryKey: ["excel-column-headers", clientId],
+  // Fetch all unique values for the 3 allowed columns from uploaded Excel data
+  const { data: columnValues = {} } = useQuery({
+    queryKey: ["excel-column-values", clientId],
     queryFn: async () => {
       const [queueResult, importsResult] = await Promise.all([
         supabase
           .from("cancellation_queue")
           .select("uploaded_data")
           .eq("client_id", clientId)
-          .limit(50),
+          .limit(500),
         supabase
           .from("cancellation_imports")
           .select("unmatched_rows")
           .eq("client_id", clientId)
           .not("unmatched_rows", "is", null)
-          .limit(10),
+          .limit(50),
       ]);
 
       if (queueResult.error) throw queueResult.error;
       if (importsResult.error) throw importsResult.error;
 
-      const columns = new Set<string>();
+      const values: Record<string, Set<string>> = {};
+      for (const col of ALLOWED_COLUMNS) values[col] = new Set();
+
+      const extractFromRow = (row: Record<string, unknown>) => {
+        for (const col of ALLOWED_COLUMNS) {
+          const val = row[col];
+          if (val != null && String(val).trim()) {
+            values[col].add(String(val).trim());
+          }
+        }
+      };
 
       for (const row of queueResult.data || []) {
         if (row.uploaded_data && typeof row.uploaded_data === "object") {
-          Object.keys(row.uploaded_data as Record<string, unknown>).forEach(k => columns.add(k));
+          extractFromRow(row.uploaded_data as Record<string, unknown>);
         }
       }
 
@@ -199,12 +209,16 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
         if (!Array.isArray(imp.unmatched_rows)) continue;
         for (const row of imp.unmatched_rows) {
           if (row && typeof row === "object") {
-            Object.keys(row as Record<string, unknown>).forEach(k => columns.add(k));
+            extractFromRow(row as Record<string, unknown>);
           }
         }
       }
 
-      return [...columns].sort((a, b) => a.localeCompare(b, "da"));
+      const result: Record<string, string[]> = {};
+      for (const col of ALLOWED_COLUMNS) {
+        result[col] = [...values[col]].sort((a, b) => a.localeCompare(b, "da"));
+      }
+      return result;
     },
     enabled: !!clientId,
   });
