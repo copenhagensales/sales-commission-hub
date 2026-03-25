@@ -87,9 +87,9 @@ export function LocateSaleDialog({
       if (filterByEmployee && employeeData) {
         const empName = `${employeeData.first_name} ${employeeData.last_name}`.trim();
         if (employeeData.work_email) {
-          query = query.or(`agent_email.ilike.${employeeData.work_email},agent_name.ilike.%${empName}%`);
+          query = query.or(`agent_email.ilike.${employeeData.work_email},agent_name.ilike.*${empName}*`);
         } else {
-          query = query.ilike("agent_name", `%${empName}%`);
+          query = query.ilike("agent_name", `*${empName}*`);
         }
       }
 
