@@ -55,11 +55,10 @@ export function useForecastVsActual(clientId: string) {
         const monthKey = format(monthDate, "yyyy-MM");
         const periodLabel = format(monthDate, "MMM yyyy", { locale: da });
 
-        // Get actual sales count
+        // Get actual sales count (campaign-based, includes FM sales automatically)
         let actualSales = 0;
 
         if (clientId === "all") {
-          // Count all sales with counts_as_sale
           const { count } = await supabase
             .from("sales")
             .select("id, sale_items!inner(quantity, products(counts_as_sale))", { count: "exact", head: false })
@@ -67,24 +66,32 @@ export function useForecastVsActual(clientId: string) {
             .lte("sale_datetime", monthEndStr + "T23:59:59")
             .neq("validation_status", "rejected");
 
-          // Simplified: use count as rough estimate
           actualSales = count || 0;
         } else if (campaignIds.length > 0) {
-          const { data: salesData } = await supabase
-            .from("sales")
-            .select("id, sale_items!inner(quantity, products(counts_as_sale))")
-            .gte("sale_datetime", monthStartStr)
-            .lte("sale_datetime", monthEndStr + "T23:59:59")
-            .in("client_campaign_id", campaignIds)
-            .neq("validation_status", "rejected");
+          // Paginate to avoid 1000-row default limit
+          let offset = 0;
+          const PAGE = 5000;
+          while (true) {
+            const { data: salesData } = await supabase
+              .from("sales")
+              .select("id, sale_items!inner(quantity, products(counts_as_sale))")
+              .gte("sale_datetime", monthStartStr)
+              .lte("sale_datetime", monthEndStr + "T23:59:59")
+              .in("client_campaign_id", campaignIds)
+              .neq("validation_status", "rejected")
+              .range(offset, offset + PAGE - 1);
 
-          (salesData || []).forEach((s: any) => {
-            (s.sale_items || []).forEach((si: any) => {
-              if (si.products?.counts_as_sale !== false) {
-                actualSales += si.quantity || 1;
-              }
+            const rows = salesData || [];
+            rows.forEach((s: any) => {
+              (s.sale_items || []).forEach((si: any) => {
+                if (si.products?.counts_as_sale !== false) {
+                  actualSales += si.quantity || 1;
+                }
+              });
             });
-          });
+            if (rows.length < PAGE) break;
+            offset += PAGE;
+          }
         }
 
         const stored = forecastMap.get(monthKey);
