@@ -402,8 +402,25 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
           <ProductAutoMatch clientId={clientId} availableExcelNames={availableExcelNames} products={products} />
         </div>
 
+        {/* Show unmatched Excel product names */}
+        {availableExcelNames.length > 0 && mappings.length === 0 && (
+          <div className="rounded-md border border-dashed border-primary/30 bg-primary/5 p-4 space-y-2">
+            <p className="text-sm font-medium text-foreground">
+              {availableExcelNames.length} umappede produktnavne fundet fra uploads:
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {availableExcelNames.map(name => (
+                <Badge key={name} variant="outline" className="text-xs cursor-pointer hover:bg-primary/10" onClick={() => { setNewExcelName(name); }}>
+                  {name}
+                </Badge>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">Klik på et navn for at vælge det, eller brug Auto-match knappen ovenfor.</p>
+          </div>
+        )}
+
         {/* Existing mappings */}
-        {mappings.length === 0 ? (
+        {mappings.length === 0 && availableExcelNames.length === 0 ? (
           <div className="py-8 text-center text-muted-foreground">
             <Package className="h-12 w-12 mx-auto mb-4 opacity-40" />
             <p className="font-medium">Ingen produkt-mappings endnu</p>
