@@ -1,57 +1,42 @@
 
 
-# Analysér og opdatér Eesy TM survival-profil
+# Tilføj kampagne-vælger til opstartshold-dialogen
 
-## Kontekst
-Survival-profilen styrer, hvor stor en andel af et nyt opstartshold der forventes stadig at være ansat efter dag 7, 14, 30 og 60. Den nuværende `MOCK_SURVIVAL_PROFILE` bruger uvaliderede tal:
+## Oversigt
+Når man opretter et forecast-opstartshold, kan man i dag ikke vælge kampagne. Det betyder at `client_campaign_id` altid er `null`, og systemet falder tilbage til en generisk profil. Vi tilføjer en kampagne-dropdown så det rigtige ramp- og survival-profil automatisk matches.
 
-| Dag | Nuværende (mock) |
-|-----|-----------------|
-| 7   | 92%             |
-| 14  | 84%             |
-| 30  | 74%             |
-| 60  | 66%             |
+## Ændringer
 
-Vi ved ikke om disse matcher virkeligheden for Eesy TM. Samme fremgangsmåde som ramp-up analysen.
+### 1. `CreateCohortDialog.tsx` — Tilføj kampagne-selector
+- Acceptér en ny prop: `campaigns: { id: string; name: string; clientName: string }[]`
+- Tilføj state for `selectedCampaignId`
+- Rendér en `Select`-dropdown med kampagner (grupperet/vist med kundenavn)
+- Send `client_campaign_id: selectedCampaignId` i `onSubmit` i stedet for `null`
 
-## Trin
+### 2. `EditForecastCohortDialog.tsx` — Tilføj kampagne-selector
+- Samme prop og dropdown som CreateCohortDialog
+- Pre-udfyld fra `cohort.client_campaign_id`
+- Udvid `onSubmit` data-typen til at inkludere `client_campaign_id`
 
-### 1. Dataanalyse (engangscript)
-Kør SQL mod `employee_master_data`, `historical_employment` og `team_members`:
+### 3. `ForecastCohortManager.tsx` — Videregivelse
+- Acceptér `campaigns` prop og videregiv til begge dialoger
+- Vis kampagnenavn i kohort-rækken (badge)
+- Udvid `onEdit` callback-typen til at inkludere `client_campaign_id`
 
-- Hent alle medarbejdere tilknyttet Eesy TM-teams (via `team_members` + `teams`) med `employment_start_date` fra f.eks. januar 2025+
-- For stoppede medarbejdere: beregn `tenure_days` = `employment_end_date - employment_start_date`
-- For aktive medarbejdere: beregn `tenure_days` = `today - employment_start_date`
-- Beregn overlevelsesrate ved dag 7, 14, 30, 60:
-  - `survival_day_N = antal der stadig var ansat efter N dage / total antal startere`
-- Output: de fire faktiske survival-faktorer
+### 4. `Forecast.tsx` — Hent kampagner og videregiv
+- Hent `client_campaigns` med `clients(name)` join
+- Videregiv listen til `ForecastCohortManager`
+- Opdatér `editCohort` mutation til at inkludere `client_campaign_id`
 
-### 2. Migration: Indsæt Eesy TM survival-profil
-Baseret på analysen, indsæt i `forecast_survival_profiles`:
-```sql
-INSERT INTO forecast_survival_profiles (name, client_campaign_id, survival_day_7, survival_day_14, survival_day_30, survival_day_60)
-SELECT 'Eesy TM Survival', cc.id, <dag7>, <dag14>, <dag30>, <dag60>
-FROM client_campaigns cc
-JOIN clients c ON cc.client_id = c.id
-WHERE c.name ILIKE '%eesy%' AND cc.campaign_type = 'tm';
-```
-
-### 3. `useClientForecast.ts`: Hent kampagne-specifik survival-profil
-Samme mønster som ramp-profiler:
-- Hent `forecast_survival_profiles` med `.in("client_campaign_id", campaignIds)`
-- Byg et map `campaignId → survivalProfile`
-- Brug den matchede profil i `cohortInputs` i stedet for `MOCK_SURVIVAL_PROFILE`
-- Fallback til `MOCK_SURVIVAL_PROFILE` for kampagner uden specifik profil
-
-### 4. `Forecast.tsx`: Vis aktiv survival-profil i assumptions
-Opdatér `ForecastAssumptions`-kaldet til at bruge den faktiske survival-profil fra forecast-data.
+### 5. Kohort-visning — Vis kampagnenavn
+I kohort-rækken vises et badge med kampagnenavn, så det er tydeligt hvilken profil der bruges.
 
 ## Berørte filer
-- **Engangscript**: SQL-analyse af faktisk overlevelse
-- **Migration**: Ny række i `forecast_survival_profiles`
-- **`src/hooks/useClientForecast.ts`**: Hent og brug kampagne-specifik survival-profil (~15 linjer)
-- **`src/pages/Forecast.tsx`**: Videregiv korrekt survival-profil til UI (1 linje)
+- `src/components/forecast/CreateCohortDialog.tsx`
+- `src/components/forecast/EditForecastCohortDialog.tsx`
+- `src/components/forecast/ForecastCohortManager.tsx`
+- `src/pages/Forecast.tsx`
 
 ## Effekt
-Kohort-forecastet afspejler Eesy TM's faktiske fastholdelse i stedet for generiske mock-tal. Andre kampagner forbliver uændrede.
+Nye opstartshold kan nu tilknyttes en specifik kampagne. `useClientForecast` henter allerede kampagne-specifikke ramp- og survival-profiler, så det korrekte profil automatisk bruges når `client_campaign_id` er sat.
 
