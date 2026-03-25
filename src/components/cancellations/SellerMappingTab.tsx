@@ -268,9 +268,13 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
 
   // Combine all sources and filter out already-mapped names
   const mappedNames = new Set(mappings.map(m => m.excel_product_name));
+  // For the dropdown, include both upload names and sale_item titles for flexibility
   const allExcelNames = [...new Set([...excelProductNames, ...saleItemNames])]
     .sort((a, b) => a.localeCompare(b, "da"));
   const availableExcelNames = allExcelNames.filter(n => !mappedNames.has(n));
+  // For the "unmapped from uploads" chips, only show names actually from uploads
+  const unmappedUploadNames = excelProductNames.filter(n => !mappedNames.has(n))
+    .sort((a, b) => a.localeCompare(b, "da"));
 
   const productMap = new Map(products.map(p => [p.id, p.name]));
 
@@ -413,13 +417,13 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
         </div>
 
         {/* Show unmatched Excel product names */}
-        {availableExcelNames.length > 0 && mappings.length === 0 && (
+        {unmappedUploadNames.length > 0 && mappings.length === 0 && (
           <div className="rounded-md border border-dashed border-primary/30 bg-primary/5 p-4 space-y-2">
             <p className="text-sm font-medium text-foreground">
-              {availableExcelNames.length} umappede produktnavne fundet fra uploads:
+              {unmappedUploadNames.length} umappede produktnavne fundet fra uploads:
             </p>
             <div className="flex flex-wrap gap-1.5">
-              {availableExcelNames.map(name => (
+              {unmappedUploadNames.map(name => (
                 <Badge key={name} variant="outline" className="text-xs cursor-pointer hover:bg-primary/10" onClick={() => { setNewExcelName(name); }}>
                   {name}
                 </Badge>
@@ -430,7 +434,7 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
         )}
 
         {/* Existing mappings */}
-        {mappings.length === 0 && availableExcelNames.length === 0 ? (
+        {mappings.length === 0 && unmappedUploadNames.length === 0 ? (
           <div className="py-8 text-center text-muted-foreground">
             <Package className="h-12 w-12 mx-auto mb-4 opacity-40" />
             <p className="font-medium">Ingen produkt-mappings endnu</p>
