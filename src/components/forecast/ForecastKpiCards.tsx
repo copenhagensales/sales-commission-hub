@@ -14,6 +14,7 @@ interface Props {
   forecast: ForecastResult;
   clientTarget?: number;
   danishHolidays?: string[];
+  overrideTotal?: number;
 }
 
 function getWorkingDays(start: string, end: string, holidays: string[] = []): number {
@@ -26,7 +27,8 @@ function getWorkingDays(start: string, end: string, holidays: string[] = []): nu
   }
 }
 
-export function ForecastKpiCards({ forecast, clientTarget, danishHolidays = [] }: Props) {
+export function ForecastKpiCards({ forecast, clientTarget, danishHolidays = [], overrideTotal }: Props) {
+  const effectiveTotal = overrideTotal ?? forecast.totalSalesExpected;
   const hasActualData = forecast.actualSalesToDate !== undefined && forecast.actualSalesToDate > 0;
 
   const workingDays = useMemo(
@@ -38,8 +40,8 @@ export function ForecastKpiCards({ forecast, clientTarget, danishHolidays = [] }
     if (clientTarget && clientTarget > 0) {
       return clientTarget / workingDays;
     }
-    return forecast.totalSalesExpected / workingDays;
-  }, [clientTarget, forecast.totalSalesExpected, workingDays]);
+    return effectiveTotal / workingDays;
+  }, [effectiveTotal, workingDays]);
 
   // If we have actual data, calculate remaining sales/day needed
   const remainingSalesPerDay = useMemo(() => {
@@ -52,7 +54,7 @@ export function ForecastKpiCards({ forecast, clientTarget, danishHolidays = [] }
   const cards = [
     {
       label: "Forventet salg",
-      value: forecast.totalSalesExpected,
+      value: effectiveTotal,
       low: forecast.totalSalesLow,
       high: forecast.totalSalesHigh,
       unit: "salg",
@@ -86,7 +88,7 @@ export function ForecastKpiCards({ forecast, clientTarget, danishHolidays = [] }
       icon: Target,
       tooltip: clientTarget
         ? `For at nå targettet (${clientTarget.toLocaleString("da-DK")} salg) skal der laves ${salesPerDay.toFixed(1)} salg pr. arbejdsdag.${remainingSalesPerDay !== undefined ? ` Resterende: ${remainingSalesPerDay.toFixed(1)} salg/dag.` : ""}`
-        : `Baseret på forecast (${forecast.totalSalesExpected.toLocaleString("da-DK")} salg) fordelt på ${workingDays} arbejdsdage.`,
+        : `Baseret på forecast (${effectiveTotal.toLocaleString("da-DK")} salg) fordelt på ${workingDays} arbejdsdage.`,
       color: "text-teal-600",
       isDecimal: true,
       subtitle: remainingSalesPerDay !== undefined && remainingSalesPerDay > 0
@@ -127,7 +129,7 @@ export function ForecastKpiCards({ forecast, clientTarget, danishHolidays = [] }
     },
     {
       label: "Forecast-interval",
-      value: forecast.totalSalesExpected,
+      value: effectiveTotal,
       low: forecast.totalSalesLow,
       high: forecast.totalSalesHigh,
       unit: "",

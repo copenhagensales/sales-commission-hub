@@ -292,11 +292,11 @@ export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = f
                   {hasActuals ? (
                     <>
                       <td className="pt-2 text-right tabular-nums">{activeEmployees.reduce((s, e) => s + (e.actualSales || 0), 0)}</td>
-                      <td className="pt-2 text-right tabular-nums">{activeEmployees.reduce((s, e) => s + e.forecastSales, 0)}</td>
-                      <td className="pt-2 text-right tabular-nums">{activeEmployees.reduce((s, e) => s + (e.actualSales || 0) + e.forecastSales, 0)}</td>
+                      <td className="pt-2 text-right tabular-nums">{activeEmployees.reduce((s, e) => s + (overrides?.get(e.employeeId)?.override_sales ?? e.forecastSales), 0)}</td>
+                      <td className="pt-2 text-right tabular-nums">{activeEmployees.reduce((s, e) => s + (e.actualSales || 0) + (overrides?.get(e.employeeId)?.override_sales ?? e.forecastSales), 0)}</td>
                     </>
                   ) : (
-                    <td className="pt-2 text-right tabular-nums">{activeEmployees.reduce((s, e) => s + e.forecastSales, 0)}</td>
+                    <td className="pt-2 text-right tabular-nums">{activeEmployees.reduce((s, e) => s + (overrides?.get(e.employeeId)?.override_sales ?? e.forecastSales), 0)}</td>
                   )}
                 </tr>
               </tfoot>
