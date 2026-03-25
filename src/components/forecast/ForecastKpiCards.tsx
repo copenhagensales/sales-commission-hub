@@ -1,5 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { ShoppingCart, Users, Clock, TrendingDown, UserMinus, BarChart3 } from "lucide-react";
+import { ShoppingCart, Users, Clock, TrendingDown, UserMinus, BarChart3, CalendarDays, Target } from "lucide-react";
 import { ForecastIntervalBadge } from "./ForecastIntervalBadge";
 import type { ForecastResult } from "@/types/forecast";
 import {
@@ -7,13 +7,45 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useMemo } from "react";
+import { eachDayOfInterval, isWeekend, parseISO } from "date-fns";
 
 interface Props {
   forecast: ForecastResult;
+  clientTarget?: number;
 }
 
-export function ForecastKpiCards({ forecast }: Props) {
+function getWorkingDays(start: string, end: string): number {
+  try {
+    const days = eachDayOfInterval({ start: parseISO(start), end: parseISO(end) });
+    return days.filter(d => !isWeekend(d)).length;
+  } catch {
+    return 22; // fallback
+  }
+}
+
+export function ForecastKpiCards({ forecast, clientTarget }: Props) {
   const hasActualData = forecast.actualSalesToDate !== undefined && forecast.actualSalesToDate > 0;
+
+  const workingDays = useMemo(
+    () => getWorkingDays(forecast.periodStart, forecast.periodEnd),
+    [forecast.periodStart, forecast.periodEnd]
+  );
+
+  const salesPerDay = useMemo(() => {
+    if (clientTarget && clientTarget > 0) {
+      return clientTarget / workingDays;
+    }
+    return forecast.totalSalesExpected / workingDays;
+  }, [clientTarget, forecast.totalSalesExpected, workingDays]);
+
+  // If we have actual data, calculate remaining sales/day needed
+  const remainingSalesPerDay = useMemo(() => {
+    if (!hasActualData || !clientTarget || !forecast.daysRemaining) return undefined;
+    const remaining = clientTarget - (forecast.actualSalesToDate ?? 0);
+    if (remaining <= 0 || forecast.daysRemaining <= 0) return 0;
+    return remaining / forecast.daysRemaining;
+  }, [hasActualData, clientTarget, forecast.actualSalesToDate, forecast.daysRemaining]);
 
   const cards = [
     {
@@ -33,6 +65,31 @@ export function ForecastKpiCards({ forecast }: Props) {
         daysElapsed: forecast.daysElapsed!,
         daysRemaining: forecast.daysRemaining!,
       } : undefined,
+    },
+    {
+      label: "Arbejdsdage",
+      value: workingDays,
+      unit: "dage",
+      icon: CalendarDays,
+      tooltip: `Der er ${workingDays} arbejdsdage (hverdage ekskl. weekender) i forecast-perioden.${hasActualData && forecast.daysRemaining ? ` ${forecast.daysRemaining} dage tilbage.` : ""}`,
+      color: "text-amber-600",
+      subtitle: hasActualData && forecast.daysElapsed
+        ? `${forecast.daysElapsed} passeret · ${forecast.daysRemaining} tilbage`
+        : undefined,
+    },
+    {
+      label: clientTarget ? "Salg/dag (target)" : "Salg/dag (forecast)",
+      value: salesPerDay,
+      unit: "salg/dag",
+      icon: Target,
+      tooltip: clientTarget
+        ? `For at nå targettet (${clientTarget.toLocaleString("da-DK")} salg) skal der laves ${salesPerDay.toFixed(1)} salg pr. arbejdsdag.${remainingSalesPerDay !== undefined ? ` Resterende: ${remainingSalesPerDay.toFixed(1)} salg/dag.` : ""}`
+        : `Baseret på forecast (${forecast.totalSalesExpected.toLocaleString("da-DK")} salg) fordelt på ${workingDays} arbejdsdage.`,
+      color: "text-teal-600",
+      isDecimal: true,
+      subtitle: remainingSalesPerDay !== undefined && remainingSalesPerDay > 0
+        ? `${remainingSalesPerDay.toFixed(1)} salg/dag nødvendigt resten af mdr.`
+        : undefined,
     },
     {
       label: "Aktive sælgere",
@@ -80,7 +137,7 @@ export function ForecastKpiCards({ forecast }: Props) {
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       {cards.map((card) => {
         const Icon = card.icon;
         return (
@@ -100,7 +157,9 @@ export function ForecastKpiCards({ forecast }: Props) {
                       ) : (
                         <>
                           <p className="text-2xl font-bold tracking-tight">
-                            {card.value.toLocaleString('da-DK')}
+                            {'isDecimal' in card && card.isDecimal
+                              ? Number(card.value).toFixed(1)
+                              : Number(card.value).toLocaleString('da-DK')}
                             <span className="text-sm font-normal text-muted-foreground ml-1">{card.unit}</span>
                           </p>
                           {card.actualBreakdown && (
@@ -110,6 +169,9 @@ export function ForecastKpiCards({ forecast }: Props) {
                               <span className="font-medium">{card.actualBreakdown.remaining.toLocaleString('da-DK')} forventet</span>
                               <span className="ml-1">({card.actualBreakdown.daysRemaining} dage tilbage)</span>
                             </p>
+                          )}
+                          {'subtitle' in card && card.subtitle && (
+                            <p className="text-xs text-muted-foreground">{card.subtitle}</p>
                           )}
                         </>
                       )}

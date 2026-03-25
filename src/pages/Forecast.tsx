@@ -291,7 +291,7 @@ export default function Forecast() {
             />
 
             {/* KPI Cards */}
-            <ForecastKpiCards forecast={forecast} />
+            <ForecastKpiCards forecast={forecast} clientTarget={targetData ?? undefined} />
 
 
             {/* Main content grid */}
