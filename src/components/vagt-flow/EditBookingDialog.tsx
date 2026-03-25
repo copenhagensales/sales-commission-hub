@@ -219,6 +219,8 @@ export function EditBookingDialog({
   onAddVehicleAssignment,
 }: EditBookingDialogProps) {
   const queryClient = useQueryClient();
+  const { canView } = usePermissions();
+  const showTrainingTab = canView("tab_fm_training");
   
   // Booking tab state
   const [clientId, setClientId] = useState<string>("");
