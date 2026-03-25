@@ -82,8 +82,8 @@ describe("forecastNewEmployeeHybrid", () => {
       daysSinceStart: 30,
     });
     const hybrid = forecastNewEmployeeHybrid(emp, MOCK_RAMP_PROFILE, baseline);
-    // rampedSph = 0.5 * 0.6 = 0.3, clampHigh = 0.3 * 1.4 = 0.42
-    // So the empirical (2.0) should be clamped, result SPH < 2.0
+    // baseline = 0.5, clampHigh = 0.5 * 1.4 = 0.7
+    // So the empirical (2.0) should be clamped to 0.7, result SPH < 1.0
     expect(hybrid.expectedSph).toBeLessThan(1.0);
     expect(hybrid.hybridBlend).toBe(true);
   });
