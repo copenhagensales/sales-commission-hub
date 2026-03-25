@@ -1,33 +1,57 @@
 
 
-# Fix: Faktiske salg mangler FM-salg i forecast
+# Fix: Rebecca Hove mangler i næste måneds forecast
 
 ## Problem
-Forecast-sidens "faktiske salg" (1.000) er lavere end det reelle tal (1.161) fordi:
+Rebecca Hove (og potentielt andre) filtreres væk fra forecast-tabellen for næste måned. Det sker i to trin:
 
-1. **FM-salg via `fm_seller_id` tælles ikke med** i "actual sales to date" (sektion 8 i `useClientForecast.ts`, linje 772-800). Den henter kun salg matchet via `agent_email`, men FM-salg registreres via `raw_payload.fm_seller_id` -- precis som EWMA-sektionen gør (linje 213-229), men det er glemt i actual-sektionen.
+1. **EWMA = 0**: Rebecca har været på ferie/fridage næsten hele marts (uge 9-13). Alle 4 EWMA-uger springes over fordi hun arbejdede under 50% kapacitet. Resultat: `expectedSph = 0`.
 
-2. **Samme problem i `useForecastVsActual.ts`** -- den tæller kun via `agent_email`, ikke `fm_seller_id`.
-
-3. **`.limit(10000)`** kan potentielt afskære data hvis der er mange salg.
+2. **Tabelfiltrering**: `ForecastBreakdownTable` linje 62 filtrerer med:
+   ```
+   e.expectedSph > 0 || (e.actualSales || 0) > 0
+   ```
+   For næste måned (april) er `actualSales = 0` (ikke startet endnu), og `expectedSph = 0` (ingen EWMA-data). Rebecca forsvinder helt fra tabellen.
 
 ## Løsning
 
-### 1. `useClientForecast.ts` -- Sektion 8 (actual sales, linje 772-812)
-- Tilføj en **FM-specifik query** (ligesom linje 213-229) der henter salg med `source = "fieldmarketing"` og matcher via `raw_payload.fm_seller_id`
-- Brug samme dedup-logik (track sale IDs) så salg ikke tælles dobbelt
-- Fjern eller hæv `.limit(10000)`
+### 1. `useClientForecast.ts` -- Fallback SPH for medarbejdere med 0 gyldige uger
+Når `weeklySph` er tom (alle uger sprunget over), brug en **ældre historik-fallback**:
+- Udvid EWMA-vinduet til 8 uger bagud for at finde mindst 1 gyldig uge
+- Hvis stadig 0: brug team-gennemsnittet for den periode som fallback
+- Markér medarbejderen som "estimeret" så det er synligt i UI
 
-### 2. `useForecastVsActual.ts`
-- Tilføj FM-salg via `fm_seller_id`-logik, eller brug en samlet query der tæller alle salg for kampagnens campaigns uanset attribution-metode (da denne hook ikke behøver per-employee breakdown)
-
-### 3. Øg limit
-- Brug pagination eller fjern `.limit()` for actual-queries der skal tælle alle salg i en måned
+### 2. `ForecastBreakdownTable.tsx` -- Vis alle etablerede medarbejdere
+Fjern filtreringen der skjuler medarbejdere med `expectedSph = 0`. I stedet:
+- Vis dem i tabellen med et "Ingen data" eller "Fravær"-badge
+- De kan stadig have planlagte timer (shifts) i forecast-perioden, og bør vises med 0 eller et estimat
 
 ## Berørte filer
 
 | Fil | Ændring |
 |-----|---------|
-| `src/hooks/useClientForecast.ts` | Tilføj FM actual sales query med `fm_seller_id` dedup i sektion 8 |
-| `src/hooks/useForecastVsActual.ts` | Inkluder FM-salg i historisk actual-optælling |
+| `src/hooks/useClientForecast.ts` | Tilføj fallback-SPH når alle EWMA-uger er tomme (udvid vindue eller brug team-snit) |
+| `src/components/forecast/ForecastBreakdownTable.tsx` | Fjern `expectedSph > 0`-filter; vis alle etablerede med planlagte timer |
+
+## Teknisk detalje
+
+I `useClientForecast.ts` efter EWMA-loopet (ca. linje 530):
+```typescript
+// If no valid weeks found, try extending to 12 weeks back
+if (weeklySph.length === 0) {
+  // Try 4 more weeks back...
+  // If still 0, use team average SPH as fallback
+}
+```
+
+I `ForecastBreakdownTable.tsx` linje 62:
+```typescript
+// Before (hides Rebecca):
+const activeEmployees = establishedMapped.filter(e => e.expectedSph > 0 || (e.actualSales || 0) > 0);
+
+// After (show all with planned hours):
+const activeEmployees = establishedMapped.filter(e => 
+  e.expectedSph > 0 || (e.actualSales || 0) > 0 || e.plannedHours > 0
+);
+```
 
