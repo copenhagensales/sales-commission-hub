@@ -11,7 +11,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, Loader2, Check } from "lucide-react";
+import { Search, Loader2, Check, AlertTriangle } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
@@ -56,48 +56,100 @@ export function LocateSaleDialog({
   const [filterByEmployee, setFilterByEmployee] = useState(!!assignedEmployeeId);
   const queryClient = useQueryClient();
 
-  // Fetch employee email for filtering
-  const { data: employeeData } = useQuery({
-    queryKey: ["employee-email", assignedEmployeeId],
+  // Fetch all agent identities for this employee via agent mappings
+  const { data: agentIdentities, isLoading: agentLoading } = useQuery({
+    queryKey: ["employee-agent-identities", assignedEmployeeId],
     queryFn: async () => {
       if (!assignedEmployeeId) return null;
-      const { data, error } = await supabase
+
+      // Get agent_ids mapped to this employee
+      const { data: mappings } = await supabase
+        .from("employee_agent_mapping")
+        .select("agent_id")
+        .eq("employee_id", assignedEmployeeId);
+
+      const agentIds = (mappings || []).map(m => m.agent_id);
+
+      const emails = new Set<string>();
+      const names = new Set<string>();
+
+      if (agentIds.length > 0) {
+        const { data: agents } = await supabase
+          .from("agents")
+          .select("email, name")
+          .in("id", agentIds);
+
+        for (const a of agents || []) {
+          if (a.email) emails.add(a.email.toLowerCase());
+          if (a.name) names.add(a.name.toLowerCase());
+        }
+      }
+
+      // Fallback: get work_email from employee_master_data
+      const { data: emp } = await supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name, work_email")
+        .select("first_name, last_name, work_email")
         .eq("id", assignedEmployeeId)
         .single();
-      if (error) throw error;
-      return data;
+
+      if (emp?.work_email) emails.add(emp.work_email.toLowerCase());
+
+      const isMappingBased = agentIds.length > 0;
+
+      return {
+        emails: [...emails],
+        names: [...names],
+        isMappingBased,
+        fallbackName: emp ? `${emp.first_name || ""} ${emp.last_name || ""}`.trim() : null,
+      };
     },
-    enabled: !!assignedEmployeeId,
+    enabled: !!assignedEmployeeId && open,
   });
 
+  // Only run sales query when agent identities are ready (if filter is on)
+  const filterReady = !filterByEmployee || (!!agentIdentities && (agentIdentities.emails.length > 0 || agentIdentities.names.length > 0));
+
   const { data: sales = [], isLoading } = useQuery({
-    queryKey: ["locate-sales", clientId, campaignIds, filterByEmployee, assignedEmployeeId],
+    queryKey: ["locate-sales", clientId, campaignIds, filterByEmployee, agentIdentities],
     queryFn: async () => {
       if (campaignIds.length === 0) return [];
 
-      let query = supabase
+      if (filterByEmployee && agentIdentities) {
+        // Build precise OR filter from agent identities
+        const orClauses: string[] = [];
+        for (const email of agentIdentities.emails) {
+          orClauses.push(`agent_email.eq.${email}`);
+        }
+        for (const name of agentIdentities.names) {
+          orClauses.push(`agent_name.eq.${name}`);
+        }
+
+        if (orClauses.length === 0) return [];
+
+        const { data, error } = await supabase
+          .from("sales")
+          .select("id, sale_datetime, agent_name, agent_email, customer_phone, customer_company, sale_items(display_name, quantity, mapped_revenue)")
+          .in("client_campaign_id", campaignIds)
+          .or(orClauses.join(","))
+          .order("sale_datetime", { ascending: false })
+          .limit(200);
+
+        if (error) throw error;
+        return (data || []) as SaleRow[];
+      }
+
+      // No filter – show all sales for campaigns
+      const { data, error } = await supabase
         .from("sales")
         .select("id, sale_datetime, agent_name, agent_email, customer_phone, customer_company, sale_items(display_name, quantity, mapped_revenue)")
         .in("client_campaign_id", campaignIds)
         .order("sale_datetime", { ascending: false })
         .limit(200);
 
-      if (filterByEmployee && employeeData) {
-        const empName = `${employeeData.first_name} ${employeeData.last_name}`.trim();
-        if (employeeData.work_email) {
-          query = query.or(`agent_email.ilike.${employeeData.work_email},agent_name.ilike.*${empName}*`);
-        } else {
-          query = query.ilike("agent_name", `*${empName}*`);
-        }
-      }
-
-      const { data, error } = await query;
       if (error) throw error;
       return (data || []) as SaleRow[];
     },
-    enabled: open && campaignIds.length > 0,
+    enabled: open && campaignIds.length > 0 && filterReady,
   });
 
   const filtered = useMemo(() => {
@@ -117,7 +169,6 @@ export function LocateSaleDialog({
 
   const linkSaleMutation = useMutation({
     mutationFn: async (saleId: string) => {
-      // 1. Insert into cancellation_queue
       const { error: queueError } = await supabase
         .from("cancellation_queue")
         .insert([{
@@ -130,7 +181,6 @@ export function LocateSaleDialog({
         }]);
       if (queueError) throw queueError;
 
-      // 2. Remove row from unmatched_rows
       const { data: importData } = await supabase
         .from("cancellation_imports")
         .select("unmatched_rows")
@@ -159,6 +209,8 @@ export function LocateSaleDialog({
       toast({ title: "Fejl ved kobling af salg", variant: "destructive" });
     },
   });
+
+  const showFallbackWarning = filterByEmployee && agentIdentities && !agentIdentities.isMappingBased;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -208,7 +260,15 @@ export function LocateSaleDialog({
             )}
           </div>
 
-          {isLoading ? (
+          {/* Fallback warning */}
+          {showFallbackWarning && (
+            <div className="flex items-center gap-2 rounded-md border border-yellow-500/30 bg-yellow-500/10 p-2 text-xs text-yellow-700 dark:text-yellow-400">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+              <span>Ingen agent-mapping fundet — filteret bruger kun work-email som fallback og kan være bredere end forventet.</span>
+            </div>
+          )}
+
+          {(isLoading || (filterByEmployee && agentLoading)) ? (
             <div className="flex justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
