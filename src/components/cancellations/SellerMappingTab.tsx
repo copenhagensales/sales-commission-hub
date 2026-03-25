@@ -294,16 +294,20 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-[300px] p-0" align="start">
-                <Command>
+                <Command onKeyDown={(e) => {
+                  if (e.key === "Enter" && newExcelName.trim() && availableExcelNames.every(n => n.toLowerCase() !== newExcelName.trim().toLowerCase())) {
+                    setExcelPopoverOpen(false);
+                  }
+                }}>
                   <CommandInput placeholder="Søg eller skriv nyt navn..." className="h-9 text-xs" onValueChange={v => setNewExcelName(v)} />
                   <CommandList>
                     <CommandEmpty>
                       {newExcelName.trim() ? (
                         <button
-                          className="w-full px-2 py-1.5 text-xs text-left hover:bg-accent rounded-sm cursor-pointer"
+                          className="w-full px-3 py-2 text-xs text-left hover:bg-accent rounded-sm cursor-pointer flex items-center gap-2 font-medium"
                           onClick={() => { setExcelPopoverOpen(false); }}
                         >
-                          Brug "{newExcelName.trim()}"
+                          <Plus className="h-3 w-3" /> Opret ny: "{newExcelName.trim()}"
                         </button>
                       ) : "Ingen produktnavne fundet."}
                     </CommandEmpty>
