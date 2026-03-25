@@ -984,7 +984,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
             const rawExcelPhone = phoneColumn !== "__none__" ? getCaseInsensitive(row.originalRow, phoneColumn) : null;
             const excelPhone = rawExcelPhone ? normalizePhone(String(rawExcelPhone)) : "";
-            if (excelPhone) return; // has phone → should have been matched in pass 1
+            if (excelPhone) return; // has phone → should have been matched in pass 1 or 1b
 
             const excelSeller = String(getCaseInsensitive(row.originalRow, sellerCol) || "").trim();
             const excelDate = String(getCaseInsensitive(row.originalRow, dateCol) || "").trim();
