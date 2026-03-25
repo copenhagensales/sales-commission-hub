@@ -163,12 +163,23 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
 
       const activeIds = employees.map(e => e.id);
       // allEmployeeIds includes both active + stopped employees (for actual sales attribution)
-      const allEmployeeIds = new Set([...activeIds, ...inactiveEmployees.map(e => e.id)]);
+      const inactiveIds = inactiveEmployees.map(e => e.id);
+      const allEmployeeIds = new Set([...activeIds, ...inactiveIds]);
       const teamNameMap = new Map((teamsRes.data || []).map(t => [t.id, t.name]));
+
+      // Fetch agent mappings for inactive employees too (not covered by initial agentRes)
+      let inactiveAgentMappings: any[] = [];
+      if (inactiveIds.length > 0) {
+        const { data } = await supabase
+          .from("employee_agent_mapping")
+          .select("employee_id, agent_id, agents(email)")
+          .in("employee_id", inactiveIds);
+        inactiveAgentMappings = data || [];
+      }
 
       // Build employee -> agent emails map (includes both active and inactive)
       const empEmailMap = new Map<string, string[]>();
-      (agentRes.data || []).forEach((m: any) => {
+      [...(agentRes.data || []), ...inactiveAgentMappings].forEach((m: any) => {
         const email = m.agents?.email;
         if (email) {
           if (!empEmailMap.has(m.employee_id)) empEmailMap.set(m.employee_id, []);
