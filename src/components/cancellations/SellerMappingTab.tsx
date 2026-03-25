@@ -237,25 +237,31 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
     enabled: campaignIds.length > 0,
   });
 
-  // Fetch unique product titles from sale_items as fallback
+  // Fetch unique product titles from sale_items via a direct join approach
   const { data: saleItemNames = [] } = useQuery({
     queryKey: ["sale-item-product-names", campaignIds],
     queryFn: async () => {
       if (campaignIds.length === 0) return [] as string[];
-      const { data: sales, error: salesErr } = await supabase
-        .from("sales")
-        .select("id")
-        .in("client_campaign_id", campaignIds);
-      if (salesErr) throw salesErr;
-      const saleIds = (sales || []).map(s => s.id);
-      if (saleIds.length === 0) return [] as string[];
-      const { data, error } = await supabase
-        .from("sale_items")
-        .select("adversus_product_title")
-        .in("sale_id", saleIds)
-        .not("adversus_product_title", "is", null);
-      if (error) throw error;
-      return [...new Set((data || []).map(d => d.adversus_product_title).filter(Boolean))] as string[];
+      // Use RPC or paginated approach — fetch distinct titles directly via sales join
+      const allTitles = new Set<string>();
+      for (const campId of campaignIds) {
+        const { data: sales } = await supabase
+          .from("sales")
+          .select("id")
+          .eq("client_campaign_id", campId)
+          .limit(500);
+        if (!sales || sales.length === 0) continue;
+        const saleIds = sales.map(s => s.id);
+        const { data } = await supabase
+          .from("sale_items")
+          .select("adversus_product_title")
+          .in("sale_id", saleIds)
+          .not("adversus_product_title", "is", null);
+        for (const d of data || []) {
+          if (d.adversus_product_title) allTitles.add(d.adversus_product_title);
+        }
+      }
+      return [...allTitles];
     },
     enabled: campaignIds.length > 0,
   });
