@@ -762,7 +762,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           clientId,
           null,
           teamChurnRates,
-          MOCK_RAMP_PROFILE,
+          activeRampProfile,
           baselineSph,
         );
         
@@ -862,7 +862,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         clientId,
         null,
         teamChurnRates,
-        MOCK_RAMP_PROFILE,
+        activeRampProfile,
         baselineSph,
         true, // isFuturePeriod — apply momentum correction
       );
