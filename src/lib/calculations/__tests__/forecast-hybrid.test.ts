@@ -88,6 +88,20 @@ describe("forecastNewEmployeeHybrid", () => {
     expect(hybrid.hybridBlend).toBe(true);
   });
 
+  it("uses empirical SPH directly when above ramp and reliable (asymmetric blend)", () => {
+    const emp = makeEmp({
+      weeklySalesPerHour: [0.7, 0.72, 0.68],
+      validWeekCount: 3,
+      totalHoursWorked: 90,
+      totalSalesCount: 65,
+      daysSinceStart: 45,
+    });
+    const hybrid = forecastNewEmployeeHybrid(emp, MOCK_RAMP_PROFILE, baseline);
+    expect(hybrid.hybridBlend).toBe(true);
+    // With asymmetric blend, finalSph should be close to empirical (~0.7), not dragged down by ramp
+    expect(hybrid.expectedSph).toBeGreaterThan(0.6);
+  });
+
   it("applies momentum cap of ±15% for new hires", () => {
     // Recent weeks much higher than EWMA
     const emp = makeEmp({
