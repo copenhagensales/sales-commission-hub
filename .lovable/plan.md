@@ -1,20 +1,32 @@
 
 
-## Problem: "Fejl i match" tæller viser ikke (43)
+## To nye handlinger per række i "Fejl i match"
 
-### Analyse
+### Hvad bygges
 
-Koden for tælleren er faktisk stadig til stede (linje 1203 i ApprovalQueueTab.tsx). Problemet er at `match-errors-count` queryen ikke invalideres efter upload. I UploadCancellationsTab.tsx invalideres kun `match-errors` men **ikke** `match-errors-count` (linje 1472).
+To knapper per række i Match Errors tabellen:
 
-Derudover har `match-errors-count` queryen et potentielt stale-data problem — den caches og opdateres kun ved invalidation.
+1. **Lokaliser salg** — Åbner en dialog der viser alle salg for den tildelte medarbejder (filtreret på klientens kampagner). Brugeren kan søge og vælge et salg → det kobles til annulleringsrækken (indsættes i `cancellation_queue`, fjernes fra `unmatched_rows`).
 
-### Plan
+2. **Ignorer række** — Knap med to-trins bekræftelse (inline confirm) der fjerner den enkelte række fra `unmatched_rows` uden at koble den til et salg.
 
-**Fil: `src/components/cancellations/UploadCancellationsTab.tsx`**
-- Tilføj `queryClient.invalidateQueries({ queryKey: ["match-errors-count"] })` efter linje 1472, så tælleren opdateres efter upload-matching
+### Teknisk plan
 
-**Fil: `src/components/cancellations/ApprovalQueueTab.tsx`**
-- Tilføj `refetchInterval: 5000` eller `staleTime: 0` til `match-errors-count` queryen, så den holder sig opdateret mens brugeren arbejder i godkendelseskøen
+**Ny fil: `src/components/cancellations/LocateSaleDialog.tsx`**
+- Dialog med søgefelt (fritekst: telefon, firma, sælgernavn)
+- Henter salg fra `sales` + `sale_items` filtreret på klientens `campaignIds`
+- Hvis en medarbejder er tildelt (via `localAssignments` / `mappingsByName`), pre-filtrerer på `agent_email` / `agent_name` — med toggle til at fjerne filteret
+- Tabel med: Dato, Sælger, Telefon, Produkter, Omsætning
+- "Vælg" knap per salg → indsætter i `cancellation_queue` med `sale_id`, fjerner rækken fra `unmatched_rows`, invaliderer queries
 
-Berørte filer: 2
+**Ændring: `src/components/cancellations/MatchErrorsSubTab.tsx`**
+- Tilføj ny kolonne "Handlinger" med to knapper:
+  - `Lokaliser salg` (søge-ikon) → åbner `LocateSaleDialog` med `row`, `clientId`, `campaignIds`, evt. tildelt `employeeId`
+  - `Ignorer` (trash-ikon) → inline two-step: først klik → knappen skifter til "Bekræft?" i rødt, andet klik → fjerner rækken fra `unmatched_rows` i databasen
+- Tilføj state for `ignorePendingIdx` til two-step confirm
+- Tilføj mutation `ignoreRowMutation` der fjerner én specifik række (genbruger logik fra `ignoreAllMutation` men for én række)
+
+### Berørte filer
+- `src/components/cancellations/LocateSaleDialog.tsx` (ny)
+- `src/components/cancellations/MatchErrorsSubTab.tsx` (tilføj handlingskolonne + dialog-integration)
 
