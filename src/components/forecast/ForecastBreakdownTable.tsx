@@ -273,10 +273,22 @@ export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = f
                           <td className="py-2.5 text-right">{renderForecastCell()}</td>
                           <td className="py-2.5 text-right">
                             <span className="font-semibold tabular-nums">{total}</span>
+                            {emp.forecastSalesSubs !== undefined && (
+                              <p className="text-[10px] text-muted-foreground font-normal">
+                                A:{(emp.actualSalesSubs || 0) + (emp.forecastSalesSubs || 0)} · 5G:{(emp.actualSales5G || 0) + (emp.forecastSales5G || 0)}
+                              </p>
+                            )}
                           </td>
                         </>
                       ) : (
-                        <td className="py-2.5 text-right">{renderForecastCell()}</td>
+                        <td className="py-2.5 text-right">
+                          {renderForecastCell()}
+                          {emp.forecastSalesSubs !== undefined && (
+                            <p className="text-[10px] text-muted-foreground">
+                              Abon: {emp.forecastSalesSubs} · 5G: {emp.forecastSales5G}
+                            </p>
+                          )}
+                        </td>
                       )}
                     </tr>
                   );
