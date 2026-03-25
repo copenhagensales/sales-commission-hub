@@ -6464,6 +6464,47 @@ export type Database = {
         }
         Relationships: []
       }
+      fm_weekly_forecast_overrides: {
+        Row: {
+          client_id: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          note: string | null
+          override_sales: number | null
+          week_number: number
+          year: number
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          override_sales?: number | null
+          week_number: number
+          year: number
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          override_sales?: number | null
+          week_number?: number
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fm_weekly_forecast_overrides_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       forecast_ramp_profiles: {
         Row: {
           client_campaign_id: string | null

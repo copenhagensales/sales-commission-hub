@@ -19,11 +19,13 @@ import { ForecastProgressBar } from "@/components/forecast/ForecastProgressBar";
 import { ForecastTeamOverview } from "@/components/forecast/ForecastTeamOverview";
 
 import { ForecastInsights } from "@/components/forecast/ForecastInsights";
+import { FmWeeklyForecastTable } from "@/components/forecast/FmWeeklyForecastTable";
 import { DataFreshnessBadge } from "@/components/ui/DataFreshnessBadge";
 import { MOCK_RAMP_PROFILE, MOCK_SURVIVAL_PROFILE } from "@/lib/calculations/forecast";
 import { useClientForecast } from "@/hooks/useClientForecast";
 import { useForecastVsActual } from "@/hooks/useForecastVsActual";
 import { useEmployeeForecastOverrides } from "@/hooks/useEmployeeForecastOverrides";
+import { useFmWeeklyForecast } from "@/hooks/useFmWeeklyForecast";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { ClientForecastCohort } from "@/types/forecast";
@@ -96,6 +98,21 @@ export default function Forecast() {
 
   // Real vs actual data
   const { data: vsActual = [], isLoading: vsActualLoading } = useForecastVsActual(selectedClient);
+
+  // FM Weekly forecast - compute month/year for the period
+  const fmPeriod = useMemo(() => {
+    const now = new Date();
+    const target = period === "current"
+      ? now
+      : new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    return { month: target.getMonth() + 1, year: target.getFullYear() };
+  }, [period]);
+
+  const { weeklyData: fmWeeks, isLoading: fmWeeksLoading, upsertOverride: upsertFmOverride, deleteOverride: deleteFmOverride } =
+    useFmWeeklyForecast(selectedClient, fmPeriod.month, fmPeriod.year);
+
+  // Check if client has FM bookings (to show weekly section)
+  const showFmWeekly = fmWeeks.length > 0;
 
 
   // Add cohort mutation
@@ -327,6 +344,20 @@ export default function Forecast() {
 
             {/* KPI Cards */}
             <ForecastKpiCards forecast={forecast} clientTarget={targetData ?? undefined} danishHolidays={danishHolidays} />
+
+            {/* FM Weekly Forecast */}
+            {showFmWeekly && (
+              <FmWeeklyForecastTable
+                weeks={fmWeeks}
+                onOverride={(weekNumber, year, sales) => {
+                  if (sales === null) {
+                    deleteFmOverride.mutate({ weekNumber, year });
+                  } else {
+                    upsertFmOverride.mutate({ weekNumber, year, sales });
+                  }
+                }}
+              />
+            )}
 
 
             {/* Main content grid */}
