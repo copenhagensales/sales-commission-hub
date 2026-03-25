@@ -23,6 +23,7 @@ import { DataFreshnessBadge } from "@/components/ui/DataFreshnessBadge";
 import { MOCK_RAMP_PROFILE, MOCK_SURVIVAL_PROFILE } from "@/lib/calculations/forecast";
 import { useClientForecast } from "@/hooks/useClientForecast";
 import { useForecastVsActual } from "@/hooks/useForecastVsActual";
+import { useEmployeeForecastOverrides } from "@/hooks/useEmployeeForecastOverrides";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { ClientForecastCohort } from "@/types/forecast";
@@ -95,6 +96,7 @@ export default function Forecast() {
 
   // Real vs actual data
   const { data: vsActual = [], isLoading: vsActualLoading } = useForecastVsActual(selectedClient);
+
 
   // Add cohort mutation
   const addCohort = useMutation({
@@ -187,6 +189,17 @@ export default function Forecast() {
     const month = (m % 12) + 1;
     return `${y}-${String(month).padStart(2, '0')}-01`;
   }, [period]);
+
+  // Forecast overrides per employee
+  const { overrides, upsertOverride, deleteOverride: deleteOverrideMutation } = useEmployeeForecastOverrides(selectedClient, periodStart);
+
+  const handleOverride = (employeeId: string, value: number | null) => {
+    if (value === null) {
+      deleteOverrideMutation.mutate(employeeId);
+    } else {
+      upsertOverride.mutate({ employeeId, overrideSales: value });
+    }
+  };
 
   const { data: targetData } = useQuery({
     queryKey: ["client-target", selectedClient, periodStart],
@@ -348,6 +361,8 @@ export default function Forecast() {
                   employees={forecast.establishedEmployees}
                   cohorts={forecast.cohorts}
                   isCurrentPeriod={period === "current"}
+                  overrides={selectedClient !== "all" ? overrides : undefined}
+                  onOverride={selectedClient !== "all" ? handleOverride : undefined}
                 />
                 <ForecastVsActualChart data={vsActual} />
               </div>

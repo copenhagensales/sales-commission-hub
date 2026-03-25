@@ -1,24 +1,59 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Users, UserPlus, ArrowUpDown, GraduationCap, CalendarOff, PhoneCall } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Users, UserPlus, ArrowUpDown, GraduationCap, CalendarOff, PhoneCall, Pencil, X, Check } from "lucide-react";
 import type { EmployeeForecastResult, CohortForecastResult } from "@/types/forecast";
 import { ForecastIntervalBadge } from "./ForecastIntervalBadge";
 import { SetPlannedDepartureDialog } from "./SetPlannedDepartureDialog";
+import type { ForecastOverride } from "@/hooks/useEmployeeForecastOverrides";
 
 interface Props {
   employees: EmployeeForecastResult[];
   cohorts: CohortForecastResult[];
   isCurrentPeriod?: boolean;
+  overrides?: Map<string, ForecastOverride>;
+  onOverride?: (employeeId: string, value: number | null) => void;
 }
 
-export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = false }: Props) {
+export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = false, overrides, onOverride }: Props) {
   const [sortKey, setSortKey] = useState<'name' | 'sph' | 'forecast' | 'total'>('total');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [departureDialog, setDepartureDialog] = useState<{ id: string; name: string; endDate?: string | null } | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const editInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editingId && editInputRef.current) {
+      editInputRef.current.focus();
+      editInputRef.current.select();
+    }
+  }, [editingId]);
+
+  const startEdit = (empId: string, currentValue: number) => {
+    setEditingId(empId);
+    setEditValue(String(currentValue));
+  };
+
+  const confirmEdit = () => {
+    if (!editingId || !onOverride) return;
+    const val = parseInt(editValue, 10);
+    if (!isNaN(val) && val >= 0) {
+      onOverride(editingId, val);
+    }
+    setEditingId(null);
+  };
+
+  const cancelEdit = () => setEditingId(null);
+
+  const removeOverride = (empId: string) => {
+    if (onOverride) onOverride(empId, null);
+  };
 
   // Split into: new (ramp-up), active (established with data)
   const mappedEmployees = employees.filter(e => !e.missingAgentMapping);
@@ -95,7 +130,10 @@ export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = f
               <tbody>
                 {sortedEmployees.map((emp) => {
                   const actual = emp.actualSales || 0;
-                  const total = actual + emp.forecastSales;
+                  const override = overrides?.get(emp.employeeId);
+                  const displayForecast = override ? override.override_sales : emp.forecastSales;
+                  const total = actual + displayForecast;
+                  const isEditing = editingId === emp.employeeId;
 
                   // Risk badge logic
                   let riskBadge: { label: string; className: string } | null = null;
@@ -106,6 +144,78 @@ export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = f
                   } else if (emp.expectedSph >= avgSph * 1.2) {
                     riskBadge = { label: "Top", className: "bg-emerald-100 text-emerald-700 border-emerald-200" };
                   }
+
+                  const renderForecastCell = () => {
+                    if (isEditing) {
+                      return (
+                        <div className="flex items-center justify-end gap-1">
+                          <Input
+                            ref={editInputRef}
+                            type="number"
+                            min={0}
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") confirmEdit();
+                              if (e.key === "Escape") cancelEdit();
+                            }}
+                            className="h-7 w-20 text-right text-sm tabular-nums"
+                          />
+                          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={confirmEdit}>
+                            <Check className="h-3.5 w-3.5 text-emerald-600" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={cancelEdit}>
+                            <X className="h-3.5 w-3.5 text-destructive" />
+                          </Button>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="flex items-center justify-end gap-1 group">
+                        {override ? (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="font-semibold tabular-nums px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                                  {displayForecast}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-xs">Beregnet: {emp.forecastSales} | Manuel: {override.override_sales}</p>
+                                {override.note && <p className="text-xs text-muted-foreground">{override.note}</p>}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ) : (
+                          <>
+                            <span className="font-semibold tabular-nums">{displayForecast}</span>
+                            {!hasActuals && (
+                              <span className="text-xs text-muted-foreground">
+                                ({emp.forecastSalesLow}-{emp.forecastSalesHigh})
+                              </span>
+                            )}
+                          </>
+                        )}
+                        {onOverride && (
+                          <button
+                            className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+                            onClick={() => startEdit(emp.employeeId, displayForecast)}
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </button>
+                        )}
+                        {override && onOverride && (
+                          <button
+                            className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                            onClick={() => removeOverride(emp.employeeId)}
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  };
 
                   return (
                     <tr key={emp.employeeId} className="border-b last:border-0 hover:bg-muted/30">
@@ -160,20 +270,13 @@ export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = f
                       {hasActuals ? (
                         <>
                           <td className="py-2.5 text-right tabular-nums font-medium">{actual}</td>
-                          <td className="py-2.5 text-right tabular-nums text-muted-foreground">{emp.forecastSales}</td>
+                          <td className="py-2.5 text-right">{renderForecastCell()}</td>
                           <td className="py-2.5 text-right">
                             <span className="font-semibold tabular-nums">{total}</span>
                           </td>
                         </>
                       ) : (
-                        <td className="py-2.5 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <span className="font-semibold tabular-nums">{emp.forecastSales}</span>
-                            <span className="text-xs text-muted-foreground">
-                              ({emp.forecastSalesLow}-{emp.forecastSalesHigh})
-                            </span>
-                          </div>
-                        </td>
+                        <td className="py-2.5 text-right">{renderForecastCell()}</td>
                       )}
                     </tr>
                   );
