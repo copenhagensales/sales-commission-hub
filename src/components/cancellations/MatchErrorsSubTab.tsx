@@ -546,6 +546,33 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
           </AlertDialogContent>
         </AlertDialog>
       </div>
+
+      {locateDialogRow && (
+        <LocateSaleDialog
+          open={!!locateDialogRow}
+          onOpenChange={(open) => { if (!open) setLocateDialogRow(null); }}
+          row={locateDialogRow.row}
+          clientId={clientId}
+          campaignIds={campaignIds}
+          assignedEmployeeId={
+            (() => {
+              const localValue = localAssignments[locateDialogRow.idx];
+              const sellerValue = sellerField ? String(locateDialogRow.row.rowData[sellerField] ?? "") : "";
+              return localValue ?? mappingsByName.get(sellerValue.toLowerCase()) ?? undefined;
+            })()
+          }
+          assignedEmployeeName={
+            (() => {
+              const localValue = localAssignments[locateDialogRow.idx];
+              const sellerValue = sellerField ? String(locateDialogRow.row.rowData[sellerField] ?? "") : "";
+              const empId = localValue ?? mappingsByName.get(sellerValue.toLowerCase()) ?? "";
+              if (!empId) return undefined;
+              const emp = employees.find(e => e.id === empId);
+              return emp ? `${emp.first_name} ${emp.last_name}` : undefined;
+            })()
+          }
+        />
+      )}
     </div>
   );
 }
