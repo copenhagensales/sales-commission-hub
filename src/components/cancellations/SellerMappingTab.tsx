@@ -160,8 +160,8 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
     enabled: !!clientId,
   });
 
-  // Get unique Excel product names from previous uploads (all types: cancellations + basket corrections)
-  // Also extract from uploaded_data for imports where target_product_name is null (e.g. Eesy FM)
+  // Get unique Excel product names from previous uploads
+  // Reads both target_product_name and uploaded_data for imports where target_product_name is null (e.g. Eesy FM)
   const { data: excelProductNames = [] } = useQuery({
     queryKey: ["excel-product-names", clientId],
     queryFn: async () => {
@@ -177,22 +177,26 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
       for (const row of data || []) {
         if (row.target_product_name) {
           names.add(row.target_product_name);
-        } else if (row.uploaded_data && typeof row.uploaded_data === "object") {
+          continue;
+        }
+        if (row.uploaded_data && typeof row.uploaded_data === "object") {
           const ud = row.uploaded_data as Record<string, unknown>;
-          // Try config-based product columns first, then well-known keys
+          // Try well-known keys first
+          let found = false;
           for (const key of PRODUCT_KEYS) {
             const val = ud[key];
             if (val && typeof val === "string" && val.trim()) {
               names.add(val.trim());
+              found = true;
               break;
             }
           }
-          // Also check all keys case-insensitively for product-like fields
-          if (!Array.from(names).some(n => PRODUCT_KEYS.some(k => ud[k] && String(ud[k]).trim() === n))) {
+          // Case-insensitive fallback
+          if (!found) {
             for (const [k, v] of Object.entries(ud)) {
               const lower = k.toLowerCase();
               if ((lower.includes("subscription") || lower.includes("product") || lower.includes("produkt") || lower.includes("abonnement")) && v && typeof v === "string" && v.trim()) {
-                names.add(v.trim());
+                names.add((v as string).trim());
                 break;
               }
             }
