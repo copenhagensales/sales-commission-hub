@@ -199,6 +199,7 @@ export function ForecastKpiCards({ forecast, clientTarget, danishHolidays = [], 
                           )}
                           {'subtitle' in card && card.subtitle && (
                             <p className="text-xs text-muted-foreground">{card.subtitle}</p>
+                          )}
                         </>
                       )}
                       {!card.isInterval && card.low !== undefined && !card.actualBreakdown && (
