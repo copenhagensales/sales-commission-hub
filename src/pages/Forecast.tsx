@@ -201,6 +201,7 @@ export default function Forecast() {
     }
   };
 
+  const { data: targetData } = useQuery({
     queryKey: ["client-target", selectedClient, periodStart],
     queryFn: async () => {
       if (selectedClient === "all") return null;
