@@ -904,9 +904,9 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
               rows.forEach((s: any) => {
                 const sellerId = s.raw_payload?.fm_seller_id;
                 if (sellerId && allEmployeeIds.has(sellerId)) {
-                  (s.sale_items || []).forEach((si: any) => {
+                  (s.sale_items || []).forEach((si: any, idx: number) => {
                     if (si.products?.counts_as_sale !== false) {
-                      addActualSale(sellerId, s.id, si.quantity || 1, is5GProduct(si));
+                      addActualSaleItem(sellerId, s.id, idx, si.quantity || 1, is5GProduct(si));
                     }
                   });
                 }
@@ -941,9 +941,9 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
                     // Find employee for this email (active or inactive)
                     const empId = emailToEmployeeId.get(email);
                     if (!empId) return;
-                    (s.sale_items || []).forEach((si: any) => {
+                    (s.sale_items || []).forEach((si: any, idx: number) => {
                       if (si.products?.counts_as_sale !== false) {
-                        addActualSale(empId, s.id, si.quantity || 1, is5GProduct(si));
+                        addActualSaleItem(empId, s.id, idx, si.quantity || 1, is5GProduct(si));
                       }
                     });
                   });
