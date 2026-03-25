@@ -63,6 +63,28 @@ export default function Forecast() {
     },
   });
 
+  // Fetch Danish holidays for forecast period
+  const { data: danishHolidays = [] } = useQuery({
+    queryKey: ["danish-holidays-forecast", period],
+    queryFn: async () => {
+      const now = new Date();
+      const target = period === "current"
+        ? now
+        : new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      const y = target.getFullYear();
+      const m = target.getMonth();
+      const start = `${y}-${String(m + 1).padStart(2, '0')}-01`;
+      const end = `${y}-${String(m + 1).padStart(2, '0')}-${new Date(y, m + 1, 0).getDate()}`;
+      const { data, error } = await supabase
+        .from("danish_holiday")
+        .select("date")
+        .gte("date", start)
+        .lte("date", end);
+      if (error) throw error;
+      return (data || []).map((h: any) => h.date as string);
+    },
+  });
+
   // Real forecast data
   const { data: forecastData, isLoading: forecastLoading, refetch } = useClientForecast(selectedClient, period);
   const forecast = forecastData?.forecast;
@@ -291,7 +313,7 @@ export default function Forecast() {
             />
 
             {/* KPI Cards */}
-            <ForecastKpiCards forecast={forecast} clientTarget={targetData ?? undefined} />
+            <ForecastKpiCards forecast={forecast} clientTarget={targetData ?? undefined} danishHolidays={danishHolidays} />
 
 
             {/* Main content grid */}

@@ -8,28 +8,30 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useMemo } from "react";
-import { eachDayOfInterval, isWeekend, parseISO } from "date-fns";
+import { eachDayOfInterval, isWeekend, parseISO, format } from "date-fns";
 
 interface Props {
   forecast: ForecastResult;
   clientTarget?: number;
+  danishHolidays?: string[];
 }
 
-function getWorkingDays(start: string, end: string): number {
+function getWorkingDays(start: string, end: string, holidays: string[] = []): number {
   try {
+    const holidaySet = new Set(holidays);
     const days = eachDayOfInterval({ start: parseISO(start), end: parseISO(end) });
-    return days.filter(d => !isWeekend(d)).length;
+    return days.filter(d => !isWeekend(d) && !holidaySet.has(format(d, 'yyyy-MM-dd'))).length;
   } catch {
     return 22; // fallback
   }
 }
 
-export function ForecastKpiCards({ forecast, clientTarget }: Props) {
+export function ForecastKpiCards({ forecast, clientTarget, danishHolidays = [] }: Props) {
   const hasActualData = forecast.actualSalesToDate !== undefined && forecast.actualSalesToDate > 0;
 
   const workingDays = useMemo(
-    () => getWorkingDays(forecast.periodStart, forecast.periodEnd),
-    [forecast.periodStart, forecast.periodEnd]
+    () => getWorkingDays(forecast.periodStart, forecast.periodEnd, danishHolidays),
+    [forecast.periodStart, forecast.periodEnd, danishHolidays]
   );
 
   const salesPerDay = useMemo(() => {
