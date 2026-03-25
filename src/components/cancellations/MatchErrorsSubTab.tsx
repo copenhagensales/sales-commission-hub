@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
@@ -35,15 +35,24 @@ interface MatchErrorsSubTabProps {
 
 const SELLER_FIELD_CANDIDATES = ["operator", "agent", "sælger", "agent_email", "seller", "agent_name", "employee name", "employee_name"];
 
+/** Create a stable unique key for a row based on importId + rowData hash */
+function rowKey(row: FlatUnmatchedRow): string {
+  // Use a simple deterministic string from importId + sorted JSON of rowData
+  const dataStr = JSON.stringify(
+    Object.entries(row.rowData)
+      .filter(([k]) => k !== "_product_rows")
+      .sort(([a], [b]) => a.localeCompare(b))
+  );
+  return `${row.importId}::${dataStr}`;
+}
+
 function parseFlexibleDate(value: unknown): string | null {
   if (!value) return null;
   const str = String(value).trim();
-  // Try ISO format first
   const isoDate = new Date(str);
   if (!isNaN(isoDate.getTime())) {
     return isoDate.toISOString().split("T")[0];
   }
-  // Try DD-MM-YYYY or DD/MM/YYYY
   const parts = str.split(/[-/.]/);
   if (parts.length === 3) {
     const [a, b, c] = parts;
@@ -57,10 +66,10 @@ function parseFlexibleDate(value: unknown): string | null {
 
 export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [localAssignments, setLocalAssignments] = useState<Record<number, string>>({});
-  const [openPopoverIdx, setOpenPopoverIdx] = useState<number | null>(null);
-  const [locateDialogRow, setLocateDialogRow] = useState<{ row: FlatUnmatchedRow; idx: number } | null>(null);
-  const [ignorePendingIdx, setIgnorePendingIdx] = useState<number | null>(null);
+  const [localAssignments, setLocalAssignments] = useState<Record<string, string>>({});
+  const [openPopoverKey, setOpenPopoverKey] = useState<string | null>(null);
+  const [locateDialogRow, setLocateDialogRow] = useState<{ row: FlatUnmatchedRow; key: string } | null>(null);
+  const [ignorePendingKey, setIgnorePendingKey] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   // Fetch unmatched rows
@@ -166,7 +175,7 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
   }, [existingMappings]);
 
   const upsertMapping = useMutation({
-    mutationFn: async ({ row, rowIndex, employeeId }: { row: FlatUnmatchedRow; rowIndex: number; employeeId: string }) => {
+    mutationFn: async ({ row, rKey, employeeId }: { row: FlatUnmatchedRow; rKey: string; employeeId: string }) => {
       // 1. Save global mapping for future uploads
       const sellerValue = sellerField ? String(row.rowData[sellerField] ?? "") : "";
       if (sellerValue) {
@@ -192,7 +201,6 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
       const dateValue = parseFlexibleDate(row.rowData[dateCol]);
       if (!dateValue) return { matched: 0 };
 
-      // Try matching by agent_email first, then by agent_name for FM sales
       let sales: { id: string }[] | null = null;
 
       if (workEmail) {
@@ -207,7 +215,6 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
         sales = data;
       }
 
-      // Fallback: match by agent_name (FM sales often use name, not email)
       if ((!sales || sales.length === 0) && empFullName) {
         const { data } = await supabase
           .from("sales")
@@ -222,7 +229,6 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
 
       if (!sales || sales.length === 0) return { matched: 0 };
 
-      // Insert into cancellation_queue
       const { error: queueError } = await supabase
         .from("cancellation_queue")
         .insert([{
@@ -238,7 +244,6 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
         return { matched: 0 };
       }
 
-      // Remove this row from unmatched_rows in cancellation_imports
       const { data: importData } = await supabase
         .from("cancellation_imports")
         .select("unmatched_rows")
@@ -329,13 +334,13 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
     },
     onSuccess: () => {
       toast({ title: "Rækken er blevet ignoreret" });
-      setIgnorePendingIdx(null);
+      setIgnorePendingKey(null);
       queryClient.invalidateQueries({ queryKey: ["match-errors", clientId] });
       queryClient.invalidateQueries({ queryKey: ["match-errors-count"] });
     },
     onError: () => {
       toast({ title: "Fejl ved ignorering", variant: "destructive" });
-      setIgnorePendingIdx(null);
+      setIgnorePendingKey(null);
     },
   });
 
@@ -365,6 +370,14 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
     }
     return result;
   }, [rows, searchQuery]);
+
+  // Helper to resolve employee for a given row
+  const getAssignedEmployeeId = useCallback((rk: string, row: FlatUnmatchedRow): string => {
+    const localValue = localAssignments[rk];
+    if (localValue) return localValue;
+    const sellerValue = sellerField ? String(row.rowData[sellerField] ?? "") : "";
+    return mappingsByName.get(sellerValue.toLowerCase()) ?? "";
+  }, [localAssignments, sellerField, mappingsByName]);
 
   if (isLoading) {
     return <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
@@ -408,13 +421,12 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {processed.map((row, idx) => {
-              const localValue = localAssignments[idx];
-              const sellerValue = sellerField ? String(row.rowData[sellerField] ?? "") : "";
-              const currentMapping = localValue ?? mappingsByName.get(sellerValue.toLowerCase()) ?? "";
+            {processed.map((row) => {
+              const rk = rowKey(row);
+              const currentMapping = getAssignedEmployeeId(rk, row);
 
               return (
-                <TableRow key={`${row.importId}-${idx}`}>
+                <TableRow key={rk}>
                   <TableCell>
                     <Badge variant={row.uploadType === "cancellation" ? "destructive" : "secondary"}>
                       {row.uploadType === "cancellation" ? "Annullering" : "Kurvrettelse"}
@@ -426,11 +438,11 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
                         size="sm"
                         variant="outline"
                         className="h-7 text-xs"
-                        onClick={() => setLocateDialogRow({ row, idx })}
+                        onClick={() => setLocateDialogRow({ row, key: rk })}
                       >
                         <SearchCheck className="h-3 w-3 mr-1" /> Lokaliser salg
                       </Button>
-                      {ignorePendingIdx === idx ? (
+                      {ignorePendingKey === rk ? (
                         <div className="flex items-center gap-1">
                           <Button
                             size="sm"
@@ -445,7 +457,7 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
                             size="sm"
                             variant="ghost"
                             className="h-7 w-7 p-0"
-                            onClick={() => setIgnorePendingIdx(null)}
+                            onClick={() => setIgnorePendingKey(null)}
                           >
                             <X className="h-3 w-3" />
                           </Button>
@@ -455,7 +467,7 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
                           size="sm"
                           variant="ghost"
                           className="h-7 text-xs text-muted-foreground"
-                          onClick={() => setIgnorePendingIdx(idx)}
+                          onClick={() => setIgnorePendingKey(rk)}
                         >
                           <Trash2 className="h-3 w-3 mr-1" /> Ignorer
                         </Button>
@@ -465,8 +477,8 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
                   {sellerField && (
                     <TableCell className="min-w-[220px]">
                       <Popover
-                        open={openPopoverIdx === idx}
-                        onOpenChange={(open) => setOpenPopoverIdx(open ? idx : null)}
+                        open={openPopoverKey === rk}
+                        onOpenChange={(open) => setOpenPopoverKey(open ? rk : null)}
                       >
                         <PopoverTrigger asChild>
                           <Button
@@ -496,9 +508,9 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
                                     key={emp.id}
                                     value={`${emp.first_name} ${emp.last_name}`}
                                     onSelect={() => {
-                                      setLocalAssignments(prev => ({ ...prev, [idx]: emp.id }));
-                                      upsertMapping.mutate({ row, rowIndex: idx, employeeId: emp.id });
-                                      setOpenPopoverIdx(null);
+                                      setLocalAssignments(prev => ({ ...prev, [rk]: emp.id }));
+                                      upsertMapping.mutate({ row, rKey: rk, employeeId: emp.id });
+                                      setOpenPopoverKey(null);
                                     }}
                                     className="text-xs"
                                   >
@@ -555,17 +567,11 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
           clientId={clientId}
           campaignIds={campaignIds}
           assignedEmployeeId={
-            (() => {
-              const localValue = localAssignments[locateDialogRow.idx];
-              const sellerValue = sellerField ? String(locateDialogRow.row.rowData[sellerField] ?? "") : "";
-              return localValue ?? mappingsByName.get(sellerValue.toLowerCase()) ?? undefined;
-            })()
+            getAssignedEmployeeId(locateDialogRow.key, locateDialogRow.row) || undefined
           }
           assignedEmployeeName={
             (() => {
-              const localValue = localAssignments[locateDialogRow.idx];
-              const sellerValue = sellerField ? String(locateDialogRow.row.rowData[sellerField] ?? "") : "";
-              const empId = localValue ?? mappingsByName.get(sellerValue.toLowerCase()) ?? "";
+              const empId = getAssignedEmployeeId(locateDialogRow.key, locateDialogRow.row);
               if (!empId) return undefined;
               const emp = employees.find(e => e.id === empId);
               return emp ? `${emp.first_name} ${emp.last_name}` : undefined;
