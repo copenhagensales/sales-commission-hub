@@ -12,6 +12,7 @@ import { toast } from "@/hooks/use-toast";
 import { Trash2, Users, Loader2, Package, Plus, Check, ChevronsUpDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { ProductAutoMatch } from "./ProductAutoMatch";
 
 interface SellerMappingTabProps {
   clientId: string;
@@ -369,6 +370,7 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
           >
             <Plus className="h-4 w-4 mr-1" /> Tilføj
           </Button>
+          <ProductAutoMatch clientId={clientId} availableExcelNames={availableExcelNames} products={products} />
         </div>
 
         {/* Existing mappings */}
