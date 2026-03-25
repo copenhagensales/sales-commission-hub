@@ -268,9 +268,10 @@ export function forecastNewEmployeeHybrid(
   if (w > 0 && emp.weeklySalesPerHour.length >= 2) {
     const rawEmpiricalSph = calculateEwmaSph(emp.weeklySalesPerHour);
 
-    // Guardrail: clamp empirical SPH to [0.6x, 1.4x] of ramp-expected SPH
-    const clampLow = rampedSph * 0.6;
-    const clampHigh = rampedSph * 1.4;
+    // Guardrail: clamp empirical SPH to [0.6x, 1.4x] of campaign baseline SPH
+    // Using baselineSph (not rampedSph) so high-performing new hires aren't suppressed by low ramp factors
+    const clampLow = baselineSph * 0.6;
+    const clampHigh = baselineSph * 1.4;
     const clampedEmpiricalSph = Math.max(clampLow, Math.min(clampHigh, rawEmpiricalSph));
 
     finalSph = (1 - w) * rampedSph + w * clampedEmpiricalSph;
