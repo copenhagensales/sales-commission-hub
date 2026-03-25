@@ -900,6 +900,48 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
         console.log("[handleMatch] productMatched (pass 1):", productMatched.length);
 
+        // --- PASS 1b: FM phone matching via customer_phone directly ---
+        // For rows that have a phone but weren't matched in Pass 1 (FM sales don't have raw_payload.data phone fields)
+        filteredData.forEach((row, idx) => {
+          if (matchedIndicesLocal.has(idx)) return; // already matched in pass 1
+
+          const rawExcelPhone = phoneColumn !== "__none__" ? getCaseInsensitive(row.originalRow, phoneColumn) : null;
+          if (!rawExcelPhone) return; // phone-less rows handled in pass 2
+          const excelPhone = normalizePhone(String(rawExcelPhone));
+          if (!excelPhone) return;
+
+          for (const sale of candidateSales) {
+            if (existingIds.has(sale.id)) continue;
+            const salePhone = normalizePhone(sale.customer_phone || "");
+            if (!salePhone || salePhone !== excelPhone) continue;
+
+            // Direct phone match found (typically FM sales)
+            const allItems = saleItemsMap.get(sale.id) || [];
+            const firstItem = allItems[0];
+            const key = `${sale.id}|${firstItem?.adversus_product_title || "direct-phone"}`;
+            if (matchedSaleProductKeys.has(key)) continue;
+            matchedSaleProductKeys.add(key);
+            matchedIndicesLocal.add(idx);
+            productMatched.push({
+              saleId: sale.id,
+              phone: sale.customer_phone || "",
+              company: sale.customer_company || "",
+              oppNumber: "",
+              saleDate: sale.sale_datetime || "",
+              employee: sale.agent_name || "Ukendt",
+              currentStatus: sale.validation_status || "pending",
+              uploadedRowData: row.originalRow,
+              targetProductName: firstItem?.adversus_product_title || "Ukendt produkt",
+              realProductName: firstItem?.adversus_product_title || "Ukendt produkt",
+              commission: firstItem?.mapped_commission ?? undefined,
+              revenue: firstItem?.mapped_revenue ?? undefined,
+            });
+            break; // one match per row
+          }
+        });
+
+        console.log("[handleMatch] productMatched (after pass 1b FM):", productMatched.length);
+
         // --- PASS 2: Seller + Date + Product fallback for phone-less rows ---
         const sellerCol = activeConfig?.seller_column;
         const dateCol = activeConfig?.date_column;
@@ -942,7 +984,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
             const rawExcelPhone = phoneColumn !== "__none__" ? getCaseInsensitive(row.originalRow, phoneColumn) : null;
             const excelPhone = rawExcelPhone ? normalizePhone(String(rawExcelPhone)) : "";
-            if (excelPhone) return; // has phone → should have been matched in pass 1
+            if (excelPhone) return; // has phone → should have been matched in pass 1 or 1b
 
             const excelSeller = String(getCaseInsensitive(row.originalRow, sellerCol) || "").trim();
             const excelDate = String(getCaseInsensitive(row.originalRow, dateCol) || "").trim();
