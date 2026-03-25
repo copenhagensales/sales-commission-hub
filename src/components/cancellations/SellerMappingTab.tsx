@@ -434,7 +434,7 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
         )}
 
         {/* Existing mappings */}
-        {mappings.length === 0 && availableExcelNames.length === 0 ? (
+        {mappings.length === 0 && unmappedUploadNames.length === 0 ? (
           <div className="py-8 text-center text-muted-foreground">
             <Package className="h-12 w-12 mx-auto mb-4 opacity-40" />
             <p className="font-medium">Ingen produkt-mappings endnu</p>
