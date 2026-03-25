@@ -1,43 +1,39 @@
 
 
-# Problem: Hybrid-blending trækker stadig stærke nye sælgere ned
+# Inkludér danske helligdage i arbejdsdags-beregning
 
-## Årsag
-Formlen `finalSph = (1 - w) * rampedSph + w * empiricalSph` blander **altid** den lave ramp-SPH ind — selv når vi har pålidelige data.
+## Problem
+`getWorkingDays()` i `ForecastKpiCards.tsx` tæller kun hverdage minus weekender. Danske helligdage (påske, Kr. Himmelfart, pinse, juledag osv.) ignoreres, hvilket giver et for højt antal arbejdsdage — og dermed et for lavt "salg/dag"-krav.
 
-For Jacob Cenni med w ≈ 0.8:
-- `rampedSph` = 0.83 × 0.31 = **0.26** (gennemsnit for alle nye)
-- `empiricalSph` ≈ **0.72** (hans faktiske performance)
-- `finalSph` = 0.2 × 0.26 + 0.8 × 0.72 = **0.63**
+## Fix
 
-De 20% ramp-komponent trækker ham fra 0.72 ned til 0.63 — et tab på ~13%. Over en hel måned med ~140 timer bliver det ~12-13 salg tabt "i modellen", bare fordi gennemsnittet for nye sælgere er lavt.
+### 1. `src/components/forecast/ForecastKpiCards.tsx`
+- Fetch danske helligdage fra `danish_holiday`-tabellen for forecast-perioden (allerede brugt andre steder i appen, f.eks. `useEmployeeWorkingDays`)
+- Opdatér `getWorkingDays` til også at filtrere helligdage fra
+- Alternativt: flyt helligdage-fetch op i `Forecast.tsx` og send dem som prop
 
-Ved 130 faktiske salg i indeværende måned ville man forvente ~120-130 næste måned — ikke ~81.
+### Tilgang
+Da `ForecastKpiCards` er en ren presentationskomponent, er det renere at:
+1. Tilføje et `danishHolidays` prop til `ForecastKpiCards`
+2. Fetche helligdage i `Forecast.tsx` (ligesom `MyGoals.tsx` allerede gør)
+3. Sende dem ned som prop
+4. Opdatere `getWorkingDays()` til at modtage en liste af helligdagsdatoer og ekskludere dem
 
-## Fix: Asymmetrisk blending
-
-Når empirisk SPH er **højere** end ramp-SPH og reliability er tilstrækkelig (w > 0.5), bør ramp-komponenten ikke trække ned. Ramp eksisterer for at estimere performance når vi mangler data — ikke for at straffe gode sælgere.
-
-**Ny logik i `forecastNewEmployeeHybrid()`:**
-
+### Konkret ændring i `getWorkingDays`:
 ```ts
-// Hvis empirisk > ramp OG reliability er høj: brug ren empirisk (med guardrails)
-// Hvis empirisk < ramp: behold blending (ramp beskytter mod pessimistisk data)
-if (clampedEmpiricalSph >= rampedSph && w >= 0.5) {
-  finalSph = clampedEmpiricalSph;  // Trust proven performance
-} else {
-  finalSph = (1 - w) * rampedSph + w * clampedEmpiricalSph;  // Blend as before
+function getWorkingDays(start: string, end: string, holidays: string[] = []): number {
+  const holidaySet = new Set(holidays);
+  const days = eachDayOfInterval({ start: parseISO(start), end: parseISO(end) });
+  return days.filter(d => !isWeekend(d) && !holidaySet.has(format(d, 'yyyy-MM-dd'))).length;
 }
 ```
 
-Effekt for Jacob: `finalSph ≈ 0.72`, forecast ≈ 0.72 × 140 × 0.92 ≈ **93 salg** (+ evt. momentum-boost → ~100-107).
-
-Effekt for svage nye sælgere: uændret — ramp-blending beskytter stadig mod urealistisk lav empiri.
-
-## Ændringer
-
+## Berørte filer
 | Fil | Ændring |
 |-----|---------|
-| `src/lib/calculations/forecast.ts` | Tilføj asymmetrisk blend-check (~5 linjer i `forecastNewEmployeeHybrid`) |
-| `src/lib/calculations/__tests__/forecast-hybrid.test.ts` | Tilføj test for asymmetrisk case |
+| `src/pages/Forecast.tsx` | Fetch `danish_holiday` for forecast-perioden, send som prop |
+| `src/components/forecast/ForecastKpiCards.tsx` | Modtag `danishHolidays` prop, ekskludér dem i `getWorkingDays` |
+
+## Effekt
+April 2026: 22 hverdage → **19 arbejdsdage** (minus Skærtorsdag, Langfredag, 2. Påskedag). Salg/dag-tallet stiger tilsvarende og bliver mere realistisk.
 
