@@ -1,47 +1,47 @@
 
 
-## Refactor: Two-Step Product Mapping (Column → Values)
+## Show All 3 Columns' Values at Once in the Dialog
 
-### Current Behavior
-The dialog shows all Excel column headers as checkboxes. User maps column names directly to a product.
+### Problem
+Currently the dialog forces a two-step flow: pick a column first, then see its values. The user wants to see and select values from all 3 columns (Operator, Subscription Name, Sales Department) simultaneously.
 
-### New Behavior
-1. **Step 1 — Pick Column**: Dialog shows only 3 hardcoded columns: **Operator**, **Subscription Name**, **Sales Department**
-2. **Step 2 — Pick Values**: After selecting a column, fetch all unique values from that column across uploaded data (`cancellation_queue.uploaded_data` + `cancellation_imports.unmatched_rows`), and show them as checkboxes
-3. User selects which values map to the internal product (multiple allowed)
-4. Save stores the selected values (not the column name) as `excel_product_name` in `cancellation_product_mappings`
+### Solution
+Remove the column-selection step. Instead, show all 3 columns as collapsible/accordion sections in the dialog, each listing its values as checkboxes. The user can pick values from any combination of columns in one view.
 
-### Technical Changes
+### Changes — `src/components/cancellations/SellerMappingTab.tsx`
 
-**File: `src/components/cancellations/SellerMappingTab.tsx`**
+1. **Remove `selectedColumn` state** — no longer needed.
 
-- **Replace `excelColumns` query** with a new query that fetches unique values per column. For each row in `cancellation_queue` and `cancellation_imports.unmatched_rows`, extract values for the 3 allowed columns
-- **Add state**: `selectedColumn: string | null` to track which column is being drilled into
-- **Dialog redesign**:
-  - Step 1: Show 3 clickable column options (Operator, Subscription Name, Sales Department)
-  - Step 2: When a column is clicked, show all unique values from that column as checkboxes (with back button)
-  - Keep manual "Tilføj nyt navn" input
-- **Update unmapped overview**: Show unmapped values (not column names) as badges
-- **Keep save logic** unchanged — it already stores string values as `excel_product_name`
+2. **Replace the two-step dialog body** (lines 478-553) with a single scrollable view containing 3 sections:
+   - Each section has a bold header (e.g. "Operator") and lists all unique values from that column as checkbox rows.
+   - All sections are visible at once — no drill-down needed.
+   - Checked state uses the same `checkedNames` set across all columns.
 
-### UI Flow
+3. **Keep the manual input** ("Tilføj nyt navn manuelt") at the bottom, outside the column sections.
+
+4. **Keep save logic unchanged** — it already handles any set of string values.
+
+### UI Sketch
 ```text
-[Select product] → Dialog opens
-  ┌──────────────────────────┐
-  │ Vælg kolonne:            │
-  │  ▸ Operator              │
-  │  ▸ Subscription Name     │
-  │  ▸ Sales Department      │
-  └──────────────────────────┘
-       ↓ click "Operator"
-  ┌──────────────────────────┐
-  │ ← Tilbage                │
-  │ Værdier fra "Operator":  │
-  │  ☑ TDC                   │
-  │  ☐ Telia                  │
-  │  ☑ 3                     │
-  │  ☐ Yousee                │
-  └──────────────────────────┘
-       ↓ Gem
+┌──────────────────────────────────┐
+│ Tilknyt værdier til "Produkt X"  │
+│                                  │
+│ Operator                         │
+│  ☑ TDC                           │
+│  ☐ Telia                         │
+│  ☐ Yousee                        │
+│                                  │
+│ Subscription Name                │
+│  ☐ 5G Internet                   │
+│  ☑ Mobil 99                      │
+│                                  │
+│ Sales Department                 │
+│  ☐ Dept A                        │
+│  ☐ Dept B                        │
+│                                  │
+│ [Tilføj nyt navn manuelt...] [+] │
+│                                  │
+│         Annuller    Gem (2 valgt) │
+└──────────────────────────────────┘
 ```
 
