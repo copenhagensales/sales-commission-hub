@@ -1,36 +1,27 @@
 
 
-# Fejl: Cohort-baseline SPH er forkert — bruger globalt gennemsnit
+# Cohort-forecast: Weekend-fix + Ramp-recalibrering — IMPLEMENTERET
 
-## Problem
-Linje 680-688 i `useClientForecast.ts` beregner `baselineSph` som gennemsnittet af **alle** etablerede sælgeres SPH. Denne bruges direkte som `campaignBaselineSph` for cohorts (linje 701).
+## Ændringer udført
 
-Hvis f.eks. TDC-sælgere har høj SPH, trækker det gennemsnittet op, og nye Eesy TM-hold forecaster med en SPH der ikke matcher Eesy TM's virkelighed.
+### 1. Weekend/helligdags-fix (`src/lib/calculations/forecast.ts`)
+- `dailyHours` beregnes nu som `weeklyHours / 5` (hverdage) i stedet for `/7`
+- Simuleringen skipper weekender (lør+søn) og helligdage
+- `activeDays` i resultatet viser nu kun faktiske arbejdsdage
 
-### Eksempel-beregning med nuværende kode
-Antag `baselineSph = 0.7` (globalt gennemsnit), `dailyHours = 5.29`, `attendance = 0.92`:
+### 2. Holidays videregives (`src/hooks/useClientForecast.ts`)
+- `holidayDates` (Set<string>) sendes nu med i `CohortForecastInput`
 
-**Hold 1 (7 pers, start 31/3, 30 aktive dage i april):**
-- Dag 1-7: 7 × 0.95 survival × 5.29 × 0.92 × 0.7 × 0.65 = ~14.5 salg
-- Dag 8-14: 7 × 0.85 survival × 5.29 × 0.92 × 0.7 × 0.95 = ~19.4 salg
-- Dag 15-30: 7 × ~0.67 survival × 5.29 × 0.92 × 0.7 × 1.0 × 16 dage = ~29.2 salg
-- **Total hold 1: ~63 salg**
+### 3. Type-opdatering (`src/types/forecast.ts`)
+- `holidays?: Set<string>` tilføjet til `CohortForecastInput`
 
-Men empirisk laver de ~41 salg/måned ved steady state (uge 3-4). Det indikerer en reel SPH på ~0.26, ikke 0.7.
+### 4. Ramp-profil recalibreret (database)
+Eesy TM ramp-profil opdateret fra relative-til-sig-selv til relative-til-etableret-SPH:
+- Uge 1: 65% → **20%**
+- Uge 2: 95% → **30%**
+- Uge 3-4: 100% → **31%**
+- Dag 31-60: 100% → **31%**
+- Steady state: 100% → **31%**
 
-## Løsning
-Beregn `campaignBaselineSph` **pr. kampagne** i stedet for globalt:
-
-1. I `useClientForecast.ts`: Når cohort har et `client_campaign_id`, beregn baseline kun fra etablerede sælgere tilknyttet **den kampagnes teams**
-2. Fallback til globalt gennemsnit kun når ingen kampagne-specifikke sælgere findes
-3. Brug `teamCampaignMap` (som allerede eksisterer) til at filtrere
-
-### Ændringer
-- **`src/hooks/useClientForecast.ts`** (~15 linjer):
-  - Byg et map `campaignId → avgSph` fra etablerede sælgere
-  - I `cohortInputs.map()`: brug kampagne-specifik SPH hvis tilgængelig
-  - Log/eksponér den brugte baseline i cohort-resultatet (allerede understøttet via `baselineSph` i `CohortForecastResult`)
-
-## Effekt
-Eesy TM-cohorts bruger Eesy TM-sælgeres faktiske SPH i stedet for et oppustet globalt gennemsnit. Forecast-tallet falder markant og matcher den empiriske ~41 salg/måned ved steady state.
-
+## Forventet effekt
+Cohort-forecast for 15 Eesy TM-sælgere bør falde fra ~876 til ~80-115 salg.
