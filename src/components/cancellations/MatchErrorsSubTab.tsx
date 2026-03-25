@@ -428,6 +428,28 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
           </TableBody>
         </Table>
       </div>
+
+      <div className="flex justify-end">
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button size="sm" variant="destructive" disabled={ignoreAllMutation.isPending || processed.length === 0}>
+              <Trash2 className="h-4 w-4 mr-1" /> Ignorer alle
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Bekræft ignorering</AlertDialogTitle>
+              <AlertDialogDescription>
+                Er du sikker på at du vil ignorere alle fejlede rækker? De vil blive fjernet permanent.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annuller</AlertDialogCancel>
+              <AlertDialogAction onClick={() => ignoreAllMutation.mutate()}>Ignorer alle</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
     </div>
   );
 }
