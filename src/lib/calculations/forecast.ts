@@ -227,7 +227,9 @@ export function forecastNewEmployee(
 // ============================================================================
 
 /**
- * Calculate forecast for a new hire cohort.
+ * Calculate forecast for a new hire cohort using week-by-week simulation.
+ * Instead of a single midpoint ramp/survival, this iterates day by day,
+ * applying the correct ramp and survival factor for each day.
  */
 export function forecastCohort(input: CohortForecastInput): CohortForecastResult {
   const { cohort, rampProfile, survivalProfile, campaignBaselineSph, weeklyHoursPerHead, attendanceFactor, periodStart, periodEnd } = input;
@@ -235,18 +237,15 @@ export function forecastCohort(input: CohortForecastInput): CohortForecastResult
   const cohortStart = new Date(cohort.start_date);
   const pStart = new Date(periodStart);
   const pEnd = new Date(periodEnd);
-  const now = new Date();
   
   // Effective start = latest of cohort start and period start
   const effectiveStart = cohortStart > pStart ? cohortStart : pStart;
-  // Effective end = earliest of period end and now (for current period)
-  const effectiveEnd = pEnd < now ? pEnd : now > pStart ? (now < pEnd ? pEnd : pEnd) : pEnd;
+  const effectiveEnd = pEnd;
   
   // Days the cohort actually works within this period
-  const daysInPeriod = Math.max(0, Math.floor((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)));
-  const weeksInPeriod = daysInPeriod / 7;
+  const activeDays = Math.max(0, Math.floor((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)));
   
-  if (weeksInPeriod <= 0) {
+  if (activeDays <= 0) {
     return {
       cohortId: cohort.id,
       startDate: cohort.start_date,
@@ -259,32 +258,58 @@ export function forecastCohort(input: CohortForecastInput): CohortForecastResult
       forecastSalesLow: 0,
       forecastSalesHigh: 0,
       note: cohort.note,
+      activeDays: 0,
+      weightedRampFactor: 0,
+      weightedSurvivalFactor: 1,
+      baselineSph: campaignBaselineSph,
     };
   }
   
-  const daysSinceStart = Math.max(0, Math.floor((now.getTime() - cohortStart.getTime()) / (1000 * 60 * 60 * 24)));
-  // Use mid-point of their active period for ramp/survival
-  const avgDays = daysSinceStart + Math.round(daysInPeriod / 2);
+  // Day-by-day simulation
+  const dailyHours = (weeklyHoursPerHead / 7); // hours per head per calendar day
+  let totalSales = 0;
+  let totalHours = 0;
+  let rampSum = 0;
+  let survivalSum = 0;
   
-  const rampFactor = getRampFactor(avgDays, rampProfile);
-  const survivalFactor = getSurvivalFactor(avgDays, survivalProfile);
+  for (let d = 0; d < activeDays; d++) {
+    // How many days since cohort started for this particular day
+    const daysSinceCohortStart = Math.max(0, Math.floor((effectiveStart.getTime() - cohortStart.getTime()) / (1000 * 60 * 60 * 24))) + d;
+    
+    const dayRamp = getRampFactor(daysSinceCohortStart, rampProfile);
+    const daySurvival = getSurvivalFactor(daysSinceCohortStart, survivalProfile);
+    
+    rampSum += dayRamp;
+    survivalSum += daySurvival;
+    
+    const headsToday = cohort.planned_headcount * daySurvival;
+    const hoursToday = headsToday * dailyHours * attendanceFactor;
+    const salesToday = hoursToday * campaignBaselineSph * dayRamp;
+    
+    totalHours += hoursToday;
+    totalSales += salesToday;
+  }
   
-  const effectiveHeads = cohort.planned_headcount * survivalFactor;
-  const forecastHours = effectiveHeads * weeklyHoursPerHead * weeksInPeriod * attendanceFactor;
-  const expected = forecastHours * campaignBaselineSph * rampFactor;
+  const weightedRampFactor = rampSum / activeDays;
+  const weightedSurvivalFactor = survivalSum / activeDays;
+  const effectiveHeads = cohort.planned_headcount * weightedSurvivalFactor;
   
   return {
     cohortId: cohort.id,
     startDate: cohort.start_date,
     plannedHeadcount: cohort.planned_headcount,
     effectiveHeads: Math.round(effectiveHeads * 10) / 10,
-    rampFactor,
-    survivalFactor,
-    forecastHours: Math.round(forecastHours),
-    forecastSales: Math.round(expected),
-    forecastSalesLow: Math.round(expected * LOW_FACTOR),
-    forecastSalesHigh: Math.round(expected * HIGH_FACTOR),
+    rampFactor: weightedRampFactor,
+    survivalFactor: weightedSurvivalFactor,
+    forecastHours: Math.round(totalHours),
+    forecastSales: Math.round(totalSales),
+    forecastSalesLow: Math.round(totalSales * LOW_FACTOR),
+    forecastSalesHigh: Math.round(totalSales * HIGH_FACTOR),
     note: cohort.note,
+    activeDays,
+    weightedRampFactor,
+    weightedSurvivalFactor,
+    baselineSph: campaignBaselineSph,
   };
 }
 
