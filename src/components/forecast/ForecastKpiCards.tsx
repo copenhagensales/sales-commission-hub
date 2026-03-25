@@ -31,6 +31,13 @@ export function ForecastKpiCards({ forecast, clientTarget, danishHolidays = [], 
   const effectiveTotal = overrideTotal ?? forecast.totalSalesExpected;
   const hasActualData = forecast.actualSalesToDate !== undefined && forecast.actualSalesToDate > 0;
 
+  // Scale Low/High proportionally when overrides are applied
+  const scaleFactor = overrideTotal && forecast.totalSalesExpected > 0
+    ? overrideTotal / forecast.totalSalesExpected
+    : 1;
+  const effectiveLow = Math.round(forecast.totalSalesLow * scaleFactor);
+  const effectiveHigh = Math.round(forecast.totalSalesHigh * scaleFactor);
+
   const workingDays = useMemo(
     () => getWorkingDays(forecast.periodStart, forecast.periodEnd, danishHolidays),
     [forecast.periodStart, forecast.periodEnd, danishHolidays]
@@ -55,8 +62,8 @@ export function ForecastKpiCards({ forecast, clientTarget, danishHolidays = [], 
     {
       label: "Forventet salg",
       value: effectiveTotal,
-      low: forecast.totalSalesLow,
-      high: forecast.totalSalesHigh,
+      low: effectiveLow,
+      high: effectiveHigh,
       unit: "salg",
       icon: ShoppingCart,
       tooltip: hasActualData
@@ -130,8 +137,8 @@ export function ForecastKpiCards({ forecast, clientTarget, danishHolidays = [], 
     {
       label: "Forecast-interval",
       value: effectiveTotal,
-      low: forecast.totalSalesLow,
-      high: forecast.totalSalesHigh,
+      low: effectiveLow,
+      high: effectiveHigh,
       unit: "",
       icon: BarChart3,
       tooltip: "Low = P20 scenarie, High = P80 scenarie.",
