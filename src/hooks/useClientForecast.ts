@@ -120,12 +120,20 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
       const employeeTeamMap = new Map(members.map(m => [m.employee_id, m.team_id]));
 
       // 3. Employee info + agent emails + team names
-      const [empRes, agentRes, teamsRes] = await Promise.all([
+      // Also fetch inactive employees who stopped during/after the forecast period
+      // so their actual sales are counted in "actual sales to date"
+      const [empRes, inactiveEmpRes, agentRes, teamsRes] = await Promise.all([
         supabase
           .from("employee_master_data")
           .select("id, first_name, last_name, team_id, avatar_url, employment_start_date, work_email, employment_end_date, expected_monthly_shifts")
           .in("id", employeeIds)
           .eq("is_active", true),
+        supabase
+          .from("employee_master_data")
+          .select("id, first_name, last_name, team_id, work_email, employment_end_date")
+          .in("id", employeeIds)
+          .eq("is_active", false)
+          .gte("employment_end_date", forecastStartStr),
         supabase
           .from("employee_agent_mapping")
           .select("employee_id, agent_id, agents(email)")
@@ -134,7 +142,8 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
       ]);
 
       const employees = empRes.data || [];
-      if (!employees.length) {
+      const inactiveEmployees = inactiveEmpRes.data || [];
+      if (!employees.length && !inactiveEmployees.length) {
         return {
           forecast: emptyForecast(forecastStartStr, forecastEndStr, clientId),
           cohorts: [],
@@ -145,9 +154,11 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
       }
 
       const activeIds = employees.map(e => e.id);
+      // allEmployeeIds includes both active + stopped employees (for actual sales attribution)
+      const allEmployeeIds = new Set([...activeIds, ...inactiveEmployees.map(e => e.id)]);
       const teamNameMap = new Map((teamsRes.data || []).map(t => [t.id, t.name]));
 
-      // Build employee -> agent emails map
+      // Build employee -> agent emails map (includes both active and inactive)
       const empEmailMap = new Map<string, string[]>();
       (agentRes.data || []).forEach((m: any) => {
         const email = m.agents?.email;
@@ -161,6 +172,12 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
       for (const emp of employees) {
         if (!empEmailMap.has(emp.id) && (emp as any).work_email) {
           empEmailMap.set(emp.id, [(emp as any).work_email.toLowerCase()]);
+        }
+      }
+      // Also add work_email fallback for inactive employees
+      for (const emp of inactiveEmployees) {
+        if (!empEmailMap.has(emp.id) && emp.work_email) {
+          empEmailMap.set(emp.id, [emp.work_email.toLowerCase()]);
         }
       }
 
@@ -876,7 +893,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
               const rows = fmData || [];
               rows.forEach((s: any) => {
                 const sellerId = s.raw_payload?.fm_seller_id;
-                if (sellerId && activeIds.includes(sellerId)) {
+                if (sellerId && allEmployeeIds.has(sellerId)) {
                   (s.sale_items || []).forEach((si: any) => {
                     if (si.products?.counts_as_sale !== false) {
                       addActualSale(sellerId, s.id, si.quantity || 1, is5GProduct(si));
@@ -911,8 +928,8 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
                   rows.forEach((s: any) => {
                     const email = s.agent_email?.toLowerCase();
                     if (!email) return;
-                    // Find employee for this email
-                    const empId = employees.find(e => (empEmailMap.get(e.id) || []).includes(email))?.id;
+                    // Find employee for this email (active or inactive)
+                    const empId = emailToEmployeeId.get(email);
                     if (!empId) return;
                     (s.sale_items || []).forEach((si: any) => {
                       if (si.products?.counts_as_sale !== false) {
