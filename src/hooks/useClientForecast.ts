@@ -685,16 +685,39 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         ? employeePerformances.reduce((s, e) => s + e.personalAttendanceFactor, 0) / employeePerformances.length
         : 0.92;
 
-      // Baseline SPH = average SPH of established employees
+      // Baseline SPH: compute per-client (campaign-specific) averages
+      // Global fallback
       const establishedSphs = employeePerformances
         .filter(e => e.isEstablished && e.weeklySalesPerHour.some(s => s > 0))
         .map(e => {
           const sum = e.weeklySalesPerHour.reduce((a, b) => a + b, 0);
           return sum / e.weeklySalesPerHour.length;
         });
-      const baselineSph = establishedSphs.length > 0
+      const globalBaselineSph = establishedSphs.length > 0
         ? establishedSphs.reduce((a, b) => a + b, 0) / establishedSphs.length
         : 0.45;
+
+      // Per-client SPH: group established employees by their team's client
+      const clientSphMap = new Map<string, number[]>();
+      for (const emp of employeePerformances) {
+        if (!emp.isEstablished || !emp.weeklySalesPerHour.some(s => s > 0)) continue;
+        const teamId = employeeTeamMap.get(emp.employeeId);
+        const empClientId = teamId ? teamClientMap.get(teamId) : undefined;
+        if (!empClientId) continue;
+        if (!clientSphMap.has(empClientId)) clientSphMap.set(empClientId, []);
+        const avgSph = emp.weeklySalesPerHour.reduce((a, b) => a + b, 0) / emp.weeklySalesPerHour.length;
+        clientSphMap.get(empClientId)!.push(avgSph);
+      }
+
+      // Helper: get baseline SPH for a campaign
+      function getCampaignBaselineSph(campaignId: string | null): number {
+        if (!campaignId) return globalBaselineSph;
+        const cClientId = campaignClientMap.get(campaignId);
+        if (!cClientId) return globalBaselineSph;
+        const sphs = clientSphMap.get(cClientId);
+        if (!sphs || sphs.length === 0) return globalBaselineSph;
+        return sphs.reduce((a, b) => a + b, 0) / sphs.length;
+      }
 
       const cohortInputs: CohortForecastInput[] = cohorts.map(c => {
         // Use campaign-specific ramp profile if available for this cohort's campaign
@@ -707,7 +730,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           survivalProfile: (c.client_campaign_id && campaignSurvivalMap.has(c.client_campaign_id))
             ? campaignSurvivalMap.get(c.client_campaign_id)!
             : activeSurvivalProfile,
-          campaignBaselineSph: baselineSph,
+          campaignBaselineSph: getCampaignBaselineSph(c.client_campaign_id),
           weeklyHoursPerHead: DEFAULT_WEEKLY_HOURS,
           attendanceFactor: avgAttendance,
           periodStart: format(forecastStart, "yyyy-MM-dd"),
