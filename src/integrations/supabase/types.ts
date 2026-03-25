@@ -1606,6 +1606,45 @@ export type Database = {
           },
         ]
       }
+      cancellation_product_mappings: {
+        Row: {
+          client_id: string
+          created_at: string | null
+          excel_product_name: string
+          id: string
+          product_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string | null
+          excel_product_name: string
+          id?: string
+          product_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string | null
+          excel_product_name?: string
+          id?: string
+          product_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cancellation_product_mappings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cancellation_product_mappings_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cancellation_queue: {
         Row: {
           client_id: string | null
