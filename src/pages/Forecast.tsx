@@ -342,6 +342,7 @@ export default function Forecast() {
               clientTarget={targetData}
               onTargetChange={(t) => upsertTarget.mutate(t)}
               showTarget={selectedClient !== "all"}
+              overrideTotal={overrideAdjustedTotal}
             />
 
             {/* Progress bar (current period only) */}

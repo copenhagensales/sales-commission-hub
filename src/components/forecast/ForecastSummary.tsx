@@ -12,12 +12,13 @@ interface Props {
   clientTarget?: number | null;
   onTargetChange?: (target: number) => void;
   showTarget?: boolean;
+  overrideTotal?: number;
 }
 
-export function ForecastSummary({ forecast, periodLabel, isCurrentPeriod, clientTarget, onTargetChange, showTarget }: Props) {
+export function ForecastSummary({ forecast, periodLabel, isCurrentPeriod, clientTarget, onTargetChange, showTarget, overrideTotal }: Props) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
-  const totalSales = forecast.totalSalesExpected;
+  const totalSales = overrideTotal ?? forecast.totalSalesExpected;
   const numEmployees = forecast.establishedEmployees.length;
   const numCohorts = forecast.cohorts.length;
   const absenceLoss = forecast.absenceLoss;
