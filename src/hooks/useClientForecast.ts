@@ -175,6 +175,10 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
       // both agent_email AND fm_seller_id are only counted once per employee.
       // Build: salesByEmployeeByWeek Map<employeeId, Map<weekKey, count>>
       const salesByEmployeeByWeek = new Map<string, Map<number, number>>();
+      // Track 5G Internet sales separately for product split (Eesy FM)
+      const isEesyFm = clientId === EESY_FM_CLIENT_ID;
+      const sales5GByEmployee = new Map<string, number>(); // total 5G sales per employee (historical)
+      const salesTotalByEmployee = new Map<string, number>(); // total all sales per employee (historical)
 
       // Build reverse lookup: email -> employeeId
       const emailToEmployeeId = new Map<string, string>();
@@ -186,6 +190,11 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
 
       // Track attributed sale item IDs per employee to prevent double-counting
       const attributedSaleItems = new Map<string, Set<string>>(); // empId -> Set<saleId:itemIdx>
+
+      function is5GProduct(si: any): boolean {
+        const productName = si.products?.name || si.adversus_product_title || '';
+        return productName.toLowerCase().includes('5g internet');
+      }
 
       function attributeSaleItems(empId: string, sale: any) {
         const saleDate = new Date(sale.sale_datetime);
@@ -202,9 +211,19 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           if (si.products?.counts_as_sale === false) return;
           seen.add(itemKey);
 
+          const qty = si.quantity || 1;
+
           if (!salesByEmployeeByWeek.has(empId)) salesByEmployeeByWeek.set(empId, new Map());
           const weekMap = salesByEmployeeByWeek.get(empId)!;
-          weekMap.set(weekKey, (weekMap.get(weekKey) || 0) + (si.quantity || 1));
+          weekMap.set(weekKey, (weekMap.get(weekKey) || 0) + qty);
+
+          // Track 5G split for Eesy FM
+          if (isEesyFm) {
+            salesTotalByEmployee.set(empId, (salesTotalByEmployee.get(empId) || 0) + qty);
+            if (is5GProduct(si)) {
+              sales5GByEmployee.set(empId, (sales5GByEmployee.get(empId) || 0) + qty);
+            }
+          }
         });
       }
 
