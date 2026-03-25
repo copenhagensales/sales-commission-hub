@@ -1095,6 +1095,26 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         enableHybrid,
       );
 
+      // Add product split for Eesy FM (future period)
+      if (isEesyFm) {
+        const globalHistTotal = Array.from(salesTotalByEmployee.values()).reduce((s, v) => s + v, 0);
+        const globalHist5G = Array.from(sales5GByEmployee.values()).reduce((s, v) => s + v, 0);
+        const globalRatio5G = globalHistTotal > 0 ? globalHist5G / globalHistTotal : 0;
+        forecast.totalSales5G = Math.round(forecast.totalSalesExpected * globalRatio5G);
+        forecast.totalSalesSubs = forecast.totalSalesExpected - forecast.totalSales5G;
+        // Apply per-employee split
+        forecast.establishedEmployees = forecast.establishedEmployees.map(emp => {
+          const histTotal = salesTotalByEmployee.get(emp.employeeId) || 0;
+          const hist5G = sales5GByEmployee.get(emp.employeeId) || 0;
+          const ratio5G = histTotal > 0 ? hist5G / histTotal : globalRatio5G;
+          return {
+            ...emp,
+            forecastSales5G: Math.round(emp.forecastSales * ratio5G),
+            forecastSalesSubs: emp.forecastSales - Math.round(emp.forecastSales * ratio5G),
+          };
+        });
+      }
+
       return {
         forecast,
         cohorts,
