@@ -610,9 +610,9 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           const starters = teamStarters.get(teamName) || { entered0_60: 1, entered61_180: 1, entered180plus: 1 };
           const rates: TenureBucketRates = {
             // Monthly rate = exits / (people who entered bucket) / months observed
-            bucket0_60: Math.min(exits.bucket0_60 / (Math.max(starters.entered0_60, 1) * monthsObserved), 0.25),
-            bucket61_180: Math.min(exits.bucket61_180 / (Math.max(starters.entered61_180, 1) * monthsObserved), 0.12),
-            bucket180plus: Math.min(exits.bucket180plus / (Math.max(starters.entered180plus, 1) * monthsObserved), 0.05),
+            bucket0_60: Math.min(exits.bucket0_60 / (Math.max(starters.entered0_60, 1) * monthsObserved), 1.0),
+            bucket61_180: Math.min(exits.bucket61_180 / (Math.max(starters.entered61_180, 1) * monthsObserved), 1.0),
+            bucket180plus: Math.min(exits.bucket180plus / (Math.max(starters.entered180plus, 1) * monthsObserved), 1.0),
           };
           teamChurnRates.set(teamName, rates);
         }
