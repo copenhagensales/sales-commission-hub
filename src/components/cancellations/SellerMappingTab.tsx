@@ -161,17 +161,46 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
   });
 
   // Get unique Excel product names from previous uploads (all types: cancellations + basket corrections)
+  // Also extract from uploaded_data for imports where target_product_name is null (e.g. Eesy FM)
   const { data: excelProductNames = [] } = useQuery({
     queryKey: ["excel-product-names", clientId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("cancellation_queue")
-        .select("target_product_name")
-        .eq("client_id", clientId)
-        .not("target_product_name", "is", null);
+        .select("target_product_name, uploaded_data")
+        .eq("client_id", clientId);
       if (error) throw error;
-      const unique = [...new Set((data || []).map(d => d.target_product_name).filter(Boolean))] as string[];
-      return unique;
+
+      const names = new Set<string>();
+      const PRODUCT_KEYS = ["Subscription Name", "Product", "Produkt", "Abonnement", "Product Name", "Produktnavn"];
+
+      for (const row of data || []) {
+        if (row.target_product_name) {
+          names.add(row.target_product_name);
+        } else if (row.uploaded_data && typeof row.uploaded_data === "object") {
+          const ud = row.uploaded_data as Record<string, unknown>;
+          // Try config-based product columns first, then well-known keys
+          for (const key of PRODUCT_KEYS) {
+            const val = ud[key];
+            if (val && typeof val === "string" && val.trim()) {
+              names.add(val.trim());
+              break;
+            }
+          }
+          // Also check all keys case-insensitively for product-like fields
+          if (!Array.from(names).some(n => PRODUCT_KEYS.some(k => ud[k] && String(ud[k]).trim() === n))) {
+            for (const [k, v] of Object.entries(ud)) {
+              const lower = k.toLowerCase();
+              if ((lower.includes("subscription") || lower.includes("product") || lower.includes("produkt") || lower.includes("abonnement")) && v && typeof v === "string" && v.trim()) {
+                names.add(v.trim());
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      return [...names];
     },
     enabled: !!clientId,
   });
