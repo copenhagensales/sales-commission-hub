@@ -59,7 +59,7 @@ export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = f
   const mappedEmployees = employees.filter(e => !e.missingAgentMapping);
   const newEmployees = mappedEmployees.filter(e => e.isNew);
   const establishedMapped = mappedEmployees.filter(e => !e.isNew);
-  const activeEmployees = establishedMapped.filter(e => e.expectedSph > 0 || (e.actualSales || 0) > 0);
+  const activeEmployees = establishedMapped.filter(e => e.expectedSph > 0 || (e.actualSales || 0) > 0 || e.plannedHours > 0);
 
   const hasActuals = isCurrentPeriod && activeEmployees.some(e => (e.actualSales || 0) > 0);
 

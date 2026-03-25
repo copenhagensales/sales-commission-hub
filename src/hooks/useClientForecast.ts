@@ -165,8 +165,8 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
 
       const allEmails = [...new Set(Array.from(empEmailMap.values()).flat())];
 
-      // 4. Get weekly sales for the past 8 weeks
-      const weeksAgo8 = subWeeks(now, EWMA_WEEKS);
+      // 4. Get weekly sales for the past 12 weeks (extended for fallback lookback)
+      const weeksAgo8 = subWeeks(now, 12);
       const salesStartStr = format(weeksAgo8, "yyyy-MM-dd");
       const salesEndStr = format(now, "yyyy-MM-dd");
 
@@ -469,11 +469,17 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         return 0;
       }
 
-      // 6. Build EmployeePerformance for each active employee
+        // 6. Build EmployeePerformance for each active employee
       // For EWMA: get SPH per week (sales / shifts / 7.5)
+      // Use extended window (up to 12 weeks) to find valid weeks for employees with heavy absence
+      const EXTENDED_EWMA_WEEKS = 12;
       const weekStarts: Date[] = [];
       for (let i = 0; i < EWMA_WEEKS; i++) {
         weekStarts.push(startOfWeek(subWeeks(now, i + 1), { weekStartsOn: 1 }));
+      }
+      const extendedWeekStarts: Date[] = [];
+      for (let i = EWMA_WEEKS; i < EXTENDED_EWMA_WEEKS; i++) {
+        extendedWeekStarts.push(startOfWeek(subWeeks(now, i + 1), { weekStartsOn: 1 }));
       }
 
       const employeePerformances: EmployeePerformance[] = [];
@@ -530,6 +536,29 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           validWeekCount++;
         }
 
+        // Fallback: if no valid weeks in standard window, try extended lookback (up to 12 weeks)
+        if (weeklySph.length === 0) {
+          for (const ws of extendedWeekStarts) {
+            const we = endOfWeek(ws, { weekStartsOn: 1 });
+            const shiftsInWeek = countShifts(emp.id, ws, we, true);
+            if (shiftsInWeek < normalWeeklyShifts * 0.5) continue;
+            const hoursInWeek = shiftsInWeek * HOURS_PER_SHIFT;
+            let salesInWeek = 0;
+            const empWeekMap = salesByEmployeeByWeek.get(emp.id);
+            if (empWeekMap) {
+              salesInWeek = empWeekMap.get(ws.getTime()) || 0;
+            }
+            const concreteShiftsInWeek = countConcreteShifts(emp.id, ws, we);
+            if (salesInWeek === 0 && concreteShiftsInWeek === 0) continue;
+            if (salesInWeek === 0 && shiftsInWeek <= 2) continue;
+            const sph = hoursInWeek > 0 ? salesInWeek / hoursInWeek : 0;
+            weeklySph.push(sph);
+            totalHoursWorked += hoursInWeek;
+            totalSalesCount += salesInWeek;
+            validWeekCount++;
+          }
+        }
+
         // Planned hours for forecast month (gross = full capacity, net = minus absences)
         // Use empForecastEnd to cap hours for employees with planned departure
         let grossShifts = countShifts(emp.id, forecastStart, empForecastEnd, false);
@@ -570,6 +599,28 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           totalSalesCount,
           validWeekCount,
         });
+      }
+
+      // 6a-fallback. For established employees with no valid EWMA weeks, use team average SPH
+      const teamSphSums = new Map<string, { total: number; count: number }>();
+      for (const ep of employeePerformances) {
+        if (!ep.isEstablished || ep.weeklySalesPerHour.length === 0 || !ep.teamName) continue;
+        const avgSph = ep.weeklySalesPerHour.reduce((a, b) => a + b, 0) / ep.weeklySalesPerHour.length;
+        if (avgSph > 0) {
+          const entry = teamSphSums.get(ep.teamName) || { total: 0, count: 0 };
+          entry.total += avgSph;
+          entry.count++;
+          teamSphSums.set(ep.teamName, entry);
+        }
+      }
+      for (const ep of employeePerformances) {
+        if (ep.isEstablished && ep.weeklySalesPerHour.length === 0 && ep.teamName) {
+          const teamAvg = teamSphSums.get(ep.teamName);
+          if (teamAvg && teamAvg.count > 0) {
+            // Use team average as a single-entry fallback SPH
+            ep.weeklySalesPerHour = [teamAvg.total / teamAvg.count];
+          }
+        }
       }
 
       // 6b. Fetch team churn rates from historical_employment (last 12 months)
