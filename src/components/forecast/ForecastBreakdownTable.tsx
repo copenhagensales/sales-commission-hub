@@ -273,32 +273,61 @@ export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = f
                           <td className="py-2.5 text-right">{renderForecastCell()}</td>
                           <td className="py-2.5 text-right">
                             <span className="font-semibold tabular-nums">{total}</span>
+                            {emp.forecastSalesSubs !== undefined && (
+                              <p className="text-[10px] text-muted-foreground font-normal">
+                                A:{(emp.actualSalesSubs || 0) + (emp.forecastSalesSubs || 0)} · 5G:{(emp.actualSales5G || 0) + (emp.forecastSales5G || 0)}
+                              </p>
+                            )}
                           </td>
                         </>
                       ) : (
-                        <td className="py-2.5 text-right">{renderForecastCell()}</td>
+                        <td className="py-2.5 text-right">
+                          {renderForecastCell()}
+                          {emp.forecastSalesSubs !== undefined && (
+                            <p className="text-[10px] text-muted-foreground">
+                              Abon: {emp.forecastSalesSubs} · 5G: {emp.forecastSales5G}
+                            </p>
+                          )}
+                        </td>
                       )}
                     </tr>
                   );
                 })}
               </tbody>
               <tfoot>
-                <tr className="border-t font-semibold">
-                  <td className="pt-2">Total</td>
-                  <td className="pt-2 text-right tabular-nums">{activeEmployees.reduce((s, e) => s + e.plannedHours, 0)}</td>
-                  <td className="pt-2 text-right">—</td>
-                  <td className="pt-2 text-right">—</td>
-                  <td className="pt-2 text-right">—</td>
-                  {hasActuals ? (
-                    <>
-                      <td className="pt-2 text-right tabular-nums">{activeEmployees.reduce((s, e) => s + (e.actualSales || 0), 0)}</td>
-                      <td className="pt-2 text-right tabular-nums">{activeEmployees.reduce((s, e) => s + (overrides?.get(e.employeeId)?.override_sales ?? e.forecastSales), 0)}</td>
-                      <td className="pt-2 text-right tabular-nums">{activeEmployees.reduce((s, e) => s + (e.actualSales || 0) + (overrides?.get(e.employeeId)?.override_sales ?? e.forecastSales), 0)}</td>
-                    </>
-                  ) : (
-                    <td className="pt-2 text-right tabular-nums">{activeEmployees.reduce((s, e) => s + (overrides?.get(e.employeeId)?.override_sales ?? e.forecastSales), 0)}</td>
-                  )}
-                </tr>
+                {(() => {
+                  const hasProductSplit = activeEmployees.some(e => e.forecastSalesSubs !== undefined);
+                  const totalSubs = hasProductSplit ? activeEmployees.reduce((s, e) => s + (e.forecastSalesSubs || 0), 0) : undefined;
+                  const total5G = hasProductSplit ? activeEmployees.reduce((s, e) => s + (e.forecastSales5G || 0), 0) : undefined;
+                  return (
+                    <tr className="border-t font-semibold">
+                      <td className="pt-2">Total</td>
+                      <td className="pt-2 text-right tabular-nums">{activeEmployees.reduce((s, e) => s + e.plannedHours, 0)}</td>
+                      <td className="pt-2 text-right">—</td>
+                      <td className="pt-2 text-right">—</td>
+                      <td className="pt-2 text-right">—</td>
+                      {hasActuals ? (
+                        <>
+                          <td className="pt-2 text-right tabular-nums">{activeEmployees.reduce((s, e) => s + (e.actualSales || 0), 0)}</td>
+                          <td className="pt-2 text-right tabular-nums">{activeEmployees.reduce((s, e) => s + (overrides?.get(e.employeeId)?.override_sales ?? e.forecastSales), 0)}</td>
+                          <td className="pt-2 text-right">
+                            <span className="tabular-nums">{activeEmployees.reduce((s, e) => s + (e.actualSales || 0) + (overrides?.get(e.employeeId)?.override_sales ?? e.forecastSales), 0)}</span>
+                            {hasProductSplit && totalSubs !== undefined && total5G !== undefined && (
+                              <p className="text-xs font-normal text-muted-foreground">Abon: {totalSubs} · 5G: {total5G}</p>
+                            )}
+                          </td>
+                        </>
+                      ) : (
+                        <td className="pt-2 text-right">
+                          <span className="tabular-nums">{activeEmployees.reduce((s, e) => s + (overrides?.get(e.employeeId)?.override_sales ?? e.forecastSales), 0)}</span>
+                          {hasProductSplit && totalSubs !== undefined && total5G !== undefined && (
+                            <p className="text-xs font-normal text-muted-foreground">Abon: {totalSubs} · 5G: {total5G}</p>
+                          )}
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })()}
               </tfoot>
             </table>
           </div>

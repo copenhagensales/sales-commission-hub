@@ -23,6 +23,7 @@ import type {
 const HOURS_PER_SHIFT = 7.5;
 const EWMA_WEEKS = 4;
 const DEFAULT_WEEKLY_HOURS = 37;
+const EESY_FM_CLIENT_ID = "9a92ea4c-6404-4b58-be08-065e7552d552";
 
 /**
  * Hook that computes a real forecast for a given client (or "all" clients).
@@ -174,6 +175,10 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
       // both agent_email AND fm_seller_id are only counted once per employee.
       // Build: salesByEmployeeByWeek Map<employeeId, Map<weekKey, count>>
       const salesByEmployeeByWeek = new Map<string, Map<number, number>>();
+      // Track 5G Internet sales separately for product split (Eesy FM)
+      const isEesyFm = clientId === EESY_FM_CLIENT_ID;
+      const sales5GByEmployee = new Map<string, number>(); // total 5G sales per employee (historical)
+      const salesTotalByEmployee = new Map<string, number>(); // total all sales per employee (historical)
 
       // Build reverse lookup: email -> employeeId
       const emailToEmployeeId = new Map<string, string>();
@@ -185,6 +190,11 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
 
       // Track attributed sale item IDs per employee to prevent double-counting
       const attributedSaleItems = new Map<string, Set<string>>(); // empId -> Set<saleId:itemIdx>
+
+      function is5GProduct(si: any): boolean {
+        const productName = si.products?.name || si.adversus_product_title || '';
+        return productName.toLowerCase().includes('5g internet');
+      }
 
       function attributeSaleItems(empId: string, sale: any) {
         const saleDate = new Date(sale.sale_datetime);
@@ -201,9 +211,19 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           if (si.products?.counts_as_sale === false) return;
           seen.add(itemKey);
 
+          const qty = si.quantity || 1;
+
           if (!salesByEmployeeByWeek.has(empId)) salesByEmployeeByWeek.set(empId, new Map());
           const weekMap = salesByEmployeeByWeek.get(empId)!;
-          weekMap.set(weekKey, (weekMap.get(weekKey) || 0) + (si.quantity || 1));
+          weekMap.set(weekKey, (weekMap.get(weekKey) || 0) + qty);
+
+          // Track 5G split for Eesy FM
+          if (isEesyFm) {
+            salesTotalByEmployee.set(empId, (salesTotalByEmployee.get(empId) || 0) + qty);
+            if (is5GProduct(si)) {
+              sales5GByEmployee.set(empId, (sales5GByEmployee.get(empId) || 0) + qty);
+            }
+          }
         });
       }
 
@@ -214,7 +234,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         for (const campaignBatch of campaignChunks) {
           const { data: fmSalesData } = await supabase
             .from("sales")
-            .select("id, raw_payload, agent_email, sale_datetime, sale_items!inner(quantity, product_id, products(counts_as_sale))")
+            .select("id, raw_payload, agent_email, sale_datetime, sale_items!inner(quantity, product_id, products(counts_as_sale, name))")
             .eq("source", "fieldmarketing")
             .gte("sale_datetime", salesStartStr)
             .lte("sale_datetime", salesEndStr + "T23:59:59")
@@ -236,7 +256,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
             for (const campaignBatch of campaignChunks) {
               const { data: salesData } = await supabase
                 .from("sales")
-                .select("id, agent_email, sale_datetime, sale_items!inner(quantity, product_id, products(counts_as_sale))")
+                .select("id, agent_email, sale_datetime, sale_items!inner(quantity, product_id, products(counts_as_sale, name))")
                 .gte("sale_datetime", salesStartStr)
                 .lte("sale_datetime", salesEndStr + "T23:59:59")
                 .in("agent_email", emailBatch)
@@ -822,13 +842,17 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         
         // Fetch actual sales this month — FM + email based with dedup
         const actualSalesPerEmployee = new Map<string, number>();
+        const actual5GPerEmployee = new Map<string, number>(); // 5G Internet actual sales
         const countedSaleIds = new Set<string>();
 
-        const addActualSale = (empId: string, saleId: string, qty: number) => {
+        const addActualSale = (empId: string, saleId: string, qty: number, is5G: boolean) => {
           if (countedSaleIds.has(saleId)) return;
           countedSaleIds.add(saleId);
           actualSalesToDate += qty;
           actualSalesPerEmployee.set(empId, (actualSalesPerEmployee.get(empId) || 0) + qty);
+          if (isEesyFm && is5G) {
+            actual5GPerEmployee.set(empId, (actual5GPerEmployee.get(empId) || 0) + qty);
+          }
         };
 
         if (campaignIds.length > 0) {
@@ -841,7 +865,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
             while (true) {
               const { data: fmData } = await supabase
                 .from("sales")
-                .select("id, raw_payload, sale_items!inner(quantity, products(counts_as_sale))")
+                .select("id, raw_payload, sale_items!inner(quantity, products(counts_as_sale, name))")
                 .eq("source", "fieldmarketing")
                 .gte("sale_datetime", forecastStartStr)
                 .lte("sale_datetime", todayStr + "T23:59:59")
@@ -855,7 +879,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
                 if (sellerId && activeIds.includes(sellerId)) {
                   (s.sale_items || []).forEach((si: any) => {
                     if (si.products?.counts_as_sale !== false) {
-                      addActualSale(sellerId, s.id, si.quantity || 1);
+                      addActualSale(sellerId, s.id, si.quantity || 1, is5GProduct(si));
                     }
                   });
                 }
@@ -875,7 +899,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
                 while (true) {
                   const { data: actualSalesData } = await supabase
                     .from("sales")
-                    .select("id, agent_email, sale_items!inner(quantity, products(counts_as_sale))")
+                    .select("id, agent_email, sale_items!inner(quantity, products(counts_as_sale, name))")
                     .gte("sale_datetime", forecastStartStr)
                     .lte("sale_datetime", todayStr + "T23:59:59")
                     .in("agent_email", emailBatch)
@@ -892,7 +916,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
                     if (!empId) return;
                     (s.sale_items || []).forEach((si: any) => {
                       if (si.products?.counts_as_sale !== false) {
-                        addActualSale(empId, s.id, si.quantity || 1);
+                        addActualSale(empId, s.id, si.quantity || 1, is5GProduct(si));
                       }
                     });
                   });
@@ -939,11 +963,26 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         // Combine: actual + remaining
         const totalExpected = actualSalesToDate + remainingForecast.totalSalesExpected;
         
-        // Enrich established employees with actual sales
-        const enrichedEmployees = remainingForecast.establishedEmployees.map(emp => ({
-          ...emp,
-          actualSales: actualSalesPerEmployee.get(emp.employeeId) || 0,
-        }));
+        // Enrich established employees with actual sales + product split
+        const enrichedEmployees = remainingForecast.establishedEmployees.map(emp => {
+          const actualTotal = actualSalesPerEmployee.get(emp.employeeId) || 0;
+          const actual5G = actual5GPerEmployee.get(emp.employeeId) || 0;
+          const empResult: any = {
+            ...emp,
+            actualSales: actualTotal,
+          };
+          if (isEesyFm) {
+            // Compute 5G ratio from historical data for this employee
+            const histTotal = salesTotalByEmployee.get(emp.employeeId) || 0;
+            const hist5G = sales5GByEmployee.get(emp.employeeId) || 0;
+            const ratio5G = histTotal > 0 ? hist5G / histTotal : 0;
+            empResult.forecastSales5G = Math.round(emp.forecastSales * ratio5G);
+            empResult.forecastSalesSubs = emp.forecastSales - empResult.forecastSales5G;
+            empResult.actualSales5G = actual5G;
+            empResult.actualSalesSubs = actualTotal - actual5G;
+          }
+          return empResult;
+        });
         
         const combinedForecast: ForecastResult = {
           ...remainingForecast,
@@ -959,6 +998,21 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           daysElapsed,
           daysRemaining,
         };
+
+        // Add product split totals for Eesy FM
+        if (isEesyFm) {
+          const totalActual5G = Array.from(actual5GPerEmployee.values()).reduce((s, v) => s + v, 0);
+          const totalActualSubs = actualSalesToDate - totalActual5G;
+          // Use global historical ratio for forecast split
+          const globalHistTotal = Array.from(salesTotalByEmployee.values()).reduce((s, v) => s + v, 0);
+          const globalHist5G = Array.from(sales5GByEmployee.values()).reduce((s, v) => s + v, 0);
+          const globalRatio5G = globalHistTotal > 0 ? globalHist5G / globalHistTotal : 0;
+          const forecast5G = Math.round(remainingForecast.totalSalesExpected * globalRatio5G);
+          combinedForecast.totalSales5G = totalActual5G + forecast5G;
+          combinedForecast.totalSalesSubs = totalExpected - combinedForecast.totalSales5G;
+          combinedForecast.actualSales5G = totalActual5G;
+          combinedForecast.actualSalesSubs = totalActualSubs;
+        }
         
         // Calculate full-month absence loss for drivers
         let fullMonthKnownAbsenceLoss = 0;
@@ -1040,6 +1094,26 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         true, // isFuturePeriod — apply momentum correction
         enableHybrid,
       );
+
+      // Add product split for Eesy FM (future period)
+      if (isEesyFm) {
+        const globalHistTotal = Array.from(salesTotalByEmployee.values()).reduce((s, v) => s + v, 0);
+        const globalHist5G = Array.from(sales5GByEmployee.values()).reduce((s, v) => s + v, 0);
+        const globalRatio5G = globalHistTotal > 0 ? globalHist5G / globalHistTotal : 0;
+        forecast.totalSales5G = Math.round(forecast.totalSalesExpected * globalRatio5G);
+        forecast.totalSalesSubs = forecast.totalSalesExpected - forecast.totalSales5G;
+        // Apply per-employee split
+        forecast.establishedEmployees = forecast.establishedEmployees.map(emp => {
+          const histTotal = salesTotalByEmployee.get(emp.employeeId) || 0;
+          const hist5G = sales5GByEmployee.get(emp.employeeId) || 0;
+          const ratio5G = histTotal > 0 ? hist5G / histTotal : globalRatio5G;
+          return {
+            ...emp,
+            forecastSales5G: Math.round(emp.forecastSales * ratio5G),
+            forecastSalesSubs: emp.forecastSales - Math.round(emp.forecastSales * ratio5G),
+          };
+        });
+      }
 
       return {
         forecast,

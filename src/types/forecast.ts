@@ -121,6 +121,11 @@ export interface EmployeeForecastResult {
   reliabilityWeight?: number;
   empiricalSph?: number;
   hybridBlend?: boolean;
+  // Product split (Eesy FM: 5G Internet vs Subscriptions)
+  forecastSalesSubs?: number;
+  forecastSales5G?: number;
+  actualSalesSubs?: number;
+  actualSales5G?: number;
 }
 
 // ============================================================================
@@ -176,6 +181,12 @@ export interface ForecastResult {
   remainingForecast?: number;
   daysElapsed?: number;
   daysRemaining?: number;
+
+  // Product split (Eesy FM: 5G Internet vs Subscriptions)
+  totalSalesSubs?: number;
+  totalSales5G?: number;
+  actualSalesSubs?: number;
+  actualSales5G?: number;
 
   // Breakdowns
   establishedEmployees: EmployeeForecastResult[];
