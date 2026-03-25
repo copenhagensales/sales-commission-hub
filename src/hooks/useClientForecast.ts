@@ -34,7 +34,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
   // Normalize period to monthOffset for backward compat
   const monthOffset = typeof period === "number" ? period : period === "current" ? 0 : 1;
 
-  const FORECAST_LOGIC_VERSION = 7; // bump: week-by-week cohort simulation
+  const FORECAST_LOGIC_VERSION = 8; // bump: fix inactive emp source + item-level dedup
   return useQuery({
     queryKey: ["client-forecast", clientId, monthOffset, FORECAST_LOGIC_VERSION],
     queryFn: async (): Promise<{
@@ -122,16 +122,19 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
       // 3. Employee info + agent emails + team names
       // Also fetch inactive employees who stopped during/after the forecast period
       // so their actual sales are counted in "actual sales to date"
+      // NOTE: Inactive employees are NO LONGER in team_members (removed on deactivation),
+      // so we query employee_master_data directly using last_team_id / team_id.
       const [empRes, inactiveEmpRes, agentRes, teamsRes] = await Promise.all([
         supabase
           .from("employee_master_data")
           .select("id, first_name, last_name, team_id, avatar_url, employment_start_date, work_email, employment_end_date, expected_monthly_shifts")
           .in("id", employeeIds)
           .eq("is_active", true),
+        // Fetch stopped employees via last_team_id (set by trigger on deactivation)
+        // or team_id, filtering by teams relevant to this client
         supabase
           .from("employee_master_data")
-          .select("id, first_name, last_name, team_id, work_email, employment_end_date")
-          .in("id", employeeIds)
+          .select("id, first_name, last_name, team_id, last_team_id, work_email, employment_end_date")
           .eq("is_active", false)
           .gte("employment_end_date", forecastStartStr),
         supabase
@@ -142,7 +145,12 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
       ]);
 
       const employees = empRes.data || [];
-      const inactiveEmployees = inactiveEmpRes.data || [];
+      // Filter inactive employees: their last_team_id or team_id must match one of our teamIds
+      const teamIdSet = new Set(teamIds);
+      const inactiveEmployees = (inactiveEmpRes.data || []).filter((e: any) => {
+        const relevantTeam = e.last_team_id || e.team_id;
+        return relevantTeam && teamIdSet.has(relevantTeam);
+      });
       if (!employees.length && !inactiveEmployees.length) {
         return {
           forecast: emptyForecast(forecastStartStr, forecastEndStr, clientId),
@@ -155,12 +163,23 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
 
       const activeIds = employees.map(e => e.id);
       // allEmployeeIds includes both active + stopped employees (for actual sales attribution)
-      const allEmployeeIds = new Set([...activeIds, ...inactiveEmployees.map(e => e.id)]);
+      const inactiveIds = inactiveEmployees.map(e => e.id);
+      const allEmployeeIds = new Set([...activeIds, ...inactiveIds]);
       const teamNameMap = new Map((teamsRes.data || []).map(t => [t.id, t.name]));
+
+      // Fetch agent mappings for inactive employees too (not covered by initial agentRes)
+      let inactiveAgentMappings: any[] = [];
+      if (inactiveIds.length > 0) {
+        const { data } = await supabase
+          .from("employee_agent_mapping")
+          .select("employee_id, agent_id, agents(email)")
+          .in("employee_id", inactiveIds);
+        inactiveAgentMappings = data || [];
+      }
 
       // Build employee -> agent emails map (includes both active and inactive)
       const empEmailMap = new Map<string, string[]>();
-      (agentRes.data || []).forEach((m: any) => {
+      [...(agentRes.data || []), ...inactiveAgentMappings].forEach((m: any) => {
         const email = m.agents?.email;
         if (email) {
           if (!empEmailMap.has(m.employee_id)) empEmailMap.set(m.employee_id, []);
@@ -860,11 +879,13 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         // Fetch actual sales this month — FM + email based with dedup
         const actualSalesPerEmployee = new Map<string, number>();
         const actual5GPerEmployee = new Map<string, number>(); // 5G Internet actual sales
-        const countedSaleIds = new Set<string>();
+        // Dedup at sale_item level (not sale level!) so multi-item sales count all items
+        const countedSaleItemKeys = new Set<string>();
 
-        const addActualSale = (empId: string, saleId: string, qty: number, is5G: boolean) => {
-          if (countedSaleIds.has(saleId)) return;
-          countedSaleIds.add(saleId);
+        const addActualSaleItem = (empId: string, saleId: string, itemIdx: number, qty: number, is5G: boolean) => {
+          const itemKey = `${saleId}:${itemIdx}`;
+          if (countedSaleItemKeys.has(itemKey)) return;
+          countedSaleItemKeys.add(itemKey);
           actualSalesToDate += qty;
           actualSalesPerEmployee.set(empId, (actualSalesPerEmployee.get(empId) || 0) + qty);
           if (isEesyFm && is5G) {
@@ -894,9 +915,9 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
               rows.forEach((s: any) => {
                 const sellerId = s.raw_payload?.fm_seller_id;
                 if (sellerId && allEmployeeIds.has(sellerId)) {
-                  (s.sale_items || []).forEach((si: any) => {
+                  (s.sale_items || []).forEach((si: any, idx: number) => {
                     if (si.products?.counts_as_sale !== false) {
-                      addActualSale(sellerId, s.id, si.quantity || 1, is5GProduct(si));
+                      addActualSaleItem(sellerId, s.id, idx, si.quantity || 1, is5GProduct(si));
                     }
                   });
                 }
@@ -931,9 +952,9 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
                     // Find employee for this email (active or inactive)
                     const empId = emailToEmployeeId.get(email);
                     if (!empId) return;
-                    (s.sale_items || []).forEach((si: any) => {
+                    (s.sale_items || []).forEach((si: any, idx: number) => {
                       if (si.products?.counts_as_sale !== false) {
-                        addActualSale(empId, s.id, si.quantity || 1, is5GProduct(si));
+                        addActualSaleItem(empId, s.id, idx, si.quantity || 1, is5GProduct(si));
                       }
                     });
                   });
