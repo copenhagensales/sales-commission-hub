@@ -25,6 +25,7 @@ import { MOCK_RAMP_PROFILE, MOCK_SURVIVAL_PROFILE } from "@/lib/calculations/for
 import { useClientForecast } from "@/hooks/useClientForecast";
 import { useForecastVsActual } from "@/hooks/useForecastVsActual";
 import { useEmployeeForecastOverrides } from "@/hooks/useEmployeeForecastOverrides";
+import { useFmWeeklyForecast } from "@/hooks/useFmWeeklyForecast";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { ClientForecastCohort } from "@/types/forecast";
