@@ -82,6 +82,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           forecast: emptyForecast(forecastStartStr, forecastEndStr, clientId),
           cohorts: [],
           calculatedAt: now.toISOString(),
+          activeRampProfile: MOCK_RAMP_PROFILE,
         };
       }
 
@@ -96,6 +97,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           forecast: emptyForecast(forecastStartStr, forecastEndStr, clientId),
           cohorts: [],
           calculatedAt: now.toISOString(),
+          activeRampProfile: MOCK_RAMP_PROFILE,
         };
       }
 
@@ -122,6 +124,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           forecast: emptyForecast(forecastStartStr, forecastEndStr, clientId),
           cohorts: [],
           calculatedAt: now.toISOString(),
+          activeRampProfile: MOCK_RAMP_PROFILE,
         };
       }
 
@@ -851,6 +854,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           forecast: combinedForecast,
           cohorts,
           calculatedAt: now.toISOString(),
+          activeRampProfile,
         };
       }
 
@@ -872,6 +876,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         forecast,
         cohorts,
         calculatedAt: now.toISOString(),
+        activeRampProfile,
       };
     },
     staleTime: 0,
