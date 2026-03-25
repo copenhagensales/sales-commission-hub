@@ -53,30 +53,39 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
       let teamIds: string[] = [];
       let campaignIds: string[] = [];
 
+      // teamClientMap: teamId → clientId (used later for campaign-specific SPH)
+      const teamClientMap = new Map<string, string>();
+      // campaignClientMap: campaignId → clientId
+      const campaignClientMap = new Map<string, string>();
+
       if (clientId === "all") {
         const { data: allTeamClients } = await supabase
           .from("team_clients")
           .select("team_id, client_id");
         teamIds = [...new Set((allTeamClients || []).map(tc => tc.team_id))];
         const clientIds = [...new Set((allTeamClients || []).map(tc => tc.client_id))];
+        (allTeamClients || []).forEach(tc => teamClientMap.set(tc.team_id, tc.client_id));
         if (clientIds.length > 0) {
           const { data: campaigns } = await supabase
             .from("client_campaigns")
-            .select("id")
+            .select("id, client_id")
             .in("client_id", clientIds);
           campaignIds = (campaigns || []).map(c => c.id);
+          (campaigns || []).forEach(c => campaignClientMap.set(c.id, c.client_id));
         }
       } else {
         const { data: teamClients } = await supabase
           .from("team_clients")
-          .select("team_id")
+          .select("team_id, client_id")
           .eq("client_id", clientId);
         teamIds = (teamClients || []).map(tc => tc.team_id);
+        (teamClients || []).forEach(tc => teamClientMap.set(tc.team_id, tc.client_id));
         const { data: campaigns } = await supabase
           .from("client_campaigns")
-          .select("id")
+          .select("id, client_id")
           .eq("client_id", clientId);
         campaignIds = (campaigns || []).map(c => c.id);
+        (campaigns || []).forEach(c => campaignClientMap.set(c.id, c.client_id));
       }
 
       if (teamIds.length === 0) {
@@ -676,16 +685,39 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         ? employeePerformances.reduce((s, e) => s + e.personalAttendanceFactor, 0) / employeePerformances.length
         : 0.92;
 
-      // Baseline SPH = average SPH of established employees
+      // Baseline SPH: compute per-client (campaign-specific) averages
+      // Global fallback
       const establishedSphs = employeePerformances
         .filter(e => e.isEstablished && e.weeklySalesPerHour.some(s => s > 0))
         .map(e => {
           const sum = e.weeklySalesPerHour.reduce((a, b) => a + b, 0);
           return sum / e.weeklySalesPerHour.length;
         });
-      const baselineSph = establishedSphs.length > 0
+      const globalBaselineSph = establishedSphs.length > 0
         ? establishedSphs.reduce((a, b) => a + b, 0) / establishedSphs.length
         : 0.45;
+
+      // Per-client SPH: group established employees by their team's client
+      const clientSphMap = new Map<string, number[]>();
+      for (const emp of employeePerformances) {
+        if (!emp.isEstablished || !emp.weeklySalesPerHour.some(s => s > 0)) continue;
+        const teamId = employeeTeamMap.get(emp.employeeId);
+        const empClientId = teamId ? teamClientMap.get(teamId) : undefined;
+        if (!empClientId) continue;
+        if (!clientSphMap.has(empClientId)) clientSphMap.set(empClientId, []);
+        const avgSph = emp.weeklySalesPerHour.reduce((a, b) => a + b, 0) / emp.weeklySalesPerHour.length;
+        clientSphMap.get(empClientId)!.push(avgSph);
+      }
+
+      // Helper: get baseline SPH for a campaign
+      function getCampaignBaselineSph(campaignId: string | null): number {
+        if (!campaignId) return globalBaselineSph;
+        const cClientId = campaignClientMap.get(campaignId);
+        if (!cClientId) return globalBaselineSph;
+        const sphs = clientSphMap.get(cClientId);
+        if (!sphs || sphs.length === 0) return globalBaselineSph;
+        return sphs.reduce((a, b) => a + b, 0) / sphs.length;
+      }
 
       const cohortInputs: CohortForecastInput[] = cohorts.map(c => {
         // Use campaign-specific ramp profile if available for this cohort's campaign
@@ -698,7 +730,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           survivalProfile: (c.client_campaign_id && campaignSurvivalMap.has(c.client_campaign_id))
             ? campaignSurvivalMap.get(c.client_campaign_id)!
             : activeSurvivalProfile,
-          campaignBaselineSph: baselineSph,
+          campaignBaselineSph: getCampaignBaselineSph(c.client_campaign_id),
           weeklyHoursPerHead: DEFAULT_WEEKLY_HOURS,
           attendanceFactor: avgAttendance,
           periodStart: format(forecastStart, "yyyy-MM-dd"),
@@ -793,7 +825,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           null,
           teamChurnRates,
           activeRampProfile,
-          baselineSph,
+          globalBaselineSph,
         );
         
         // Combine: actual + remaining
@@ -895,7 +927,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         null,
         teamChurnRates,
         activeRampProfile,
-        baselineSph,
+        globalBaselineSph,
         true, // isFuturePeriod — apply momentum correction
       );
 
