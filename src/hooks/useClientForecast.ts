@@ -16,6 +16,7 @@ import type {
   TeamChurnRates,
   TenureBucketRates,
   ForecastRampProfile,
+  ForecastSurvivalProfile,
 } from "@/types/forecast";
 
 const HOURS_PER_SHIFT = 7.5;
@@ -39,6 +40,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
       cohorts: ClientForecastCohort[];
       calculatedAt: string;
       activeRampProfile: ForecastRampProfile;
+      activeSurvivalProfile: ForecastSurvivalProfile;
     }> => {
       const now = new Date();
       const forecastStart = startOfMonth(new Date(now.getFullYear(), now.getMonth() + monthOffset, 1));
@@ -83,6 +85,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           cohorts: [],
           calculatedAt: now.toISOString(),
           activeRampProfile: MOCK_RAMP_PROFILE,
+          activeSurvivalProfile: MOCK_SURVIVAL_PROFILE,
         };
       }
 
@@ -98,6 +101,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           cohorts: [],
           calculatedAt: now.toISOString(),
           activeRampProfile: MOCK_RAMP_PROFILE,
+          activeSurvivalProfile: MOCK_SURVIVAL_PROFILE,
         };
       }
 
@@ -125,6 +129,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           cohorts: [],
           calculatedAt: now.toISOString(),
           activeRampProfile: MOCK_RAMP_PROFILE,
+          activeSurvivalProfile: MOCK_SURVIVAL_PROFILE,
         };
       }
 
@@ -623,11 +628,17 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
       if (clientId !== "all") {
         cohortQuery = cohortQuery.eq("client_id", clientId);
       }
-      const [cohortsRes, rampProfilesRes] = await Promise.all([
+      const [cohortsRes, rampProfilesRes, survivalProfilesRes] = await Promise.all([
         cohortQuery,
         campaignIds.length > 0
           ? supabase
               .from("forecast_ramp_profiles")
+              .select("*")
+              .in("client_campaign_id", campaignIds)
+          : Promise.resolve({ data: [] }),
+        campaignIds.length > 0
+          ? supabase
+              .from("forecast_survival_profiles")
               .select("*")
               .in("client_campaign_id", campaignIds)
           : Promise.resolve({ data: [] }),
@@ -642,10 +653,23 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         }
       });
 
+      // Build campaign -> survival profile map
+      const campaignSurvivalMap = new Map<string, ForecastSurvivalProfile>();
+      ((survivalProfilesRes as any).data || []).forEach((p: any) => {
+        if (p.client_campaign_id) {
+          campaignSurvivalMap.set(p.client_campaign_id, p as ForecastSurvivalProfile);
+        }
+      });
+
       // Determine the active ramp profile (campaign-specific or fallback)
       const activeRampProfile: ForecastRampProfile = campaignRampMap.size > 0
         ? campaignRampMap.values().next().value!
         : MOCK_RAMP_PROFILE;
+
+      // Determine the active survival profile (campaign-specific or fallback)
+      const activeSurvivalProfile: ForecastSurvivalProfile = campaignSurvivalMap.size > 0
+        ? campaignSurvivalMap.values().next().value!
+        : MOCK_SURVIVAL_PROFILE;
 
       // Build CohortForecastInput
       const avgAttendance = employeePerformances.length > 0
@@ -671,7 +695,9 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         return {
           cohort: c,
           rampProfile: ramp,
-          survivalProfile: MOCK_SURVIVAL_PROFILE,
+          survivalProfile: (c.client_campaign_id && campaignSurvivalMap.has(c.client_campaign_id))
+            ? campaignSurvivalMap.get(c.client_campaign_id)!
+            : activeSurvivalProfile,
           campaignBaselineSph: baselineSph,
           weeklyHoursPerHead: DEFAULT_WEEKLY_HOURS,
           attendanceFactor: avgAttendance,
@@ -855,6 +881,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           cohorts,
           calculatedAt: now.toISOString(),
           activeRampProfile,
+          activeSurvivalProfile,
         };
       }
 
@@ -877,6 +904,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         cohorts,
         calculatedAt: now.toISOString(),
         activeRampProfile,
+        activeSurvivalProfile,
       };
     },
     staleTime: 0,

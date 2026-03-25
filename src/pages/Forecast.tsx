@@ -52,6 +52,7 @@ export default function Forecast() {
   const cohorts = forecastData?.cohorts || [];
   const calculatedAt = forecastData?.calculatedAt || null;
   const activeRampProfile = forecastData?.activeRampProfile || MOCK_RAMP_PROFILE;
+  const activeSurvivalProfile = forecastData?.activeSurvivalProfile || MOCK_SURVIVAL_PROFILE;
 
   // Real vs actual data
   const { data: vsActual = [], isLoading: vsActualLoading } = useForecastVsActual(selectedClient);
@@ -294,7 +295,7 @@ export default function Forecast() {
                 />
                 <ForecastAssumptions
                   rampProfile={activeRampProfile}
-                  survivalProfile={MOCK_SURVIVAL_PROFILE}
+                  survivalProfile={activeSurvivalProfile}
                   avgAttendance={avgAttendance}
                   baselineSph={baselineSph}
                 />
