@@ -88,6 +88,7 @@ export default function Logikker() {
                 <li>Salg vises kun på kundespecifikke dashboards, hvis <strong>client_campaign_id</strong> er sat korrekt via kampagnemapping.</li>
                 <li>Seneste TDC Erhverv-salg viser produktnavn sammen med <strong>(x quantity)</strong> pr. linje.</li>
                 <li>Forecast SPH beregnes som <strong>4-ugers EWMA</strong> (Exponential Weighted Moving Average) med decay 0.85 pr. uge.</li>
+                <li>Churn-rater (afgangssandsynlighed) beregnes fra <strong>faktiske afgange pr. team og anciennitetsbucket</strong> (0-60, 61-180, 180+ dage) — ingen kunstige caps.</li>
               </ul>
             </CardContent>
           </Card>
