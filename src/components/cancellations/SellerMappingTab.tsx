@@ -11,7 +11,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/hooks/use-toast";
-import { Trash2, Users, Loader2, Package, Plus, Check, ChevronsUpDown } from "lucide-react";
+import { Trash2, Users, Loader2, Package, Plus, Check, ChevronsUpDown, ChevronRight, ArrowLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { ProductAutoMatch } from "./ProductAutoMatch";
@@ -148,6 +148,9 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [checkedNames, setCheckedNames] = useState<Set<string>>(new Set());
   const [customName, setCustomName] = useState("");
+  const [selectedColumn, setSelectedColumn] = useState<string | null>(null);
+
+  const ALLOWED_COLUMNS = ["Operator", "Subscription Name", "Sales Department"] as const;
 
   const { data: mappings = [], isLoading } = useQuery({
     queryKey: ["cancellation-product-mappings", clientId],
@@ -163,32 +166,42 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
     enabled: !!clientId,
   });
 
-  // Fetch all unique column headers from uploaded Excel data
-  const { data: excelColumns = [] } = useQuery({
-    queryKey: ["excel-column-headers", clientId],
+  // Fetch all unique values for the 3 allowed columns from uploaded Excel data
+  const { data: columnValues = {} } = useQuery({
+    queryKey: ["excel-column-values", clientId],
     queryFn: async () => {
       const [queueResult, importsResult] = await Promise.all([
         supabase
           .from("cancellation_queue")
           .select("uploaded_data")
           .eq("client_id", clientId)
-          .limit(50),
+          .limit(500),
         supabase
           .from("cancellation_imports")
           .select("unmatched_rows")
           .eq("client_id", clientId)
           .not("unmatched_rows", "is", null)
-          .limit(10),
+          .limit(50),
       ]);
 
       if (queueResult.error) throw queueResult.error;
       if (importsResult.error) throw importsResult.error;
 
-      const columns = new Set<string>();
+      const values: Record<string, Set<string>> = {};
+      for (const col of ALLOWED_COLUMNS) values[col] = new Set();
+
+      const extractFromRow = (row: Record<string, unknown>) => {
+        for (const col of ALLOWED_COLUMNS) {
+          const val = row[col];
+          if (val != null && String(val).trim()) {
+            values[col].add(String(val).trim());
+          }
+        }
+      };
 
       for (const row of queueResult.data || []) {
         if (row.uploaded_data && typeof row.uploaded_data === "object") {
-          Object.keys(row.uploaded_data as Record<string, unknown>).forEach(k => columns.add(k));
+          extractFromRow(row.uploaded_data as Record<string, unknown>);
         }
       }
 
@@ -196,12 +209,16 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
         if (!Array.isArray(imp.unmatched_rows)) continue;
         for (const row of imp.unmatched_rows) {
           if (row && typeof row === "object") {
-            Object.keys(row as Record<string, unknown>).forEach(k => columns.add(k));
+            extractFromRow(row as Record<string, unknown>);
           }
         }
       }
 
-      return [...columns].sort((a, b) => a.localeCompare(b, "da"));
+      const result: Record<string, string[]> = {};
+      for (const col of ALLOWED_COLUMNS) {
+        result[col] = [...values[col]].sort((a, b) => a.localeCompare(b, "da"));
+      }
+      return result;
     },
     enabled: !!clientId,
   });
@@ -233,9 +250,10 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
     enabled: campaignIds.length > 0,
   });
 
+  // All unique values across all allowed columns
+  const allValues = Object.values(columnValues).flat();
   const mappedNames = new Set(mappings.map(m => m.excel_product_name));
-  const availableExcelNames = excelColumns.filter((n: string) => !mappedNames.has(n));
-  const unmappedUploadNames = availableExcelNames;
+  const unmappedUploadNames = allValues.filter(n => !mappedNames.has(n));
 
   const productMap = new Map(products.map(p => [p.id, p.name]));
 
@@ -249,10 +267,10 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
 
   const openDialogForProduct = (productId: string) => {
     setSelectedProductId(productId);
-    // Pre-check already mapped names for this product
     const existing = (mappingsByProduct.get(productId) || []).map(m => m.excel_product_name);
     setCheckedNames(new Set(existing));
     setCustomName("");
+    setSelectedColumn(null);
     setDialogOpen(true);
   };
 
@@ -382,7 +400,7 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
           {unmappedUploadNames.length > 0 && (
             <div className="rounded-md border border-dashed border-primary/30 bg-primary/5 p-4 space-y-2">
               <p className="text-sm font-medium text-foreground">
-                {unmappedUploadNames.length} umappede kolonner fundet fra uploads:
+                {unmappedUploadNames.length} umappede værdier fundet fra uploads:
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {unmappedUploadNames.map((name: string) => (
@@ -407,7 +425,7 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Internt produkt</TableHead>
-                    <TableHead>Excel-kolonner</TableHead>
+                    <TableHead>Excel-værdier</TableHead>
                     <TableHead>Oprettet</TableHead>
                     <TableHead className="w-16"></TableHead>
                   </TableRow>
@@ -449,56 +467,90 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
         </CardContent>
       </Card>
 
-      {/* Dialog for selecting Excel names */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      {/* Dialog for selecting Excel values (two-step) */}
+      <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setSelectedColumn(null); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
-              Tilknyt Excel-kolonner til "{selectedProduct?.name}"
+              Tilknyt værdier til "{selectedProduct?.name}"
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <p className="text-sm text-muted-foreground">
-              Vælg hvilke kolonner fra Excel-filen der skal mappes til dette produkt. Et produkt kan have flere kolonner.
-            </p>
+            {!selectedColumn ? (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Vælg hvilken kolonne du vil hente værdier fra:
+                </p>
+                <div className="space-y-2">
+                  {ALLOWED_COLUMNS.map(col => {
+                    const count = (columnValues[col] || []).length;
+                    return (
+                      <button
+                        key={col}
+                        type="button"
+                        className="flex items-center justify-between w-full rounded-md border px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors text-left"
+                        onClick={() => setSelectedColumn(col)}
+                      >
+                        <div>
+                          <span className="text-sm font-medium">{col}</span>
+                          <span className="text-xs text-muted-foreground ml-2">({count} værdier)</span>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                  onClick={() => setSelectedColumn(null)}
+                >
+                  <ArrowLeft className="h-4 w-4" /> Tilbage
+                </button>
+                <p className="text-sm text-muted-foreground">
+                  Værdier fra "<span className="font-medium text-foreground">{selectedColumn}</span>":
+                </p>
+                <div className="space-y-2 max-h-[400px] overflow-auto">
+                  {(columnValues[selectedColumn] || []).map((name: string) => (
+                    <label key={name} className="flex items-center gap-3 rounded-md border px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors">
+                      <Checkbox
+                        checked={checkedNames.has(name)}
+                        onCheckedChange={() => toggleName(name)}
+                      />
+                      <span className="text-sm">{name}</span>
+                      {mappedNames.has(name) && !checkedNames.has(name) && (
+                        <Badge variant="secondary" className="text-[10px] ml-auto">Allerede mappet</Badge>
+                      )}
+                    </label>
+                  ))}
+                  {/* Custom-added names */}
+                  {[...checkedNames].filter(n => !(columnValues[selectedColumn] || []).includes(n) && !Object.values(columnValues).some(vals => vals.includes(n))).map((name: string) => (
+                    <label key={name} className="flex items-center gap-3 rounded-md border px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors border-primary/30">
+                      <Checkbox checked onCheckedChange={() => toggleName(name)} />
+                      <span className="text-sm">{name}</span>
+                      <Badge variant="outline" className="text-[10px] ml-auto">Manuelt tilføjet</Badge>
+                    </label>
+                  ))}
+                </div>
 
-            {/* All Excel columns */}
-            <div className="space-y-2 max-h-[400px] overflow-auto">
-              {excelColumns.map((name: string) => (
-                <label key={name} className="flex items-center gap-3 rounded-md border px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors">
-                  <Checkbox
-                    checked={checkedNames.has(name)}
-                    onCheckedChange={() => toggleName(name)}
+                {/* Add custom name */}
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Tilføj nyt navn manuelt..."
+                    value={customName}
+                    onChange={e => setCustomName(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addCustomName(); } }}
+                    className="h-9 text-sm"
                   />
-                  <span className="text-sm">{name}</span>
-                  {mappedNames.has(name) && !checkedNames.has(name) && (
-                    <Badge variant="secondary" className="text-[10px] ml-auto">Allerede mappet</Badge>
-                  )}
-                </label>
-              ))}
-              {/* Show custom-added names not in available list */}
-              {[...checkedNames].filter(n => !excelColumns.includes(n)).map((name: string) => (
-                <label key={name} className="flex items-center gap-3 rounded-md border px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors border-primary/30">
-                  <Checkbox checked onCheckedChange={() => toggleName(name)} />
-                  <span className="text-sm">{name}</span>
-                  <Badge variant="outline" className="text-[10px] ml-auto">Manuelt tilføjet</Badge>
-                </label>
-              ))}
-            </div>
-
-            {/* Add custom name */}
-            <div className="flex gap-2">
-              <Input
-                placeholder="Tilføj nyt navn manuelt..."
-                value={customName}
-                onChange={e => setCustomName(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addCustomName(); } }}
-                className="h-9 text-sm"
-              />
-              <Button variant="outline" size="sm" className="h-9 shrink-0" onClick={addCustomName} disabled={!customName.trim()}>
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
+                  <Button variant="outline" size="sm" className="h-9 shrink-0" onClick={addCustomName} disabled={!customName.trim()}>
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setDialogOpen(false)}>Annuller</Button>
