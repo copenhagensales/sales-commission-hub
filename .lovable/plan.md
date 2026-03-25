@@ -1,69 +1,80 @@
 
 
-# Manuel forecast-override pr. medarbejder
+# Uge-forecast for Eesy FM med markeder/centre
 
 ## Hvad
-Tilføj muligheden for at overskrive den beregnede forecast for individuelle medarbejdere direkte i `ForecastBreakdownTable` på Kundeforecast-siden. Overrides gemmes i databasen, så de overlever sidegenindlæsning og kan ses af andre brugere.
+En ny sektion/side der viser **uge-for-uge forecast** for Eesy FM, baseret på faktiske bookinger. Hver uge viser:
+- Antal bookede lokationer (opdelt i centre vs. markeder)
+- Antal bookede dage (inkl. weekender)
+- Bemanding pr. uge
+- Forventet salg pr. uge (baseret på medarbejder-performance × bookede dage)
+- Faktiske salg (når ugen er i gang/afsluttet)
 
-## Hvordan det virker
-
-1. I forecast-tabellen vises et lille blyant-ikon ved forecast-tallet for hver medarbejder
-2. Klik åbner en inline-redigering (input-felt) eller en lille dialog, hvor man kan indtaste et manuelt tal
-3. Det manuelle override gemmes i en ny tabel og bruges i stedet for den beregnede værdi
-4. Et visuelt hint (f.eks. badge/farve) viser at værdien er manuelt overridden
-5. Man kan fjerne override'et og gå tilbage til beregnet forecast
+## Hvorfor
+FM-arbejdet er uge-drevet og afhænger af hvad der er booket (centre har anden performance end markeder). Weekendarbejde er normalt. Et månedligt forecast fanger ikke denne dynamik.
 
 ## Teknisk plan
 
-### 1. Ny databasetabel: `employee_forecast_overrides`
+### 1. Ny hook: `useFmWeeklyForecast.ts`
+- Input: `clientId`, `month`/`year` (eller en dato-range)
+- Henter bookinger fra `booking`-tabellen for Eesy FM klienten, joinet med `location` (for `type`) og `booking_assignment` (for faktisk bemanding)
+- Grupperer pr. `week_number` + `year`
+- For hver uge:
+  - Tæller bookede dage (`booked_days` array-længde), opdelt efter `location.type` (centre vs. markeder)
+  - Tæller unikke medarbejdere fra `booking_assignment`
+  - Beregner forventet salg: henter SPH/salg-pr-dag fra `useClientForecast` eller beregner direkte fra historisk data
+  - Henter faktiske salg fra `sales`-tabellen for den uge
+- Returnerer `WeekForecast[]` med alle metrics
 
+### 2. Ny komponent: `FmWeeklyForecastTable.tsx`
+- Tabel med én række pr. uge i den valgte måned
+- Kolonner: Uge nr., Dage (centre), Dage (markeder), Total dage, Medarbejdere, Forventet salg, Faktisk salg, Afvigelse
+- Farvekodning: grøn/rød baseret på actual vs. forecast
+- Mulighed for at **manuelt overskrive forventet salg pr. uge** (genbruger `employee_forecast_overrides`-konceptet, men på ugeniveau)
+- Sumrække i bunden
+
+### 3. Ny tabel: `fm_weekly_forecast_overrides` (migration)
 ```sql
-CREATE TABLE public.employee_forecast_overrides (
+CREATE TABLE public.fm_weekly_forecast_overrides (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  employee_id uuid NOT NULL REFERENCES employee_master_data(id) ON DELETE CASCADE,
   client_id uuid REFERENCES clients(id) ON DELETE CASCADE,
-  period_start date NOT NULL, -- Første dag i måneden (YYYY-MM-01)
-  override_sales integer NOT NULL,
+  week_number integer NOT NULL,
+  year integer NOT NULL,
+  override_sales integer,
   note text,
   created_by uuid REFERENCES auth.users(id),
   created_at timestamptz DEFAULT now(),
-  updated_at timestamptz DEFAULT now(),
-  UNIQUE(employee_id, client_id, period_start)
+  UNIQUE(client_id, week_number, year)
 );
-
-ALTER TABLE public.employee_forecast_overrides ENABLE ROW LEVEL SECURITY;
-
--- Authenticated users can read/write (manager-level access kontrolleres i frontend)
-CREATE POLICY "Authenticated can manage overrides"
-  ON public.employee_forecast_overrides FOR ALL TO authenticated USING (true) WITH CHECK (true);
+ALTER TABLE public.fm_weekly_forecast_overrides ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Auth can manage fm weekly overrides"
+  ON public.fm_weekly_forecast_overrides FOR ALL TO authenticated
+  USING (true) WITH CHECK (true);
 ```
 
-### 2. Hook: `useEmployeeForecastOverrides`
-- Henter overrides for den aktuelle client + periode
-- Mutation for upsert og sletning
-- Returnerer et `Map<employeeId, overrideSales>`
+### 4. Integration i Forecast-siden
+- Når Eesy FM er valgt som kunde på `/forecast`, vis en ny sektion **"Ugefordeling"** mellem KPI-kort og breakdown-tabellen
+- Viser `FmWeeklyForecastTable` med data fra hooken
+- Periode-toggle (denne/næste måned) genbruges
 
-### 3. `ForecastBreakdownTable` ændringer
-- Modtag nye props: `overrides: Map<string, number>`, `onOverride(employeeId, value | null)`, `clientId`, `periodStart`
-- Ved forecast-kolonnen: vis override-værdi med blåt highlight + blyant-ikon
-- Klik → inline input til nyt tal med gem/annuller
-- Lille "×" knap til at fjerne override
-
-### 4. `useClientForecast` / `Forecast.tsx` ændringer
-- Hent overrides for den valgte client + periode
-- Anvend overrides på `forecastSales` i resultatet, så KPI-kort og totaler afspejler de manuelle værdier
-- Behold den beregnede værdi tilgængelig (vises som tooltip)
-
-### 5. Visuel indikation
-- Overridden forecast vises med blå baggrund og "Manuel" badge
-- Tooltip viser: "Beregnet: X | Manuel: Y"
+### 5. Data-flow
+```text
+booking (week_number, year, location_id, booked_days, client_id)
+  → JOIN location (type: "Coop butik" | "Markeder" | ...)
+  → JOIN booking_assignment (employee_id, date)
+  → GROUP BY week_number
+  
+sales (sale_datetime, client_campaign_id)
+  → filtrer på Eesy FM campaigns
+  → GROUP BY ISO week
+```
 
 ## Berørte filer
 
 | Fil | Ændring |
 |-----|---------|
-| Migration | Ny `employee_forecast_overrides` tabel |
-| `src/hooks/useEmployeeForecastOverrides.ts` | Nyt hook (fetch + upsert + delete) |
-| `src/components/forecast/ForecastBreakdownTable.tsx` | Inline edit UI for overrides |
-| `src/pages/Forecast.tsx` | Hent overrides, apply på forecast data, send som props |
+| Migration | Ny `fm_weekly_forecast_overrides` tabel |
+| `src/hooks/useFmWeeklyForecast.ts` | Nyt hook: bookinger + salg pr. uge |
+| `src/components/forecast/FmWeeklyForecastTable.tsx` | Ny komponent: uge-tabel med override |
+| `src/pages/Forecast.tsx` | Vis ugefordeling når FM-kunde er valgt |
 
