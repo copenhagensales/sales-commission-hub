@@ -10,7 +10,7 @@ export const PERMISSION_GROUPS: Record<string, { label: string; children: string
   // Fieldmarketing > Booking tabs
   'menu_fm_booking': {
     label: 'Booking',
-    children: ['tab_fm_book_week', 'tab_fm_bookings', 'tab_fm_markets', 'tab_fm_locations', 'tab_fm_vagtplan', 'tab_fm_hotels']
+    children: ['tab_fm_book_week', 'tab_fm_bookings', 'tab_fm_markets', 'tab_fm_locations', 'tab_fm_vagtplan', 'tab_fm_hotels', 'tab_fm_training']
   },
   // Onboarding tabs
   'menu_onboarding_overview': {

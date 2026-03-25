@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { usePermissions } from "@/hooks/usePositionPermissions";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, addDays, isWithinInterval, parseISO } from "date-fns";
@@ -218,6 +219,8 @@ export function EditBookingDialog({
   onAddVehicleAssignment,
 }: EditBookingDialogProps) {
   const queryClient = useQueryClient();
+  const { canView } = usePermissions();
+  const showTrainingTab = canView("tab_fm_training");
   
   // Booking tab state
   const [clientId, setClientId] = useState<string>("");
@@ -1229,7 +1232,7 @@ export function EditBookingDialog({
         </DialogHeader>
         
         <Tabs defaultValue="booking" className="w-full">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className={`grid w-full ${showTrainingTab ? 'grid-cols-6' : 'grid-cols-5'}`}>
             <TabsTrigger value="booking" className="flex items-center gap-1 text-xs px-2">
               <FileText className="h-4 w-4" />
               Booking
@@ -1246,10 +1249,12 @@ export function EditBookingDialog({
               <Utensils className="h-4 w-4" />
               Diæt
             </TabsTrigger>
-            <TabsTrigger value="training" className="flex items-center gap-1 text-xs px-2">
-              <GraduationCap className="h-4 w-4" />
-              Oplæring
-            </TabsTrigger>
+            {showTrainingTab && (
+              <TabsTrigger value="training" className="flex items-center gap-1 text-xs px-2">
+                <GraduationCap className="h-4 w-4" />
+                Oplæring
+              </TabsTrigger>
+            )}
             <TabsTrigger value="hotel" className="flex items-center gap-1 text-xs px-2">
               <Building2 className="h-4 w-4" />
               Hotel
@@ -2024,6 +2029,7 @@ export function EditBookingDialog({
           </TabsContent>
 
           {/* Training Bonus Tab */}
+          {showTrainingTab && (
           <TabsContent value="training" className="space-y-4 mt-4">
             {/* Existing training bonus assignments */}
             {Object.keys(groupedTrainingAssignments).length > 0 && (
@@ -2164,6 +2170,7 @@ export function EditBookingDialog({
               </>
             )}
           </TabsContent>
+          )}
 
           {/* Hotel Tab */}
           <TabsContent value="hotel" className="space-y-4 mt-4">
