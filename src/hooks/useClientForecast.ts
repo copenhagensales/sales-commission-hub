@@ -85,6 +85,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           cohorts: [],
           calculatedAt: now.toISOString(),
           activeRampProfile: MOCK_RAMP_PROFILE,
+          activeSurvivalProfile: MOCK_SURVIVAL_PROFILE,
         };
       }
 
@@ -100,6 +101,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           cohorts: [],
           calculatedAt: now.toISOString(),
           activeRampProfile: MOCK_RAMP_PROFILE,
+          activeSurvivalProfile: MOCK_SURVIVAL_PROFILE,
         };
       }
 
@@ -127,6 +129,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           cohorts: [],
           calculatedAt: now.toISOString(),
           activeRampProfile: MOCK_RAMP_PROFILE,
+          activeSurvivalProfile: MOCK_SURVIVAL_PROFILE,
         };
       }
 
