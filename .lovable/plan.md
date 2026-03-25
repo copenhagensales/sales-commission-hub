@@ -1,54 +1,82 @@
 
 
-## Fix: Udvid produkt-dropdown med navne fra både annulleringer og kurv-rettelser
+## Auto-match for produkt-mappings
 
 ### Problem
-Dropdown'en for Excel-produktnavne henter kun fra `cancellation_queue.target_product_name`, men den filtrerer ikke på `upload_type`. Hvis klienten primært har haft kurv-rettelser eller slet ingen uploads, er listen tom eller ufuldstændig.
+Der er mange Excel-produktnavne (f.eks. "Fri tale + 70 GB data (5G) (6 mdr. binding)") som ligner interne produktnavne. Brugeren skal manuelt mappe dem én ad gangen, selvom de ofte er næsten identiske.
 
 ### Løsning
+Tilføj en "Auto-match" knap der kører fuzzy string-matching mellem umappede Excel-navne og interne produkter, og viser forslag i en godkendelses-tabel.
+
 **Fil:** `src/components/cancellations/SellerMappingTab.tsx`
 
-Udvid den eksisterende `excelProductNames`-query til at hente `target_product_name` fra **alle** queue-rækker for klienten — uanset `upload_type` (både `cancellation` og `basket_difference`) og uanset `status` (pending, cancelled, basket_changed, rejected). Det dækker både igangværende og historiske uploads.
+### Matching-algoritme
+For hvert umappet Excel-navn:
+1. **Eksakt match** — case-insensitive direkte sammenligning
+2. **Substring containment** — hvis det ene navn indeholder det andet
+3. **Normalized similarity** — fjern parenteser, ekstra whitespace, og sammenlign kernenavne med en simpel token-overlap score (Jaccard-lignende)
 
-Derudover tilføjes en ekstra datakilde: unikke `adversus_product_title` fra `sale_items` for klientens kampagner, som fallback for klienter helt uden uploads.
+Kun forslag med tilstrækkelig høj score (>0.5) vises. Bedste match per Excel-navn vælges.
 
-### Ændringer
+### UI-flow
+1. Ny knap **"Auto-match"** (med Wand-ikon) ved siden af den eksisterende "Tilføj"-sektion
+2. Klik genererer forslag client-side (ingen API-kald)
+3. Forslag vises i en tabel med kolonner:
+   - Excel-produktnavn
+   - Foreslået internt produkt
+   - Score (som badge: "Eksakt", "Høj", "Medium")
+   - Checkbox for godkendelse (alle valgt som default)
+4. **"Godkend valgte"**-knap gemmer alle markerede forslag som mappings via batch-upsert
+5. Brugeren kan ændre det foreslåede produkt via dropdown inden godkendelse
 
-1. **Behold den eksisterende queue-query**, men fjern evt. implicit filtrering — den nuværende query henter allerede alle statuser og upload_types, men listen kan være tom hvis `target_product_name` ikke blev sat ved upload. Ingen ændring nødvendig her.
-
-2. **Tilføj ny query** der henter unikke `adversus_product_title` fra `sale_items` via klientens kampagner (genbruger eksisterende `campaignIds`-query):
-```typescript
-const { data: saleItemNames = [] } = useQuery({
-  queryKey: ["sale-item-product-names", campaignIds],
-  queryFn: async () => {
-    if (campaignIds.length === 0) return [];
-    const { data, error } = await supabase
-      .from("sale_items")
-      .select("adversus_product_title")
-      .in("sale_id", 
-        supabase.from("sales").select("id").in("client_campaign_id", campaignIds)
-      )
-      .not("adversus_product_title", "is", null);
-    if (error) throw error;
-    return [...new Set(data.map(d => d.adversus_product_title).filter(Boolean))];
-  },
-  enabled: campaignIds.length > 0,
-});
+### Teknisk detalje
+```text
+// Pseudo-kode for matching
+function findBestMatch(excelName: string, products: Product[]): Match | null {
+  const normalized = normalize(excelName);  // lowercase, fjern parenteser, trim
+  
+  // 1. Eksakt match
+  const exact = products.find(p => normalize(p.name) === normalized);
+  if (exact) return { product: exact, score: 1.0, level: "Eksakt" };
+  
+  // 2. Substring
+  const substring = products.find(p => 
+    normalized.includes(normalize(p.name)) || normalize(p.name).includes(normalized)
+  );
+  if (substring) return { product: substring, score: 0.8, level: "Høj" };
+  
+  // 3. Token overlap (Jaccard)
+  const tokens = normalized.split(/\s+/);
+  let best = { product: null, score: 0 };
+  for (const p of products) {
+    const pTokens = normalize(p.name).split(/\s+/);
+    const intersection = tokens.filter(t => pTokens.includes(t)).length;
+    const union = new Set([...tokens, ...pTokens]).size;
+    const score = intersection / union;
+    if (score > best.score) best = { product: p, score };
+  }
+  if (best.score > 0.5) return { ...best, level: best.score > 0.7 ? "Høj" : "Medium" };
+  return null;
+}
 ```
 
-   Da Supabase JS-klienten ikke understøtter sub-selects i `.in()`, bruges i stedet en to-trins tilgang: først hentes salgs-IDs for kampagnerne, derefter hentes unikke produktnavne fra sale_items.
-
-3. **Kombiner begge lister** og fjern allerede mappede navne:
+### Batch-godkendelse
+Ved klik på "Godkend valgte" upsert'es alle markerede forslag i ét kald:
 ```typescript
-const allExcelNames = [...new Set([...excelProductNames, ...saleItemNames])]
-  .sort((a, b) => a.localeCompare(b, "da"));
-const availableExcelNames = allExcelNames.filter(n => !mappedNames.has(n));
+await supabase
+  .from("cancellation_product_mappings")
+  .upsert(
+    selectedSuggestions.map(s => ({
+      client_id: clientId,
+      excel_product_name: s.excelName,
+      product_id: s.productId,
+    })),
+    { onConflict: "client_id,excel_product_name" }
+  );
 ```
-
-4. **Forbedre fritekst-UX**: Tillad Enter-tast til at bekræfte manuelt skrevet navn og gør "Brug [navn]"-knappen tydeligere.
 
 ### Forventet resultat
-- Dropdown viser produktnavne fra **alle** uploads (annulleringer + kurv-rettelser, aktive + historiske)
-- Suppleret med produktnavne fra faktiske salg som fallback
-- Klarere UX for manuel indtastning af nye navne
+- Mapper 80-90% af produktnavne automatisk med ét klik
+- Brugeren verificerer og godkender inden noget gemmes
+- Mulighed for at justere individuelle forslag før godkendelse
 
