@@ -1,33 +1,30 @@
 
 
-# Analysér og justér Eesy FM ramp-up profil
+# Ændr EWMA-vindue fra 8 uger til 4 uger
 
-## Tilgang
-Samme metode som Eesy TM: analysér faktisk salgsperformance for nye Eesy FM-sælgere, sammenlign med den nuværende generiske ramp-profil (15%/35%/60%/85%), og indsæt en kampagne-specifik profil i `forecast_ramp_profiles`.
+## Ændring
 
-## Trin
+**Fil: `src/hooks/useClientForecast.ts`** (linje 22)
 
-### 1. Datanalyse (script)
-Kør en analyse af nye Eesy FM-sælgere (ansat fra juni 2025+):
-- Hent medarbejdere med `employment_start_date` inden for perioden, tilknyttet Eesy FM-teams
-- Beregn salg pr. uge relativt til ansættelsesdato (uge 1, 2, 3, 4)
-- Sammenlign med etablerede sælgeres gennemsnit for at udlede faktiske ramp-faktorer
-- FM-salg bruger `source = 'fieldmarketing'` og `fm_seller_id` i stedet for `agent_email`
-
-### 2. Migration: Indsæt Eesy FM ramp-profil
-Baseret på analyseresultaterne, indsæt en profil i `forecast_ramp_profiles` for Eesy FM-kampagner:
-```sql
-INSERT INTO forecast_ramp_profiles (name, client_campaign_id, day_1_7_factor, ...)
-SELECT 'Eesy FM Ramp', cc.id, <faktisk_uge1>, <faktisk_uge2>, ...
-FROM client_campaigns cc
-JOIN clients c ON cc.client_id = c.id
-WHERE c.name ILIKE '%eesy%' AND cc.campaign_type = 'fm';
+```ts
+// Fra:
+const EWMA_WEEKS = 8;
+// Til:
+const EWMA_WEEKS = 4;
 ```
 
-### 3. Ingen kodeændringer
-`useClientForecast.ts` henter allerede kampagne-specifikke profiler fra databasen (implementeret i forrige ændring). Eesy FM vil automatisk bruge den nye profil.
+Det er den eneste ændring. Konstanten bruges allerede konsekvent i hele filen:
+- Linje 154: Henter salg fra `subWeeks(now, EWMA_WEEKS)` 
+- Linje 443-450: Booking-gennemsnit divideres med `EWMA_WEEKS`
+- Linje 460: Antal uge-iterationer i EWMA-loopen
 
-## Berørte filer
-- **Kun database**: Ny række i `forecast_ramp_profiles`
-- Analysen køres som et engangscript
+Selve EWMA-beregningen (decay = 0.85 pr. uge) i `forecast.ts` er uændret — den arbejder på det array den får, som nu bare bliver 4 uger langt i stedet for 8.
+
+## Effekt
+- SPH reagerer hurtigere på nylige performance-ændringer
+- Mindre udvanding fra ældre uger
+- Momentum-korrektionen (seneste 2 uger vs. EWMA) bliver mindre dramatisk, da EWMA allerede er tættere på nylige tal
+
+## Opdatér også Forretningslogikker-teksten
+Tilføj en note på Logikker-siden eller i kodekommentaren om at vinduet er 4 uger (ikke 8).
 
