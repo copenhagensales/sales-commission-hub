@@ -38,6 +38,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
       forecast: ForecastResult;
       cohorts: ClientForecastCohort[];
       calculatedAt: string;
+      activeRampProfile: ForecastRampProfile;
     }> => {
       const now = new Date();
       const forecastStart = startOfMonth(new Date(now.getFullYear(), now.getMonth() + monthOffset, 1));
