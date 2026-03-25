@@ -53,30 +53,39 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
       let teamIds: string[] = [];
       let campaignIds: string[] = [];
 
+      // teamClientMap: teamId → clientId (used later for campaign-specific SPH)
+      const teamClientMap = new Map<string, string>();
+      // campaignClientMap: campaignId → clientId
+      const campaignClientMap = new Map<string, string>();
+
       if (clientId === "all") {
         const { data: allTeamClients } = await supabase
           .from("team_clients")
           .select("team_id, client_id");
         teamIds = [...new Set((allTeamClients || []).map(tc => tc.team_id))];
         const clientIds = [...new Set((allTeamClients || []).map(tc => tc.client_id))];
+        (allTeamClients || []).forEach(tc => teamClientMap.set(tc.team_id, tc.client_id));
         if (clientIds.length > 0) {
           const { data: campaigns } = await supabase
             .from("client_campaigns")
-            .select("id")
+            .select("id, client_id")
             .in("client_id", clientIds);
           campaignIds = (campaigns || []).map(c => c.id);
+          (campaigns || []).forEach(c => campaignClientMap.set(c.id, c.client_id));
         }
       } else {
         const { data: teamClients } = await supabase
           .from("team_clients")
-          .select("team_id")
+          .select("team_id, client_id")
           .eq("client_id", clientId);
         teamIds = (teamClients || []).map(tc => tc.team_id);
+        (teamClients || []).forEach(tc => teamClientMap.set(tc.team_id, tc.client_id));
         const { data: campaigns } = await supabase
           .from("client_campaigns")
-          .select("id")
+          .select("id, client_id")
           .eq("client_id", clientId);
         campaignIds = (campaigns || []).map(c => c.id);
+        (campaigns || []).forEach(c => campaignClientMap.set(c.id, c.client_id));
       }
 
       if (teamIds.length === 0) {
