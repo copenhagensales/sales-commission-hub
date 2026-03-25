@@ -23,6 +23,7 @@ import type {
 const HOURS_PER_SHIFT = 7.5;
 const EWMA_WEEKS = 4;
 const DEFAULT_WEEKLY_HOURS = 37;
+const EESY_FM_CLIENT_ID = "9a92ea4c-6404-4b58-be08-065e7552d552";
 
 /**
  * Hook that computes a real forecast for a given client (or "all" clients).
