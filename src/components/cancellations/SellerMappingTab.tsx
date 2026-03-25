@@ -234,9 +234,8 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
   });
 
   const mappedNames = new Set(mappings.map(m => m.excel_product_name));
-  const availableExcelNames = [...new Set(excelProductNames)]
-    .sort((a, b) => a.localeCompare(b, "da"));
-  const unmappedUploadNames = availableExcelNames.filter(n => !mappedNames.has(n));
+  const availableExcelNames = excelColumns.filter((n: string) => !mappedNames.has(n));
+  const unmappedUploadNames = availableExcelNames;
 
   const productMap = new Map(products.map(p => [p.id, p.name]));
 
