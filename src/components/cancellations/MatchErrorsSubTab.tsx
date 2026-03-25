@@ -10,13 +10,14 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
-import { Search, Loader2, AlertTriangle, Check, ChevronsUpDown, Trash2 } from "lucide-react";
+import { Search, Loader2, AlertTriangle, Check, ChevronsUpDown, Trash2, SearchCheck, X } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
+import { LocateSaleDialog } from "./LocateSaleDialog";
 
 interface UnmatchedRow {
   [key: string]: unknown;
@@ -58,6 +59,8 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [localAssignments, setLocalAssignments] = useState<Record<number, string>>({});
   const [openPopoverIdx, setOpenPopoverIdx] = useState<number | null>(null);
+  const [locateDialogRow, setLocateDialogRow] = useState<{ row: FlatUnmatchedRow; idx: number } | null>(null);
+  const [ignorePendingIdx, setIgnorePendingIdx] = useState<number | null>(null);
   const queryClient = useQueryClient();
 
   // Fetch unmatched rows
@@ -300,9 +303,39 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
     onSuccess: () => {
       toast({ title: "Alle fejlede rækker er blevet ignoreret og fjernet" });
       queryClient.invalidateQueries({ queryKey: ["match-errors", clientId] });
+      queryClient.invalidateQueries({ queryKey: ["match-errors-count"] });
     },
     onError: () => {
       toast({ title: "Fejl ved ignorering af rækker", variant: "destructive" });
+    },
+  });
+
+  const ignoreRowMutation = useMutation({
+    mutationFn: async (row: FlatUnmatchedRow) => {
+      const { data: importData } = await supabase
+        .from("cancellation_imports")
+        .select("unmatched_rows")
+        .eq("id", row.importId)
+        .single();
+      if (!importData?.unmatched_rows || !Array.isArray(importData.unmatched_rows)) return;
+      const rowJson = JSON.stringify(row.rowData);
+      const updated = (importData.unmatched_rows as Record<string, unknown>[]).filter(
+        ur => JSON.stringify(ur) !== rowJson
+      );
+      await supabase
+        .from("cancellation_imports")
+        .update({ unmatched_rows: (updated.length > 0 ? updated : null) as unknown as Json })
+        .eq("id", row.importId);
+    },
+    onSuccess: () => {
+      toast({ title: "Rækken er blevet ignoreret" });
+      setIgnorePendingIdx(null);
+      queryClient.invalidateQueries({ queryKey: ["match-errors", clientId] });
+      queryClient.invalidateQueries({ queryKey: ["match-errors-count"] });
+    },
+    onError: () => {
+      toast({ title: "Fejl ved ignorering", variant: "destructive" });
+      setIgnorePendingIdx(null);
     },
   });
 
@@ -367,6 +400,7 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
           <TableHeader>
             <TableRow>
               <TableHead>Type</TableHead>
+              <TableHead className="whitespace-nowrap">Handlinger</TableHead>
               {sellerField && <TableHead className="whitespace-nowrap">Tildel sælger</TableHead>}
               {allKeys.map(key => (
                 <TableHead key={key} className="whitespace-nowrap">{key}</TableHead>
@@ -385,6 +419,48 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
                     <Badge variant={row.uploadType === "cancellation" ? "destructive" : "secondary"}>
                       {row.uploadType === "cancellation" ? "Annullering" : "Kurvrettelse"}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="min-w-[180px]">
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        onClick={() => setLocateDialogRow({ row, idx })}
+                      >
+                        <SearchCheck className="h-3 w-3 mr-1" /> Lokaliser salg
+                      </Button>
+                      {ignorePendingIdx === idx ? (
+                        <div className="flex items-center gap-1">
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="h-7 text-xs"
+                            disabled={ignoreRowMutation.isPending}
+                            onClick={() => ignoreRowMutation.mutate(row)}
+                          >
+                            Bekræft?
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 p-0"
+                            onClick={() => setIgnorePendingIdx(null)}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs text-muted-foreground"
+                          onClick={() => setIgnorePendingIdx(idx)}
+                        >
+                          <Trash2 className="h-3 w-3 mr-1" /> Ignorer
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                   {sellerField && (
                     <TableCell className="min-w-[220px]">
@@ -470,6 +546,33 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
           </AlertDialogContent>
         </AlertDialog>
       </div>
+
+      {locateDialogRow && (
+        <LocateSaleDialog
+          open={!!locateDialogRow}
+          onOpenChange={(open) => { if (!open) setLocateDialogRow(null); }}
+          row={locateDialogRow.row}
+          clientId={clientId}
+          campaignIds={campaignIds}
+          assignedEmployeeId={
+            (() => {
+              const localValue = localAssignments[locateDialogRow.idx];
+              const sellerValue = sellerField ? String(locateDialogRow.row.rowData[sellerField] ?? "") : "";
+              return localValue ?? mappingsByName.get(sellerValue.toLowerCase()) ?? undefined;
+            })()
+          }
+          assignedEmployeeName={
+            (() => {
+              const localValue = localAssignments[locateDialogRow.idx];
+              const sellerValue = sellerField ? String(locateDialogRow.row.rowData[sellerField] ?? "") : "";
+              const empId = localValue ?? mappingsByName.get(sellerValue.toLowerCase()) ?? "";
+              if (!empId) return undefined;
+              const emp = employees.find(e => e.id === empId);
+              return emp ? `${emp.first_name} ${emp.last_name}` : undefined;
+            })()
+          }
+        />
+      )}
     </div>
   );
 }
