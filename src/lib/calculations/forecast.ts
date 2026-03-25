@@ -274,7 +274,13 @@ export function forecastNewEmployeeHybrid(
     const clampHigh = baselineSph * 1.4;
     const clampedEmpiricalSph = Math.max(clampLow, Math.min(clampHigh, rawEmpiricalSph));
 
-    finalSph = (1 - w) * rampedSph + w * clampedEmpiricalSph;
+    // Asymmetric blending: if empirical >= ramp AND reliability is sufficient,
+    // trust proven performance instead of dragging it down with low ramp average
+    if (clampedEmpiricalSph >= rampedSph && w >= 0.5) {
+      finalSph = clampedEmpiricalSph;
+    } else {
+      finalSph = (1 - w) * rampedSph + w * clampedEmpiricalSph;
+    }
     empiricalSphUsed = rawEmpiricalSph;
     hybridBlend = true;
 
