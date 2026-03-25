@@ -469,11 +469,17 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         return 0;
       }
 
-      // 6. Build EmployeePerformance for each active employee
+        // 6. Build EmployeePerformance for each active employee
       // For EWMA: get SPH per week (sales / shifts / 7.5)
+      // Use extended window (up to 12 weeks) to find valid weeks for employees with heavy absence
+      const EXTENDED_EWMA_WEEKS = 12;
       const weekStarts: Date[] = [];
       for (let i = 0; i < EWMA_WEEKS; i++) {
         weekStarts.push(startOfWeek(subWeeks(now, i + 1), { weekStartsOn: 1 }));
+      }
+      const extendedWeekStarts: Date[] = [];
+      for (let i = EWMA_WEEKS; i < EXTENDED_EWMA_WEEKS; i++) {
+        extendedWeekStarts.push(startOfWeek(subWeeks(now, i + 1), { weekStartsOn: 1 }));
       }
 
       const employeePerformances: EmployeePerformance[] = [];
