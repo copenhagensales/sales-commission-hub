@@ -165,8 +165,8 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
 
       const allEmails = [...new Set(Array.from(empEmailMap.values()).flat())];
 
-      // 4. Get weekly sales for the past 8 weeks
-      const weeksAgo8 = subWeeks(now, EWMA_WEEKS);
+      // 4. Get weekly sales for the past 12 weeks (extended for fallback lookback)
+      const weeksAgo8 = subWeeks(now, 12);
       const salesStartStr = format(weeksAgo8, "yyyy-MM-dd");
       const salesEndStr = format(now, "yyyy-MM-dd");
 
