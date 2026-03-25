@@ -163,59 +163,45 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
     enabled: !!clientId,
   });
 
-  const { data: excelProductNames = [] } = useQuery({
-    queryKey: ["excel-product-names", clientId],
+  // Fetch all unique column headers from uploaded Excel data
+  const { data: excelColumns = [] } = useQuery({
+    queryKey: ["excel-column-headers", clientId],
     queryFn: async () => {
       const [queueResult, importsResult] = await Promise.all([
         supabase
           .from("cancellation_queue")
-          .select("target_product_name, uploaded_data")
-          .eq("client_id", clientId),
+          .select("uploaded_data")
+          .eq("client_id", clientId)
+          .limit(50),
         supabase
           .from("cancellation_imports")
           .select("unmatched_rows")
           .eq("client_id", clientId)
-          .not("unmatched_rows", "is", null),
+          .not("unmatched_rows", "is", null)
+          .limit(10),
       ]);
 
       if (queueResult.error) throw queueResult.error;
       if (importsResult.error) throw importsResult.error;
 
-      const names = new Set<string>();
-      const PRODUCT_KEYS = ["Subscription Name", "Product", "Produkt", "Abonnement", "Product Name", "Produktnavn"];
-
-      const extractName = (row: Record<string, unknown>) => {
-        for (const key of PRODUCT_KEYS) {
-          const val = row[key];
-          if (typeof val === "string" && val.trim()) {
-            names.add(val.trim());
-            return;
-          }
-        }
-        for (const [k, v] of Object.entries(row)) {
-          const lower = k.toLowerCase();
-          if ((lower.includes("subscription") || lower.includes("product") || lower.includes("produkt") || lower.includes("abonnement")) && typeof v === "string" && v.trim()) {
-            names.add(v.trim());
-            return;
-          }
-        }
-      };
+      const columns = new Set<string>();
 
       for (const row of queueResult.data || []) {
-        if (row.target_product_name) { names.add(row.target_product_name); continue; }
         if (row.uploaded_data && typeof row.uploaded_data === "object") {
-          extractName(row.uploaded_data as Record<string, unknown>);
+          Object.keys(row.uploaded_data as Record<string, unknown>).forEach(k => columns.add(k));
         }
       }
 
       for (const imp of importsResult.data || []) {
         if (!Array.isArray(imp.unmatched_rows)) continue;
         for (const row of imp.unmatched_rows) {
-          if (row && typeof row === "object") extractName(row as Record<string, unknown>);
+          if (row && typeof row === "object") {
+            Object.keys(row as Record<string, unknown>).forEach(k => columns.add(k));
+          }
         }
       }
 
-      return [...names];
+      return [...columns].sort((a, b) => a.localeCompare(b, "da"));
     },
     enabled: !!clientId,
   });
