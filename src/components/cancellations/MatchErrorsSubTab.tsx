@@ -303,9 +303,39 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
     onSuccess: () => {
       toast({ title: "Alle fejlede rækker er blevet ignoreret og fjernet" });
       queryClient.invalidateQueries({ queryKey: ["match-errors", clientId] });
+      queryClient.invalidateQueries({ queryKey: ["match-errors-count"] });
     },
     onError: () => {
       toast({ title: "Fejl ved ignorering af rækker", variant: "destructive" });
+    },
+  });
+
+  const ignoreRowMutation = useMutation({
+    mutationFn: async (row: FlatUnmatchedRow) => {
+      const { data: importData } = await supabase
+        .from("cancellation_imports")
+        .select("unmatched_rows")
+        .eq("id", row.importId)
+        .single();
+      if (!importData?.unmatched_rows || !Array.isArray(importData.unmatched_rows)) return;
+      const rowJson = JSON.stringify(row.rowData);
+      const updated = (importData.unmatched_rows as Record<string, unknown>[]).filter(
+        ur => JSON.stringify(ur) !== rowJson
+      );
+      await supabase
+        .from("cancellation_imports")
+        .update({ unmatched_rows: (updated.length > 0 ? updated : null) as unknown as Json })
+        .eq("id", row.importId);
+    },
+    onSuccess: () => {
+      toast({ title: "Rækken er blevet ignoreret" });
+      setIgnorePendingIdx(null);
+      queryClient.invalidateQueries({ queryKey: ["match-errors", clientId] });
+      queryClient.invalidateQueries({ queryKey: ["match-errors-count"] });
+    },
+    onError: () => {
+      toast({ title: "Fejl ved ignorering", variant: "destructive" });
+      setIgnorePendingIdx(null);
     },
   });
 
