@@ -15,7 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
-import { Check, X, Loader2, Clock, Filter, Search, ArrowUpDown, ArrowUp, ArrowDown, Trash2, RotateCcw } from "lucide-react";
+import { Check, X, Loader2, Clock, Filter, Search, ArrowUpDown, ArrowUp, ArrowDown, Trash2, RotateCcw, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,9 +33,11 @@ import { da } from "date-fns/locale";
 
 import { MatchErrorsSubTab } from "@/components/cancellations/MatchErrorsSubTab";
 import { CLIENT_IDS } from "@/utils/clientIds";
+import { fetchByIds } from "@/utils/supabasePagination";
 import { FileSpreadsheet, AlertTriangle } from "lucide-react";
 
 const TDC_ERHVERV_CLIENT_ID = CLIENT_IDS["TDC Erhverv"];
+const PAGE_SIZE = 50;
 
 interface DiffField {
   label: string;
@@ -61,21 +63,6 @@ interface SaleItem {
 interface PreviewField {
   label: string;
   value: string;
-}
-
-function extractOpp(rawPayload: unknown): string {
-  if (!rawPayload || typeof rawPayload !== "object") return "";
-  const rp = rawPayload as Record<string, unknown>;
-  if (rp["legacy_opp_number"]) return String(rp["legacy_opp_number"]);
-  const fields = rp["leadResultFields"] as Record<string, unknown> | undefined;
-  if (fields?.["OPP nr"]) return String(fields["OPP nr"]);
-  if (fields?.["OPP-nr"]) return String(fields["OPP-nr"]);
-  const dataArr = rp["leadResultData"] as Array<{ label?: string; value?: string }> | undefined;
-  if (Array.isArray(dataArr)) {
-    const found = dataArr.find((d) => d.label === "OPP nr" || d.label === "OPP-nr");
-    if (found?.value) return String(found.value);
-  }
-  return "";
 }
 
 function stripPercentSuffix(name: string): string {
@@ -207,7 +194,6 @@ function buildUploadedPreview(
     seen.add(label);
   };
 
-  // Show product names from _product_rows if available (TDC multi-row OPPs)
   const productRows = uploadedData._product_rows as Record<string, unknown>[] | undefined;
   if (productRows && productRows.length > 0) {
     const productNames = productRows
@@ -306,6 +292,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   const [subTab, setSubTab] = useState<"cancellation" | "basket_difference" | "match_errors">("cancellation");
   const [searchQuery, setSearchQuery] = useState("");
   const [sellerFilter, setSellerFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
   type QueueSortKey = "date" | "agent" | "opp" | "type";
   type QueueSortDir = "asc" | "desc";
   const [sortKey, setSortKey] = useState<QueueSortKey>("date");
@@ -332,80 +319,68 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
     queryFn: async () => {
       let query = supabase
         .from("cancellation_queue")
-        .select(`id, sale_id, upload_type, status, reviewed_at, created_at, import_id`)
+        .select("id, sale_id, upload_type, status, reviewed_at, created_at, import_id, uploaded_data, opp_group, client_id")
         .order("created_at", { ascending: false });
 
       if (statusFilter !== "all") {
         query = query.eq("status", statusFilter);
       }
-
       if (clientId) {
         query = query.eq("client_id", clientId);
       }
 
-      const { data, error } = await query.limit(500);
+      const { data, error } = await query.limit(200);
       if (error) throw error;
-
-      const queueIds = data.map((d) => d.id);
-      let extendedDataMap = new Map<string, { uploaded_data: Record<string, unknown> | null; opp_group: string | null; client_id: string | null }>();
-      if (queueIds.length > 0) {
-        const { data: rawData } = await supabase
-          .from("cancellation_queue")
-          .select("id, uploaded_data, opp_group, client_id")
-          .in("id", queueIds) as any;
-        if (rawData) {
-          for (const r of rawData) {
-            extendedDataMap.set(r.id, { uploaded_data: r.uploaded_data, opp_group: r.opp_group, client_id: r.client_id });
-          }
-        }
-      }
+      if (!data || data.length === 0) return { oppGroups: [], flatItems: [] };
 
       const saleIds = [...new Set(data.map((d) => d.sale_id))];
       const importIds = [...new Set(data.map((d) => d.import_id))];
 
-      const [salesResult, importsResult, saleItemsResult] = await Promise.all([
+      const [salesData, importsResult, saleItemsData] = await Promise.all([
         saleIds.length > 0
-          ? supabase.from("sales").select("id, sale_datetime, customer_phone, customer_company, agent_name, validation_status, raw_payload").in("id", saleIds)
-          : { data: [] as any[], error: null },
+          ? fetchByIds<any>("sales", "id", saleIds, "id, sale_datetime, customer_phone, customer_company, agent_name, validation_status")
+          : [],
         importIds.length > 0
           ? supabase.from("cancellation_imports").select("id, file_name, uploaded_by, config_id").in("id", importIds)
           : { data: [] as any[], error: null },
         saleIds.length > 0
-          ? supabase.from("sale_items").select("sale_id, quantity, mapped_commission, mapped_revenue, adversus_product_title, product_id").in("sale_id", saleIds)
-          : { data: [] as any[], error: null },
+          ? fetchByIds<any>("sale_items", "sale_id", saleIds, "sale_id, quantity, mapped_commission, mapped_revenue, adversus_product_title, product_id")
+          : [],
       ]);
 
-      const configIds = [...new Set((importsResult.data || []).map((i: any) => i.config_id).filter(Boolean))];
+      const importsData = (importsResult as any)?.data || importsResult || [];
+
+      const configIds = [...new Set((importsData as any[]).map((i: any) => i.config_id).filter(Boolean))];
+      const productIds = [...new Set((saleItemsData as any[]).map((si: any) => si.product_id).filter(Boolean))];
+
+      const [configsResult, productsResult] = await Promise.all([
+        configIds.length > 0
+          ? supabase.from("cancellation_upload_configs").select("id, product_columns, revenue_column, commission_column, product_match_mode").in("id", configIds) as any
+          : { data: [] },
+        productIds.length > 0
+          ? fetchByIds<any>("products", "id", productIds, "id, name")
+          : [],
+      ]);
+
       const configsMap = new Map<string, ColumnMapping>();
-      if (configIds.length > 0) {
-        const { data: configs } = await supabase
-          .from("cancellation_upload_configs")
-          .select("id, product_columns, revenue_column, commission_column, product_match_mode")
-          .in("id", configIds) as any;
-        if (configs) {
-          for (const cfg of configs) {
-            configsMap.set(cfg.id, {
-              product_columns: cfg.product_columns || [],
-              revenue_column: cfg.revenue_column,
-              commission_column: cfg.commission_column,
-              product_match_mode: cfg.product_match_mode || "exact",
-            });
-          }
-        }
+      for (const cfg of (configsResult?.data || [])) {
+        configsMap.set(cfg.id, {
+          product_columns: cfg.product_columns || [],
+          revenue_column: cfg.revenue_column,
+          commission_column: cfg.commission_column,
+          product_match_mode: cfg.product_match_mode || "exact",
+        });
       }
 
-      const productIds = [...new Set((saleItemsResult.data || []).map((si) => si.product_id).filter(Boolean))];
-      let productsMap = new Map<string, string>();
-      if (productIds.length > 0) {
-        const { data: products } = await supabase.from("products").select("id, name").in("id", productIds);
-        if (products) productsMap = new Map(products.map((p) => [p.id, p.name]));
-      }
+      const productsMap = new Map<string, string>(
+        (productsResult as any[]).map((p: any) => [p.id, p.name])
+      );
 
-      const salesMap = new Map((salesResult.data || []).map((s) => [s.id, s]));
-      const importsMap = new Map((importsResult.data || []).map((i: any) => [i.id, i]));
+      const salesMap = new Map((salesData as any[]).map((s: any) => [s.id, s]));
+      const importsMap = new Map((importsData as any[]).map((i: any) => [i.id, i]));
 
       const saleItemsBySale = new Map<string, SaleItem[]>();
-      for (const si of saleItemsResult.data || []) {
+      for (const si of saleItemsData as any[]) {
         const items = saleItemsBySale.get(si.sale_id) || [];
         items.push({
           product_name: productsMap.get(si.product_id) || si.adversus_product_title || "Ukendt",
@@ -420,21 +395,20 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
         const sale = salesMap.get(item.sale_id);
         const imp = importsMap.get(item.import_id);
         const saleItems = saleItemsBySale.get(item.sale_id) || [];
-        const ext = extendedDataMap.get(item.id);
-        const uploaded = (ext?.uploaded_data || null) as Record<string, unknown> | null;
+        const uploaded = (item.uploaded_data || null) as Record<string, unknown> | null;
         const configId = imp?.config_id;
         const mapping = configId ? configsMap.get(configId) || null : null;
         const diffs = computeDiff(uploaded, saleItems, mapping);
 
         return {
           ...item,
-          opp_group: ext?.opp_group || null,
-          client_id: ext?.client_id || null,
+          opp_group: item.opp_group || null,
+          client_id: item.client_id || null,
           saleDate: sale?.sale_datetime || "",
           agentName: sale?.agent_name || "Ukendt",
           phone: sale?.customer_phone || "",
           company: sale?.customer_company || "",
-          oppNumber: extractOpp(sale?.raw_payload),
+          oppNumber: item.opp_group || "",
           currentValidationStatus: sale?.validation_status || "",
           fileName: imp?.file_name || "",
           saleItems,
@@ -500,71 +474,85 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
       if (!currentEmployee?.id) throw new Error("Ingen medarbejder fundet");
       const newStatus = uploadType === "cancellation" ? "cancelled" : "basket_changed";
 
-      // Check if any queue items have target_product_name (product-level cancellation)
-      const { data: queueItems } = await supabase
-        .from("cancellation_queue")
-        .select("id, sale_id, target_product_name")
-        .in("id", queueItemIds) as any;
+      const queueItems = await fetchByIds<any>("cancellation_queue", "id", queueItemIds, "id, sale_id, target_product_name");
 
-      const productLevelItems = (queueItems || []).filter((qi: any) => qi.target_product_name);
-      const wholeSaleItems = (queueItems || []).filter((qi: any) => !qi.target_product_name);
+      const productLevelItems = queueItems.filter((qi: any) => qi.target_product_name);
+      const wholeSaleItems = queueItems.filter((qi: any) => !qi.target_product_name);
 
-      // Handle product-level cancellations
-      for (const qi of productLevelItems) {
-        // Find matching sale_items by product name and cancel them
-        const { data: saleItems } = await supabase
-          .from("sale_items")
-          .select("id, product_id, adversus_product_title")
-          .eq("sale_id", qi.sale_id);
+      if (productLevelItems.length > 0) {
+        const productSaleIds = [...new Set(productLevelItems.map((qi: any) => qi.sale_id))];
+        
+        const [allSaleItems, allProducts] = await Promise.all([
+          fetchByIds<any>("sale_items", "sale_id", productSaleIds, "id, sale_id, product_id, adversus_product_title, is_cancelled"),
+          (async () => {
+            const saleItemsForProducts = await fetchByIds<any>("sale_items", "sale_id", productSaleIds, "product_id");
+            const pIds = [...new Set(saleItemsForProducts.map((si: any) => si.product_id).filter(Boolean))];
+            return pIds.length > 0 ? fetchByIds<any>("products", "id", pIds, "id, name") : [];
+          })(),
+        ]);
 
-        // Also fetch product names
-        const productIds = (saleItems || []).map((si: any) => si.product_id).filter(Boolean);
-        let productNamesMap = new Map<string, string>();
-        if (productIds.length > 0) {
-          const { data: products } = await supabase.from("products").select("id, name").in("id", productIds);
-          if (products) productNamesMap = new Map(products.map((p: any) => [p.id, p.name]));
+        const productNamesMap = new Map<string, string>(allProducts.map((p: any) => [p.id, p.name]));
+
+        const saleItemsBySaleId = new Map<string, any[]>();
+        for (const si of allSaleItems) {
+          const arr = saleItemsBySaleId.get(si.sale_id) || [];
+          arr.push(si);
+          saleItemsBySaleId.set(si.sale_id, arr);
         }
 
-        const targetName = qi.target_product_name.toLowerCase().trim();
-        const matchingItem = (saleItems || []).find((si: any) => {
-          const name = (productNamesMap.get(si.product_id) || si.adversus_product_title || "").toLowerCase().trim();
-          return name === targetName;
+        const itemsToCancel: string[] = [];
+        const salesToCheckAllCancelled: string[] = [];
+
+        for (const qi of productLevelItems) {
+          const saleItems = saleItemsBySaleId.get(qi.sale_id) || [];
+          const targetName = qi.target_product_name.toLowerCase().trim();
+          const matchingItem = saleItems.find((si: any) => {
+            const name = (productNamesMap.get(si.product_id) || si.adversus_product_title || "").toLowerCase().trim();
+            return name === targetName;
+          });
+          if (matchingItem) {
+            itemsToCancel.push(matchingItem.id);
+          }
+          salesToCheckAllCancelled.push(qi.sale_id);
+        }
+
+        if (itemsToCancel.length > 0) {
+          await supabase.from("sale_items").update({ is_cancelled: true } as any).in("id", itemsToCancel);
+        }
+
+        const uniqueSalesToCheck = [...new Set(salesToCheckAllCancelled)];
+        const updatedSaleItems = await fetchByIds<any>("sale_items", "sale_id", uniqueSalesToCheck, "id, sale_id, is_cancelled");
+        
+        const saleItemsAfterUpdate = new Map<string, any[]>();
+        for (const si of updatedSaleItems) {
+          const arr = saleItemsAfterUpdate.get(si.sale_id) || [];
+          arr.push(si);
+          saleItemsAfterUpdate.set(si.sale_id, arr);
+        }
+
+        const fullyCanelledSaleIds = uniqueSalesToCheck.filter(saleId => {
+          const items = saleItemsAfterUpdate.get(saleId) || [];
+          return items.length > 0 && items.every((si: any) => si.is_cancelled === true);
         });
 
-        if (matchingItem) {
-          await supabase.from("sale_items").update({
-            is_cancelled: true,
-          } as any).eq("id", matchingItem.id);
-        }
-
-        // Check if ALL sale_items are now cancelled
-        const { data: remainingItems } = await supabase
-          .from("sale_items")
-          .select("id, is_cancelled")
-          .eq("sale_id", qi.sale_id) as any;
-
-        const allCancelled = (remainingItems || []).every((si: any) => si.is_cancelled === true);
-        if (allCancelled) {
-          await supabase.from("sales").update({ validation_status: "cancelled" }).eq("id", qi.sale_id);
+        if (fullyCanelledSaleIds.length > 0) {
+          await supabase.from("sales").update({ validation_status: "cancelled" }).in("id", fullyCanelledSaleIds);
         }
       }
 
-      // Handle whole-sale cancellations (existing logic)
       const wholeSaleIds: string[] = Array.from(new Set<string>(wholeSaleItems.map((qi: any) => String(qi.sale_id))));
-      for (const saleId of wholeSaleIds) {
-        const { error } = await supabase.from("sales").update({ validation_status: newStatus } as any).eq("id", saleId);
+      if (wholeSaleIds.length > 0) {
+        const { error } = await supabase.from("sales").update({ validation_status: newStatus } as any).in("id", wholeSaleIds);
         if (error) throw error;
       }
 
-      // Mark queue items as approved
-      for (const id of queueItemIds) {
-        const { error } = await supabase.from("cancellation_queue").update({
-          status: "approved",
-          reviewed_by: currentEmployee.id,
-          reviewed_at: new Date().toISOString(),
-        }).eq("id", id);
-        if (error) throw error;
-      }
+      const { error: approveError } = await supabase.from("cancellation_queue").update({
+        status: "approved",
+        reviewed_by: currentEmployee.id,
+        reviewed_at: new Date().toISOString(),
+      }).in("id", queueItemIds);
+      if (approveError) throw approveError;
+
       return { count: queueItemIds.length };
     },
     onSuccess: ({ count }) => {
@@ -579,14 +567,12 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   const rejectMutation = useMutation({
     mutationFn: async (itemIds: string[]) => {
       if (!currentEmployee?.id) throw new Error("Ingen medarbejder fundet");
-      for (const id of itemIds) {
-        const { error } = await supabase.from("cancellation_queue").update({
-          status: "rejected",
-          reviewed_by: currentEmployee.id,
-          reviewed_at: new Date().toISOString(),
-        }).eq("id", id);
-        if (error) throw error;
-      }
+      const { error } = await supabase.from("cancellation_queue").update({
+        status: "rejected",
+        reviewed_by: currentEmployee.id,
+        reviewed_at: new Date().toISOString(),
+      }).in("id", itemIds);
+      if (error) throw error;
       return { count: itemIds.length };
     },
     onSuccess: ({ count }) => {
@@ -601,11 +587,9 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   const filteredOppGroups = onlyDifferences ? oppGroups.filter((g) => g.hasDifferences) : oppGroups;
   const filteredFlatItems = onlyDifferences ? flatItems.filter((i) => i.hasDifferences) : flatItems;
 
-  // Split by sub-tab (upload_type)
   const subOppGroups = useMemo(() => filteredOppGroups.filter((g) => g.uploadType === subTab), [filteredOppGroups, subTab]);
   const subFlatItems = useMemo(() => filteredFlatItems.filter((i) => i.upload_type === subTab), [filteredFlatItems, subTab]);
 
-  // Unique sellers across all items for filter
   const allSellers = useMemo(() => {
     const names = new Set<string>();
     filteredOppGroups.forEach(g => g.agents.forEach(a => names.add(a)));
@@ -613,7 +597,6 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
     return [...names].sort();
   }, [filteredOppGroups, filteredFlatItems]);
 
-  // Apply search + seller filter + sort to sub-tab items
   const filterAndSort = <T extends { agentName?: string; agents?: string[]; oppNumber?: string; oppGroup?: string; phone?: string; company?: string; saleDate?: string; createdAt?: string; fileName?: string }>(
     items: T[],
     getAgent: (item: T) => string,
@@ -671,7 +654,6 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
     ),
     [subFlatItems, sellerFilter, searchQuery, sortKey, sortDir]);
 
-  // Counts per sub-tab for labels (use original unfiltered)
   const cancellationCount = useMemo(() =>
     filteredOppGroups.filter((g) => g.uploadType === "cancellation").length +
     filteredFlatItems.filter((i) => i.upload_type === "cancellation").length,
@@ -681,7 +663,6 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
     filteredFlatItems.filter((i) => i.upload_type === "basket_difference").length,
     [filteredOppGroups, filteredFlatItems]);
 
-  // Active import query — imports with pending queue items
   const { data: activeImport } = useQuery({
     queryKey: ["active-import-info", clientId],
     enabled: !!clientId,
@@ -706,8 +687,6 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
     },
   });
 
-
-  // Count for "Fejl i match" tab
   const { data: matchErrorsCount = 0 } = useQuery({
     queryKey: ["match-errors-count", clientId],
     enabled: !!clientId,
@@ -723,7 +702,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
         return sum + (Array.isArray(rows) ? rows.length : 0);
       }, 0);
     },
-    staleTime: 0,
+    staleTime: 30_000,
   });
 
   const pendingOppGroups = processedOppGroups.filter((g) => g.status === "pending");
@@ -764,6 +743,62 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
     if (allIds.length > 0) rejectMutation.mutate(allIds);
   };
 
+  const totalItems = processedOppGroups.length + processedFlatItems.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+
+  useMemo(() => {
+    setCurrentPage(1);
+  }, [statusFilter, onlyDifferences, subTab, searchQuery, sellerFilter]);
+
+  const paginatedOppGroups = useMemo(() => {
+    const start = (safeCurrentPage - 1) * PAGE_SIZE;
+    const end = start + PAGE_SIZE;
+    if (start >= processedOppGroups.length) return [];
+    return processedOppGroups.slice(start, Math.min(end, processedOppGroups.length));
+  }, [processedOppGroups, safeCurrentPage]);
+
+  const paginatedFlatItems = useMemo(() => {
+    const oppCount = processedOppGroups.length;
+    const start = (safeCurrentPage - 1) * PAGE_SIZE;
+    const end = start + PAGE_SIZE;
+    const flatStart = Math.max(0, start - oppCount);
+    const flatEnd = Math.max(0, end - oppCount);
+    if (flatStart >= processedFlatItems.length) return [];
+    return processedFlatItems.slice(flatStart, Math.min(flatEnd, processedFlatItems.length));
+  }, [processedFlatItems, processedOppGroups.length, safeCurrentPage]);
+
+  const renderPagination = () => {
+    if (totalPages <= 1) return null;
+    return (
+      <div className="flex items-center justify-between mt-4">
+        <span className="text-sm text-muted-foreground">
+          Side {safeCurrentPage} af {totalPages} ({totalItems} rækker)
+        </span>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={safeCurrentPage <= 1}
+          >
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            Forrige
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={safeCurrentPage >= totalPages}
+          >
+            Næste
+            <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
   const renderTable = () => {
     if (processedOppGroups.length === 0 && processedFlatItems.length === 0) {
       return (
@@ -777,7 +812,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
 
     return (
       <div className="space-y-6">
-        {processedOppGroups.length > 0 && (
+        {paginatedOppGroups.length > 0 && (
           <div>
             <h3 className="text-sm font-semibold mb-2 text-muted-foreground">TDC Erhverv — OPP-grupperet</h3>
             <div className="rounded-md border max-h-[600px] overflow-auto">
@@ -799,7 +834,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                    </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {processedOppGroups.map((g) => {
+                  {paginatedOppGroups.map((g) => {
                     const summarizedItems = summarizeSaleItems(g.saleItems);
                     const uploadedPreview = buildUploadedPreview(g.uploadedData, g.mapping);
                     return (
@@ -889,9 +924,9 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
           </div>
         )}
 
-        {processedFlatItems.length > 0 && (
+        {paginatedFlatItems.length > 0 && (
           <div>
-            {processedOppGroups.length > 0 && (
+            {paginatedOppGroups.length > 0 && (
               <h3 className="text-sm font-semibold mb-2 text-muted-foreground">Andre kunder — per salg</h3>
             )}
             <div className="rounded-md border max-h-[600px] overflow-auto">
@@ -916,7 +951,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                    </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {processedFlatItems.map((item) => {
+                  {paginatedFlatItems.map((item) => {
                     const summarizedItems = summarizeSaleItems(item.saleItems);
                     const uploadedPreview = buildUploadedPreview(item.uploadedData, item.mapping);
                     return (
@@ -1003,13 +1038,14 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
             </div>
           </div>
         )}
+
+        {renderPagination()}
       </div>
     );
   };
 
   return (
     <div className="space-y-6">
-      {/* Active import card */}
       {activeImport && (
         <Card className="border-primary/50 bg-primary/5">
           <CardContent className="flex items-center gap-4 py-4">
