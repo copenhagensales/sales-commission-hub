@@ -143,6 +143,7 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
   const [newExcelName, setNewExcelName] = useState("");
   const [selectedProductId, setSelectedProductId] = useState("");
   const [popoverOpen, setPopoverOpen] = useState(false);
+  const [excelPopoverOpen, setExcelPopoverOpen] = useState(false);
 
   const { data: mappings = [], isLoading } = useQuery({
     queryKey: ["cancellation-product-mappings", clientId],
@@ -157,6 +158,26 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
     },
     enabled: !!clientId,
   });
+
+  // Get unique Excel product names from previous uploads
+  const { data: excelProductNames = [] } = useQuery({
+    queryKey: ["excel-product-names", clientId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("cancellation_queue")
+        .select("target_product_name")
+        .eq("client_id", clientId)
+        .not("target_product_name", "is", null);
+      if (error) throw error;
+      const unique = [...new Set((data || []).map(d => d.target_product_name).filter(Boolean))] as string[];
+      return unique.sort((a, b) => a.localeCompare(b, "da"));
+    },
+    enabled: !!clientId,
+  });
+
+  // Filter out names that already have a mapping
+  const mappedNames = new Set(mappings.map(m => m.excel_product_name));
+  const availableExcelNames = excelProductNames.filter(n => !mappedNames.has(n));
 
   // Get campaign IDs for client, then products for those campaigns
   const { data: campaignIds = [] } = useQuery({
@@ -178,6 +199,7 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
         .select("id, name, client_campaign_id")
         .in("client_campaign_id", campaignIds)
         .eq("is_active", true)
+        .eq("is_hidden", false)
         .order("name");
       if (error) throw error;
       return data || [];
@@ -239,12 +261,44 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
         <div className="flex items-end gap-3">
           <div className="flex-1 space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">Produktnavn fra Excel</label>
-            <Input
-              placeholder="F.eks. 'Eesy uden første måned'"
-              value={newExcelName}
-              onChange={e => setNewExcelName(e.target.value)}
-              className="h-9"
-            />
+            <Popover open={excelPopoverOpen} onOpenChange={setExcelPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" className="h-9 w-full justify-between text-xs font-normal">
+                  <span className="truncate">{newExcelName || "Vælg produktnavn..."}</span>
+                  <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[300px] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Søg eller skriv nyt navn..." className="h-9 text-xs" onValueChange={v => setNewExcelName(v)} />
+                  <CommandList>
+                    <CommandEmpty>
+                      {newExcelName.trim() ? (
+                        <button
+                          className="w-full px-2 py-1.5 text-xs text-left hover:bg-accent rounded-sm cursor-pointer"
+                          onClick={() => { setExcelPopoverOpen(false); }}
+                        >
+                          Brug "{newExcelName.trim()}"
+                        </button>
+                      ) : "Ingen produktnavne fundet."}
+                    </CommandEmpty>
+                    <CommandGroup>
+                      {availableExcelNames.map(name => (
+                        <CommandItem
+                          key={name}
+                          value={name}
+                          onSelect={() => { setNewExcelName(name); setExcelPopoverOpen(false); }}
+                          className="text-xs"
+                        >
+                          <Check className={cn("mr-2 h-3 w-3", newExcelName === name ? "opacity-100" : "opacity-0")} />
+                          {name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
           <div className="flex-1 space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">Internt produkt</label>
