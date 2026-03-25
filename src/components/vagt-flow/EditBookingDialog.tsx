@@ -1232,7 +1232,7 @@ export function EditBookingDialog({
         </DialogHeader>
         
         <Tabs defaultValue="booking" className="w-full">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className={`grid w-full ${showTrainingTab ? 'grid-cols-6' : 'grid-cols-5'}`}>
             <TabsTrigger value="booking" className="flex items-center gap-1 text-xs px-2">
               <FileText className="h-4 w-4" />
               Booking
@@ -1249,10 +1249,12 @@ export function EditBookingDialog({
               <Utensils className="h-4 w-4" />
               Diæt
             </TabsTrigger>
-            <TabsTrigger value="training" className="flex items-center gap-1 text-xs px-2">
-              <GraduationCap className="h-4 w-4" />
-              Oplæring
-            </TabsTrigger>
+            {showTrainingTab && (
+              <TabsTrigger value="training" className="flex items-center gap-1 text-xs px-2">
+                <GraduationCap className="h-4 w-4" />
+                Oplæring
+              </TabsTrigger>
+            )}
             <TabsTrigger value="hotel" className="flex items-center gap-1 text-xs px-2">
               <Building2 className="h-4 w-4" />
               Hotel
