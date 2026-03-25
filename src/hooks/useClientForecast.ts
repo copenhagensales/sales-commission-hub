@@ -928,8 +928,8 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
                   rows.forEach((s: any) => {
                     const email = s.agent_email?.toLowerCase();
                     if (!email) return;
-                    // Find employee for this email
-                    const empId = employees.find(e => (empEmailMap.get(e.id) || []).includes(email))?.id;
+                    // Find employee for this email (active or inactive)
+                    const empId = emailToEmployeeId.get(email);
                     if (!empId) return;
                     (s.sale_items || []).forEach((si: any) => {
                       if (si.products?.counts_as_sale !== false) {
