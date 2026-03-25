@@ -159,7 +159,7 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
     enabled: !!clientId,
   });
 
-  // Get unique Excel product names from previous uploads
+  // Get unique Excel product names from previous uploads (all types: cancellations + basket corrections)
   const { data: excelProductNames = [] } = useQuery({
     queryKey: ["excel-product-names", clientId],
     queryFn: async () => {
@@ -170,14 +170,10 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
         .not("target_product_name", "is", null);
       if (error) throw error;
       const unique = [...new Set((data || []).map(d => d.target_product_name).filter(Boolean))] as string[];
-      return unique.sort((a, b) => a.localeCompare(b, "da"));
+      return unique;
     },
     enabled: !!clientId,
   });
-
-  // Filter out names that already have a mapping
-  const mappedNames = new Set(mappings.map(m => m.excel_product_name));
-  const availableExcelNames = excelProductNames.filter(n => !mappedNames.has(n));
 
   // Get campaign IDs for client, then products for those campaigns
   const { data: campaignIds = [] } = useQuery({
