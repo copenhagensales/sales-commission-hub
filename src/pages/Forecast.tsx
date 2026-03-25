@@ -51,6 +51,7 @@ export default function Forecast() {
   const forecast = forecastData?.forecast;
   const cohorts = forecastData?.cohorts || [];
   const calculatedAt = forecastData?.calculatedAt || null;
+  const activeRampProfile = forecastData?.activeRampProfile || MOCK_RAMP_PROFILE;
 
   // Real vs actual data
   const { data: vsActual = [], isLoading: vsActualLoading } = useForecastVsActual(selectedClient);
@@ -292,7 +293,7 @@ export default function Forecast() {
                   onEdit={(id, data) => updateCohort.mutate({ id, data })}
                 />
                 <ForecastAssumptions
-                  rampProfile={MOCK_RAMP_PROFILE}
+                  rampProfile={activeRampProfile}
                   survivalProfile={MOCK_SURVIVAL_PROFILE}
                   avgAttendance={avgAttendance}
                   baselineSph={baselineSph}

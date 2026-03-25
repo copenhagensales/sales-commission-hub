@@ -15,6 +15,7 @@ import type {
   ClientForecastCohort,
   TeamChurnRates,
   TenureBucketRates,
+  ForecastRampProfile,
 } from "@/types/forecast";
 
 const HOURS_PER_SHIFT = 7.5;
@@ -30,13 +31,14 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
   // Normalize period to monthOffset for backward compat
   const monthOffset = typeof period === "number" ? period : period === "current" ? 0 : 1;
 
-  const FORECAST_LOGIC_VERSION = 5; // bump to force a fresh recompute after FM forecast fixes
+  const FORECAST_LOGIC_VERSION = 6; // bump: campaign-specific ramp profiles
   return useQuery({
     queryKey: ["client-forecast", clientId, monthOffset, FORECAST_LOGIC_VERSION],
     queryFn: async (): Promise<{
       forecast: ForecastResult;
       cohorts: ClientForecastCohort[];
       calculatedAt: string;
+      activeRampProfile: ForecastRampProfile;
     }> => {
       const now = new Date();
       const forecastStart = startOfMonth(new Date(now.getFullYear(), now.getMonth() + monthOffset, 1));
@@ -80,6 +82,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           forecast: emptyForecast(forecastStartStr, forecastEndStr, clientId),
           cohorts: [],
           calculatedAt: now.toISOString(),
+          activeRampProfile: MOCK_RAMP_PROFILE,
         };
       }
 
@@ -94,6 +97,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           forecast: emptyForecast(forecastStartStr, forecastEndStr, clientId),
           cohorts: [],
           calculatedAt: now.toISOString(),
+          activeRampProfile: MOCK_RAMP_PROFILE,
         };
       }
 
@@ -120,6 +124,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           forecast: emptyForecast(forecastStartStr, forecastEndStr, clientId),
           cohorts: [],
           calculatedAt: now.toISOString(),
+          activeRampProfile: MOCK_RAMP_PROFILE,
         };
       }
 
@@ -613,13 +618,34 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         }
       }
 
-      // 7. Fetch cohorts from DB
+      // 7. Fetch cohorts and campaign-specific ramp profiles from DB
       let cohortQuery = supabase.from("client_forecast_cohorts").select("*");
       if (clientId !== "all") {
         cohortQuery = cohortQuery.eq("client_id", clientId);
       }
-      const { data: dbCohorts } = await cohortQuery;
-      const cohorts: ClientForecastCohort[] = (dbCohorts || []) as ClientForecastCohort[];
+      const [cohortsRes, rampProfilesRes] = await Promise.all([
+        cohortQuery,
+        campaignIds.length > 0
+          ? supabase
+              .from("forecast_ramp_profiles")
+              .select("*")
+              .in("client_campaign_id", campaignIds)
+          : Promise.resolve({ data: [] }),
+      ]);
+      const cohorts: ClientForecastCohort[] = (cohortsRes.data || []) as ClientForecastCohort[];
+
+      // Build campaign -> ramp profile map
+      const campaignRampMap = new Map<string, ForecastRampProfile>();
+      ((rampProfilesRes as any).data || []).forEach((p: any) => {
+        if (p.client_campaign_id) {
+          campaignRampMap.set(p.client_campaign_id, p as ForecastRampProfile);
+        }
+      });
+
+      // Determine the active ramp profile (campaign-specific or fallback)
+      const activeRampProfile: ForecastRampProfile = campaignRampMap.size > 0
+        ? campaignRampMap.values().next().value!
+        : MOCK_RAMP_PROFILE;
 
       // Build CohortForecastInput
       const avgAttendance = employeePerformances.length > 0
@@ -637,16 +663,22 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         ? establishedSphs.reduce((a, b) => a + b, 0) / establishedSphs.length
         : 0.45;
 
-      const cohortInputs: CohortForecastInput[] = cohorts.map(c => ({
-        cohort: c,
-        rampProfile: MOCK_RAMP_PROFILE,
-        survivalProfile: MOCK_SURVIVAL_PROFILE,
-        campaignBaselineSph: baselineSph,
-        weeklyHoursPerHead: DEFAULT_WEEKLY_HOURS,
-        attendanceFactor: avgAttendance,
-        periodStart: format(forecastStart, "yyyy-MM-dd"),
-        periodEnd: format(forecastEnd, "yyyy-MM-dd"),
-      }));
+      const cohortInputs: CohortForecastInput[] = cohorts.map(c => {
+        // Use campaign-specific ramp profile if available for this cohort's campaign
+        const ramp = (c.client_campaign_id && campaignRampMap.has(c.client_campaign_id))
+          ? campaignRampMap.get(c.client_campaign_id)!
+          : activeRampProfile;
+        return {
+          cohort: c,
+          rampProfile: ramp,
+          survivalProfile: MOCK_SURVIVAL_PROFILE,
+          campaignBaselineSph: baselineSph,
+          weeklyHoursPerHead: DEFAULT_WEEKLY_HOURS,
+          attendanceFactor: avgAttendance,
+          periodStart: format(forecastStart, "yyyy-MM-dd"),
+          periodEnd: format(forecastEnd, "yyyy-MM-dd"),
+        };
+      });
 
       // 8. For current period: fetch actual sales to date
       let actualSalesToDate = 0;
@@ -734,7 +766,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           clientId,
           null,
           teamChurnRates,
-          MOCK_RAMP_PROFILE,
+          activeRampProfile,
           baselineSph,
         );
         
@@ -822,6 +854,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           forecast: combinedForecast,
           cohorts,
           calculatedAt: now.toISOString(),
+          activeRampProfile,
         };
       }
 
@@ -834,7 +867,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         clientId,
         null,
         teamChurnRates,
-        MOCK_RAMP_PROFILE,
+        activeRampProfile,
         baselineSph,
         true, // isFuturePeriod — apply momentum correction
       );
@@ -843,6 +876,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         forecast,
         cohorts,
         calculatedAt: now.toISOString(),
+        activeRampProfile,
       };
     },
     staleTime: 0,
