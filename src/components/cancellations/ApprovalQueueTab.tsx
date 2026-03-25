@@ -1145,31 +1145,57 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
               </TabsList>
 
               <TabsContent value="cancellation" className="mt-4">
+                {renderTable()}
                 {statusFilter === "pending" && totalPending > 0 && (
-                  <div className="flex gap-2 mb-4">
-                    <Button size="sm" variant="default" onClick={handleApproveAllPending} disabled={isPending}>
-                      <Check className="h-4 w-4 mr-1" /> Godkend alle
-                    </Button>
-                    <Button size="sm" variant="destructive" onClick={handleRejectAllPending} disabled={isPending}>
-                      <X className="h-4 w-4 mr-1" /> Afvis alle
-                    </Button>
+                  <div className="flex justify-end mt-4">
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button size="sm" variant="default" disabled={isPending}>
+                          <Check className="h-4 w-4 mr-1" /> Godkend alle
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Bekræft godkendelse</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Er du sikker på at du vil godkende alle ventende rækker?
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Annuller</AlertDialogCancel>
+                          <AlertDialogAction onClick={handleApproveAllPending}>Godkend alle</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 )}
-                {renderTable()}
               </TabsContent>
 
               <TabsContent value="basket_difference" className="mt-4">
+                {renderTable()}
                 {statusFilter === "pending" && totalPending > 0 && (
-                  <div className="flex gap-2 mb-4">
-                    <Button size="sm" variant="default" onClick={handleApproveAllPending} disabled={isPending}>
-                      <Check className="h-4 w-4 mr-1" /> Godkend alle
-                    </Button>
-                    <Button size="sm" variant="destructive" onClick={handleRejectAllPending} disabled={isPending}>
-                      <X className="h-4 w-4 mr-1" /> Afvis alle
-                    </Button>
+                  <div className="flex justify-end mt-4">
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button size="sm" variant="default" disabled={isPending}>
+                          <Check className="h-4 w-4 mr-1" /> Godkend alle
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Bekræft godkendelse</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Er du sikker på at du vil godkende alle ventende rækker?
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Annuller</AlertDialogCancel>
+                          <AlertDialogAction onClick={handleApproveAllPending}>Godkend alle</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 )}
-                {renderTable()}
               </TabsContent>
 
 
