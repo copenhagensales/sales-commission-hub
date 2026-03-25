@@ -735,6 +735,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           attendanceFactor: avgAttendance,
           periodStart: format(forecastStart, "yyyy-MM-dd"),
           periodEnd: format(forecastEnd, "yyyy-MM-dd"),
+          holidays: holidayDates,
         };
       });
 
