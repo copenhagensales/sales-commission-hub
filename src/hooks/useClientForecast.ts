@@ -842,13 +842,17 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         
         // Fetch actual sales this month — FM + email based with dedup
         const actualSalesPerEmployee = new Map<string, number>();
+        const actual5GPerEmployee = new Map<string, number>(); // 5G Internet actual sales
         const countedSaleIds = new Set<string>();
 
-        const addActualSale = (empId: string, saleId: string, qty: number) => {
+        const addActualSale = (empId: string, saleId: string, qty: number, is5G: boolean) => {
           if (countedSaleIds.has(saleId)) return;
           countedSaleIds.add(saleId);
           actualSalesToDate += qty;
           actualSalesPerEmployee.set(empId, (actualSalesPerEmployee.get(empId) || 0) + qty);
+          if (isEesyFm && is5G) {
+            actual5GPerEmployee.set(empId, (actual5GPerEmployee.get(empId) || 0) + qty);
+          }
         };
 
         if (campaignIds.length > 0) {
