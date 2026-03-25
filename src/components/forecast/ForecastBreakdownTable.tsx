@@ -314,15 +314,30 @@ export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = f
                         <div>
                           <p className="font-medium">Start {new Date(cohort.startDate).toLocaleDateString('da-DK', { day: 'numeric', month: 'short' })}</p>
                           {cohort.note && <p className="text-xs text-muted-foreground">{cohort.note}</p>}
+                          {cohort.activeDays != null && (
+                            <p className="text-xs text-muted-foreground">
+                              {cohort.activeDays} aktive dage · SPH {cohort.baselineSph?.toFixed(2) ?? '—'}
+                            </p>
+                          )}
                         </div>
                       </td>
                       <td className="py-2.5 text-right tabular-nums">{cohort.plannedHeadcount}</td>
                       <td className="py-2.5 text-right tabular-nums">{cohort.effectiveHeads}</td>
                       <td className="py-2.5 text-right">
-                        <Badge variant="outline" className="text-xs">{Math.round(cohort.rampFactor * 100)}%</Badge>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Badge variant="outline" className="text-xs">{Math.round(cohort.rampFactor * 100)}%</Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>Vægtet gennemsnit over {cohort.activeDays ?? '?'} dage</TooltipContent>
+                        </Tooltip>
                       </td>
                       <td className="py-2.5 text-right">
-                        <Badge variant="outline" className="text-xs">{Math.round(cohort.survivalFactor * 100)}%</Badge>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Badge variant="outline" className="text-xs">{Math.round(cohort.survivalFactor * 100)}%</Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>Vægtet gennemsnit over {cohort.activeDays ?? '?'} dage</TooltipContent>
+                        </Tooltip>
                       </td>
                       <td className="py-2.5 text-right">
                         <div className="flex items-center justify-end gap-1.5">

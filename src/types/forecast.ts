@@ -140,6 +140,11 @@ export interface CohortForecastResult {
   forecastSalesLow: number;
   forecastSalesHigh: number;
   note: string | null;
+  // Debug breakdown from week-by-week simulation
+  activeDays?: number;
+  weightedRampFactor?: number;
+  weightedSurvivalFactor?: number;
+  baselineSph?: number;
 }
 
 export interface ForecastResult {

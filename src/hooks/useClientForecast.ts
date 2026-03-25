@@ -32,7 +32,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
   // Normalize period to monthOffset for backward compat
   const monthOffset = typeof period === "number" ? period : period === "current" ? 0 : 1;
 
-  const FORECAST_LOGIC_VERSION = 6; // bump: campaign-specific ramp profiles
+  const FORECAST_LOGIC_VERSION = 7; // bump: week-by-week cohort simulation
   return useQuery({
     queryKey: ["client-forecast", clientId, monthOffset, FORECAST_LOGIC_VERSION],
     queryFn: async (): Promise<{
