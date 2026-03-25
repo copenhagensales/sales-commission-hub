@@ -59,6 +59,8 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [localAssignments, setLocalAssignments] = useState<Record<number, string>>({});
   const [openPopoverIdx, setOpenPopoverIdx] = useState<number | null>(null);
+  const [locateDialogRow, setLocateDialogRow] = useState<{ row: FlatUnmatchedRow; idx: number } | null>(null);
+  const [ignorePendingIdx, setIgnorePendingIdx] = useState<number | null>(null);
   const queryClient = useQueryClient();
 
   // Fetch unmatched rows
