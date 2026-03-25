@@ -723,6 +723,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
         return sum + (Array.isArray(rows) ? rows.length : 0);
       }, 0);
     },
+    staleTime: 0,
   });
 
   const pendingOppGroups = processedOppGroups.filter((g) => g.status === "pending");

@@ -1470,6 +1470,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                           queryClient.invalidateQueries({ queryKey: ["active-import-block"] });
                           queryClient.invalidateQueries({ queryKey: ["cancellation-queue"] });
                           queryClient.invalidateQueries({ queryKey: ["match-errors"] });
+                          queryClient.invalidateQueries({ queryKey: ["match-errors-count"] });
                         } catch (err: any) {
                           toast({ title: "Fejl", description: err.message, variant: "destructive" });
                         }
