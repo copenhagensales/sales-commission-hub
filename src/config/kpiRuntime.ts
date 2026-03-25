@@ -2,6 +2,7 @@ export interface KpiFeatureFlags {
   useUnifiedKpiSource: boolean;
   enableDualReadCompare: boolean;
   enableKpiHealthAlerts: boolean;
+  enableHybridNewHireForecast: boolean;
 }
 
 export interface KpiThresholds {
@@ -32,6 +33,7 @@ export function getKpiFeatureFlags(): KpiFeatureFlags {
         : envBool(import.meta.env.VITE_USE_UNIFIED_KPI_SOURCE, false),
     enableDualReadCompare: envBool(import.meta.env.VITE_ENABLE_KPI_DUAL_READ_COMPARE, false),
     enableKpiHealthAlerts: envBool(import.meta.env.VITE_ENABLE_KPI_HEALTH_ALERTS, true),
+    enableHybridNewHireForecast: envBool(import.meta.env.VITE_ENABLE_HYBRID_NEW_HIRE_FORECAST, true),
   };
 }
 

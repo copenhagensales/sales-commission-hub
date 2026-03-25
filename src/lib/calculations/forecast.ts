@@ -223,6 +223,104 @@ export function forecastNewEmployee(
 }
 
 // ============================================================================
+// HYBRID NEW HIRE FORECAST
+// ============================================================================
+
+/**
+ * Calculate reliability weight for blending ramp vs empirical SPH.
+ * Returns 0 when data is insufficient, scales to 1 as data grows.
+ */
+export function calculateReliabilityWeight(
+  totalHours: number,
+  totalSales: number,
+  validWeeks: number,
+): number {
+  if (validWeeks < 2 || totalHours < 20) return 0;
+  const weekFactor = Math.min((validWeeks - 1) / 5, 1);
+  const hourFactor = Math.min(totalHours / 80, 1);
+  return Math.min(weekFactor * hourFactor, 1);
+}
+
+/**
+ * Hybrid forecast for new employees (≤60 days).
+ * Blends ramp-up model with empirical EWMA SPH based on data reliability.
+ * Applies momentum with a conservative ±15% cap for new hires.
+ */
+export function forecastNewEmployeeHybrid(
+  emp: EmployeePerformance,
+  rampProfile: ForecastRampProfile,
+  baselineSph: number,
+  teamChurnRates?: TeamChurnRates,
+): EmployeeForecastResult {
+  const rampFactor = getRampFactor(emp.daysSinceStart, rampProfile);
+  const rampedSph = baselineSph * rampFactor;
+
+  const totalHours = emp.totalHoursWorked ?? 0;
+  const totalSales = emp.totalSalesCount ?? 0;
+  const validWeeks = emp.validWeekCount ?? 0;
+
+  const w = calculateReliabilityWeight(totalHours, totalSales, validWeeks);
+
+  let finalSph = rampedSph;
+  let empiricalSphUsed: number | undefined;
+  let hybridBlend = false;
+
+  if (w > 0 && emp.weeklySalesPerHour.length >= 2) {
+    const rawEmpiricalSph = calculateEwmaSph(emp.weeklySalesPerHour);
+
+    // Guardrail: clamp empirical SPH to [0.6x, 1.4x] of ramp-expected SPH
+    const clampLow = rampedSph * 0.6;
+    const clampHigh = rampedSph * 1.4;
+    const clampedEmpiricalSph = Math.max(clampLow, Math.min(clampHigh, rawEmpiricalSph));
+
+    finalSph = (1 - w) * rampedSph + w * clampedEmpiricalSph;
+    empiricalSphUsed = rawEmpiricalSph;
+    hybridBlend = true;
+
+    // Momentum for new hires: only if ≥3 valid weeks, cap ±15%
+    if (validWeeks >= 3 && emp.weeklySalesPerHour.length >= 2) {
+      const recentSph = (emp.weeklySalesPerHour[0] + emp.weeklySalesPerHour[1]) / 2;
+      const ratio = recentSph / finalSph;
+      if (ratio > 1.05) {
+        finalSph *= Math.min(ratio, 1.15); // cap +15%
+      } else if (ratio < 0.95) {
+        finalSph *= Math.max(ratio, 0.85); // cap -15%
+      }
+    }
+  }
+
+  const effectiveHours = emp.plannedHours * emp.personalAttendanceFactor;
+  const expected = effectiveHours * finalSph;
+
+  const churnProbability = getEstablishedChurnRate(emp.daysSinceStart, emp.teamName, teamChurnRates);
+  const churnLoss = expected * churnProbability * 0.5;
+
+  return {
+    employeeId: emp.employeeId,
+    employeeName: emp.employeeName,
+    teamName: emp.teamName,
+    avatarUrl: emp.avatarUrl,
+    isEstablished: false,
+    isNew: true,
+    rampFactor,
+    plannedHours: emp.plannedHours,
+    expectedSph: finalSph,
+    attendanceFactor: emp.personalAttendanceFactor,
+    forecastSales: Math.round(expected),
+    forecastSalesLow: Math.round(expected * LOW_FACTOR),
+    forecastSalesHigh: Math.round(expected * HIGH_FACTOR),
+    churnProbability,
+    churnLoss: Math.round(churnLoss),
+    missingAgentMapping: emp.missingAgentMapping,
+    plannedEndDate: emp.plannedEndDate,
+    isOnCall: emp.isOnCall,
+    reliabilityWeight: w > 0 ? w : undefined,
+    empiricalSph: empiricalSphUsed,
+    hybridBlend,
+  };
+}
+
+// ============================================================================
 // COHORT FORECAST
 // ============================================================================
 
@@ -364,6 +462,7 @@ export function calculateFullForecast(
   rampProfile?: ForecastRampProfile,
   baselineSph?: number,
   isFuturePeriod?: boolean,
+  enableHybridNewHire?: boolean,
 ): ForecastResult {
   // Split employees into established (>60 days) and new (≤60 days)
   const established = employees.filter(e => e.isEstablished);
@@ -371,7 +470,11 @@ export function calculateFullForecast(
   
   const establishedResults = established.map(e => forecastEstablishedEmployee(e, teamChurnRates, isFuturePeriod));
   const newResults = (rampProfile && baselineSph != null)
-    ? newHires.map(e => forecastNewEmployee(e, rampProfile, baselineSph, teamChurnRates))
+    ? newHires.map(e => 
+        enableHybridNewHire
+          ? forecastNewEmployeeHybrid(e, rampProfile, baselineSph, teamChurnRates)
+          : forecastNewEmployee(e, rampProfile, baselineSph, teamChurnRates)
+      )
     : newHires.map(e => forecastEstablishedEmployee(e, teamChurnRates, isFuturePeriod)); // fallback
   
   const employeeResults = [...establishedResults, ...newResults];

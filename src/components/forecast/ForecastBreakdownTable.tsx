@@ -216,7 +216,7 @@ export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = f
           </CardHeader>
           <CardContent className="pt-0">
             <p className="text-xs text-indigo-700 mb-3">
-              Nye medarbejdere (≤60 dage). Forecast er baseret på ramp-up kurve — ikke historisk performance.
+              Nye medarbejdere (≤60 dage). Forecast bruger ramp-up kurve blended med faktisk performance når data er tilgængeligt.
             </p>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -249,12 +249,21 @@ export function ForecastBreakdownTable({ employees, cohorts, isCurrentPeriod = f
                           <td className="py-2.5 text-right">
                             <Tooltip>
                               <TooltipTrigger>
-                                <Badge variant="outline" className="text-xs bg-indigo-100 text-indigo-700 border-indigo-200">
-                                  {rampPct}%
+                                <Badge variant="outline" className={`text-xs ${emp.hybridBlend ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-indigo-100 text-indigo-700 border-indigo-200'}`}>
+                                  {rampPct}%{emp.hybridBlend ? ' ⚡' : ''}
                                 </Badge>
                               </TooltipTrigger>
                               <TooltipContent>
-                                <p>{rampPct}% af normal kapacitet (ramp-up kurve)</p>
+                                {emp.hybridBlend ? (
+                                  <div className="text-xs space-y-1">
+                                    <p>Hybrid: {Math.round((emp.reliabilityWeight || 0) * 100)}% empirisk, {Math.round((1 - (emp.reliabilityWeight || 0)) * 100)}% ramp</p>
+                                    <p>Ramp SPH: {(emp.expectedSph / (emp.reliabilityWeight ? 1 : 1)).toFixed(2)}</p>
+                                    {emp.empiricalSph != null && <p>Empirisk SPH: {emp.empiricalSph.toFixed(2)}</p>}
+                                    <p>Reliability: {Math.round((emp.reliabilityWeight || 0) * 100)}%</p>
+                                  </div>
+                                ) : (
+                                  <p>{rampPct}% af normal kapacitet (ramp-up kurve, ingen empirisk data endnu)</p>
+                                )}
                               </TooltipContent>
                             </Tooltip>
                           </td>

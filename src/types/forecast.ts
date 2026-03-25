@@ -80,6 +80,9 @@ export interface EmployeePerformance {
   missingAgentMapping?: boolean;
   plannedEndDate?: string;
   isOnCall?: boolean;
+  totalHoursWorked?: number;
+  totalSalesCount?: number;
+  validWeekCount?: number;
 }
 
 export interface CohortForecastInput {
@@ -115,6 +118,9 @@ export interface EmployeeForecastResult {
   missingAgentMapping?: boolean;
   plannedEndDate?: string;
   isOnCall?: boolean;
+  reliabilityWeight?: number;
+  empiricalSph?: number;
+  hybridBlend?: boolean;
 }
 
 // ============================================================================
