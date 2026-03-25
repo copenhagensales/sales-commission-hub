@@ -190,7 +190,17 @@ export default function Forecast() {
     return `${y}-${String(month).padStart(2, '0')}-01`;
   }, [period]);
 
-  const { data: targetData } = useQuery({
+  // Forecast overrides per employee
+  const { overrides, upsertOverride, deleteOverride: deleteOverrideMutation } = useEmployeeForecastOverrides(selectedClient, periodStart);
+
+  const handleOverride = (employeeId: string, value: number | null) => {
+    if (value === null) {
+      deleteOverrideMutation.mutate(employeeId);
+    } else {
+      upsertOverride.mutate({ employeeId, overrideSales: value });
+    }
+  };
+
     queryKey: ["client-target", selectedClient, periodStart],
     queryFn: async () => {
       if (selectedClient === "all") return null;
