@@ -825,7 +825,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           null,
           teamChurnRates,
           activeRampProfile,
-          baselineSph,
+          globalBaselineSph,
         );
         
         // Combine: actual + remaining
@@ -927,7 +927,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         null,
         teamChurnRates,
         activeRampProfile,
-        baselineSph,
+        globalBaselineSph,
         true, // isFuturePeriod — apply momentum correction
       );
 
