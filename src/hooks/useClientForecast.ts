@@ -827,6 +827,8 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           };
         });
         
+        const { enableHybridNewHireForecast } = getKpiFeatureFlags();
+        
         const remainingForecast = calculateFullForecast(
           remainingPerformances,
           cohortInputs,
@@ -837,6 +839,8 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
           teamChurnRates,
           activeRampProfile,
           globalBaselineSph,
+          false,
+          enableHybridNewHireForecast,
         );
         
         // Combine: actual + remaining
@@ -929,6 +933,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
       }
 
       // 8b. Calculate full forecast (next month - original logic)
+      const { enableHybridNewHireForecast: enableHybrid } = getKpiFeatureFlags();
       const forecast = calculateFullForecast(
         employeePerformances,
         cohortInputs,
@@ -940,6 +945,7 @@ export function useClientForecast(clientId: string, period: "current" | "next" |
         activeRampProfile,
         globalBaselineSph,
         true, // isFuturePeriod — apply momentum correction
+        enableHybrid,
       );
 
       return {
