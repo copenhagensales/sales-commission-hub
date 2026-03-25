@@ -462,6 +462,7 @@ export function calculateFullForecast(
   rampProfile?: ForecastRampProfile,
   baselineSph?: number,
   isFuturePeriod?: boolean,
+  enableHybridNewHire?: boolean,
 ): ForecastResult {
   // Split employees into established (>60 days) and new (≤60 days)
   const established = employees.filter(e => e.isEstablished);
@@ -469,7 +470,11 @@ export function calculateFullForecast(
   
   const establishedResults = established.map(e => forecastEstablishedEmployee(e, teamChurnRates, isFuturePeriod));
   const newResults = (rampProfile && baselineSph != null)
-    ? newHires.map(e => forecastNewEmployee(e, rampProfile, baselineSph, teamChurnRates))
+    ? newHires.map(e => 
+        enableHybridNewHire
+          ? forecastNewEmployeeHybrid(e, rampProfile, baselineSph, teamChurnRates)
+          : forecastNewEmployee(e, rampProfile, baselineSph, teamChurnRates)
+      )
     : newHires.map(e => forecastEstablishedEmployee(e, teamChurnRates, isFuturePeriod)); // fallback
   
   const employeeResults = [...establishedResults, ...newResults];
