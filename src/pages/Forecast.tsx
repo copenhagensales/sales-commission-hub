@@ -255,6 +255,19 @@ export default function Forecast() {
 
   const isLoading = forecastLoading;
 
+  // Calculate override-adjusted total for KPI cards
+  const overrideAdjustedTotal = useMemo(() => {
+    if (!forecast || overrides.size === 0) return undefined;
+    let diff = 0;
+    for (const [empId, ov] of overrides) {
+      const emp = forecast.establishedEmployees.find(e => e.employeeId === empId);
+      if (emp) {
+        diff += ov.override_sales - emp.forecastSales;
+      }
+    }
+    return forecast.totalSalesExpected + diff;
+  }, [forecast, overrides]);
+
   return (
     <MainLayout>
       <div className="max-w-7xl mx-auto space-y-6">
@@ -343,7 +356,7 @@ export default function Forecast() {
             />
 
             {/* KPI Cards */}
-            <ForecastKpiCards forecast={forecast} clientTarget={targetData ?? undefined} danishHolidays={danishHolidays} />
+            <ForecastKpiCards forecast={forecast} clientTarget={targetData ?? undefined} danishHolidays={danishHolidays} overrideTotal={overrideAdjustedTotal} />
 
             {/* FM Weekly Forecast */}
             {showFmWeekly && (
