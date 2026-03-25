@@ -1,32 +1,38 @@
 
+Målet er at stoppe “Lokaliser salg” fra at vise salg for andre sælgere end den tildelte medarbejder.
 
-## To nye handlinger per række i "Fejl i match"
+1. Find og luk den primære filterfejl i `LocateSaleDialog.tsx`
+- Den nuværende salgs-query kan køre før medarbejderdata er klar, så dialogen først henter en bred liste uden sælgerfilter.
+- Jeg vil gøre queryen afhængig af, at filterdata er klar, når “Kun tildelt sælger” er slået til.
+- Query key/enabled-logik bliver opdateret, så dialogen refetcher, når de reelle filterværdier er loaded.
 
-### Hvad bygges
+2. Skift fra bred navne-søgning til præcis agent-filtering
+- I stedet for primært at bruge `work_email` + `agent_name ilike *fuldt navn*`, vil jeg bygge filteret ud fra de faktiske agent-tilknytninger:
+  - `employee_agent_mapping`
+  - `agents.email`
+  - `agents.name`
+- Derefter filtreres salgene kun på de agent-identiteter, som faktisk hører til den valgte medarbejder.
+- `work_email` bliver kun fallback, hvis der ikke findes agent-mapping.
+- Det fjerner falske matches fra brede `ilike`-navnesøgninger.
 
-To knapper per række i Match Errors tabellen:
+3. Gør filtreringen robust mod flere aliaser pr. medarbejder
+- Hvis en medarbejder har flere agentprofiler, samles alle gyldige emails/navne for den medarbejder.
+- Resultatet merges og deduplikeres, så dialogen stadig viser alle relevante salg for samme medarbejder, men ikke andre sælgere.
 
-1. **Lokaliser salg** — Åbner en dialog der viser alle salg for den tildelte medarbejder (filtreret på klientens kampagner). Brugeren kan søge og vælge et salg → det kobles til annulleringsrækken (indsættes i `cancellation_queue`, fjernes fra `unmatched_rows`).
+4. Hærd state i `MatchErrorsSubTab.tsx`
+- Den lokale række-state bruger i dag `idx`, som kan blive ustabilt ved filtrering/opdateringer.
+- Jeg vil skifte til en stabil row-nøgle per række, så valgt medarbejder, ignore-state og dialog altid følger den rigtige række.
+- Det reducerer risikoen for, at dialogen får sendt forkert `assignedEmployeeId`.
 
-2. **Ignorer række** — Knap med to-trins bekræftelse (inline confirm) der fjerner den enkelte række fra `unmatched_rows` uden at koble den til et salg.
+5. UI-sikringer i dialogen
+- Hvis der ikke findes agent-mapping for medarbejderen, viser dialogen en tydelig note om, at filteret er fallback/bredere.
+- Hvis filter er aktivt, vises kun resultater for den konkrete medarbejder eller en tom liste.
 
-### Teknisk plan
+Berørte filer
+- `src/components/cancellations/LocateSaleDialog.tsx`
+- `src/components/cancellations/MatchErrorsSubTab.tsx`
 
-**Ny fil: `src/components/cancellations/LocateSaleDialog.tsx`**
-- Dialog med søgefelt (fritekst: telefon, firma, sælgernavn)
-- Henter salg fra `sales` + `sale_items` filtreret på klientens `campaignIds`
-- Hvis en medarbejder er tildelt (via `localAssignments` / `mappingsByName`), pre-filtrerer på `agent_email` / `agent_name` — med toggle til at fjerne filteret
-- Tabel med: Dato, Sælger, Telefon, Produkter, Omsætning
-- "Vælg" knap per salg → indsætter i `cancellation_queue` med `sale_id`, fjerner rækken fra `unmatched_rows`, invaliderer queries
-
-**Ændring: `src/components/cancellations/MatchErrorsSubTab.tsx`**
-- Tilføj ny kolonne "Handlinger" med to knapper:
-  - `Lokaliser salg` (søge-ikon) → åbner `LocateSaleDialog` med `row`, `clientId`, `campaignIds`, evt. tildelt `employeeId`
-  - `Ignorer` (trash-ikon) → inline two-step: først klik → knappen skifter til "Bekræft?" i rødt, andet klik → fjerner rækken fra `unmatched_rows` i databasen
-- Tilføj state for `ignorePendingIdx` til two-step confirm
-- Tilføj mutation `ignoreRowMutation` der fjerner én specifik række (genbruger logik fra `ignoreAllMutation` men for én række)
-
-### Berørte filer
-- `src/components/cancellations/LocateSaleDialog.tsx` (ny)
-- `src/components/cancellations/MatchErrorsSubTab.tsx` (tilføj handlingskolonne + dialog-integration)
-
+Forventet resultat
+- “Kun [medarbejder]” viser kun salg, der matcher den medarbejders agent-mapping.
+- Ingen brede lister med andre sælgere ved første åbning.
+- Rækkevalg bliver stabilt, også når listen ændrer sig.
