@@ -454,17 +454,17 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
-              Tilknyt Excel-navne til "{selectedProduct?.name}"
+              Tilknyt Excel-kolonner til "{selectedProduct?.name}"
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <p className="text-sm text-muted-foreground">
-              Vælg hvilke produktnavne fra Excel-filer der skal mappes til dette produkt.
+              Vælg hvilke kolonner fra Excel-filen der skal mappes til dette produkt. Et produkt kan have flere kolonner.
             </p>
 
-            {/* Available names from uploads */}
+            {/* All Excel columns */}
             <div className="space-y-2 max-h-[400px] overflow-auto">
-              {availableExcelNames.map(name => (
+              {excelColumns.map((name: string) => (
                 <label key={name} className="flex items-center gap-3 rounded-md border px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors">
                   <Checkbox
                     checked={checkedNames.has(name)}
@@ -477,7 +477,7 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
                 </label>
               ))}
               {/* Show custom-added names not in available list */}
-              {[...checkedNames].filter(n => !availableExcelNames.includes(n)).map(name => (
+              {[...checkedNames].filter(n => !excelColumns.includes(n)).map((name: string) => (
                 <label key={name} className="flex items-center gap-3 rounded-md border px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors border-primary/30">
                   <Checkbox checked onCheckedChange={() => toggleName(name)} />
                   <span className="text-sm">{name}</span>
