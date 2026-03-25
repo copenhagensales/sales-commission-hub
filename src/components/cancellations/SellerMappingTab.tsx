@@ -203,6 +203,35 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
     enabled: campaignIds.length > 0,
   });
 
+  // Fetch unique product titles from sale_items as fallback
+  const { data: saleItemNames = [] } = useQuery({
+    queryKey: ["sale-item-product-names", campaignIds],
+    queryFn: async () => {
+      if (campaignIds.length === 0) return [] as string[];
+      const { data: sales, error: salesErr } = await supabase
+        .from("sales")
+        .select("id")
+        .in("client_campaign_id", campaignIds);
+      if (salesErr) throw salesErr;
+      const saleIds = (sales || []).map(s => s.id);
+      if (saleIds.length === 0) return [] as string[];
+      const { data, error } = await supabase
+        .from("sale_items")
+        .select("adversus_product_title")
+        .in("sale_id", saleIds)
+        .not("adversus_product_title", "is", null);
+      if (error) throw error;
+      return [...new Set((data || []).map(d => d.adversus_product_title).filter(Boolean))] as string[];
+    },
+    enabled: campaignIds.length > 0,
+  });
+
+  // Combine all sources and filter out already-mapped names
+  const mappedNames = new Set(mappings.map(m => m.excel_product_name));
+  const allExcelNames = [...new Set([...excelProductNames, ...saleItemNames])]
+    .sort((a, b) => a.localeCompare(b, "da"));
+  const availableExcelNames = allExcelNames.filter(n => !mappedNames.has(n));
+
   const productMap = new Map(products.map(p => [p.id, p.name]));
 
   const addMutation = useMutation({
