@@ -69,6 +69,13 @@ export function ForecastSummary({ forecast, periodLabel, isCurrentPeriod, client
               <span className="text-3xl font-bold tracking-tight">{totalSales.toLocaleString('da-DK')}</span>
               <span className="text-sm text-muted-foreground font-medium">forventede salg i {periodLabel}</span>
             </div>
+            {forecast.totalSalesSubs !== undefined && forecast.totalSales5G !== undefined && (
+              <p className="text-sm text-muted-foreground">
+                heraf <span className="font-semibold">{forecast.totalSalesSubs.toLocaleString('da-DK')} abonnementer</span>
+                {' og '}
+                <span className="font-semibold">{forecast.totalSales5G.toLocaleString('da-DK')} 5G Internet</span>
+              </p>
+            )}
             <p className="text-sm text-muted-foreground leading-relaxed">
               {parts.join(' ')}
             </p>
