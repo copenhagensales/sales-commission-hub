@@ -40,8 +40,7 @@ interface SaleRow {
   agent_email: string | null;
   customer_phone: string | null;
   customer_company: string | null;
-  revenue: number | null;
-  sale_items: { product_name: string | null; quantity: number | null }[];
+  sale_items: { display_name: string | null; quantity: number | null; mapped_revenue: number | null }[];
 }
 
 export function LocateSaleDialog({
@@ -80,7 +79,7 @@ export function LocateSaleDialog({
 
       let query = supabase
         .from("sales")
-        .select("id, sale_datetime, agent_name, agent_email, customer_phone, customer_company, revenue, sale_items(product_name, quantity)")
+        .select("id, sale_datetime, agent_name, agent_email, customer_phone, customer_company, sale_items(display_name, quantity, mapped_revenue)")
         .in("client_campaign_id", campaignIds)
         .order("sale_datetime", { ascending: false })
         .limit(200);
@@ -110,7 +109,7 @@ export function LocateSaleDialog({
         s.agent_email,
         s.customer_phone,
         s.customer_company,
-        s.sale_items?.map(i => i.product_name).join(" "),
+        s.sale_items?.map(i => i.display_name).join(" "),
       ].filter(Boolean).join(" ").toLowerCase();
       return searchable.includes(q);
     });
@@ -227,7 +226,7 @@ export function LocateSaleDialog({
                     <TableHead>Telefon</TableHead>
                     <TableHead>Firma</TableHead>
                     <TableHead>Produkter</TableHead>
-                    <TableHead className="text-right">Omsætning</TableHead>
+                    <TableHead className="text-right">Revenue</TableHead>
                     <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -241,10 +240,13 @@ export function LocateSaleDialog({
                       <TableCell className="text-xs">{sale.customer_phone || "-"}</TableCell>
                       <TableCell className="text-xs">{sale.customer_company || "-"}</TableCell>
                       <TableCell className="text-xs max-w-[200px] truncate">
-                        {sale.sale_items?.map(i => i.product_name).filter(Boolean).join(", ") || "-"}
+                        {sale.sale_items?.map(i => i.display_name).filter(Boolean).join(", ") || "-"}
                       </TableCell>
                       <TableCell className="text-xs text-right">
-                        {sale.revenue != null ? `${sale.revenue.toLocaleString("da-DK")} kr` : "-"}
+                        {(() => {
+                          const total = sale.sale_items?.reduce((sum, i) => sum + (i.mapped_revenue || 0), 0) || 0;
+                          return total > 0 ? `${total.toLocaleString("da-DK")} kr` : "-";
+                        })()}
                       </TableCell>
                       <TableCell>
                         <Button
