@@ -1,36 +1,77 @@
 
 
-# Fejl: Cohort-baseline SPH er forkert — bruger globalt gennemsnit
+# Problem: Cohort-forecast stadig ~3x for højt (876 salg for 15 nye sælgere)
 
-## Problem
-Linje 680-688 i `useClientForecast.ts` beregner `baselineSph` som gennemsnittet af **alle** etablerede sælgeres SPH. Denne bruges direkte som `campaignBaselineSph` for cohorts (linje 701).
+## To fejl identificeret
 
-Hvis f.eks. TDC-sælgere har høj SPH, trækker det gennemsnittet op, og nye Eesy TM-hold forecaster med en SPH der ikke matcher Eesy TM's virkelighed.
+### Fejl 1: Weekender tælles som arbejdsdage
+I `forecastCohort()` (linje 269-291 i `forecast.ts`):
+```ts
+const dailyHours = weeklyHoursPerHead / 7; // = 5.29 timer/dag
+for (let d = 0; d < activeDays; d++) { ... } // alle kalenderdage inkl. weekender
+```
+Simuleringen kører over **alle 30 kalenderdage** i april og giver 5.29 timer til hver — inkl. lørdag og søndag. Det er ~8 dage for meget, altså ~27% overvurdering.
 
-### Eksempel-beregning med nuværende kode
-Antag `baselineSph = 0.7` (globalt gennemsnit), `dailyHours = 5.29`, `attendance = 0.92`:
+**Fix**: Skip weekender (og helligdage) i loopet. Brug `dailyHours = weeklyHoursPerHead / 5` for hverdage.
 
-**Hold 1 (7 pers, start 31/3, 30 aktive dage i april):**
-- Dag 1-7: 7 × 0.95 survival × 5.29 × 0.92 × 0.7 × 0.65 = ~14.5 salg
-- Dag 8-14: 7 × 0.85 survival × 5.29 × 0.92 × 0.7 × 0.95 = ~19.4 salg
-- Dag 15-30: 7 × ~0.67 survival × 5.29 × 0.92 × 0.7 × 1.0 × 16 dage = ~29.2 salg
-- **Total hold 1: ~63 salg**
+### Fejl 2: Ramp-faktorerne er forkerte som "% af etableret SPH"
+Ramp-profilen for Eesy TM siger:
+- Uge 1: 65%, Uge 2: 95%, Uge 3+: 100%
 
-Men empirisk laver de ~41 salg/måned ved steady state (uge 3-4). Det indikerer en reel SPH på ~0.26, ikke 0.7.
+Disse blev udregnet fra **absolutte salgstal** (uge 1: ~8, uge 2: ~12, uge 3: ~10, uge 4: ~12). Men i forecast-modellen ganges de på **etablerede sælgeres SPH** (~0.83 for Eesy TM).
+
+100% af 0.83 SPH = ~0.83 SPH for nye sælgere i uge 3+.
+Men empirisk laver nye sælgere ~41 salg/måned ≈ 0.26 SPH ved steady state.
+
+Så ramp 100% burde reelt svare til ~31% af etableret SPH — **ikke** 100%.
+
+**Årsag**: Ramp-procenterne blev beregnet relativt til uge 4 (den bedste nye-sælger-uge), men bruges som om de er relativt til etablerede sælgere. Det er to helt forskellige baselines.
 
 ## Løsning
-Beregn `campaignBaselineSph` **pr. kampagne** i stedet for globalt:
 
-1. I `useClientForecast.ts`: Når cohort har et `client_campaign_id`, beregn baseline kun fra etablerede sælgere tilknyttet **den kampagnes teams**
-2. Fallback til globalt gennemsnit kun når ingen kampagne-specifikke sælgere findes
-3. Brug `teamCampaignMap` (som allerede eksisterer) til at filtrere
+### Mulighed A: Recalibrér ramp-profilen (anbefalet)
+Genberegn ramp-faktorerne som faktisk andel af etablerede sælgeres SPH:
+- Nye sælgeres steady-state SPH ≈ 0.26 (baseret på ~41 salg/måned ved ~159 timer)
+- Etableret SPH ≈ 0.83
+- Uge 3-4 ramp = 0.26 / 0.83 ≈ **31%**
+- Uge 1 ramp = (8 salg/uge) / (0.83 × 37) ≈ **26%** (eller relativt: 65% × 31% ≈ **20%**)
+- Uge 2 ramp = 95% × 31% ≈ **30%**
 
-### Ændringer
-- **`src/hooks/useClientForecast.ts`** (~15 linjer):
-  - Byg et map `campaignId → avgSph` fra etablerede sælgere
-  - I `cohortInputs.map()`: brug kampagne-specifik SPH hvis tilgængelig
-  - Log/eksponér den brugte baseline i cohort-resultatet (allerede understøttet via `baselineSph` i `CohortForecastResult`)
+Opdatér `forecast_ramp_profiles` i databasen for Eesy TM-kampagnen.
 
-## Effekt
-Eesy TM-cohorts bruger Eesy TM-sælgeres faktiske SPH i stedet for et oppustet globalt gennemsnit. Forecast-tallet falder markant og matcher den empiriske ~41 salg/måned ved steady state.
+### Mulighed B: Brug absolut baseline SPH i ramp-profilen
+I stedet for at ramp-faktorerne er relative til etablerede sælgere, lad profilen definere en absolut steady-state SPH for nye sælgere. Ramp-faktorerne forbliver som de er (65%/95%/100%), men baseline ændres fra etableret SPH til en kampagne-specifik "ny-sælger-SPH".
+
+**Fordel**: Enklere at forstå ("100% = fuld ny-sælger-kapacitet").
+**Ulempe**: Kræver et nyt felt i profilen.
+
+### Weekend-fix (uanset A/B)
+I `forecastCohort()`:
+
+```text
+Nuværende:
+  dailyHours = weeklyHoursPerHead / 7
+  loop over alle kalenderdage
+
+Nyt:
+  dailyHours = weeklyHoursPerHead / 5
+  loop over kalenderdage, skip lør+søn (og helligdage hvis tilgængelige)
+```
+
+## Ændringer
+
+| Fil | Ændring |
+|-----|---------|
+| `src/lib/calculations/forecast.ts` | Skip weekender i cohort-simulation, juster `dailyHours` til `/5` |
+| `src/hooks/useClientForecast.ts` | Videregiv helligdage til cohort-input (allerede beregnet) |
+| `src/types/forecast.ts` | Tilføj `holidays?: Set<string>` til `CohortForecastInput` |
+| Migration | Opdatér Eesy TM ramp-profil med recalibrerede faktorer |
+
+## Forventet effekt
+Med begge fixes:
+- Hold 1 (7 pers, 31/3, ~22 hverdage i april): ~50-70 salg i stedet for ~400+
+- Hold 2 (8 pers, 14/4, ~13 hverdage): ~30-45 salg
+- **Total cohort: ~80-115 salg** i stedet for 876
+
+Det matcher langt bedre den empiriske ~41 salg/måned ved steady state, justeret for ramp-up og frafald.
 
