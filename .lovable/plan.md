@@ -1,38 +1,20 @@
 
 
-# Opsætning af annulleringskonfiguration for Eesy FM
+# Ændringer i ApprovalQueueTab
 
-## Problem
-Eesy FM mangler en `cancellation_upload_configs` post, hvilket blokerer upload af annulleringsfiler (som vist i screenshottet: "Ingen opsætning fundet").
+## Ændringer
+1. **Fjern "Afvis alle"** knappen fra begge tabs (cancellation + basket_difference)
+2. **Flyt "Godkend alle"** ned under tabellen (efter `renderTable()`)
+3. **Tilføj bekræftelsesdialog** (AlertDialog) der spørger "Er du sikker?" før godkendelse køres
 
-## Løsning
-Indsæt en konfiguration i `cancellation_upload_configs` via en database-migration. Strukturen er næsten identisk med Eesy TM, men simplere — FM-salg matcher direkte på `customer_phone` (standard matching), så `product_phone_mappings` er ikke nødvendig.
-
-### Konfigurationsdetaljer
-
-| Felt | Værdi | Bemærkning |
-|------|-------|------------|
-| client_id | `9a92ea4c-...` | Eesy FM |
-| name | "Eesy FM Standard" | |
-| date_column | "Date Creation" | Dato fra Excel |
-| phone_column | "Phone Number" | Matches mod `customer_phone` |
-| seller_column | "Employee Name" | Sælgernavn + lokation via "Sales Department" |
-| filter_column | "Annulled Sales" | Kun annullerede rækker |
-| filter_value | "1" | |
-| is_default | true | Auto-valgt |
-| product_match_mode | "phone" | Standard phone-matching |
-| fallback_product_mappings | `[{"excelProductPattern":"5G Internet","saleItemTitle":"5G Internet"}]` | For 5G-produkter uden telefonmatch |
-
-### Matching-logik
-- **Standard abonnementer**: Matcher via telefonnummer (Excel `Phone Number` → DB `customer_phone`)
-- **5G Internet**: Fallback Pass 2 — matcher via sælgernavn + dato + produkttitel (da 5G-salg ofte deler telefonnummer med abonnementssalget)
-- **Lokation**: "Sales Department" (f.eks. "CPH-Sales", "CPH-Sales market") gemmes automatisk i `uploaded_data` JSONB-feltet i `cancellation_queue`, og er synlig i godkendelseskøen
-
-### Teknisk plan
+## Berørte filer
 
 | Fil | Ændring |
 |-----|---------|
-| Migration (SQL) | INSERT i `cancellation_upload_configs` for Eesy FM |
+| `src/components/cancellations/ApprovalQueueTab.tsx` | Fjern "Afvis alle", flyt "Godkend alle" under tabel, tilføj AlertDialog bekræftelse |
 
-Ingen kodeændringer — den eksisterende matching-logik håndterer allerede standard phone-matching og fallback-produkter.
+## Detaljer
+- Begge steder (linje 1148-1156 og 1162-1170) ændres: fjern div med knapper over tabellen, tilføj "Godkend alle" med AlertDialog wrapper under `renderTable()`
+- AlertDialog bruger eksisterende `@/components/ui/alert-dialog` komponent
+- Bekræftelsestekst: "Er du sikker på at du vil godkende alle ventende rækker?"
 
