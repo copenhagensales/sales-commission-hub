@@ -407,7 +407,7 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Internt produkt</TableHead>
-                    <TableHead>Excel-navne</TableHead>
+                    <TableHead>Excel-kolonner</TableHead>
                     <TableHead>Oprettet</TableHead>
                     <TableHead className="w-16"></TableHead>
                   </TableRow>
