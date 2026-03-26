@@ -1,41 +1,38 @@
 
 
-## Problem: Salg MTD tæller kun nuværende teammedlemmer
+## Problem: `get_sales_report_detailed` mangler salg via adversus campaign mappings
 
 ### Årsag
-`useClientForecast` henter medarbejdere fra `team_members` (linje 56-59), som kun indeholder **aktive** teammedlemmer. Medarbejdere der er stoppet fjernes fra `team_members` (via `remove_deactivated_employee_from_teams` triggeren).
+RPC'en `get_sales_report_detailed` finder kun salg hvor `s.client_campaign_id` direkte peger på klientens campaigns:
 
-Når salg derefter hentes via `get_sales_report_detailed`, matches de kun mod navne/emails fra de nuværende teammedlemmer (linje 107-116). Salg lavet af stoppede medarbejdere ignoreres → **Salg MTD er for lavt**.
-
-### Løsning: Tæl ALLE klient-salg + vis stoppede medarbejdere
-
-#### 1. Beregn total Salg MTD direkte fra RPC
-I stedet for kun at summere salg fra matchede medarbejdere, brug `get_sales_report_detailed`-resultatet direkte til at beregne `actualSalesMtd` (sum af ALL rows, ikke kun matchede).
-
-#### 2. Inkludér stoppede medarbejdere med salg i perioden
-- Hent `salesReport` FØRST
-- For navne/emails der IKKE matcher et nuværende teammedlem, slå op i `employee_master_data` (inkl. inaktive) og `historical_employment`
-- Vis dem i tabellen (evt. med "Stoppet" badge i stedet for "Ny"/"Etableret")
-
-#### 3. Ændringer i `useClientForecast.ts`
-
-```
-Nuværende flow:
-  team_members → employeeIds → salesReport filtered by employeeIds
-
-Nyt flow:
-  team_members → employeeIds (aktive)
-  salesReport → totalActualFromAllRows (ufiltreret sum)
-  salesReport umatched rows → opslag i employee_master_data → tilføj som "stoppet" rækker
+```sql
+AND s.client_campaign_id IN (
+  SELECT cc.id FROM client_campaigns cc WHERE cc.client_id = p_client_id
+)
 ```
 
-Konkret:
-- **totalActual**: Sum af ALLE `salesReport` rows' `quantity` (ikke kun matchede)
-- **Umatchede salg**: Forsøg at finde medarbejder via `employee_master_data` med navn/email match. Tilføj dem til employee-listen med `projected: 0` og en ny type-markering
-- **EmployeeForecastRow**: Tilføj `isStopped: boolean` til interfacet
-- **UI**: Vis "Stoppet" badge for stoppede medarbejdere, og sæt deres projected/forecast til kun actual (ingen fremtidig projektion)
+Men `get_sales_report_raw` (som bruges i Rapporter-siden) bruger **tre** matchveje:
+1. Produktets campaign → klient (`cc_prod.client_id`)
+2. Salgets campaign → klient (`cc_sale.client_id`)  
+3. Adversus mapping → campaign → klient (`adversus_campaign_mappings` → `cc_mapping.client_id`)
+
+Salg der kun er koblet via adversus campaign mappings (vej 3) eller via produktets campaign (vej 1) tælles **ikke** med i forecast. Dette forklarer den lavere Salg MTD.
+
+### Løsning: Opdater `get_sales_report_detailed` RPC
+
+Tilføj de samme JOINs som `get_sales_report_raw` bruger, så alle tre matchveje dækkes:
+
+```sql
+LEFT JOIN client_campaigns cc_prod ON cc_prod.id = p.client_campaign_id
+LEFT JOIN client_campaigns cc_sale ON cc_sale.id = s.client_campaign_id
+LEFT JOIN adversus_campaign_mappings acm ON acm.adversus_campaign_id = s.dialer_campaign_id
+LEFT JOIN client_campaigns cc_mapping ON cc_mapping.id = acm.client_campaign_id
+WHERE COALESCE(cc_prod.client_id, cc_sale.client_id, cc_mapping.client_id) = p_client_id
+```
 
 ### Berørte filer
-- `src/hooks/useClientForecast.ts` — hovedlogik
-- Forecast detail-side (tabelvisning) — vis "Stoppet" badge
+- Ny database migration (opdater `get_sales_report_detailed` funktionen)
+
+### Ingen kodeændringer
+Hook'en (`useClientForecast.ts`) kalder allerede RPC'en korrekt — det er kun SQL-funktionen der skal opdateres.
 
