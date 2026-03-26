@@ -73,7 +73,7 @@ export function useClientForecast(
   const cutoffDate = isCurrentMonth ? today : monthEnd;
 
   const { data, isLoading } = useQuery({
-    queryKey: ["client-forecast", teamId, month, year, settings?.id, settings?.updated_at],
+    queryKey: ["client-forecast-v2", teamId, month, year, settings?.id, settings?.updated_at],
     queryFn: async () => {
       if (!teamId || !settings) return { actualSalesMtd: 0, projectedRemaining: 0, totalForecast: 0, employees: [] };
 
