@@ -244,8 +244,8 @@ function TopSellersSection({ tv }: { tv: boolean }) {
             {/* Stats */}
             <div className="text-right flex-shrink-0">
               <p className={`font-black tabular-nums ${tv ? "text-2xl" : "text-lg"}`}>
-                {seller.salesCount}
-                <span className="text-xs font-normal text-muted-foreground ml-1">salg</span>
+                {seller.commission.toLocaleString("da-DK")}
+                <span className="text-xs font-normal text-muted-foreground ml-1">kr.</span>
               </p>
             </div>
           </div>
