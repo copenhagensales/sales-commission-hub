@@ -436,7 +436,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   
   // Check if any Ledelse menu items are visible (requires section permission)
   const showLedelseMenu = p.canView("menu_section_ledelse") && 
-    (p.canViewContracts || p.canViewPermissions || p.canViewCareerWishesOverview || p.canViewSecurityDashboard || p.canViewCarQuizAdmin || p.canViewCocAdmin || p.canViewPulseSurvey || p.canView("menu_customer_inquiries") || p.canViewClientForecast);
+    (p.canViewContracts || p.canViewPermissions || p.canViewCareerWishesOverview || p.canViewSecurityDashboard || p.canViewCarQuizAdmin || p.canViewCocAdmin || p.canViewPulseSurvey || p.canView("menu_customer_inquiries") || p.canViewClientForecast || true);
   
   // Check if any MG menu items are visible (requires section permission)
   const showMgMenu = p.canView("menu_section_mg") && p.canViewMgTest;
