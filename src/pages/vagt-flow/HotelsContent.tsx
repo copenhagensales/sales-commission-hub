@@ -129,6 +129,7 @@ export default function HotelsContent() {
                               <span className="text-muted-foreground ml-2">Bek.nr: {bh.confirmation_number}</span>
                             )}
                             {bh.rooms && <span className="text-muted-foreground ml-2">{bh.rooms} værelse(r)</span>}
+                            {bh.booked_days && bh.booked_days.length > 0 && <span className="text-muted-foreground ml-2">{bh.booked_days.length} dage</span>}
                           </div>
                         )}
                       </div>
