@@ -138,7 +138,7 @@ export default function LocationProfitabilityContent() {
       if (bookingIds.length === 0) return [];
       const { data, error } = await (supabase as any)
         .from("booking_hotel")
-        .select("booking_id, check_in, check_out, price_per_night, rooms")
+        .select("booking_id, check_in, check_out, price_per_night, rooms, booked_days")
         .in("booking_id", bookingIds);
       if (error) throw error;
       return data || [];
@@ -180,12 +180,21 @@ export default function LocationProfitabilityContent() {
     onError: () => toast.error("Kunne ikke opdatere placering"),
   });
 
-  // Pre-compute hotel & diet costs per booking_id
+  // Pre-compute hotel cost per booking and per-day distribution
   const hotelCostByBooking = useMemo(() => {
     const map = new Map<string, number>();
     for (const h of hotelData || []) {
       const cost = (h.price_per_night || 0) * (h.rooms || 1);
       map.set(h.booking_id, (map.get(h.booking_id) || 0) + cost);
+    }
+    return map;
+  }, [hotelData]);
+
+  // Hotel booked_days per booking for daily distribution
+  const hotelBookedDaysByBooking = useMemo(() => {
+    const map = new Map<string, number[]>();
+    for (const h of hotelData || []) {
+      map.set(h.booking_id, h.booked_days || []);
     }
     return map;
   }, [hotelData]);
