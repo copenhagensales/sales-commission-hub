@@ -1,47 +1,32 @@
 
 
-## Dag-vælger til hotel-bookinger (som biler)
+## Fix: Hotel-pris beregnes forkert i økonomi-fanen
 
-### Hvad
-Erstat check-in/check-out dato-felter med en dagvælger (checkboxes for ugedage), ligesom bil-fanen. Samlet pris fordeles ligeligt over de valgte dage. Økonomi-fanen bruger hotellets egne valgte dage til prisfordeling.
+### Problem
+`price_per_night` er i virkeligheden **samlet pris** for hele opholdet (ikke pris per nat). Men i `LocationProfitabilityContent.tsx` linje 187 ganges den med `rooms`:
 
-### Database
-Ny kolonne på `booking_hotel`:
-```sql
-ALTER TABLE booking_hotel ADD COLUMN booked_days integer[] DEFAULT '{}';
+```typescript
+const cost = (h.price_per_night || 0) * (h.rooms || 1);
 ```
-Migrer eksisterende data: udled dage fra `check_in`/`check_out` intervaller.
 
-### Fil 1: `src/components/vagt-flow/EditBookingDialog.tsx` — `HotelTabContent`
+For Kolding Storcenter: 3.777 kr × 2 værelser = 7.554 kr → fordelt på 4 dage = 1.889 kr/dag.
+Det korrekte er: 3.777 kr / 4 dage = **944 kr/dag**.
 
-- Fjern check-in/check-out dato-inputs
-- Tilføj dagvælger med checkboxes (Man–Søn) — identisk pattern som vehicle-fanen
-- Kun dage inden for booking's `start_date`–`end_date` kan vælges
-- Vis beregning: "Samlet pris / antal valgte dage = X kr/dag"
-- `handleSave` sender `booked_days` (integer array) i stedet for `check_in`/`check_out`
+### Ændring
 
-### Fil 2: `src/components/vagt-flow/AssignHotelDialog.tsx`
+**Fil: `src/pages/vagt-flow/LocationProfitabilityContent.tsx`** — linje 187
 
-- Tilføj dagvælger i stedet for check-in/check-out
-- Ved oprettelse: send `booked_days` array med hotel-assignment
+Fjern multiplikation med `rooms`:
+```typescript
+// Før:
+const cost = (h.price_per_night || 0) * (h.rooms || 1);
+// Efter:
+const cost = h.price_per_night || 0;
+```
 
-### Fil 3: `src/hooks/useBookingHotels.ts`
-
-- Udvid `BookingHotel` interface med `booked_days: number[]`
-- Opdater `useUpdateBookingHotel` og `useAssignHotel` til at acceptere `booked_days`
-
-### Fil 4: `src/pages/vagt-flow/LocationProfitabilityContent.tsx`
-
-- Hent `booked_days` fra `booking_hotel` query (linje ~141)
-- Brug hotellets egne `booked_days.length` til at fordele prisen per dag i stedet for bookings `booked_days.length`
-- I daglig nedbrydning (linje ~531): tjek om datoen er i hotellets `booked_days` for at tildele hotelomkostning
-
-### Fil 5: `src/pages/vagt-flow/HotelsContent.tsx`
-
-- Vis antal valgte hoteldage i booking-kortet (f.eks. "4 dage")
+Samlet pris er allerede det fulde beløb. `rooms` er metadata, ikke en multiplier.
 
 ### Resultat
-- Pris 5.000 kr, 5 dage = 1.000 kr/dag
-- Fjern en dag → 4 dage = 1.250 kr/dag
-- Synkroniseret mellem hotel-fanen og økonomi-fanen
+- Kolding: 3.777 kr / 4 dage = **944 kr/dag** ✓
+- Total hotel i uge-oversigten: 3.777 kr (halveret fra nuværende 7.554 kr)
 
