@@ -140,6 +140,7 @@ import {
   PowerdagBoard,
   PowerdagInput,
   PowerdagAdmin,
+  SystemFeedback,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -423,6 +424,9 @@ export const routes: RouteConfig[] = [
   { path: "/amo/tasks", component: AmoTasks, access: "role", positionPermission: "menu_amo_tasks" },
   { path: "/amo/settings", component: AmoSettings, access: "role", positionPermission: "menu_amo_settings" },
   { path: "/amo/audit-log", component: AmoAuditLog, access: "role", positionPermission: "menu_amo_audit_log" },
+
+  // System Feedback
+  { path: "/system-feedback", component: SystemFeedback, access: "protected" },
 
   { path: "*", component: NotFound, access: "public" },
 ];
