@@ -40,6 +40,7 @@ interface Observation {
   db: number;
   dbPct: number;
   salesCount: number;
+  clientName: string;
 }
 
 interface LocationScore {
@@ -222,7 +223,13 @@ function computeScores(observations: Observation[], settings: AgentSettings) {
   return { locationScores, sellerScores, riskFlags, combos: combos.slice(0, 20) };
 }
 
-function formatDataContext(scores: ReturnType<typeof computeScores>, totalObs: number, settings: AgentSettings): string {
+function formatDataContext(
+  scores: ReturnType<typeof computeScores>,
+  totalObs: number,
+  settings: AgentSettings,
+  locClientMap?: Map<string, string[]>,
+  clientNameMap?: Map<string, string>,
+): string {
   const { locationScores, sellerScores, riskFlags, combos } = scores;
 
   const locs = [...locationScores].sort((a, b) => b.totalDB - a.totalDB);
@@ -230,6 +237,17 @@ function formatDataContext(scores: ReturnType<typeof computeScores>, totalObs: n
 
   let ctx = `## FM Profit Agent Data (seneste ${settings.data_window_weeks} uger)\n`;
   ctx += `Total observationer: ${totalObs}\n\n`;
+
+  // Location-client mapping section
+  if (locClientMap && clientNameMap) {
+    ctx += `### Lokation → Kunde mapping\n`;
+    for (const l of locs) {
+      const clientIds = locClientMap.get(l.id) || [];
+      const clientNames = clientIds.map((cid: string) => clientNameMap.get(cid) || cid).join(", ");
+      ctx += `- ${l.name}: ${clientNames || "Ingen kunder konfigureret"}\n`;
+    }
+    ctx += `\n`;
+  }
 
   ctx += `### Top lokationer (efter DB)\n`;
   for (const l of locs.slice(0, 15)) {
@@ -320,9 +338,18 @@ serve(async (req) => {
       }
     }
 
-    // 3. Fetch location names
-    const { data: locations } = await supabase.from("location").select("id, name");
+    // 3. Fetch location names + bookable clients
+    const { data: locations } = await supabase.from("location").select("id, name, bookable_client_ids");
     const locMap = new Map((locations || []).map((l: any) => [l.id, l.name]));
+    const locClientMap = new Map<string, string[]>((locations || []).map((l: any) => [l.id, l.bookable_client_ids || []]));
+
+    // 3b. Fetch client names for mapping
+    const { data: clients } = await supabase.from("clients").select("id, name");
+    const clientNameMap = new Map<string, string>((clients || []).map((c: any) => [c.id, c.name]));
+
+    // 3c. Fetch client_campaigns to map campaign_id → client_id
+    const { data: campaigns } = await supabase.from("client_campaigns").select("id, client_id");
+    const campaignClientMap = new Map<string, string>((campaigns || []).map((cc: any) => [cc.id, cc.client_id]));
 
     // 4. Fetch employee names
     const sellerIds = [...new Set((sales || []).map((s: any) => s.raw_payload?.fm_seller_id).filter(Boolean))];
@@ -383,7 +410,7 @@ serve(async (req) => {
     }
 
     // 6. Build observations
-    const obsMap = new Map<string, { rev: number; comm: number; count: number; locId: string; locName: string; sellerId: string; sellerName: string; week: string }>();
+    const obsMap = new Map<string, { rev: number; comm: number; count: number; locId: string; locName: string; sellerId: string; sellerName: string; week: string; clientCampaignId: string | null }>();
 
     for (const sale of sales || []) {
       const locId = (sale.raw_payload as any)?.fm_location_id;
@@ -405,6 +432,7 @@ serve(async (req) => {
         locId, locName: locMap.get(locId) || locId,
         sellerId, sellerName: empMap.get(sellerId) || sale.agent_name || sellerId,
         week,
+        clientCampaignId: sale.client_campaign_id || null,
       };
       existing.rev += items.revenue;
       existing.comm += items.commission;
@@ -421,6 +449,10 @@ serve(async (req) => {
       const sellerCost = o.comm * sellerCostMultiplier;
       const totalCost = sellerCost + costs.locationCost + costs.hotelCost + costs.dietCost;
       const db = o.rev - totalCost;
+      // Resolve client name from campaign
+      const clientId = o.clientCampaignId ? campaignClientMap.get(o.clientCampaignId) : undefined;
+      const resolvedClientName = clientId ? (clientNameMap.get(clientId) || "Ukendt") : "Ukendt";
+
       observations.push({
         locationId: o.locId,
         locationName: o.locName,
@@ -436,12 +468,13 @@ serve(async (req) => {
         db,
         dbPct: o.rev > 0 ? (db / o.rev) * 100 : 0,
         salesCount: o.count,
+        clientName: resolvedClientName,
       });
     }
 
     // 7. Compute scores
     const scores = computeScores(observations, settings);
-    const dataContext = formatDataContext(scores, observations.length, settings);
+    const dataContext = formatDataContext(scores, observations.length, settings, locClientMap, clientNameMap);
 
     // 8. Build system prompt with settings
     const focusLabels: Record<string, string> = {
@@ -482,6 +515,13 @@ Når du svarer:
 - Brug konkrete tal fra dataen
 - Vær direkte og handlingsorienteret
 - Lokationer med DB% under ${settings.target_db_pct}% skal flagges som under mål
+
+### Vigtige forretningsregler for FM-planlægning
+- Hver lokation kræver ALTID 2 sælgere. Man kan ikke sende kun 1 person ud på en lokation.
+- Yousee og Eesy FM er helt separate kunder med separate lokationer. De kan IKKE blandes på samme lokation.
+- Hver lokation har en specifik liste af kunder den må bruges til (se "Lokation → Kunde mapping" i data).
+- Når du anbefaler lokationer eller ugeplaner, skal du altid respektere disse begrænsninger.
+- Angiv altid hvilken kunde (Yousee/Eesy FM) en lokation tilhører når du nævner den.
 
 Driver-klassifikation:
 - "location" = Stabil performance på tværs af forskellige sælgere → strukturelt stærk
