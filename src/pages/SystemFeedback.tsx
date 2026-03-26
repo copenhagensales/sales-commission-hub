@@ -423,6 +423,13 @@ export default function SystemFeedback() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Recipients tab (owner only) */}
+        {isOwner && (
+          <TabsContent value="recipients">
+            <RecipientsTab />
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* Detail Dialog */}
