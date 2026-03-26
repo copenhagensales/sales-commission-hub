@@ -672,7 +672,7 @@ export function usePermissions() {
     canViewEconomicBudget: canView("menu_economic_budget"),
     canViewEconomicMapping: canView("menu_economic_mapping"),
     canViewEconomicUpload: canView("menu_economic_upload"),
-    canViewForecast: canView("menu_forecast"),
+    
     // AMO permissions
     canViewAmoDashboard: canView("menu_amo_dashboard"),
     canViewAmoOrganisation: canView("menu_amo_organisation"),

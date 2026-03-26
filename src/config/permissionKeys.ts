@@ -63,7 +63,7 @@ export const PERMISSION_KEYS = {
   menu_economic_budget: { label: 'Budget 2026', section: 'economic', parent: 'menu_section_economic' },
   menu_economic_mapping: { label: 'Økonomi Mapping', section: 'economic', parent: 'menu_section_economic' },
   menu_economic_upload: { label: 'E-conomic Import', section: 'economic', parent: 'menu_section_economic' },
-  menu_forecast: { label: 'Kundeforecast', section: 'economic', parent: 'menu_section_economic' },
+  
 
   // ==================== MIT HJEM (under menu_section_personal) ====================
   menu_home: { label: 'Hjem', section: 'mit_hjem', parent: 'menu_section_personal' },
