@@ -1,55 +1,29 @@
 
 
-## Løntilføjelser direkte på tabelkolonner
+## Synliggør løntilføjelser i tabellen + slet-funktion
 
-### Ændring fra tidligere plan
-Ingen kobling til `salary_types`-tabellen. I stedet vælger brugeren direkte den kolonne (Provision, Annulleringer, Feriepenge, Diet, Sygdom, Dagsbonus, Henvisning) som beløbet skal lægges til/trækkes fra.
+### Problem
+Salary additions bliver gemt og lagt til kolonne-værdierne, men man kan ikke se hvilke celler der har tilføjelser, og man kan ikke slette dem.
 
-### 1. Ny databasetabel: `salary_additions`
+### Løsning
 
-```sql
-create table public.salary_additions (
-  id uuid primary key default gen_random_uuid(),
-  employee_id uuid not null references public.employee_master_data(id) on delete cascade,
-  column_key text not null check (column_key in (
-    'commission','cancellations','vacationPay','diet','sickDays','dailyBonus','referralBonus'
-  )),
-  amount numeric not null,
-  period_start date not null,
-  period_end date not null,
-  note text,
-  created_at timestamptz default now()
-);
-alter table public.salary_additions enable row level security;
-create policy "Auth users manage salary_additions"
-  on public.salary_additions for all to authenticated using (true) with check (true);
-```
+#### 1. Udvid `useSellerSalariesCached` med additions-detaljer
+- Tilføj et `salaryAdditions` felt til `SellerData` interfacet: `Record<string, { total: number; items: { id: string; amount: number; note: string | null }[] }>`
+- Hent `id` og `note` i salary_additions query (udover employee_id, column_key, amount)
+- Byg additions-data per medarbejder med individuelle poster så de kan vises og slettes
 
-`column_key` matcher de eksisterende SortKey-værdier fra tabellen.
+#### 2. Ny komponent: `SalaryAdditionCell.tsx`
+- Wrapper-komponent til TableCell der viser beløbet som normalt
+- Hvis medarbejderen har tilføjelser på den kolonne, vis en lille indikator (fx farvet dot eller tooltip-ikon)
+- Ved klik/hover åbnes en Popover med liste over tilføjelser (beløb, note, slet-knap)
+- Slet-knap kalder `supabase.from('salary_additions').delete().eq('id', ...)` og invaliderer query
 
-### 2. Ny komponent: `AddSalaryAdditionDialog.tsx`
-
-- Søgbar medarbejder-dropdown (fra sellerData eller employees)
-- Dropdown med kolonne-valg: Provision, Annulleringer, Feriepenge, Diet, Sygdom, Dagsbonus, Henvisning
-- Beløb-input (positivt eller negativt)
-- Valgfri note
-- Periode arves fra den valgte lønperiode
-
-### 3. Opdater `SellerSalariesTab.tsx`
-
-- Tilføj "Løntilføjelse" knap i header ved siden af `PayrollPeriodSelector`
-- Knappen åbner dialogen
-
-### 4. Opdater `useSellerSalariesCached.ts`
-
-- Ny query: hent `salary_additions` for perioden
-- I useMemo: aggregér per employee + column_key
-- Læg beløbene oven i de eksisterende værdier (fx `commission += additions.commission`)
-- Tilføj `salaryAdditions` objekt til SellerData så man kan se hvad der er tilføjet
+#### 3. Opdater `SellerSalariesTab.tsx`
+- Erstat de simple `<TableCell>` for hver kolonne med `<SalaryAdditionCell>`
+- Send medarbejderens additions-data og kolonne-nøgle som props
 
 ### Berørte filer
-- Ny migration
-- Ny: `src/components/salary/AddSalaryAdditionDialog.tsx`
-- Ændret: `src/components/salary/SellerSalariesTab.tsx`
-- Ændret: `src/hooks/useSellerSalariesCached.ts`
+- `src/hooks/useSellerSalariesCached.ts` — udvid query og SellerData interface
+- `src/components/salary/SalaryAdditionCell.tsx` — ny komponent
+- `src/components/salary/SellerSalariesTab.tsx` — brug SalaryAdditionCell
 
