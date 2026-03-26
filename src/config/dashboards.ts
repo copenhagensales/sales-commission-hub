@@ -6,6 +6,8 @@ export interface DashboardConfig {
   description?: string;
   // Permission key is optional - if not set, dashboard is visible to all
   permissionKey?: string;
+  // If true, dashboard is visible to ALL authenticated users (bypasses team_dashboard_permissions)
+  globalAccess?: boolean;
 }
 
 export const DASHBOARD_LIST: DashboardConfig[] = [
@@ -98,6 +100,7 @@ export const DASHBOARD_LIST: DashboardConfig[] = [
     name: "Powerdag", 
     path: "/dashboards/powerdag", 
     description: "Powerdag konkurrence – live team standings med manuel score-input",
-    permissionKey: "menu_dashboard_powerdag" 
+    permissionKey: "menu_dashboard_powerdag",
+    globalAccess: true,
   },
 ];

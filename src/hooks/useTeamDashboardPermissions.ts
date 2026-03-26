@@ -225,6 +225,9 @@ export function useAccessibleDashboards() {
       
       // 6. Filtrer dashboards baseret på rettigheder
       const accessibleDashboards = DASHBOARD_LIST.filter(dashboard => {
+        // Global dashboards er synlige for alle autentificerede brugere
+        if (dashboard.globalAccess) return true;
+        
         const dashboardPerms = permissionMap.get(dashboard.slug) || [];
         
         // Tjek hver af brugerens teams
