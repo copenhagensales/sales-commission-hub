@@ -109,17 +109,7 @@ export function useClientForecast(
         .in("employee_id", employeeIds);
 
       const totalShiftsMap = new Map<string, number>();
-      shiftCounts?.forEach(s => {
-        totalShiftsMap.set(s.employee_id, (totalShiftsMap.get(s.employee_id) || 0) + 1);
-      });
-
-      // Also check shift_assignments for non-FM teams
-      const { data: shiftAssignments } = await supabase
-        .from("shift_assignments")
-        .select("employee_id")
-        .in("employee_id", employeeIds);
-
-      shiftAssignments?.forEach(s => {
+      shiftCounts?.forEach((s: any) => {
         totalShiftsMap.set(s.employee_id, (totalShiftsMap.get(s.employee_id) || 0) + 1);
       });
 
@@ -132,19 +122,7 @@ export function useClientForecast(
         .lte("date", fmtEnd);
 
       const remainingShiftsMap = new Map<string, number>();
-      futureShifts?.forEach(s => {
-        remainingShiftsMap.set(s.employee_id, (remainingShiftsMap.get(s.employee_id) || 0) + 1);
-      });
-
-      // Also check shift_assignments for remaining
-      const { data: futureShiftAssignments } = await supabase
-        .from("shift_assignments")
-        .select("employee_id, date")
-        .in("employee_id", employeeIds)
-        .gt("date", fmtCutoff)
-        .lte("date", fmtEnd);
-
-      futureShiftAssignments?.forEach(s => {
+      futureShifts?.forEach((s: any) => {
         remainingShiftsMap.set(s.employee_id, (remainingShiftsMap.get(s.employee_id) || 0) + 1);
       });
 

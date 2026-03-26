@@ -24,7 +24,7 @@ export function CreateForecastDialog({ month, year, existingTeamIds }: Props) {
   const { data: teams } = useQuery({
     queryKey: ["teams-for-forecast"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("teams").select("id, name").eq("is_active", true).order("name");
+      const { data, error } = await supabase.from("teams").select("id, name").eq("is_active", true).order("name") as any;
       if (error) throw error;
       return data;
     },
