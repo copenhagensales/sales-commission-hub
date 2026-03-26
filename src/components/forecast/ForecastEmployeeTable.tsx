@@ -48,6 +48,22 @@ export function ForecastEmployeeTable({ employees }: Props) {
             ))
           )}
         </TableBody>
+        {employees.length > 0 && (
+          <tfoot>
+            <tr className="border-t-2 border-border bg-muted/50">
+              <td className="p-2 pl-4 font-bold">I alt</td>
+              <td className="p-2"></td>
+              <td className="p-2 text-right font-bold">{employees.reduce((s, e) => s + e.shiftCount, 0)}</td>
+              <td className="p-2 text-right font-bold">
+                {(employees.reduce((s, e) => s + parseFloat(String(e.salesPerDay)), 0) / (employees.filter(e => !e.isStopped).length || 1)).toFixed(1)}
+              </td>
+              <td className="p-2 text-right font-bold">{employees.reduce((s, e) => s + e.actualSales, 0)}</td>
+              <td className="p-2 text-right font-bold">{employees.reduce((s, e) => s + e.remainingShifts, 0)}</td>
+              <td className="p-2 text-right font-bold">{employees.reduce((s, e) => s + e.projected, 0)}</td>
+              <td className="p-2 text-right font-bold text-primary">{employees.reduce((s, e) => s + e.totalForecast, 0)}</td>
+            </tr>
+          </tfoot>
+        )}
       </Table>
     </div>
   );
