@@ -55,7 +55,7 @@ export default function PowerdagBoard() {
             </h1>
             {event && <p className="text-sm text-muted-foreground mt-1">{new Date(event.event_date).toLocaleDateString("da-DK", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>}
           </div>
-          {!tv && (
+          {!tv && hasEditAccess && (
             <div className="flex items-center gap-2">
               <TvBoardQuickGenerator dashboardSlug="powerdag" />
               <Link to="/dashboards/powerdag/input">
