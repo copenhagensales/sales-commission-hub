@@ -1,30 +1,30 @@
 
 
-## Fix: Hotelomkostning skal beregnes pr. nat og kun på de rigtige dage
+## Tilføj mulighed for at ændre datoer på hotel-bookinger
 
-### Problem
-1. **Hotelomkostning pr. booking** beregnes som `price_per_night × rooms` (= 1 nat). Den mangler at gange med antal nætter (`check_out - check_in`).
-2. **Daglig fordeling** spreder hotelomkostningen jævnt over ALLE bookede dage i stedet for kun de dage der falder inden for `check_in`–`check_out`.
+### Hvad
+I `HotelTabContent` (inden i EditBookingDialog) kan man i dag kun redigere pris, status, bekræftelsesnummer og bemærkninger. Check-in og check-out datoer kan ikke ændres uden at åbne "Rediger alle felter"-dialogen. Brugeren vil gerne kunne ændre datoerne direkte — ligesom bil-fanen har en dag-vælger.
 
-Derfor vises 1.185 kr på lørdag 28/3 selvom hotellet nu slutter d. 27/3.
+### Ændringer
 
-### Ændring: `src/pages/vagt-flow/LocationProfitabilityContent.tsx`
+**Fil: `src/components/vagt-flow/EditBookingDialog.tsx` — `HotelTabContent`**
 
-**1. Beregn total hotelkost korrekt (linje ~184-191)**
-- Beregn antal nætter: `differenceInDays(check_out, check_in)`
-- Total = `price_per_night × rooms × nætter`
+1. Tilføj `checkIn` og `checkOut` som redigerbare state-felter (ligesom `price`, `status` osv.)
+2. Pre-fill fra `hotelEntry.check_in` / `hotelEntry.check_out`
+3. Tilføj to datoinputs (type="date") i formularen mellem hotel-header og pris-feltet
+4. Inkluder `check_in` og `check_out` i `handleSave` kaldet til `updateBookingHotel.mutateAsync`
 
-**2. Byg et hotel-kost-per-dag map i stedet for jævn fordeling**
-- Nyt `hotelCostByBookingDate` map: `Map<string, number>` med nøgle `bookingId|YYYY-MM-DD`
-- For hver hotel-entry: loop fra `check_in` til `check_out - 1 dag`, sæt `price_per_night × rooms` på hver nat-dato
-- Brug dette map i daglig breakdown (linje ~531) i stedet for `loc.hotelCost / loc.bookedDays.length`
+**Fil: `src/hooks/useBookingHotels.ts` — `useUpdateBookingHotel`**
 
-**3. Opdater location-aggregering**
-- `hotelCostByLocation` summerer nu alle nætters kost (allerede korrekt når booking-total er korrekt)
-- Location-total hotel i header-cards vil nu vise korrekt beløb
+5. Udvid mutation-typingen til at acceptere `check_in` og `check_out` som valgfrie felter
 
-### Resultat
-- Hotel-kolonnen viser kun omkostning på de dage der faktisk har hotelovernatning
-- Lørdag 28/3 viser 0 kr hotel efter din rettelse
-- Totalen matcher `pris × værelser × nætter`
+### UI-layout
+Datofelterne placeres i et 2-kolonne grid (ligesom pris/status):
+- **Check-in** (date input) | **Check-out** (date input)
+- Samlet pris | Status
+- Bekræftelsesnummer
+- Bemærkninger
+
+### Ingen databaseændringer
+`booking_hotel`-tabellen har allerede `check_in` og `check_out` kolonner — det handler kun om at eksponere dem i quick-edit UI'et.
 

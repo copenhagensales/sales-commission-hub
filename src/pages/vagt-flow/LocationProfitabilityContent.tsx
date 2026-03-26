@@ -17,7 +17,7 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
   TrendingUp, TrendingDown, MapPin,
 } from "lucide-react";
-import { format, addDays, differenceInCalendarDays, differenceInDays, parseISO } from "date-fns";
+import { format, addDays, differenceInCalendarDays } from "date-fns";
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
 
@@ -180,25 +180,14 @@ export default function LocationProfitabilityContent() {
     onError: () => toast.error("Kunne ikke opdatere placering"),
   });
 
-  // Pre-compute hotel costs per booking_id (total) and per booking+date (daily)
-  const { hotelCostByBooking, hotelCostByBookingDate } = useMemo(() => {
-    const totalMap = new Map<string, number>();
-    const dateMap = new Map<string, number>(); // key: "bookingId|YYYY-MM-DD"
+  // Pre-compute hotel & diet costs per booking_id
+  const hotelCostByBooking = useMemo(() => {
+    const map = new Map<string, number>();
     for (const h of hotelData || []) {
-      const checkIn = parseISO(h.check_in);
-      const checkOut = parseISO(h.check_out);
-      const nights = Math.max(differenceInDays(checkOut, checkIn), 1);
-      const perNight = (h.price_per_night || 0) * (h.rooms || 1);
-      const totalCost = perNight * nights;
-      totalMap.set(h.booking_id, (totalMap.get(h.booking_id) || 0) + totalCost);
-      // Distribute cost to each night-date (check_in up to check_out - 1)
-      for (let i = 0; i < nights; i++) {
-        const d = format(addDays(checkIn, i), "yyyy-MM-dd");
-        const key = `${h.booking_id}|${d}`;
-        dateMap.set(key, (dateMap.get(key) || 0) + perNight);
-      }
+      const cost = (h.price_per_night || 0) * (h.rooms || 1);
+      map.set(h.booking_id, (map.get(h.booking_id) || 0) + cost);
     }
-    return { hotelCostByBooking: totalMap, hotelCostByBookingDate: dateMap };
+    return map;
   }, [hotelData]);
 
   const dietCostByBooking = useMemo(() => {
@@ -539,16 +528,7 @@ export default function LocationProfitabilityContent() {
                         const daySellerCost = dayCommission * (1 + VACATION_PAY_RATES.SELLER);
                         const dayLocCost = isBooked ? loc.dailyRate : 0;
                         const dayDietCost = dietByLocationDate.get(`${loc.locationId}|${dateStr}`) || 0;
-                        // Sum hotel cost for this date across all bookings for this location
-                        const dayHotelCost = (() => {
-                          let total = 0;
-                          for (const b of bookings || []) {
-                            if (b.location_id === loc.locationId) {
-                              total += hotelCostByBookingDate.get(`${b.id}|${dateStr}`) || 0;
-                            }
-                          }
-                          return total;
-                        })();
+                        const dayHotelCost = isBooked && loc.bookedDays.length > 0 ? (loc.hotelCost / loc.bookedDays.length) : 0;
                         const dayDB = dayRevenue - daySellerCost - dayLocCost - dayHotelCost - dayDietCost;
 
                         return (
