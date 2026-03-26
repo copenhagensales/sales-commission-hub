@@ -6269,6 +6269,68 @@ export type Database = {
         }
         Relationships: []
       }
+      forecast_settings: {
+        Row: {
+          churn_established_pct: number
+          churn_new_pct: number
+          client_goal: number
+          created_at: string
+          created_by: string | null
+          id: string
+          month: number
+          new_seller_threshold: number
+          new_seller_weekly_target: number
+          rolling_avg_shifts: number
+          sick_pct: number
+          team_id: string
+          updated_at: string
+          vacation_pct: number
+          year: number
+        }
+        Insert: {
+          churn_established_pct?: number
+          churn_new_pct?: number
+          client_goal?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          month: number
+          new_seller_threshold?: number
+          new_seller_weekly_target?: number
+          rolling_avg_shifts?: number
+          sick_pct?: number
+          team_id: string
+          updated_at?: string
+          vacation_pct?: number
+          year: number
+        }
+        Update: {
+          churn_established_pct?: number
+          churn_new_pct?: number
+          client_goal?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          month?: number
+          new_seller_threshold?: number
+          new_seller_weekly_target?: number
+          rolling_avg_shifts?: number
+          sick_pct?: number
+          team_id?: string
+          updated_at?: string
+          vacation_pct?: number
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forecast_settings_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gdpr_consents: {
         Row: {
           consent_type: string
