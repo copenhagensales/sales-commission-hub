@@ -24,7 +24,8 @@ const PODIUM_ORDER = [1, 0, 2];
 export default function PowerdagBoard() {
   const tv = isTvMode();
   useAutoReload(tv, 5 * 60_000);
-  const { canView, isLoading: accessLoading } = useRequireDashboardAccess("powerdag");
+  const { canView } = useUnifiedPermissions();
+  const hasEditAccess = canView("menu_powerdag_input");
 
   const { data: event } = useActiveEvent();
   const { data: rules = [] } = useRulesForEvent(event?.id);
@@ -34,9 +35,6 @@ export default function PowerdagBoard() {
   const maxPoints = Math.max(...standings.map(s => s.total_points), 1);
   const top3 = standings.slice(0, 3);
   const rest = standings.slice(3);
-
-  if (accessLoading) return <DashboardShell><div className="flex items-center justify-center h-64 text-muted-foreground">Indlæser...</div></DashboardShell>;
-  if (!canView) return null;
 
   return (
     <DashboardShell>
