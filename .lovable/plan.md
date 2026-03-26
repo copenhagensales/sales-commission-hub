@@ -1,24 +1,14 @@
 
 
-## Gør Powerdag tilgængelig på TV-skærm
+## Tilføj TV-knap til Powerdag Board
 
-Powerdag skal tilføjes til TV board-systemet, så den kan vises via en adgangskode på `/t/XXXX`.
+Powerdag-boardet bruger ikke `DashboardHeader` og har derfor ingen TV-knap. Løsningen er at importere og tilføje `TvBoardQuickGenerator` i headeren.
 
-### Ændringer
+### Ændring
 
-**1. `src/pages/tv-board/TvBoardView.tsx`** — tilføj powerdag til component map:
-```ts
-import PowerdagBoard from "@/pages/dashboards/PowerdagBoard";
-// i dashboardComponents:
-"powerdag": PowerdagBoard,
-```
+**Fil: `src/pages/dashboards/PowerdagBoard.tsx`**
 
-**2. `src/pages/tv-board/TvBoardDirect.tsx`** — samme tilføjelse:
-```ts
-import PowerdagBoard from "@/pages/dashboards/PowerdagBoard";
-// i dashboardComponents:
-"powerdag": PowerdagBoard,
-```
-
-Det er alt. Powerdag-boardet har allerede TV-mode support (via `isTvMode()`, `useAutoReload`, skjult cursor). Herefter kan du oprette en TV-adgangskode til "powerdag" via TV Board Admin eller TvBoardQuickGenerator.
+1. Importer `TvBoardQuickGenerator` fra `@/components/dashboard/TvBoardQuickGenerator`
+2. Tilføj `<TvBoardQuickGenerator dashboardSlug="powerdag" />` i header-området ved siden af "Indtast salg"-knappen
+3. Skjul knappen i TV-mode (når `isTvMode()` er true)
 
