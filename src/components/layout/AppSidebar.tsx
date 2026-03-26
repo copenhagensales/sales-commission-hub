@@ -1913,3 +1913,44 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
     </aside>
   );
 }
+
+function FeedbackNavLink({ handleNavClick }: { handleNavClick: () => void }) {
+  const location = useLocation();
+  const { user } = useAuth();
+
+  const { data: hasAccess } = useQuery({
+    queryKey: ["feedback-sidebar-access", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return false;
+      // Check if owner
+      const { data: ownerCheck } = await supabase.rpc("is_owner", { _user_id: user.id });
+      if (ownerCheck) return true;
+      // Check access table
+      const { data: emp } = await supabase
+        .from("employee_master_data")
+        .select("id")
+        .eq("auth_user_id", user.id)
+        .maybeSingle();
+      if (!emp?.id) return false;
+      const { data: access } = await supabase
+        .from("system_feedback_access" as any)
+        .select("id")
+        .eq("employee_id", emp.id)
+        .maybeSingle();
+      return !!access;
+    },
+    enabled: !!user?.id,
+  });
+
+  if (!hasAccess) return null;
+
+  return (
+    <NavLink to="/system-feedback" onClick={handleNavClick} className={cn(
+      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+      location.pathname === "/system-feedback" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+    )}>
+      <Bug className="h-4 w-4" />
+      Fejlrapportering
+    </NavLink>
+  );
+}
