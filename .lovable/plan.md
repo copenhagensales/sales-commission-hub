@@ -1,25 +1,24 @@
 
 
-## Vis Top 5 sælgere fra CS Top 20 på Powerdag Board
+## Gør Powerdag tilgængelig på TV-skærm
 
-Tilføj en sektion nederst på Powerdag-boardet der viser de 5 bedste individuelle sælgere fra dagens CS Top 20 leaderboard.
+Powerdag skal tilføjes til TV board-systemet, så den kan vises via en adgangskode på `/t/XXXX`.
 
-### Ændring
+### Ændringer
 
-**Fil: `src/pages/dashboards/PowerdagBoard.tsx`**
-
-1. Importer `useCachedLeaderboard`, `formatDisplayName`, `getInitials` fra `@/hooks/useCachedLeaderboard`
-2. Kald `useCachedLeaderboard("today", { type: "global" }, { limit: 5 })` for at hente top 5 sælgere
-3. Tilføj en ny sektion efter team-standings med:
-   - Overskrift: "🏅 Top 5 Sælgere — I dag"
-   - Liste med avatar-cirkel (initialer), navn, team-badge (farvekodet), antal salg og provision
-   - Styling der matcher det eksisterende board-design (mørke kort, glow-effekter)
-   - Staggered fade-in animation som resten af boardet
-
-Layout pr. sælger-række:
-```text
-[Rank] [Avatar] Navn [Team-badge]    Salg    Provision
+**1. `src/pages/tv-board/TvBoardView.tsx`** — tilføj powerdag til component map:
+```ts
+import PowerdagBoard from "@/pages/dashboards/PowerdagBoard";
+// i dashboardComponents:
+"powerdag": PowerdagBoard,
 ```
 
-Ingen database-ændringer — bruger eksisterende cached leaderboard data.
+**2. `src/pages/tv-board/TvBoardDirect.tsx`** — samme tilføjelse:
+```ts
+import PowerdagBoard from "@/pages/dashboards/PowerdagBoard";
+// i dashboardComponents:
+"powerdag": PowerdagBoard,
+```
+
+Det er alt. Powerdag-boardet har allerede TV-mode support (via `isTvMode()`, `useAutoReload`, skjult cursor). Herefter kan du oprette en TV-adgangskode til "powerdag" via TV Board Admin eller TvBoardQuickGenerator.
 
