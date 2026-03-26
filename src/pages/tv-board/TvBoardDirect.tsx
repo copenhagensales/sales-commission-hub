@@ -22,6 +22,7 @@ import CsTop20Dashboard from "@/pages/CsTop20Dashboard";
 import UnitedDashboard from "@/pages/UnitedDashboard";
 import SalesOverviewAll from "@/pages/dashboards/SalesOverviewAll";
 import TvLeagueDashboard from "@/pages/tv-board/TvLeagueDashboard";
+import PowerdagBoard from "@/pages/dashboards/PowerdagBoard";
 
 // Map dashboard slugs to components
 const dashboardComponents: Record<string, React.ComponentType> = {
@@ -34,6 +35,7 @@ const dashboardComponents: Record<string, React.ComponentType> = {
   "cs-top-20": CsTop20Dashboard,
   "sales-overview-all": SalesOverviewAll,
   "commission-league": TvLeagueDashboard,
+  "powerdag": PowerdagBoard,
 };
 
 export default function TvBoardDirect() {
