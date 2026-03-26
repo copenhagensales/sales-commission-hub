@@ -1,22 +1,44 @@
 
 
-## Redigerbar point/salg + split Tryg/Codan
+## Powerdag Board — Visuelt Upgrade
 
-### Ændringer
+Boardet er funktionelt men ser ud som en simpel liste. Her er forslaget til at gøre det til et ægte konkurrence-board:
 
-**1. Gør "Point/salg" redigerbar på input-siden (`PowerdagInput.tsx`)**
-- Erstat det statiske tal i "Point/salg"-kolonnen med et inline `<Input>` felt
-- Ved blur gemmes den nye værdi direkte til `powerdag_point_rules` tabellen
-- Refetch rules efter ændring så beregningen opdateres live
+### Visuelle forbedringer
 
-**2. Split "Tryg/Codan" til to separate linjer (database)**
-- Slet den eksisterende "Tryg/Codan" regel (id: `fb9a9fff-...`)
-- Opret to nye regler under United:
-  - "Tryg" — 0.4 point/salg
-  - "Codan" — 0.4 point/salg
-- YouSee er allerede under Fieldmarketing, ingen ændring nødvendig der
+**1. Podium-sektion for Top 3**
+- Dedikeret podium-layout øverst med #1 i midten (størst), #2 til venstre, #3 til højre
+- Guld/sølv/bronze farvekoder med glow-effekter
+- Stort pointtal med animeret counter-effekt
+- Trophy/medal ikoner med shimmer-animation
 
-### Berørte filer
-- `src/pages/dashboards/PowerdagInput.tsx` — tilføj redigerbar point/salg kolonne
-- Database — split Tryg/Codan regel
+**2. Progress-bar mellem teams**
+- Horisontal bar under hvert team der viser point relativt til #1
+- Giver visuelt overblik over hvor tæt konkurrencen er
+
+**3. Animationer og effekter**
+- Entries fader ind med staggered animation
+- Point-tal har tabular-nums med stor, fed skrift og subtle glow for top 3
+- Pulse-animation på #1 kortet
+- Shimmer-effekt på podium-kort
+
+**4. Bedre spacing og typografi**
+- Større kontrast mellem top 3 og resten
+- Team-kort med hover-effekt
+- Rank-nummer i cirkel med gradient baggrund for top 3
+
+**5. Live-indikator**
+- Lille grøn pulserende dot i headeren der viser "Live"
+- Sidst opdateret timestamp
+
+### Teknisk
+
+**Fil: `src/pages/dashboards/PowerdagBoard.tsx`** — komplet redesign af layoutet:
+- Ny `PodiumCard` komponent til top 3 med guld/sølv/bronze styling
+- Staggered fade-in via inline `animation-delay`
+- Relativ progress-bar (`team.total_points / maxPoints * 100%`)
+- CSS animations via eksisterende Tailwind keyframes + nye inline styles
+- TV-mode: Podium endnu større, auto-scroll resten
+
+Ingen nye dependencies eller database-ændringer nødvendige.
 
