@@ -1,28 +1,57 @@
 
 
-## Fix: Referral Code Lookup for Emma Sylvest
+## Slet Kundeforecast fra menu og database
 
-### Investigation Results
-Emma's data is correct in the database:
-- `auth_user_id` matches her auth account
-- `referral_code = EMMC2591`
-- `is_active = true`
-- RLS policies allow authenticated users to read active employees
+### Oversigt
+Fjern hele kundeforecast-funktionaliteten: sider, komponenter, hooks, routes, menupunkt, permission-key og alle 7 relaterede database-tabeller.
 
-The most likely cause is the `.eq('private_email', ...)` fallback being **case-sensitive**, and the primary `auth_user_id` query silently failing in some edge cases. The hook also never checks `work_email`.
+### Database-migration (DROP tables)
+Drop disse tabeller i korrekt rækkefølge (pga. foreign keys):
 
-### Fix — `src/hooks/useReferrals.ts`
+1. `client_forecast_cohorts` (references ramp/survival profiles)
+2. `client_forecasts`
+3. `client_monthly_targets`
+4. `employee_forecast_overrides`
+5. `fm_weekly_forecast_overrides`
+6. `forecast_ramp_profiles`
+7. `forecast_survival_profiles`
 
-Make the lookup more robust:
+```sql
+DROP TABLE IF EXISTS client_forecast_cohorts CASCADE;
+DROP TABLE IF EXISTS client_forecasts CASCADE;
+DROP TABLE IF EXISTS client_monthly_targets CASCADE;
+DROP TABLE IF EXISTS employee_forecast_overrides CASCADE;
+DROP TABLE IF EXISTS fm_weekly_forecast_overrides CASCADE;
+DROP TABLE IF EXISTS forecast_ramp_profiles CASCADE;
+DROP TABLE IF EXISTS forecast_survival_profiles CASCADE;
+```
 
-1. **Primary query**: Keep `.eq('auth_user_id', user.id)` — unchanged
-2. **Fallback query**: Replace case-sensitive `.eq('private_email', ...)` with a case-insensitive `.or()` that checks both `private_email` and `work_email`:
-   ```typescript
-   .or(`private_email.ilike.${user.email},work_email.ilike.${user.email}`)
-   ```
-3. **Add `is_active` filter** to both queries to be explicit
-4. **Better error handling**: Log errors from the primary query instead of silently swallowing them, so we can debug if it happens again
+### Slet filer (sider + komponenter + hooks)
 
-### Single file change
-- `src/hooks/useReferrals.ts` lines 245-272
+**Sider:**
+- `src/pages/Forecast.tsx`
+- `src/pages/ForecastClientReport.tsx`
+
+**Komponenter (hele mappen):**
+- `src/components/forecast/` (16 filer)
+
+**Hooks:**
+- `src/hooks/useClientForecast.ts`
+- `src/hooks/useEmployeeForecastOverrides.ts`
+- `src/hooks/useFmWeeklyForecast.ts`
+- `src/hooks/useForecastVsActual.ts`
+
+**Types:**
+- Forecast-relaterede typer i `src/types/forecast.ts`
+
+### Redigér filer
+
+1. **`src/routes/config.tsx`** — Fjern 2 forecast-routes + import af `Forecast`, `ForecastClientReport`
+2. **`src/routes/pages.ts`** — Fjern 2 lazy exports (`Forecast`, `ForecastClientReport`)
+3. **`src/components/layout/AppSidebar.tsx`** — Fjern "Kundeforecast" NavLink-blokken (linje 1681-1694)
+4. **`src/hooks/usePositionPermissions.ts`** — Fjern `canViewForecast` permission
+5. **`src/config/permissionKeys.ts`** — Fjern `menu_forecast` entry
+
+### Uberørte filer
+- `useTeamGoalForecast.ts` — Bruges til team-mål, ikke kundeforecast. Beholdes.
 
