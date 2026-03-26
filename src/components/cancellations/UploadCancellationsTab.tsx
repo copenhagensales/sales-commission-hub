@@ -1085,17 +1085,17 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               // Check product match via sale_items
               const items = saleItemsMap.get(sale.id) || [];
               const hasProduct = items.some(item => 
-                item.adversus_product_title?.toLowerCase() === matchingFallback.saleItemTitle.toLowerCase()
+                item.adversus_product_title?.toLowerCase() === resolvedProductTitle!.toLowerCase()
               );
               if (!hasProduct) continue;
 
               // Match found!
-              const key = `${sale.id}|${matchingFallback.saleItemTitle}`;
+              const key = `${sale.id}|${resolvedProductTitle}`;
               if (matchedSaleProductKeys.has(key)) continue;
               matchedSaleProductKeys.add(key);
               matchedIndicesLocal.add(idx);
               const matchedItem = items.find(item => 
-                item.adversus_product_title?.toLowerCase() === matchingFallback.saleItemTitle.toLowerCase()
+                item.adversus_product_title?.toLowerCase() === resolvedProductTitle!.toLowerCase()
               );
               productMatched.push({
                 saleId: sale.id,
@@ -1106,8 +1106,8 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                 employee: sale.agent_name || "Ukendt",
                 currentStatus: sale.validation_status || "pending",
                 uploadedRowData: row.originalRow,
-                targetProductName: matchingFallback.saleItemTitle,
-                realProductName: matchedItem?.adversus_product_title || matchingFallback.saleItemTitle,
+                targetProductName: resolvedProductTitle!,
+                realProductName: matchedItem?.adversus_product_title || resolvedProductTitle!,
                 commission: matchedItem?.mapped_commission ?? undefined,
                 revenue: matchedItem?.mapped_revenue ?? undefined,
               });
