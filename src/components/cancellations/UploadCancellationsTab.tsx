@@ -1013,12 +1013,29 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             const excelSeller = String(getCaseInsensitive(row.originalRow, sellerCol) || "").trim();
             const excelDate = String(getCaseInsensitive(row.originalRow, dateCol) || "").trim();
             
-            // Find which fallback product this row matches
+            // Find which product this row matches — try condition-based first, then fallback
             const excelSubName = String(getCaseInsensitive(row.originalRow, "Subscription Name") || "").trim();
-            const matchingFallback = fallbackMappings.find(fm => 
-              excelSubName.toLowerCase().includes(fm.excelProductPattern.toLowerCase())
-            );
-            if (!matchingFallback) return; // not a fallback-eligible product
+            let resolvedProductTitle: string | null = null;
+
+            // 1. Condition-based matching
+            if (groupedConditions.length > 0) {
+              const matchedPid = findMatchingProductId(groupedConditions, row.originalRow);
+              if (matchedPid) {
+                resolvedProductTitle = condProductNames.get(matchedPid) || null;
+              }
+            }
+
+            // 2. Fallback to legacy fallback_product_mappings
+            if (!resolvedProductTitle) {
+              const matchingFallback = fallbackMappings.find(fm => 
+                excelSubName.toLowerCase().includes(fm.excelProductPattern.toLowerCase())
+              );
+              if (matchingFallback) {
+                resolvedProductTitle = matchingFallback.saleItemTitle;
+              }
+            }
+
+            if (!resolvedProductTitle) return; // not a matchable product
 
             if (!excelSeller || !excelDate) return;
 
