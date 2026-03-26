@@ -10,6 +10,16 @@ function toLocalDateString(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+export interface SalaryAdditionItem {
+  id: string;
+  amount: number;
+  note: string | null;
+}
+
+export interface SalaryAdditionsMap {
+  [columnKey: string]: { total: number; items: SalaryAdditionItem[] };
+}
+
 interface SellerData {
   id: string;
   name: string;
@@ -25,6 +35,7 @@ interface SellerData {
   referralBonus: number;
   isActive: boolean;
   isFreelanceConsultant: boolean;
+  salaryAdditions: SalaryAdditionsMap;
 }
 
 interface UseSellerSalariesCachedResult {
@@ -158,7 +169,7 @@ export function useSellerSalariesCached(
       if (!periodStartISO || !periodEndISO) return [];
       const { data, error } = await (supabase
         .from("salary_additions") as any)
-        .select("employee_id, column_key, amount")
+        .select("id, employee_id, column_key, amount, note")
         .eq("period_start", periodStartISO)
         .eq("period_end", periodEndISO);
       
@@ -274,11 +285,23 @@ export function useSellerSalariesCached(
       cancellationMap[employeeId] = (cancellationMap[employeeId] || 0) + totalCommission;
     }
 
-    // Build salary additions map: { employeeId: { columnKey: totalAmount } }
+    // Build salary additions map with individual items for display/delete
     const additionsMap: Record<string, Record<string, number>> = {};
+    const additionsDetailMap: Record<string, SalaryAdditionsMap> = {};
     for (const sa of salaryAdditionsData || []) {
       if (!additionsMap[sa.employee_id]) additionsMap[sa.employee_id] = {};
       additionsMap[sa.employee_id][sa.column_key] = (additionsMap[sa.employee_id][sa.column_key] || 0) + Number(sa.amount);
+
+      if (!additionsDetailMap[sa.employee_id]) additionsDetailMap[sa.employee_id] = {};
+      if (!additionsDetailMap[sa.employee_id][sa.column_key]) {
+        additionsDetailMap[sa.employee_id][sa.column_key] = { total: 0, items: [] };
+      }
+      additionsDetailMap[sa.employee_id][sa.column_key].total += Number(sa.amount);
+      additionsDetailMap[sa.employee_id][sa.column_key].items.push({
+        id: sa.id,
+        amount: Number(sa.amount),
+        note: sa.note || null,
+      });
     }
 
     // Filter by team if needed
@@ -317,6 +340,7 @@ export function useSellerSalariesCached(
         referralBonus: (emp.referral_bonus || 0) + (adds?.referralBonus || 0),
         isActive: emp.is_active ?? true,
         isFreelanceConsultant: emp.is_freelance_consultant ?? false,
+        salaryAdditions: additionsDetailMap[emp.id] || {},
       };
     });
 
