@@ -9635,6 +9635,61 @@ export type Database = {
           },
         ]
       }
+      salary_additions: {
+        Row: {
+          amount: number
+          column_key: string
+          created_at: string | null
+          employee_id: string
+          id: string
+          note: string | null
+          period_end: string
+          period_start: string
+        }
+        Insert: {
+          amount: number
+          column_key: string
+          created_at?: string | null
+          employee_id: string
+          id?: string
+          note?: string | null
+          period_end: string
+          period_start: string
+        }
+        Update: {
+          amount?: number
+          column_key?: string
+          created_at?: string | null
+          employee_id?: string
+          id?: string
+          note?: string | null
+          period_end?: string
+          period_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "salary_additions_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "salary_additions_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "salary_additions_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       salary_schemes: {
         Row: {
           created_at: string
