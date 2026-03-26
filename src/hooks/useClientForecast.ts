@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { startOfMonth, endOfMonth, format, eachDayOfInterval, addDays } from "date-fns";
+import { startOfMonth, endOfMonth, format, eachDayOfInterval, addDays, differenceInCalendarDays } from "date-fns";
 import type { ForecastSettings } from "./useForecastSettings";
 
 export interface EmployeeForecastRow {
@@ -23,41 +23,13 @@ export interface ClientForecastResult {
   isLoading: boolean;
 }
 
-/**
- * Determines if a given date is a working day using the shift hierarchy:
- * 1. Individual shifts (shift table)
- * 2. Employee standard shifts
- * 3. Team standard shifts
- * 4. Fallback: weekdays (Mon-Fri)
- */
-function isWorkingDay(
-  dateStr: string,
-  day: Date,
-  empId: string,
-  individualShiftDates: Set<string>,
-  empStandardDays: Map<string, number[]>,
-  teamStandardDays: number[],
-  absenceDates: Set<string>,
-): boolean {
-  // Skip absences
-  if (absenceDates.has(`${empId}:${dateStr}`)) return false;
-
-  // 1. Individual shift exists for this date
-  if (individualShiftDates.has(`${empId}:${dateStr}`)) return true;
-
-  // For standard shifts, check day of week (ISO: Mon=1..Sun=7)
-  const dow = day.getDay();
-  const isoDow = dow === 0 ? 7 : dow;
-
-  // 2. Employee standard shifts
-  const empDays = empStandardDays.get(empId);
-  if (empDays && empDays.length > 0) return empDays.includes(isoDow);
-
-  // 3. Team standard shifts
-  if (teamStandardDays.length > 0) return teamStandardDays.includes(isoDow);
-
-  // 4. Fallback: weekdays
-  return dow !== 0 && dow !== 6;
+/** Count weekdays (Mon-Fri) in an interval */
+function countWeekdays(start: Date, end: Date): number {
+  if (start > end) return 0;
+  return eachDayOfInterval({ start, end }).filter(d => {
+    const dow = d.getDay();
+    return dow !== 0 && dow !== 6;
+  }).length;
 }
 
 export function useClientForecast(
@@ -73,14 +45,14 @@ export function useClientForecast(
   const cutoffDate = isCurrentMonth ? today : monthEnd;
 
   const { data, isLoading } = useQuery({
-    queryKey: ["client-forecast-v2", teamId, month, year, settings?.id, settings?.updated_at],
+    queryKey: ["client-forecast-v3", teamId, month, year, settings?.id, settings?.updated_at],
     queryFn: async () => {
       if (!teamId || !settings) return { actualSalesMtd: 0, projectedRemaining: 0, totalForecast: 0, employees: [] };
 
       const threshold = settings.new_seller_threshold;
       const rollingShifts = settings.rolling_avg_shifts;
 
-      // 1. Get team members with employee data (including employment_start_date)
+      // 1. Get team members with employee data
       const { data: members } = await supabase
         .from("team_members")
         .select("employee_id, team_id, employee_master_data:employee_id(id, first_name, last_name, work_email, employment_start_date)")
@@ -97,116 +69,11 @@ export function useClientForecast(
       const fmtEnd = format(monthEnd, "yyyy-MM-dd");
       const fmtCutoff = format(cutoffDate, "yyyy-MM-dd");
 
-      // 2. Fetch all scheduling data in parallel
-      const [
-        individualShiftsRes,
-        empStandardShiftsRes,
-        teamStandardShiftsRes,
-        shiftDaysRes,
-        absencesRes,
-      ] = await Promise.all([
-        // Individual shifts for these employees (all time, for historical count)
-        supabase
-          .from("shift")
-          .select("employee_id, date")
-          .in("employee_id", employeeIds),
-        // Employee standard shifts
-        supabase
-          .from("employee_standard_shifts")
-          .select("employee_id, shift_id")
-          .in("employee_id", employeeIds),
-        // Team standard shifts
-        supabase
-          .from("team_standard_shifts")
-          .select("id, is_active")
-          .eq("team_id", teamId),
-        // All shift days (for both employee and team standard shifts)
-        supabase
-          .from("team_standard_shift_days")
-          .select("shift_id, day_of_week"),
-        // Approved absences for these employees
-        supabase
-          .from("absence_request_v2")
-          .select("employee_id, start_date, end_date")
-          .in("employee_id", employeeIds)
-          .eq("status", "approved"),
-      ]);
+      // 2. Simple calendar-based shift counts (same for everyone)
+      const shiftCountMtd = countWeekdays(monthStart, cutoffDate);
+      const remainingShifts = countWeekdays(addDays(cutoffDate, 1), monthEnd);
 
-      // Build individual shift date set: "empId:yyyy-MM-dd"
-      const individualShiftDates = new Set<string>();
-      (individualShiftsRes.data || []).forEach((s: any) => {
-        individualShiftDates.add(`${s.employee_id}:${s.date}`);
-      });
-
-      // Build employee standard days map: empId → day_of_week[]
-      const allShiftDays = shiftDaysRes.data || [];
-      const empStandardDays = new Map<string, number[]>();
-      (empStandardShiftsRes.data || []).forEach((es: any) => {
-        const days = allShiftDays
-          .filter((sd: any) => sd.shift_id === es.shift_id)
-          .map((sd: any) => sd.day_of_week as number);
-        const existing = empStandardDays.get(es.employee_id) || [];
-        empStandardDays.set(es.employee_id, [...existing, ...days]);
-      });
-
-      // Build team standard days: day_of_week[]
-      const activeTeamShift = (teamStandardShiftsRes.data || []).find((s: any) => s.is_active);
-      const teamStandardDays: number[] = activeTeamShift
-        ? allShiftDays
-            .filter((sd: any) => sd.shift_id === activeTeamShift.id)
-            .map((sd: any) => sd.day_of_week as number)
-        : [];
-
-      // Build absence date set: "empId:yyyy-MM-dd"
-      const absenceDates = new Set<string>();
-      (absencesRes.data || []).forEach((a: any) => {
-        try {
-          const absStart = new Date(a.start_date);
-          const absEnd = new Date(a.end_date);
-          eachDayOfInterval({ start: absStart, end: absEnd }).forEach(day => {
-            absenceDates.add(`${a.employee_id}:${format(day, "yyyy-MM-dd")}`);
-          });
-        } catch { /* skip invalid dates */ }
-      });
-
-      // 3. Calculate shift counts and remaining shifts per employee
-      const totalShiftsMap = new Map<string, number>();
-      const remainingShiftsMap = new Map<string, number>();
-
-      for (const emp of empData) {
-        // Historical shift count: from employment_start_date to cutoff
-        const empStart = emp.employment_start_date ? new Date(emp.employment_start_date) : null;
-        let historicalCount = 0;
-
-        if (empStart && empStart <= cutoffDate) {
-          const countStart = empStart;
-          const countEnd = cutoffDate;
-          const days = eachDayOfInterval({ start: countStart, end: countEnd });
-          for (const day of days) {
-            const ds = format(day, "yyyy-MM-dd");
-            if (isWorkingDay(ds, day, emp.id, individualShiftDates, empStandardDays, teamStandardDays, absenceDates)) {
-              historicalCount++;
-            }
-          }
-        }
-        totalShiftsMap.set(emp.id, historicalCount);
-
-        // Remaining shifts: from day after cutoff to month end
-        let remaining = 0;
-        const remStart = addDays(cutoffDate, 1);
-        if (remStart <= monthEnd) {
-          const days = eachDayOfInterval({ start: remStart, end: monthEnd });
-          for (const day of days) {
-            const ds = format(day, "yyyy-MM-dd");
-            if (isWorkingDay(ds, day, emp.id, individualShiftDates, empStandardDays, teamStandardDays, absenceDates)) {
-              remaining++;
-            }
-          }
-        }
-        remainingShiftsMap.set(emp.id, remaining);
-      }
-
-      // 4. Get actual sales MTD
+      // 3. Get actual sales MTD
       const actualSalesMap = new Map<string, number>();
 
       if (settings.client_id) {
@@ -266,6 +133,18 @@ export function useClientForecast(
         }
       }
 
+      // 4. Determine isNew based on employment_start_date workdays
+      const isNewMap = new Map<string, boolean>();
+      for (const emp of empData) {
+        if (!emp.employment_start_date) {
+          isNewMap.set(emp.id, true);
+          continue;
+        }
+        const startDate = new Date(emp.employment_start_date);
+        const workdaysSinceStart = countWeekdays(startDate, today);
+        isNewMap.set(emp.id, workdaysSinceStart < threshold);
+      }
+
       // 5. Rolling avg for established employees
       const rollingAvgMap = new Map<string, number>();
 
@@ -275,43 +154,42 @@ export function useClientForecast(
         .in("employee_id", employeeIds);
 
       for (const empId of employeeIds) {
-        const shiftCount = totalShiftsMap.get(empId) || 0;
-        if (shiftCount >= threshold) {
-          const emp = empData.find(e => e.id === empId);
-          const empEmails: string[] = [];
-          if (emp?.work_email) empEmails.push(emp.work_email.toLowerCase());
-          agentMappingsForRolling?.filter(am => am.employee_id === empId).forEach(am => {
-            const email = (am.agent as any)?.email?.toLowerCase();
-            if (email) empEmails.push(email);
-          });
+        if (isNewMap.get(empId)) continue;
 
-          if (empEmails.length > 0) {
-            const { data: recentSales } = await supabase
-              .from("sales")
-              .select("sale_datetime, sale_items:sale_items(quantity, product:product_id(counts_as_sale))")
-              .in("agent_email", empEmails)
-              .neq("source", "fieldmarketing")
-              .order("sale_datetime", { ascending: false })
-              .limit(200);
+        const emp = empData.find(e => e.id === empId);
+        const empEmails: string[] = [];
+        if (emp?.work_email) empEmails.push(emp.work_email.toLowerCase());
+        agentMappingsForRolling?.filter(am => am.employee_id === empId).forEach(am => {
+          const email = (am.agent as any)?.email?.toLowerCase();
+          if (email) empEmails.push(email);
+        });
 
-            if (recentSales?.length) {
-              const dayMap = new Map<string, number>();
-              recentSales.forEach(s => {
-                const day = s.sale_datetime?.substring(0, 10);
-                if (!day) return;
-                const count = (s.sale_items as any[])?.reduce((sum, si) => {
-                  return sum + (si.product?.counts_as_sale !== false ? (si.quantity || 1) : 0);
-                }, 0) || 0;
-                dayMap.set(day, (dayMap.get(day) || 0) + count);
-              });
-              const sortedDays = Array.from(dayMap.entries())
-                .sort((a, b) => b[0].localeCompare(a[0]))
-                .slice(0, rollingShifts);
+        if (empEmails.length > 0) {
+          const { data: recentSales } = await supabase
+            .from("sales")
+            .select("sale_datetime, sale_items:sale_items(quantity, product:product_id(counts_as_sale))")
+            .in("agent_email", empEmails)
+            .neq("source", "fieldmarketing")
+            .order("sale_datetime", { ascending: false })
+            .limit(200);
 
-              if (sortedDays.length > 0) {
-                const totalSales = sortedDays.reduce((s, [_, v]) => s + v, 0);
-                rollingAvgMap.set(empId, totalSales / sortedDays.length);
-              }
+          if (recentSales?.length) {
+            const dayMap = new Map<string, number>();
+            recentSales.forEach(s => {
+              const day = s.sale_datetime?.substring(0, 10);
+              if (!day) return;
+              const count = (s.sale_items as any[])?.reduce((sum, si) => {
+                return sum + (si.product?.counts_as_sale !== false ? (si.quantity || 1) : 0);
+              }, 0) || 0;
+              dayMap.set(day, (dayMap.get(day) || 0) + count);
+            });
+            const sortedDays = Array.from(dayMap.entries())
+              .sort((a, b) => b[0].localeCompare(a[0]))
+              .slice(0, rollingShifts);
+
+            if (sortedDays.length > 0) {
+              const totalSales = sortedDays.reduce((s, [_, v]) => s + v, 0);
+              rollingAvgMap.set(empId, totalSales / sortedDays.length);
             }
           }
         }
@@ -326,21 +204,19 @@ export function useClientForecast(
         const emp = empData.find(e => e.id === empId);
         if (!emp) continue;
 
-        const shiftCount = totalShiftsMap.get(empId) || 0;
-        const isNew = shiftCount < threshold;
+        const isNew = isNewMap.get(empId) ?? true;
         const actual = actualSalesMap.get(empId) || 0;
-        const remaining = remainingShiftsMap.get(empId) || 0;
 
         let salesPerDay = 0;
         let projected = 0;
 
         if (isNew) {
           salesPerDay = settings.new_seller_weekly_target / 5;
-          projected = salesPerDay * remaining;
+          projected = salesPerDay * remainingShifts;
           projected *= (1 - settings.churn_new_pct / 100);
         } else {
           salesPerDay = rollingAvgMap.get(empId) || 0;
-          projected = salesPerDay * remaining;
+          projected = salesPerDay * remainingShifts;
           projected *= (1 - settings.churn_established_pct / 100);
         }
 
@@ -354,10 +230,10 @@ export function useClientForecast(
           employeeId: empId,
           name: `${emp.first_name || ""} ${emp.last_name || ""}`.trim(),
           isNew,
-          shiftCount,
+          shiftCount: shiftCountMtd,
           actualSales: actual,
           salesPerDay: Math.round(salesPerDay * 10) / 10,
-          remainingShifts: remaining,
+          remainingShifts: remainingShifts,
           projected: Math.round(projected),
           totalForecast: actual + Math.round(projected),
         });
