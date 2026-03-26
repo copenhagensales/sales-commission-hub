@@ -5,6 +5,7 @@ import { toast } from "sonner";
 export interface ForecastSettings {
   id: string;
   team_id: string;
+  client_id: string | null;
   month: number;
   year: number;
   client_goal: number;
@@ -57,6 +58,7 @@ export function useCreateForecastSettings() {
   return useMutation({
     mutationFn: async (input: {
       team_id: string;
+      client_id?: string | null;
       month: number;
       year: number;
       client_goal?: number;
