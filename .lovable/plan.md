@@ -1,25 +1,33 @@
 
 
-## Tillad samme værdi på flere produkter
+## Genopret ASE upload-konfiguration
 
-### Problem
-Badget "Allerede mappet" antyder at en værdi kun bør tilknyttes ét produkt. Men sammensætningen af værdier på tværs af kolonner (Operator, Subscription Name, Sales Department) er det der bestemmer produktet — så samme værdi skal kunne bruges på flere produkter.
+ASE-konfigurationen mangler i `cancellation_upload_configs`. Den skal genoprettes med de korrekte kolonne-mappings baseret på den uploadede Excel-fil.
 
-### Løsning
+### Excel-kolonne-struktur (ASE)
+| Kolonne | Mapping |
+|---|---|
+| Sælger | `seller_column` |
+| Indmeldelsesdato | `date_column` |
+| Medlemsnummer | `member_number_column` |
+| A-kasse + Lønsikring forsikringssum | `product_columns` |
+| Type | (ingen direkte mapping — bruges evt. til filter) |
 
-#### 1. Ændre badge-visning i dialogen (`SellerMappingTab.tsx`)
-- Fjern det afskrækkende "Allerede mappet" badge
-- Erstat med en informativ tekst der viser *hvilke* produkter værdien allerede er tilknyttet (fx "Også på: Fri tale + 170GB")
-- Behold fuld valgfrihed — ingen visuel forskel i checkbox-tilstand
+### Ændringer
 
-#### 2. Verificér upsert-logik
-- Den nuværende `upsert` bruger `onConflict: "client_id,excel_product_name"` — men da samme `excel_product_name` nu skal kunne eksistere med *forskellige* `product_id`, er upsert-nøglen forkert
-- Ændre til insert med duplikat-check: tjek om kombinationen `(client_id, excel_product_name, product_id)` allerede eksisterer før insert, eller brug upsert med den korrekte unikke constraint
+**1. Indsæt ASE upload-konfiguration i databasen**
+- Brug insert-tool til at oprette en ny række i `cancellation_upload_configs`:
+  - `client_id`: `53eb9c4a-91b0-44a9-9ee7-a87d87cc3e0f` (Ase)
+  - `name`: "Ase Standard"
+  - `seller_column`: "Sælger"
+  - `date_column`: "Indmeldelsesdato"
+  - `member_number_column`: "Medlemsnummer"
+  - `product_columns`: ["A-kasse"] (primær produktkolonne)
+  - `phone_column`: null (ingen telefonkolonne)
+  - `opp_column`: null
+  - `company_column`: null
+  - `is_default`: true
+  - `product_match_mode`: "strip_percent_suffix"
 
-#### 3. Tjek database-constraint
-- `cancellation_product_mappings` har formentlig en unik constraint på `(client_id, excel_product_name)` — denne skal ændres til `(client_id, excel_product_name, product_id)` via migration, så samme excel-navn kan mappes til flere produkter
-
-### Berørte filer
-- `src/components/cancellations/SellerMappingTab.tsx` — badge-visning og save-logik
-- Database migration — ændre unik constraint
+Ingen kodeændringer nødvendige — systemet understøtter allerede `member_number_column` i upload-wizarden og matching-logikken.
 
