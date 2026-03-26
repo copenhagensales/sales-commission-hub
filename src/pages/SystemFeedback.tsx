@@ -234,6 +234,7 @@ export default function SystemFeedback() {
   };
 
   return (
+    <DashboardLayout>
     <div className="container mx-auto py-6 space-y-6 max-w-5xl">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Fejlrapportering & Forslag</h1>
@@ -529,6 +530,7 @@ export default function SystemFeedback() {
         </DialogContent>
       </Dialog>
     </div>
+    </DashboardLayout>
   );
 }
 
