@@ -72,7 +72,6 @@ export function AssignHotelDialog({ open, onOpenChange, booking, existingBooking
     const total = Number(pricePerNight) || 0;
     return hotelBookedDays.length > 0 ? total / hotelBookedDays.length : 0;
   }, [pricePerNight, hotelBookedDays]);
-  const [showNewHotel, setShowNewHotel] = useState(false);
 
   const [newName, setNewName] = useState("");
   const [newCity, setNewCity] = useState(city);
