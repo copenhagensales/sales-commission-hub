@@ -143,23 +143,44 @@ function SellerMappingSection({ clientId }: { clientId: string }) {
 
 /* ────────────────────────────────────────── Produkt ────────────────────────────────────────── */
 
+const OPERATOR_LABELS: Record<string, string> = {
+  any: "Ligegyldigt",
+  in: "Er en af",
+  not_in: "Er ikke en af",
+  equals: "Er lig med",
+  not_equals: "Er ikke lig med",
+};
+
+const OPERATOR_SYMBOLS: Record<string, string> = {
+  any: "∗",
+  in: "∈",
+  not_in: "∉",
+  equals: "=",
+  not_equals: "≠",
+};
+
+interface ConditionDraft {
+  operator: string;
+  values: string[];
+}
+
 function ProductMappingSection({ clientId }: { clientId: string }) {
   const queryClient = useQueryClient();
   const [selectedProductId, setSelectedProductId] = useState("");
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [checkedNames, setCheckedNames] = useState<Set<string>>(new Set());
-  const [customName, setCustomName] = useState("");
-  
+  const [conditionDrafts, setConditionDrafts] = useState<Record<string, ConditionDraft>>({});
+  const [customInputs, setCustomInputs] = useState<Record<string, string>>({});
 
   const ALLOWED_COLUMNS = ["Operator", "Subscription Name", "Sales Department"] as const;
 
-  const { data: mappings = [], isLoading } = useQuery({
-    queryKey: ["cancellation-product-mappings", clientId],
+  // Fetch existing conditions
+  const { data: conditions = [], isLoading } = useQuery({
+    queryKey: ["cancellation-product-conditions", clientId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("cancellation_product_mappings")
-        .select("id, excel_product_name, product_id, created_at")
+        .from("cancellation_product_conditions")
+        .select("id, product_id, column_name, operator, values, created_at")
         .eq("client_id", clientId)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -168,7 +189,7 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
     enabled: !!clientId,
   });
 
-  // Fetch all unique values for the 3 allowed columns from uploaded Excel data
+  // Fetch column values from uploaded data
   const { data: columnValues = {} } = useQuery({
     queryKey: ["excel-column-values", clientId],
     queryFn: async () => {
@@ -252,91 +273,117 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
     enabled: campaignIds.length > 0,
   });
 
-  // All unique values across all allowed columns
-  const allValues = Object.values(columnValues).flat();
-  const mappedNames = new Set(mappings.map(m => m.excel_product_name));
-  const unmappedUploadNames = allValues.filter(n => !mappedNames.has(n));
-
   const productMap = new Map(products.map(p => [p.id, p.name]));
 
-  // Group existing mappings by product
-  const mappingsByProduct = new Map<string, typeof mappings>();
-  for (const m of mappings) {
-    const list = mappingsByProduct.get(m.product_id) || [];
-    list.push(m);
-    mappingsByProduct.set(m.product_id, list);
+  // Group conditions by product
+  const conditionsByProduct = new Map<string, typeof conditions>();
+  for (const c of conditions) {
+    const list = conditionsByProduct.get(c.product_id) || [];
+    list.push(c);
+    conditionsByProduct.set(c.product_id, list);
   }
+
+  // Products that have conditions
+  const productsWithConditions = [...conditionsByProduct.keys()];
 
   const openDialogForProduct = (productId: string) => {
     setSelectedProductId(productId);
-    const existing = (mappingsByProduct.get(productId) || []).map(m => m.excel_product_name);
-    setCheckedNames(new Set(existing));
-    setCustomName("");
+    const existing = conditionsByProduct.get(productId) || [];
+    const drafts: Record<string, ConditionDraft> = {};
+    for (const col of ALLOWED_COLUMNS) {
+      const cond = existing.find(c => c.column_name === col);
+      drafts[col] = cond
+        ? { operator: cond.operator, values: [...cond.values] }
+        : { operator: "any", values: [] };
+    }
+    setConditionDrafts(drafts);
+    setCustomInputs({});
     setDialogOpen(true);
   };
 
-  const toggleName = (name: string) => {
-    setCheckedNames(prev => {
-      const next = new Set(prev);
-      if (next.has(name)) next.delete(name); else next.add(name);
-      return next;
+  const updateDraftOperator = (col: string, operator: string) => {
+    setConditionDrafts(prev => ({
+      ...prev,
+      [col]: { ...prev[col], operator, values: operator === "any" ? [] : prev[col]?.values || [] },
+    }));
+  };
+
+  const toggleDraftValue = (col: string, value: string) => {
+    setConditionDrafts(prev => {
+      const draft = prev[col] || { operator: "in", values: [] };
+      const values = draft.values.includes(value)
+        ? draft.values.filter(v => v !== value)
+        : [...draft.values, value];
+      return { ...prev, [col]: { ...draft, values } };
     });
   };
 
-  const addCustomName = () => {
-    const trimmed = customName.trim();
-    if (trimmed) {
-      setCheckedNames(prev => new Set(prev).add(trimmed));
-      setCustomName("");
-    }
+  const addCustomValue = (col: string) => {
+    const val = (customInputs[col] || "").trim();
+    if (!val) return;
+    setConditionDrafts(prev => {
+      const draft = prev[col] || { operator: "in", values: [] };
+      if (draft.values.includes(val)) return prev;
+      return { ...prev, [col]: { ...draft, values: [...draft.values, val] } };
+    });
+    setCustomInputs(prev => ({ ...prev, [col]: "" }));
   };
 
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!selectedProductId) return;
 
-      const existingForProduct = (mappingsByProduct.get(selectedProductId) || []);
-      const existingNames = new Set(existingForProduct.map(m => m.excel_product_name));
-
-      // Names to add
-      const toAdd = [...checkedNames].filter(n => !existingNames.has(n));
-      // Names to remove
-      const toRemove = existingForProduct.filter(m => !checkedNames.has(m.excel_product_name));
-
-      // Delete removed
-      for (const m of toRemove) {
-        const { error } = await supabase.from("cancellation_product_mappings").delete().eq("id", m.id);
-        if (error) throw error;
-      }
-
-      // Insert new
-      if (toAdd.length > 0) {
-        const { error } = await supabase
-          .from("cancellation_product_mappings")
-          .insert(
-            toAdd.map(name => ({ client_id: clientId, excel_product_name: name, product_id: selectedProductId }))
-          );
-        if (error) throw error;
+      // For each column, upsert or delete the condition
+      for (const col of ALLOWED_COLUMNS) {
+        const draft = conditionDrafts[col];
+        if (!draft || draft.operator === "any") {
+          // Delete any existing condition for this column
+          await supabase
+            .from("cancellation_product_conditions")
+            .delete()
+            .eq("client_id", clientId)
+            .eq("product_id", selectedProductId)
+            .eq("column_name", col);
+        } else {
+          // Upsert
+          const { error } = await supabase
+            .from("cancellation_product_conditions")
+            .upsert(
+              {
+                client_id: clientId,
+                product_id: selectedProductId,
+                column_name: col,
+                operator: draft.operator,
+                values: draft.values,
+              },
+              { onConflict: "client_id,product_id,column_name" }
+            );
+          if (error) throw error;
+        }
       }
     },
     onSuccess: () => {
-      toast({ title: "Gemt", description: "Produkt-mappings opdateret." });
+      toast({ title: "Gemt", description: "Produktbetingelser opdateret." });
       setDialogOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["cancellation-product-mappings", clientId] });
+      queryClient.invalidateQueries({ queryKey: ["cancellation-product-conditions", clientId] });
     },
     onError: (err: Error) => {
       toast({ title: "Fejl", description: err.message, variant: "destructive" });
     },
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("cancellation_product_mappings").delete().eq("id", id);
+  const deleteProductConditions = useMutation({
+    mutationFn: async (productId: string) => {
+      const { error } = await supabase
+        .from("cancellation_product_conditions")
+        .delete()
+        .eq("client_id", clientId)
+        .eq("product_id", productId);
       if (error) throw error;
     },
     onSuccess: () => {
-      toast({ title: "Slettet", description: "Produkt-mapping er fjernet." });
-      queryClient.invalidateQueries({ queryKey: ["cancellation-product-mappings", clientId] });
+      toast({ title: "Slettet", description: "Alle betingelser for produktet er fjernet." });
+      queryClient.invalidateQueries({ queryKey: ["cancellation-product-conditions", clientId] });
     },
     onError: (err: Error) => {
       toast({ title: "Fejl", description: err.message, variant: "destructive" });
@@ -349,15 +396,35 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
 
   const selectedProduct = products.find(p => p.id === selectedProductId);
 
+  // Helper to render conditions summary
+  const renderConditionsSummary = (productId: string) => {
+    const conds = conditionsByProduct.get(productId) || [];
+    if (conds.length === 0) return <span className="text-muted-foreground text-xs">Ingen betingelser</span>;
+    return (
+      <div className="flex flex-wrap gap-1.5">
+        {conds.filter(c => c.operator !== "any").map(c => (
+          <Badge key={c.column_name} variant="outline" className="text-[11px] font-normal gap-1">
+            <span className="font-medium">{c.column_name}</span>
+            <span className="text-muted-foreground">{OPERATOR_SYMBOLS[c.operator] || c.operator}</span>
+            <span className="max-w-[200px] truncate">{c.values.join(", ")}</span>
+          </Badge>
+        ))}
+      </div>
+    );
+  };
+
+  // Check if any non-any condition has values selected
+  const hasAnyCondition = Object.values(conditionDrafts).some(d => d.operator !== "any" && d.values.length > 0);
+
   return (
     <>
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Package className="h-5 w-5" />Produkt-mappings</CardTitle>
-          <CardDescription>Koblinger mellem produktnavne fra upload-filer og interne produkter. Bruges til kurvrettelser.</CardDescription>
+          <CardTitle className="flex items-center gap-2"><Package className="h-5 w-5" />Produkt-betingelser</CardTitle>
+          <CardDescription>Definer kolonne-betingelser pr. produkt. Bruges til at bestemme hvilket produkt en upload-række hører til.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Select product to map */}
+          {/* Select product */}
           <div className="flex items-end gap-3">
             <div className="flex-1 max-w-sm space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">Vælg internt produkt</label>
@@ -393,57 +460,30 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
                 </PopoverContent>
               </Popover>
             </div>
-            <ProductAutoMatch clientId={clientId} availableExcelNames={unmappedUploadNames} products={products} />
           </div>
 
-          {/* Show unmapped Excel columns */}
-          {unmappedUploadNames.length > 0 && (
-            <div className="rounded-md border border-dashed border-primary/30 bg-primary/5 p-4 space-y-2">
-              <p className="text-sm font-medium text-foreground">
-                {unmappedUploadNames.length} umappede værdier fundet fra uploads:
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {unmappedUploadNames.map((name: string) => (
-                  <Badge key={name} variant="outline" className="text-xs">
-                    {name}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Existing mappings grouped by product */}
-          {mappings.length === 0 && unmappedUploadNames.length === 0 ? (
+          {/* Existing conditions grouped by product */}
+          {productsWithConditions.length === 0 ? (
             <div className="py-8 text-center text-muted-foreground">
               <Package className="h-12 w-12 mx-auto mb-4 opacity-40" />
-              <p className="font-medium">Ingen produkt-mappings endnu</p>
-              <p className="text-sm mt-1">Vælg et internt produkt ovenfor for at tilknytte Excel-navne.</p>
+              <p className="font-medium">Ingen produkt-betingelser endnu</p>
+              <p className="text-sm mt-1">Vælg et internt produkt ovenfor for at definere betingelser.</p>
             </div>
-          ) : mappings.length > 0 && (
+          ) : (
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Internt produkt</TableHead>
-                    <TableHead>Excel-værdier</TableHead>
-                    <TableHead>Oprettet</TableHead>
+                    <TableHead>Betingelser</TableHead>
                     <TableHead className="w-16"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {[...mappingsByProduct.entries()].map(([productId, productMappings]) => (
+                  {productsWithConditions.map(productId => (
                     <TableRow key={productId} className="cursor-pointer hover:bg-muted/50" onClick={() => openDialogForProduct(productId)}>
                       <TableCell className="font-medium">{productMap.get(productId) || productId}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {productMappings.map(m => (
-                            <Badge key={m.id} variant="outline" className="text-xs">{m.excel_product_name}</Badge>
-                          ))}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {new Date(productMappings[0].created_at).toLocaleDateString("da-DK")}
-                      </TableCell>
+                      <TableCell>{renderConditionsSummary(productId)}</TableCell>
                       <TableCell>
                         <Button
                           variant="ghost"
@@ -451,9 +491,9 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
                           className="h-8 w-8 text-destructive hover:text-destructive"
                           onClick={(e) => {
                             e.stopPropagation();
-                            productMappings.forEach(m => deleteMutation.mutate(m.id));
+                            deleteProductConditions.mutate(productId);
                           }}
-                          disabled={deleteMutation.isPending}
+                          disabled={deleteProductConditions.isPending}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -467,74 +507,90 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
         </CardContent>
       </Card>
 
-      {/* Dialog for selecting Excel values */}
+      {/* Condition builder dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-auto">
           <DialogHeader>
             <DialogTitle>
-              Tilknyt værdier til "{selectedProduct?.name}"
+              Betingelser for "{selectedProduct?.name}"
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-5 max-h-[400px] overflow-auto pr-1">
-              {ALLOWED_COLUMNS.map(col => {
-                const vals = columnValues[col] || [];
-                if (vals.length === 0) return null;
-                return (
-                  <div key={col} className="space-y-2">
-                    <h4 className="text-sm font-semibold text-foreground border-b pb-1">{col}</h4>
-                    {vals.map((name: string) => (
-                      <label key={name} className="flex items-center gap-3 rounded-md border px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors">
-                        <Checkbox
-                          checked={checkedNames.has(name)}
-                          onCheckedChange={() => toggleName(name)}
-                        />
-                        <span className="text-sm">{name}</span>
-                        {(() => {
-                          const otherProducts = mappings
-                            .filter(m => m.excel_product_name === name && m.product_id !== selectedProductId)
-                            .map(m => productMap.get(m.product_id) || m.product_id);
-                          if (otherProducts.length === 0) return null;
-                          return (
-                            <span className="text-[10px] text-muted-foreground ml-auto truncate max-w-[140px]" title={otherProducts.join(", ")}>
-                              Også på: {otherProducts.join(", ")}
-                            </span>
-                          );
-                        })()}
-                      </label>
-                    ))}
-                  </div>
-                );
-              })}
-              {/* Custom-added names that don't appear in any column */}
-              {[...checkedNames].filter(n => !allValues.includes(n)).map((name: string) => (
-                <label key={name} className="flex items-center gap-3 rounded-md border px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors border-primary/30">
-                  <Checkbox checked onCheckedChange={() => toggleName(name)} />
-                  <span className="text-sm">{name}</span>
-                  <Badge variant="outline" className="text-[10px] ml-auto">Manuelt tilføjet</Badge>
-                </label>
-              ))}
-            </div>
+          <div className="space-y-5 py-2">
+            {ALLOWED_COLUMNS.map(col => {
+              const draft = conditionDrafts[col] || { operator: "any", values: [] };
+              const knownValues = columnValues[col] || [];
+              const showValues = draft.operator !== "any";
 
-            {/* Add custom name */}
-            <div className="flex gap-2">
-              <Input
-                placeholder="Tilføj nyt navn manuelt..."
-                value={customName}
-                onChange={e => setCustomName(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addCustomName(); } }}
-                className="h-9 text-sm"
-              />
-              <Button variant="outline" size="sm" className="h-9 shrink-0" onClick={addCustomName} disabled={!customName.trim()}>
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
+              return (
+                <div key={col} className="space-y-2.5 border rounded-lg p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label className="text-sm font-semibold">{col}</Label>
+                    <Select value={draft.operator} onValueChange={(v) => updateDraftOperator(col, v)}>
+                      <SelectTrigger className="h-8 w-[180px] text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(OPERATOR_LABELS).map(([key, label]) => (
+                          <SelectItem key={key} value={key} className="text-xs">{label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {showValues && (
+                    <div className="space-y-2">
+                      {/* Known values from uploads */}
+                      {knownValues.length > 0 && (
+                        <div className="max-h-[150px] overflow-auto space-y-1">
+                          {knownValues.map((val: string) => (
+                            <label key={val} className="flex items-center gap-2.5 rounded-md border px-2.5 py-1.5 cursor-pointer hover:bg-muted/50 transition-colors text-xs">
+                              <Checkbox
+                                checked={draft.values.includes(val)}
+                                onCheckedChange={() => toggleDraftValue(col, val)}
+                              />
+                              <span>{val}</span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Custom-added values not in known list */}
+                      {draft.values.filter(v => !knownValues.includes(v)).map(v => (
+                        <label key={v} className="flex items-center gap-2.5 rounded-md border border-primary/30 px-2.5 py-1.5 cursor-pointer hover:bg-muted/50 transition-colors text-xs">
+                          <Checkbox checked onCheckedChange={() => toggleDraftValue(col, v)} />
+                          <span>{v}</span>
+                          <Badge variant="outline" className="text-[9px] ml-auto">Manuelt</Badge>
+                        </label>
+                      ))}
+
+                      {/* Add custom value */}
+                      <div className="flex gap-1.5">
+                        <Input
+                          placeholder="Tilføj værdi..."
+                          value={customInputs[col] || ""}
+                          onChange={e => setCustomInputs(prev => ({ ...prev, [col]: e.target.value }))}
+                          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addCustomValue(col); } }}
+                          className="h-8 text-xs"
+                        />
+                        <Button variant="outline" size="sm" className="h-8 shrink-0 px-2" onClick={() => addCustomValue(col)} disabled={!(customInputs[col] || "").trim()}>
+                          <Plus className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+
+                      {draft.values.length === 0 && (
+                        <p className="text-[11px] text-muted-foreground">Vælg mindst én værdi</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setDialogOpen(false)}>Annuller</Button>
-            <Button onClick={() => saveMutation.mutate()} disabled={checkedNames.size === 0 || saveMutation.isPending}>
+            <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
               {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Gem ({checkedNames.size} valgt)
+              Gem betingelser
             </Button>
           </DialogFooter>
         </DialogContent>
