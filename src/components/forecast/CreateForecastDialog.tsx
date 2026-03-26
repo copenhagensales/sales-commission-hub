@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
@@ -9,16 +9,24 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCreateForecastSettings } from "@/hooks/useForecastSettings";
 
+const MONTHS = [
+  "Januar", "Februar", "Marts", "April", "Maj", "Juni",
+  "Juli", "August", "September", "Oktober", "November", "December"
+];
+
 interface Props {
   month: number;
   year: number;
   existingTeamIds: string[];
 }
 
-export function CreateForecastDialog({ month, year, existingTeamIds }: Props) {
+export function CreateForecastDialog({ month: defaultMonth, year: defaultYear, existingTeamIds }: Props) {
+  const now = new Date();
   const [open, setOpen] = useState(false);
   const [teamId, setTeamId] = useState("");
   const [clientGoal, setClientGoal] = useState("0");
+  const [selectedMonth, setSelectedMonth] = useState(String(defaultMonth));
+  const [selectedYear, setSelectedYear] = useState(String(defaultYear));
   const createMutation = useCreateForecastSettings();
 
   const { data: teams } = useQuery({
@@ -34,20 +42,40 @@ export function CreateForecastDialog({ month, year, existingTeamIds }: Props) {
 
   const handleCreate = () => {
     if (!teamId) return;
+    const month = Number(selectedMonth);
+    const year = Number(selectedYear);
     createMutation.mutate(
       { team_id: teamId, month, year, client_goal: parseInt(clientGoal) || 0 },
-      { onSuccess: () => { setOpen(false); setTeamId(""); setClientGoal("0"); } }
+      {
+        onSuccess: () => {
+          setOpen(false);
+          setTeamId("");
+          setClientGoal("0");
+        },
+      }
     );
   };
 
+  // Reset to parent defaults when dialog opens
+  const handleOpenChange = (isOpen: boolean) => {
+    setOpen(isOpen);
+    if (isOpen) {
+      setSelectedMonth(String(defaultMonth));
+      setSelectedYear(String(defaultYear));
+      setTeamId("");
+      setClientGoal("0");
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button><Plus className="h-4 w-4 mr-2" /> Opret forecast</Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Opret nyt forecast</DialogTitle>
+          <DialogDescription>Vælg team, måned og salgsmål for det nye forecast.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 pt-2">
           <div className="space-y-2">
@@ -60,6 +88,30 @@ export function CreateForecastDialog({ month, year, existingTeamIds }: Props) {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Måned</Label>
+              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {MONTHS.map((m, i) => (
+                    <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>År</Label>
+              <Select value={selectedYear} onValueChange={setSelectedYear}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {[now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1].map(y => (
+                    <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div className="space-y-2">
             <Label>Kundens salgsmål</Label>
