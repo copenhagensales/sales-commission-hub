@@ -1,23 +1,21 @@
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useActiveEvent, useRulesForEvent, useScoresForEvent, computeStandings } from "@/hooks/usePowerdagData";
 import { useAutoReload, isTvMode } from "@/utils/tvMode";
-import { Trophy, Zap, Flame, ChevronDown } from "lucide-react";
+import { Trophy } from "lucide-react";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { useRequireDashboardAccess } from "@/hooks/useRequireDashboardAccess";
+import { Progress } from "@/components/ui/progress";
 
-const RANK_ICONS = [
-  <Flame className="h-6 w-6 text-yellow-400 animate-pulse" />,
-  <Zap className="h-5 w-5 text-blue-400" />,
-  <Zap className="h-5 w-5 text-emerald-400" />,
+const PODIUM_CONFIG = [
+  { emoji: "🥇", bg: "from-yellow-500/20 via-amber-500/10 to-yellow-600/5", border: "border-yellow-500/50", glow: "shadow-yellow-500/20", label: "text-yellow-400" },
+  { emoji: "🥈", bg: "from-slate-300/20 via-slate-400/10 to-slate-300/5", border: "border-slate-400/40", glow: "shadow-slate-400/15", label: "text-slate-300" },
+  { emoji: "🥉", bg: "from-orange-500/20 via-amber-600/10 to-orange-500/5", border: "border-orange-500/40", glow: "shadow-orange-500/15", label: "text-orange-400" },
 ];
 
-const RANK_COLORS = [
-  "from-yellow-500/20 to-orange-500/10 border-yellow-500/40",
-  "from-blue-500/15 to-blue-500/5 border-blue-500/30",
-  "from-emerald-500/15 to-emerald-500/5 border-emerald-500/30",
-];
+// Podium order: [1st place center (tall), 0th=2nd left, 2nd=3rd right]
+const PODIUM_ORDER = [1, 0, 2];
 
 export default function PowerdagBoard() {
   const tv = isTvMode();
@@ -29,19 +27,29 @@ export default function PowerdagBoard() {
   const { data: scores = [] } = useScoresForEvent(event?.id);
 
   const standings = computeStandings(rules, scores);
+  const maxPoints = Math.max(...standings.map(s => s.total_points), 1);
+  const top3 = standings.slice(0, 3);
+  const rest = standings.slice(3);
 
   if (accessLoading) return <DashboardShell><div className="flex items-center justify-center h-64 text-muted-foreground">Indlæser...</div></DashboardShell>;
   if (!canView) return null;
 
   return (
     <DashboardShell>
-      <div className={`${tv ? "p-6" : "p-4 md:p-6"} max-w-4xl mx-auto space-y-6`}>
+      <div className={`${tv ? "p-6" : "p-4 md:p-6"} max-w-5xl mx-auto space-y-8`}>
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl md:text-3xl font-black tracking-tight flex items-center gap-2">
+            <h1 className={`${tv ? "text-4xl" : "text-2xl md:text-3xl"} font-black tracking-tight flex items-center gap-3`}>
               <Trophy className="h-7 w-7 text-yellow-500" />
               {event?.name ?? "Powerdag"}
+              <span className="inline-flex items-center gap-1.5 ml-2 px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-semibold uppercase tracking-wider">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                </span>
+                Live
+              </span>
             </h1>
             {event && <p className="text-sm text-muted-foreground mt-1">{new Date(event.event_date).toLocaleDateString("da-DK", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>}
           </div>
@@ -52,74 +60,138 @@ export default function PowerdagBoard() {
           )}
         </div>
 
-        {/* Standings */}
         {standings.length === 0 ? (
           <p className="text-muted-foreground text-center py-12">Ingen data endnu — start med at indtaste salg.</p>
         ) : (
-          <div className="space-y-3">
-            {standings.map((team, i) => {
-              const isComposite = team.sub_entries.length > 1 || team.sub_entries.some(e => e.sub_client_name);
-
-              return (
-                <div
-                  key={team.team_name}
-                  className={`rounded-xl border bg-gradient-to-r p-4 md:p-5 transition-all ${i < 3 ? RANK_COLORS[i] : "from-card to-card border-border"}`}
-                >
-                  <div className="flex items-center gap-4">
-                    {/* Rank */}
-                    <div className="flex-shrink-0 w-10 h-10 rounded-full bg-background/60 flex items-center justify-center font-bold text-lg">
-                      {i < 3 ? RANK_ICONS[i] : <span className="text-muted-foreground">{i + 1}</span>}
-                    </div>
-
-                    {/* Team name */}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-bold text-lg truncate">{team.team_name}</p>
-                      {isComposite && (
-                        <p className="text-xs text-muted-foreground">
+          <>
+            {/* Podium — Top 3 */}
+            {top3.length >= 3 && (
+              <div className={`grid grid-cols-3 gap-3 md:gap-4 items-end ${tv ? "gap-6" : ""}`}>
+                {PODIUM_ORDER.map((idx) => {
+                  const team = top3[idx];
+                  const cfg = PODIUM_CONFIG[idx];
+                  const isFirst = idx === 0;
+                  return (
+                    <div
+                      key={team.team_name}
+                      className={`relative rounded-2xl border-2 bg-gradient-to-b ${cfg.bg} ${cfg.border} p-4 md:p-6 text-center transition-all shadow-lg ${cfg.glow} ${isFirst ? "scale-105 md:scale-110 z-10" : ""}`}
+                      style={{
+                        animation: `fade-in 0.5s ease-out ${idx * 0.15}s both`,
+                        minHeight: isFirst ? (tv ? "260px" : "200px") : (tv ? "220px" : "170px"),
+                      }}
+                    >
+                      {/* Rank badge */}
+                      <div className={`text-3xl md:text-4xl mb-2 ${isFirst ? "animate-bounce" : ""}`} style={isFirst ? { animationDuration: "2s" } : undefined}>
+                        {cfg.emoji}
+                      </div>
+                      {/* Points */}
+                      <p className={`font-black tabular-nums ${cfg.label} ${tv ? "text-5xl md:text-6xl" : "text-3xl md:text-4xl"}`}>
+                        {team.total_points % 1 === 0 ? team.total_points : team.total_points.toFixed(1)}
+                      </p>
+                      <p className="text-[10px] uppercase tracking-widest text-muted-foreground mt-1">Point</p>
+                      {/* Team name */}
+                      <p className={`font-bold mt-3 truncate ${tv ? "text-lg" : "text-sm md:text-base"}`}>{team.team_name}</p>
+                      {/* Sub entries hint */}
+                      {team.sub_entries.length > 1 && (
+                        <p className="text-[10px] text-muted-foreground mt-0.5 truncate">
                           {team.sub_entries.map(e => e.sub_client_name ?? team.team_name).join(" · ")}
                         </p>
                       )}
                     </div>
+                  );
+                })}
+              </div>
+            )}
 
-                    {/* Points */}
-                    <div className="text-right">
-                      <p className={`font-black ${tv ? "text-4xl" : "text-3xl"} tabular-nums`}>
-                        {team.total_points % 1 === 0 ? team.total_points : team.total_points.toFixed(1)}
-                      </p>
-                      <p className="text-xs text-muted-foreground uppercase tracking-wider">Point</p>
-                    </div>
-                  </div>
+            {/* Fallback: if < 3 teams, show all as list */}
+            {top3.length < 3 && top3.length > 0 && (
+              <div className="space-y-3">
+                {top3.map((team, i) => (
+                  <TeamRow key={team.team_name} team={team} rank={i} maxPoints={maxPoints} tv={tv} cfg={PODIUM_CONFIG[i]} />
+                ))}
+              </div>
+            )}
 
-                  {/* Sub-entries for composite teams */}
-                  {isComposite && !tv && (
-                    <Accordion type="single" collapsible className="mt-2">
-                      <AccordionItem value="details" className="border-0">
-                        <AccordionTrigger className="py-1 text-xs text-muted-foreground hover:no-underline">
-                          Vis detaljer
-                        </AccordionTrigger>
-                        <AccordionContent>
-                          <div className="grid grid-cols-3 gap-1 text-xs">
-                            <span className="font-medium text-muted-foreground">Klient</span>
-                            <span className="font-medium text-muted-foreground text-right">Salg</span>
-                            <span className="font-medium text-muted-foreground text-right">Point</span>
-                            {team.sub_entries.map((e, j) => (
-                              <div key={j} className="contents">
-                                <span>{e.sub_client_name ?? team.team_name}</span>
-                                <span className="text-right tabular-nums">{e.sales_count}</span>
-                                <span className="text-right tabular-nums">{e.points % 1 === 0 ? e.points : e.points.toFixed(1)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    </Accordion>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+            {/* Rest of teams */}
+            {rest.length > 0 && (
+              <div className="space-y-2">
+                {rest.map((team, i) => (
+                  <TeamRow key={team.team_name} team={team} rank={i + 3} maxPoints={maxPoints} tv={tv} delay={i * 0.08} />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
     </DashboardShell>
+  );
+}
+
+function TeamRow({ team, rank, maxPoints, tv, cfg, delay = 0 }: {
+  team: ReturnType<typeof computeStandings>[number];
+  rank: number;
+  maxPoints: number;
+  tv: boolean;
+  cfg?: typeof PODIUM_CONFIG[number];
+  delay?: number;
+}) {
+  const pct = maxPoints > 0 ? (team.total_points / maxPoints) * 100 : 0;
+  const isComposite = team.sub_entries.length > 1 || team.sub_entries.some(e => e.sub_client_name);
+
+  return (
+    <div
+      className={`rounded-xl border bg-gradient-to-r p-4 md:p-5 transition-all hover-scale ${cfg ? `${cfg.bg} ${cfg.border} shadow-md ${cfg.glow}` : "from-card to-card border-border"}`}
+      style={{ animation: `fade-in 0.4s ease-out ${delay}s both` }}
+    >
+      <div className="flex items-center gap-4">
+        {/* Rank */}
+        <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg ${cfg ? `bg-gradient-to-br ${cfg.bg} border ${cfg.border}` : "bg-muted"}`}>
+          {cfg ? <span className="text-xl">{cfg.emoji}</span> : <span className="text-muted-foreground">{rank + 1}</span>}
+        </div>
+
+        {/* Team info */}
+        <div className="flex-1 min-w-0 space-y-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <p className="font-bold text-lg truncate">{team.team_name}</p>
+            <p className={`font-black tabular-nums flex-shrink-0 ${tv ? "text-3xl" : "text-2xl"} ${cfg ? cfg.label : ""}`}>
+              {team.total_points % 1 === 0 ? team.total_points : team.total_points.toFixed(1)}
+              <span className="text-xs font-normal text-muted-foreground ml-1">pt</span>
+            </p>
+          </div>
+          {/* Progress bar */}
+          <Progress value={pct} className="h-2" />
+          {isComposite && (
+            <p className="text-[10px] text-muted-foreground">
+              {team.sub_entries.map(e => e.sub_client_name ?? team.team_name).join(" · ")}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Sub-entries accordion */}
+      {isComposite && !tv && (
+        <Accordion type="single" collapsible className="mt-2">
+          <AccordionItem value="details" className="border-0">
+            <AccordionTrigger className="py-1 text-xs text-muted-foreground hover:no-underline">
+              Vis detaljer
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="grid grid-cols-3 gap-1 text-xs">
+                <span className="font-medium text-muted-foreground">Klient</span>
+                <span className="font-medium text-muted-foreground text-right">Salg</span>
+                <span className="font-medium text-muted-foreground text-right">Point</span>
+                {team.sub_entries.map((e, j) => (
+                  <div key={j} className="contents">
+                    <span>{e.sub_client_name ?? team.team_name}</span>
+                    <span className="text-right tabular-nums">{e.sales_count}</span>
+                    <span className="text-right tabular-nums">{e.points % 1 === 0 ? e.points : e.points.toFixed(1)}</span>
+                  </div>
+                ))}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      )}
+    </div>
   );
 }
