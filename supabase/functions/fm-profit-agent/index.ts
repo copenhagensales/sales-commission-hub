@@ -223,7 +223,13 @@ function computeScores(observations: Observation[], settings: AgentSettings) {
   return { locationScores, sellerScores, riskFlags, combos: combos.slice(0, 20) };
 }
 
-function formatDataContext(scores: ReturnType<typeof computeScores>, totalObs: number, settings: AgentSettings): string {
+function formatDataContext(
+  scores: ReturnType<typeof computeScores>,
+  totalObs: number,
+  settings: AgentSettings,
+  locClientMap?: Map<string, string[]>,
+  clientNameMap?: Map<string, string>,
+): string {
   const { locationScores, sellerScores, riskFlags, combos } = scores;
 
   const locs = [...locationScores].sort((a, b) => b.totalDB - a.totalDB);
@@ -231,6 +237,17 @@ function formatDataContext(scores: ReturnType<typeof computeScores>, totalObs: n
 
   let ctx = `## FM Profit Agent Data (seneste ${settings.data_window_weeks} uger)\n`;
   ctx += `Total observationer: ${totalObs}\n\n`;
+
+  // Location-client mapping section
+  if (locClientMap && clientNameMap) {
+    ctx += `### Lokation → Kunde mapping\n`;
+    for (const l of locs) {
+      const clientIds = locClientMap.get(l.id) || [];
+      const clientNames = clientIds.map((cid: string) => clientNameMap.get(cid) || cid).join(", ");
+      ctx += `- ${l.name}: ${clientNames || "Ingen kunder konfigureret"}\n`;
+    }
+    ctx += `\n`;
+  }
 
   ctx += `### Top lokationer (efter DB)\n`;
   for (const l of locs.slice(0, 15)) {
