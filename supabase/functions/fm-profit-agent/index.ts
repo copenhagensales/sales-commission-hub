@@ -474,7 +474,7 @@ serve(async (req) => {
 
     // 7. Compute scores
     const scores = computeScores(observations, settings);
-    const dataContext = formatDataContext(scores, observations.length, settings);
+    const dataContext = formatDataContext(scores, observations.length, settings, locClientMap, clientNameMap);
 
     // 8. Build system prompt with settings
     const focusLabels: Record<string, string> = {
@@ -515,6 +515,13 @@ Når du svarer:
 - Brug konkrete tal fra dataen
 - Vær direkte og handlingsorienteret
 - Lokationer med DB% under ${settings.target_db_pct}% skal flagges som under mål
+
+### Vigtige forretningsregler for FM-planlægning
+- Hver lokation kræver ALTID 2 sælgere. Man kan ikke sende kun 1 person ud på en lokation.
+- Yousee og Eesy FM er helt separate kunder med separate lokationer. De kan IKKE blandes på samme lokation.
+- Hver lokation har en specifik liste af kunder den må bruges til (se "Lokation → Kunde mapping" i data).
+- Når du anbefaler lokationer eller ugeplaner, skal du altid respektere disse begrænsninger.
+- Angiv altid hvilken kunde (Yousee/Eesy FM) en lokation tilhører når du nævner den.
 
 Driver-klassifikation:
 - "location" = Stabil performance på tværs af forskellige sælgere → strukturelt stærk
