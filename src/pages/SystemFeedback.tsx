@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useDropzone } from "react-dropzone";
@@ -233,6 +234,7 @@ export default function SystemFeedback() {
   };
 
   return (
+    <DashboardLayout>
     <div className="container mx-auto py-6 space-y-6 max-w-5xl">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Fejlrapportering & Forslag</h1>
@@ -528,6 +530,7 @@ export default function SystemFeedback() {
         </DialogContent>
       </Dialog>
     </div>
+    </DashboardLayout>
   );
 }
 
