@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Search, Users, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { AddSalaryAdditionDialog } from "@/components/salary/AddSalaryAdditionDialog";
+import { SalaryAdditionCell } from "@/components/salary/SalaryAdditionCell";
 import { useSellerSalariesCached } from "@/hooks/useSellerSalariesCached";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
@@ -231,13 +232,13 @@ export function SellerSalariesTab() {
                       {!seller.isActive && <Badge variant="outline" className="ml-2 text-[10px] px-1 py-0">Inaktiv</Badge>}
                     </TableCell>
                     <TableCell>{seller.team}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(seller.commission)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(seller.cancellations)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(seller.vacationPay)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(seller.diet)}</TableCell>
-                    <TableCell className="text-right">{seller.sickDays}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(seller.dailyBonus)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(seller.referralBonus)}</TableCell>
+                    <SalaryAdditionCell value={seller.commission} columnKey="commission" items={seller.salaryAdditions?.commission} />
+                    <SalaryAdditionCell value={seller.cancellations} columnKey="cancellations" items={seller.salaryAdditions?.cancellations} />
+                    <SalaryAdditionCell value={seller.vacationPay} columnKey="vacationPay" items={seller.salaryAdditions?.vacationPay} />
+                    <SalaryAdditionCell value={seller.diet} columnKey="diet" items={seller.salaryAdditions?.diet} />
+                    <SalaryAdditionCell value={seller.sickDays} columnKey="sickDays" items={seller.salaryAdditions?.sickDays} isCurrency={false} />
+                    <SalaryAdditionCell value={seller.dailyBonus} columnKey="dailyBonus" items={seller.salaryAdditions?.dailyBonus} />
+                    <SalaryAdditionCell value={seller.referralBonus} columnKey="referralBonus" items={seller.salaryAdditions?.referralBonus} />
                   </TableRow>
                 ))}
                 <TableRow className="bg-muted/50 font-medium">
