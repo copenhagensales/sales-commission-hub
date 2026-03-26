@@ -296,11 +296,11 @@ export function useSellerSalariesCached(
       const teamData = teamMember?.teams;
       const teamName = teamData?.name || emp.last_team?.name || "Ikke tildelt";
       const teamId = teamMember?.team_id || emp.last_team_id || null;
+      const adds = additionsMap[emp.id] || {};
       const commission = (commissionMap[emp.id] || 0) + (adds?.commission || 0);
       const vacationType = emp.vacation_type as "vacation_pay" | "vacation_bonus" | null;
       const vacationRate = getVacationPayRate(vacationType);
       const vacationPay = commission * vacationRate + (adds?.vacationPay || 0);
-      const adds = additionsMap[emp.id] || {};
 
       return {
         id: emp.id,
