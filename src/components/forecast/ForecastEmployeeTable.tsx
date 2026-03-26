@@ -34,8 +34,8 @@ export function ForecastEmployeeTable({ employees }: Props) {
               <TableRow key={emp.employeeId}>
                 <TableCell className="font-medium">{emp.name}</TableCell>
                 <TableCell>
-                  <Badge variant={emp.isNew ? "secondary" : "outline"}>
-                    {emp.isNew ? "Ny" : "Etableret"}
+                  <Badge variant={emp.isStopped ? "destructive" : emp.isNew ? "secondary" : "outline"}>
+                    {emp.isStopped ? "Stoppet" : emp.isNew ? "Ny" : "Etableret"}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">{emp.shiftCount}</TableCell>

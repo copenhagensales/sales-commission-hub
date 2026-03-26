@@ -7,6 +7,7 @@ export interface EmployeeForecastRow {
   employeeId: string;
   name: string;
   isNew: boolean;
+  isStopped: boolean;
   shiftCount: number;
   actualSales: number;
   salesPerDay: number;
@@ -75,6 +76,9 @@ export function useClientForecast(
 
       // 3. Get actual sales MTD
       const actualSalesMap = new Map<string, number>();
+      // Track unmatched sales by name for stopped employees
+      const unmatchedSalesMap = new Map<string, number>();
+      let totalActualAllSales = 0;
 
       if (settings.client_id) {
         const { data: salesReport } = await supabase.rpc("get_sales_report_detailed", {
@@ -105,13 +109,19 @@ export function useClientForecast(
           });
 
           for (const row of salesReport) {
+            const qty = row.quantity || 0;
+            totalActualAllSales += qty;
             const empName = (row.employee_name || "").toLowerCase();
             let empId = nameToEmpId.get(empName);
             if (!empId && empName.includes("@")) {
               empId = emailToEmpId.get(empName);
             }
             if (empId && employeeIds.includes(empId)) {
-              actualSalesMap.set(empId, (actualSalesMap.get(empId) || 0) + (row.quantity || 0));
+              actualSalesMap.set(empId, (actualSalesMap.get(empId) || 0) + qty);
+            } else if (qty > 0) {
+              // Unmatched - likely a stopped employee
+              const key = row.employee_name || "Ukendt";
+              unmatchedSalesMap.set(key, (unmatchedSalesMap.get(key) || 0) + qty);
             }
           }
         }
@@ -125,9 +135,11 @@ export function useClientForecast(
 
         if (aggData) {
           for (const row of aggData) {
+            const sales = Number(row.total_sales) || 0;
+            totalActualAllSales += sales;
             const empId = row.group_key;
             if (empId && employeeIds.includes(empId)) {
-              actualSalesMap.set(empId, Number(row.total_sales) || 0);
+              actualSalesMap.set(empId, sales);
             }
           }
         }
@@ -197,7 +209,6 @@ export function useClientForecast(
 
       // 6. Build employee forecast rows
       const employees: EmployeeForecastRow[] = [];
-      let totalActual = 0;
       let totalProjected = 0;
 
       for (const empId of employeeIds) {
@@ -223,13 +234,13 @@ export function useClientForecast(
         projected *= (1 - settings.sick_pct / 100);
         projected *= (1 - settings.vacation_pct / 100);
 
-        totalActual += actual;
         totalProjected += projected;
 
         employees.push({
           employeeId: empId,
           name: `${emp.first_name || ""} ${emp.last_name || ""}`.trim(),
           isNew,
+          isStopped: false,
           shiftCount: shiftCountMtd,
           actualSales: actual,
           salesPerDay: Math.round(salesPerDay * 10) / 10,
@@ -239,12 +250,28 @@ export function useClientForecast(
         });
       }
 
+      // 7. Add stopped employees with unmatched sales
+      for (const [name, sales] of unmatchedSalesMap) {
+        employees.push({
+          employeeId: `stopped-${name}`,
+          name,
+          isNew: false,
+          isStopped: true,
+          shiftCount: 0,
+          actualSales: sales,
+          salesPerDay: 0,
+          remainingShifts: 0,
+          projected: 0,
+          totalForecast: sales,
+        });
+      }
+
       employees.sort((a, b) => b.totalForecast - a.totalForecast);
 
       return {
-        actualSalesMtd: totalActual,
+        actualSalesMtd: totalActualAllSales,
         projectedRemaining: Math.round(totalProjected),
-        totalForecast: totalActual + Math.round(totalProjected),
+        totalForecast: totalActualAllSales + Math.round(totalProjected),
         employees,
       };
     },
