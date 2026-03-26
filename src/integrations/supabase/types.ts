@@ -1609,6 +1609,51 @@ export type Database = {
           },
         ]
       }
+      cancellation_product_conditions: {
+        Row: {
+          client_id: string
+          column_name: string
+          created_at: string | null
+          id: string
+          operator: string
+          product_id: string
+          values: string[]
+        }
+        Insert: {
+          client_id: string
+          column_name: string
+          created_at?: string | null
+          id?: string
+          operator?: string
+          product_id: string
+          values?: string[]
+        }
+        Update: {
+          client_id?: string
+          column_name?: string
+          created_at?: string | null
+          id?: string
+          operator?: string
+          product_id?: string
+          values?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cancellation_product_conditions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cancellation_product_conditions_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cancellation_product_mappings: {
         Row: {
           client_id: string
