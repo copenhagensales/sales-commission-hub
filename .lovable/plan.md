@@ -1,32 +1,24 @@
 
 
-## Fix: Hotel-pris beregnes forkert i økonomi-fanen
+## Giv Oscar Belcher adgang til Powerdag
 
-### Problem
-`price_per_night` er i virkeligheden **samlet pris** for hele opholdet (ikke pris per nat). Men i `LocationProfitabilityContent.tsx` linje 187 ganges den med `rooms`:
+### Analyse
+Oscar Belcher er i **Stab**-teamet og er korrekt sat op (aktiv, har auth, kan se dashboards-sektionen). Powerdag har `globalAccess: true` i koden, som burde gøre det synligt for alle — men Stab-teamet har **ingen** `team_dashboard_permissions` rows overhovedet (heller ikke for andre dashboards). 
 
-```typescript
-const cost = (h.price_per_night || 0) * (h.rooms || 1);
-```
-
-For Kolding Storcenter: 3.777 kr × 2 værelser = 7.554 kr → fordelt på 4 dage = 1.889 kr/dag.
-Det korrekte er: 3.777 kr / 4 dage = **944 kr/dag**.
+Det kan betyde at seeding aldrig har kørt for Stab, og der kan være en edge case i caching eller query-timing. Den sikreste løsning er at oprette en explicit permission-row.
 
 ### Ændring
 
-**Fil: `src/pages/vagt-flow/LocationProfitabilityContent.tsx`** — linje 187
+**Database**: Indsæt en `team_dashboard_permissions` row for Stab + powerdag:
 
-Fjern multiplikation med `rooms`:
-```typescript
-// Før:
-const cost = (h.price_per_night || 0) * (h.rooms || 1);
-// Efter:
-const cost = h.price_per_night || 0;
+```sql
+INSERT INTO team_dashboard_permissions (team_id, dashboard_slug, access_level)
+VALUES ('09012ce9-e307-4f6d-a51e-f72af7200d74', 'powerdag', 'all')
+ON CONFLICT (team_id, dashboard_slug) DO UPDATE SET access_level = 'all';
 ```
 
-Samlet pris er allerede det fulde beløb. `rooms` er metadata, ikke en multiplier.
+Dette sikrer at alle i Stab-teamet (inkl. Oscar) eksplicit får adgang til Powerdag via `team_dashboard_permissions` — uanset `globalAccess`-logikken.
 
 ### Resultat
-- Kolding: 3.777 kr / 4 dage = **944 kr/dag** ✓
-- Total hotel i uge-oversigten: 3.777 kr (halveret fra nuværende 7.554 kr)
+Oscar Belcher vil se Powerdag i dashboard-listen og kan navigere til det.
 
