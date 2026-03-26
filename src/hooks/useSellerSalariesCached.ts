@@ -274,6 +274,13 @@ export function useSellerSalariesCached(
       cancellationMap[employeeId] = (cancellationMap[employeeId] || 0) + totalCommission;
     }
 
+    // Build salary additions map: { employeeId: { columnKey: totalAmount } }
+    const additionsMap: Record<string, Record<string, number>> = {};
+    for (const sa of salaryAdditionsData || []) {
+      if (!additionsMap[sa.employee_id]) additionsMap[sa.employee_id] = {};
+      additionsMap[sa.employee_id][sa.column_key] = (additionsMap[sa.employee_id][sa.column_key] || 0) + Number(sa.amount);
+    }
+
     // Filter by team if needed
     let filteredEmployees = employees;
     if (selectedTeam && selectedTeam !== "all") {
@@ -289,10 +296,11 @@ export function useSellerSalariesCached(
       const teamData = teamMember?.teams;
       const teamName = teamData?.name || emp.last_team?.name || "Ikke tildelt";
       const teamId = teamMember?.team_id || emp.last_team_id || null;
-      const commission = commissionMap[emp.id] || 0;
+      const commission = (commissionMap[emp.id] || 0) + (adds?.commission || 0);
       const vacationType = emp.vacation_type as "vacation_pay" | "vacation_bonus" | null;
       const vacationRate = getVacationPayRate(vacationType);
-      const vacationPay = commission * vacationRate;
+      const vacationPay = commission * vacationRate + (adds?.vacationPay || 0);
+      const adds = additionsMap[emp.id] || {};
 
       return {
         id: emp.id,
@@ -300,13 +308,13 @@ export function useSellerSalariesCached(
         team: teamName,
         teamId: teamId,
         commission,
-        cancellations: cancellationMap[emp.id] || 0,
+        cancellations: (cancellationMap[emp.id] || 0) + (adds?.cancellations || 0),
         vacationType,
         vacationPay,
-        diet: dietMap[emp.id] || 0,
-        sickDays: sickMap[emp.id] || 0,
-        dailyBonus: dailyBonusMap[emp.id] || 0,
-        referralBonus: emp.referral_bonus || 0,
+        diet: (dietMap[emp.id] || 0) + (adds?.diet || 0),
+        sickDays: (sickMap[emp.id] || 0) + (adds?.sickDays || 0),
+        dailyBonus: (dailyBonusMap[emp.id] || 0) + (adds?.dailyBonus || 0),
+        referralBonus: (emp.referral_bonus || 0) + (adds?.referralBonus || 0),
         isActive: emp.is_active ?? true,
         isFreelanceConsultant: emp.is_freelance_consultant ?? false,
       };
@@ -315,11 +323,11 @@ export function useSellerSalariesCached(
     sellers.sort((a, b) => b.commission - a.commission);
 
     return { sellerData: sellers, lastUpdated: new Date() };
-  }, [employees, salesAggregates, selectedTeam, salaryTypes, dietData, sickData, dailyBonusData, cancellationData]);
+  }, [employees, salesAggregates, selectedTeam, salaryTypes, dietData, sickData, dailyBonusData, cancellationData, salaryAdditionsData]);
 
   return {
     sellerData,
-    isLoading: employeesLoading || commissionLoading || salaryTypesLoading || dietLoading || sickLoading || dailyBonusLoading || cancellationLoading,
+    isLoading: employeesLoading || commissionLoading || salaryTypesLoading || dietLoading || sickLoading || dailyBonusLoading || cancellationLoading || salaryAdditionsLoading,
     lastUpdated,
   };
 }
