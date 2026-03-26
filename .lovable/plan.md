@@ -1,40 +1,20 @@
 
 
-## Fix: Brug `get_sales_report_detailed` RPC til korrekte salgstal
+## Fix: Brug `shift`-tabellen til vagter i stedet for `booking_assignment`
 
 ### Problem
-Den nuværende `useClientForecast` henter **alle** salg fra `sales`-tabellen uden team-filter og rammer Supabase's 1000-rækkers grænse. Desuden filtrerer den ikke på `client_campaigns` eller `validation_status`, som den eksisterende rapporteringslogik gør.
+Forecast-hooket bruger `booking_assignment` til at tælle vagter — men den tabel er kun til fieldmarketing-bookinger. Almindelige teams bruger `shift`-tabellen. Resultatet er at alle medarbejdere har 0 vagter og klassificeres som "Ny".
 
 ### Løsning
-Brug den allerede eksisterende `get_sales_report_detailed` RPC-funktion, som:
-- Korrekt joiner `sales → sale_items → products → agents → employee_master_data`
-- Filtrerer på `client_campaign_id` (via client_id)
-- Ekskluderer rejected salg
-- Kun tæller produkter med `counts_as_sale = true`
-- Kører som SECURITY DEFINER (ingen RLS-problemer)
 
-### Nødvendig ændring
+**Fil: `src/hooks/useClientForecast.ts`** — to ændringer:
 
-**Database**: Tilføj `client_id` kolonne til `forecast_settings` så vi ved hvilken klient teamet tilhører (behøves for RPC-kaldet). Alternativt kan vi slå det op via teamets medarbejdere → client_campaigns, men en direkte reference er simplere.
+1. **Totalt antal vagter (ny/etableret-klassifikation)**: Hent fra **`shift`**-tabellen i stedet for `booking_assignment`. Tæl alle historiske vagter pr. medarbejder for at afgøre om de er over threshold.
 
-**`src/hooks/useClientForecast.ts`**:
-1. Kald `get_sales_report_detailed(client_id, monthStart, cutoffDate)` i stedet for den rå sales-query
-2. Match RPC-resultatet (som returnerer `employee_name, product_name, quantity`) til teammedlemmer
-3. Summer `quantity` per medarbejder for at få faktisk salg MTD
-4. Resten af beregningen (projected, rolling avg, etc.) forbliver uændret
+2. **Resterende vagter (projected)**: Hent fremtidige vagter fra **`shift`**-tabellen (efter cutoff, inden månedsslut) i stedet for `booking_assignment`.
 
-**`src/components/forecast/CreateForecastDialog.tsx`**: 
-- Tilføj client_id lookup baseret på valgt team (via client_campaigns relation)
-- Gem client_id i forecast_settings ved oprettelse
-
-### Fordele
-- Bruger **præcis** samme logik som Salgsrapporter-siden
-- Ingen 1000-rækkers begrænsning (RPC kører server-side)
-- Korrekt filtrering på validation_status og counts_as_sale
+Begge queries beholder samme struktur — kun tabelnavnet ændres fra `booking_assignment` til `shift`.
 
 ### Berørte filer
-- Migration: tilføj `client_id` til `forecast_settings`
-- `src/hooks/useClientForecast.ts` — erstat rå sales-query med RPC
-- `src/components/forecast/CreateForecastDialog.tsx` — gem client_id
-- `src/hooks/useForecastSettings.ts` — inkluder client_id i typen
+- `src/hooks/useClientForecast.ts` — ændr 2 queries fra `booking_assignment` → `shift`
 
