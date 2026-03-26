@@ -6274,6 +6274,7 @@ export type Database = {
           churn_established_pct: number
           churn_new_pct: number
           client_goal: number
+          client_id: string | null
           created_at: string
           created_by: string | null
           id: string
@@ -6291,6 +6292,7 @@ export type Database = {
           churn_established_pct?: number
           churn_new_pct?: number
           client_goal?: number
+          client_id?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -6308,6 +6310,7 @@ export type Database = {
           churn_established_pct?: number
           churn_new_pct?: number
           client_goal?: number
+          client_id?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -6322,6 +6325,13 @@ export type Database = {
           year?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "forecast_settings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "forecast_settings_team_id_fkey"
             columns: ["team_id"]

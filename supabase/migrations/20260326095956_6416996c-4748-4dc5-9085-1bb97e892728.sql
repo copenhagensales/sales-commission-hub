@@ -1,0 +1,1 @@
+ALTER TABLE public.forecast_settings ADD COLUMN client_id uuid REFERENCES public.clients(id);

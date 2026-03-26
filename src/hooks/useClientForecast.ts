@@ -43,66 +43,91 @@ export function useClientForecast(
       const threshold = settings.new_seller_threshold;
       const rollingShifts = settings.rolling_avg_shifts;
 
-      // 1. Get team members
+      // 1. Get team members with employee data
       const { data: members } = await supabase
         .from("team_members")
-        .select("employee_id, employee_master_data:employee_id(id, first_name, last_name)")
+        .select("employee_id, employee_master_data:employee_id(id, first_name, last_name, work_email)")
         .eq("team_id", teamId);
 
       if (!members?.length) return { actualSalesMtd: 0, projectedRemaining: 0, totalForecast: 0, employees: [] };
 
       const employeeIds = members.map(m => m.employee_id);
+      const empData = members.map(m => m.employee_master_data as any as { id: string; first_name: string; last_name: string; work_email: string | null }).filter(Boolean);
+
       const fmtStart = format(monthStart, "yyyy-MM-dd");
       const fmtEnd = format(monthEnd, "yyyy-MM-dd");
       const fmtCutoff = format(cutoffDate, "yyyy-MM-dd");
 
-      // 2. Get actual sales MTD for each employee (up to cutoff)
-      const { data: salesData } = await supabase
-        .from("sales")
-        .select("agent_email, sale_items:sale_items(quantity, product:product_id(counts_as_sale))")
-        .gte("sale_datetime", fmtStart)
-        .lte("sale_datetime", fmtCutoff + "T23:59:59")
-        .neq("source", "fieldmarketing");
-
-      // Get employee emails for matching
-      const { data: empData } = await supabase
-        .from("employee_master_data")
-        .select("id, first_name, last_name, work_email")
-        .in("id", employeeIds);
-
-      const emailToEmp = new Map<string, { id: string; first_name: string; last_name: string }>();
-      empData?.forEach(e => {
-        if (e.work_email) emailToEmp.set(e.work_email.toLowerCase(), e);
-      });
-
-      // Also get agent mappings
-      const { data: agentMappings } = await supabase
-        .from("employee_agent_mapping")
-        .select("employee_id, agent:agent_id(email)")
-        .in("employee_id", employeeIds);
-
-      agentMappings?.forEach(am => {
-        const emp = empData?.find(e => e.id === am.employee_id);
-        const email = (am.agent as any)?.email?.toLowerCase();
-        if (emp && email) emailToEmp.set(email, emp);
-      });
-
-      // Count actual sales per employee
+      // 2. Get actual sales MTD using RPC if client_id is set, otherwise fallback
       const actualSalesMap = new Map<string, number>();
-      salesData?.forEach(sale => {
-        const email = sale.agent_email?.toLowerCase();
-        if (!email) return;
-        const emp = emailToEmp.get(email);
-        if (!emp || !employeeIds.includes(emp.id)) return;
-        const saleCount = (sale.sale_items as any[])?.reduce((sum, si) => {
-          const countsAsSale = si.product?.counts_as_sale !== false;
-          return sum + (countsAsSale ? (si.quantity || 1) : 0);
-        }, 0) || 0;
-        actualSalesMap.set(emp.id, (actualSalesMap.get(emp.id) || 0) + saleCount);
-      });
 
-      // 3. For each employee, determine shift count (historical) to classify new/established
-      // Use booking_assignment as proxy for shift count
+      if (settings.client_id) {
+        // Use the same RPC as the reports page for accurate data
+        const { data: salesReport } = await supabase.rpc("get_sales_report_detailed", {
+          p_client_id: settings.client_id,
+          p_start: fmtStart,
+          p_end: fmtCutoff,
+        });
+
+        if (salesReport) {
+          // Build name → employee_id mapping
+          const nameToEmpId = new Map<string, string>();
+          empData.forEach(e => {
+            const fullName = `${e.first_name || ""} ${e.last_name || ""}`.trim();
+            if (fullName) nameToEmpId.set(fullName.toLowerCase(), e.id);
+          });
+
+          // Also get agent mappings for email-based matching
+          const { data: agentMappings } = await supabase
+            .from("employee_agent_mapping")
+            .select("employee_id, agent:agent_id(email)")
+            .in("employee_id", employeeIds);
+
+          // Build email → employee_id mapping
+          const emailToEmpId = new Map<string, string>();
+          empData.forEach(e => {
+            if (e.work_email) emailToEmpId.set(e.work_email.toLowerCase(), e.id);
+          });
+          agentMappings?.forEach(am => {
+            const email = (am.agent as any)?.email?.toLowerCase();
+            if (email) emailToEmpId.set(email, am.employee_id);
+          });
+
+          // Match RPC results to team employees
+          for (const row of salesReport) {
+            const empName = (row.employee_name || "").toLowerCase();
+            let empId = nameToEmpId.get(empName);
+
+            // Fallback: check if employee_name is actually an email
+            if (!empId && empName.includes("@")) {
+              empId = emailToEmpId.get(empName);
+            }
+
+            if (empId && employeeIds.includes(empId)) {
+              actualSalesMap.set(empId, (actualSalesMap.get(empId) || 0) + (row.quantity || 0));
+            }
+          }
+        }
+      } else {
+        // Fallback: use get_sales_aggregates_v2 with team_id filter
+        const { data: aggData } = await supabase.rpc("get_sales_aggregates_v2", {
+          p_start: `${fmtStart}T00:00:00+00:00`,
+          p_end: `${fmtCutoff}T23:59:59+00:00`,
+          p_team_id: teamId,
+          p_group_by: "employee",
+        });
+
+        if (aggData) {
+          for (const row of aggData) {
+            const empId = row.group_key;
+            if (empId && employeeIds.includes(empId)) {
+              actualSalesMap.set(empId, Number(row.total_sales) || 0);
+            }
+          }
+        }
+      }
+
+      // 3. Get total shift counts per employee (for new/established classification)
       const { data: shiftCounts } = await supabase
         .from("booking_assignment")
         .select("employee_id, date")
@@ -113,7 +138,7 @@ export function useClientForecast(
         totalShiftsMap.set(s.employee_id, (totalShiftsMap.get(s.employee_id) || 0) + 1);
       });
 
-      // 4. Get remaining shifts for each employee (after cutoff until month end)
+      // 4. Get remaining shifts (after cutoff until month end)
       const { data: futureShifts } = await supabase
         .from("booking_assignment")
         .select("employee_id, date")
@@ -126,22 +151,27 @@ export function useClientForecast(
         remainingShiftsMap.set(s.employee_id, (remainingShiftsMap.get(s.employee_id) || 0) + 1);
       });
 
-      // 5. For established employees, get rolling avg of last N shifts
+      // 5. Rolling avg for established employees
       const rollingAvgMap = new Map<string, number>();
+
+      // Get agent mappings (reuse if already fetched, otherwise fetch)
+      const { data: agentMappingsForRolling } = await supabase
+        .from("employee_agent_mapping")
+        .select("employee_id, agent:agent_id(email)")
+        .in("employee_id", employeeIds);
+
       for (const empId of employeeIds) {
         const shiftCount = totalShiftsMap.get(empId) || 0;
         if (shiftCount >= threshold) {
-          // Get last N sales-days for this employee via sales aggregated by day
-          const emp = empData?.find(e => e.id === empId);
+          const emp = empData.find(e => e.id === empId);
           const empEmails: string[] = [];
           if (emp?.work_email) empEmails.push(emp.work_email.toLowerCase());
-          agentMappings?.filter(am => am.employee_id === empId).forEach(am => {
+          agentMappingsForRolling?.filter(am => am.employee_id === empId).forEach(am => {
             const email = (am.agent as any)?.email?.toLowerCase();
             if (email) empEmails.push(email);
           });
 
           if (empEmails.length > 0) {
-            // Get sales grouped by date, last N shift-days
             const { data: recentSales } = await supabase
               .from("sales")
               .select("sale_datetime, sale_items:sale_items(quantity, product:product_id(counts_as_sale))")
@@ -151,7 +181,6 @@ export function useClientForecast(
               .limit(200);
 
             if (recentSales?.length) {
-              // Group by date, take last N unique days
               const dayMap = new Map<string, number>();
               recentSales.forEach(s => {
                 const day = s.sale_datetime?.substring(0, 10);
@@ -164,7 +193,7 @@ export function useClientForecast(
               const sortedDays = Array.from(dayMap.entries())
                 .sort((a, b) => b[0].localeCompare(a[0]))
                 .slice(0, rollingShifts);
-              
+
               if (sortedDays.length > 0) {
                 const totalSales = sortedDays.reduce((s, [_, v]) => s + v, 0);
                 rollingAvgMap.set(empId, totalSales / sortedDays.length);
@@ -180,7 +209,7 @@ export function useClientForecast(
       let totalProjected = 0;
 
       for (const empId of employeeIds) {
-        const emp = empData?.find(e => e.id === empId);
+        const emp = empData.find(e => e.id === empId);
         if (!emp) continue;
 
         const shiftCount = totalShiftsMap.get(empId) || 0;
@@ -201,7 +230,6 @@ export function useClientForecast(
           projected *= (1 - settings.churn_established_pct / 100);
         }
 
-        // Apply sick and vacation adjustments to projected only
         projected *= (1 - settings.sick_pct / 100);
         projected *= (1 - settings.vacation_pct / 100);
 
