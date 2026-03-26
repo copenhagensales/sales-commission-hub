@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Bug, Lightbulb, Sparkles, Upload, Image, AlertTriangle, ArrowUp, Minus, ArrowDown, Eye, Copy, CheckCircle2 } from "lucide-react";
+import { Bug, Lightbulb, Sparkles, Upload, Image, AlertTriangle, ArrowUp, Minus, ArrowDown, Eye, Copy, CheckCircle2, UserPlus, X, Bell } from "lucide-react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 
@@ -241,6 +241,7 @@ export default function SystemFeedback() {
             Alle indrapporteringer
             {feedbackList.length > 0 && <Badge variant="secondary" className="ml-2">{feedbackList.length}</Badge>}
           </TabsTrigger>
+          {isOwner && <TabsTrigger value="recipients"><Bell className="h-4 w-4 mr-1" />Modtagere</TabsTrigger>}
         </TabsList>
 
         {/* Submit form */}
@@ -422,6 +423,13 @@ export default function SystemFeedback() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Recipients tab (owner only) */}
+        {isOwner && (
+          <TabsContent value="recipients">
+            <RecipientsTab />
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* Detail Dialog */}
@@ -507,5 +515,132 @@ export default function SystemFeedback() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+// Recipients management component (only for owners)
+function RecipientsTab() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [searchTerm, setSearchTerm] = useState("");
+
+  // Fetch current recipients
+  const { data: recipients = [] } = useQuery({
+    queryKey: ["feedback-recipients"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("system_feedback_recipients" as any)
+        .select("id, employee_id, employee:employee_master_data!system_feedback_recipients_employee_id_fkey(id, first_name, last_name, work_email)")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data || []) as any[];
+    },
+  });
+
+  // Search employees
+  const { data: searchResults = [] } = useQuery({
+    queryKey: ["employee-search-feedback", searchTerm],
+    queryFn: async () => {
+      if (searchTerm.length < 2) return [];
+      const { data, error } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name, work_email")
+        .eq("is_active", true)
+        .or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,work_email.ilike.%${searchTerm}%`)
+        .limit(10);
+      if (error) throw error;
+      const recipientIds = recipients.map((r: any) => r.employee_id);
+      return (data || []).filter((e: any) => !recipientIds.includes(e.id));
+    },
+    enabled: searchTerm.length >= 2,
+  });
+
+  const addMutation = useMutation({
+    mutationFn: async (employeeId: string) => {
+      const { error } = await supabase
+        .from("system_feedback_recipients" as any)
+        .insert({ employee_id: employeeId });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: "Modtager tilføjet" });
+      setSearchTerm("");
+      queryClient.invalidateQueries({ queryKey: ["feedback-recipients"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Fejl", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("system_feedback_recipients" as any)
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: "Modtager fjernet" });
+      queryClient.invalidateQueries({ queryKey: ["feedback-recipients"] });
+    },
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">Notifikationsmodtagere</CardTitle>
+        <p className="text-sm text-muted-foreground">Disse personer får besked når der indsendes nye fejlrapporteringer</p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Search and add */}
+        <div className="relative">
+          <Input
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            placeholder="Søg efter medarbejder..."
+          />
+          {searchResults.length > 0 && (
+            <div className="absolute z-10 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-48 overflow-y-auto">
+              {searchResults.map((emp: any) => (
+                <button
+                  key={emp.id}
+                  onClick={() => addMutation.mutate(emp.id)}
+                  className="w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-muted/50 text-left"
+                >
+                  <span>{emp.first_name} {emp.last_name}</span>
+                  <span className="text-muted-foreground text-xs">{emp.work_email}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Current recipients */}
+        {recipients.length === 0 ? (
+          <p className="text-muted-foreground text-sm text-center py-4">Ingen modtagere tilføjet endnu</p>
+        ) : (
+          <div className="space-y-2">
+            {recipients.map((r: any) => (
+              <div key={r.id} className="flex items-center justify-between px-3 py-2 bg-muted/30 rounded-md">
+                <div className="flex items-center gap-2">
+                  <UserPlus className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">
+                    {r.employee?.first_name} {r.employee?.last_name}
+                  </span>
+                  <span className="text-xs text-muted-foreground">{r.employee?.work_email}</span>
+                </div>
+                <button
+                  onClick={() => removeMutation.mutate(r.id)}
+                  className="text-muted-foreground hover:text-destructive transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
