@@ -151,7 +151,25 @@ export function useSellerSalariesCached(
     staleTime: 60000,
   });
 
-  // Query 7: Approved cancellations for the period (deduction_date within period)
+  // Query 7: Salary additions for the period
+  const { data: salaryAdditionsData, isLoading: salaryAdditionsLoading } = useQuery({
+    queryKey: ["salary-additions", periodStartISO, periodEndISO],
+    queryFn: async () => {
+      if (!periodStartISO || !periodEndISO) return [];
+      const { data, error } = await (supabase
+        .from("salary_additions") as any)
+        .select("employee_id, column_key, amount")
+        .eq("period_start", periodStartISO)
+        .eq("period_end", periodEndISO);
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!periodStartISO && !!periodEndISO,
+    staleTime: 30000,
+  });
+
+  // Query 8: Approved cancellations for the period (deduction_date within period)
   const { data: cancellationData, isLoading: cancellationLoading } = useQuery({
     queryKey: ["seller-cancellations", periodStartISO, periodEndISO],
     queryFn: async () => {
