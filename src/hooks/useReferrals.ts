@@ -253,14 +253,19 @@ export function useMyReferralCode() {
         .from('employee_master_data')
         .select('referral_code, first_name, last_name')
         .eq('auth_user_id', user.id)
+        .eq('is_active', true)
         .maybeSingle();
 
-      if (error || !data) {
-        // Try by email as fallback
+      if (error) {
+        console.warn('Referral code primary lookup failed:', error.message);
+      }
+
+      if (!data && user.email) {
         const { data: dataByEmail, error: errorByEmail } = await supabase
           .from('employee_master_data')
           .select('referral_code, first_name, last_name')
-          .eq('private_email', user.email)
+          .or(`private_email.ilike.${user.email},work_email.ilike.${user.email}`)
+          .eq('is_active', true)
           .maybeSingle();
 
         if (errorByEmail) throw errorByEmail;
