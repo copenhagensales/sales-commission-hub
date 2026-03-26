@@ -1,94 +1,69 @@
 
 
-## Kolonne-baserede produktbetingelser for annulleringer
+## Systemforbedringer / Fejlrapportering fra ledere
 
-### Hvad bygges
-Erstat den flade checkbox-baserede produktmapping med et betingelsessystem, hvor man pr. produkt kan definere regler på **flere kolonner** med operatorer (f.eks. "Operator er IKKE Call Me, CBB" + "Subscription Name = Fri tale..."). Gælder for **både annulleringer og kurvrettelser**.
+### Idé
+En simpel formular hvor ledere kan indrapportere problemer, ønsker og forbedringsforslag. Hver indrapportering indeholder screenshot, beskrivelse, berørt bruger og prioritet. Du kan derefter tage screenshots + brugernavne direkte ind i Lovable for hurtig fejlsøgning.
+
+### Ekstra overvejelser
+- **Kategori**: Skelne mellem "fejl/bug", "forbedringsforslag" og "ny funktion" — giver overblik over hvad der haster vs. nice-to-have
+- **Status-tracking**: Så lederne kan se om deres indrapportering er set/under arbejde/løst — reducerer "har I set min besked?"-spørgsmål
+- **Side/sektion-felt**: Hvilken del af systemet handler det om (f.eks. "Salg", "Vagtplan", "Dashboard") — hurtigere at finde fejlen
+- **Duplikat-forebyggelse**: Ledere kan se eksisterende indrapporteringer og evt. "stemme op" i stedet for at oprette en ny
 
 ### Database
 
-**Ny tabel: `cancellation_product_conditions`**
+**Ny tabel: `system_feedback`**
 
-```sql
-CREATE TABLE cancellation_product_conditions (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  client_id uuid REFERENCES clients(id) ON DELETE CASCADE NOT NULL,
-  product_id uuid REFERENCES products(id) ON DELETE CASCADE NOT NULL,
-  column_name text NOT NULL,
-  operator text NOT NULL DEFAULT 'any',  -- 'any', 'equals', 'not_equals', 'in', 'not_in'
-  values text[] NOT NULL DEFAULT '{}',
-  created_at timestamptz DEFAULT now()
-);
--- Unik: ét produkt har max én betingelse pr. kolonne pr. klient
-ALTER TABLE cancellation_product_conditions 
-  ADD CONSTRAINT uq_product_column UNIQUE (client_id, product_id, column_name);
+| Kolonne | Type | Beskrivelse |
+|---|---|---|
+| id | uuid PK | |
+| submitted_by | uuid FK → employee_master_data | Lederen der indrapporterer |
+| affected_employee_name | text | Navn på brugeren der oplever problemet |
+| category | text | 'bug', 'improvement', 'feature_request' |
+| priority | text | 'critical', 'high', 'medium', 'low' |
+| title | text | Kort overskrift |
+| description | text | Detaljeret beskrivelse |
+| system_area | text | Hvilken del af systemet (valgfrit) |
+| screenshot_url | text | URL til uploadet screenshot |
+| status | text | 'new', 'seen', 'in_progress', 'resolved', 'wont_fix' |
+| admin_notes | text | Dine noter (kun synlige for dig) |
+| created_at | timestamptz | |
 
-ALTER TABLE cancellation_product_conditions ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Authenticated full access" ON cancellation_product_conditions 
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);
-```
+**Storage bucket**: `feedback-screenshots` (public read, authenticated upload)
 
-Eksisterende `cancellation_product_mappings` bevares for bagudkompatibilitet (Eesy TM bruger dem stadig indtil videre).
+RLS: Authenticated users kan oprette + læse egne. Owners/teamledere kan læse alle.
 
-### UI-ændringer: `SellerMappingTab.tsx` — ProductMappingSection
+### UI
 
-**Ny dialog** når man vælger et produkt:
+**1. Ny side: `/system-feedback`**
+- Tilgængelig fra sidebar under "Administration" (for teamledere+)
+- Simpel formular med:
+  - **Overskrift** (kort titel)
+  - **Kategori** (Fejl / Forbedring / Ny funktion) — dropdown
+  - **Prioritet** (Kritisk / Høj / Medium / Lav) — farvekodede knapper
+  - **Berørt bruger** — tekstfelt med navn
+  - **Systemområde** — dropdown (Salg, Vagtplan, Dashboard, Annulleringer, osv.)
+  - **Beskrivelse** — textarea
+  - **Screenshot** — drag-and-drop eller klik-upload
+- Bekræftelse via toast efter indsendelse
 
-For hver af de 3 kolonner (Operator, Subscription Name, Sales Department) vises:
-1. **Operator-dropdown**: "Ligegyldigt" (any) | "Er en af" (in) | "Er ikke en af" (not_in) | "Er lig med" (equals) | "Er ikke lig med" (not_equals)
-2. **Værdi-vælger**: Checkboxes med kendte værdier fra uploads (hentes fra `columnValues` som allerede eksisterer i koden) + manuelt input
-3. Standard: "Ligegyldigt" (ingen filtrering)
+**2. Liste-visning (for dig/ejer)**
+- Tabel med alle indrapporteringer, sorteret efter prioritet + dato
+- Filtre: kategori, prioritet, status
+- Klik for at se detaljer + screenshot
+- Mulighed for at ændre status og tilføje admin-noter
+- Eksporter-knap så du kan copy-paste direkte ind i Lovable
 
-Gem-knappen skriver til `cancellation_product_conditions` (upsert pr. kolonne).
+**3. Sidebar-link**
+- Tilføj "Fejlrapportering" under administration i sidebar
 
-**Tabel-visning** opdateres: Viser betingelser i læsbart format — f.eks. "Operator ≠ Call Me, CBB | Subscription Name = Fri tale..."
+### Filer der oprettes/ændres
+1. **Migration**: Opret `system_feedback` tabel + storage bucket + RLS
+2. **Ny side**: `src/pages/SystemFeedback.tsx` — formular + liste
+3. **Route**: Tilføj til `src/routes/config.tsx` + `src/routes/pages.ts`
+4. **Sidebar**: Tilføj link i `DashboardSidebar.tsx`
 
-### Matching-logik ændringer
-
-**`ApprovalQueueTab.tsx`** (linje ~479-525) — produktresolvering ved godkendelse:
-
-Nuværende logik: slår op i `cancellation_product_mappings` med excel_product_name.
-Ny logik:
-1. Hent `cancellation_product_conditions` for klienten
-2. Grupper betingelser pr. product_id
-3. For hver queue-item: evaluer alle produkters betingelser mod `uploaded_data`
-4. Hvis et produkt matcher alle betingelser → brug det
-5. Fallback til eksisterende `cancellation_product_mappings` for bagudkompatibilitet
-
-**`UploadCancellationsTab.tsx`** — Pass 2 (sælger+dato) matching:
-
-Nuværende `fallback_product_mappings` bruges til at finde produktet. Tilføj condition-baseret resolving som alternativ:
-1. Hent conditions for klienten
-2. Evaluer Excel-rækkens data mod betingelserne
-3. Hvis match → brug det matchede produkt til at finde sale_item
-
-### Evalueringslogik (delt hjælpefunktion)
-
-```typescript
-// Ny fil: src/utils/productConditionMatcher.ts
-function evaluateConditions(
-  conditions: { column_name: string; operator: string; values: string[] }[],
-  rowData: Record<string, unknown>
-): boolean {
-  return conditions.every(c => {
-    if (c.operator === 'any') return true;
-    const cell = String(getCaseInsensitive(rowData, c.column_name) || '').trim().toLowerCase();
-    const vals = c.values.map(v => v.toLowerCase().trim());
-    switch (c.operator) {
-      case 'equals': return vals.includes(cell);
-      case 'not_equals': return !vals.includes(cell);
-      case 'in': return vals.includes(cell);
-      case 'not_in': return !vals.includes(cell);
-      default: return true;
-    }
-  });
-}
-```
-
-### Filer der ændres/oprettes
-1. **Ny migration** — opret `cancellation_product_conditions`
-2. **Ny fil** `src/utils/productConditionMatcher.ts` — delt evalueringslogik
-3. **`SellerMappingTab.tsx`** — ny dialog med operatorer + betingelser; opdateret tabelvisning
-4. **`ApprovalQueueTab.tsx`** — condition-baseret produktresolvering ved godkendelse
-5. **`UploadCancellationsTab.tsx`** — condition-baseret matching i Pass 2
+### Simpelhed
+Formularen er designet til at tage under 1 minut at udfylde. Screenshot + brugernavn + beskrivelse giver dig alt du behøver for at fejlsøge direkte i Lovable.
 
