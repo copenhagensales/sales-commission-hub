@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Search, Users, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { AddSalaryAdditionDialog } from "@/components/salary/AddSalaryAdditionDialog";
 import { useSellerSalariesCached } from "@/hooks/useSellerSalariesCached";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
@@ -111,6 +112,11 @@ export function SellerSalariesTab() {
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <PayrollPeriodSelector onChange={handlePeriodChange} />
+          <AddSalaryAdditionDialog
+            employees={sellerData?.map(s => ({ id: s.id, name: s.name })) || []}
+            periodStart={periodStart}
+            periodEnd={periodEnd}
+          />
           {lastUpdated && (
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <RefreshCw className="h-3 w-3" />
