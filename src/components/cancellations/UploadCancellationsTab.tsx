@@ -954,8 +954,26 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         const fallbackMappings: FallbackProductMapping[] = (activeConfig as any)?.fallback_product_mappings || [];
         const unmatchedSellers: UnmatchedSellerRow[] = [];
 
-        if (sellerCol && dateCol && fallbackMappings.length > 0) {
-          console.log("[handleMatch] PASS 2: seller+date fallback", { sellerCol, dateCol, fallbackMappings });
+        // Fetch condition-based product matching
+        const { data: conditionRows } = await supabase
+          .from("cancellation_product_conditions")
+          .select("product_id, column_name, operator, values")
+          .eq("client_id", selectedClientId);
+        const groupedConditions = conditionRows && conditionRows.length > 0
+          ? groupConditionsByProduct(conditionRows)
+          : [];
+        // Build condition product_id → product name map
+        let condProductNames = new Map<string, string>();
+        if (groupedConditions.length > 0) {
+          const condPids = [...new Set(conditionRows!.map(r => r.product_id))];
+          const { data: condProds } = await supabase.from("products").select("id, name").in("id", condPids);
+          if (condProds) condProductNames = new Map(condProds.map(p => [p.id, p.name]));
+        }
+
+        const hasPass2Sources = (sellerCol && dateCol && (fallbackMappings.length > 0 || groupedConditions.length > 0));
+
+        if (hasPass2Sources) {
+          console.log("[handleMatch] PASS 2: seller+date fallback", { sellerCol, dateCol, fallbackMappings, conditionProducts: groupedConditions.length });
 
           // Build seller name → employee work_email map from persistent mappings
           const sellerToEmployeeId = new Map<string, string>();
