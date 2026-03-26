@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
+import { groupConditionsByProduct, findMatchingProductId } from "@/utils/productConditionMatcher";
 import { formatCurrency } from "@/lib/calculations/formatting";
 import { useAgentNameResolver } from "@/hooks/useAgentNameResolver";
 import { useDropzone } from "react-dropzone";
@@ -953,8 +954,26 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         const fallbackMappings: FallbackProductMapping[] = (activeConfig as any)?.fallback_product_mappings || [];
         const unmatchedSellers: UnmatchedSellerRow[] = [];
 
-        if (sellerCol && dateCol && fallbackMappings.length > 0) {
-          console.log("[handleMatch] PASS 2: seller+date fallback", { sellerCol, dateCol, fallbackMappings });
+        // Fetch condition-based product matching
+        const { data: conditionRows } = await supabase
+          .from("cancellation_product_conditions")
+          .select("product_id, column_name, operator, values")
+          .eq("client_id", selectedClientId);
+        const groupedConditions = conditionRows && conditionRows.length > 0
+          ? groupConditionsByProduct(conditionRows)
+          : [];
+        // Build condition product_id → product name map
+        let condProductNames = new Map<string, string>();
+        if (groupedConditions.length > 0) {
+          const condPids = [...new Set(conditionRows!.map(r => r.product_id))];
+          const { data: condProds } = await supabase.from("products").select("id, name").in("id", condPids);
+          if (condProds) condProductNames = new Map(condProds.map(p => [p.id, p.name]));
+        }
+
+        const hasPass2Sources = (sellerCol && dateCol && (fallbackMappings.length > 0 || groupedConditions.length > 0));
+
+        if (hasPass2Sources) {
+          console.log("[handleMatch] PASS 2: seller+date fallback", { sellerCol, dateCol, fallbackMappings, conditionProducts: groupedConditions.length });
 
           // Build seller name → employee work_email map from persistent mappings
           const sellerToEmployeeId = new Map<string, string>();
@@ -994,12 +1013,29 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             const excelSeller = String(getCaseInsensitive(row.originalRow, sellerCol) || "").trim();
             const excelDate = String(getCaseInsensitive(row.originalRow, dateCol) || "").trim();
             
-            // Find which fallback product this row matches
+            // Find which product this row matches — try condition-based first, then fallback
             const excelSubName = String(getCaseInsensitive(row.originalRow, "Subscription Name") || "").trim();
-            const matchingFallback = fallbackMappings.find(fm => 
-              excelSubName.toLowerCase().includes(fm.excelProductPattern.toLowerCase())
-            );
-            if (!matchingFallback) return; // not a fallback-eligible product
+            let resolvedProductTitle: string | null = null;
+
+            // 1. Condition-based matching
+            if (groupedConditions.length > 0) {
+              const matchedPid = findMatchingProductId(groupedConditions, row.originalRow);
+              if (matchedPid) {
+                resolvedProductTitle = condProductNames.get(matchedPid) || null;
+              }
+            }
+
+            // 2. Fallback to legacy fallback_product_mappings
+            if (!resolvedProductTitle) {
+              const matchingFallback = fallbackMappings.find(fm => 
+                excelSubName.toLowerCase().includes(fm.excelProductPattern.toLowerCase())
+              );
+              if (matchingFallback) {
+                resolvedProductTitle = matchingFallback.saleItemTitle;
+              }
+            }
+
+            if (!resolvedProductTitle) return; // not a matchable product
 
             if (!excelSeller || !excelDate) return;
 
@@ -1049,17 +1085,17 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               // Check product match via sale_items
               const items = saleItemsMap.get(sale.id) || [];
               const hasProduct = items.some(item => 
-                item.adversus_product_title?.toLowerCase() === matchingFallback.saleItemTitle.toLowerCase()
+                item.adversus_product_title?.toLowerCase() === resolvedProductTitle!.toLowerCase()
               );
               if (!hasProduct) continue;
 
               // Match found!
-              const key = `${sale.id}|${matchingFallback.saleItemTitle}`;
+              const key = `${sale.id}|${resolvedProductTitle}`;
               if (matchedSaleProductKeys.has(key)) continue;
               matchedSaleProductKeys.add(key);
               matchedIndicesLocal.add(idx);
               const matchedItem = items.find(item => 
-                item.adversus_product_title?.toLowerCase() === matchingFallback.saleItemTitle.toLowerCase()
+                item.adversus_product_title?.toLowerCase() === resolvedProductTitle!.toLowerCase()
               );
               productMatched.push({
                 saleId: sale.id,
@@ -1070,8 +1106,8 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                 employee: sale.agent_name || "Ukendt",
                 currentStatus: sale.validation_status || "pending",
                 uploadedRowData: row.originalRow,
-                targetProductName: matchingFallback.saleItemTitle,
-                realProductName: matchedItem?.adversus_product_title || matchingFallback.saleItemTitle,
+                targetProductName: resolvedProductTitle!,
+                realProductName: matchedItem?.adversus_product_title || resolvedProductTitle!,
                 commission: matchedItem?.mapped_commission ?? undefined,
                 revenue: matchedItem?.mapped_revenue ?? undefined,
               });
