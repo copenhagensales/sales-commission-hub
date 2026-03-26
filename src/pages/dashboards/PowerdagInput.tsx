@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useActiveEvent, useRulesForEvent, useScoresForEvent, useUpsertScore } from "@/hooks/usePowerdagData";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
@@ -13,9 +15,18 @@ export default function PowerdagInput() {
   const { data: rules = [] } = useRulesForEvent(event?.id);
   const { data: scores = [] } = useScoresForEvent(event?.id);
   const upsert = useUpsertScore();
+  const qc = useQueryClient();
 
   const [localCounts, setLocalCounts] = useState<Record<string, number>>({});
   const [dirty, setDirty] = useState(false);
+
+  const handleUpdatePoints = async (ruleId: string, val: string) => {
+    const pts = parseFloat(val);
+    if (isNaN(pts)) return;
+    await supabase.from("powerdag_point_rules").update({ points_per_sale: pts } as any).eq("id", ruleId);
+    qc.invalidateQueries({ queryKey: ["powerdag-rules", event?.id] });
+    toast.success("Point/salg opdateret");
+  };
 
   // Sync from server
   useEffect(() => {
@@ -103,7 +114,16 @@ export default function PowerdagInput() {
                           <span className="font-semibold">{teamName}</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">{r.points_per_sale}</TableCell>
+                      <TableCell className="text-right">
+                        <Input
+                          type="number"
+                          step="0.1"
+                          min={0}
+                          className="w-20 ml-auto text-right tabular-nums"
+                          defaultValue={r.points_per_sale}
+                          onBlur={e => handleUpdatePoints(r.id, e.target.value)}
+                        />
+                      </TableCell>
                       <TableCell className="text-right">
                         <Input
                           type="number"
