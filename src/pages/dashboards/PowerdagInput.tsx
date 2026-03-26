@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useActiveEvent, useRulesForEvent, useScoresForEvent, useUpsertScore } from "@/hooks/usePowerdagData";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
