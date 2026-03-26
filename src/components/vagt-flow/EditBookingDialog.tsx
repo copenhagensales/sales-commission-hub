@@ -87,6 +87,8 @@ function HotelTabContent({ booking }: { booking: any }) {
   const [confNum, setConfNum] = useState("");
   const [status, setStatus] = useState("pending");
   const [notes, setNotes] = useState("");
+  const [checkIn, setCheckIn] = useState("");
+  const [checkOut, setCheckOut] = useState("");
 
   useEffect(() => {
     if (hotelEntry) {
@@ -94,6 +96,8 @@ function HotelTabContent({ booking }: { booking: any }) {
       setConfNum(hotelEntry.confirmation_number || "");
       setStatus(hotelEntry.status);
       setNotes(hotelEntry.notes || "");
+      setCheckIn(hotelEntry.check_in || "");
+      setCheckOut(hotelEntry.check_out || "");
     }
   }, [hotelEntry]);
 
@@ -105,6 +109,8 @@ function HotelTabContent({ booking }: { booking: any }) {
       confirmation_number: confNum || undefined,
       status,
       notes: notes || undefined,
+      check_in: checkIn || undefined,
+      check_out: checkOut || undefined,
     });
   };
 
@@ -154,6 +160,14 @@ function HotelTabContent({ booking }: { booking: any }) {
       </div>
 
       <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label className="text-xs">Check-in</Label>
+          <Input type="date" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} />
+        </div>
+        <div>
+          <Label className="text-xs">Check-out</Label>
+          <Input type="date" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} />
+        </div>
         <div>
           <Label className="text-xs">Samlet pris (DKK) *</Label>
           <Input
