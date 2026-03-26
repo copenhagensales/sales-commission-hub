@@ -1,50 +1,26 @@
 
-Problem
-- Jeg har fundet den konkrete årsag: dette forecast-team har ingen rækker i `shift` og ingen i `employee_standard_shifts`, men de har en aktiv `team_standard_shift` med mandag-fredag.
-- `useClientForecast.ts` tæller lige nu kun vagter fra `shift`, så resultatet bliver nødvendigvis `0` for alle.
-- Derudover har flere medarbejdere `employee_master_data.team_id = null`, så løsningen skal bruge `team_members` som sand kilde til team, ikke kun `employee_master_data`.
 
-Plan
-1. Opdatér `src/hooks/useClientForecast.ts`
-   - Udvid medarbejder-fetch til også at hente `employment_start_date`.
-   - Hent planlægningsdata i samme hook:
-     - `shift`
-     - `employee_standard_shifts`
-     - `team_standard_shifts`
-     - `team_standard_shift_days`
-     - `absence_request_v2`
-     - `booking_assignment` som FM-backup
-   - Byg samme vagt-hierarki som resten af appen:
-     1. Individuel vagt
-     2. Booking assignment (FM)
-     3. Medarbejder-standardvagt
-     4. Team-standardvagt
-     5. Evt. weekday-fallback hvis der ikke findes anden plan
+## Simplificér vagter: brug arbejdsdage i måneden
 
-2. Erstat nuværende `shiftCount`- og `remainingShifts`-beregning
-   - `shiftCount` skal ikke være “antal rækker i shift”.
-   - Det skal være antal planlagte arbejdsdage fra medarbejderens `employment_start_date` til forecast-cutoff, fratrukket godkendt fravær.
-   - `remainingShifts` skal beregnes fra dagen efter cutoff til månedens slutning med samme hierarki.
+### Ændring
+Fjern hele vagt-hierarkiet (individual shifts, employee standard, team standard, absences) og erstat med simpel beregning: **vagter = hverdage (man-fre) i måneden**.
 
-3. Ret type-klassifikation
-   - `isNew` skal fortsat afgøres af `new_seller_threshold`, men nu mod den rigtige historiske vagtmængde.
-   - Det vil gøre at fx medarbejdere startet i februar bliver “Etableret”, mens marts-startere stadig kan være “Ny”.
+### Hvad ændres i `src/hooks/useClientForecast.ts`
 
-4. Behold salgslogikken som den er
-   - MTD/projection-salg skal ikke ændres i denne omgang.
-   - Kun vagtberigelse og type skal rettes, så vi ikke risikerer at bryde de korrekte salgstal igen.
+1. **Slet** `isWorkingDay`-funktionen og alle relaterede queries (individual shifts, employee standard shifts, team standard shifts, shift days, absences).
 
-5. QA efter implementering
-   - Åbn forecastet `02de9a87-6414-4f30-8d18-ee7df05197e2`.
-   - Bekræft at “Vagter” ikke længere er 0 for alle.
-   - Bekræft at teamet får blandede typer (“Ny” og “Etableret”).
-   - Bekræft at “Rest. vagter” også bliver > 0 for medarbejdere med planlagte dage resten af måneden.
+2. **Ny simpel logik**:
+   - `shiftCount` = antal hverdage (man-fre) fra månedens start til cutoff-dato
+   - `remainingShifts` = antal hverdage fra dagen efter cutoff til månedens slutning
+   - Samme tal for alle medarbejdere — ren kalenderbaseret beregning
 
-Tekniske detaljer
-- Berørt fil: `src/hooks/useClientForecast.ts`
-- Vigtig designregel: brug `team_members.team_id` som team-kilde, fordi flere i teamet mangler `employee_master_data.team_id`.
-- Live-data jeg fandt:
-  - `shift` for teamet: 0 rækker
-  - `employee_standard_shifts` for teamet: 0 rækker
-  - `team_standard_shifts`: aktiv dagsvagt man-fre
-- Derfor er den nuværende kode logisk korrekt ift. sin query, men funktionelt forkert ift. jeres planlægningsmodel.
+3. **isNew-klassifikation**: Basér på `employment_start_date` i stedet for historisk vagtantal. Ny = ansat i under `threshold` arbejdsdage (fra ansættelsesdato til i dag).
+
+4. **Fjern unødvendige parallel-queries**: Kun `team_members`, `employee_master_data`, sales og rolling avg queries beholdes. De 5 scheduling-queries slettes.
+
+### Resultat
+- Alle medarbejdere får korrekte vagttal (fx ~19 hverdage i marts)
+- Ingen afhængighed af shift/standard-shift tabeller
+- Hurtigere load (færre DB-kald)
+- Korrekt ny/etableret klassifikation baseret på ansættelsesdato
+
