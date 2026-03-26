@@ -311,9 +311,8 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
       if (toAdd.length > 0) {
         const { error } = await supabase
           .from("cancellation_product_mappings")
-          .upsert(
-            toAdd.map(name => ({ client_id: clientId, excel_product_name: name, product_id: selectedProductId })),
-            { onConflict: "client_id,excel_product_name" }
+          .insert(
+            toAdd.map(name => ({ client_id: clientId, excel_product_name: name, product_id: selectedProductId }))
           );
         if (error) throw error;
       }
@@ -489,9 +488,17 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
                           onCheckedChange={() => toggleName(name)}
                         />
                         <span className="text-sm">{name}</span>
-                        {mappedNames.has(name) && !checkedNames.has(name) && (
-                          <Badge variant="secondary" className="text-[10px] ml-auto">Allerede mappet</Badge>
-                        )}
+                        {(() => {
+                          const otherProducts = mappings
+                            .filter(m => m.excel_product_name === name && m.product_id !== selectedProductId)
+                            .map(m => productMap.get(m.product_id) || m.product_id);
+                          if (otherProducts.length === 0) return null;
+                          return (
+                            <span className="text-[10px] text-muted-foreground ml-auto truncate max-w-[140px]" title={otherProducts.join(", ")}>
+                              Også på: {otherProducts.join(", ")}
+                            </span>
+                          );
+                        })()}
                       </label>
                     ))}
                   </div>
