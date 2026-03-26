@@ -10879,6 +10879,76 @@ export type Database = {
         }
         Relationships: []
       }
+      system_feedback: {
+        Row: {
+          admin_notes: string | null
+          affected_employee_name: string | null
+          category: string
+          created_at: string
+          description: string | null
+          id: string
+          priority: string
+          screenshot_url: string | null
+          status: string
+          submitted_by: string | null
+          system_area: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          affected_employee_name?: string | null
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          priority?: string
+          screenshot_url?: string | null
+          status?: string
+          submitted_by?: string | null
+          system_area?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          admin_notes?: string | null
+          affected_employee_name?: string | null
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          priority?: string
+          screenshot_url?: string | null
+          status?: string
+          submitted_by?: string | null
+          system_area?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "system_feedback_submitted_by_fkey"
+            columns: ["submitted_by"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "system_feedback_submitted_by_fkey"
+            columns: ["submitted_by"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "system_feedback_submitted_by_fkey"
+            columns: ["submitted_by"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       system_role_definitions: {
         Row: {
           color: string | null
