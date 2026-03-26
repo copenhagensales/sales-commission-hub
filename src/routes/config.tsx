@@ -137,6 +137,9 @@ import {
   TvLeagueDashboard,
   ClientForecast,
   ClientForecastDetail,
+  PowerdagBoard,
+  PowerdagInput,
+  PowerdagAdmin,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -334,6 +337,9 @@ export const routes: RouteConfig[] = [
   { path: "/dashboards/cs-top-20", component: CsTop20Dashboard, access: "protected" },
   { path: "/dashboards/sales-overview-all", component: SalesOverviewAll, access: "protected" },
   { path: "/dashboards/commission-league", component: TvLeagueDashboard, access: "protected" },
+  { path: "/dashboards/powerdag", component: PowerdagBoard, access: "protected" },
+  { path: "/dashboards/powerdag/input", component: PowerdagInput, access: "protected" },
+  { path: "/dashboards/powerdag/admin", component: PowerdagAdmin, access: "protected" },
 
   // Dashboard Admin pages - restricted to those with dashboard admin permission
   { path: "/dashboards/settings", component: DashboardSettings, access: "role", positionPermission: "menu_dashboard_admin" },
