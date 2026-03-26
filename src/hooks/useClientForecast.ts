@@ -7,6 +7,7 @@ export interface EmployeeForecastRow {
   employeeId: string;
   name: string;
   isNew: boolean;
+  isStopped: boolean;
   shiftCount: number;
   actualSales: number;
   salesPerDay: number;
