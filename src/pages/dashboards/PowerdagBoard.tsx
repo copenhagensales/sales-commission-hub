@@ -6,6 +6,7 @@ import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { useRequireDashboardAccess } from "@/hooks/useRequireDashboardAccess";
+import { TvBoardQuickGenerator } from "@/components/dashboard/TvBoardQuickGenerator";
 import { Progress } from "@/components/ui/progress";
 import { useCachedLeaderboard, formatDisplayName, getInitials } from "@/hooks/useCachedLeaderboard";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -57,9 +58,12 @@ export default function PowerdagBoard() {
             {event && <p className="text-sm text-muted-foreground mt-1">{new Date(event.event_date).toLocaleDateString("da-DK", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>}
           </div>
           {!tv && (
-            <Link to="/dashboards/powerdag/input">
-              <Button variant="outline" size="sm">Indtast salg</Button>
-            </Link>
+            <div className="flex items-center gap-2">
+              <TvBoardQuickGenerator dashboardSlug="powerdag" />
+              <Link to="/dashboards/powerdag/input">
+                <Button variant="outline" size="sm">Indtast salg</Button>
+              </Link>
+            </div>
           )}
         </div>
 
