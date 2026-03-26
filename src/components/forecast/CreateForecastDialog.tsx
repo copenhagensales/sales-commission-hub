@@ -24,6 +24,7 @@ export function CreateForecastDialog({ month: defaultMonth, year: defaultYear, e
   const now = new Date();
   const [open, setOpen] = useState(false);
   const [teamId, setTeamId] = useState("");
+  const [clientId, setClientId] = useState("");
   const [clientGoal, setClientGoal] = useState("0");
   const [selectedMonth, setSelectedMonth] = useState(String(defaultMonth));
   const [selectedYear, setSelectedYear] = useState(String(defaultYear));
@@ -38,6 +39,15 @@ export function CreateForecastDialog({ month: defaultMonth, year: defaultYear, e
     },
   });
 
+  const { data: clients } = useQuery({
+    queryKey: ["clients-for-forecast"],
+    queryFn: async (): Promise<{ id: string; name: string }[]> => {
+      const { data, error } = await supabase.from("clients").select("id, name").order("name");
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
   const availableTeams = teams?.filter(t => !existingTeamIds.includes(t.id)) || [];
 
   const handleCreate = () => {
@@ -45,24 +55,25 @@ export function CreateForecastDialog({ month: defaultMonth, year: defaultYear, e
     const month = Number(selectedMonth);
     const year = Number(selectedYear);
     createMutation.mutate(
-      { team_id: teamId, month, year, client_goal: parseInt(clientGoal) || 0 },
+      { team_id: teamId, client_id: clientId || null, month, year, client_goal: parseInt(clientGoal) || 0 },
       {
         onSuccess: () => {
           setOpen(false);
           setTeamId("");
+          setClientId("");
           setClientGoal("0");
         },
       }
     );
   };
 
-  // Reset to parent defaults when dialog opens
   const handleOpenChange = (isOpen: boolean) => {
     setOpen(isOpen);
     if (isOpen) {
       setSelectedMonth(String(defaultMonth));
       setSelectedYear(String(defaultYear));
       setTeamId("");
+      setClientId("");
       setClientGoal("0");
     }
   };
@@ -75,7 +86,7 @@ export function CreateForecastDialog({ month: defaultMonth, year: defaultYear, e
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Opret nyt forecast</DialogTitle>
-          <DialogDescription>Vælg team, måned og salgsmål for det nye forecast.</DialogDescription>
+          <DialogDescription>Vælg team, kunde, måned og salgsmål for det nye forecast.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 pt-2">
           <div className="space-y-2">
@@ -85,6 +96,17 @@ export function CreateForecastDialog({ month: defaultMonth, year: defaultYear, e
               <SelectContent>
                 {availableTeams.map(t => (
                   <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Kunde (til salgsdata)</Label>
+            <Select value={clientId} onValueChange={setClientId}>
+              <SelectTrigger><SelectValue placeholder="Vælg kunde" /></SelectTrigger>
+              <SelectContent>
+                {clients?.map(c => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
