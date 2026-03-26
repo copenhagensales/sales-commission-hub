@@ -410,7 +410,7 @@ serve(async (req) => {
     }
 
     // 6. Build observations
-    const obsMap = new Map<string, { rev: number; comm: number; count: number; locId: string; locName: string; sellerId: string; sellerName: string; week: string }>();
+    const obsMap = new Map<string, { rev: number; comm: number; count: number; locId: string; locName: string; sellerId: string; sellerName: string; week: string; clientCampaignId: string | null }>();
 
     for (const sale of sales || []) {
       const locId = (sale.raw_payload as any)?.fm_location_id;
@@ -432,6 +432,7 @@ serve(async (req) => {
         locId, locName: locMap.get(locId) || locId,
         sellerId, sellerName: empMap.get(sellerId) || sale.agent_name || sellerId,
         week,
+        clientCampaignId: sale.client_campaign_id || null,
       };
       existing.rev += items.revenue;
       existing.comm += items.commission;
@@ -448,6 +449,10 @@ serve(async (req) => {
       const sellerCost = o.comm * sellerCostMultiplier;
       const totalCost = sellerCost + costs.locationCost + costs.hotelCost + costs.dietCost;
       const db = o.rev - totalCost;
+      // Resolve client name from campaign
+      const clientId = o.clientCampaignId ? campaignClientMap.get(o.clientCampaignId) : undefined;
+      const resolvedClientName = clientId ? (clientNameMap.get(clientId) || "Ukendt") : "Ukendt";
+
       observations.push({
         locationId: o.locId,
         locationName: o.locName,
@@ -463,6 +468,7 @@ serve(async (req) => {
         db,
         dbPct: o.rev > 0 ? (db / o.rev) * 100 : 0,
         salesCount: o.count,
+        clientName: resolvedClientName,
       });
     }
 
