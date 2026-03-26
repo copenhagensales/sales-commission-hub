@@ -129,7 +129,7 @@ export function useClientForecast(
 
       // 3. Get total shift counts per employee (for new/established classification)
       const { data: shiftCounts } = await supabase
-        .from("booking_assignment")
+        .from("shift")
         .select("employee_id, date")
         .in("employee_id", employeeIds);
 
@@ -140,7 +140,7 @@ export function useClientForecast(
 
       // 4. Get remaining shifts (after cutoff until month end)
       const { data: futureShifts } = await supabase
-        .from("booking_assignment")
+        .from("shift")
         .select("employee_id, date")
         .in("employee_id", employeeIds)
         .gt("date", fmtCutoff)
