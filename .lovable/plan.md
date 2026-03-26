@@ -1,30 +1,47 @@
 
 
-## Tilføj mulighed for at ændre datoer på hotel-bookinger
+## Dag-vælger til hotel-bookinger (som biler)
 
 ### Hvad
-I `HotelTabContent` (inden i EditBookingDialog) kan man i dag kun redigere pris, status, bekræftelsesnummer og bemærkninger. Check-in og check-out datoer kan ikke ændres uden at åbne "Rediger alle felter"-dialogen. Brugeren vil gerne kunne ændre datoerne direkte — ligesom bil-fanen har en dag-vælger.
+Erstat check-in/check-out dato-felter med en dagvælger (checkboxes for ugedage), ligesom bil-fanen. Samlet pris fordeles ligeligt over de valgte dage. Økonomi-fanen bruger hotellets egne valgte dage til prisfordeling.
 
-### Ændringer
+### Database
+Ny kolonne på `booking_hotel`:
+```sql
+ALTER TABLE booking_hotel ADD COLUMN booked_days integer[] DEFAULT '{}';
+```
+Migrer eksisterende data: udled dage fra `check_in`/`check_out` intervaller.
 
-**Fil: `src/components/vagt-flow/EditBookingDialog.tsx` — `HotelTabContent`**
+### Fil 1: `src/components/vagt-flow/EditBookingDialog.tsx` — `HotelTabContent`
 
-1. Tilføj `checkIn` og `checkOut` som redigerbare state-felter (ligesom `price`, `status` osv.)
-2. Pre-fill fra `hotelEntry.check_in` / `hotelEntry.check_out`
-3. Tilføj to datoinputs (type="date") i formularen mellem hotel-header og pris-feltet
-4. Inkluder `check_in` og `check_out` i `handleSave` kaldet til `updateBookingHotel.mutateAsync`
+- Fjern check-in/check-out dato-inputs
+- Tilføj dagvælger med checkboxes (Man–Søn) — identisk pattern som vehicle-fanen
+- Kun dage inden for booking's `start_date`–`end_date` kan vælges
+- Vis beregning: "Samlet pris / antal valgte dage = X kr/dag"
+- `handleSave` sender `booked_days` (integer array) i stedet for `check_in`/`check_out`
 
-**Fil: `src/hooks/useBookingHotels.ts` — `useUpdateBookingHotel`**
+### Fil 2: `src/components/vagt-flow/AssignHotelDialog.tsx`
 
-5. Udvid mutation-typingen til at acceptere `check_in` og `check_out` som valgfrie felter
+- Tilføj dagvælger i stedet for check-in/check-out
+- Ved oprettelse: send `booked_days` array med hotel-assignment
 
-### UI-layout
-Datofelterne placeres i et 2-kolonne grid (ligesom pris/status):
-- **Check-in** (date input) | **Check-out** (date input)
-- Samlet pris | Status
-- Bekræftelsesnummer
-- Bemærkninger
+### Fil 3: `src/hooks/useBookingHotels.ts`
 
-### Ingen databaseændringer
-`booking_hotel`-tabellen har allerede `check_in` og `check_out` kolonner — det handler kun om at eksponere dem i quick-edit UI'et.
+- Udvid `BookingHotel` interface med `booked_days: number[]`
+- Opdater `useUpdateBookingHotel` og `useAssignHotel` til at acceptere `booked_days`
+
+### Fil 4: `src/pages/vagt-flow/LocationProfitabilityContent.tsx`
+
+- Hent `booked_days` fra `booking_hotel` query (linje ~141)
+- Brug hotellets egne `booked_days.length` til at fordele prisen per dag i stedet for bookings `booked_days.length`
+- I daglig nedbrydning (linje ~531): tjek om datoen er i hotellets `booked_days` for at tildele hotelomkostning
+
+### Fil 5: `src/pages/vagt-flow/HotelsContent.tsx`
+
+- Vis antal valgte hoteldage i booking-kortet (f.eks. "4 dage")
+
+### Resultat
+- Pris 5.000 kr, 5 dage = 1.000 kr/dag
+- Fjern en dag → 4 dage = 1.250 kr/dag
+- Synkroniseret mellem hotel-fanen og økonomi-fanen
 
