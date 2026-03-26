@@ -40,6 +40,7 @@ interface Observation {
   db: number;
   dbPct: number;
   salesCount: number;
+  clientName: string;
 }
 
 interface LocationScore {
