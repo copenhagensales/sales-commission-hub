@@ -135,8 +135,6 @@ import {
   AmoSettings,
   CustomerInquiries,
   TvLeagueDashboard,
-  Forecast,
-  ForecastClientReport,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -400,9 +398,6 @@ export const routes: RouteConfig[] = [
   { path: "/economic/revenue-match", component: EconomicRevenueMatch, access: "role", positionPermission: "menu_economic_dashboard" },
   { path: "/economic/sales-validation", component: SalesValidation, access: "role", positionPermission: "menu_economic_dashboard" },
 
-  // Forecast
-  { path: "/forecast", component: Forecast, access: "role", positionPermission: "menu_forecast" },
-  { path: "/forecast/rapport", component: ForecastClientReport, access: "role", positionPermission: "menu_forecast" },
 
   // AMO Compliance Hub
   { path: "/amo", component: AmoDashboard, access: "role", positionPermission: "menu_amo_dashboard" },
