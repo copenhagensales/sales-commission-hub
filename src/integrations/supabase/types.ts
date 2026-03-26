@@ -10882,6 +10882,7 @@ export type Database = {
       system_feedback: {
         Row: {
           admin_notes: string | null
+          admin_response: string | null
           affected_employee_name: string | null
           category: string
           created_at: string
@@ -10897,6 +10898,7 @@ export type Database = {
         }
         Insert: {
           admin_notes?: string | null
+          admin_response?: string | null
           affected_employee_name?: string | null
           category?: string
           created_at?: string
@@ -10912,6 +10914,7 @@ export type Database = {
         }
         Update: {
           admin_notes?: string | null
+          admin_response?: string | null
           affected_employee_name?: string | null
           category?: string
           created_at?: string
@@ -10944,6 +10947,46 @@ export type Database = {
             foreignKeyName: "system_feedback_submitted_by_fkey"
             columns: ["submitted_by"]
             isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      system_feedback_access: {
+        Row: {
+          created_at: string
+          employee_id: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          employee_id: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "system_feedback_access_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "system_feedback_access_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "system_feedback_access_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
             referencedRelation: "employee_referral_lookup"
             referencedColumns: ["id"]
           },
