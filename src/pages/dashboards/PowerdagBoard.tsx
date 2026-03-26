@@ -230,12 +230,6 @@ function TopSellersSection({ tv }: { tv: boolean }) {
             <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm border ${idx < 3 ? SELLER_RANK_STYLES[idx] : "bg-muted text-muted-foreground"}`}>
               {idx + 1}
             </div>
-            {/* Avatar */}
-            <Avatar className="h-9 w-9">
-              <AvatarFallback className="text-xs font-semibold bg-primary/10 text-primary">
-                {getInitials(seller.employeeName)}
-              </AvatarFallback>
-            </Avatar>
             {/* Name + team */}
             <div className="flex-1 min-w-0">
               <p className={`font-semibold truncate ${tv ? "text-lg" : "text-sm"}`}>
