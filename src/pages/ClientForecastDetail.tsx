@@ -4,6 +4,7 @@ import { useClientForecast } from "@/hooks/useClientForecast";
 import { ForecastKpiCards } from "@/components/forecast/ForecastKpiCards";
 import { ForecastSettingsPanel } from "@/components/forecast/ForecastSettingsPanel";
 import { ForecastEmployeeTable } from "@/components/forecast/ForecastEmployeeTable";
+import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Trash2, Loader2 } from "lucide-react";
 
