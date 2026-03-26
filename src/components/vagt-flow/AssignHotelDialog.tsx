@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { parseISO, addDays } from "date-fns";
 import { toast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -42,14 +43,35 @@ export function AssignHotelDialog({ open, onOpenChange, booking, existingBooking
   }, [hotels, city]);
 
   const [selectedHotelId, setSelectedHotelId] = useState("");
-  const [checkIn, setCheckIn] = useState(booking.start_date);
-  const [checkOut, setCheckOut] = useState(booking.end_date);
   const [rooms, setRooms] = useState(1);
   const [confirmationNumber, setConfirmationNumber] = useState("");
   const [pricePerNight, setPricePerNight] = useState("");
   const [notes, setNotes] = useState("");
   const [status, setStatus] = useState("pending");
+  const [hotelBookedDays, setHotelBookedDays] = useState<number[]>([]);
   const [showNewHotel, setShowNewHotel] = useState(false);
+
+  const DAY_NAMES = ["Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag", "Søndag"];
+
+  // Derive available day indices from booking
+  const availableDays = useMemo(() => {
+    const start = parseISO(booking.start_date);
+    const end = parseISO(booking.end_date);
+    const days: number[] = [];
+    let current = start;
+    while (current <= end) {
+      const jsDay = current.getDay();
+      const dayIdx = jsDay === 0 ? 6 : jsDay - 1;
+      if (!days.includes(dayIdx)) days.push(dayIdx);
+      current = addDays(current, 1);
+    }
+    return days.sort();
+  }, [booking.start_date, booking.end_date]);
+
+  const pricePerDay = useMemo(() => {
+    const total = Number(pricePerNight) || 0;
+    return hotelBookedDays.length > 0 ? total / hotelBookedDays.length : 0;
+  }, [pricePerNight, hotelBookedDays]);
 
   const [newName, setNewName] = useState("");
   const [newCity, setNewCity] = useState(city);
@@ -63,25 +85,23 @@ export function AssignHotelDialog({ open, onOpenChange, booking, existingBooking
   useEffect(() => {
     if (existingBookingHotel) {
       setSelectedHotelId(existingBookingHotel.hotel_id);
-      setCheckIn(existingBookingHotel.check_in);
-      setCheckOut(existingBookingHotel.check_out);
       setRooms(existingBookingHotel.rooms);
       setConfirmationNumber(existingBookingHotel.confirmation_number || "");
       setPricePerNight(existingBookingHotel.price_per_night?.toString() || "");
       setNotes(existingBookingHotel.notes || "");
       setStatus(existingBookingHotel.status);
+      setHotelBookedDays(existingBookingHotel.booked_days || []);
     } else {
       setSelectedHotelId("");
-      setCheckIn(booking.start_date);
-      setCheckOut(booking.end_date);
       setRooms(1);
       setConfirmationNumber("");
       setPricePerNight("");
       setNotes("");
       setStatus("pending");
+      setHotelBookedDays(availableDays);
     }
     setShowNewHotel(false);
-  }, [existingBookingHotel, booking, open]);
+  }, [existingBookingHotel, booking, open, availableDays]);
 
   const handleSubmit = async () => {
     if (!pricePerNight || Number(pricePerNight) <= 0) {
@@ -97,6 +117,7 @@ export function AssignHotelDialog({ open, onOpenChange, booking, existingBooking
         rooms,
         price_per_night: Number(pricePerNight),
         notes: notes || undefined,
+        booked_days: hotelBookedDays,
       });
       onOpenChange(false);
       return;
@@ -117,10 +138,11 @@ export function AssignHotelDialog({ open, onOpenChange, booking, existingBooking
 
     await assignHotel.mutateAsync({
       booking_id: booking.id, hotel_id: hotelId,
-      check_in: checkIn, check_out: checkOut, rooms,
+      check_in: booking.start_date, check_out: booking.end_date, rooms,
       confirmation_number: confirmationNumber || undefined,
       price_per_night: pricePerNight ? Number(pricePerNight) : undefined,
       notes: notes || undefined,
+      booked_days: hotelBookedDays,
     });
     onOpenChange(false);
   };
@@ -243,19 +265,40 @@ export function AssignHotelDialog({ open, onOpenChange, booking, existingBooking
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
-            {!isEditing && (
-              <>
-                <div>
-                  <Label className="text-xs">Check-in</Label>
-                  <Input type="date" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} />
-                </div>
-                <div>
-                  <Label className="text-xs">Check-out</Label>
-                  <Input type="date" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} />
-                </div>
-              </>
+          {/* Day selector */}
+          <div>
+            <Label className="text-xs mb-2 block">Hoteldage</Label>
+            <div className="flex flex-wrap gap-2">
+              {availableDays.map((dayIdx) => {
+                const isSelected = hotelBookedDays.includes(dayIdx);
+                return (
+                  <button
+                    key={dayIdx}
+                    type="button"
+                    onClick={() => {
+                      setHotelBookedDays(prev =>
+                        isSelected ? prev.filter(d => d !== dayIdx) : [...prev, dayIdx].sort()
+                      );
+                    }}
+                    className={`px-3 py-1.5 rounded-md border text-sm font-medium transition-colors ${
+                      isSelected
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "hover:bg-muted border-border"
+                    }`}
+                  >
+                    {DAY_NAMES[dayIdx]?.slice(0, 3)}
+                  </button>
+                );
+              })}
+            </div>
+            {hotelBookedDays.length > 0 && pricePerNight && Number(pricePerNight) > 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {Number(pricePerNight).toLocaleString("da-DK")} kr / {hotelBookedDays.length} dage = {Math.round(pricePerDay).toLocaleString("da-DK")} kr/dag
+              </p>
             )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs">Antal værelser</Label>
               <Input type="number" min={1} value={rooms} onChange={(e) => setRooms(Number(e.target.value))} />

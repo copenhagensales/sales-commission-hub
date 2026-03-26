@@ -87,8 +87,23 @@ function HotelTabContent({ booking }: { booking: any }) {
   const [confNum, setConfNum] = useState("");
   const [status, setStatus] = useState("pending");
   const [notes, setNotes] = useState("");
-  const [checkIn, setCheckIn] = useState("");
-  const [checkOut, setCheckOut] = useState("");
+  const [hotelBookedDays, setHotelBookedDays] = useState<number[]>([]);
+
+  // Derive available day indices from booking start/end
+  const availableDays = useMemo(() => {
+    if (!booking?.start_date || !booking?.end_date) return [];
+    const start = parseISO(booking.start_date);
+    const end = parseISO(booking.end_date);
+    const days: number[] = [];
+    let current = start;
+    while (current <= end) {
+      const jsDay = current.getDay();
+      const dayIdx = jsDay === 0 ? 6 : jsDay - 1; // 0=Mon...6=Sun
+      if (!days.includes(dayIdx)) days.push(dayIdx);
+      current = addDays(current, 1);
+    }
+    return days.sort();
+  }, [booking?.start_date, booking?.end_date]);
 
   useEffect(() => {
     if (hotelEntry) {
@@ -96,10 +111,14 @@ function HotelTabContent({ booking }: { booking: any }) {
       setConfNum(hotelEntry.confirmation_number || "");
       setStatus(hotelEntry.status);
       setNotes(hotelEntry.notes || "");
-      setCheckIn(hotelEntry.check_in || "");
-      setCheckOut(hotelEntry.check_out || "");
+      setHotelBookedDays(hotelEntry.booked_days || []);
     }
   }, [hotelEntry]);
+
+  const pricePerDay = useMemo(() => {
+    const total = Number(price) || 0;
+    return hotelBookedDays.length > 0 ? total / hotelBookedDays.length : 0;
+  }, [price, hotelBookedDays]);
 
   const handleSave = async () => {
     if (!hotelEntry) return;
@@ -109,8 +128,7 @@ function HotelTabContent({ booking }: { booking: any }) {
       confirmation_number: confNum || undefined,
       status,
       notes: notes || undefined,
-      check_in: checkIn || undefined,
-      check_out: checkOut || undefined,
+      booked_days: hotelBookedDays,
     });
   };
 
@@ -148,7 +166,7 @@ function HotelTabContent({ booking }: { booking: any }) {
       <div className="flex items-center justify-between">
         <div>
           <p className="font-medium">{hotelEntry.hotel?.name}</p>
-          <p className="text-sm text-muted-foreground">{hotelEntry.hotel?.city} • {hotelEntry.check_in} → {hotelEntry.check_out}</p>
+          <p className="text-sm text-muted-foreground">{hotelEntry.hotel?.city} • {hotelBookedDays.length} dage valgt</p>
         </div>
         <Button variant="outline" size="sm" onClick={() => {
           setEditingHotel(hotelEntry);
@@ -159,15 +177,40 @@ function HotelTabContent({ booking }: { booking: any }) {
         </Button>
       </div>
 
+      {/* Day selector */}
+      <div>
+        <Label className="text-xs mb-2 block">Hoteldage</Label>
+        <div className="flex flex-wrap gap-2">
+          {availableDays.map((dayIdx) => {
+            const isSelected = hotelBookedDays.includes(dayIdx);
+            return (
+              <button
+                key={dayIdx}
+                type="button"
+                onClick={() => {
+                  setHotelBookedDays(prev =>
+                    isSelected ? prev.filter(d => d !== dayIdx) : [...prev, dayIdx].sort()
+                  );
+                }}
+                className={`px-3 py-1.5 rounded-md border text-sm font-medium transition-colors ${
+                  isSelected
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "hover:bg-muted border-border"
+                }`}
+              >
+                {DAY_NAMES[dayIdx]?.slice(0, 3)}
+              </button>
+            );
+          })}
+        </div>
+        {hotelBookedDays.length > 0 && price && Number(price) > 0 && (
+          <p className="text-xs text-muted-foreground mt-1">
+            {Number(price).toLocaleString("da-DK")} kr / {hotelBookedDays.length} dage = {Math.round(pricePerDay).toLocaleString("da-DK")} kr/dag
+          </p>
+        )}
+      </div>
+
       <div className="grid grid-cols-2 gap-3">
-        <div>
-          <Label className="text-xs">Check-in</Label>
-          <Input type="date" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} />
-        </div>
-        <div>
-          <Label className="text-xs">Check-out</Label>
-          <Input type="date" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} />
-        </div>
         <div>
           <Label className="text-xs">Samlet pris (DKK) *</Label>
           <Input

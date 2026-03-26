@@ -1318,6 +1318,7 @@ export type Database = {
       }
       booking_hotel: {
         Row: {
+          booked_days: number[] | null
           booking_id: string
           check_in: string
           check_in_time: string | null
@@ -1333,6 +1334,7 @@ export type Database = {
           status: string
         }
         Insert: {
+          booked_days?: number[] | null
           booking_id: string
           check_in: string
           check_in_time?: string | null
@@ -1348,6 +1350,7 @@ export type Database = {
           status?: string
         }
         Update: {
+          booked_days?: number[] | null
           booking_id?: string
           check_in?: string
           check_in_time?: string | null

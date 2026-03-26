@@ -29,6 +29,7 @@ export interface BookingHotel {
   price_per_night: number | null;
   notes: string | null;
   created_at: string;
+  booked_days: number[];
   hotel?: Hotel;
 }
 
@@ -141,6 +142,7 @@ export function useAssignHotel() {
       status?: string;
       price_per_night?: number;
       notes?: string;
+      booked_days?: number[];
     }) => {
       const { data, error } = await (supabase as any)
         .from("booking_hotel")
@@ -163,7 +165,7 @@ export function useAssignHotel() {
 export function useUpdateBookingHotel() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...updates }: { id: string; status?: string; confirmation_number?: string; rooms?: number; price_per_night?: number; notes?: string; check_in?: string; check_out?: string }) => {
+    mutationFn: async ({ id, ...updates }: { id: string; status?: string; confirmation_number?: string; rooms?: number; price_per_night?: number; notes?: string; check_in?: string; check_out?: string; booked_days?: number[] }) => {
       const { error } = await (supabase as any)
         .from("booking_hotel")
         .update(updates)
