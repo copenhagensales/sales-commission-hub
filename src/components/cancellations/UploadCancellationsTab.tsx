@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
+import { groupConditionsByProduct, findMatchingProductId } from "@/utils/productConditionMatcher";
 import { formatCurrency } from "@/lib/calculations/formatting";
 import { useAgentNameResolver } from "@/hooks/useAgentNameResolver";
 import { useDropzone } from "react-dropzone";
