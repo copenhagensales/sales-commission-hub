@@ -1,37 +1,29 @@
 
 
-## Adgangsstyring til fejlrapporteringsmodulet
+## Problem: Powerdag TV-board er sort/blank
 
-### Hvad bygges
-En ny fane **"Adgang"** (owner-only) i `/system-feedback` hvor du kan styre hvilke medarbejdere der har adgang til formularen. Kun medarbejdere på adgangslisten (+ owners) kan se sidebar-linket og indsende/se egne rapporter.
+### Årsag
+Alle tre Powerdag-tabeller (`powerdag_events`, `powerdag_point_rules`, `powerdag_scores`) har RLS-policies der kun tillader **authenticated** brugere at læse data. TV-boards kører **uden authentication** (anon key), så alle queries returnerer tomme resultater → blank skærm.
 
-### Database
+### Løsning
+Tilføj SELECT-policies for `anon`-rollen på alle tre tabeller, så TV-boards kan læse data uden login.
 
-**Ny tabel: `system_feedback_access`**
+### Database-migration
 
-| Kolonne | Type |
-|---|---|
-| id | uuid PK |
-| employee_id | uuid FK → employee_master_data (UNIQUE, ON DELETE CASCADE) |
-| created_at | timestamptz |
+```sql
+-- Allow anonymous (TV board) read access to powerdag tables
+CREATE POLICY "Anon can read powerdag_events"
+  ON public.powerdag_events FOR SELECT TO anon USING (true);
 
-RLS: Authenticated kan læse (for sidebar-check). Kun owners kan insert/delete.
+CREATE POLICY "Anon can read powerdag_point_rules"
+  ON public.powerdag_point_rules FOR SELECT TO anon USING (true);
 
-**Opdatér RLS på `system_feedback`**: Insert-policy ændres så kun medarbejdere i `system_feedback_access` (eller owners) kan indsende.
-
-### UI-ændringer
-
-**1. `SystemFeedback.tsx`**
-- Ny fane **"Adgang"** (kun owner) — identisk mønster som "Modtagere"-fanen: søg + tilføj/fjern medarbejdere
-- Liste-fanen: Ikke-owners ser kun egne indrapporteringer (filtreret på `submitted_by`)
-- Indsend-fanen: Virker uændret (RLS sikrer at kun folk med adgang kan indsende)
-
-**2. `AppSidebar.tsx`**
-- Sidebar-linket "Fejlrapportering" vises kun hvis brugeren er owner ELLER findes i `system_feedback_access`-tabellen
-- Ny query der checker adgang ved sidebar-load
+CREATE POLICY "Anon can read powerdag_scores"
+  ON public.powerdag_scores FOR SELECT TO anon USING (true);
+```
 
 ### Filer der ændres
-1. **Migration** — opret `system_feedback_access` + opdatér insert-policy på `system_feedback`
-2. **`src/pages/SystemFeedback.tsx`** — ny "Adgang"-fane + filtrer liste for ikke-owners
-3. **`src/components/layout/AppSidebar.tsx`** — betinget visning af sidebar-link baseret på adgangstabel
+1. **Ny migration** — tilføj anon SELECT-policies på de 3 powerdag-tabeller
+
+Ingen kodeændringer nødvendige — komponenterne og queries fungerer allerede korrekt, de mangler bare data-adgang.
 
