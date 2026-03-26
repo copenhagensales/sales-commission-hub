@@ -181,6 +181,7 @@ function HotelFormDialog({
           </div>
           <div>
             <Label>Standardpris pr. nat (DKK)</Label>
+            <p className="text-xs text-muted-foreground">Ex moms</p>
             <Input type="number" value={defaultPrice} onChange={(e) => setDefaultPrice(e.target.value)} placeholder="F.eks. 895" />
           </div>
           <div>
