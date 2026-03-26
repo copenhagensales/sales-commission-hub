@@ -1,38 +1,25 @@
 
 
-## Problem: `get_sales_report_detailed` mangler salg via adversus campaign mappings
+## Tillad samme værdi på flere produkter
 
-### Årsag
-RPC'en `get_sales_report_detailed` finder kun salg hvor `s.client_campaign_id` direkte peger på klientens campaigns:
+### Problem
+Badget "Allerede mappet" antyder at en værdi kun bør tilknyttes ét produkt. Men sammensætningen af værdier på tværs af kolonner (Operator, Subscription Name, Sales Department) er det der bestemmer produktet — så samme værdi skal kunne bruges på flere produkter.
 
-```sql
-AND s.client_campaign_id IN (
-  SELECT cc.id FROM client_campaigns cc WHERE cc.client_id = p_client_id
-)
-```
+### Løsning
 
-Men `get_sales_report_raw` (som bruges i Rapporter-siden) bruger **tre** matchveje:
-1. Produktets campaign → klient (`cc_prod.client_id`)
-2. Salgets campaign → klient (`cc_sale.client_id`)  
-3. Adversus mapping → campaign → klient (`adversus_campaign_mappings` → `cc_mapping.client_id`)
+#### 1. Ændre badge-visning i dialogen (`SellerMappingTab.tsx`)
+- Fjern det afskrækkende "Allerede mappet" badge
+- Erstat med en informativ tekst der viser *hvilke* produkter værdien allerede er tilknyttet (fx "Også på: Fri tale + 170GB")
+- Behold fuld valgfrihed — ingen visuel forskel i checkbox-tilstand
 
-Salg der kun er koblet via adversus campaign mappings (vej 3) eller via produktets campaign (vej 1) tælles **ikke** med i forecast. Dette forklarer den lavere Salg MTD.
+#### 2. Verificér upsert-logik
+- Den nuværende `upsert` bruger `onConflict: "client_id,excel_product_name"` — men da samme `excel_product_name` nu skal kunne eksistere med *forskellige* `product_id`, er upsert-nøglen forkert
+- Ændre til insert med duplikat-check: tjek om kombinationen `(client_id, excel_product_name, product_id)` allerede eksisterer før insert, eller brug upsert med den korrekte unikke constraint
 
-### Løsning: Opdater `get_sales_report_detailed` RPC
-
-Tilføj de samme JOINs som `get_sales_report_raw` bruger, så alle tre matchveje dækkes:
-
-```sql
-LEFT JOIN client_campaigns cc_prod ON cc_prod.id = p.client_campaign_id
-LEFT JOIN client_campaigns cc_sale ON cc_sale.id = s.client_campaign_id
-LEFT JOIN adversus_campaign_mappings acm ON acm.adversus_campaign_id = s.dialer_campaign_id
-LEFT JOIN client_campaigns cc_mapping ON cc_mapping.id = acm.client_campaign_id
-WHERE COALESCE(cc_prod.client_id, cc_sale.client_id, cc_mapping.client_id) = p_client_id
-```
+#### 3. Tjek database-constraint
+- `cancellation_product_mappings` har formentlig en unik constraint på `(client_id, excel_product_name)` — denne skal ændres til `(client_id, excel_product_name, product_id)` via migration, så samme excel-navn kan mappes til flere produkter
 
 ### Berørte filer
-- Ny database migration (opdater `get_sales_report_detailed` funktionen)
-
-### Ingen kodeændringer
-Hook'en (`useClientForecast.ts`) kalder allerede RPC'en korrekt — det er kun SQL-funktionen der skal opdateres.
+- `src/components/cancellations/SellerMappingTab.tsx` — badge-visning og save-logik
+- Database migration — ændre unik constraint
 
