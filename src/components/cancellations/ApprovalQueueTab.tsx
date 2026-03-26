@@ -35,6 +35,7 @@ import { MatchErrorsSubTab } from "@/components/cancellations/MatchErrorsSubTab"
 import { CLIENT_IDS } from "@/utils/clientIds";
 import { fetchByIds } from "@/utils/supabasePagination";
 import { FileSpreadsheet, AlertTriangle } from "lucide-react";
+import { groupConditionsByProduct, findMatchingProductId } from "@/utils/productConditionMatcher";
 
 const TDC_ERHVERV_CLIENT_ID = CLIENT_IDS["TDC Erhverv"];
 const PAGE_SIZE = 50;
