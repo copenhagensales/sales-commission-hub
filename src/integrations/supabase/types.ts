@@ -8919,6 +8919,110 @@ export type Database = {
           },
         ]
       }
+      powerdag_events: {
+        Row: {
+          created_at: string
+          event_date: string
+          id: string
+          is_active: boolean
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          event_date?: string
+          id?: string
+          is_active?: boolean
+          name: string
+        }
+        Update: {
+          created_at?: string
+          event_date?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+        }
+        Relationships: []
+      }
+      powerdag_point_rules: {
+        Row: {
+          created_at: string
+          display_order: number
+          event_id: string
+          id: string
+          points_per_sale: number
+          sub_client_name: string | null
+          team_name: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          event_id: string
+          id?: string
+          points_per_sale?: number
+          sub_client_name?: string | null
+          team_name: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          event_id?: string
+          id?: string
+          points_per_sale?: number
+          sub_client_name?: string | null
+          team_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "powerdag_point_rules_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "powerdag_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      powerdag_scores: {
+        Row: {
+          event_id: string
+          id: string
+          rule_id: string
+          sales_count: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          event_id: string
+          id?: string
+          rule_id: string
+          sales_count?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          event_id?: string
+          id?: string
+          rule_id?: string
+          sales_count?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "powerdag_scores_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "powerdag_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "powerdag_scores_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "powerdag_point_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pricing_rule_history: {
         Row: {
           allows_immediate_payment: boolean | null
