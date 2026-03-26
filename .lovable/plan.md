@@ -1,118 +1,40 @@
 
 
-## Simpelt Kundeforecast-modul — Dynamisk Intra-Month Justering
+## Fix: Brug `get_sales_report_detailed` RPC til korrekte salgstal
 
-### Kerneidé: Forecast der lever med måneden
+### Problem
+Den nuværende `useClientForecast` henter **alle** salg fra `sales`-tabellen uden team-filter og rammer Supabase's 1000-rækkers grænse. Desuden filtrerer den ikke på `client_campaigns` eller `validation_status`, som den eksisterende rapporteringslogik gør.
 
-Forecast opdeles i **faktisk salg** (allerede sket) + **projected salg** (resterende vagter). Jo flere dage der er gået, jo mere fylder faktisk data og jo mindre fylder projektionen — forecast regulerer sig automatisk.
+### Løsning
+Brug den allerede eksisterende `get_sales_report_detailed` RPC-funktion, som:
+- Korrekt joiner `sales → sale_items → products → agents → employee_master_data`
+- Filtrerer på `client_campaign_id` (via client_id)
+- Ekskluderer rejected salg
+- Kun tæller produkter med `counts_as_sale = true`
+- Kører som SECURITY DEFINER (ingen RLS-problemer)
 
-```text
-Dag 1:   Forecast = 0 faktisk + 20 dage projected
-Dag 10:  Forecast = 150 faktisk + 10 dage projected  
-Dag 20:  Forecast = 380 faktisk + 2 dage projected ← næsten kun reel data
-```
+### Nødvendig ændring
 
-### Database: `forecast_settings`
+**Database**: Tilføj `client_id` kolonne til `forecast_settings` så vi ved hvilken klient teamet tilhører (behøves for RPC-kaldet). Alternativt kan vi slå det op via teamets medarbejdere → client_campaigns, men en direkte reference er simplere.
 
-Én række pr. team pr. måned (oprettes manuelt):
+**`src/hooks/useClientForecast.ts`**:
+1. Kald `get_sales_report_detailed(client_id, monthStart, cutoffDate)` i stedet for den rå sales-query
+2. Match RPC-resultatet (som returnerer `employee_name, product_name, quantity`) til teammedlemmer
+3. Summer `quantity` per medarbejder for at få faktisk salg MTD
+4. Resten af beregningen (projected, rolling avg, etc.) forbliver uændret
 
-| Kolonne | Type | Beskrivelse |
-|---------|------|-------------|
-| id | uuid PK | |
-| team_id | uuid FK → teams | |
-| month, year | int | |
-| client_goal | int | Kundens salgsmål |
-| sick_pct | numeric DEFAULT 0 | Forventet sygdom % |
-| vacation_pct | numeric DEFAULT 0 | Forventet ferie % |
-| churn_new_pct | numeric DEFAULT 0 | Churn % nye (<20 vagter) |
-| churn_established_pct | numeric DEFAULT 0 | Churn % etablerede |
-| new_seller_weekly_target | numeric DEFAULT 0 | Ugentligt mål for nye |
-| new_seller_threshold | int DEFAULT 20 | Grænse for "ny" (vagter) |
-| rolling_avg_shifts | int DEFAULT 10 | Antal vagter til gns. |
-| created_by | uuid | |
-| updated_at | timestamptz | |
+**`src/components/forecast/CreateForecastDialog.tsx`**: 
+- Tilføj client_id lookup baseret på valgt team (via client_campaigns relation)
+- Gem client_id i forecast_settings ved oprettelse
 
-UNIQUE: `(team_id, month, year)`. RLS: authenticated.
+### Fordele
+- Bruger **præcis** samme logik som Salgsrapporter-siden
+- Ingen 1000-rækkers begrænsning (RPC kører server-side)
+- Korrekt filtrering på validation_status og counts_as_sale
 
-### Beregningslogik (dynamisk intra-month)
-
-```text
-For hver medarbejder:
-
-  dags_dato = i dag (eller månedens sidste dag, det tidligste)
-  
-  FAKTISK SALG (1. → dags_dato):
-    → Hent reelle salg fra sales-tabellen for denne medarbejder denne måned
-  
-  PROJECTED SALG (dags_dato+1 → månedens slutning):
-    Hvis ny (< threshold vagter):
-      → dagligt_mål = weekly_target / 5
-      → projected = dagligt_mål × resterende planlagte vagter
-      → × (1 - churn_new_pct/100)
-    Hvis etableret (≥ threshold vagter):
-      → salg/dag = gns. af seneste [rolling_avg_shifts] vagter
-      → projected = salg/dag × resterende planlagte vagter
-      → × (1 - churn_established_pct/100)
-    
-    Projected justeres: × (1 - sick_pct/100) × (1 - vacation_pct/100)
-
-  MEDARBEJDER FORECAST = faktisk_salg + projected_salg
-
-TOTAL FORECAST = sum(alle medarbejderes forecast)
-```
-
-**Effekt:** I starten af måneden er forecast primært baseret på projektioner. Mod slutningen er det næsten kun faktiske tal — forecast bliver mere og mere præcist.
-
-### KPI-kort
-
-| KPI | Beskrivelse |
-|-----|-------------|
-| Salg MTD | Faktiske salg til dato |
-| Forecast | Faktisk + projected (dynamisk) |
-| Kundens mål | Fra settings |
-| Pace | Faktisk / forventet-til-dato (over/under 100%) |
-| Sygdom % | Faktisk vs. forventet |
-| Ferie % | Faktisk vs. forventet |
-
-### UI: Forside (`/client-forecast`)
-
-Grid af team-cards for alle oprettede forecasts i valgt måned. Hvert card:
-- Teamnavn, kundemål, dynamisk forecast, faktisk salg MTD
-- Progressbar (faktisk vs. mål)
-- Status-badge: Foran / På mål / Bagud (pace-baseret)
-
-### UI: Detalje (`/client-forecast/:id`)
-
-- KPI-kort (6 stk)
-- Settings-panel (alle parametre redigerbare pr. team)
-- Medarbejder-tabel: Navn, Type, Faktisk salg, Projected, Total forecast
-
-### Filer
-
-```text
-src/pages/ClientForecast.tsx
-src/pages/ClientForecastDetail.tsx
-src/hooks/useClientForecast.ts
-src/hooks/useForecastSettings.ts
-src/components/forecast/ForecastCard.tsx
-src/components/forecast/ForecastKpiCards.tsx
-src/components/forecast/ForecastSettingsPanel.tsx
-src/components/forecast/ForecastEmployeeTable.tsx
-src/components/forecast/CreateForecastDialog.tsx
-```
-
-### Routes + menu + permissions
-
-- Routes: `/client-forecast` + `/client-forecast/:id`
-- Sidebar: menupunkt under "Ledelse" sektionen
-- Permission-key: `menu_client_forecast` under `menu_section_ledelse`
-
-### Implementeringsrækkefølge
-
-1. Database-migration (opret `forecast_settings` med RLS)
-2. `useForecastSettings` hook (CRUD + kopiér fra forrige måned)
-3. `useClientForecast` hook (dynamisk: faktisk salg + projected med alle konfigurerbare parametre)
-4. Forside med team-cards + opret-dialog
-5. Detalje-side med KPI, settings, medarbejder-tabel
-6. Route, sidebar-link, permission-key
+### Berørte filer
+- Migration: tilføj `client_id` til `forecast_settings`
+- `src/hooks/useClientForecast.ts` — erstat rå sales-query med RPC
+- `src/components/forecast/CreateForecastDialog.tsx` — gem client_id
+- `src/hooks/useForecastSettings.ts` — inkluder client_id i typen
 
