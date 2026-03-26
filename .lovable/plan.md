@@ -1,57 +1,118 @@
 
 
-## Slet Kundeforecast fra menu og database
+## Simpelt Kundeforecast-modul — Dynamisk Intra-Month Justering
 
-### Oversigt
-Fjern hele kundeforecast-funktionaliteten: sider, komponenter, hooks, routes, menupunkt, permission-key og alle 7 relaterede database-tabeller.
+### Kerneidé: Forecast der lever med måneden
 
-### Database-migration (DROP tables)
-Drop disse tabeller i korrekt rækkefølge (pga. foreign keys):
+Forecast opdeles i **faktisk salg** (allerede sket) + **projected salg** (resterende vagter). Jo flere dage der er gået, jo mere fylder faktisk data og jo mindre fylder projektionen — forecast regulerer sig automatisk.
 
-1. `client_forecast_cohorts` (references ramp/survival profiles)
-2. `client_forecasts`
-3. `client_monthly_targets`
-4. `employee_forecast_overrides`
-5. `fm_weekly_forecast_overrides`
-6. `forecast_ramp_profiles`
-7. `forecast_survival_profiles`
-
-```sql
-DROP TABLE IF EXISTS client_forecast_cohorts CASCADE;
-DROP TABLE IF EXISTS client_forecasts CASCADE;
-DROP TABLE IF EXISTS client_monthly_targets CASCADE;
-DROP TABLE IF EXISTS employee_forecast_overrides CASCADE;
-DROP TABLE IF EXISTS fm_weekly_forecast_overrides CASCADE;
-DROP TABLE IF EXISTS forecast_ramp_profiles CASCADE;
-DROP TABLE IF EXISTS forecast_survival_profiles CASCADE;
+```text
+Dag 1:   Forecast = 0 faktisk + 20 dage projected
+Dag 10:  Forecast = 150 faktisk + 10 dage projected  
+Dag 20:  Forecast = 380 faktisk + 2 dage projected ← næsten kun reel data
 ```
 
-### Slet filer (sider + komponenter + hooks)
+### Database: `forecast_settings`
 
-**Sider:**
-- `src/pages/Forecast.tsx`
-- `src/pages/ForecastClientReport.tsx`
+Én række pr. team pr. måned (oprettes manuelt):
 
-**Komponenter (hele mappen):**
-- `src/components/forecast/` (16 filer)
+| Kolonne | Type | Beskrivelse |
+|---------|------|-------------|
+| id | uuid PK | |
+| team_id | uuid FK → teams | |
+| month, year | int | |
+| client_goal | int | Kundens salgsmål |
+| sick_pct | numeric DEFAULT 0 | Forventet sygdom % |
+| vacation_pct | numeric DEFAULT 0 | Forventet ferie % |
+| churn_new_pct | numeric DEFAULT 0 | Churn % nye (<20 vagter) |
+| churn_established_pct | numeric DEFAULT 0 | Churn % etablerede |
+| new_seller_weekly_target | numeric DEFAULT 0 | Ugentligt mål for nye |
+| new_seller_threshold | int DEFAULT 20 | Grænse for "ny" (vagter) |
+| rolling_avg_shifts | int DEFAULT 10 | Antal vagter til gns. |
+| created_by | uuid | |
+| updated_at | timestamptz | |
 
-**Hooks:**
-- `src/hooks/useClientForecast.ts`
-- `src/hooks/useEmployeeForecastOverrides.ts`
-- `src/hooks/useFmWeeklyForecast.ts`
-- `src/hooks/useForecastVsActual.ts`
+UNIQUE: `(team_id, month, year)`. RLS: authenticated.
 
-**Types:**
-- Forecast-relaterede typer i `src/types/forecast.ts`
+### Beregningslogik (dynamisk intra-month)
 
-### Redigér filer
+```text
+For hver medarbejder:
 
-1. **`src/routes/config.tsx`** — Fjern 2 forecast-routes + import af `Forecast`, `ForecastClientReport`
-2. **`src/routes/pages.ts`** — Fjern 2 lazy exports (`Forecast`, `ForecastClientReport`)
-3. **`src/components/layout/AppSidebar.tsx`** — Fjern "Kundeforecast" NavLink-blokken (linje 1681-1694)
-4. **`src/hooks/usePositionPermissions.ts`** — Fjern `canViewForecast` permission
-5. **`src/config/permissionKeys.ts`** — Fjern `menu_forecast` entry
+  dags_dato = i dag (eller månedens sidste dag, det tidligste)
+  
+  FAKTISK SALG (1. → dags_dato):
+    → Hent reelle salg fra sales-tabellen for denne medarbejder denne måned
+  
+  PROJECTED SALG (dags_dato+1 → månedens slutning):
+    Hvis ny (< threshold vagter):
+      → dagligt_mål = weekly_target / 5
+      → projected = dagligt_mål × resterende planlagte vagter
+      → × (1 - churn_new_pct/100)
+    Hvis etableret (≥ threshold vagter):
+      → salg/dag = gns. af seneste [rolling_avg_shifts] vagter
+      → projected = salg/dag × resterende planlagte vagter
+      → × (1 - churn_established_pct/100)
+    
+    Projected justeres: × (1 - sick_pct/100) × (1 - vacation_pct/100)
 
-### Uberørte filer
-- `useTeamGoalForecast.ts` — Bruges til team-mål, ikke kundeforecast. Beholdes.
+  MEDARBEJDER FORECAST = faktisk_salg + projected_salg
+
+TOTAL FORECAST = sum(alle medarbejderes forecast)
+```
+
+**Effekt:** I starten af måneden er forecast primært baseret på projektioner. Mod slutningen er det næsten kun faktiske tal — forecast bliver mere og mere præcist.
+
+### KPI-kort
+
+| KPI | Beskrivelse |
+|-----|-------------|
+| Salg MTD | Faktiske salg til dato |
+| Forecast | Faktisk + projected (dynamisk) |
+| Kundens mål | Fra settings |
+| Pace | Faktisk / forventet-til-dato (over/under 100%) |
+| Sygdom % | Faktisk vs. forventet |
+| Ferie % | Faktisk vs. forventet |
+
+### UI: Forside (`/client-forecast`)
+
+Grid af team-cards for alle oprettede forecasts i valgt måned. Hvert card:
+- Teamnavn, kundemål, dynamisk forecast, faktisk salg MTD
+- Progressbar (faktisk vs. mål)
+- Status-badge: Foran / På mål / Bagud (pace-baseret)
+
+### UI: Detalje (`/client-forecast/:id`)
+
+- KPI-kort (6 stk)
+- Settings-panel (alle parametre redigerbare pr. team)
+- Medarbejder-tabel: Navn, Type, Faktisk salg, Projected, Total forecast
+
+### Filer
+
+```text
+src/pages/ClientForecast.tsx
+src/pages/ClientForecastDetail.tsx
+src/hooks/useClientForecast.ts
+src/hooks/useForecastSettings.ts
+src/components/forecast/ForecastCard.tsx
+src/components/forecast/ForecastKpiCards.tsx
+src/components/forecast/ForecastSettingsPanel.tsx
+src/components/forecast/ForecastEmployeeTable.tsx
+src/components/forecast/CreateForecastDialog.tsx
+```
+
+### Routes + menu + permissions
+
+- Routes: `/client-forecast` + `/client-forecast/:id`
+- Sidebar: menupunkt under "Ledelse" sektionen
+- Permission-key: `menu_client_forecast` under `menu_section_ledelse`
+
+### Implementeringsrækkefølge
+
+1. Database-migration (opret `forecast_settings` med RLS)
+2. `useForecastSettings` hook (CRUD + kopiér fra forrige måned)
+3. `useClientForecast` hook (dynamisk: faktisk salg + projected med alle konfigurerbare parametre)
+4. Forside med team-cards + opret-dialog
+5. Detalje-side med KPI, settings, medarbejder-tabel
+6. Route, sidebar-link, permission-key
 
