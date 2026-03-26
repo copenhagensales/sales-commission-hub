@@ -483,43 +483,73 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
 
       const itemsNeedingResolution = resolvedQueueItems.filter((qi: any) => !qi.target_product_name && qi.uploaded_data);
       if (itemsNeedingResolution.length > 0) {
-        // Get product mappings for the client
         const cId = itemsNeedingResolution[0]?.client_id || clientId;
-        const { data: productMappings } = await supabase
-          .from("cancellation_product_mappings")
-          .select("excel_product_name, product_id")
+
+        // 1. Try condition-based matching first
+        const { data: conditionRows } = await supabase
+          .from("cancellation_product_conditions")
+          .select("product_id, column_name, operator, values")
           .eq("client_id", cId);
 
-        if (productMappings && productMappings.length > 0) {
-          // Get product names for the mapped product IDs
-          const mappedProductIds = [...new Set(productMappings.map(m => m.product_id))];
-          const mappedProducts = await fetchByIds<any>("products", "id", mappedProductIds, "id, name");
-          const mappedProductNames = new Map<string, string>(mappedProducts.map((p: any) => [p.id, p.name]));
-
-          const excelToProductName = new Map<string, string>();
-          for (const pm of productMappings) {
-            const productName = mappedProductNames.get(pm.product_id);
-            if (productName) excelToProductName.set(pm.excel_product_name.toLowerCase().trim(), productName);
-          }
+        let conditionResolved = 0;
+        if (conditionRows && conditionRows.length > 0) {
+          const grouped = groupConditionsByProduct(conditionRows);
+          // Get product names for condition product IDs
+          const condProductIds = [...new Set(conditionRows.map(r => r.product_id))];
+          const condProducts = await fetchByIds<any>("products", "id", condProductIds, "id, name");
+          const condProductNames = new Map<string, string>(condProducts.map((p: any) => [p.id, p.name]));
 
           for (const qi of itemsNeedingResolution) {
             const ud = qi.uploaded_data as Record<string, unknown>;
-            let excelName: string | null = null;
-            for (const key of PRODUCT_KEYS) {
-              const val = ud[key];
-              if (val && typeof val === "string" && val.trim()) { excelName = val.trim(); break; }
-            }
-            if (!excelName) {
-              for (const [k, v] of Object.entries(ud)) {
-                const lower = k.toLowerCase();
-                if ((lower.includes("subscription") || lower.includes("product") || lower.includes("produkt")) && v && typeof v === "string" && v.trim()) {
-                  excelName = v.trim(); break;
-                }
+            const matchedPid = findMatchingProductId(grouped, ud);
+            if (matchedPid) {
+              const pName = condProductNames.get(matchedPid);
+              if (pName) {
+                qi.target_product_name = pName;
+                conditionResolved++;
               }
             }
-            if (excelName) {
-              const resolvedName = excelToProductName.get(excelName.toLowerCase().trim());
-              if (resolvedName) qi.target_product_name = resolvedName;
+          }
+        }
+
+        // 2. Fallback: legacy cancellation_product_mappings for remaining items
+        const stillUnresolved = itemsNeedingResolution.filter((qi: any) => !qi.target_product_name);
+        if (stillUnresolved.length > 0) {
+          const { data: productMappings } = await supabase
+            .from("cancellation_product_mappings")
+            .select("excel_product_name, product_id")
+            .eq("client_id", cId);
+
+          if (productMappings && productMappings.length > 0) {
+            const mappedProductIds = [...new Set(productMappings.map(m => m.product_id))];
+            const mappedProducts = await fetchByIds<any>("products", "id", mappedProductIds, "id, name");
+            const mappedProductNames = new Map<string, string>(mappedProducts.map((p: any) => [p.id, p.name]));
+
+            const excelToProductName = new Map<string, string>();
+            for (const pm of productMappings) {
+              const productName = mappedProductNames.get(pm.product_id);
+              if (productName) excelToProductName.set(pm.excel_product_name.toLowerCase().trim(), productName);
+            }
+
+            for (const qi of stillUnresolved) {
+              const ud = qi.uploaded_data as Record<string, unknown>;
+              let excelName: string | null = null;
+              for (const key of PRODUCT_KEYS) {
+                const val = ud[key];
+                if (val && typeof val === "string" && val.trim()) { excelName = val.trim(); break; }
+              }
+              if (!excelName) {
+                for (const [k, v] of Object.entries(ud)) {
+                  const lower = k.toLowerCase();
+                  if ((lower.includes("subscription") || lower.includes("product") || lower.includes("produkt")) && v && typeof v === "string" && v.trim()) {
+                    excelName = v.trim(); break;
+                  }
+                }
+              }
+              if (excelName) {
+                const resolvedName = excelToProductName.get(excelName.toLowerCase().trim());
+                if (resolvedName) qi.target_product_name = resolvedName;
+              }
             }
           }
         }
