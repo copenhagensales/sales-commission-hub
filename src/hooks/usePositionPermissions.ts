@@ -685,5 +685,7 @@ export function usePermissions() {
     canViewAmoTasks: canView("menu_amo_tasks"),
     canViewAmoSettings: canView("menu_amo_settings"),
     canViewAmoAuditLog: canView("menu_amo_audit_log"),
+    // Client Forecast
+    canViewClientForecast: canView("menu_client_forecast"),
   };
 }
