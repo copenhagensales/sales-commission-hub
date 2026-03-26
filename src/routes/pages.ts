@@ -206,3 +206,8 @@ export const CustomerInquiries = lazyPage(() => import("@/pages/CustomerInquirie
 // Client Forecast
 export const ClientForecast = lazyPage(() => import("@/pages/ClientForecast"));
 export const ClientForecastDetail = lazyPage(() => import("@/pages/ClientForecastDetail"));
+
+// Powerdag
+export const PowerdagBoard = lazyPage(() => import("@/pages/dashboards/PowerdagBoard"));
+export const PowerdagInput = lazyPage(() => import("@/pages/dashboards/PowerdagInput"));
+export const PowerdagAdmin = lazyPage(() => import("@/pages/dashboards/PowerdagAdmin"));

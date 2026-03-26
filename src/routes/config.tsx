@@ -137,6 +137,9 @@ import {
   TvLeagueDashboard,
   ClientForecast,
   ClientForecastDetail,
+  PowerdagBoard,
+  PowerdagInput,
+  PowerdagAdmin,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 

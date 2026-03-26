@@ -93,4 +93,11 @@ export const DASHBOARD_LIST: DashboardConfig[] = [
     description: "Live liga-overblik med top performers og division highlights",
     permissionKey: "menu_dashboard_commission_league" 
   },
+  { 
+    slug: "powerdag", 
+    name: "Powerdag", 
+    path: "/dashboards/powerdag", 
+    description: "Powerdag konkurrence – live team standings med manuel score-input",
+    permissionKey: "menu_dashboard_powerdag" 
+  },
 ];
