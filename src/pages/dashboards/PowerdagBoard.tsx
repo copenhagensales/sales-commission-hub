@@ -1,12 +1,15 @@
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useActiveEvent, useRulesForEvent, useScoresForEvent, computeStandings } from "@/hooks/usePowerdagData";
 import { useAutoReload, isTvMode } from "@/utils/tvMode";
-import { Trophy } from "lucide-react";
+import { Trophy, Medal } from "lucide-react";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { useRequireDashboardAccess } from "@/hooks/useRequireDashboardAccess";
 import { Progress } from "@/components/ui/progress";
+import { useCachedLeaderboard, formatDisplayName, getInitials } from "@/hooks/useCachedLeaderboard";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 
 const PODIUM_CONFIG = [
   { emoji: "🥇", bg: "from-yellow-500/20 via-amber-500/10 to-yellow-600/5", border: "border-yellow-500/50", glow: "shadow-yellow-500/20", label: "text-yellow-400" },
@@ -122,6 +125,9 @@ export default function PowerdagBoard() {
             )}
           </>
         )}
+
+        {/* Top 5 Sælgere */}
+        <TopSellersSection tv={tv} />
       </div>
     </DashboardShell>
   );
@@ -140,7 +146,7 @@ function TeamRow({ team, rank, maxPoints, tv, cfg, delay = 0 }: {
 
   return (
     <div
-      className={`rounded-xl border bg-gradient-to-r p-4 md:p-5 transition-all hover-scale ${cfg ? `${cfg.bg} ${cfg.border} shadow-md ${cfg.glow}` : "from-card to-card border-border"}`}
+      className={`rounded-xl border bg-gradient-to-r p-4 md:p-5 transition-all ${cfg ? `${cfg.bg} ${cfg.border} shadow-md ${cfg.glow}` : "from-card to-card border-border"}`}
       style={{ animation: `fade-in 0.4s ease-out ${delay}s both` }}
     >
       <div className="flex items-center gap-4">
@@ -192,6 +198,65 @@ function TeamRow({ team, rank, maxPoints, tv, cfg, delay = 0 }: {
           </AccordionItem>
         </Accordion>
       )}
+    </div>
+  );
+}
+
+const SELLER_RANK_STYLES = [
+  "bg-gradient-to-br from-yellow-500/20 to-yellow-600/10 border-yellow-500/40 text-yellow-400",
+  "bg-gradient-to-br from-slate-300/20 to-slate-400/10 border-slate-400/30 text-slate-300",
+  "bg-gradient-to-br from-orange-500/20 to-orange-600/10 border-orange-500/30 text-orange-400",
+];
+
+function TopSellersSection({ tv }: { tv: boolean }) {
+  const { data: topSellers = [] } = useCachedLeaderboard("today", { type: "global" }, { limit: 5 });
+
+  if (topSellers.length === 0) return null;
+
+  return (
+    <div className="space-y-4">
+      <h2 className={`${tv ? "text-2xl" : "text-lg md:text-xl"} font-bold flex items-center gap-2`}>
+        <Medal className="h-5 w-5 text-primary" />
+        Top 5 Sælgere — I dag
+      </h2>
+      <div className="space-y-2">
+        {topSellers.map((seller, idx) => (
+          <div
+            key={seller.employeeId}
+            className="flex items-center gap-3 rounded-xl border border-border bg-card/60 p-3 md:p-4"
+            style={{ animation: `fade-in 0.4s ease-out ${idx * 0.1}s both` }}
+          >
+            {/* Rank */}
+            <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm border ${idx < 3 ? SELLER_RANK_STYLES[idx] : "bg-muted text-muted-foreground"}`}>
+              {idx + 1}
+            </div>
+            {/* Avatar */}
+            <Avatar className="h-9 w-9">
+              <AvatarFallback className="text-xs font-semibold bg-primary/10 text-primary">
+                {getInitials(seller.employeeName)}
+              </AvatarFallback>
+            </Avatar>
+            {/* Name + team */}
+            <div className="flex-1 min-w-0">
+              <p className={`font-semibold truncate ${tv ? "text-lg" : "text-sm"}`}>
+                {formatDisplayName(seller.employeeName)}
+              </p>
+              {seller.teamName && (
+                <Badge variant="outline" className="text-[10px] mt-0.5 px-1.5 py-0">
+                  {seller.teamName}
+                </Badge>
+              )}
+            </div>
+            {/* Stats */}
+            <div className="text-right flex-shrink-0">
+              <p className={`font-black tabular-nums ${tv ? "text-2xl" : "text-lg"}`}>
+                {seller.salesCount}
+                <span className="text-xs font-normal text-muted-foreground ml-1">salg</span>
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
