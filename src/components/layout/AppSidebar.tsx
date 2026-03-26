@@ -1074,6 +1074,8 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
             </NavLink>
           )}
 
+          {/* Fejlrapportering - standalone, visible for users with access */}
+          <FeedbackNavLink handleNavClick={handleNavClick} />
 
           {/* Intern Vagtplan menu */}
           {showShiftPlanningMenu && (
