@@ -6,6 +6,7 @@ import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { useRequireDashboardAccess } from "@/hooks/useRequireDashboardAccess";
+import { TvBoardQuickGenerator } from "@/components/dashboard/TvBoardQuickGenerator";
 import { Progress } from "@/components/ui/progress";
 import { useCachedLeaderboard, formatDisplayName, getInitials } from "@/hooks/useCachedLeaderboard";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
