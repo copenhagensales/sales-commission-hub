@@ -255,33 +255,21 @@ export default function SystemFeedback() {
                 <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="Kort beskrivelse af problemet" maxLength={200} />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-foreground mb-1.5 block">Kategori</label>
-                  <Select value={category} onValueChange={setCategory}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {CATEGORIES.map(c => (
-                        <SelectItem key={c.value} value={c.value}>
-                          <span className="flex items-center gap-2">
-                            <c.icon className={`h-4 w-4 ${c.color}`} />
-                            {c.label}
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-foreground mb-1.5 block">Systemområde</label>
-                  <Select value={systemArea} onValueChange={setSystemArea}>
-                    <SelectTrigger><SelectValue placeholder="Vælg område..." /></SelectTrigger>
-                    <SelectContent>
-                      {SYSTEM_AREAS.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div>
+                <label className="text-sm font-medium text-foreground mb-1.5 block">Kategori</label>
+                <Select value={category} onValueChange={setCategory}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {CATEGORIES.map(c => (
+                      <SelectItem key={c.value} value={c.value}>
+                        <span className="flex items-center gap-2">
+                          <c.icon className={`h-4 w-4 ${c.color}`} />
+                          {c.label}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
@@ -304,7 +292,7 @@ export default function SystemFeedback() {
 
               <div>
                 <label className="text-sm font-medium text-foreground mb-1.5 block">Berørt bruger</label>
-                <Input value={affectedEmployee} onChange={e => setAffectedEmployee(e.target.value)} placeholder="Navn på den person der oplever problemet" maxLength={100} />
+                <Input value={affectedEmployee} onChange={e => setAffectedEmployee(e.target.value)} placeholder="Fulde navn (fornavn og efternavn) på personen der oplever problemet" maxLength={100} />
               </div>
 
               <div>
