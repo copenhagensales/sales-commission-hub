@@ -10949,6 +10949,46 @@ export type Database = {
           },
         ]
       }
+      system_feedback_recipients: {
+        Row: {
+          created_at: string
+          employee_id: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          employee_id: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "system_feedback_recipients_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "system_feedback_recipients_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "system_feedback_recipients_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       system_role_definitions: {
         Row: {
           color: string | null
