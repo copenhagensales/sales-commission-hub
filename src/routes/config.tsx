@@ -135,6 +135,8 @@ import {
   AmoSettings,
   CustomerInquiries,
   TvLeagueDashboard,
+  ClientForecast,
+  ClientForecastDetail,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -247,6 +249,10 @@ export const routes: RouteConfig[] = [
     positionPermission: "menu_career_wishes_overview",
   },
   { path: "/customer-inquiries", component: CustomerInquiries, access: "role", positionPermission: "menu_customer_inquiries" },
+  
+  // Client Forecast
+  { path: "/client-forecast", component: ClientForecast, access: "role", positionPermission: "menu_client_forecast" },
+  { path: "/client-forecast/:id", component: ClientForecastDetail, access: "role", positionPermission: "menu_client_forecast" },
   { path: "/car-quiz-admin", component: CarQuizAdmin, access: "role", positionPermission: "menu_car_quiz_admin" },
   {
     path: "/code-of-conduct-admin",
