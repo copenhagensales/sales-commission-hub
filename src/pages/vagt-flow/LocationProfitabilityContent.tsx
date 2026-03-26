@@ -226,6 +226,20 @@ export default function LocationProfitabilityContent() {
     return map;
   }, [hotelCostByBooking, bookingToLocation]);
 
+  // Aggregate hotel booked_days per location
+  const hotelBookedDaysByLocation = useMemo(() => {
+    const map = new Map<string, number[]>();
+    for (const [bid, days] of hotelBookedDaysByBooking) {
+      const locId = bookingToLocation.get(bid);
+      if (locId) {
+        const existing = map.get(locId) || [];
+        const merged = Array.from(new Set([...existing, ...days])).sort();
+        map.set(locId, merged);
+      }
+    }
+    return map;
+  }, [hotelBookedDaysByBooking, bookingToLocation]);
+
   const dietCostByLocation = useMemo(() => {
     const map = new Map<string, number>();
     for (const [bid, cost] of dietCostByBooking) {
@@ -537,7 +551,9 @@ export default function LocationProfitabilityContent() {
                         const daySellerCost = dayCommission * (1 + VACATION_PAY_RATES.SELLER);
                         const dayLocCost = isBooked ? loc.dailyRate : 0;
                         const dayDietCost = dietByLocationDate.get(`${loc.locationId}|${dateStr}`) || 0;
-                        const dayHotelCost = isBooked && loc.bookedDays.length > 0 ? (loc.hotelCost / loc.bookedDays.length) : 0;
+                        const hotelDays = hotelBookedDaysByLocation.get(loc.locationId) || [];
+                        const isHotelDay = hotelDays.includes(dayNum);
+                        const dayHotelCost = isHotelDay && hotelDays.length > 0 ? (loc.hotelCost / hotelDays.length) : 0;
                         const dayDB = dayRevenue - daySellerCost - dayLocCost - dayHotelCost - dayDietCost;
 
                         return (
