@@ -1,69 +1,37 @@
 
 
-## Systemforbedringer / Fejlrapportering fra ledere
+## Adgangsstyring til fejlrapporteringsmodulet
 
-### Idé
-En simpel formular hvor ledere kan indrapportere problemer, ønsker og forbedringsforslag. Hver indrapportering indeholder screenshot, beskrivelse, berørt bruger og prioritet. Du kan derefter tage screenshots + brugernavne direkte ind i Lovable for hurtig fejlsøgning.
-
-### Ekstra overvejelser
-- **Kategori**: Skelne mellem "fejl/bug", "forbedringsforslag" og "ny funktion" — giver overblik over hvad der haster vs. nice-to-have
-- **Status-tracking**: Så lederne kan se om deres indrapportering er set/under arbejde/løst — reducerer "har I set min besked?"-spørgsmål
-- **Side/sektion-felt**: Hvilken del af systemet handler det om (f.eks. "Salg", "Vagtplan", "Dashboard") — hurtigere at finde fejlen
-- **Duplikat-forebyggelse**: Ledere kan se eksisterende indrapporteringer og evt. "stemme op" i stedet for at oprette en ny
+### Hvad bygges
+En ny fane **"Adgang"** (owner-only) i `/system-feedback` hvor du kan styre hvilke medarbejdere der har adgang til formularen. Kun medarbejdere på adgangslisten (+ owners) kan se sidebar-linket og indsende/se egne rapporter.
 
 ### Database
 
-**Ny tabel: `system_feedback`**
+**Ny tabel: `system_feedback_access`**
 
-| Kolonne | Type | Beskrivelse |
-|---|---|---|
-| id | uuid PK | |
-| submitted_by | uuid FK → employee_master_data | Lederen der indrapporterer |
-| affected_employee_name | text | Navn på brugeren der oplever problemet |
-| category | text | 'bug', 'improvement', 'feature_request' |
-| priority | text | 'critical', 'high', 'medium', 'low' |
-| title | text | Kort overskrift |
-| description | text | Detaljeret beskrivelse |
-| system_area | text | Hvilken del af systemet (valgfrit) |
-| screenshot_url | text | URL til uploadet screenshot |
-| status | text | 'new', 'seen', 'in_progress', 'resolved', 'wont_fix' |
-| admin_notes | text | Dine noter (kun synlige for dig) |
-| created_at | timestamptz | |
+| Kolonne | Type |
+|---|---|
+| id | uuid PK |
+| employee_id | uuid FK → employee_master_data (UNIQUE, ON DELETE CASCADE) |
+| created_at | timestamptz |
 
-**Storage bucket**: `feedback-screenshots` (public read, authenticated upload)
+RLS: Authenticated kan læse (for sidebar-check). Kun owners kan insert/delete.
 
-RLS: Authenticated users kan oprette + læse egne. Owners/teamledere kan læse alle.
+**Opdatér RLS på `system_feedback`**: Insert-policy ændres så kun medarbejdere i `system_feedback_access` (eller owners) kan indsende.
 
-### UI
+### UI-ændringer
 
-**1. Ny side: `/system-feedback`**
-- Tilgængelig fra sidebar under "Administration" (for teamledere+)
-- Simpel formular med:
-  - **Overskrift** (kort titel)
-  - **Kategori** (Fejl / Forbedring / Ny funktion) — dropdown
-  - **Prioritet** (Kritisk / Høj / Medium / Lav) — farvekodede knapper
-  - **Berørt bruger** — tekstfelt med navn
-  - **Systemområde** — dropdown (Salg, Vagtplan, Dashboard, Annulleringer, osv.)
-  - **Beskrivelse** — textarea
-  - **Screenshot** — drag-and-drop eller klik-upload
-- Bekræftelse via toast efter indsendelse
+**1. `SystemFeedback.tsx`**
+- Ny fane **"Adgang"** (kun owner) — identisk mønster som "Modtagere"-fanen: søg + tilføj/fjern medarbejdere
+- Liste-fanen: Ikke-owners ser kun egne indrapporteringer (filtreret på `submitted_by`)
+- Indsend-fanen: Virker uændret (RLS sikrer at kun folk med adgang kan indsende)
 
-**2. Liste-visning (for dig/ejer)**
-- Tabel med alle indrapporteringer, sorteret efter prioritet + dato
-- Filtre: kategori, prioritet, status
-- Klik for at se detaljer + screenshot
-- Mulighed for at ændre status og tilføje admin-noter
-- Eksporter-knap så du kan copy-paste direkte ind i Lovable
+**2. `AppSidebar.tsx`**
+- Sidebar-linket "Fejlrapportering" vises kun hvis brugeren er owner ELLER findes i `system_feedback_access`-tabellen
+- Ny query der checker adgang ved sidebar-load
 
-**3. Sidebar-link**
-- Tilføj "Fejlrapportering" under administration i sidebar
-
-### Filer der oprettes/ændres
-1. **Migration**: Opret `system_feedback` tabel + storage bucket + RLS
-2. **Ny side**: `src/pages/SystemFeedback.tsx` — formular + liste
-3. **Route**: Tilføj til `src/routes/config.tsx` + `src/routes/pages.ts`
-4. **Sidebar**: Tilføj link i `DashboardSidebar.tsx`
-
-### Simpelhed
-Formularen er designet til at tage under 1 minut at udfylde. Screenshot + brugernavn + beskrivelse giver dig alt du behøver for at fejlsøge direkte i Lovable.
+### Filer der ændres
+1. **Migration** — opret `system_feedback_access` + opdatér insert-policy på `system_feedback`
+2. **`src/pages/SystemFeedback.tsx`** — ny "Adgang"-fane + filtrer liste for ikke-owners
+3. **`src/components/layout/AppSidebar.tsx`** — betinget visning af sidebar-link baseret på adgangstabel
 
