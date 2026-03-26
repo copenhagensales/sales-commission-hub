@@ -320,9 +320,18 @@ serve(async (req) => {
       }
     }
 
-    // 3. Fetch location names
-    const { data: locations } = await supabase.from("location").select("id, name");
+    // 3. Fetch location names + bookable clients
+    const { data: locations } = await supabase.from("location").select("id, name, bookable_client_ids");
     const locMap = new Map((locations || []).map((l: any) => [l.id, l.name]));
+    const locClientMap = new Map<string, string[]>((locations || []).map((l: any) => [l.id, l.bookable_client_ids || []]));
+
+    // 3b. Fetch client names for mapping
+    const { data: clients } = await supabase.from("clients").select("id, name");
+    const clientNameMap = new Map<string, string>((clients || []).map((c: any) => [c.id, c.name]));
+
+    // 3c. Fetch client_campaigns to map campaign_id → client_id
+    const { data: campaigns } = await supabase.from("client_campaigns").select("id, client_id");
+    const campaignClientMap = new Map<string, string>((campaigns || []).map((cc: any) => [cc.id, cc.client_id]));
 
     // 4. Fetch employee names
     const sellerIds = [...new Set((sales || []).map((s: any) => s.raw_payload?.fm_seller_id).filter(Boolean))];
