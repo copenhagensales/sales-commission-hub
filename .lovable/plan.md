@@ -1,41 +1,30 @@
 
 
-## Tilføj forretningsregler til FM Profit Agent
+## Tilføj mulighed for at ændre datoer på hotel-bookinger
 
-### Hvad skal ændres
-Profit Agent'en kender i dag ikke til tre vigtige FM-regler:
+### Hvad
+I `HotelTabContent` (inden i EditBookingDialog) kan man i dag kun redigere pris, status, bekræftelsesnummer og bemærkninger. Check-in og check-out datoer kan ikke ændres uden at åbne "Rediger alle felter"-dialogen. Brugeren vil gerne kunne ændre datoerne direkte — ligesom bil-fanen har en dag-vælger.
 
-1. **Kapacitetskrav**: Der skal altid stå 2 sælgere på hver lokation
-2. **Klient-separation**: Yousee og Eesy FM er forskellige kunder og kan **ikke** blandes på samme lokation
-3. **Lokations-klientbinding**: Hver lokation har en liste over tilladte kunder (`bookable_client_ids`)
+### Ændringer
 
-### Ændring: `supabase/functions/fm-profit-agent/index.ts`
+**Fil: `src/components/vagt-flow/EditBookingDialog.tsx` — `HotelTabContent`**
 
-**1. Hent klient-info til datakontekst**
-- Udvid `location`-query til at inkludere `bookable_client_ids`
-- Hent klientnavne fra `client_campaigns` / `clients`-tabellen, så agenten kan vise "Eesy FM" / "Yousee" i stedet for UUIDs
-- Inkluder klient-info i observations og scores
+1. Tilføj `checkIn` og `checkOut` som redigerbare state-felter (ligesom `price`, `status` osv.)
+2. Pre-fill fra `hotelEntry.check_in` / `hotelEntry.check_out`
+3. Tilføj to datoinputs (type="date") i formularen mellem hotel-header og pris-feltet
+4. Inkluder `check_in` og `check_out` i `handleSave` kaldet til `updateBookingHotel.mutateAsync`
 
-**2. Tilføj lokations-klient-mapping i datakontekst**
-- I `formatDataContext()`: Tilføj en sektion der viser hvilke lokationer der tilhører hvilke kunder
-- Marker lokationer der kun kan bruges til én kunde vs. begge
+**Fil: `src/hooks/useBookingHotels.ts` — `useUpdateBookingHotel`**
 
-**3. Opdater system prompt med forretningsregler**
-Tilføj følgende regler til systemprompten (linje ~466):
+5. Udvid mutation-typingen til at acceptere `check_in` og `check_out` som valgfrie felter
 
-```
-### Vigtige forretningsregler for FM-planlægning
-- Hver lokation kræver ALTID 2 sælgere. Man kan ikke sende kun 1 person.
-- Yousee og Eesy FM er helt separate kunder med separate lokationer. De kan IKKE blandes.
-- Hver lokation har en specifik liste af kunder den må bruges til (bookable_client_ids).
-- Når du anbefaler lokationer eller ugeplaner, skal du altid respektere disse begrænsninger.
-- Angiv altid hvilken kunde en lokation tilhører når du nævner den.
-```
+### UI-layout
+Datofelterne placeres i et 2-kolonne grid (ligesom pris/status):
+- **Check-in** (date input) | **Check-out** (date input)
+- Samlet pris | Status
+- Bekræftelsesnummer
+- Bemærkninger
 
-**4. Berig observations med klient-kontekst**
-- Tilføj `clientName` felt til `Observation`-interfacet (udledt fra `client_campaign_id` → klientnavn)
-- Vis klient-navn i datakonteksten så AI'en kan skelne mellem Yousee- og Eesy-lokationer
-
-### Ingen UI-ændringer nødvendige
-Kun edge function opdateres.
+### Ingen databaseændringer
+`booking_hotel`-tabellen har allerede `check_in` og `check_out` kolonner — det handler kun om at eksponere dem i quick-edit UI'et.
 
