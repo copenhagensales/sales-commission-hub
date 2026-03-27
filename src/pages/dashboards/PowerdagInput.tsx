@@ -23,7 +23,11 @@ export default function PowerdagInput() {
   const handleUpdatePoints = async (ruleId: string, val: string) => {
     const pts = parseFloat(val);
     if (isNaN(pts)) return;
-    await supabase.from("powerdag_point_rules").update({ points_per_sale: pts } as any).eq("id", ruleId);
+    const { error } = await supabase.from("powerdag_point_rules").update({ points_per_sale: pts } as any).eq("id", ruleId);
+    if (error) {
+      toast.error("Kunne ikke opdatere point/salg");
+      return;
+    }
     qc.invalidateQueries({ queryKey: ["powerdag-rules", event?.id] });
     toast.success("Point/salg opdateret");
   };
