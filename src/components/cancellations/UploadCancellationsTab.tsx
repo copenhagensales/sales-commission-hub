@@ -992,7 +992,6 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         console.log("[handleMatch] productMatched (after pass 1b FM):", productMatched.length);
 
         // --- PASS 2: Seller + Date + Product fallback for phone-less rows ---
-        const sellerCol = activeConfig?.seller_column;
         const dateCol = activeConfig?.date_column;
         const fallbackMappings: FallbackProductMapping[] = (activeConfig as any)?.fallback_product_mappings || [];
         const unmatchedSellers: UnmatchedSellerRow[] = [];
