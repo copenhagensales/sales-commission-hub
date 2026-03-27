@@ -1,36 +1,27 @@
 
 
-## Fix: Point/salg ændringer gemmes ikke for ikke-owner brugere
+## Tillad oprettelse af vagter på helligdage
 
-### Årsag
-RLS-policyen på `powerdag_point_rules` tillader kun `is_owner()` at opdatere. Oscar har `menu_powerdag_input`-rettighed men er ikke owner, så hans UPDATE fejler stille. Koden tjekker ikke for fejl og viser altid success-toast.
+### Problem
+Kalenderen i "Opret ny vagt" dialogen deaktiverer alle standard-arbejdsdage (f.eks. mandag-fredag), fordi de allerede er dækket af team-standardvagten. Det betyder at helligdage der falder på hverdage (f.eks. juledag på en onsdag) også er deaktiverede — og man kan ikke oprette en manuel vagt på dem.
 
 ### Løsning
+Importér `useDanishHolidays` i `CreateShiftDialog` og tilføj et tjek i `isDateDisabled`: hvis datoen er en helligdag, skal den **ikke** deaktiveres (return false), så brugeren kan vælge den og oprette en vagt.
 
-**1. Database-migration** — Tilføj UPDATE-policy for brugere med powerdag-input adgang
+### Teknisk ændring
 
-Tilføj en ny RLS-policy der tillader authenticated brugere at opdatere `points_per_sale` (alle med adgang til input-siden har rettigheden via permissions-systemet, så vi kan tillade alle authenticated brugere at opdatere — adgangskontrol sker allerede i UI/routing via `menu_powerdag_input`):
+**`src/components/shift-planning/CreateShiftDialog.tsx`**
+1. Importér `useDanishHolidays` fra `@/hooks/useShiftPlanning`
+2. Kald hooket i komponenten
+3. I `isDateDisabled`-funktionen: tilføj et tidligt return `false` hvis datoen matcher en helligdag — før de øvrige tjek for standard-arbejdsdage
 
-```sql
-CREATE POLICY "Authenticated users with input access can update point rules"
-  ON public.powerdag_point_rules FOR UPDATE TO authenticated
-  USING (true) WITH CHECK (true);
+Logik:
+```text
+isDateDisabled(date):
+  1. Har allerede en individuel vagt? → disabled (uændret)
+  2. Er det en helligdag? → IKKE disabled (NY)
+  3. Er det en standard-arbejdsdag? → disabled (uændret)
 ```
 
-**2. `src/pages/dashboards/PowerdagInput.tsx`** — Tilføj fejlhåndtering
-
-Ret `handleUpdatePoints` til at tjekke for fejl fra Supabase og vise korrekt fejl-toast:
-
-```typescript
-const { error } = await supabase.from("powerdag_point_rules")
-  .update({ points_per_sale: pts }).eq("id", ruleId);
-if (error) {
-  toast.error("Kunne ikke opdatere point/salg");
-  return;
-}
-```
-
-### Filer der ændres
-1. **Ny migration** — UPDATE-policy på `powerdag_point_rules`
-2. **PowerdagInput.tsx** — fejlhåndtering i `handleUpdatePoints`
+Ingen database-ændringer. Kun én fil ændres.
 
