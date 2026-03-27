@@ -110,9 +110,16 @@ interface UploadCancellationsTabProps {
 
 function getCaseInsensitive(obj: Record<string, unknown> | undefined, key: string): unknown {
   if (!obj) return undefined;
+  // Exact case-insensitive match first
   const lowerKey = key.toLowerCase();
   for (const k of Object.keys(obj)) {
     if (k.toLowerCase() === lowerKey) return obj[k];
+  }
+  // Fuzzy: ignore hyphens, spaces, dots
+  const normalize = (s: string) => s.toLowerCase().replace(/[-\s.]/g, "");
+  const normKey = normalize(key);
+  for (const k of Object.keys(obj)) {
+    if (normalize(k) === normKey) return obj[k];
   }
   return undefined;
 }
