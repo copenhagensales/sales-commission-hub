@@ -1,0 +1,1 @@
+REVOKE SELECT ON public.mv_daily_sales_stats FROM anon, authenticated;
