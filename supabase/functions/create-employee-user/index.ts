@@ -29,9 +29,35 @@ serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false }
     });
 
+    // Verify caller is authenticated and is manager or above
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Authorization header required" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user: callingUser }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !callingUser) {
+      return new Response(
+        JSON.stringify({ error: "Invalid token" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { data: isManager } = await supabase.rpc("is_manager_or_above", { _user_id: callingUser.id });
+    if (!isManager) {
+      return new Response(
+        JSON.stringify({ error: "Kun ledere kan oprette brugere" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const body: CreateUserRequest = await req.json();
     
-    // Support both camelCase and snake_case field names
     const email = body.email;
     const password = body.password;
     const firstName = body.firstName || body.first_name;
@@ -124,7 +150,7 @@ serve(async (req) => {
     }
 
     // Create auth user
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+    const { data: authData, error: createAuthError } = await supabase.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
@@ -135,10 +161,10 @@ serve(async (req) => {
       }
     });
 
-    if (authError) {
-      console.error("Auth error:", authError);
+    if (createAuthError) {
+      console.error("Auth error:", createAuthError);
       return new Response(
-        JSON.stringify({ error: authError.message }),
+        JSON.stringify({ error: createAuthError.message }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -148,18 +174,11 @@ serve(async (req) => {
     // Assign default "medarbejder" role
     const { error: roleError } = await supabase
       .from("system_roles")
-      .insert({
-        user_id: authData.user.id,
-        role: "medarbejder"
-      });
+      .insert({ user_id: authData.user.id, role: "medarbejder" });
+    if (roleError) console.error("Role assignment error:", roleError);
+    else console.log(`Assigned medarbejder role to user ${authData.user.id}`);
 
-    if (roleError) {
-      console.error("Role assignment error:", roleError);
-    } else {
-      console.log(`Assigned medarbejder role to user ${authData.user.id}`);
-    }
-
-    // Check if employee_master_data record exists, if not create one
+    // Check if employee_master_data record exists
     const { data: existingEmployee } = await supabase
       .from("employee_master_data")
       .select("id")
@@ -167,7 +186,6 @@ serve(async (req) => {
       .maybeSingle();
 
     if (existingEmployee) {
-      // Link auth_user_id on existing employee record
       const { error: linkError } = await supabase
         .from("employee_master_data")
         .update({ auth_user_id: authData.user.id })
@@ -182,24 +200,14 @@ serve(async (req) => {
         is_active: true,
         auth_user_id: authData.user.id,
       };
-      
-      // Add job_title and is_staff_employee if provided
-      if (jobTitle) {
-        employeeData.job_title = jobTitle;
-      }
-      if (isStaffEmployee !== undefined) {
-        employeeData.is_staff_employee = isStaffEmployee;
-      }
+      if (jobTitle) employeeData.job_title = jobTitle;
+      if (isStaffEmployee !== undefined) employeeData.is_staff_employee = isStaffEmployee;
       
       const { error: employeeError } = await supabase
         .from("employee_master_data")
         .insert(employeeData);
-
-      if (employeeError) {
-        console.error("Employee creation error:", employeeError);
-      } else {
-        console.log(`Created employee_master_data record for ${email}`);
-      }
+      if (employeeError) console.error("Employee creation error:", employeeError);
+      else console.log(`Created employee_master_data record for ${email}`);
     }
 
     return new Response(

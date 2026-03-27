@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import DOMPurify from "dompurify";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -457,7 +458,7 @@ export default function ContractSign() {
           <div className="px-8 md:px-12 lg:px-16 py-8">
             <div
               className={CONTRACT_PROSE_SIGN_CLASSES}
-              dangerouslySetInnerHTML={{ __html: contract.content || "" }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(contract.content || "") }}
             />
             {/* Invisible sentinel for scroll tracking */}
             <div ref={contentEndRef} className="h-px" />
