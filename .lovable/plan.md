@@ -1,29 +1,30 @@
 
 
-## Powerdag: Separat visnings- og redigeringsrettighed
+## Fix: Brug upsert i stedet for insert ved oprettelse af rettigheder
 
-### Nuværende tilstand
-- `menu_dashboard_powerdag` findes som permission key, men dashboardet har `globalAccess: true` — så **alle** kan se det uanset rettigheder
-- Ruten `/dashboards/powerdag` er kun `access: "protected"` (kræver login, men ingen specifik rettighed)
-- `menu_powerdag_input` eksisterer allerede og bruges til at vise/skjule redigerings-knapperne + beskytte `/input` og `/admin` ruterne
+### Problem
+Fejlen "duplicate key value violates unique constraint" opstår fordi rækken allerede findes i `role_page_permissions`-tabellen (med en anden kombination af `can_view`/`can_edit`/`visibility`), men koden forsøger at lave en `INSERT`. Det sker typisk når en rettighed tidligere er blevet oprettet men vises som "manglende" i kortet.
 
-### Ændringer
+### Løsning
+Ændr `.insert()` til `.upsert()` med `onConflict: 'role_key,permission_key'` i `handleCreateAndSetAccess`-funktionen. Så vil den opdatere den eksisterende række i stedet for at fejle.
 
-**1. Fjern globalAccess fra Powerdag** (`src/config/dashboards.ts`)
-- Sæt `globalAccess: false` (eller fjern feltet) på powerdag-dashboardet, så det styres af `menu_dashboard_powerdag` rettigheden ligesom de andre dashboards
+### Ændring
 
-**2. Tilføj rettighedscheck på ruten** (`src/routes/config.tsx`)
-- Ændr powerdag-ruten fra `access: "protected"` til `access: "role", positionPermission: "menu_dashboard_powerdag"` — så kun brugere med visningsrettighed kan tilgå siden
+**Fil: `src/components/employees/permissions/PermissionMap.tsx`** (linje 118-128)
 
-**3. Opdater rettighedskortet: Dashboards-specifik logik** (`src/components/employees/permissions/PermissionMap.tsx`)
-- `menu_dashboard_powerdag` bruger allerede det forenklede 2-niveau system (Fuld/Ingen) fra sidste ændring — det passer fint til "kan se dashboardet"
-- `menu_powerdag_input` bevarer også 2 niveauer — "kan redigere point og taste salg"
+Erstat:
+```typescript
+const { error } = await supabase
+  .from("role_page_permissions")
+  .insert({...})
+```
 
-### Resultat
-- **Visning**: Kræver `menu_dashboard_powerdag` rettighed — uden den ser man ikke dashboardet i menuen og kan ikke tilgå det
-- **Redigering**: Kræver derudover `menu_powerdag_input` — giver adgang til at taste salg, rette point/salg-værdier, og admin-siden
-- Begge rettigheder kan tildeles per rolle via rettighedskortet
+Med:
+```typescript
+const { error } = await supabase
+  .from("role_page_permissions")
+  .upsert({...}, { onConflict: 'role_key,permission_key' })
+```
 
-### Risiko
-**Lav** — fjerner kun `globalAccess` og tilføjer et rettighedscheck der allerede bruges af andre dashboards.
+Det er én linje der ændres. Ingen risiko — upsert opfører sig som insert når rækken ikke findes, og som update når den gør.
 
