@@ -747,15 +747,50 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         ? parsedData.filter(row => String(getCaseInsensitive(row.originalRow, filterColumn) ?? "").trim() === filterValue.trim())
         : parsedData;
 
-      console.log("[handleMatch] total rows:", parsedData.length, "after filter:", filteredData.length, "filterCol:", filterColumn, "filterVal:", filterValue);
+      // Filter out junk rows (Total/subtotal/header rows from pivot tables)
+      const sellerCol = activeConfig?.seller_column;
+      const isJunkRow = (row: Record<string, any>): boolean => {
+        const phoneVal = phoneColumn !== "__none__" ? String(getCaseInsensitive(row, phoneColumn) ?? "").trim().toLowerCase() : "";
+        const sellerVal = sellerCol ? String(getCaseInsensitive(row, sellerCol) ?? "").trim().toLowerCase() : "";
+        const companyVal = companyColumn !== "__none__" ? String(getCaseInsensitive(row, companyColumn) ?? "").trim().toLowerCase() : "";
+        const oppVal = oppColumn !== "__none__" ? String(getCaseInsensitive(row, oppColumn) ?? "").trim().toLowerCase() : "";
+        const memberVal = memberNumberColumn !== "__none__" ? String(getCaseInsensitive(row, memberNumberColumn) ?? "").trim().toLowerCase() : "";
 
-      // Extract values from filtered data
+        // Rule 1: phone column contains "total" → junk
+        if (phoneVal === "total" || phoneVal === "subtotal" || phoneVal === "i alt" || phoneVal === "sum") return true;
+
+        // Rule 2: phone column is empty and seller/other columns contain "total" → junk
+        if (!phoneVal) {
+          if (sellerVal === "total" || sellerVal === "subtotal") return true;
+          if (companyVal === "total" || companyVal === "subtotal") return true;
+
+          // Rule 3: phone is empty and no other match-relevant columns have real values → junk
+          const hasAnyMatchValue = sellerVal.length > 0 || companyVal.length > 0 || oppVal.length > 0 || memberVal.length > 0;
+          if (!hasAnyMatchValue) return true;
+        }
+
+        return false;
+      };
+
+      const cleanedData = filteredData.filter(row => !isJunkRow(row.originalRow));
+      const junkRowCount = filteredData.length - cleanedData.length;
+
+      console.log("[handleMatch] total rows:", parsedData.length, "after filter:", filteredData.length, "junk rows removed:", junkRowCount, "clean rows:", cleanedData.length);
+
+      if (junkRowCount > 0) {
+        toast({
+          title: `${junkRowCount} header/total-rækker ignoreret`,
+          description: `${cleanedData.length} datarækker bruges til matching.`,
+        });
+      }
+
+      // Extract values from cleaned data
       const phones: string[] = [];
       const companies: string[] = [];
       const oppNumbers: string[] = [];
       const memberNumbers: string[] = [];
 
-      filteredData.forEach(row => {
+      cleanedData.forEach(row => {
         if (phoneColumn !== "__none__") {
           const pv = getCaseInsensitive(row.originalRow, phoneColumn);
           if (pv) phones.push(normalizePhone(String(pv)));
@@ -860,10 +895,10 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         const matchedSaleProductKeys = new Set<string>(); // saleId|productName dedup
 
         console.log("[handleMatch] PRODUCT-PHONE MATCHING (reversed)");
-        console.log("[handleMatch] candidateSales:", candidateSales.length, "filteredRows:", filteredData.length);
+        console.log("[handleMatch] candidateSales:", candidateSales.length, "cleanedRows:", cleanedData.length);
         console.log("[handleMatch] mappings:", productPhoneMappings);
 
-        filteredData.forEach((row, idx) => {
+        cleanedData.forEach((row, idx) => {
           // Get the single phone from Excel's phoneColumn
           const rawExcelPhone = phoneColumn !== "__none__" ? getCaseInsensitive(row.originalRow, phoneColumn) : null;
           if (!rawExcelPhone) return; // phone-less rows handled in pass 2
@@ -916,7 +951,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
         // --- PASS 1b: FM phone matching via customer_phone directly ---
         // For rows that have a phone but weren't matched in Pass 1 (FM sales don't have raw_payload.data phone fields)
-        filteredData.forEach((row, idx) => {
+        cleanedData.forEach((row, idx) => {
           if (matchedIndicesLocal.has(idx)) return; // already matched in pass 1
 
           const rawExcelPhone = phoneColumn !== "__none__" ? getCaseInsensitive(row.originalRow, phoneColumn) : null;
@@ -957,7 +992,6 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         console.log("[handleMatch] productMatched (after pass 1b FM):", productMatched.length);
 
         // --- PASS 2: Seller + Date + Product fallback for phone-less rows ---
-        const sellerCol = activeConfig?.seller_column;
         const dateCol = activeConfig?.date_column;
         const fallbackMappings: FallbackProductMapping[] = (activeConfig as any)?.fallback_product_mappings || [];
         const unmatchedSellers: UnmatchedSellerRow[] = [];
@@ -1011,7 +1045,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
 
 
-          filteredData.forEach((row, idx) => {
+          cleanedData.forEach((row, idx) => {
             if (matchedIndicesLocal.has(idx)) return; // already matched in pass 1
 
             const rawExcelPhone = phoneColumn !== "__none__" ? getCaseInsensitive(row.originalRow, phoneColumn) : null;
@@ -1191,7 +1225,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       const uploadedRowByCompany = new Map<string, Record<string, unknown>>();
       const uploadedRowByMemberNr = new Map<string, Record<string, unknown>>();
       
-      filteredData.forEach(row => {
+      cleanedData.forEach(row => {
         if (oppColumn !== "__none__") {
           const ov = getCaseInsensitive(row.originalRow, oppColumn);
           if (ov) {
@@ -1236,7 +1270,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       const indexByPhone = new Map<string, number>();
       const indexByCompany = new Map<string, number>();
       const indexByMemberNr = new Map<string, number>();
-      filteredData.forEach((row, idx) => {
+      cleanedData.forEach((row, idx) => {
         if (oppColumn !== "__none__") {
           const ov = getCaseInsensitive(row.originalRow, oppColumn);
           if (ov) {
@@ -1421,10 +1455,31 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     setStep("type");
   };
 
-  // Compute unmatched rows for preview
-  const filteredDataForPreview = (filterColumn !== "__none__" && filterValue.trim())
-    ? parsedData.filter(row => String(row.originalRow[filterColumn] ?? "").trim() === filterValue.trim())
-    : parsedData;
+  // Compute unmatched rows for preview (excluding junk/total rows)
+  const filteredDataForPreview = (() => {
+    const activeConfig = clientConfigs.find(c => c.id === selectedConfigId) || clientConfigs.find(c => c.is_default) || clientConfigs[0];
+    const sc = activeConfig?.seller_column;
+    let data = (filterColumn !== "__none__" && filterValue.trim())
+      ? parsedData.filter(row => String(row.originalRow[filterColumn] ?? "").trim() === filterValue.trim())
+      : parsedData;
+    // Apply same junk row filter
+    data = data.filter(row => {
+      const r = row.originalRow;
+      const phoneVal = phoneColumn !== "__none__" ? String(getCaseInsensitive(r, phoneColumn) ?? "").trim().toLowerCase() : "";
+      const sellerVal = sc ? String(getCaseInsensitive(r, sc) ?? "").trim().toLowerCase() : "";
+      const companyVal = companyColumn !== "__none__" ? String(getCaseInsensitive(r, companyColumn) ?? "").trim().toLowerCase() : "";
+      const oppVal = oppColumn !== "__none__" ? String(getCaseInsensitive(r, oppColumn) ?? "").trim().toLowerCase() : "";
+      const memberVal = memberNumberColumn !== "__none__" ? String(getCaseInsensitive(r, memberNumberColumn) ?? "").trim().toLowerCase() : "";
+      if (phoneVal === "total" || phoneVal === "subtotal" || phoneVal === "i alt" || phoneVal === "sum") return false;
+      if (!phoneVal) {
+        if (sellerVal === "total" || sellerVal === "subtotal") return false;
+        if (companyVal === "total" || companyVal === "subtotal") return false;
+        if (!sellerVal && !companyVal && !oppVal && !memberVal) return false;
+      }
+      return true;
+    });
+    return data;
+  })();
   const unmatchedRows = filteredDataForPreview.filter((_, idx) => !matchedRowIndices.has(idx));
   const unmatchedCount = unmatchedRows.length;
   const [previewTab, setPreviewTab] = useState<"matched" | "unmatched" | "seller_unmatched">("matched");
