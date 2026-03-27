@@ -139,12 +139,13 @@ function computeDiff(
     const val = uploadedData[mapping.revenue_column];
     if (!isIrrelevantValue(val)) {
       const uploadedVal = parseFloat(String(val).replace(/[^0-9.,\-]/g, "").replace(",", "."));
-      if (!isNaN(uploadedVal) && Math.abs(uploadedVal - systemRevenue) > 1) {
+      if (!isNaN(uploadedVal)) {
+        const isDiff = Math.abs(uploadedVal - systemRevenue) > 1;
         diffs.push({
           label: `Omsætning (${mapping.revenue_column})`,
           systemValue: `${systemRevenue.toFixed(0)} kr`,
           uploadedValue: `${uploadedVal.toFixed(0)} kr`,
-          isDifferent: true,
+          isDifferent: isDiff,
         });
       }
     }
@@ -154,12 +155,13 @@ function computeDiff(
     const val = uploadedData[mapping.commission_column];
     if (!isIrrelevantValue(val)) {
       const uploadedVal = parseFloat(String(val).replace(/[^0-9.,\-]/g, "").replace(",", "."));
-      if (!isNaN(uploadedVal) && Math.abs(uploadedVal - systemCommission) > 1) {
+      if (!isNaN(uploadedVal)) {
+        const isDiff = Math.abs(uploadedVal - systemCommission) > 1;
         diffs.push({
           label: `Provision (${mapping.commission_column})`,
           systemValue: `${systemCommission.toFixed(0)} kr`,
           uploadedValue: `${uploadedVal.toFixed(0)} kr`,
-          isDifferent: true,
+          isDifferent: isDiff,
         });
       }
     }
@@ -180,16 +182,13 @@ function computeDiff(
           (si) => normalizeProductName(si.product_name, matchMode) === normalizedCol
         );
         const systemQty = matchedItem?.quantity || 0;
-        if (Math.abs(uploadedQty - systemQty) > 0.01) {
-          diffs.push({ label: colName, systemValue: `${systemQty}`, uploadedValue: `${uploadedQty}`, isDifferent: true });
-        }
+        const isDiff = Math.abs(uploadedQty - systemQty) > 0.01;
+        diffs.push({ label: colName, systemValue: `${systemQty}`, uploadedValue: `${uploadedQty}`, isDifferent: isDiff });
       } else {
         const uploadedProduct = String(val).trim();
         const normalizedUploaded = normalizeProductName(uploadedProduct, matchMode);
         const matchesAny = systemProducts.some((sp) => normalizeProductName(sp, matchMode) === normalizedUploaded);
-        if (!matchesAny && systemProducts.length > 0) {
-          diffs.push({ label: colName, systemValue: systemProducts.join(", ") || "-", uploadedValue: uploadedProduct, isDifferent: true });
-        }
+        diffs.push({ label: colName, systemValue: systemProducts.join(", ") || "-", uploadedValue: uploadedProduct, isDifferent: !matchesAny && systemProducts.length > 0 });
       }
     }
   }
