@@ -1,20 +1,22 @@
 
 
-## Tillad handlinger på helligdage i vagtplan-oversigten
+## Fix: Function Search Path Mutable
 
 ### Problem
-I `ShiftOverview.tsx` er helligdage fuldstændig blokeret:
-1. **Linje 1398**: Helligdags-celler får `cursor-not-allowed` styling
-2. **Linje 1519**: Popover-menuen (med "Opret vagt", "Ferie", "Syg" osv.) vises slet ikke for helligdage (`{!holiday && (...)}`)
+Supabase linter flags functions with `SECURITY DEFINER` that lack an explicit `SET search_path`. Without it, a malicious actor could manipulate the search path to hijack function calls. Two functions are affected:
 
-Brugeren kan derfor ikke oprette vagter, registrere fravær eller gøre noget som helst på helligdage.
+1. **`cleanup_stale_leaderboard_cache()`** — deletes old leaderboard cache rows
+2. **`schedule_integration_sync(...)`** — schedules cron jobs for integration sync
 
-### Løsning
-Ændringer i **`src/pages/shift-planning/ShiftOverview.tsx`**:
+### Solution
+One database migration that adds `SET search_path TO 'public'` to both functions using `CREATE OR REPLACE FUNCTION`.
 
-1. **Fjern `cursor-not-allowed`** fra helligdags-celler (linje 1398) — behold den dæmpede baggrundsfarve men gør cellen klikbar
-2. **Vis popover-menuen på helligdage** (linje 1519) — fjern `!holiday &&` betingelsen så menuen åbnes når man klikker
-3. **Tilføj hover-effekt** på helligdage (linje 1400) — så de også får `hover:bg-muted/30`
+### Technical Details
 
-Kun én fil ændres. Ingen database-ændringer.
+**New migration file** with two `CREATE OR REPLACE FUNCTION` statements:
+
+1. `cleanup_stale_leaderboard_cache()` — add `SET search_path TO 'public'` (body unchanged)
+2. `schedule_integration_sync(...)` — add `SET search_path TO 'public'` (body unchanged, note: this one also references `cron` and `net` schemas, so we may need `SET search_path TO 'public', 'cron', 'net', 'extensions'`)
+
+No code changes needed — migration only.
 
