@@ -1,43 +1,44 @@
 
 
-## Problem: To parallelle rettighedssystemer for dashboards
+## Problem: TDC Erhverv OPP-matching virker ikke
 
-Der er to uafhængige systemer der styrer dashboard-adgang:
+### Årsag
+Den gemte konfiguration "TDC Erhverv Standard" har `opp_column = "OPP nr."` (med mellemrum), men den uploadede Excel-fil har kolonnenavnet `"OPP-nr."` (med bindestreg). 
 
-1. **Rolle-baseret** (Permission Map / `role_page_permissions`): Styrer om en rute kan tilgås — det er her du har givet "Rekruttering" adgang
-2. **Team-baseret** (`team_dashboard_permissions`): Styrer om dashboardet vises i sidebar og dashboard-oversigten — her har Rekrutterings teams **ikke** fået adgang
+`getCaseInsensitive` gør kun case-insensitive opslag — den matcher **ikke** `"opp nr."` med `"opp-nr."`, fordi der er forskel på mellemrum vs. bindestreg. Resultatet er, at **ingen OPP-numre bliver udtrukket** fra Excel-filen, og hele OPP-matchingen springes over → 0 matches.
 
-Når Oscar Belcher (Rekruttering) logger ind, tjekker sidebar og dashboardlisten kun det team-baserede system. Selv om hans rolle har fået grøn dot i Permission Map, vises dashboardet aldrig fordi hans teams ikke har `team_dashboard_permissions`-adgang.
-
-### Løsning: Flet de to systemer i `useAccessibleDashboards`
-
-Udvid `useAccessibleDashboards` så den også tjekker rolle-baserede rettigheder. Hvis brugerens rolle har `can_view: true` for et dashboards `permissionKey`, skal dashboardet vises — uanset team-indstillinger.
+### Løsning
+Gør kolonne-opslaget mere robust, så det også ignorerer forskelle i bindestreg/mellemrum/punktum ved lookup.
 
 ### Ændring
 
-**Fil: `src/hooks/useTeamDashboardPermissions.ts`** — `useAccessibleDashboards`
+**Fil: `src/components/cancellations/UploadCancellationsTab.tsx`**
 
-1. Importer `usePagePermissions` fra `useUnifiedPermissions`
-2. Hent brugerens rolle og tilhørende `role_page_permissions`
-3. I filtreringslogikken: tilføj et ekstra tjek — hvis brugerens rolle har `can_view: true` for dashboardets `permissionKey`, returner `true` (dashboard er synligt)
-4. Det eksisterende team-baserede tjek bevares som fallback
+Opdater `getCaseInsensitive`-funktionen (linje ~111-118) til at normalisere nøgler ved at fjerne bindestreger, mellemrum og punktum før sammenligning:
 
-```text
-Nuværende logik:
-  globalAccess? → ja
-  team_dashboard_permissions match? → ja
-  ellers → nej
-
-Ny logik:
-  globalAccess? → ja
-  role_page_permissions has can_view for permissionKey? → ja
-  team_dashboard_permissions match? → ja
-  ellers → nej
+```typescript
+function getCaseInsensitive(obj: Record<string, unknown> | undefined, key: string): unknown {
+  if (!obj) return undefined;
+  // Exact case-insensitive match first
+  const lowerKey = key.toLowerCase();
+  for (const k of Object.keys(obj)) {
+    if (k.toLowerCase() === lowerKey) return obj[k];
+  }
+  // Fuzzy: ignore hyphens, spaces, dots
+  const normalize = (s: string) => s.toLowerCase().replace(/[-\s.]/g, "");
+  const normKey = normalize(key);
+  for (const k of Object.keys(obj)) {
+    if (normalize(k) === normKey) return obj[k];
+  }
+  return undefined;
+}
 ```
 
+Med denne ændring vil `"OPP nr."`, `"OPP-nr."`, `"OPP nr"` og `"opp-nr"` alle matche hinanden, og TDC Erhverv-matchingen vil fungere igen uanset mindre formateringsforskelle i Excel-kolonnenavne.
+
 ### Berørte filer
-- `src/hooks/useTeamDashboardPermissions.ts` — tilføj rolle-tjek i `useAccessibleDashboards`
+- `src/components/cancellations/UploadCancellationsTab.tsx` — én funktion ændres
 
 ### Risiko
-**Lav** — tilføjer kun en ekstra adgangsvej; eksisterende team-baseret logik forbliver uændret.
+**Meget lav** — fuzzy-matching er kun et fallback efter det eksakte case-insensitive tjek, så eksisterende matches påvirkes ikke.
 
