@@ -22,6 +22,12 @@ function getCaseInsensitive(obj: Record<string, unknown>, key: string): unknown 
   for (const k of Object.keys(obj)) {
     if (k.toLowerCase() === lower) return obj[k];
   }
+  // Fuzzy: ignore hyphens, spaces, dots
+  const normalize = (s: string) => s.toLowerCase().replace(/[-\s.]/g, "");
+  const normKey = normalize(key);
+  for (const k of Object.keys(obj)) {
+    if (normalize(k) === normKey) return obj[k];
+  }
   return undefined;
 }
 
