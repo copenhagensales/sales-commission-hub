@@ -48,6 +48,9 @@ const accessConfig: Record<AccessLevel, { color: string; border: string; label: 
 };
 
 const ACCESS_LEVELS: AccessLevel[] = ["full", "edit", "view", "none"];
+const DASHBOARD_ACCESS_LEVELS: AccessLevel[] = ["full", "none"];
+
+const isDashboardSection = (sectionKey: string) => sectionKey === "menu_section_dashboards";
 
 const sectionOrder = [
   "menu_section_personal", "menu_section_some", "menu_section_personale",
@@ -195,6 +198,7 @@ export function PermissionMap() {
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
                     {pageKeys.map((permKey) => {
                       const label = permissionKeyLabels[permKey] || permKey.replace(/^menu_/, "").replace(/_/g, " ");
+                      const levels = isDashboardSection(sectionKey) ? DASHBOARD_ACCESS_LEVELS : ACCESS_LEVELS;
 
                       return (
                         <div key={permKey} className="border rounded-lg p-2.5 hover:bg-muted/50 transition-colors space-y-2">
@@ -227,7 +231,7 @@ export function PermissionMap() {
                                       <p className="text-xs font-medium px-2 py-1 text-muted-foreground truncate">{role.label} — {label}</p>
                                       <p className="text-[10px] px-2 pb-1 text-muted-foreground/70">Opretter ny rettighed</p>
                                       <div className="space-y-0.5">
-                                        {ACCESS_LEVELS.map((al) => (
+                                        {levels.map((al) => (
                                           <button
                                             key={al}
                                             onClick={() => handleCreateAndSetAccess(role.key, permKey, al)}
@@ -259,7 +263,7 @@ export function PermissionMap() {
                                   <PopoverContent className="w-48 p-1.5" side="bottom" align="start">
                                     <p className="text-xs font-medium px-2 py-1 text-muted-foreground truncate">{role.label} — {label}</p>
                                     <div className="space-y-0.5">
-                                      {ACCESS_LEVELS.map((al) => (
+                                      {levels.map((al) => (
                                         <button
                                           key={al}
                                           onClick={() => handleUpdateAccess(perm.id, al)}
