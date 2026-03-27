@@ -748,9 +748,10 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         : parsedData;
 
       // Filter out junk rows (Total/subtotal/header rows from pivot tables)
+      const sellerCol = activeConfig?.seller_column;
       const isJunkRow = (row: Record<string, any>): boolean => {
         const phoneVal = phoneColumn !== "__none__" ? String(getCaseInsensitive(row, phoneColumn) ?? "").trim().toLowerCase() : "";
-        const sellerVal = sellerColumn !== "__none__" ? String(getCaseInsensitive(row, sellerColumn) ?? "").trim().toLowerCase() : "";
+        const sellerVal = sellerCol ? String(getCaseInsensitive(row, sellerCol) ?? "").trim().toLowerCase() : "";
         const companyVal = companyColumn !== "__none__" ? String(getCaseInsensitive(row, companyColumn) ?? "").trim().toLowerCase() : "";
         const oppVal = oppColumn !== "__none__" ? String(getCaseInsensitive(row, oppColumn) ?? "").trim().toLowerCase() : "";
         const memberVal = memberNumberColumn !== "__none__" ? String(getCaseInsensitive(row, memberNumberColumn) ?? "").trim().toLowerCase() : "";
