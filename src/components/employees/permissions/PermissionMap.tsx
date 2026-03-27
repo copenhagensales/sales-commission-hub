@@ -18,6 +18,7 @@ import {
   generatePermissionCategories,
   getPermissionTypeFromKey,
   SECTION_ICONS,
+  PERMISSION_KEYS,
 } from "@/config/permissionKeys";
 import { cn } from "@/lib/utils";
 
