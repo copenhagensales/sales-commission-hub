@@ -950,6 +950,7 @@ export function SupplierReportTab() {
                     discountPercent: appliedDiscount,
                     discountDescription: appliedRule?.description ?? null,
                     ytdRevenue,
+                    monthlyRevenue: totalAmountNonExcluded,
                     staircaseSteps,
                   },
                   exceptions: (locationExceptions || []).map(exc => ({
