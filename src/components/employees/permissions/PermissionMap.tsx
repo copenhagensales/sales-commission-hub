@@ -231,7 +231,7 @@ export function PermissionMap() {
                                       <p className="text-xs font-medium px-2 py-1 text-muted-foreground truncate">{role.label} — {label}</p>
                                       <p className="text-[10px] px-2 pb-1 text-muted-foreground/70">Opretter ny rettighed</p>
                                       <div className="space-y-0.5">
-                                        {ACCESS_LEVELS.map((al) => (
+                                        {levels.map((al) => (
                                           <button
                                             key={al}
                                             onClick={() => handleCreateAndSetAccess(role.key, permKey, al)}
@@ -263,7 +263,7 @@ export function PermissionMap() {
                                   <PopoverContent className="w-48 p-1.5" side="bottom" align="start">
                                     <p className="text-xs font-medium px-2 py-1 text-muted-foreground truncate">{role.label} — {label}</p>
                                     <div className="space-y-0.5">
-                                      {ACCESS_LEVELS.map((al) => (
+                                      {levels.map((al) => (
                                         <button
                                           key={al}
                                           onClick={() => handleUpdateAccess(perm.id, al)}
