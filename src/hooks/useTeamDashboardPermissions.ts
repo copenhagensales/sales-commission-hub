@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
+import { useUnifiedPermissions, usePagePermissions } from "@/hooks/useUnifiedPermissions";
 import { useTeamAssistantLeaders } from "@/hooks/useTeamAssistantLeaders";
 import { DASHBOARD_LIST, type DashboardConfig } from "@/config/dashboards";
 
@@ -164,8 +164,9 @@ export function useSeedMissingDashboardPermissions() {
 // Hent brugerens tilgængelige dashboards
 export function useAccessibleDashboards() {
   const { user } = useAuth();
-  const { isOwner, isReady } = useUnifiedPermissions();
+  const { isOwner, isReady, role } = useUnifiedPermissions();
   const { data: assistantRelations } = useTeamAssistantLeaders();
+  const { data: rolePermissions } = usePagePermissions();
   
   return useQuery({
     queryKey: ["accessible-dashboards", user?.id, isOwner],
@@ -227,6 +228,14 @@ export function useAccessibleDashboards() {
       const accessibleDashboards = DASHBOARD_LIST.filter(dashboard => {
         // Global dashboards er synlige for alle autentificerede brugere
         if (dashboard.globalAccess) return true;
+        
+        // Rolle-baseret adgang: tjek om brugerens rolle har can_view for dashboardets permissionKey
+        if (dashboard.permissionKey && rolePermissions) {
+          const rolePerm = rolePermissions.find(
+            p => p.role_key === role && p.permission_key === dashboard.permissionKey
+          );
+          if (rolePerm?.can_view) return true;
+        }
         
         const dashboardPerms = permissionMap.get(dashboard.slug) || [];
         
