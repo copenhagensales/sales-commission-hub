@@ -1,32 +1,32 @@
 
 
-## Udspecificér individuelle dashboards i rettighedskortet
+## Fix: Auto-opret manglende permission-rækker ved klik
 
 ### Problem
-Dashboards-sektionen i rettighedskortet viser kun generelle entries ("Dashboards generelt", "Dashboard Administration" osv.), men ikke de **13 individuelle dashboards** (CPH Sales, Fieldmarketing, Eesy TM osv.). Deres permission keys (`menu_dashboard_cph_sales`, `menu_dashboard_fieldmarketing` ...) er defineret i `dashboards.ts` men mangler i `permissionKeys.ts`, som er den kilde rettighedskortet bruger.
+Når en permission-key er defineret i `permissionKeys.ts` men ikke har en tilsvarende række i `role_page_permissions` for en given rolle, vises en grå dot med "Ingen permission-række" og man kan ikke ændre adgangen.
 
 ### Løsning
-Tilføj alle individuelle dashboard permission keys fra `DASHBOARD_LIST` til `PERMISSION_KEYS` i `permissionKeys.ts` under dashboards-sektionen.
+Gør de "tomme" dots klikbare: når man klikker, oprettes rækken automatisk via `INSERT` og det valgte adgangsniveau sættes med det samme.
 
 ### Ændringer
 
-**Fil: `src/config/permissionKeys.ts`**
+**Fil: `src/components/employees/permissions/PermissionMap.tsx`**
 
-Tilføj under dashboards-sektionen (efter `menu_dashboard_settings`):
+1. Tilføj en ny funktion `handleCreateAndSetAccess(roleKey, permKey, parentKey, level)` der:
+   - Kører `supabase.from('role_page_permissions').insert({ role_key, permission_key, parent_key, permission_type: 'page', can_view, can_edit, visibility })`
+   - Invaliderer `['page-permissions']` cache
+   - Viser toast
 
-```
-menu_dashboard_cph_sales:          { label: 'Dagsboard CPH Sales',   section: 'dashboards', parent: 'menu_section_dashboards' },
-menu_dashboard_fieldmarketing:     { label: 'Fieldmarketing',        section: 'dashboards', parent: 'menu_section_dashboards' },
-menu_dashboard_eesy_tm:            { label: 'Eesy TM',              section: 'dashboards', parent: 'menu_section_dashboards' },
-menu_dashboard_tdc_erhverv:        { label: 'TDC Erhverv',          section: 'dashboards', parent: 'menu_section_dashboards' },
-menu_dashboard_relatel:            { label: 'Relatel',              section: 'dashboards', parent: 'menu_section_dashboards' },
-menu_dashboard_united:             { label: 'United',               section: 'dashboards', parent: 'menu_section_dashboards' },
-menu_dashboard_test:               { label: 'Test Dashboard',       section: 'dashboards', parent: 'menu_section_dashboards' },
-menu_dashboard_cs_top_20:          { label: 'CS Top 20',            section: 'dashboards', parent: 'menu_section_dashboards' },
-menu_dashboard_sales_overview_all: { label: 'Salgsoversigt alle',   section: 'dashboards', parent: 'menu_section_dashboards' },
-menu_dashboard_commission_league:  { label: 'Superliga Live',       section: 'dashboards', parent: 'menu_section_dashboards' },
-menu_dashboard_powerdag:           { label: 'Powerdag',             section: 'dashboards', parent: 'menu_section_dashboards' },
-```
+2. Erstat den passive `<Tooltip><span cursor-not-allowed>` (linje 182-190) med en `<Popover>` der viser samme 4 adgangsniveauer som de eksisterende dots — men kalder `handleCreateAndSetAccess` i stedet for `handleUpdateAccess`
 
-Det er **én fil** med additive entries. Rettighedskortet og editoren viser dem automatisk, da begge bruger `generatePermissionCategories()` fra denne fil. Ingen risiko for regression.
+3. Den visuelle dot ændres fra `opacity-50 cursor-not-allowed` til `cursor-pointer` med en stiplet border for at indikere "kan oprettes"
+
+### Resultat
+- Alle dots i kortet bliver klikbare
+- Manglende rækker oprettes on-demand med det valgte adgangsniveau
+- Ændringer synkroniseres automatisk med "Rediger"-fanen via query invalidation
+- Ingen bulk-migration nødvendig — rækker oprettes præcis når de behøves
+
+### Risiko
+**Lav** — bruger samme tabel og RLS-regler som eksisterende insert-logik i PermissionEditor.
 
