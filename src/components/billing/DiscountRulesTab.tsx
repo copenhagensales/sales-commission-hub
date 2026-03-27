@@ -117,6 +117,7 @@ export function DiscountRulesTab() {
         payload.min_placements = parseInt(formData.min_placements);
         payload.min_revenue = null;
       } else {
+        // annual_revenue or monthly_revenue
         payload.min_placements = 0;
         payload.min_revenue = parseFloat(formData.min_revenue);
       }
@@ -280,11 +281,11 @@ export function DiscountRulesTab() {
                     <TableCell className="font-medium">{rule.location_type}</TableCell>
                     <TableCell>
                       <Badge variant="outline">
-                        {rule.discount_type === "annual_revenue" ? "Årsomsætning" : "Placeringer"}
+                        {rule.discount_type === "annual_revenue" ? "Årsomsætning" : rule.discount_type === "monthly_revenue" ? "Månedsomsætning" : "Placeringer"}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      {rule.discount_type === "annual_revenue"
+                      {rule.discount_type === "annual_revenue" || rule.discount_type === "monthly_revenue"
                         ? `${(rule.min_revenue ?? 0).toLocaleString("da-DK")} kr`
                         : `${rule.min_placements} stk`}
                     </TableCell>
@@ -411,6 +412,7 @@ export function DiscountRulesTab() {
                 <SelectContent>
                   <SelectItem value="placements">Placeringer (antal/måned)</SelectItem>
                   <SelectItem value="annual_revenue">Årsomsætning (kr)</SelectItem>
+                  <SelectItem value="monthly_revenue">Månedsomsætning (kr)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -427,12 +429,12 @@ export function DiscountRulesTab() {
                 </div>
               ) : (
                 <div>
-                  <Label>Min. omsætning (kr)</Label>
+                  <Label>{formData.discount_type === "monthly_revenue" ? "Min. månedsomsætning (kr)" : "Min. årsomsætning (kr)"}</Label>
                   <Input
                     type="number"
                     value={formData.min_revenue}
                     onChange={(e) => setFormData((p) => ({ ...p, min_revenue: e.target.value }))}
-                    placeholder="200000"
+                    placeholder={formData.discount_type === "monthly_revenue" ? "100000" : "200000"}
                   />
                 </div>
               )}

@@ -80,6 +80,8 @@ export function downloadSupplierReportPdf(config: SupplierReportPdfConfig) {
   }
 
   const isAnnualRevenue = config.discountType === "annual_revenue";
+  const isMonthlyRevenue = config.discountType === "monthly_revenue";
+  const isRevenueType = isAnnualRevenue || isMonthlyRevenue;
   const showDiscount = config.hasDiscountRules;
 
   const locationRows = config.locations

@@ -442,7 +442,17 @@ export function SupplierReportTab() {
   let appliedRule: DiscountRule | null = null;
 
   if (discountRules && discountRules.length > 0) {
-    if (discountType === "annual_revenue") {
+    if (discountType === "monthly_revenue") {
+      // Monthly revenue: use current period's total non-excluded amount
+      const sortedRules = [...discountRules].sort((a, b) => (b.min_revenue ?? 0) - (a.min_revenue ?? 0));
+      for (const rule of sortedRules) {
+        if (totalAmountNonExcluded >= (rule.min_revenue ?? 0)) {
+          appliedDiscount = Number(rule.discount_percent);
+          appliedRule = rule;
+          break;
+        }
+      }
+    } else if (discountType === "annual_revenue") {
       // Sort by min_revenue desc for staircase lookup
       const sortedRules = [...discountRules].sort((a, b) => (b.min_revenue ?? 0) - (a.min_revenue ?? 0));
       for (const rule of sortedRules) {
@@ -558,8 +568,8 @@ export function SupplierReportTab() {
     return `${format(new Date(minDate), "dd/MM")} - ${format(new Date(maxDate), "dd/MM")}`;
   };
 
-  // Build staircase visualization for annual_revenue
-  const staircaseSteps = discountType === "annual_revenue" && discountRules
+  // Build staircase visualization for revenue-based types
+  const staircaseSteps = (discountType === "annual_revenue" || discountType === "monthly_revenue") && discountRules
     ? [...discountRules].sort((a, b) => (a.min_revenue ?? 0) - (b.min_revenue ?? 0))
     : [];
 
@@ -616,7 +626,7 @@ export function SupplierReportTab() {
         </Card>
       ) : isLoading ? (
         <p className="text-muted-foreground text-center py-8">Indlæser...</p>
-      ) : totalPlacements === 0 ? (
+      ) : locationEntries.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
             Ingen bookinger fundet for {selectedLocationType} i den valgte periode
@@ -756,7 +766,62 @@ export function SupplierReportTab() {
                 <h2 className="text-lg font-semibold">Rabatberegning</h2>
               </div>
 
-              {discountType === "annual_revenue" ? (
+              {discountType === "monthly_revenue" ? (
+                <div className="space-y-4">
+                  {/* Monthly revenue overview */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Månedsomsætning (denne periode)</p>
+                      <p className="text-2xl font-bold">{totalAmountNonExcluded.toLocaleString("da-DK")} kr</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Rabattrin</p>
+                      <p className="text-2xl font-bold">
+                        {appliedDiscount > 0 ? `${appliedDiscount}%` : "Ingen"}
+                      </p>
+                      {appliedRule && (
+                        <p className="text-xs text-muted-foreground">{appliedRule.description}</p>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Rabatbeløb</p>
+                      <p className="text-2xl font-bold text-green-600">
+                        -{totalDiscountAmount.toLocaleString("da-DK")} kr
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total efter rabat</p>
+                      <p className="text-2xl font-bold">{finalAmount.toLocaleString("da-DK")} kr</p>
+                    </div>
+                  </div>
+
+                  {/* Staircase visualization */}
+                  {discountRules && discountRules.length > 0 && (
+                    <div className="border rounded-lg p-4">
+                      <h3 className="text-sm font-medium mb-2">Rabattrappe</h3>
+                      <div className="space-y-2">
+                        {[...discountRules]
+                          .sort((a, b) => (a.min_revenue ?? 0) - (b.min_revenue ?? 0))
+                          .map((rule) => (
+                            <div
+                              key={rule.id}
+                              className={`flex items-center justify-between p-2 rounded ${
+                                appliedRule?.id === rule.id
+                                  ? "bg-primary/10 border border-primary"
+                                  : "bg-muted/50"
+                              }`}
+                            >
+                              <span className="text-sm">
+                                {rule.description || `Fra ${(rule.min_revenue ?? 0).toLocaleString("da-DK")} kr`}
+                              </span>
+                              <span className="font-semibold">{rule.discount_percent}%</span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : discountType === "annual_revenue" ? (
                 <div className="space-y-4">
                   {/* Annual revenue overview */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -792,7 +857,7 @@ export function SupplierReportTab() {
                       <div className="space-y-2">
                         {[...discountRules]
                           .sort((a, b) => (a.min_revenue ?? 0) - (b.min_revenue ?? 0))
-                          .map((rule, idx) => (
+                          .map((rule) => (
                             <div
                               key={rule.id}
                               className={`flex items-center justify-between p-2 rounded ${

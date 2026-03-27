@@ -246,9 +246,26 @@ function BillingOverviewTab() {
       // Calculate placements for this type
       const placements = locs.reduce((s: number, l: any) => s + Math.floor(l.totalDays / minDaysPerLoc), 0);
 
+      // Calculate type-group total for monthly_revenue lookup
+      const typeGroupTotal = locs.reduce((s: number, l: any) => {
+        const locName = l.location?.name?.toLowerCase() || "";
+        const exc = exceptionMap.get(locName);
+        if (exc?.exception_type === "excluded") return s;
+        return s + l.totalAmount;
+      }, 0);
+
       // Find applicable discount
       let appliedDiscount = 0;
-      if (discountType === "annual_revenue") {
+      if (discountType === "monthly_revenue") {
+        // Monthly revenue: use type group's total booking amount
+        const sorted = [...rulesForType].sort((a: any, b: any) => (b.min_revenue ?? 0) - (a.min_revenue ?? 0));
+        for (const rule of sorted) {
+          if (typeGroupTotal >= (rule.min_revenue ?? 0)) {
+            appliedDiscount = Number(rule.discount_percent);
+            break;
+          }
+        }
+      } else if (discountType === "annual_revenue") {
         // For annual_revenue, we'd need YTD data — simplify by using the lowest tier
         const sorted = [...rulesForType].sort((a: any, b: any) => (b.min_revenue ?? 0) - (a.min_revenue ?? 0));
         // Use lowest tier (0 revenue) as approximation since we don't have YTD in this tab
