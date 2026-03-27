@@ -951,7 +951,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
         // --- PASS 1b: FM phone matching via customer_phone directly ---
         // For rows that have a phone but weren't matched in Pass 1 (FM sales don't have raw_payload.data phone fields)
-        filteredData.forEach((row, idx) => {
+        cleanedData.forEach((row, idx) => {
           if (matchedIndicesLocal.has(idx)) return; // already matched in pass 1
 
           const rawExcelPhone = phoneColumn !== "__none__" ? getCaseInsensitive(row.originalRow, phoneColumn) : null;
