@@ -747,9 +747,43 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         ? parsedData.filter(row => String(getCaseInsensitive(row.originalRow, filterColumn) ?? "").trim() === filterValue.trim())
         : parsedData;
 
-      console.log("[handleMatch] total rows:", parsedData.length, "after filter:", filteredData.length, "filterCol:", filterColumn, "filterVal:", filterValue);
+      // Filter out junk rows (Total/subtotal/header rows from pivot tables)
+      const isJunkRow = (row: Record<string, any>): boolean => {
+        const phoneVal = phoneColumn !== "__none__" ? String(getCaseInsensitive(row, phoneColumn) ?? "").trim().toLowerCase() : "";
+        const sellerVal = sellerColumn !== "__none__" ? String(getCaseInsensitive(row, sellerColumn) ?? "").trim().toLowerCase() : "";
+        const companyVal = companyColumn !== "__none__" ? String(getCaseInsensitive(row, companyColumn) ?? "").trim().toLowerCase() : "";
+        const oppVal = oppColumn !== "__none__" ? String(getCaseInsensitive(row, oppColumn) ?? "").trim().toLowerCase() : "";
+        const memberVal = memberNumberColumn !== "__none__" ? String(getCaseInsensitive(row, memberNumberColumn) ?? "").trim().toLowerCase() : "";
 
-      // Extract values from filtered data
+        // Rule 1: phone column contains "total" → junk
+        if (phoneVal === "total" || phoneVal === "subtotal" || phoneVal === "i alt" || phoneVal === "sum") return true;
+
+        // Rule 2: phone column is empty and seller/other columns contain "total" → junk
+        if (!phoneVal) {
+          if (sellerVal === "total" || sellerVal === "subtotal") return true;
+          if (companyVal === "total" || companyVal === "subtotal") return true;
+
+          // Rule 3: phone is empty and no other match-relevant columns have real values → junk
+          const hasAnyMatchValue = sellerVal.length > 0 || companyVal.length > 0 || oppVal.length > 0 || memberVal.length > 0;
+          if (!hasAnyMatchValue) return true;
+        }
+
+        return false;
+      };
+
+      const cleanedData = filteredData.filter(row => !isJunkRow(row.originalRow));
+      const junkRowCount = filteredData.length - cleanedData.length;
+
+      console.log("[handleMatch] total rows:", parsedData.length, "after filter:", filteredData.length, "junk rows removed:", junkRowCount, "clean rows:", cleanedData.length);
+
+      if (junkRowCount > 0) {
+        toast({
+          title: `${junkRowCount} header/total-rækker ignoreret`,
+          description: `${cleanedData.length} datarækker bruges til matching.`,
+        });
+      }
+
+      // Extract values from cleaned data
       const phones: string[] = [];
       const companies: string[] = [];
       const oppNumbers: string[] = [];
