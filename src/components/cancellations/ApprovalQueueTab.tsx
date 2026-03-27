@@ -52,6 +52,7 @@ interface ColumnMapping {
   revenue_column: string | null;
   commission_column: string | null;
   product_match_mode: string;
+  date_column: string | null;
 }
 
 interface SaleItem {
@@ -82,15 +83,55 @@ function isIrrelevantValue(val: unknown): boolean {
   return s === "total" || s === "0" || s === "";
 }
 
+function parseExcelDate(val: unknown): Date | null {
+  if (!val) return null;
+  const s = String(val).trim();
+  // dd/MM/yyyy or dd-MM-yyyy
+  const dmy = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/);
+  if (dmy) {
+    const d = new Date(Number(dmy[3]), Number(dmy[2]) - 1, Number(dmy[1]));
+    return isNaN(d.getTime()) ? null : d;
+  }
+  // yyyy-MM-dd
+  const ymd = s.match(/^(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})/);
+  if (ymd) {
+    const d = new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]));
+    return isNaN(d.getTime()) ? null : d;
+  }
+  // Try native parse
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 function computeDiff(
   uploadedData: Record<string, unknown> | null,
   saleItems: SaleItem[],
   mapping: ColumnMapping | null,
+  saleDate?: string,
 ): DiffField[] {
   if (!uploadedData || Object.keys(uploadedData).length === 0) return [];
   if (!mapping) return [];
 
   const diffs: DiffField[] = [];
+
+  // Date comparison
+  if (mapping.date_column) {
+    const excelRaw = uploadedData[mapping.date_column];
+    const excelDate = parseExcelDate(excelRaw);
+    if (excelDate && saleDate) {
+      const sysDate = new Date(saleDate);
+      const excelStr = format(excelDate, "dd/MM/yyyy");
+      const sysStr = format(sysDate, "dd/MM/yyyy");
+      diffs.push({
+        label: "Dato",
+        systemValue: sysStr,
+        uploadedValue: excelStr,
+        isDifferent: excelStr !== sysStr,
+      });
+    } else if (excelRaw && !saleDate) {
+      diffs.push({ label: "Dato", systemValue: "-", uploadedValue: String(excelRaw), isDifferent: true });
+    }
+  }
   const systemRevenue = saleItems.reduce((sum, si) => sum + (si.mapped_revenue || 0), 0);
   const systemCommission = saleItems.reduce((sum, si) => sum + (si.mapped_commission || 0), 0);
 
@@ -356,7 +397,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
 
       const [configsResult, productsResult] = await Promise.all([
         configIds.length > 0
-          ? supabase.from("cancellation_upload_configs").select("id, product_columns, revenue_column, commission_column, product_match_mode").in("id", configIds) as any
+          ? supabase.from("cancellation_upload_configs").select("id, product_columns, revenue_column, commission_column, product_match_mode, date_column").in("id", configIds) as any
           : { data: [] },
         productIds.length > 0
           ? fetchByIds<any>("products", "id", productIds, "id, name")
@@ -370,6 +411,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
           revenue_column: cfg.revenue_column,
           commission_column: cfg.commission_column,
           product_match_mode: cfg.product_match_mode || "exact",
+          date_column: cfg.date_column || null,
         });
       }
 
@@ -399,13 +441,14 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
         const uploaded = (item.uploaded_data || null) as Record<string, unknown> | null;
         const configId = imp?.config_id;
         const mapping = configId ? configsMap.get(configId) || null : null;
-        const diffs = computeDiff(uploaded, saleItems, mapping);
+        const saleDateVal = sale?.sale_datetime || "";
+        const diffs = computeDiff(uploaded, saleItems, mapping, saleDateVal);
 
         return {
           ...item,
           opp_group: item.opp_group || null,
           client_id: item.client_id || null,
-          saleDate: sale?.sale_datetime || "",
+          saleDate: saleDateVal,
           agentName: sale?.agent_name || "Ukendt",
           phone: sale?.customer_phone || "",
           company: sale?.customer_company || "",
@@ -443,7 +486,12 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
         const imp = importsMap.get(items[0]?.import_id);
         const configId = imp?.config_id;
         const mapping = configId ? configsMap.get(configId) || null : null;
-        const diffs = computeDiff(uploaded, aggregatedItems, mapping);
+        const earliestDate = items.reduce((earliest, i) => {
+          if (!i.saleDate) return earliest;
+          if (!earliest) return i.saleDate;
+          return i.saleDate < earliest ? i.saleDate : earliest;
+        }, "" as string);
+        const diffs = computeDiff(uploaded, aggregatedItems, mapping, earliestDate);
 
         oppGroups.push({
           oppGroup,
@@ -966,8 +1014,10 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                           {g.diffs.length > 0 ? (
                             <div className="space-y-1">
                               {g.diffs.map((d, idx) => (
-                                <div key={idx} className="p-1 rounded bg-destructive/10 border border-destructive/20">
-                                  <div className="font-medium text-destructive">{d.label}</div>
+                                <div key={idx} className={`p-1 rounded border ${d.isDifferent ? 'bg-destructive/10 border-destructive/20' : 'bg-green-500/10 border-green-500/20'}`}>
+                                  <div className={`font-medium ${d.isDifferent ? 'text-destructive' : 'text-green-600'}`}>
+                                    {d.isDifferent ? '✗' : '✓'} {d.label}
+                                  </div>
                                   <div>System: <span className="font-mono">{d.systemValue}</span></div>
                                   <div>Upload: <span className="font-mono">{d.uploadedValue}</span></div>
                                 </div>
@@ -1081,8 +1131,10 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                           {item.diffs.length > 0 ? (
                             <div className="space-y-1">
                               {item.diffs.map((d, idx) => (
-                                <div key={idx} className="p-1 rounded bg-destructive/10 border border-destructive/20">
-                                  <div className="font-medium text-destructive">{d.label}</div>
+                                <div key={idx} className={`p-1 rounded border ${d.isDifferent ? 'bg-destructive/10 border-destructive/20' : 'bg-green-500/10 border-green-500/20'}`}>
+                                  <div className={`font-medium ${d.isDifferent ? 'text-destructive' : 'text-green-600'}`}>
+                                    {d.isDifferent ? '✗' : '✓'} {d.label}
+                                  </div>
                                   <div>System: <span className="font-mono">{d.systemValue}</span></div>
                                   <div>Upload: <span className="font-mono">{d.uploadedValue}</span></div>
                                 </div>
