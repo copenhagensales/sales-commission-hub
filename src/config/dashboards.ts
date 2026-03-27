@@ -101,6 +101,5 @@ export const DASHBOARD_LIST: DashboardConfig[] = [
     path: "/dashboards/powerdag", 
     description: "Powerdag konkurrence – live team standings med manuel score-input",
     permissionKey: "menu_dashboard_powerdag",
-    globalAccess: true,
   },
 ];
