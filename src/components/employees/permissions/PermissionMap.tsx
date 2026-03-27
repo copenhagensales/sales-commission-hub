@@ -48,6 +48,9 @@ const accessConfig: Record<AccessLevel, { color: string; border: string; label: 
 };
 
 const ACCESS_LEVELS: AccessLevel[] = ["full", "edit", "view", "none"];
+const DASHBOARD_ACCESS_LEVELS: AccessLevel[] = ["full", "none"];
+
+const isDashboardSection = (sectionKey: string) => sectionKey === "menu_section_dashboards";
 
 const sectionOrder = [
   "menu_section_personal", "menu_section_some", "menu_section_personale",
