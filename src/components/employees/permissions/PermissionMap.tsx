@@ -13,6 +13,7 @@ import {
   usePagePermissions,
   permissionKeyLabels,
   type Visibility,
+  type PagePermission,
 } from "@/hooks/useUnifiedPermissions";
 import {
   generatePermissionCategories,
