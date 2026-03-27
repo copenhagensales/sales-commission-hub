@@ -229,6 +229,14 @@ export function useAccessibleDashboards() {
         // Global dashboards er synlige for alle autentificerede brugere
         if (dashboard.globalAccess) return true;
         
+        // Rolle-baseret adgang: tjek om brugerens rolle har can_view for dashboardets permissionKey
+        if (dashboard.permissionKey && rolePermissions) {
+          const rolePerm = rolePermissions.find(
+            p => p.role_key === role && p.permission_key === dashboard.permissionKey
+          );
+          if (rolePerm?.can_view) return true;
+        }
+        
         const dashboardPerms = permissionMap.get(dashboard.slug) || [];
         
         // Tjek hver af brugerens teams
