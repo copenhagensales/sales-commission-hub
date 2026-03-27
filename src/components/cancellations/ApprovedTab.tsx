@@ -14,6 +14,7 @@ import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { getPayrollPeriod } from "@/lib/calculations/dates";
 import { toast } from "sonner";
+import { extractOpp } from "./utils/extractOpp";
 
 interface ApprovedTabProps {
   clientId: string;
@@ -22,11 +23,7 @@ interface ApprovedTabProps {
 type SortKey = "date" | "agent" | "opp" | "type" | "status" | "deduction" | "reviewed_at";
 type SortDir = "asc" | "desc";
 
-function extractOpp(rawPayload: any): string {
-  if (!rawPayload) return "";
-  const opp = rawPayload.opp || rawPayload.OPP || rawPayload.opportunity_id || rawPayload.reference || "";
-  return String(opp);
-}
+// extractOpp imported from shared utility
 
 export function ApprovedTab({ clientId }: ApprovedTabProps) {
   const { resolve } = useAgentNameResolver();

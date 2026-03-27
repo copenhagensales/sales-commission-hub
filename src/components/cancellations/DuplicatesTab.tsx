@@ -38,23 +38,15 @@ import { da } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { EditCartDialog } from "./EditCartDialog";
 import { CLIENT_IDS } from "@/utils/clientIds";
+import { extractOpp } from "./utils/extractOpp";
 
 const DUMMY_PHONES = new Set(["0000000", "00000000", "99999999", "", null]);
 
-function extractOpp(raw: Record<string, unknown> | null): string | null {
+// Wrapper returning null instead of "" for backward compat
+function extractOppNullable(raw: Record<string, unknown> | null): string | null {
   if (!raw) return null;
-  const direct = raw["OPP nr"] ?? raw["opp_nr"] ?? raw["legacy_opp_number"];
-  if (direct) return String(direct).trim();
-  const lrd = raw["leadResultData"];
-  if (Array.isArray(lrd)) {
-    for (const item of lrd) {
-      if (item && typeof item === "object") {
-        const val = (item as Record<string, unknown>)["OPP nr"];
-        if (val) return String(val).trim();
-      }
-    }
-  }
-  return null;
+  const result = extractOpp(raw);
+  return result || null;
 }
 
 interface SaleRow {
@@ -157,7 +149,7 @@ export function DuplicatesTab({ clientId: selectedClientId }: DuplicatesTabProps
     for (const sale of sales) {
       let key: string | null = null;
       if (isTdc) {
-        key = extractOpp(sale.raw_payload);
+        key = extractOppNullable(sale.raw_payload);
       } else {
         const phone = sale.customer_phone?.trim();
         if (isValidPhone(phone)) key = phone;

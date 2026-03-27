@@ -12,21 +12,7 @@ import {
 } from "@/components/ui/select";
 import { AlertCircle, Clock, ArrowUpDown, ArrowUp, ArrowDown, Search } from "lucide-react";
 import { format } from "date-fns";
-
-function extractOpp(rawPayload: unknown): string {
-  if (!rawPayload || typeof rawPayload !== "object") return "";
-  const rp = rawPayload as Record<string, unknown>;
-  if (rp["legacy_opp_number"]) return String(rp["legacy_opp_number"]);
-  const fields = rp["leadResultFields"] as Record<string, unknown> | undefined;
-  if (fields?.["OPP nr"]) return String(fields["OPP nr"]);
-  if (fields?.["OPP-nr"]) return String(fields["OPP-nr"]);
-  const dataArr = rp["leadResultData"] as Array<{ label?: string; value?: string }> | undefined;
-  if (Array.isArray(dataArr)) {
-    const found = dataArr.find(d => d.label === "OPP nr" || d.label === "OPP-nr");
-    if (found?.value) return String(found.value);
-  }
-  return "";
-}
+import { extractOpp } from "./utils/extractOpp";
 
 type SortKey = "date" | "agent" | "opp" | "revenue" | "phone" | "company";
 type SortDir = "asc" | "desc";
