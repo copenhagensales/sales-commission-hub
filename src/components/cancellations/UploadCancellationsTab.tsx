@@ -1270,7 +1270,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       const indexByPhone = new Map<string, number>();
       const indexByCompany = new Map<string, number>();
       const indexByMemberNr = new Map<string, number>();
-      filteredData.forEach((row, idx) => {
+      cleanedData.forEach((row, idx) => {
         if (oppColumn !== "__none__") {
           const ov = getCaseInsensitive(row.originalRow, oppColumn);
           if (ov) {
