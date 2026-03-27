@@ -1,46 +1,33 @@
 
-Problem:
-Systemet kan godt finde salget via OPP i “Sales Overview”, men annullerings-matcheren bruger en anden og mere fejlbehæftet OPP-udtrækning.
 
-Bekræftet årsag:
-- TDC Erhverv-konfigurationen matcher på `opp_column = "OPP nr."`.
-- I mindst ét konkret salg (OPP-1073213) ligger den fulde værdi korrekt i `raw_payload.leadResultFields["OPP nr"]` og `leadResultData`.
-- `UploadCancellationsTab` returnerer dog `legacy_opp_number` først, og i dette salg er den værdi trunkeret: `OPP-107321`.
-- Derfor finder søgningen salget, men matching fejler mod Excel-rækken.
-- Jeg kunne også bekræfte, at der er mange TDC-salg hvor `legacy_opp_number` afviger fra den fulde OPP-værdi i payloaden.
+## Tilføj dato-match visning i Godkendelseskøen
 
-Hvorfor søgning virker:
-- “Sales Overview” bruger `search_sales`, som søger i `raw_payload::text`.
-- Den finder derfor den fulde OPP, selv når annullerings-flowet læser den forkerte/trunkerede fallback-værdi.
+### Problem
+Godkendelseskøen viser forskelle på produkter, omsætning og provision — men ikke om datoerne matcher mellem systemets salgsdato og Excel-filens dato.
 
-Plan:
-1. Centralisér OPP-udtræk i en delt helper
-- Opret én fælles utility til OPP-ekstraktion, så alle TDC-relaterede views bruger samme logik.
-- Prioritér fulde payload-felter før legacy-feltet:
-  1) `leadResultFields`
-  2) `leadResultData`
-  3) top-level OPP-nøgler
-  4) `legacy_opp_number` som sidste fallback
-- Brug robust label-matching (`OPP nr`, `OPP-nr`, med/uden punktum).
+### Løsning
+Udvid `computeDiff` og `ColumnMapping` til at inkludere `date_column`, og vis en dato-sammenligning i "Forskelle"-kolonnen.
 
-2. Opdatér matching-flowet
-- Skift `extractOpp` i `src/components/cancellations/UploadCancellationsTab.tsx` til den fælles helper.
-- Match på normaliseret OPP (trim + upper-case), men med korrekt prioritet så trunkerede legacy-værdier ikke vinder.
+### Ændringer
 
-3. Gør visningerne konsistente
-- Erstat lokale `extractOpp`-implementeringer i:
-  - `src/components/cancellations/UnmatchedTab.tsx`
-  - `src/components/cancellations/DuplicatesTab.tsx`
-  - `src/components/cancellations/ApprovedTab.tsx`
-- Så samme salg viser samme OPP overalt i annulleringsmodulet.
+**Fil: `src/components/cancellations/ApprovalQueueTab.tsx`**
 
-4. Verificér målrettet
-- Test det konkrete eksempel `OPP-1073213`.
-- Bekræft at preview nu matcher salget.
-- Bekræft at antallet af umatchede rækker falder.
-- Tjek at Dubletter, Afventer og Godkendte viser samme OPP-værdi.
+1. **Udvid config-fetch** (linje 359): Tilføj `date_column` til SELECT-query fra `cancellation_upload_configs`.
 
-Tekniske noter:
-- Ingen databaseændringer er nødvendige.
-- Dette er primært en logikfejl i prioriteringen af OPP-kilder.
-- Den sikre løsning er ikke bare “mere fuzzy matching”, men at bruge den rigtige kilde først og gøre logikken ens på tværs af komponenterne.
+2. **Udvid `ColumnMapping`** (linje 50-55): Tilføj `date_column: string | null`.
+
+3. **Udvid `computeDiff`** (linje 85-157): Tilføj dato-sammenligning:
+   - Hent Excel-dato fra `uploadedData[mapping.date_column]`
+   - Parse til dato-objekt
+   - Sammenlign med salgets `sale_datetime` (kun dato-delen, dd/MM/yyyy)
+   - Tilføj en DiffField hvis datoerne er forskellige, eller en "match"-indikation hvis de er ens
+
+4. **Opdater `computeDiff` kald** (linje 402, 446): Send `saleDate` med som parameter, så funktionen har adgang til systemets salgsdato.
+
+5. **Vis dato-match i UI**: I "Forskelle"-kolonnen vises nu også dato-sammenligningen — grøn hvis match, rød hvis afvigelse.
+
+### Teknisk detalje
+- `computeDiff` får en ny parameter: `saleDate: string`
+- Dato-parsing fra Excel håndterer formater som `dd/MM/yyyy`, `dd-MM-yyyy`, `yyyy-MM-dd`
+- For OPP-grupperede rækker bruges den tidligste salgsdato fra gruppen
+
