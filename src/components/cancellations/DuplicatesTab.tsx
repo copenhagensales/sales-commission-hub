@@ -38,11 +38,12 @@ import { da } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { EditCartDialog } from "./EditCartDialog";
 import { CLIENT_IDS } from "@/utils/clientIds";
+import { extractOpp } from "./utils/extractOpp";
 
 const DUMMY_PHONES = new Set(["0000000", "00000000", "99999999", "", null]);
 
-// Use shared extractOpp — returns "" for no match, convert to null for backward compat
-function extractOppLocal(raw: Record<string, unknown> | null): string | null {
+// Wrapper returning null instead of "" for backward compat
+function extractOppNullable(raw: Record<string, unknown> | null): string | null {
   if (!raw) return null;
   const result = extractOpp(raw);
   return result || null;
@@ -148,7 +149,7 @@ export function DuplicatesTab({ clientId: selectedClientId }: DuplicatesTabProps
     for (const sale of sales) {
       let key: string | null = null;
       if (isTdc) {
-        key = extractOpp(sale.raw_payload);
+        key = extractOppNullable(sale.raw_payload);
       } else {
         const phone = sale.customer_phone?.trim();
         if (isValidPhone(phone)) key = phone;

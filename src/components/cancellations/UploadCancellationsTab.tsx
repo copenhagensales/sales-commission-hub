@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
+import { extractOpp } from "./utils/extractOpp";
 import { groupConditionsByProduct, findMatchingProductId } from "@/utils/productConditionMatcher";
 import { formatCurrency } from "@/lib/calculations/formatting";
 import { useAgentNameResolver } from "@/hooks/useAgentNameResolver";

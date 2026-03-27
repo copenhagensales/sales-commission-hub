@@ -14,6 +14,7 @@ import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { getPayrollPeriod } from "@/lib/calculations/dates";
 import { toast } from "sonner";
+import { extractOpp } from "./utils/extractOpp";
 
 interface ApprovedTabProps {
   clientId: string;
