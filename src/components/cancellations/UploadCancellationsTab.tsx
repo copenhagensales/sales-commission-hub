@@ -1153,24 +1153,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         }
       }
 
-      const extractOpp = (rawPayload: unknown): string => {
-        if (!rawPayload || typeof rawPayload !== 'object') return "";
-        const rp = rawPayload as Record<string, unknown>;
-        if (rp['legacy_opp_number']) return String(rp['legacy_opp_number']);
-        const fields = rp['leadResultFields'] as Record<string, unknown> | undefined;
-        if (fields) {
-          const oppVal = getCaseInsensitive(fields, "OPP nr");
-          if (oppVal) return String(oppVal);
-        }
-        const data = rp['leadResultData'] as Array<{label?: string; value?: string}> | undefined;
-        if (Array.isArray(data)) {
-          const normalize = (s: string) => s.toLowerCase().replace(/[-\s.]/g, "");
-          const target = normalize("OPP nr");
-          const found = data.find(d => d.label && normalize(d.label) === target);
-          if (found?.value) return String(found.value);
-        }
-        return "";
-      };
+      // extractOpp is now imported from shared utility
 
       if (oppNumbers.length > 0) {
         const oppSet = new Set(oppNumbers.map(o => o.toUpperCase().trim()));

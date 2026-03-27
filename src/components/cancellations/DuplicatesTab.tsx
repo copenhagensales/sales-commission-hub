@@ -41,20 +41,11 @@ import { CLIENT_IDS } from "@/utils/clientIds";
 
 const DUMMY_PHONES = new Set(["0000000", "00000000", "99999999", "", null]);
 
-function extractOpp(raw: Record<string, unknown> | null): string | null {
+// Use shared extractOpp — returns "" for no match, convert to null for backward compat
+function extractOppLocal(raw: Record<string, unknown> | null): string | null {
   if (!raw) return null;
-  const direct = raw["OPP nr"] ?? raw["opp_nr"] ?? raw["legacy_opp_number"];
-  if (direct) return String(direct).trim();
-  const lrd = raw["leadResultData"];
-  if (Array.isArray(lrd)) {
-    for (const item of lrd) {
-      if (item && typeof item === "object") {
-        const val = (item as Record<string, unknown>)["OPP nr"];
-        if (val) return String(val).trim();
-      }
-    }
-  }
-  return null;
+  const result = extractOpp(raw);
+  return result || null;
 }
 
 interface SaleRow {
