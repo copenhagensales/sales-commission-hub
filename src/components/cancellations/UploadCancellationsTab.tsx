@@ -895,10 +895,10 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         const matchedSaleProductKeys = new Set<string>(); // saleId|productName dedup
 
         console.log("[handleMatch] PRODUCT-PHONE MATCHING (reversed)");
-        console.log("[handleMatch] candidateSales:", candidateSales.length, "filteredRows:", filteredData.length);
+        console.log("[handleMatch] candidateSales:", candidateSales.length, "cleanedRows:", cleanedData.length);
         console.log("[handleMatch] mappings:", productPhoneMappings);
 
-        filteredData.forEach((row, idx) => {
+        cleanedData.forEach((row, idx) => {
           // Get the single phone from Excel's phoneColumn
           const rawExcelPhone = phoneColumn !== "__none__" ? getCaseInsensitive(row.originalRow, phoneColumn) : null;
           if (!rawExcelPhone) return; // phone-less rows handled in pass 2
