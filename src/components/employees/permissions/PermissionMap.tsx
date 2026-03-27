@@ -45,7 +45,7 @@ const accessConfig: Record<AccessLevel, { color: string; border: string; label: 
   full: { color: "bg-green-500", border: "border-green-500/30", label: "Fuld adgang", canView: true, canEdit: true, visibility: "all" },
   edit: { color: "bg-blue-500", border: "border-blue-500/30", label: "Kan redigere", canView: true, canEdit: true, visibility: "team" },
   view: { color: "bg-amber-400", border: "border-amber-400/30", label: "Kun læse", canView: true, canEdit: false, visibility: "self" },
-  none: { color: "bg-muted-foreground/20", border: "border-transparent", label: "Ingen adgang", canView: false, canEdit: false, visibility: "none" },
+  none: { color: "bg-muted-foreground/20", border: "border-transparent", label: "Ingen adgang", canView: false, canEdit: false, visibility: "self" },
 };
 
 const ACCESS_LEVELS: AccessLevel[] = ["full", "edit", "view", "none"];
