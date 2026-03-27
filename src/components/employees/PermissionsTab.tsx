@@ -22,6 +22,7 @@ import {
   type Visibility
 } from "@/hooks/useUnifiedPermissions";
 import { PermissionEditor } from "./permissions/PermissionEditor";
+import { PermissionMap } from "./permissions/PermissionMap";
 import { cn } from "@/lib/utils";
 
 // Visibility icon mapping
@@ -329,6 +330,9 @@ export function PermissionsTab() {
     <Tabs defaultValue="overview" className="space-y-6">
       <TabsList>
         <TabsTrigger value="overview">Oversigt</TabsTrigger>
+        <TabsTrigger value="map" className="gap-2">
+          🗺️ Kort
+        </TabsTrigger>
         <TabsTrigger value="edit" className="gap-2">
           <Settings2 className="h-4 w-4" />
           Rediger
@@ -581,6 +585,10 @@ export function PermissionsTab() {
           </CardContent>
         </Card>
 
+      </TabsContent>
+
+      <TabsContent value="map">
+        <PermissionMap />
       </TabsContent>
 
       <TabsContent value="edit">
