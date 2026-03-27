@@ -128,15 +128,17 @@ export function downloadSupplierReportPdf(config: SupplierReportPdfConfig) {
       : "";
 
   const staircaseHtml =
-    isAnnualRevenue && config.discountInfo.staircaseSteps?.length
+    isRevenueType && config.discountInfo.staircaseSteps?.length
       ? `
       <div class="staircase">
         <h4>Rabattrappe</h4>
         <div class="staircase-row">
           ${config.discountInfo.staircaseSteps
             .map(
-              (s) =>
-                `<div class="staircase-step ${config.discountInfo.ytdRevenue != null && config.discountInfo.ytdRevenue >= s.minRevenue ? "active" : ""}">${s.discountPercent}%<br><span class="step-label">${fmtKr(s.minRevenue)}+</span></div>`
+              (s) => {
+                const lookupValue = isMonthlyRevenue ? config.totals.subtotal : (config.discountInfo.ytdRevenue ?? 0);
+                return `<div class="staircase-step ${lookupValue >= s.minRevenue ? "active" : ""}">${s.discountPercent}%<br><span class="step-label">${fmtKr(s.minRevenue)}+</span></div>`;
+              }
             )
             .join("")}
         </div>
@@ -149,6 +151,27 @@ export function downloadSupplierReportPdf(config: SupplierReportPdfConfig) {
 
   const discountSectionHtml = !showDiscount
     ? ""
+    : isMonthlyRevenue
+    ? `
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <span class="kpi-label">Månedsomsætning (denne periode)</span>
+          <span class="kpi-value">${fmtKr(config.totals.subtotal)}</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Nuværende rabattrin</span>
+          <span class="kpi-value">${config.discountInfo.discountPercent > 0 ? `${config.discountInfo.discountPercent}%` : "Ingen"}</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Samlet rabat (denne md)</span>
+          <span class="kpi-value accent">-${fmtKr(config.totals.discountAmount)}</span>
+        </div>
+        <div class="kpi-card highlight">
+          <span class="kpi-label">Total efter rabat</span>
+          <span class="kpi-value">${fmtKr(config.totals.finalAmount)}</span>
+        </div>
+      </div>
+      ${staircaseHtml}`
     : isAnnualRevenue
     ? `
       <div class="kpi-grid">
