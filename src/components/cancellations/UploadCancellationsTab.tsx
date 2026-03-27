@@ -1455,10 +1455,31 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     setStep("type");
   };
 
-  // Compute unmatched rows for preview
-  const filteredDataForPreview = (filterColumn !== "__none__" && filterValue.trim())
-    ? parsedData.filter(row => String(row.originalRow[filterColumn] ?? "").trim() === filterValue.trim())
-    : parsedData;
+  // Compute unmatched rows for preview (excluding junk/total rows)
+  const filteredDataForPreview = (() => {
+    const activeConfig = clientConfigs.find(c => c.id === selectedConfigId) || clientConfigs.find(c => c.is_default) || clientConfigs[0];
+    const sc = activeConfig?.seller_column;
+    let data = (filterColumn !== "__none__" && filterValue.trim())
+      ? parsedData.filter(row => String(row.originalRow[filterColumn] ?? "").trim() === filterValue.trim())
+      : parsedData;
+    // Apply same junk row filter
+    data = data.filter(row => {
+      const r = row.originalRow;
+      const phoneVal = phoneColumn !== "__none__" ? String(getCaseInsensitive(r, phoneColumn) ?? "").trim().toLowerCase() : "";
+      const sellerVal = sc ? String(getCaseInsensitive(r, sc) ?? "").trim().toLowerCase() : "";
+      const companyVal = companyColumn !== "__none__" ? String(getCaseInsensitive(r, companyColumn) ?? "").trim().toLowerCase() : "";
+      const oppVal = oppColumn !== "__none__" ? String(getCaseInsensitive(r, oppColumn) ?? "").trim().toLowerCase() : "";
+      const memberVal = memberNumberColumn !== "__none__" ? String(getCaseInsensitive(r, memberNumberColumn) ?? "").trim().toLowerCase() : "";
+      if (phoneVal === "total" || phoneVal === "subtotal" || phoneVal === "i alt" || phoneVal === "sum") return false;
+      if (!phoneVal) {
+        if (sellerVal === "total" || sellerVal === "subtotal") return false;
+        if (companyVal === "total" || companyVal === "subtotal") return false;
+        if (!sellerVal && !companyVal && !oppVal && !memberVal) return false;
+      }
+      return true;
+    });
+    return data;
+  })();
   const unmatchedRows = filteredDataForPreview.filter((_, idx) => !matchedRowIndices.has(idx));
   const unmatchedCount = unmatchedRows.length;
   const [previewTab, setPreviewTab] = useState<"matched" | "unmatched" | "seller_unmatched">("matched");
