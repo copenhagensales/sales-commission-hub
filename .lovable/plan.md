@@ -1,33 +1,26 @@
 
 
-## Tilføj dato-match visning i Godkendelseskøen
+## Problem
 
-### Problem
-Godkendelseskøen viser forskelle på produkter, omsætning og provision — men ikke om datoerne matcher mellem systemets salgsdato og Excel-filens dato.
+TDC Erhverv's `cancellation_upload_configs` har `date_column = NULL`. Derfor springer `computeDiff` dato-sammenligningen helt over for TDC-uploads — selvom datokolonnen `Lukkedato` eksisterer i upload-data.
 
-### Løsning
-Udvid `computeDiff` og `ColumnMapping` til at inkludere `date_column`, og vis en dato-sammenligning i "Forskelle"-kolonnen.
+Eksempel fra uploaded_data: `"Lukkedato": "2026-03-12T00:00:00.000Z"`
 
-### Ændringer
+## Løsning
 
-**Fil: `src/components/cancellations/ApprovalQueueTab.tsx`**
+Opdatér TDC Erhverv's config-record til at sætte `date_column = 'Lukkedato'`:
 
-1. **Udvid config-fetch** (linje 359): Tilføj `date_column` til SELECT-query fra `cancellation_upload_configs`.
+```sql
+UPDATE cancellation_upload_configs 
+SET date_column = 'Lukkedato' 
+WHERE client_id = '20744525-7466-4b2c-afa7-6ee09a9112b0';
+```
 
-2. **Udvid `ColumnMapping`** (linje 50-55): Tilføj `date_column: string | null`.
+Det er den eneste ændring. `parseExcelDate` og `computeDiff` håndterer allerede ISO-formatet `2026-01-09T00:00:00.000Z` korrekt via `yyyy-MM-dd` regex-match.
 
-3. **Udvid `computeDiff`** (linje 85-157): Tilføj dato-sammenligning:
-   - Hent Excel-dato fra `uploadedData[mapping.date_column]`
-   - Parse til dato-objekt
-   - Sammenlign med salgets `sale_datetime` (kun dato-delen, dd/MM/yyyy)
-   - Tilføj en DiffField hvis datoerne er forskellige, eller en "match"-indikation hvis de er ens
+### Berørte filer
+- Ingen kodeændringer — kun en database-opdatering.
 
-4. **Opdater `computeDiff` kald** (linje 402, 446): Send `saleDate` med som parameter, så funktionen har adgang til systemets salgsdato.
-
-5. **Vis dato-match i UI**: I "Forskelle"-kolonnen vises nu også dato-sammenligningen — grøn hvis match, rød hvis afvigelse.
-
-### Teknisk detalje
-- `computeDiff` får en ny parameter: `saleDate: string`
-- Dato-parsing fra Excel håndterer formater som `dd/MM/yyyy`, `dd-MM-yyyy`, `yyyy-MM-dd`
-- For OPP-grupperede rækker bruges den tidligste salgsdato fra gruppen
+### Risiko
+**Meget lav** — tilføjer blot den manglende kolonne-mapping som de øvrige klienter allerede har konfigureret.
 
