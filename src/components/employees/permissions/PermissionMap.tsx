@@ -198,6 +198,7 @@ export function PermissionMap() {
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
                     {pageKeys.map((permKey) => {
                       const label = permissionKeyLabels[permKey] || permKey.replace(/^menu_/, "").replace(/_/g, " ");
+                      const levels = isDashboardSection(sectionKey) ? DASHBOARD_ACCESS_LEVELS : ACCESS_LEVELS;
 
                       return (
                         <div key={permKey} className="border rounded-lg p-2.5 hover:bg-muted/50 transition-colors space-y-2">
