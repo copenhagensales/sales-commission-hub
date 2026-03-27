@@ -1,26 +1,32 @@
 
 
-## Problem
+## Tilføj grøn kurv-indikator (som dato)
 
-TDC Erhverv's `cancellation_upload_configs` har `date_column = NULL`. Derfor springer `computeDiff` dato-sammenligningen helt over for TDC-uploads — selvom datokolonnen `Lukkedato` eksisterer i upload-data.
+### Problem
+Dato-sammenligningen viser altid en grøn/rød indikator. Men omsætning, provision og produkter viser kun noget når der **er** en forskel — aldrig en grøn "match".
 
-Eksempel fra uploaded_data: `"Lukkedato": "2026-03-12T00:00:00.000Z"`
+### Løsning
+Udvid `computeDiff` i `ApprovalQueueTab.tsx` så revenue, commission og produkter også pusher en entry med `isDifferent: false` når værdierne matcher. Det giver samme grønne "✓ Omsætning" / "✓ Provision" visning som dato allerede har.
 
-## Løsning
+### Ændringer i `src/components/cancellations/ApprovalQueueTab.tsx`
 
-Opdatér TDC Erhverv's config-record til at sætte `date_column = 'Lukkedato'`:
-
-```sql
-UPDATE cancellation_upload_configs 
-SET date_column = 'Lukkedato' 
-WHERE client_id = '20744525-7466-4b2c-afa7-6ee09a9112b0';
+**Revenue (linje 138-151):** Tilføj `else`-gren der pusher match-entry når `Math.abs(uploadedVal - systemRevenue) <= 1`:
+```typescript
+if (!isNaN(uploadedVal)) {
+  const isDiff = Math.abs(uploadedVal - systemRevenue) > 1;
+  diffs.push({
+    label: `Omsætning (${mapping.revenue_column})`,
+    systemValue: `${systemRevenue.toFixed(0)} kr`,
+    uploadedValue: `${uploadedVal.toFixed(0)} kr`,
+    isDifferent: isDiff,
+  });
+}
 ```
 
-Det er den eneste ændring. `parseExcelDate` og `computeDiff` håndterer allerede ISO-formatet `2026-01-09T00:00:00.000Z` korrekt via `yyyy-MM-dd` regex-match.
+**Commission (linje 153-165):** Samme mønster — altid push, sæt `isDifferent` baseret på sammenligning.
 
-### Berørte filer
-- Ingen kodeændringer — kun en database-opdatering.
+**Produkter (linje 168-195):** For kvantitets-match, push også når `uploadedQty === systemQty`. For produkt-navn match, push med `isDifferent: false` når produktet genkendes.
 
-### Risiko
-**Meget lav** — tilføjer blot den manglende kolonne-mapping som de øvrige klienter allerede har konfigureret.
+### UI
+Ingen ændringer nødvendige — renderingen håndterer allerede `isDifferent: false` med grøn baggrund og ✓-ikon (bruges allerede af dato).
 
