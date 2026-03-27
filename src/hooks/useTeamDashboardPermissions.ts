@@ -164,8 +164,9 @@ export function useSeedMissingDashboardPermissions() {
 // Hent brugerens tilgængelige dashboards
 export function useAccessibleDashboards() {
   const { user } = useAuth();
-  const { isOwner, isReady } = useUnifiedPermissions();
+  const { isOwner, isReady, role } = useUnifiedPermissions();
   const { data: assistantRelations } = useTeamAssistantLeaders();
+  const { data: rolePermissions } = usePagePermissions();
   
   return useQuery({
     queryKey: ["accessible-dashboards", user?.id, isOwner],
