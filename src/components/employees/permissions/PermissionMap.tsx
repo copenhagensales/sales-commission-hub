@@ -116,7 +116,7 @@ export function PermissionMap() {
     const parentKey = permDef?.parent ?? null;
     setUpdating(`${roleKey}-${permKey}`);
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("role_page_permissions")
         .upsert({
           role_key: roleKey,
@@ -126,10 +126,30 @@ export function PermissionMap() {
           can_view: config.canView,
           can_edit: config.canEdit,
           visibility: config.visibility,
-        }, { onConflict: 'role_key,permission_key' });
+        }, { onConflict: 'role_key,permission_key' })
+        .select("*")
+        .single();
 
       if (error) throw error;
-      await queryClient.invalidateQueries({ queryKey: ["page-permissions"] });
+
+      queryClient.setQueryData<PagePermission[]>(["page-permissions"], (current = []) => {
+        const nextPermission = data as PagePermission;
+        const existingIndex = current.findIndex(
+          (permission) =>
+            permission.role_key === nextPermission.role_key &&
+            permission.permission_key === nextPermission.permission_key
+        );
+
+        if (existingIndex === -1) {
+          return [...current, nextPermission];
+        }
+
+        return current.map((permission, index) =>
+          index === existingIndex ? nextPermission : permission
+        );
+      });
+
+      void queryClient.invalidateQueries({ queryKey: ["page-permissions"], refetchType: "active" });
       toast.success("Rettighed oprettet");
     } catch (e: any) {
       toast.error("Kunne ikke oprette: " + (e.message || "Ukendt fejl"));
