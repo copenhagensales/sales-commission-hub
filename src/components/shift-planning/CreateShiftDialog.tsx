@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarIcon, Info } from "lucide-react";
-import { useCreateShift } from "@/hooks/useShiftPlanning";
+import { useCreateShift, useDanishHolidays } from "@/hooks/useShiftPlanning";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -198,6 +198,7 @@ export function CreateShiftDialog({
   const [note, setNote] = useState("");
 
   const createShift = useCreateShift();
+  const { data: holidays } = useDanishHolidays();
   
   // Get the selected employee's team via team_members table
   const { data: employeeTeamId } = useEmployeeTeamId(employeeId || undefined);
@@ -219,6 +220,12 @@ export function CreateShiftDialog({
       if (hasIndividualShift) return true;
     }
     
+    // Allow holidays even if they fall on a standard work day
+    if (holidays?.length) {
+      const isHoliday = holidays.some(h => isSameDay(parseISO(h.date), checkDate));
+      if (isHoliday) return false;
+    }
+
     // Check standard work days (0 = Sunday, 1 = Monday, etc.)
     if (workDaysData.workDays?.length > 0) {
       const dayOfWeek = getDay(checkDate);
