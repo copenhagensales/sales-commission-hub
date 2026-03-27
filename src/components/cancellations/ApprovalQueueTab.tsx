@@ -1014,8 +1014,10 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                           {g.diffs.length > 0 ? (
                             <div className="space-y-1">
                               {g.diffs.map((d, idx) => (
-                                <div key={idx} className="p-1 rounded bg-destructive/10 border border-destructive/20">
-                                  <div className="font-medium text-destructive">{d.label}</div>
+                                <div key={idx} className={`p-1 rounded border ${d.isDifferent ? 'bg-destructive/10 border-destructive/20' : 'bg-green-500/10 border-green-500/20'}`}>
+                                  <div className={`font-medium ${d.isDifferent ? 'text-destructive' : 'text-green-600'}`}>
+                                    {d.isDifferent ? '✗' : '✓'} {d.label}
+                                  </div>
                                   <div>System: <span className="font-mono">{d.systemValue}</span></div>
                                   <div>Upload: <span className="font-mono">{d.uploadedValue}</span></div>
                                 </div>
@@ -1129,8 +1131,10 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                           {item.diffs.length > 0 ? (
                             <div className="space-y-1">
                               {item.diffs.map((d, idx) => (
-                                <div key={idx} className="p-1 rounded bg-destructive/10 border border-destructive/20">
-                                  <div className="font-medium text-destructive">{d.label}</div>
+                                <div key={idx} className={`p-1 rounded border ${d.isDifferent ? 'bg-destructive/10 border-destructive/20' : 'bg-green-500/10 border-green-500/20'}`}>
+                                  <div className={`font-medium ${d.isDifferent ? 'text-destructive' : 'text-green-600'}`}>
+                                    {d.isDifferent ? '✗' : '✓'} {d.label}
+                                  </div>
                                   <div>System: <span className="font-mono">{d.systemValue}</span></div>
                                   <div>Upload: <span className="font-mono">{d.uploadedValue}</span></div>
                                 </div>
