@@ -790,7 +790,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       const oppNumbers: string[] = [];
       const memberNumbers: string[] = [];
 
-      filteredData.forEach(row => {
+      cleanedData.forEach(row => {
         if (phoneColumn !== "__none__") {
           const pv = getCaseInsensitive(row.originalRow, phoneColumn);
           if (pv) phones.push(normalizePhone(String(pv)));
