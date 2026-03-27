@@ -117,7 +117,7 @@ export function PermissionMap() {
     try {
       const { error } = await supabase
         .from("role_page_permissions")
-        .insert({
+        .upsert({
           role_key: roleKey,
           permission_key: permKey,
           parent_key: parentKey,
@@ -125,7 +125,7 @@ export function PermissionMap() {
           can_view: config.canView,
           can_edit: config.canEdit,
           visibility: config.visibility,
-        });
+        }, { onConflict: 'role_key,permission_key' });
 
       if (error) throw error;
       await queryClient.invalidateQueries({ queryKey: ["page-permissions"] });
