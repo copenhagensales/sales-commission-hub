@@ -23,6 +23,33 @@ serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
+    // Verify caller is authenticated and is an owner
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Authorization header required" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user: callingUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    
+    if (authError || !callingUser) {
+      return new Response(
+        JSON.stringify({ error: "Invalid token" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { data: isOwner } = await supabaseAdmin.rpc("is_owner", { _user_id: callingUser.id });
+    if (!isOwner) {
+      return new Response(
+        JSON.stringify({ error: "Kun ejere kan udføre denne handling" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const { email, newPassword } = await req.json() as SetPasswordRequest;
 
     if (!email || !newPassword) {
@@ -39,7 +66,7 @@ serve(async (req) => {
       );
     }
 
-    // Find user by email - paginate through all users to find the one we need
+    // Find user by email - paginate through all users
     let user = null;
     let page = 1;
     const perPage = 1000;
@@ -60,7 +87,6 @@ serve(async (req) => {
       
       user = usersPage.users.find(u => u.email?.toLowerCase() === email.toLowerCase());
       
-      // If we found the user or there are no more pages, break
       if (user || usersPage.users.length < perPage) {
         break;
       }
@@ -72,7 +98,6 @@ serve(async (req) => {
     if (!user) {
       console.log(`User not found, creating new user for: ${email}`);
       
-      // Get employee name from employee_master_data for user metadata
       const { data: employee } = await supabaseAdmin
         .from("employee_master_data")
         .select("first_name, last_name")
@@ -87,9 +112,7 @@ serve(async (req) => {
         email: email,
         password: newPassword,
         email_confirm: true,
-        user_metadata: {
-          name: fullName,
-        }
+        user_metadata: { name: fullName }
       });
 
       if (createError) {
@@ -100,17 +123,12 @@ serve(async (req) => {
         );
       }
 
-      // Assign medarbejder role and link auth_user_id
       if (newUser?.user) {
         const { error: roleError } = await supabaseAdmin
           .from("system_roles")
           .insert({ user_id: newUser.user.id, role: "medarbejder" });
-        
-        if (roleError) {
-          console.error("Error assigning role:", roleError);
-        }
+        if (roleError) console.error("Error assigning role:", roleError);
 
-        // Link auth_user_id on employee record
         const { error: linkError } = await supabaseAdmin
           .from("employee_master_data")
           .update({ auth_user_id: newUser.user.id })
@@ -139,15 +157,11 @@ serve(async (req) => {
       );
     }
 
-    // Update invitation_status and link auth_user_id for the employee
     const { error: statusError } = await supabaseAdmin
       .from("employee_master_data")
       .update({ invitation_status: "completed", auth_user_id: user.id })
       .ilike("private_email", email);
-
-    if (statusError) {
-      console.error("Error updating employee record:", statusError);
-    }
+    if (statusError) console.error("Error updating employee record:", statusError);
 
     return new Response(
       JSON.stringify({ success: true, message: "Adgangskode opdateret" }),

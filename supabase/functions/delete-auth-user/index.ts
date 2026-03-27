@@ -18,6 +18,33 @@ serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false }
     });
 
+    // Verify caller is authenticated and is an owner
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Authorization header required" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user: callingUser }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !callingUser) {
+      return new Response(
+        JSON.stringify({ error: "Invalid token" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { data: isOwner } = await supabase.rpc("is_owner", { _user_id: callingUser.id });
+    if (!isOwner) {
+      return new Response(
+        JSON.stringify({ error: "Kun ejere kan slette brugere" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const { email }: { email: string } = await req.json();
 
     if (!email) {

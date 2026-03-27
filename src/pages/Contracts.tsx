@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import DOMPurify from "dompurify";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -663,7 +664,7 @@ export default function Contracts() {
               </div>
               <div
                 className={`${CONTRACT_PROSE_SIGN_CLASSES} max-w-none rounded-lg shadow-lg p-8 bg-white`}
-                dangerouslySetInnerHTML={{ __html: previewContract?.content || "" }}
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(previewContract?.content || "") }}
               />
               {previewContract?.signatures && previewContract.signatures.length > 0 && (
                 <div className="border-t pt-4">
