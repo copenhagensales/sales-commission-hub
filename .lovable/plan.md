@@ -1,46 +1,36 @@
 
 
-## Ny rabataftale for Danske Shoppingcentre: Månedlig omsætning
+## Fix: Point/salg ændringer gemmes ikke for ikke-owner brugere
 
-### Hvad ændres
-Den eksisterende placerings-baserede rabat for "Danske Shoppingcentre" (11 stk = 10%, 20 stk = 15%) erstattes med en ny **månedlig omsætnings-baseret** rabat:
+### Årsag
+RLS-policyen på `powerdag_point_rules` tillader kun `is_owner()` at opdatere. Oscar har `menu_powerdag_input`-rettighed men er ikke owner, så hans UPDATE fejler stille. Koden tjekker ikke for fejl og viser altid success-toast.
 
-| Månedlig booking-total | Rabat |
-|---|---|
-| 100.000 kr | 10% |
-| 150.000 kr | 15% |
-| 250.000 kr | 20% |
+### Løsning
 
-Rabatten beregnes på den samlede bookingværdi for måneden på tværs af alle lokationer af typen "Danske Shoppingcentre".
+**1. Database-migration** — Tilføj UPDATE-policy for brugere med powerdag-input adgang
 
-### Ny rabattype: `monthly_revenue`
-Systemet har i dag `placements` og `annual_revenue`. Vi tilføjer `monthly_revenue` som ny type — den bruger periodens samlede bookingbeløb (allerede beregnet som `totalAmountNonExcluded`) til at slå rabattrin op.
+Tilføj en ny RLS-policy der tillader authenticated brugere at opdatere `points_per_sale` (alle med adgang til input-siden har rettigheden via permissions-systemet, så vi kan tillade alle authenticated brugere at opdatere — adgangskontrol sker allerede i UI/routing via `menu_powerdag_input`):
 
-### Database-migration
-1. Deaktiver de 2 eksisterende "Danske Shoppingcentre" placement-regler
-2. Indsæt 3 nye regler med `discount_type = 'monthly_revenue'` og `min_revenue` = 100000 / 150000 / 250000
+```sql
+CREATE POLICY "Authenticated users with input access can update point rules"
+  ON public.powerdag_point_rules FOR UPDATE TO authenticated
+  USING (true) WITH CHECK (true);
+```
 
-### Kodeændringer
+**2. `src/pages/dashboards/PowerdagInput.tsx`** — Tilføj fejlhåndtering
 
-**1. `src/components/billing/DiscountRulesTab.tsx`**
-- Tilføj `monthly_revenue` som valgmulighed i rabattype-dropdown ("Månedsomsætning (kr)")
-- Vis `min_revenue`-felt når `monthly_revenue` er valgt (ligesom `annual_revenue`)
-- Vis korrekt badge-tekst "Månedsomsætning" i tabellen
+Ret `handleUpdatePoints` til at tjekke for fejl fra Supabase og vise korrekt fejl-toast:
 
-**2. `src/components/billing/SupplierReportTab.tsx`**
-- Håndter `monthly_revenue` i rabatberegningen: brug `totalAmountNonExcluded` (allerede beregnet) som lookup-værdi mod `min_revenue`-tærsklerne
-- Vis rabattrappe-UI for `monthly_revenue` (genbruger `annual_revenue`-stilen men med label "Månedsomsætning" i stedet for "Kumulativ årsomsætning")
-
-**3. `src/pages/vagt-flow/Billing.tsx`**
-- Håndter `monthly_revenue` i netto-beregningen: brug type-gruppens samlede beløb som lookup mod `min_revenue`-reglerne
-
-**4. `src/utils/supplierReportPdfGenerator.ts`**
-- Tilføj `monthly_revenue` som gyldig `discountType` i PDF-generatoren, vis "Månedsomsætning" som label
+```typescript
+const { error } = await supabase.from("powerdag_point_rules")
+  .update({ points_per_sale: pts }).eq("id", ruleId);
+if (error) {
+  toast.error("Kunne ikke opdatere point/salg");
+  return;
+}
+```
 
 ### Filer der ændres
-1. **Ny migration** — deaktiver gamle DSC-regler, indsæt nye
-2. **DiscountRulesTab.tsx** — ny rabattype i UI
-3. **SupplierReportTab.tsx** — beregning + visning af monthly_revenue
-4. **Billing.tsx** — netto-beregning med monthly_revenue
-5. **supplierReportPdfGenerator.ts** — PDF-label
+1. **Ny migration** — UPDATE-policy på `powerdag_point_rules`
+2. **PowerdagInput.tsx** — fejlhåndtering i `handleUpdatePoints`
 
