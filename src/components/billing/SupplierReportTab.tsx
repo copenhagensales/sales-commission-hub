@@ -917,7 +917,7 @@ export function SupplierReportTab() {
               variant="outline"
               onClick={() => {
                 const monthLabel = periodLabel;
-                const staircaseSteps = discountType === "annual_revenue" && discountRules
+                const staircaseSteps = (discountType === "annual_revenue" || discountType === "monthly_revenue") && discountRules
                   ? [...discountRules].sort((a, b) => (a.min_revenue ?? 0) - (b.min_revenue ?? 0)).map(r => ({ minRevenue: r.min_revenue ?? 0, discountPercent: r.discount_percent }))
                   : [];
 
