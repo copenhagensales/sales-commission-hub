@@ -1,32 +1,49 @@
 
 
-## Tilføj grøn kurv-indikator (som dato)
+## Opret annullerings-opsætning for Tryg
 
 ### Problem
-Dato-sammenligningen viser altid en grøn/rød indikator. Men omsætning, provision og produkter viser kun noget når der **er** en forskel — aldrig en grøn "match".
+Tryg (client_id: `516a3f67-ea6d-4ef0-929d-e3224cc16e22`) har ingen record i `cancellation_upload_configs`, hvilket forhindrer upload af annulleringsfiler.
+
+### Excel-struktur (data_2.xlsx)
+Kolonner: `Kilde`, `Booker_id`, `Årsagsangivelse`, `Indtastet telefonnummer`, `Bookede møder`, `Afholdelse %`
 
 ### Løsning
-Udvid `computeDiff` i `ApprovalQueueTab.tsx` så revenue, commission og produkter også pusher en entry med `isDifferent: false` når værdierne matcher. Det giver samme grønne "✓ Omsætning" / "✓ Provision" visning som dato allerede har.
+Indsæt en standard-konfiguration for Tryg:
 
-### Ændringer i `src/components/cancellations/ApprovalQueueTab.tsx`
-
-**Revenue (linje 138-151):** Tilføj `else`-gren der pusher match-entry når `Math.abs(uploadedVal - systemRevenue) <= 1`:
-```typescript
-if (!isNaN(uploadedVal)) {
-  const isDiff = Math.abs(uploadedVal - systemRevenue) > 1;
-  diffs.push({
-    label: `Omsætning (${mapping.revenue_column})`,
-    systemValue: `${systemRevenue.toFixed(0)} kr`,
-    uploadedValue: `${uploadedVal.toFixed(0)} kr`,
-    isDifferent: isDiff,
-  });
-}
+```sql
+INSERT INTO cancellation_upload_configs (
+  client_id,
+  name,
+  phone_column,
+  seller_column,
+  date_column,
+  product_columns,
+  product_match_mode,
+  is_default
+) VALUES (
+  '516a3f67-ea6d-4ef0-929d-e3224cc16e22',
+  'Tryg Standard',
+  'Indtastet telefonnummer',
+  'Booker_id',
+  NULL,
+  '{}',
+  'phone',
+  true
+);
 ```
 
-**Commission (linje 153-165):** Samme mønster — altid push, sæt `isDifferent` baseret på sammenligning.
+### Konfigurationsvalg
+- **phone_column** = `Indtastet telefonnummer` — matcher mod salgsdata via telefonnummer (normalisering håndteres automatisk)
+- **seller_column** = `Booker_id` — e-mail-adressen bruges til at identificere sælgeren via `cancellation_seller_mappings`
+- **product_match_mode** = `phone` — Tryg matcher per telefonnummer (ét produkt per salg)
+- **date_column** = `NULL` — Excel-filen har ingen salgsdato-kolonne, kun telefonnumre og mødetal
+- **product_columns** = `{}` (tom) — ingen produktkolonne i dette format
+- **filter_column/filter_value** = ikke sat — alle rækker er relevante
 
-**Produkter (linje 168-195):** For kvantitets-match, push også når `uploadedQty === systemQty`. For produkt-navn match, push med `isDifferent: false` når produktet genkendes.
+### Ingen kodeændringer
+Systemet håndterer allerede phone-baseret matching og sælger-mapping. Den manglende config var det eneste problem.
 
-### UI
-Ingen ændringer nødvendige — renderingen håndterer allerede `isDifferent: false` med grøn baggrund og ✓-ikon (bruges allerede af dato).
+### Risiko
+Meget lav — standard config-indsættelse som de øvrige klienter allerede har.
 
