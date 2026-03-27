@@ -1045,7 +1045,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
 
 
-          filteredData.forEach((row, idx) => {
+          cleanedData.forEach((row, idx) => {
             if (matchedIndicesLocal.has(idx)) return; // already matched in pass 1
 
             const rawExcelPhone = phoneColumn !== "__none__" ? getCaseInsensitive(row.originalRow, phoneColumn) : null;
