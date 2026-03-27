@@ -42,6 +42,7 @@ interface SupplierReportPdfConfig {
     discountPercent: number;
     discountDescription: string | null;
     ytdRevenue?: number;
+    monthlyRevenue?: number;
     staircaseSteps?: Array<{ minRevenue: number; discountPercent: number }>;
   };
   exceptions: Array<{ name: string; type: string; maxDiscount: number | null }>;
