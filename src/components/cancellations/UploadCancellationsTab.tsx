@@ -1225,7 +1225,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       const uploadedRowByCompany = new Map<string, Record<string, unknown>>();
       const uploadedRowByMemberNr = new Map<string, Record<string, unknown>>();
       
-      filteredData.forEach(row => {
+      cleanedData.forEach(row => {
         if (oppColumn !== "__none__") {
           const ov = getCaseInsensitive(row.originalRow, oppColumn);
           if (ov) {
