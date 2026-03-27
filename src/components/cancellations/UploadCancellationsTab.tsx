@@ -1158,11 +1158,15 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         const rp = rawPayload as Record<string, unknown>;
         if (rp['legacy_opp_number']) return String(rp['legacy_opp_number']);
         const fields = rp['leadResultFields'] as Record<string, unknown> | undefined;
-        if (fields?.['OPP nr']) return String(fields['OPP nr']);
-        if (fields?.['OPP-nr']) return String(fields['OPP-nr']);
+        if (fields) {
+          const oppVal = getCaseInsensitive(fields, "OPP nr");
+          if (oppVal) return String(oppVal);
+        }
         const data = rp['leadResultData'] as Array<{label?: string; value?: string}> | undefined;
         if (Array.isArray(data)) {
-          const found = data.find(d => d.label === 'OPP nr' || d.label === 'OPP-nr');
+          const normalize = (s: string) => s.toLowerCase().replace(/[-\s.]/g, "");
+          const target = normalize("OPP nr");
+          const found = data.find(d => d.label && normalize(d.label) === target);
           if (found?.value) return String(found.value);
         }
         return "";
