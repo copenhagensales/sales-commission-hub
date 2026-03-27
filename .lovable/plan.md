@@ -1,27 +1,20 @@
 
 
-## Tillad oprettelse af vagter på helligdage
+## Tillad handlinger på helligdage i vagtplan-oversigten
 
 ### Problem
-Kalenderen i "Opret ny vagt" dialogen deaktiverer alle standard-arbejdsdage (f.eks. mandag-fredag), fordi de allerede er dækket af team-standardvagten. Det betyder at helligdage der falder på hverdage (f.eks. juledag på en onsdag) også er deaktiverede — og man kan ikke oprette en manuel vagt på dem.
+I `ShiftOverview.tsx` er helligdage fuldstændig blokeret:
+1. **Linje 1398**: Helligdags-celler får `cursor-not-allowed` styling
+2. **Linje 1519**: Popover-menuen (med "Opret vagt", "Ferie", "Syg" osv.) vises slet ikke for helligdage (`{!holiday && (...)}`)
+
+Brugeren kan derfor ikke oprette vagter, registrere fravær eller gøre noget som helst på helligdage.
 
 ### Løsning
-Importér `useDanishHolidays` i `CreateShiftDialog` og tilføj et tjek i `isDateDisabled`: hvis datoen er en helligdag, skal den **ikke** deaktiveres (return false), så brugeren kan vælge den og oprette en vagt.
+Ændringer i **`src/pages/shift-planning/ShiftOverview.tsx`**:
 
-### Teknisk ændring
+1. **Fjern `cursor-not-allowed`** fra helligdags-celler (linje 1398) — behold den dæmpede baggrundsfarve men gør cellen klikbar
+2. **Vis popover-menuen på helligdage** (linje 1519) — fjern `!holiday &&` betingelsen så menuen åbnes når man klikker
+3. **Tilføj hover-effekt** på helligdage (linje 1400) — så de også får `hover:bg-muted/30`
 
-**`src/components/shift-planning/CreateShiftDialog.tsx`**
-1. Importér `useDanishHolidays` fra `@/hooks/useShiftPlanning`
-2. Kald hooket i komponenten
-3. I `isDateDisabled`-funktionen: tilføj et tidligt return `false` hvis datoen matcher en helligdag — før de øvrige tjek for standard-arbejdsdage
-
-Logik:
-```text
-isDateDisabled(date):
-  1. Har allerede en individuel vagt? → disabled (uændret)
-  2. Er det en helligdag? → IKKE disabled (NY)
-  3. Er det en standard-arbejdsdag? → disabled (uændret)
-```
-
-Ingen database-ændringer. Kun én fil ændres.
+Kun én fil ændres. Ingen database-ændringer.
 
