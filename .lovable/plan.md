@@ -1,57 +1,65 @@
 
 
-## Security Fixes: Ingen Risiko + Lav Risiko
+## Ny fane: "Rettighedskort" — Visuelt overblik over roller og rettigheder
 
-Baseret på vores gennemgang fikserer vi følgende i én omgang. Ingen af ændringerne påvirker brugeroplevelsen.
+### Hvad vi bygger
+En tredje fane i PermissionsTab (ved siden af "Oversigt" og "Rediger") der viser et visuelt **kort/diagram** over alle rettigheder grupperet efter sektioner, med farve-kodede indikatorer per rolle. Formålet er at give et hurtigt overblik uden at skulle scrolle igennem den store matrixtabel.
 
----
+### Design
 
-### 1. XSS-beskyttelse i kontrakter (Ingen risiko)
-Installerer `dompurify` og saniterer al HTML før rendering i:
-- `ContractSign.tsx` (linje 460)
-- `Contracts.tsx` (linje 666)  
-- `SendContractDialog.tsx` (linje 860)
+```text
+┌──────────────────────────────────────────────────────┐
+│  [Oversigt]  [Kort 🗺️]  [Rediger ⚙️]               │
+├──────────────────────────────────────────────────────┤
+│                                                      │
+│  Rolle-filter: [Alle] [Ejer] [Teamleder] [FM Leder] │
+│                                                      │
+│  ┌─ Mit Hjem ────────────────────────────────────┐   │
+│  │  ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ │   │
+│  │  │ Hjem   │ │ H2H    │ │ Liga   │ │ Mål    │ │   │
+│  │  │ 🟢🟢🔵 │ │ 🟢🟡⚪ │ │ 🟢🟢🟢 │ │ 🟢🟡⚪ │ │   │
+│  │  └────────┘ └────────┘ └────────┘ └────────┘ │   │
+│  └───────────────────────────────────────────────┘   │
+│                                                      │
+│  ┌─ Personale ───────────────────────────────────┐   │
+│  │  ┌────────┐ ┌────────┐ ┌────────┐             │   │
+│  │  │Medarb. │ │ Teams  │ │ Login  │             │   │
+│  │  │ 🟢🟢🔵 │ │ 🟢⚪⚪ │ │ 🟢⚪⚪ │             │   │
+│  │  └────────┘ └────────┘ └────────┘             │   │
+│  └───────────────────────────────────────────────┘   │
+│                                                      │
+│  Legende: 🟢 Fuld  🔵 Rediger  🟡 Læs  ⚪ Ingen    │
+└──────────────────────────────────────────────────────┘
+```
 
-Ændring: `dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(content) }}`
+Hver "boks" er en permission-key. Hoverer man på den, viser en tooltip hvilke roller der har adgang og med hvilket scope. Boksen viser farve-dots for de valgte roller.
 
----
+### Teknisk plan
 
-### 2. Sidste Function Search Path (Ingen risiko)
-Én funktion mangler stadig: `get_distinct_sales_sources()`. Migration der tilføjer `SET search_path TO 'public'`.
+**Én ny fil:**
+- `src/components/employees/permissions/PermissionMap.tsx`
 
----
+**Én ændring:**
+- `src/components/employees/PermissionsTab.tsx` — tilføj den tredje tab
 
-### 3. Admin Edge Functions – JWT + rolle-tjek (Lav risiko)
-Tilføjer auth-validering til 3 funktioner så kun managers/owners kan kalde dem:
-- **`set-user-password`** — tilføj JWT-validering + `is_owner` check
-- **`create-employee-user`** — tilføj JWT-validering + `is_manager_or_above` check  
-- **`delete-auth-user`** — tilføj JWT-validering + `is_owner` check
+### Implementeringsdetaljer
 
-Mønsteret kopieres fra `force-password-reset` der allerede gør det korrekt. Frontend sender allerede JWT via `supabase.functions.invoke()`.
+1. **PermissionMap.tsx** komponent:
+   - Bruger eksisterende `useRoleDefinitions()` og `usePagePermissions()` hooks (ingen nye queries)
+   - Bruger `PERMISSION_KEYS` fra `permissionKeys.ts` for hierarki (section → children)
+   - Rolle-filter buttons øverst (toggle hvilke roller der vises)
+   - Grupperer permissions efter `section`/`parent` fra PERMISSION_KEYS
+   - Hver permission vises som et kort/boks med:
+     - Ikon (fra eksisterende `permissionIconMap`)
+     - Dansk label (fra `permissionKeyLabels`)
+     - Farve-dots per synlig rolle: grøn=fuld, blå=edit, gul=view-only, grå=ingen
+   - Tooltip ved hover: viser alle rollers adgang for den permission
+   - Responsive grid layout (4-6 kolonner desktop, 2-3 mobil)
 
----
+2. **PermissionsTab.tsx** ændring:
+   - Tilføj `<TabsTrigger value="map">Kort</TabsTrigger>` mellem Oversigt og Rediger
+   - Tilføj `<TabsContent value="map"><PermissionMap /></TabsContent>`
 
-### 4. RLS på salary_additions (Lav risiko)
-Erstatter `USING(true)` med:
-- **SELECT**: `is_manager_or_above(auth.uid())` — kun ledere kan se løndata
-- **INSERT/UPDATE/DELETE**: `is_owner(auth.uid())` — kun ejere kan ændre
-
----
-
-### 5. RLS på agent_presence (Lav risiko)
-Erstatter den public `USING(true)` policy med:
-- Kun **authenticated** brugere (ikke anon)
-- Medarbejdere kan kun ændre **deres egen** presence-record
-
----
-
-### Teknisk oversigt
-
-| Fix | Type | Filer |
-|-----|------|-------|
-| DOMPurify XSS | npm + kode | 3 tsx-filer |
-| search_path | Migration | 1 SQL |
-| Edge functions auth | Edge functions | 3 index.ts |
-| salary_additions RLS | Migration | 1 SQL |
-| agent_presence RLS | Migration | 1 SQL |
+### Risiko
+**Nul** — rent additiv ændring. Ingen eksisterende funktionalitet ændres.
 
