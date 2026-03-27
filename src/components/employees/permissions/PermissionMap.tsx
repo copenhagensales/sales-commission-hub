@@ -209,13 +209,37 @@ export function PermissionMap() {
                               const isUpdating = updating === perm?.id;
 
                               if (!perm?.id) {
+                                const isCreating = updating === `${role.key}-${permKey}`;
                                 return (
-                                  <Tooltip key={role.key}>
-                                    <TooltipTrigger asChild>
-                                      <span className={cn("inline-block h-3 w-3 rounded-full border cursor-not-allowed opacity-50", accessConfig[level].color, accessConfig[level].border)} />
-                                    </TooltipTrigger>
-                                    <TooltipContent side="bottom"><p className="text-xs">{role.label}: Ingen permission-række</p></TooltipContent>
-                                  </Tooltip>
+                                  <Popover key={role.key}>
+                                    <PopoverTrigger asChild>
+                                      <button
+                                        className={cn(
+                                          "inline-block h-3 w-3 rounded-full border border-dashed cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-primary/50 transition-all",
+                                          accessConfig[level].color,
+                                          "border-muted-foreground/40",
+                                          isCreating && "animate-pulse"
+                                        )}
+                                        title={`${role.label}: Ingen rettighed — klik for at oprette`}
+                                      />
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-48 p-1.5" side="bottom" align="start">
+                                      <p className="text-xs font-medium px-2 py-1 text-muted-foreground truncate">{role.label} — {label}</p>
+                                      <p className="text-[10px] px-2 pb-1 text-muted-foreground/70">Opretter ny rettighed</p>
+                                      <div className="space-y-0.5">
+                                        {ACCESS_LEVELS.map((al) => (
+                                          <button
+                                            key={al}
+                                            onClick={() => handleCreateAndSetAccess(role.key, permKey, al)}
+                                            className="flex items-center gap-2 w-full px-2 py-1.5 rounded text-xs hover:bg-muted transition-colors text-left"
+                                          >
+                                            <span className={cn("inline-block h-2.5 w-2.5 rounded-full shrink-0", accessConfig[al].color)} />
+                                            <span className="flex-1">{accessConfig[al].label}</span>
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </PopoverContent>
+                                  </Popover>
                                 );
                               }
 
