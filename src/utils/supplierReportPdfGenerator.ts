@@ -157,7 +157,7 @@ export function downloadSupplierReportPdf(config: SupplierReportPdfConfig) {
       <div class="kpi-grid">
         <div class="kpi-card">
           <span class="kpi-label">Månedsomsætning (denne periode)</span>
-          <span class="kpi-value">${fmtKr(config.totals.subtotal)}</span>
+          <span class="kpi-value">${fmtKr(config.discountInfo.monthlyRevenue ?? config.totals.subtotal)}</span>
         </div>
         <div class="kpi-card">
           <span class="kpi-label">Nuværende rabattrin</span>
