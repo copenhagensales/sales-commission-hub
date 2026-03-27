@@ -315,7 +315,7 @@ export const PERMISSION_KEYS = {
   menu_email_templates_recruitment: { label: 'E-mail skabeloner (rekruttering)', section: 'legacy', parent: 'menu_section_rekruttering' },
   menu_liga_test_board: { label: 'Liga Test Board', section: 'legacy', parent: 'menu_commission_league' },
   menu_mg_test_dashboard: { label: 'MG Test Dashboard (alias)', section: 'legacy', parent: 'menu_section_mg' },
-  menu_dashboard_mg_test: { label: 'MG Test Dashboard (alias)', section: 'legacy', parent: 'menu_section_dashboards' },
+  // menu_dashboard_mg_test moved to dashboards section above
 } as const;
 
 // ============================================================================
