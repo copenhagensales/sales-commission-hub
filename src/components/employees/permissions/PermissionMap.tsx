@@ -106,6 +106,34 @@ export function PermissionMap() {
     }
   };
 
+  const handleCreateAndSetAccess = async (roleKey: string, permKey: string, level: AccessLevel) => {
+    const config = accessConfig[level];
+    const permDef = PERMISSION_KEYS[permKey as keyof typeof PERMISSION_KEYS];
+    const parentKey = permDef?.parent ?? null;
+    setUpdating(`${roleKey}-${permKey}`);
+    try {
+      const { error } = await supabase
+        .from("role_page_permissions")
+        .insert({
+          role_key: roleKey,
+          permission_key: permKey,
+          parent_key: parentKey,
+          permission_type: "page",
+          can_view: config.canView,
+          can_edit: config.canEdit,
+          visibility: config.visibility,
+        });
+
+      if (error) throw error;
+      await queryClient.invalidateQueries({ queryKey: ["page-permissions"] });
+      toast.success("Rettighed oprettet");
+    } catch (e: any) {
+      toast.error("Kunne ikke oprette: " + (e.message || "Ukendt fejl"));
+    } finally {
+      setUpdating(null);
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
