@@ -1395,9 +1395,9 @@ export default function ShiftOverview() {
                             className={cn(
                               "min-h-[60px] p-2 border-l border-border/40 cursor-pointer transition-colors relative",
                               isToday(day) && "bg-primary/5",
-                              holiday && "bg-muted/40 cursor-not-allowed",
+                              holiday && "bg-muted/40",
                               isWeekendDay && "bg-orange-50/30 dark:bg-orange-950/10",
-                              !holiday && "hover:bg-muted/30"
+                              "hover:bg-muted/30"
                             )}
                           >
                             {/* Missing shift indicator */}
@@ -1516,7 +1516,7 @@ export default function ShiftOverview() {
                             </div>
                           </div>
                         </PopoverTrigger>
-                        {!holiday && (
+                        {(
                           <PopoverContent className="w-48 p-2" align="center" side="bottom">
                             <div className="flex flex-col gap-1">
                               <p className="text-xs font-medium text-muted-foreground px-2 py-1 border-b mb-1">
