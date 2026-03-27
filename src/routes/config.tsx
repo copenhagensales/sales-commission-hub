@@ -338,7 +338,7 @@ export const routes: RouteConfig[] = [
   { path: "/dashboards/cs-top-20", component: CsTop20Dashboard, access: "protected" },
   { path: "/dashboards/sales-overview-all", component: SalesOverviewAll, access: "protected" },
   { path: "/dashboards/commission-league", component: TvLeagueDashboard, access: "protected" },
-  { path: "/dashboards/powerdag", component: PowerdagBoard, access: "protected" },
+  { path: "/dashboards/powerdag", component: PowerdagBoard, access: "role", positionPermission: "menu_dashboard_powerdag" },
   { path: "/dashboards/powerdag/input", component: PowerdagInput, access: "role", positionPermission: "menu_powerdag_input" },
   { path: "/dashboards/powerdag/admin", component: PowerdagAdmin, access: "role", positionPermission: "menu_powerdag_input" },
 
