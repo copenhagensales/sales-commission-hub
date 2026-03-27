@@ -1,65 +1,36 @@
 
 
-## Ny fane: "Rettighedskort" — Visuelt overblik over roller og rettigheder
+## Interaktivt Rettighedskort — Klik for at ændre rettigheder direkte
 
 ### Hvad vi bygger
-En tredje fane i PermissionsTab (ved siden af "Oversigt" og "Rediger") der viser et visuelt **kort/diagram** over alle rettigheder grupperet efter sektioner, med farve-kodede indikatorer per rolle. Formålet er at give et hurtigt overblik uden at skulle scrolle igennem den store matrixtabel.
+Gør rettighedskortet interaktivt, så man kan klikke på en permissions-dot for at ændre adgangsniveauet direkte. Ændringer skrives til samme `role_page_permissions` tabel og invaliderer samme query-cache som "Rediger"-fanen, så begge views er synkroniserede.
 
 ### Design
 
-```text
-┌──────────────────────────────────────────────────────┐
-│  [Oversigt]  [Kort 🗺️]  [Rediger ⚙️]               │
-├──────────────────────────────────────────────────────┤
-│                                                      │
-│  Rolle-filter: [Alle] [Ejer] [Teamleder] [FM Leder] │
-│                                                      │
-│  ┌─ Mit Hjem ────────────────────────────────────┐   │
-│  │  ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ │   │
-│  │  │ Hjem   │ │ H2H    │ │ Liga   │ │ Mål    │ │   │
-│  │  │ 🟢🟢🔵 │ │ 🟢🟡⚪ │ │ 🟢🟢🟢 │ │ 🟢🟡⚪ │ │   │
-│  │  └────────┘ └────────┘ └────────┘ └────────┘ │   │
-│  └───────────────────────────────────────────────┘   │
-│                                                      │
-│  ┌─ Personale ───────────────────────────────────┐   │
-│  │  ┌────────┐ ┌────────┐ ┌────────┐             │   │
-│  │  │Medarb. │ │ Teams  │ │ Login  │             │   │
-│  │  │ 🟢🟢🔵 │ │ 🟢⚪⚪ │ │ 🟢⚪⚪ │             │   │
-│  │  └────────┘ └────────┘ └────────┘             │   │
-│  └───────────────────────────────────────────────┘   │
-│                                                      │
-│  Legende: 🟢 Fuld  🔵 Rediger  🟡 Læs  ⚪ Ingen    │
-└──────────────────────────────────────────────────────┘
-```
+Når man klikker på en dot (rolle+permission), åbnes en lille popover/dropdown med 4 valg:
+- Fuld adgang (can_view + can_edit + visibility=all)
+- Kan redigere (can_view + can_edit + visibility=team/self)
+- Kun læse (can_view, !can_edit)
+- Ingen adgang (!can_view, !can_edit)
 
-Hver "boks" er en permission-key. Hoverer man på den, viser en tooltip hvilke roller der har adgang og med hvilket scope. Boksen viser farve-dots for de valgte roller.
+Ændringen gemmes øjeblikkeligt til databasen (samme mønster som PermissionEditor `togglePermission`). Begge faner opdateres automatisk via `queryClient.invalidateQueries(['page-permissions'])`.
 
 ### Teknisk plan
 
-**Én ny fil:**
-- `src/components/employees/permissions/PermissionMap.tsx`
+**Én fil ændres:** `src/components/employees/permissions/PermissionMap.tsx`
 
-**Én ændring:**
-- `src/components/employees/PermissionsTab.tsx` — tilføj den tredje tab
+Ændringer:
+1. Importer `useMutation`, `useQueryClient` fra tanstack, `supabase` client, `Popover`/`PopoverContent`/`PopoverTrigger` fra UI, og `toast` fra sonner
+2. Erstat passive `<span>` dots med `<PopoverTrigger>` der åbner en lille menu med de 4 adgangsniveauer
+3. Ved klik på et niveau: kør `supabase.from('role_page_permissions').update({ can_view, can_edit, visibility }).eq('id', perm.id)` og invalider `['page-permissions']`
+4. Vis toast ved succes/fejl
+5. Filtrer kun når en enkelt rolle er valgt ELLER vis popover for hver dot uanset
 
-### Implementeringsdetaljer
+Mutation-logik kopieres fra PermissionEditors eksisterende `togglePermission` og `updateRowVisibility` — samme tabel, samme felter, samme invalidation.
 
-1. **PermissionMap.tsx** komponent:
-   - Bruger eksisterende `useRoleDefinitions()` og `usePagePermissions()` hooks (ingen nye queries)
-   - Bruger `PERMISSION_KEYS` fra `permissionKeys.ts` for hierarki (section → children)
-   - Rolle-filter buttons øverst (toggle hvilke roller der vises)
-   - Grupperer permissions efter `section`/`parent` fra PERMISSION_KEYS
-   - Hver permission vises som et kort/boks med:
-     - Ikon (fra eksisterende `permissionIconMap`)
-     - Dansk label (fra `permissionKeyLabels`)
-     - Farve-dots per synlig rolle: grøn=fuld, blå=edit, gul=view-only, grå=ingen
-   - Tooltip ved hover: viser alle rollers adgang for den permission
-   - Responsive grid layout (4-6 kolonner desktop, 2-3 mobil)
-
-2. **PermissionsTab.tsx** ændring:
-   - Tilføj `<TabsTrigger value="map">Kort</TabsTrigger>` mellem Oversigt og Rediger
-   - Tilføj `<TabsContent value="map"><PermissionMap /></TabsContent>`
+### Synkronisering
+Begge tabs bruger `usePagePermissions()` som er cached med `queryKey: ['page-permissions']`. Når kortet opdaterer og kalder `queryClient.invalidateQueries(['page-permissions'])`, opdateres editoren automatisk og omvendt. Ingen ekstra synkronisering nødvendig.
 
 ### Risiko
-**Nul** — rent additiv ændring. Ingen eksisterende funktionalitet ændres.
+**Lav** — bruger præcis samme Supabase-opdateringsmønster som PermissionEditor. Ingen ny tabeladgang, ingen nye RLS-krav. Rent additiv UI-ændring.
 
