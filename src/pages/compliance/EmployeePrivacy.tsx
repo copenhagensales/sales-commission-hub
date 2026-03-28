@@ -5,6 +5,28 @@ import { Shield, Users, Eye, Clock, Scale, ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+
+function OwnerEmail() {
+  const { data: ownerEmail } = useQuery({
+    queryKey: ["owner-email"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("employee_master_data")
+        .select("work_email")
+        .ilike("job_title", "Ejer")
+        .eq("is_active", true)
+        .maybeSingle();
+      return data?.work_email || null;
+    },
+  });
+
+  if (ownerEmail) {
+    return <a href={`mailto:${ownerEmail}`} className="text-primary underline">{ownerEmail}</a>;
+  }
+  return <span>din nærmeste leder</span>;
+}
 
 export default function EmployeePrivacy() {
   const navigate = useNavigate();
@@ -93,14 +115,13 @@ export default function EmployeePrivacy() {
               <span className="flex items-center gap-2"><Eye className="h-4 w-4" /> Adgang til oplysninger</span>
             </AccordionTrigger>
             <AccordionContent className="text-sm text-muted-foreground leading-relaxed space-y-3">
-              <p>Adgang til medarbejderoplysninger gives efter rolle og arbejdsbehov.</p>
-              <p>Som udgangspunkt gælder følgende:</p>
+              <p>Adgang til medarbejderoplysninger gives efter rolle og arbejdsbehov. Systemet anvender rollebaseret adgangsstyring:</p>
               <ul className="list-disc pl-5 space-y-1">
-                <li>medarbejdere kan se egne relevante oplysninger</li>
-                <li>ledere kan se oplysninger for eget team, når det er nødvendigt</li>
-                <li>administratorer kan have bredere adgang, når det er nødvendigt for drift, support, løn eller administration</li>
-                <li>adgang må aldrig være bredere end nødvendigt</li>
+                <li><strong>Medarbejder:</strong> kan se egne oplysninger — løn, provision, vagtplan og personlige data</li>
+                <li><strong>Teamleder:</strong> kan se salgs- og vagtdata for eget teams medarbejdere</li>
+                <li><strong>Ejer/administrator:</strong> fuld adgang til administration, løn, drift og systemkonfiguration</li>
               </ul>
+              <p>Adgang må aldrig være bredere end nødvendigt for den pågældende rolle.</p>
             </AccordionContent>
           </AccordionItem>
 
@@ -109,8 +130,24 @@ export default function EmployeePrivacy() {
               <span className="flex items-center gap-2"><Clock className="h-4 w-4" /> Hvor længe vi opbevarer oplysningerne</span>
             </AccordionTrigger>
             <AccordionContent className="text-sm text-muted-foreground leading-relaxed space-y-3">
-              <p>Vi opbevarer medarbejderoplysninger så længe, det er nødvendigt for ansættelsesforholdet, løn- og provisionshåndtering, dokumentation, opfølgning og andre legitime administrative formål.</p>
-              <p>Hvis bestemte oplysninger indgår i lovpligtig dokumentation, herunder løn- eller regnskabsmateriale, kan de blive opbevaret i længere tid i overensstemmelse med gældende regler.</p>
+              <p>Vi opbevarer medarbejderoplysninger i henhold til følgende retningslinjer:</p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border border-border rounded">
+                  <thead>
+                    <tr className="bg-muted/50">
+                      <th className="text-left p-2 border-b border-border font-medium">Datatype</th>
+                      <th className="text-left p-2 border-b border-border font-medium">Opbevaringstid</th>
+                      <th className="text-left p-2 border-b border-border font-medium">Grundlag</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr><td className="p-2 border-b border-border">Løn- og økonomidata</td><td className="p-2 border-b border-border">5 år</td><td className="p-2 border-b border-border">Bogføringsloven §10</td></tr>
+                    <tr><td className="p-2 border-b border-border">Salgs- og provisionsdata</td><td className="p-2 border-b border-border">5 år</td><td className="p-2 border-b border-border">Bogføringsloven §10</td></tr>
+                    <tr><td className="p-2 border-b border-border">Øvrig medarbejderdata</td><td className="p-2 border-b border-border">Senest 5 år efter fratrædelse</td><td className="p-2 border-b border-border">Legitim interesse</td></tr>
+                    <tr><td className="p-2">Ansøgerdata</td><td className="p-2">6 måneder efter afslag</td><td className="p-2">Samtykke / legitim interesse</td></tr>
+                  </tbody>
+                </table>
+              </div>
             </AccordionContent>
           </AccordionItem>
 
@@ -129,7 +166,7 @@ export default function EmployeePrivacy() {
               </ul>
               <p>
                 Hvis du har spørgsmål til, hvordan dine oplysninger behandles, eller ønsker at gøre brug af dine rettigheder, kan du kontakte{" "}
-                <span className="bg-yellow-200/60 text-yellow-800 px-1 rounded font-medium">[indsæt kontaktperson eller mail]</span>.
+                virksomhedens ejer via <OwnerEmail />.
               </p>
             </AccordionContent>
           </AccordionItem>
