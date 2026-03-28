@@ -5,6 +5,28 @@ import { Shield, Users, Eye, Clock, Scale, ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+
+function OwnerEmail() {
+  const { data: ownerEmail } = useQuery({
+    queryKey: ["owner-email"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("employee_master_data")
+        .select("work_email")
+        .ilike("job_title", "Ejer")
+        .eq("is_active", true)
+        .maybeSingle();
+      return data?.work_email || null;
+    },
+  });
+
+  if (ownerEmail) {
+    return <a href={`mailto:${ownerEmail}`} className="text-primary underline">{ownerEmail}</a>;
+  }
+  return <span>din nærmeste leder</span>;
+}
 
 export default function EmployeePrivacy() {
   const navigate = useNavigate();
