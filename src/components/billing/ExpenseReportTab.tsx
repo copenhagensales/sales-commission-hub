@@ -1,13 +1,12 @@
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Save, Receipt } from "lucide-react";
+import { Receipt } from "lucide-react";
 import { toast } from "sonner";
 import {
   Select,
@@ -60,7 +59,7 @@ export function ExpenseReportTab() {
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(format(now, "yyyy-MM"));
   const [rows, setRows] = useState<ExpenseRow[]>([]);
-  const [isDirty, setIsDirty] = useState(false);
+  const saveTimeoutRef = useRef<NodeJS.Timeout>();
   const queryClient = useQueryClient();
 
   const { periodStart, periodEnd } = useMemo(
@@ -141,32 +140,25 @@ export function ExpenseReportTab() {
         };
       })
     );
-    setIsDirty(false);
+    
   }, [expenses, autoLocationTotal, autoHotelTotal]);
 
-  const saveMutation = useMutation({
-    mutationFn: async () => {
+  const saveSingleMutation = useMutation({
+    mutationFn: async ({ category, amount, note }: { category: string; amount: number; note: string }) => {
       const { data: { user } } = await supabase.auth.getUser();
-      const upserts = rows.map((r) => ({
-        year_month: selectedMonth,
-        category: r.category,
-        amount: r.amount || 0,
-        note: r.note || null,
-        updated_by: user?.id ?? null,
-        updated_at: new Date().toISOString(),
-      }));
-
       const { error } = await (supabase as any)
         .from("billing_manual_expenses")
-        .upsert(upserts, { onConflict: "year_month,category" });
+        .upsert({
+          year_month: selectedMonth,
+          category,
+          amount: amount || 0,
+          note: note || null,
+          updated_by: user?.id ?? null,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "year_month,category" });
       if (error) throw error;
     },
-    onSuccess: () => {
-      toast.success("Udgifter gemt");
-      setIsDirty(false);
-      queryClient.invalidateQueries({ queryKey: ["billing-manual-expenses", selectedMonth] });
-    },
-    onError: () => toast.error("Kunne ikke gemme udgifter"),
+    onError: () => toast.error("Kunne ikke gemme udgift"),
   });
 
   const updateRow = (index: number, field: "amount" | "note", value: string) => {
@@ -177,9 +169,13 @@ export function ExpenseReportTab() {
       } else {
         next[index] = { ...next[index], note: value };
       }
+      const row = next[index];
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = setTimeout(() => {
+        saveSingleMutation.mutate({ category: row.category, amount: row.amount, note: row.note });
+      }, 800);
       return next;
     });
-    setIsDirty(true);
   };
 
   const total = rows.reduce((sum, r) => sum + (r.amount || 0), 0);
@@ -209,10 +205,6 @@ export function ExpenseReportTab() {
         <span className="text-sm text-muted-foreground">
           Lønperiode: {periodStart} → {periodEnd}
         </span>
-        <Button onClick={() => saveMutation.mutate()} disabled={!isDirty || saveMutation.isPending}>
-          <Save className="h-4 w-4 mr-2" />
-          {saveMutation.isPending ? "Gemmer..." : "Gem"}
-        </Button>
       </div>
 
       {/* KPI */}
