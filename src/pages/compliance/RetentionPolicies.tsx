@@ -63,6 +63,50 @@ export default function RetentionPolicies() {
     },
   });
 
+  const { data: dataRetentionPolicies, isLoading: loadingDataPolicies } = useQuery({
+    queryKey: ["data-retention-policies"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("data_retention_policies")
+        .select("*");
+      if (error) throw error;
+      return (data || []) as DataRetentionPolicy[];
+    },
+  });
+
+  const dataUpsertMutation = useMutation({
+    mutationFn: async (params: {
+      data_type: string;
+      retention_days?: number | null;
+      is_active?: boolean;
+      cleanup_mode?: string;
+    }) => {
+      const { data, error } = await supabase
+        .from("data_retention_policies")
+        .upsert(
+          {
+            data_type: params.data_type,
+            display_name: dataRetentionPolicies?.find(p => p.data_type === params.data_type)?.display_name || params.data_type,
+            ...(params.retention_days !== undefined && { retention_days: params.retention_days }),
+            ...(params.is_active !== undefined && { is_active: params.is_active }),
+            ...(params.cleanup_mode !== undefined && { cleanup_mode: params.cleanup_mode }),
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "data_type" }
+        )
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["data-retention-policies"] });
+    },
+    onError: (err: any) => {
+      toast.error("Kunne ikke gemme: " + err.message);
+    },
+  });
+
   const upsertMutation = useMutation({
     mutationFn: async (params: {
       client_campaign_id: string;
