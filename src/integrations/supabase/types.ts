@@ -6489,6 +6489,33 @@ export type Database = {
           },
         ]
       }
+      gdpr_cleanup_log: {
+        Row: {
+          action: string
+          details: Json | null
+          id: string
+          records_affected: number
+          run_at: string
+          triggered_by: string | null
+        }
+        Insert: {
+          action: string
+          details?: Json | null
+          id?: string
+          records_affected?: number
+          run_at?: string
+          triggered_by?: string | null
+        }
+        Update: {
+          action?: string
+          details?: Json | null
+          id?: string
+          records_affected?: number
+          run_at?: string
+          triggered_by?: string | null
+        }
+        Relationships: []
+      }
       gdpr_consents: {
         Row: {
           consent_type: string

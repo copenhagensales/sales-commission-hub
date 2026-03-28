@@ -424,7 +424,109 @@ export default function RetentionPolicies() {
             )}
           </CardContent>
         </Card>
+
+        {/* Sletningshistorik */}
+        <CleanupHistory />
       </div>
     </MainLayout>
+  );
+}
+
+function CleanupHistory() {
+  const { data: logs, isLoading } = useQuery({
+    queryKey: ["gdpr-cleanup-log"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("gdpr_cleanup_log")
+        .select("*")
+        .order("run_at", { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const actionLabels: Record<string, string> = {
+    gdpr_data_export: "Dataudtræk (Art. 15)",
+    gdpr_data_deletion: "Datasletning (Art. 17)",
+    gdpr_data_cleanup: "Automatisk rensning",
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Clock className="h-5 w-5 text-primary" />
+          Sletningshistorik
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <p className="text-muted-foreground text-sm py-8 text-center">Indlæser…</p>
+        ) : !logs?.length ? (
+          <div className="text-center py-8">
+            <Shield className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
+            <p className="text-muted-foreground text-sm">Ingen kørsler endnu</p>
+            <p className="text-muted-foreground text-xs mt-1">
+              Historik vises her når GDPR-funktioner kører
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left">
+                  <th className="py-3 pr-4 font-medium text-muted-foreground">Tidspunkt</th>
+                  <th className="py-3 pr-4 font-medium text-muted-foreground">Handling</th>
+                  <th className="py-3 pr-4 font-medium text-muted-foreground">Berørte poster</th>
+                  <th className="py-3 pr-4 font-medium text-muted-foreground">Kilde</th>
+                  <th className="py-3 font-medium text-muted-foreground">Detaljer</th>
+                </tr>
+              </thead>
+              <tbody>
+                {logs.map((log: any) => (
+                  <tr key={log.id} className="border-b last:border-0 hover:bg-muted/30">
+                    <td className="py-3 pr-4 text-foreground whitespace-nowrap">
+                      {new Date(log.run_at).toLocaleString("da-DK", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </td>
+                    <td className="py-3 pr-4">
+                      <Badge variant="outline" className="text-xs">
+                        {actionLabels[log.action] || log.action}
+                      </Badge>
+                    </td>
+                    <td className="py-3 pr-4 text-foreground">{log.records_affected}</td>
+                    <td className="py-3 pr-4 text-muted-foreground text-xs">{log.triggered_by || "—"}</td>
+                    <td className="py-3">
+                      {log.details ? (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-sm">
+                              <pre className="text-xs whitespace-pre-wrap">
+                                {JSON.stringify(log.details, null, 2)}
+                              </pre>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
