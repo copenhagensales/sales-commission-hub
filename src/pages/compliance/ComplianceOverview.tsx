@@ -71,7 +71,7 @@ export default function ComplianceOverview() {
         </Card>
 
         <div className="grid gap-6 md:grid-cols-3">
-          {cards.map((card) => (
+          {cards.filter((card) => p.canView(card.permKey)).map((card) => (
             <Card
               key={card.href}
               className="cursor-pointer hover:shadow-md transition-all hover:scale-[1.02] group"
