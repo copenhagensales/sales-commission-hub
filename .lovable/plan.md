@@ -1,65 +1,43 @@
 
 
-## Byg GDPR-compliance (5 dele)
+## Implementer 3 GDPR-forbedringer
 
-### Oversigt
-| # | Opgave | Filer |
-|---|--------|-------|
-| 1 | Art. 15 — automatisk dataudtræk | Ny edge function `gdpr-export-data/index.ts` |
-| 2 | Art. 17 — automatisk sletningsworkflow | Ny edge function `gdpr-process-deletion/index.ts` |
-| 4 | Sletningshistorik UI | `RetentionPolicies.tsx` |
-| 5 | DPA-datoer i DataTransferRegistry | `DataTransferRegistry.tsx` |
-| 6 | Kasper som ansvarlig person | `DataTransferRegistry.tsx` + `ComplianceOverview.tsx` |
+### 1. Log samtykketekst ved accept
+Tilføj en `consent_text` kolonne til `gdpr_consents`-tabellen og gem den præcise samtykketekst, som medarbejderen accepterede, ved hvert samtykke.
 
----
+**Database**: Migration der tilføjer `consent_text text` kolonne til `gdpr_consents`.
 
-### 1. Edge function: `gdpr-export-data`
-Ny edge function der:
-- Finder pending `export`-anmodninger i `gdpr_data_requests`
-- For hver: henter medarbejderdata fra `employee_master_data`, `gdpr_consents`, `login_events`, `sales` (via agent_email mapping), `coaching tasks`, `absence_requests` osv.
-- Samler alt i ét JSON-objekt
-- Gemmer JSON som fil i Supabase Storage (bucket: `gdpr-exports`)
-- Opdaterer `gdpr_data_requests.status = 'completed'` og sætter `completed_at`
+**Kode**:
+- `src/components/gdpr/GdprConsentDialog.tsx`: Definer samtykketeksten som en konstant, send den med til `useGiveConsent`.
+- `src/hooks/useGdpr.ts`: Udvid `useGiveConsent` til at modtage og gemme `consentText` i insert.
 
-Kan kaldes manuelt eller fra cron (cron aktiveres ikke nu).
+### 2. DPIA-dokumentationsside
+Ny statisk compliance-side der dokumenterer konsekvensanalyser for højrisiko-behandlinger (CPR, løn, bankdata).
 
-**Database**: Tilføj `completed_at timestamptz` og `export_file_url text` kolonner til `gdpr_data_requests`.
+**Filer**:
+- `src/pages/compliance/DpiaDocumentation.tsx` — Ny side med DPIA for relevante behandlingsaktiviteter (CPR-behandling, lønudregning, rekruttering). Indeholder risikovurdering, foranstaltninger og konklusion.
+- `src/routes/pages.ts` — Tilføj lazy import.
+- `src/routes/config.tsx` — Tilføj route `/compliance/dpia` med `menu_compliance_admin` permission.
+- `src/pages/compliance/ComplianceOverview.tsx` — Tilføj DPIA-kort til cards-arrayet.
 
-### 2. Edge function: `gdpr-process-deletion`
-Ny edge function der:
-- Finder pending `deletion`-anmodninger i `gdpr_data_requests`
-- For hver medarbejder: anonymiserer PII i `employee_master_data` (first_name → "Slettet", last_name → "Bruger", email → null, phone → null, cpr_number → null osv.)
-- Sletter tilknyttede data: `login_events`, `gdpr_consents`, `communication_logs`
-- Bevarer historisk salgsdata (sælgernavn bevares til rapporter)
-- Opdaterer status til `completed`
+### 3. Medarbejder-awareness dokumentation
+Ny compliance-side der dokumenterer hvornår medarbejdere er blevet informeret om GDPR og datahåndtering.
 
-### 3. Sletningshistorik UI (punkt 4)
-Tilføj en ny Card-sektion nederst på `RetentionPolicies.tsx`:
-- Hent seneste rækker fra `audit_logs` hvor `action = 'gdpr_data_cleanup'`
-- Vis tabel: tidspunkt, antal anonymiserede, antal slettede, detaljer (collapsed JSON)
-- Viser "Ingen kørsler endnu" når tom
+**Filer**:
+- `src/pages/compliance/GdprAwareness.tsx` — Ny side med oversigt over awareness-aktiviteter: onboarding-gennemgang, Code of Conduct quiz (allerede i systemet), løbende påmindelser. Viser at medarbejdere accepterer GDPR ved login (consent dialog) og gennemfører Code of Conduct quiz.
+- `src/routes/pages.ts` — Tilføj lazy import.
+- `src/routes/config.tsx` — Tilføj route `/compliance/awareness` med `menu_compliance_admin` permission.
+- `src/pages/compliance/ComplianceOverview.tsx` — Tilføj awareness-kort til cards-arrayet.
 
-### 4. DPA-datoer (punkt 5)
-Opdater `DataTransferRegistry.tsx`:
-- Tilføj `connectedDate` felt til hvert transfer-objekt med datoen de blev koblet til systemet
-- Tilføj "Tilsluttet"-kolonne i tabellen
-- Datoer baseret på hvornår systemet blev sat op (alle ca. juni-juli 2025 baseret på migrationshistorik)
-
-### 5. Kasper som ansvarlig (punkt 6)
-- Tilføj en "GDPR-ansvarlig"-kort i `DataTransferRegistry.tsx` med Kaspers navn og kontaktinfo
-- Tilføj også en reference til GDPR-ansvarlig i `ComplianceOverview.tsx` header-area
-
----
-
-### Fil-ændringer
-
+### Fil-oversigt
 | Fil | Ændring |
 |-----|---------|
-| `supabase/functions/gdpr-export-data/index.ts` | **Ny** — eksport af medarbejderdata som JSON |
-| `supabase/functions/gdpr-process-deletion/index.ts` | **Ny** — automatisk sletning/anonymisering |
-| `gdpr_data_requests` tabel | Migration: tilføj `completed_at`, `export_file_url` kolonner |
-| Storage bucket `gdpr-exports` | Migration: opret bucket |
-| `src/pages/compliance/RetentionPolicies.tsx` | Tilføj "Sletningshistorik" sektion |
-| `src/pages/compliance/DataTransferRegistry.tsx` | Tilføj DPA-datoer + GDPR-ansvarlig kort |
-| `src/pages/compliance/ComplianceOverview.tsx` | Tilføj GDPR-ansvarlig reference |
+| `gdpr_consents` tabel | Migration: tilføj `consent_text text` |
+| `src/hooks/useGdpr.ts` | Gem `consentText` ved insert |
+| `src/components/gdpr/GdprConsentDialog.tsx` | Send samtykketekst med |
+| `src/pages/compliance/DpiaDocumentation.tsx` | **Ny** — DPIA-side |
+| `src/pages/compliance/GdprAwareness.tsx` | **Ny** — Awareness-side |
+| `src/routes/pages.ts` | 2 nye lazy imports |
+| `src/routes/config.tsx` | 2 nye routes |
+| `src/pages/compliance/ComplianceOverview.tsx` | 2 nye kort |
 
