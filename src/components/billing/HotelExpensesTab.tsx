@@ -73,14 +73,11 @@ export function HotelExpensesTab() {
   }
 
   const totalExpense = hotelBookings?.reduce((sum, bh) => {
-    if (!bh.price_per_night) return sum;
-    const checkIn = new Date(bh.check_in);
-    const checkOut = new Date(bh.check_out);
-    const nights = Math.max(1, Math.round((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24)));
-    return sum + nights * bh.price_per_night * (bh.rooms || 1);
+    return sum + (bh.price_per_night || 0);
   }, 0) || 0;
 
   const totalNights = hotelBookings?.reduce((sum, bh) => {
+    if (bh.booked_days?.length) return sum + bh.booked_days.length;
     const checkIn = new Date(bh.check_in);
     const checkOut = new Date(bh.check_out);
     return sum + Math.max(1, Math.round((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24)));
@@ -190,9 +187,10 @@ export function HotelExpensesTab() {
                 hotelBookings.map((bh) => {
                   const checkIn = new Date(bh.check_in);
                   const checkOut = new Date(bh.check_out);
-                  const nights = Math.max(1, Math.round((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24)));
+                  const nights = bh.booked_days?.length || Math.max(1, Math.round((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24)));
                   const rooms = bh.rooms || 1;
-                  const lineTotal = (bh.price_per_night || 0) * nights * rooms;
+                  const lineTotal = bh.price_per_night || 0;
+                  const pricePerNight = nights > 0 ? lineTotal / nights : 0;
                   const statusInfo = STATUS_LABELS[bh.status] || { label: bh.status, variant: "outline" as const };
 
                   return (
@@ -210,7 +208,7 @@ export function HotelExpensesTab() {
                       <TableCell className="text-right">{nights}</TableCell>
                       <TableCell className="text-right">{rooms}</TableCell>
                       <TableCell className="text-right">
-                        {bh.price_per_night ? `${bh.price_per_night.toLocaleString("da-DK")} kr` : "—"}
+                        {pricePerNight > 0 ? `${Math.round(pricePerNight).toLocaleString("da-DK")} kr` : "—"}
                       </TableCell>
                       <TableCell className="text-right font-medium">
                         {lineTotal > 0 ? `${lineTotal.toLocaleString("da-DK")} kr` : "—"}
