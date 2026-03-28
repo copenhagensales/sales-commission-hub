@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS public.fm_agent_settings;
