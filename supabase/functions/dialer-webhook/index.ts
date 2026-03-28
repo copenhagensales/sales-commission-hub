@@ -456,7 +456,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Parsed webhook (${parseResult.provider}):`, JSON.stringify(parseResult.payload, null, 2).substring(0, 2000));
+    console.log(`Parsed webhook (${parseResult.provider}): [payload sanitized, ${JSON.stringify(parseResult.payload).length} chars]`);
 
     // Process the normalized payload
     const result = await processWebhookPayload(

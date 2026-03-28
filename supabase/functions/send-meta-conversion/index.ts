@@ -41,7 +41,7 @@ serve(async (req) => {
       }
     }
 
-    console.log('[Meta Conversion] Normalized data:', { email, phone, fbclid, first_name, last_name });
+    console.log('[Meta Conversion] Normalized data:', { email: !!email, phone: !!phone, fbclid: !!fbclid, first_name: !!first_name, last_name: !!last_name });
 
     console.log(`[Meta Conversion] Processing candidate: ${record.id}`);
 
