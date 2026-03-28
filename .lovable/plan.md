@@ -1,72 +1,56 @@
 
 
-## Plan: GDPR Security Hardening — Shared Auth Guard
+## Plan: Audit-logning af adgang til følsomme medarbejderdata
 
-### Hvad der bygges
+### Problem
+Systemet maskerer CPR, bankoplysninger og andre følsomme felter i UI, men logger **ikke** hvem der tilgår dem. DPIA-dokumentationen påstår logning eksisterer — det gør den ikke.
 
-En centraliseret auth-helper der bruges af alle tre GDPR edge functions. Ingen forretningslogik ændres — kun adgangskontrol tilføjes.
+### Løsning
+
+**1. Ny database-tabel: `sensitive_data_access_log`**
+
+| Kolonne | Type | Beskrivelse |
+|---------|------|-------------|
+| id | uuid | PK |
+| user_id | uuid | Auth user der tilgik data |
+| employee_id | uuid | Medarbejder hvis data blev set |
+| field_accessed | text | Felt (cpr_number, bank_account_number osv.) |
+| access_type | text | "view" eller "edit" |
+| created_at | timestamptz | Tidspunkt |
+
+RLS: Kun owners kan læse loggen. Insert tilladt for authenticated.
+
+**2. Hook: `useLogSensitiveAccess`**
+
+Simpel hook der kalder Supabase insert når et maskeret felt "afsløres" (klik på rediger):
+
+```text
+useLogSensitiveAccess(employeeId, fieldName, accessType)
+  → supabase.from("sensitive_data_access_log").insert(...)
+```
+
+**3. Integration i eksisterende komponenter**
+
+- `EmployeeDetail.tsx`: Log når bruger klikker "rediger" på masked felter (CPR, reg.nr, kontonummer)
+- `MyProfile.tsx`: Log når bruger redigerer egne følsomme felter (access_type = "self_edit")
+
+**4. Visning i compliance-sektionen**
+
+- Ny fane eller sektion under `/compliance` der viser de seneste 100 adgange til følsomme data
+- Filtrering på medarbejder, felt og tidsperiode
+
+**5. Ret DPIA-dokumentationen**
+
+- Opdater `DpiaDocumentation.tsx` så den matcher den faktiske implementering
 
 ### Filer
 
 | Fil | Handling |
 |-----|---------|
-| `supabase/functions/_shared/gdpr-auth.ts` | **Ny** — shared auth helper |
-| `supabase/functions/gdpr-export-data/index.ts` | Tilføj auth-guard efter CORS |
-| `supabase/functions/gdpr-process-deletion/index.ts` | Tilføj auth-guard efter CORS |
-| `supabase/functions/gdpr-data-cleanup/index.ts` | Tilføj auth-guard efter CORS |
-| `supabase/config.toml` | Tilføj 3 function blocks med `verify_jwt = false` |
-
-### 1. Shared helper: `_shared/gdpr-auth.ts`
-
-Eksporterer `authorizeGdprRequest(req)` som:
-- Tjekker `x-gdpr-cron-token` header mod env var `GDPR_CRON_TOKEN` → tillader cron-kald
-- Ellers læser `Authorization: Bearer <token>`, kalder `supabase.auth.getUser()`, tjekker `is_owner()` RPC
-- Returnerer `{ caller: "cron" | "owner:email" }` ved succes
-- Returnerer en `Response` med 401 (ingen/ugyldig auth) eller 403 (ikke-owner)
-
-### 2. Integration i de tre funktioner
-
-Ét kald tilføjes lige efter CORS-check i hver funktion:
-
-```typescript
-import { authorizeGdprRequest } from "../_shared/gdpr-auth.ts";
-
-// efter OPTIONS check:
-const authResult = await authorizeGdprRequest(req);
-if (authResult instanceof Response) return authResult;
-// authResult.caller logges i triggered_by
-```
-
-Al eksisterende forretningslogik forbliver uændret. Fejlresponses generiske (ingen stack traces).
-
-### 3. Config
-
-```toml
-[functions.gdpr-export-data]
-verify_jwt = false
-
-[functions.gdpr-process-deletion]
-verify_jwt = false
-
-[functions.gdpr-data-cleanup]
-verify_jwt = false
-```
-
-`verify_jwt = false` fordi vi validerer manuelt i koden (nødvendigt for at understøtte cron-token).
-
-### 4. Env var
-
-`GDPR_CRON_TOKEN` — en tilfældig secret string. Sættes via secrets-tool. Bruges af scheduler/cron til at kalde funktionerne uden bruger-login.
-
-### Udrulning
-1. Sæt `GDPR_CRON_TOKEN` secret
-2. Funktionerne deployes automatisk
-3. Eksisterende cron-jobs skal opdateres til at inkludere `x-gdpr-cron-token` header (hvis der tilføjes cron-jobs fremover)
-
-### Testplan
-- Kald uden auth → 401
-- Kald med korrekt cron-token → success
-- Kald med gyldig owner JWT → success
-- Kald med ikke-owner JWT → 403
-- Kald med forkert cron-token → 401
+| Migration | Ny tabel `sensitive_data_access_log` + RLS |
+| `src/hooks/useLogSensitiveAccess.ts` | **Ny** — logning-hook |
+| `src/pages/EmployeeDetail.tsx` | Tilføj logning ved edit af masked felter |
+| `src/pages/MyProfile.tsx` | Tilføj logning ved self-edit |
+| `src/pages/compliance/DpiaDocumentation.tsx` | Opdater til at matche virkeligheden |
+| `src/pages/compliance/` (ny komponent) | Visning af audit-log for følsomme data |
 
