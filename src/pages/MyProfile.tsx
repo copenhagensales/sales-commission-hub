@@ -50,12 +50,14 @@ function EditableSensitiveField({
   value, 
   onSave, 
   placeholder,
-  maskWhenSet = true
+  maskWhenSet = true,
+  onReveal
 }: { 
   value: string | null; 
   onSave: (value: string | null) => void;
   placeholder?: string;
   maskWhenSet?: boolean;
+  onReveal?: () => void;
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
@@ -74,6 +76,7 @@ function EditableSensitiveField({
   const handleStartEdit = () => {
     setEditValue(value || "");
     setIsEditing(true);
+    if (onReveal) onReveal();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -1150,7 +1153,8 @@ export default function MyProfile() {
                           <EditableSensitiveField 
                             value={employee.cpr_number} 
                             placeholder="DDMMÅÅ-XXXX"
-                            onSave={(v) => handleSaveSensitiveData("cpr_number", v)} 
+                            onSave={(v) => handleSaveSensitiveData("cpr_number", v)}
+                            onReveal={() => employee?.id && logSensitiveAccess(employee.id, "cpr_number", "view")}
                           />
                         </div>
                       </div>
@@ -1302,7 +1306,8 @@ export default function MyProfile() {
                         <EditableSensitiveField 
                           value={employee.bank_reg_number} 
                           placeholder="4 cifre"
-                          onSave={(v) => handleSaveSensitiveData("bank_reg_number", v)} 
+                          onSave={(v) => handleSaveSensitiveData("bank_reg_number", v)}
+                          onReveal={() => employee?.id && logSensitiveAccess(employee.id, "bank_reg_number", "view")}
                         />
                       </div>
                       <div>
@@ -1310,7 +1315,8 @@ export default function MyProfile() {
                         <EditableSensitiveField 
                           value={employee.bank_account_number} 
                           placeholder="Op til 10 cifre"
-                          onSave={(v) => handleSaveSensitiveData("bank_account_number", v)} 
+                          onSave={(v) => handleSaveSensitiveData("bank_account_number", v)}
+                          onReveal={() => employee?.id && logSensitiveAccess(employee.id, "bank_account_number", "view")}
                         />
                       </div>
                     </div>

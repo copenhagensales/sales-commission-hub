@@ -78,7 +78,7 @@ export default function SensitiveAccessLog() {
           <CardContent className="p-4 flex items-start gap-3">
             <Shield className="h-5 w-5 text-primary mt-0.5 shrink-0" />
             <p className="text-sm text-foreground">
-              Denne log registrerer alle tilfælde hvor følsomme medarbejderdata (CPR-nummer, bankoplysninger) er blevet redigeret. Loggen kan ikke slettes og opfylder GDPR art. 5 krav om ansvarlighed.
+              Denne log registrerer alle tilfælde hvor følsomme medarbejderdata (CPR-nummer, bankoplysninger) er blevet set eller redigeret. Loggen kan ikke slettes og opfylder GDPR art. 5 krav om ansvarlighed.
             </p>
           </CardContent>
         </Card>
@@ -125,11 +125,13 @@ export default function SensitiveAccessLog() {
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className={
-                          log.access_type === "self_edit"
+                          log.access_type === "view"
                             ? "bg-blue-500/10 text-blue-700 border-blue-500/30"
+                            : log.access_type === "self_edit"
+                            ? "bg-green-500/10 text-green-700 border-green-500/30"
                             : "bg-orange-500/10 text-orange-700 border-orange-500/30"
                         }>
-                          {log.access_type === "self_edit" ? "Selv-redigering" : "Admin-redigering"}
+                          {log.access_type === "view" ? "Visning" : log.access_type === "self_edit" ? "Selv-redigering" : "Admin-redigering"}
                         </Badge>
                       </TableCell>
                     </TableRow>

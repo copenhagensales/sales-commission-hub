@@ -18,9 +18,10 @@ interface EditableRowProps {
   onSave: (field: string, value: string | number | null) => void;
   displayValue?: string | null;
   masked?: boolean;
+  onReveal?: (field: string) => void;
 }
 
-export function EditableRow({ label, value, field, type = "text", onSave, displayValue, masked }: EditableRowProps) {
+export function EditableRow({ label, value, field, type = "text", onSave, displayValue, masked, onReveal }: EditableRowProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(String(value || ""));
 
@@ -74,7 +75,10 @@ export function EditableRow({ label, value, field, type = "text", onSave, displa
   return (
     <tr 
       className="border-b border-border/50 last:border-0 cursor-pointer hover:bg-muted/30 transition-colors group"
-      onClick={() => setIsEditing(true)}
+      onClick={() => {
+        if (masked && onReveal) onReveal(field);
+        setIsEditing(true);
+      }}
     >
       <td className="py-2.5 pr-4 text-sm text-muted-foreground w-1/3">{label}</td>
       <td className="py-2.5 text-sm font-medium">
