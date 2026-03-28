@@ -1,19 +1,42 @@
 
 
-## Erstat em-dash (—) med en-dash (–) i hele systemet
+## Opret Medarbejderhåndbog som ny fane under Min Profil
 
-### Omfang
+### Status
+Der er **ingen** eksisterende medarbejderhåndbog i systemet. Indholdet fra den uploadede DOCX (17 sider) skal omdannes til en læsbar fane.
 
-Der er **1.251 forekomster** af em-dash (`—`) fordelt på **95 filer**. De bruges i tre kontekster:
+### Plan
 
-1. **UI-placeholders** — f.eks. `"—"` som tom-celle-indikator i tabeller
-2. **Prosa/beskrivelser** — f.eks. `"inkl. godkendte annulleringer og kurvrettelser — inkl..."`  
-3. **Kode-kommentarer** — f.eks. `// Check if a default config exists — if so, auto-match`
+**1. Ny komponent: `src/components/profile/HandbookTabContent.tsx`**
+- Opretter en accordion-baseret visning af alle 30+ sektioner fra håndbogen
+- Grupperet i logiske kategorier (Ansættelse, Adfærd & Etik, Praktisk, IT & Sikkerhed, Disciplinære forhold, Trivsel & Inklusion, Whistleblowing & Brand)
+- Statisk indhold – ingen database nødvendig, da håndbogen er et fast dokument
+- Inkluderer en "Sidst opdateret: 29. august 2025" badge
 
-### Tilgang
+**2. Opdater `src/pages/MyProfile.tsx`**
+- Tilføj en ny `TabsTrigger` for "Håndbog" med `BookOpen`-ikon (fra lucide-react)
+- Tilføj tilhørende `TabsContent` der renderer `<HandbookTabContent />`
 
-Simpel find-and-replace: alle `—` (U+2014 em-dash) erstattes med `–` (U+2013 en-dash) i alle `.ts` og `.tsx` filer udenfor `node_modules` og `dist`.
+**3. Indhold der medtages (alle sektioner fra DOCX)**
+- Indledning & Om Copenhagen Sales
+- Ansættelsesvilkår, Arbejdstid, Løn, Ferie, Ferielukning
+- Opførsel & Etik, Arbejdstøj, Drikkevarer, Mobning & Chikane, Fortrolighed
+- Alkohol & Rusmidler, Mobilpolitik, Sociale medier, Internet, Sprog
+- Pauser, Kantine, Parkering, Orlov, Kørselsgodtgørelse, Leje af biler
+- Lægebesøg, Lønudbetaling, Nøgler/adgangskort, Medie/presse, MUS, Mødekultur
+- Forsikring, Førstehjælp, Henvisningshonorar, Straffeattest, Sygdom, Timeregistrering
+- Overenskomst, Børnearbejde, AMO, Pensionsordning, Personalefester, Piercinger, Rygning, Skattekort
+- Kontrol/overvågning/lagring
+- Trivsel & Stresshåndtering, Mangfoldighed & Inklusion, Klageprocedure
+- Advarsler (trin 1-3), Grov misligholdelse, Disciplinære forseelser
+- IT-sikkerhed, Adgangskoder, Adgange, Computere, Hacking
+- Anti-korruption & Whistleblower, Psykologi & Krisehjælp
+- Brandsikkerhed & Beredskab
+- Grønt fokus, Førstehjælpskasse
 
-### Filer (95 filer påvirket)
-Alle filer med em-dash vil blive opdateret i én samlet operation. Ingen logikændringer — kun tegnudskiftning.
+### Filer
+| Fil | Handling |
+|---|---|
+| `src/components/profile/HandbookTabContent.tsx` | Ny komponent med accordion-sektioner |
+| `src/pages/MyProfile.tsx` | Tilføj "Håndbog" tab |
 
