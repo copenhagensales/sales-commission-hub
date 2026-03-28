@@ -1897,6 +1897,8 @@ export type Database = {
           revenue_column: string | null
           seller_column: string | null
           skip_empty_row_filter: boolean
+          type_detection_column: string | null
+          type_detection_values: Json | null
         }
         Insert: {
           client_id: string
@@ -1919,6 +1921,8 @@ export type Database = {
           revenue_column?: string | null
           seller_column?: string | null
           skip_empty_row_filter?: boolean
+          type_detection_column?: string | null
+          type_detection_values?: Json | null
         }
         Update: {
           client_id?: string
@@ -1941,6 +1945,8 @@ export type Database = {
           revenue_column?: string | null
           seller_column?: string | null
           skip_empty_row_filter?: boolean
+          type_detection_column?: string | null
+          type_detection_values?: Json | null
         }
         Relationships: [
           {
