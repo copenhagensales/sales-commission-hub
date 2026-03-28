@@ -371,6 +371,66 @@ Deno.serve(async (req) => {
               break;
             }
 
+            case "integration_logs": {
+              const { error: delErr, count } = await supabase
+                .from("integration_logs")
+                .delete({ count: "exact" })
+                .lt("created_at", cutoffISO);
+
+              if (delErr) {
+                log("WARN", `Error deleting integration_logs: ${delErr.message}`);
+              } else {
+                const deleted = count ?? 0;
+                log("INFO", `Deleted ${deleted} expired integration logs`);
+              }
+              break;
+            }
+
+            case "login_events": {
+              const { error: delErr, count } = await supabase
+                .from("login_events")
+                .delete({ count: "exact" })
+                .lt("created_at", cutoffISO);
+
+              if (delErr) {
+                log("WARN", `Error deleting login_events: ${delErr.message}`);
+              } else {
+                const deleted = count ?? 0;
+                log("INFO", `Deleted ${deleted} expired login events`);
+              }
+              break;
+            }
+
+            case "password_reset_tokens": {
+              const { error: delErr, count } = await supabase
+                .from("password_reset_tokens")
+                .delete({ count: "exact" })
+                .lt("created_at", cutoffISO);
+
+              if (delErr) {
+                log("WARN", `Error deleting password_reset_tokens: ${delErr.message}`);
+              } else {
+                const deleted = count ?? 0;
+                log("INFO", `Deleted ${deleted} expired password reset tokens`);
+              }
+              break;
+            }
+
+            case "communication_logs": {
+              const { error: delErr, count } = await supabase
+                .from("communication_logs")
+                .delete({ count: "exact" })
+                .lt("created_at", cutoffISO);
+
+              if (delErr) {
+                log("WARN", `Error deleting communication_logs: ${delErr.message}`);
+              } else {
+                const deleted = count ?? 0;
+                log("INFO", `Deleted ${deleted} expired communication logs`);
+              }
+              break;
+            }
+
             default:
               log("INFO", `Unknown data_type "${policy.data_type}" — skipping`);
           }
