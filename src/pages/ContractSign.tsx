@@ -186,7 +186,14 @@ export default function ContractSign() {
     enabled: !!id,
   });
 
-  const { data: currentEmployee } = useQuery({
+  /* ─── Log contract access (view) ─── */
+  useEffect(() => {
+    if (contract?.id && contract?.employee_id) {
+      logContractAccess(contract.id, contract.employee_id, "view");
+    }
+  }, [contract?.id, contract?.employee_id]);
+
+
     queryKey: ["current-employee-for-contract"],
     queryFn: async () => {
       const { data: userData } = await supabase.auth.getUser();
