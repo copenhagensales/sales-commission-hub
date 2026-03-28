@@ -1662,7 +1662,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Upload className="h-5 w-5" />
-              Upload {uploadType === "cancellation" ? "annulleringsfil" : "kurv-fil"}
+              Upload {uploadType === "cancellation" ? "annulleringsfil" : uploadType === "basket_difference" ? "kurv-fil" : "kombineret fil"}
             </CardTitle>
             <CardDescription>
               Upload en Excel-fil (.xlsx). Systemet matcher automatisk baseret på gemt opsætning.
@@ -1801,6 +1801,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                         <TableHead>Virksomhed</TableHead>
                         <TableHead>OPP-nummer</TableHead>
                         <TableHead>Status</TableHead>
+                        {uploadType === "both" && <TableHead>Type</TableHead>}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1819,6 +1820,15 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                           <TableCell>
                             <Badge variant="secondary">{sale.currentStatus}</Badge>
                           </TableCell>
+                          {uploadType === "both" && (
+                            <TableCell>
+                              {String(getCaseInsensitive(sale.uploadedRowData, "Annulled Sales") || "").trim() ? (
+                                <Badge variant="destructive">Annullering</Badge>
+                              ) : (
+                                <Badge className="bg-orange-500/15 text-orange-700 border-orange-300">Kurvrettelse</Badge>
+                              )}
+                            </TableCell>
+                          )}
                         </TableRow>
                       ))}
                     </TableBody>
