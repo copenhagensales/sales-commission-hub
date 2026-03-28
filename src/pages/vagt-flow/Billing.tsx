@@ -28,6 +28,7 @@ import { SupplierReportTab } from "@/components/billing/SupplierReportTab";
 import { DiscountRulesTab } from "@/components/billing/DiscountRulesTab";
 import { SupplierContactsTab } from "@/components/billing/SupplierContactsTab";
 import { HotelExpensesTab } from "@/components/billing/HotelExpensesTab";
+import { ExpenseReportTab } from "@/components/billing/ExpenseReportTab";
 
 function BillingOverviewTab() {
   const now = new Date();
@@ -571,6 +572,7 @@ export default function VagtBilling() {
             <TabsTrigger value="overview">Oversigt</TabsTrigger>
             <TabsTrigger value="supplier">Leverandørrapport</TabsTrigger>
             <TabsTrigger value="hotels">Hoteller</TabsTrigger>
+            <TabsTrigger value="expenses">Udgiftsrapport</TabsTrigger>
             <TabsTrigger value="discounts">Rabataftaler</TabsTrigger>
             <TabsTrigger value="contacts">Kontaktpersoner</TabsTrigger>
           </TabsList>
@@ -585,6 +587,10 @@ export default function VagtBilling() {
 
           <TabsContent value="hotels">
             <HotelExpensesTab />
+          </TabsContent>
+
+          <TabsContent value="expenses">
+            <ExpenseReportTab />
           </TabsContent>
 
           <TabsContent value="discounts">
