@@ -532,6 +532,24 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   const oppGroups = queryResult?.oppGroups || [];
   const flatItems = queryResult?.flatItems || [];
 
+  // Duplicate phone detection: phones appearing >1 time across all pending items
+  const duplicatePhones = useMemo(() => {
+    const phoneCounts = new Map<string, number>();
+    for (const item of flatItems) {
+      const phone = (item.phone || "").trim();
+      if (phone) phoneCounts.set(phone, (phoneCounts.get(phone) || 0) + 1);
+    }
+    const dupes = new Set<string>();
+    for (const [phone, count] of phoneCounts) {
+      if (count > 1) dupes.add(phone);
+    }
+    return dupes;
+  }, [flatItems]);
+
+  const duplicateCount = useMemo(() => {
+    return flatItems.filter(i => duplicatePhones.has((i.phone || "").trim())).length;
+  }, [flatItems, duplicatePhones]);
+
   const approveMutation = useMutation({
     mutationFn: async ({ queueItemIds, saleIds, uploadType }: { queueItemIds: string[]; saleIds: string[]; uploadType: string }) => {
       if (!currentEmployee?.id) throw new Error("Ingen medarbejder fundet");
