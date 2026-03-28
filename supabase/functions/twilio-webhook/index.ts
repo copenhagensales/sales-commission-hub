@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sanitizePayload } from "../_shared/sanitize.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -23,7 +24,7 @@ Deno.serve(async (req) => {
       data = await req.json();
     }
 
-    console.log('Twilio webhook received:', JSON.stringify(data));
+    console.log('Twilio webhook received:', JSON.stringify(sanitizePayload(data)));
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;

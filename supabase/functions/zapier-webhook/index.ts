@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sanitizePayload, maskEmailInString } from "../_shared/sanitize.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,14 +18,14 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const body = await req.json();
-    console.log('Received application webhook:', JSON.stringify(body));
+    console.log('Received application webhook:', JSON.stringify(sanitizePayload(body)));
 
     const { first_name, last_name, email, phone, role, notes } = body;
     const fbclid = body.fbclid || body.Fbclid || null;
     console.log("Received fbclid:", fbclid);
 
     if (!first_name || !last_name || !email || !phone || !role) {
-      console.error('Missing required fields:', { first_name, last_name, email, phone, role });
+      console.error('Missing required fields:', { first_name: !!first_name, last_name: !!last_name, email: !!email, phone: !!phone, role });
       return new Response(
         JSON.stringify({ error: 'Missing required fields: first_name, last_name, email, phone, role' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

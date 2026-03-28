@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sanitizePayload } from "../_shared/sanitize.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -123,7 +124,7 @@ serve(async (req) => {
     console.log('Content-Type:', req.headers.get('content-type'));
     console.log('Content-Length:', req.headers.get('content-length'));
     console.log('Raw body length:', rawBody.length);
-    console.log('Raw body:', rawBody || '(empty)');
+    console.log('Raw body (sanitized):', rawBody.length > 0 ? `[${rawBody.length} chars]` : '(empty)');
     console.log('=====================================');
 
     // Handle empty body
@@ -148,7 +149,7 @@ serve(async (req) => {
       );
     }
 
-    console.log('Parsed webhook payload:', JSON.stringify(body, null, 2));
+    console.log('Parsed webhook payload:', JSON.stringify(sanitizePayload(body), null, 2));
 
     const externalId = String(body.payload.result_id);
 

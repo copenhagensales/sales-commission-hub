@@ -1,6 +1,6 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Shield, Users, FileText, Lock, ArrowRight, Bell, ClipboardList, AlertTriangle } from "lucide-react";
+import { Shield, Users, FileText, Lock, ArrowRight, Bell, ClipboardList, AlertTriangle, Globe } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { usePermissions } from "@/hooks/usePositionPermissions";
@@ -62,6 +62,15 @@ export default function ComplianceOverview() {
       badge: "Art. 33",
       badgeColor: "bg-red-500/10 text-red-700 border-red-500/30",
       href: "/compliance/security-incidents",
+      permKey: "menu_compliance_admin",
+    },
+    {
+      title: "Dataoverførsler til tredjeparter",
+      description: "Oversigt over tredjeparter der modtager persondata, inkl. lokation, retsgrundlag og DPA-status.",
+      icon: Globe,
+      badge: "Art. 28",
+      badgeColor: "bg-green-500/10 text-green-700 border-green-500/30",
+      href: "/compliance/data-transfers",
       permKey: "menu_compliance_admin",
     },
   ];

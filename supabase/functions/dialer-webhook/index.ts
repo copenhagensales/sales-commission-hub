@@ -388,8 +388,8 @@ serve(async (req) => {
     
     console.log('=== RAW BODY ===');
     console.log('Raw body length:', rawBody.length);
-    console.log('Raw body (full):', rawBody);
-    console.log('Raw body hex (first 100):', Array.from(rawBody.slice(0, 100)).map(c => c.charCodeAt(0).toString(16).padStart(2, '0')).join(' '));
+    console.log('Raw body (sanitized):', rawBody.length > 0 ? `[${rawBody.length} chars received]` : '(empty)');
+    
     
     // Check if data might be in query params (some webhooks do this)
     console.log('=== QUERY PARAMS ===');
@@ -456,7 +456,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Parsed webhook (${parseResult.provider}):`, JSON.stringify(parseResult.payload, null, 2).substring(0, 2000));
+    console.log(`Parsed webhook (${parseResult.provider}): [payload sanitized, ${JSON.stringify(parseResult.payload).length} chars]`);
 
     // Process the normalized payload
     const result = await processWebhookPayload(

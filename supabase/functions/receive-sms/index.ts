@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { maskPhone } from "../_shared/sanitize.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -32,9 +33,9 @@ serve(async (req) => {
 
     console.log('[receive-sms] Received inbound SMS:', {
       messageSid,
-      from,
-      to,
-      bodyPreview: body?.substring(0, 50),
+      from: maskPhone(from),
+      to: maskPhone(to),
+      bodyLength: body?.length ?? 0,
       numMedia,
       fromCity,
       fromCountry,

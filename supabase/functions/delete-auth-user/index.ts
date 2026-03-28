@@ -79,7 +79,7 @@ serve(async (req) => {
     // Also delete from system_roles
     await supabase.from("system_roles").delete().eq("user_id", existingUser.id);
 
-    console.log(`Deleted auth user: ${email}`);
+    console.log(`Deleted auth user for id: ${existingUser.id}`);
 
     return new Response(
       JSON.stringify({ success: true, message: "Bruger slettet" }),

@@ -30,7 +30,7 @@ serve(async (req) => {
       }
     } else if (contentType.includes('application/json')) {
       payload = await req.json();
-      console.log('Received JSON data:', JSON.stringify(payload, null, 2));
+      console.log('Received JSON data (keys):', Object.keys(payload));
     } else {
       // Try to read as text and parse
       const text = await req.text();
@@ -47,7 +47,7 @@ serve(async (req) => {
       }
     }
 
-    console.log('Parsed payload:', JSON.stringify(payload, null, 2));
+    console.log('Parsed payload keys:', Object.keys(payload));
 
     // Determine event type from payload
     const eventType = payload.eventType || payload.type || payload.event || 'invoice_booked';
