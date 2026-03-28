@@ -1219,6 +1219,39 @@ export type Database = {
           },
         ]
       }
+      billing_manual_expenses: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string | null
+          id: string
+          note: string | null
+          updated_at: string | null
+          updated_by: string | null
+          year_month: string
+        }
+        Insert: {
+          amount?: number
+          category: string
+          created_at?: string | null
+          id?: string
+          note?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+          year_month: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string | null
+          id?: string
+          note?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+          year_month?: string
+        }
+        Relationships: []
+      }
       booking: {
         Row: {
           booked_days: number[] | null
