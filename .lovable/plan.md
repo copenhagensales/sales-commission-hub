@@ -1,49 +1,35 @@
 
 
-## Fix: Synkroniser filter-logik og flyt excluded → unmatched
+## Fix: Synkroniser filter-logik korrekt
 
-### Ændringer i `src/components/cancellations/UploadCancellationsTab.tsx`
+### Problem nu
+Forrige ændring fjernede `uploadType !== "both"` fra handleMatch → filteret anvendes altid → kun 199 annulleringsrækker sendes til matching → kun 183 matcher.
 
-**1. Fjern `uploadType !== "both"` fra handleMatch (linje 774)**
+Begge steder (handleMatch OG filteredDataForPreview) skal have **samme** logik.
 
-Ændre:
+### Løsning i `src/components/cancellations/UploadCancellationsTab.tsx`
+
+**1. Gendan `uploadType !== "both"` i handleMatch (linje 774)**
 ```typescript
 const filteredData = (uploadType !== "both" && cfgFilterColumn !== "__none__" && cfgFilterValue.trim())
 ```
-Til:
+Tilbage til original — ved "both" springes filteret over, alle 1550 rækker bruges.
+
+**2. Tilføj samme guard i filteredDataForPreview (linje 1551)**
 ```typescript
-const filteredData = (cfgFilterColumn !== "__none__" && cfgFilterValue.trim())
+let data = (uploadType !== "both" && previewFilterColumn !== "__none__" && previewFilterValue.trim())
 ```
+Nu bruger preview præcis samme logik som handleMatch.
 
-Dette sikrer at config-filteret (f.eks. "Annulled Sales = 1") altid anvendes under matching — uanset uploadType.
-
-**2. Fjern excluded-badge og excluded-tab fra UI (linje 1835-1843 + 1972-2008)**
-
-Slet den separate "ikke-uploadede rækker" badge og dens tab-indhold. De ekskluderede rækker er reelt bare umatchede kurvrettelser og hører under "umatchede rækker".
-
-**3. Inkluder excluded rækker i unmatchedRows (linje 1574)**
-
-Ændre beregningen så `unmatchedRows` inkluderer ALLE rækker der ikke matches — både dem fra `filteredDataForPreview` og de filtrerede/junk rækker:
-
+**3. Beregn unmatchedRows fra filteredDataForPreview (linje 1574)**
 ```typescript
-const unmatchedRows = parsedData.filter(row => !matchedRowIndices.has(row.originalIndex));
-const unmatchedCount = unmatchedRows.length;
+const unmatchedRows = filteredDataForPreview.filter(row => !matchedRowIndices.has(row.originalIndex));
 ```
+Unmatched = rækker der passerede filter+junk men ikke matchede. **Ingen separat excluded-kategori** — alt der ikke matcher er "umatchet".
 
-Dette giver: matched + unmatched = total parsedData (1550). Unmatched-tabellen viser alle 243 rækker (44 + 199).
-
-**4. Fjern excludedRows/excludedCount beregning (linje 1576-1578)**
-
-Ikke længere nødvendig.
-
-**5. Fjern `"excluded"` fra previewTab type (linje 1579)**
-
-```typescript
-const [previewTab, setPreviewTab] = useState<"matched" | "unmatched" | "seller_unmatched">("matched");
-```
-
-### Resultat
-- Badge: `1307 matchede salg | 243 umatchede rækker`
-- Alle rækker er synlige — ingen forsvinder
+### Resultat (uploadType="both")
+- Filter springes over → alle 1550 rækker (minus junk) bruges
+- Matched: ~1307, Unmatched: ~243 (inkl. de 199 kurvrettelser der ikke matchede)
 - 1307 + 243 = 1550 ✓
+- Ingen "excluded" badge/tab — kun matched og unmatched
 
