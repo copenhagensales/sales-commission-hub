@@ -1,32 +1,17 @@
 
 
-## Opdater DPA-references i DataTransferRegistry
+## Tilføj Lovable (Supabase) som databehandler i DataTransferRegistry
 
-Tilføj klarhed om DPA-type og links til de offentlige DPA-dokumenter.
+### Ændring i `src/pages/compliance/DataTransferRegistry.tsx`
 
----
+Tilføj en ny entry i `transfers`-arrayet:
 
-### Ændringer i `src/pages/compliance/DataTransferRegistry.tsx`
+| Modtager | Datakategorier | Lokation | Retsgrundlag | DPA-type | Link |
+|----------|---------------|----------|-------------|----------|------|
+| Lovable (Supabase) | Brugerdata, auth-data, database-indhold | EU | GDPR Art. 28 | Standard DPA | https://supabase.com/legal/dpa |
 
-**Udvid data-modellen** med `dpaType` og `dpaUrl`:
-
-| Modtager | DPA-type | Link |
-|----------|----------|------|
-| Twilio | Standard DPA | https://www.twilio.com/legal/data-protection-addendum |
-| Meta | Standard vilkår | https://www.facebook.com/legal/terms/dataprocessing |
-| Microsoft 365 | Standard DPA | https://learn.microsoft.com/legal/cognitive-services/openai/data-privacy |
-| e-conomic | Standard DPA | https://www.visma.com/trust-centre/dpa |
-| Adversus | Standard DPA | https://www.adversus.io/legal/dpa |
-
-**Tabelændringer:**
-- Erstat "DPA"-kolonnen med "DPA-type" der viser fx "Standard DPA" eller "Standard vilkår"
-- Gør DPA-type til et klikbart link (åbner i ny fane) så man kan finde dokumentet
-- Tilføj en note i info-boksen øverst: "DPA-links henviser til leverandørernes offentligt tilgængelige databehandleraftaler"
-
-**Links skal verificeres** — jeg slår de korrekte URLs op inden implementering.
-
----
+Supabase's offentlige DPA dækker alle business-brugere og accepteres ved brug af tjenesten — samme model som de øvrige leverandører.
 
 ### Risiko
-Ingen. Kun tekstændringer på en statisk informationsside.
+Ingen. Én ny række i en statisk tabel.
 
