@@ -282,6 +282,7 @@ serve(async (req) => {
     const saleExternalId = typeof body.saleExternalId === "string" ? body.saleExternalId.trim() : "";
     const providerFilter = typeof body.provider === "string" ? body.provider.trim() : "";
     const integrationIdFilter = typeof body.integrationId === "string" ? body.integrationId.trim() : "";
+    const clientIdFilter = typeof body.clientId === "string" ? body.clientId.trim() : "";
     const supabase = getSupabase();
     const logs: string[] = [];
     const log = (msg: string) => {
