@@ -75,7 +75,7 @@ const categories: Category[] = [
       },
       {
         title: "Timeregistrering",
-        content: <p>Ansatte skal registrere sine timer i Intramanager. Det gøres ved at stemple ind når man møder ind og stemple ud når man forlader arbejdet. (Gældende, hvis andet ikke er aftalt i ansættelseskontrakten.)</p>,
+        content: <p>Ansatte skal registrere sine timer i vores interne system. Det gøres ved at stemple ind når man møder ind og stemple ud når man forlader arbejdet via <a href="/time-stamp" className="text-primary underline hover:text-primary/80">Tidsstempling</a>. (Gældende, hvis andet ikke er aftalt i ansættelseskontrakten.)</p>,
       },
     ],
   },
@@ -363,7 +363,7 @@ const categories: Category[] = [
               <li>Enreach (ringesystem)</li>
               <li>Adversus (ringesystem)</li>
               <li>Microsoft365</li>
-              <li>Intramanager.com</li>
+              <li>Copenhagen Sales Platform (internt system)</li>
             </ul>
           </div>
         ),
@@ -419,7 +419,7 @@ const categories: Category[] = [
         content: (
           <div className="space-y-2">
             <p><strong>Beskyttelse:</strong> Organisationen forpligter sig til at beskytte whistleblowere mod repressalier, chikane eller diskrimination. Anonymitet opretholdes i den udstrækning det er lovligt og praktisk muligt.</p>
-            <p><strong>Rapporteringskanaler:</strong> Organisationen har etableret klare og let tilgængelige kanaler til rapportering, herunder en intern whistleblowing-hotline og rapportering til ledelsen.</p>
+            <p><strong>Rapporteringskanaler:</strong> Organisationen har etableret klare og let tilgængelige kanaler til rapportering. <a href="https://copenhagensales.dk/whistleblower" target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80">Brug vores whistleblowerordning her</a>.</p>
             <p><strong>Undersøgelse:</strong> Alle rapporter tages alvorligt, behandles fortroligt og whistleblowere modtager løbende opdateringer om status.</p>
             <p><strong>Konsekvenser:</strong> Bekræftet ulovlig eller uetisk adfærd medfører passende disciplinære og retlige foranstaltninger.</p>
           </div>
