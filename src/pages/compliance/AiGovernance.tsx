@@ -94,27 +94,27 @@ export default function AiGovernance() {
   const { data: roles = [] } = useQuery({
     queryKey: ["ai-governance-roles"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("ai_governance_roles").select("*").order("created_at");
+      const { data, error } = await (supabase as any).from("ai_governance_roles").select("*").order("created_at");
       if (error) throw error;
-      return data;
+      return data as any[];
     },
   });
 
   const { data: useCases = [] } = useQuery({
     queryKey: ["ai-use-case-registry"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("ai_use_case_registry").select("*").order("created_at");
+      const { data, error } = await (supabase as any).from("ai_use_case_registry").select("*").order("created_at");
       if (error) throw error;
-      return data;
+      return data as any[];
     },
   });
 
   const { data: instructionLogs = [] } = useQuery({
     queryKey: ["ai-instruction-log"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("ai_instruction_log").select("*").order("instruction_date", { ascending: false });
+      const { data, error } = await (supabase as any).from("ai_instruction_log").select("*").order("instruction_date", { ascending: false });
       if (error) throw error;
-      return data;
+      return data as any[];
     },
   });
 
@@ -134,7 +134,7 @@ export default function AiGovernance() {
   // ─── Mutations ───
   const updateRole = useMutation({
     mutationFn: async ({ id, responsible_person }: { id: string; responsible_person: string }) => {
-      const { error } = await supabase.from("ai_governance_roles").update({ responsible_person, updated_at: new Date().toISOString() }).eq("id", id);
+      const { error } = await (supabase as any).from("ai_governance_roles").update({ responsible_person, updated_at: new Date().toISOString() }).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -147,11 +147,11 @@ export default function AiGovernance() {
   const upsertUseCase = useMutation({
     mutationFn: async (data: any) => {
       if (data.id) {
-        const { error } = await supabase.from("ai_use_case_registry").update({ ...data, updated_at: new Date().toISOString() }).eq("id", data.id);
+        const { error } = await (supabase as any).from("ai_use_case_registry").update({ ...data, updated_at: new Date().toISOString() }).eq("id", data.id);
         if (error) throw error;
       } else {
         const { id: _, ...insertData } = data;
-        const { error } = await supabase.from("ai_use_case_registry").insert(insertData);
+        const { error } = await (supabase as any).from("ai_use_case_registry").insert(insertData);
         if (error) throw error;
       }
     },
@@ -164,7 +164,7 @@ export default function AiGovernance() {
 
   const deleteUseCase = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("ai_use_case_registry").delete().eq("id", id);
+      const { error } = await (supabase as any).from("ai_use_case_registry").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {

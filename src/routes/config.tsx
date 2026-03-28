@@ -152,6 +152,7 @@ import {
   ComplianceRetentionPolicies,
   ComplianceDpia,
   ComplianceGdprAwareness,
+  ComplianceAiGovernance,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -451,6 +452,7 @@ export const routes: RouteConfig[] = [
   { path: "/compliance/retention-policies", component: ComplianceRetentionPolicies, access: "role", positionPermission: "menu_compliance_admin" },
   { path: "/compliance/dpia", component: ComplianceDpia, access: "role", positionPermission: "menu_compliance_admin" },
   { path: "/compliance/awareness", component: ComplianceGdprAwareness, access: "role", positionPermission: "menu_compliance_admin" },
+  { path: "/compliance/ai-governance", component: ComplianceAiGovernance, access: "role", positionPermission: "menu_compliance_admin" },
 
   { path: "*", component: NotFound, access: "public" },
 ];
