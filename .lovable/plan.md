@@ -1,23 +1,44 @@
 
 
-## Slet statisk Excel-fil og tilføj upload-dropzone
+## GDPR-rettelser: Punkt 1 (PII-sanitering) + Punkt 2 (Datatransfer-dokumentation)
 
-### Ændringer
+Ingen af disse ændringer påvirker eksisterende funktionalitet.
 
-**1. Slet `public/temp/employee-import.xlsx`**
-Fjerner persondata fra offentligt tilgængelige assets.
+---
 
-**2. Opdater `src/pages/ExcelFieldMatcher.tsx`**
-- Fjern `useEffect` der fetcher den statiske fil (linje 81-98)
-- Sæt `loading` initial state til `false`
-- Tilføj en fil-upload dropzone (drag & drop + klik) som startvisning
-- Når brugeren vælger en `.xlsx`-fil, parse den med den eksisterende `parseExcelFile()` og vis kolonnemapping + importknap som før
-- Al eksisterende logik (mapping, preview, import) forbliver uændret
+### Punkt 1: PII-sanitering i edge function logs
 
-### Filer
+**Ny fil:** `supabase/functions/_shared/sanitize.ts`
 
-| Fil | Handling |
-|---|---|
-| `public/temp/employee-import.xlsx` | **Slet** |
-| `src/pages/ExcelFieldMatcher.tsx` | Erstat auto-fetch med fil-upload dropzone |
+- `maskPhone("+4512345678")` → `"+45****5678"`
+- `maskEmail("john@test.dk")` → `"j***@test.dk"`
+- `sanitizePayload(obj)` → maskerer kendte PII-nøgler (`email`, `phone`, `From`, `To`, `Body`, `first_name`, `last_name`)
+
+**Berørte edge functions** (kun `console.log` ændres):
+
+`twilio-webhook`, `receive-sms`, `zapier-webhook`, `send-meta-conversion`, `adversus-webhook`, `dialer-webhook`, `economic-webhook`, `send-password-reset`, `complete-password-reset`, `send-employee-invitation`, `delete-auth-user`
+
+---
+
+### Punkt 2: Datatransfer-dokumentationsside
+
+**Ny fil:** `src/pages/compliance/DataTransferRegistry.tsx`
+
+Statisk side med tabel — **alle services er EU-hostede**:
+
+| Modtager | Datakategorier | Lokation | Retsgrundlag | DPA status |
+|----------|---------------|----------|-------------|------------|
+| Twilio | Telefonnumre, SMS-indhold | **EU** | DPA | Aktiv |
+| Meta (Facebook) | Email, telefon, navn (hashet) | **EU** | DPA | Aktiv |
+| Microsoft 365 | Email-adresser, navne | **EU** | DPA | Aktiv |
+| e-conomic | Faktureringsdata | **EU (DK)** | DPA | Aktiv |
+| Adversus | Agent-emails, kampagnedata | **EU** | DPA | Aktiv |
+
+**Routing:** Tilføj `/compliance/data-transfers` i `pages.ts` og `config.tsx`, samt link fra `ComplianceOverview.tsx`.
+
+---
+
+### Risiko
+
+Ingen. Punkt 1 ændrer kun log-output. Punkt 2 tilføjer en ny read-only side.
 
