@@ -58,7 +58,7 @@ interface SaleRow {
   agent_name: string | null;
   source: string | null;
   raw_payload: Record<string, unknown> | null;
-  sale_items?: { title: string | null }[];
+  sale_items?: { display_name: string | null; adversus_product_title: string | null }[];
 }
 
 interface DuplicateGroup {
@@ -108,7 +108,7 @@ export function DuplicatesTab({ clientId: selectedClientId }: DuplicatesTabProps
 
       let query = supabase
         .from("sales")
-        .select("id, sale_datetime, customer_phone, customer_company, validation_status, agent_name, source, raw_payload, sale_items(title)")
+        .select("id, sale_datetime, customer_phone, customer_company, validation_status, agent_name, source, raw_payload, sale_items(display_name, adversus_product_title)")
         .neq("validation_status", "cancelled")
         .order("sale_datetime", { ascending: false });
 
@@ -359,7 +359,7 @@ export function DuplicatesTab({ clientId: selectedClientId }: DuplicatesTabProps
                                 {sale.sale_items && sale.sale_items.length > 0
                                   ? sale.sale_items.map((item, i) => (
                                       <Badge key={i} variant="outline" className="mr-1 mb-0.5">
-                                        {item.title || "-"}
+                                        {item.display_name ?? item.adversus_product_title ?? "-"}
                                       </Badge>
                                     ))
                                   : "-"}
