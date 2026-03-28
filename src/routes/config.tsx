@@ -149,6 +149,7 @@ import {
   ComplianceProcessingActivities,
   ComplianceSecurityIncidents,
   ComplianceDataTransferRegistry,
+  ComplianceRetentionPolicies,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -445,6 +446,7 @@ export const routes: RouteConfig[] = [
   { path: "/compliance/processing-activities", component: ComplianceProcessingActivities, access: "role", positionPermission: "menu_compliance_admin" },
   { path: "/compliance/security-incidents", component: ComplianceSecurityIncidents, access: "role", positionPermission: "menu_compliance_admin" },
   { path: "/compliance/data-transfers", component: ComplianceDataTransferRegistry, access: "role", positionPermission: "menu_compliance_admin" },
+  { path: "/compliance/retention-policies", component: ComplianceRetentionPolicies, access: "role", positionPermission: "menu_compliance_admin" },
 
   { path: "*", component: NotFound, access: "public" },
 ];
