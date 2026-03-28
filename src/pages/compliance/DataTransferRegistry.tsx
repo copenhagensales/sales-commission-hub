@@ -1,7 +1,7 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Shield, Globe, ArrowLeft } from "lucide-react";
+import { Shield, Globe, ArrowLeft, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import {
@@ -18,40 +18,45 @@ const transfers = [
     recipient: "Twilio",
     categories: "Telefonnumre, SMS-indhold",
     location: "EU",
-    legalBasis: "DPA",
-    dpaStatus: "Aktiv",
+    legalBasis: "GDPR Art. 28",
+    dpaType: "Standard DPA",
+    dpaUrl: "https://www.twilio.com/legal/data-protection-addendum",
     purpose: "SMS-kommunikation med kandidater og medarbejdere",
   },
   {
     recipient: "Meta (Facebook)",
     categories: "Email, telefon, navn (hashet)",
     location: "EU",
-    legalBasis: "DPA",
-    dpaStatus: "Aktiv",
+    legalBasis: "GDPR Art. 28",
+    dpaType: "Standard vilkår",
+    dpaUrl: "https://www.facebook.com/legal/terms/dataprocessing",
     purpose: "Konversionssporing for rekrutteringskampagner (CAPI)",
   },
   {
     recipient: "Microsoft 365",
     categories: "Email-adresser, navne",
     location: "EU",
-    legalBasis: "DPA",
-    dpaStatus: "Aktiv",
+    legalBasis: "GDPR Art. 28",
+    dpaType: "Standard DPA",
+    dpaUrl: "https://learn.microsoft.com/legal/cognitive-services/openai/data-privacy",
     purpose: "Afsendelse af systemgenererede emails (invitationer, password reset)",
   },
   {
     recipient: "e-conomic",
     categories: "Faktureringsdata",
     location: "EU (DK)",
-    legalBasis: "DPA",
-    dpaStatus: "Aktiv",
+    legalBasis: "GDPR Art. 28",
+    dpaType: "Standard DPA",
+    dpaUrl: "https://www.visma.com/trust-centre/dpa",
     purpose: "Bogføring og økonomi-integration",
   },
   {
     recipient: "Adversus",
     categories: "Agent-emails, kampagnedata, salgsdata",
     location: "EU",
-    legalBasis: "DPA",
-    dpaStatus: "Aktiv",
+    legalBasis: "GDPR Art. 28",
+    dpaType: "Standard DPA",
+    dpaUrl: "https://www.adversus.io/legal/dpa",
     purpose: "Dialer-integration og salgsregistrering",
   },
 ];
@@ -86,6 +91,9 @@ export default function DataTransferRegistry() {
                 Ingen persondata overføres til lande uden for EU/EØS.
               </p>
               <p className="text-muted-foreground">
+                DPA-links henviser til leverandørernes offentligt tilgængelige databehandleraftaler, som accepteres ved brug af tjenesten.
+              </p>
+              <p className="text-muted-foreground">
                 Sidst gennemgået: marts 2026
               </p>
             </div>
@@ -107,7 +115,7 @@ export default function DataTransferRegistry() {
                   <TableHead>Datakategorier</TableHead>
                   <TableHead>Lokation</TableHead>
                   <TableHead>Retsgrundlag</TableHead>
-                  <TableHead>DPA</TableHead>
+                  <TableHead>DPA-type</TableHead>
                   <TableHead>Formål</TableHead>
                 </TableRow>
               </TableHeader>
@@ -121,11 +129,17 @@ export default function DataTransferRegistry() {
                         {t.location}
                       </Badge>
                     </TableCell>
-                    <TableCell>{t.legalBasis}</TableCell>
+                    <TableCell className="text-sm">{t.legalBasis}</TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="bg-blue-500/10 text-blue-700 border-blue-500/30">
-                        {t.dpaStatus}
-                      </Badge>
+                      <a
+                        href={t.dpaUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                      >
+                        {t.dpaType}
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground max-w-[200px]">
                       {t.purpose}
