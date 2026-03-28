@@ -105,7 +105,7 @@ export default function ComplianceOverview() {
                 Vi behandler kun de oplysninger, der er nødvendige for konkrete og saglige formål. Adgang gives efter rolle og arbejdsbehov. Denne sektion samler vores interne dokumentation og processer.
               </p>
               <p className="text-muted-foreground text-xs">
-                GDPR-ansvarlig: Kasper · Udpeget pr. juni 2025
+                GDPR-ansvarlig: Kasper Mikkelsen · Udpeget pr. juni 2025
               </p>
             </div>
           </CardContent>

@@ -202,7 +202,7 @@ export default function DataTransferRegistry() {
             </CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-foreground space-y-1">
-            <p className="font-medium">Kasper</p>
+            <p className="font-medium">Kasper Mikkelsen</p>
             <p className="text-muted-foreground">
               Ansvarlig for overholdelse af GDPR, databehandleraftaler og kontakt til Datatilsynet.
             </p>
