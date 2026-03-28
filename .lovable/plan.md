@@ -1,58 +1,53 @@
 
 
-## Plan: Fix type-klassificering (OR-logik) + dublet-visning
+## Problem: 5G Internet matches fejlagtigt på telefonnummer
 
-### Problem 1: Forkert type-klassificering
-Eesy FM config har `type_detection_column = null` og `type_detection_values = null`. Logikken falder derfor tilbage til hardcodet "Annulled Sales"-check. Rækker med `Current Status = "Nedlagt"` men tom `Annulled Sales` klassificeres fejlagtigt som kurvrettelse.
+### Analyse
 
-**Løsning**: To ændringer:
+Pass 1b (linje 1021-1060) matcher **alle** rækker med telefonnummer mod `customer_phone` på salg — uanset produkt. "5G Internet" er et internetprodukt der ikke har et reelt telefonnummer tilknyttet, så phone-matching giver falske resultater.
 
-**A. Opdater Eesy FM config i databasen** (via insert tool):
+Pass 2 (linje 1135-1141) har en guard: `if (excelPhone) return;` — rækker MED telefonnummer når aldrig Pass 2, selv når telefonnummeret er irrelevant for produktet.
+
+### Løsning: Konfigurerbar liste over produkter der skal skippe phone-matching
+
+**1. Database**: Tilføj `phone_excluded_products` (JSONB) til `cancellation_upload_configs`
+
 ```sql
-UPDATE cancellation_upload_configs 
-SET type_detection_column = 'Current Status',
-    type_detection_values = '["Nedlagt", "Aktiv men opsagt", "Afventer opgørelse", "Afvist af System", "Saldospærret"]'::jsonb
+ALTER TABLE cancellation_upload_configs
+  ADD COLUMN phone_excluded_products JSONB DEFAULT NULL;
+```
+
+Eksempel-værdi: `["5G Internet", "5G Router"]`
+
+**2. Opdater Eesy FM config**:
+```sql
+UPDATE cancellation_upload_configs
+SET phone_excluded_products = '["5G Internet"]'::jsonb
 WHERE id = '0606d7ab-3872-4dcf-aa72-080d84ebe90e';
 ```
 
-**B. Ændr logikken til OR-kombination** i `UploadCancellationsTab.tsx` (linje 1514-1526 + preview linje 1943-1960):
+**3. Kodeændringer i `UploadCancellationsTab.tsx`**:
 
-Nuværende logik bruger enten konfigureret kolonne ELLER "Annulled Sales" fallback. Ny logik checker **begge** med OR:
+- Tilføj `phone_excluded_products` til `UploadConfig` interface
+- I **Pass 1b** (linje ~1023): Tjek om rækkens produktnavn matcher exclusion-listen → skip rækken
+- I **Pass 2** (linje ~1141): Fjern `if (excelPhone) return;` guarden for rækker hvis produkt er i exclusion-listen, så de kan matches via sælger+dato+produkt
 
 ```typescript
-if (uploadType === "both") {
-  const typeCol = activeQueueConfig?.type_detection_column;
-  const typeVals = (activeQueueConfig?.type_detection_values as string[]) || [];
-  
-  let isConfiguredCancellation = false;
-  if (typeCol && typeVals.length > 0) {
-    const cellVal = String(getCaseInsensitive(sale.uploadedRowData, typeCol) || "").trim().toLowerCase();
-    isConfiguredCancellation = typeVals.some(v => v.toLowerCase() === cellVal);
-  }
-  
-  const annulledVal = String(getCaseInsensitive(sale.uploadedRowData, "Annulled Sales") || "").trim();
-  const isAnnulledSales = annulledVal !== "" && annulledVal !== "0";
-  
-  rowUploadType = (isConfiguredCancellation || isAnnulledSales) ? "cancellation" : "basket_difference";
-}
+// Pass 1b: Skip excluded products
+const phoneExcluded = (activeConfig?.phone_excluded_products as string[]) || [];
+const excelProduct = /* resolve product name from row */;
+const isPhoneExcluded = phoneExcluded.some(p => 
+  excelProduct.toLowerCase().includes(p.toLowerCase())
+);
+if (isPhoneExcluded) return; // let Pass 2 handle it
+
+// Pass 2: Allow phone-excluded rows through even if they have a phone
+if (excelPhone && !isPhoneExcluded) return;
 ```
 
-Samme OR-logik opdateres i preview-badge (linje ~1943-1960).
-
----
-
-### Problem 2: Dubletter vises ikke i godkendelseskøen
-
-`ApprovalQueueTab.tsx` har ingen dublet-detektering overhovedet.
-
-**Løsning**: Tilføj dublet-markering i `ApprovalQueueTab.tsx`:
-
-1. **Detekter dubletter**: I en `useMemo`, byg et `Map<telefonnummer, antal>` fra alle pending items. Telefonnumre med >1 forekomst er dubletter.
-2. **Vis badge**: Tilføj en orange "Dublet" `Badge` på rækker med duplikeret telefonnummer.
-3. **Filter-toggle**: Tilføj en "Kun dubletter" knap/toggle i toolbar der filtrerer til kun dublet-rækker.
+**4. Config UI**: Tilføj et inputfelt i opsætningsdialogen for "Produkter uden telefon-match" (komma-separeret).
 
 ### Filer der ændres
-1. **Database** (insert tool) — Opdater Eesy FM config med type_detection_column/values
-2. **`src/components/cancellations/UploadCancellationsTab.tsx`** — OR-logik i queue-building + preview badge
-3. **`src/components/cancellations/ApprovalQueueTab.tsx`** — Dublet-detektering, badge og filter
+- **Migration**: Tilføj `phone_excluded_products` kolonne + opdater Eesy FM config
+- **`UploadCancellationsTab.tsx`**: Interface, Pass 1b guard, Pass 2 guard, config wizard UI
 
