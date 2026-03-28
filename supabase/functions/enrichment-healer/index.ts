@@ -128,7 +128,11 @@ async function healAdversus(
         throw new Error("API returned empty lead data");
       }
 
-      const phone = leadData.phone || leadData.contactPhone || leadData.mobile || null;
+      let phone = leadData.phone || leadData.contactPhone || leadData.mobile || null;
+      if (!phone && leadData.contactData) {
+        const cd = leadData.contactData;
+        phone = cd.Telefonnummer1 || cd['Kontakt nummer'] || cd.phone || cd.mobile || cd.Mobil || cd.Telefon || null;
+      }
 
       const updatedPayload = {
         ...rawPayload,
