@@ -1,6 +1,6 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Shield, Users, FileText, Lock, ArrowRight, Bell, ClipboardList, AlertTriangle, Globe } from "lucide-react";
+import { Shield, Users, FileText, Lock, ArrowRight, Bell, ClipboardList, AlertTriangle, Globe, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { usePermissions } from "@/hooks/usePositionPermissions";
@@ -71,6 +71,15 @@ export default function ComplianceOverview() {
       badge: "Art. 28",
       badgeColor: "bg-green-500/10 text-green-700 border-green-500/30",
       href: "/compliance/data-transfers",
+      permKey: "menu_compliance_admin",
+    },
+    {
+      title: "Sletningspolitikker",
+      description: "Konfigurer retention-perioder og rensningstype per kampagne. Vælg mellem anonymisering af kundedata eller fuld sletning.",
+      icon: Clock,
+      badge: "GDPR",
+      badgeColor: "bg-yellow-500/10 text-yellow-700 border-yellow-500/30",
+      href: "/compliance/retention-policies",
       permKey: "menu_compliance_admin",
     },
   ];

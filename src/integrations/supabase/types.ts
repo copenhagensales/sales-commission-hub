@@ -1525,6 +1525,44 @@ export type Database = {
           },
         ]
       }
+      campaign_retention_policies: {
+        Row: {
+          cleanup_mode: string
+          client_campaign_id: string
+          created_at: string
+          id: string
+          is_active: boolean
+          retention_days: number | null
+          updated_at: string
+        }
+        Insert: {
+          cleanup_mode?: string
+          client_campaign_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          retention_days?: number | null
+          updated_at?: string
+        }
+        Update: {
+          cleanup_mode?: string
+          client_campaign_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          retention_days?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_retention_policies_client_campaign_id_fkey"
+            columns: ["client_campaign_id"]
+            isOneToOne: true
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cancellation_imports: {
         Row: {
           client_id: string
