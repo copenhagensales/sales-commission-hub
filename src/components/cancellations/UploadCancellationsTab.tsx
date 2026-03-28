@@ -65,6 +65,7 @@ interface MatchedSale {
   realProductName?: string;
   commission?: number;
   revenue?: number;
+  matchConfidence?: "high" | "medium";
 }
 
 interface ProductPhoneMapping {
@@ -1266,50 +1267,132 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             // Parse Excel date for comparison
             const excelDateObj = new Date(excelDate);
 
-            // Match against candidate sales by agent + date + product
-            for (const sale of candidateSales) {
-              // Check if agent matches via agent_email field
-              const saleAgentEmail = (sale.agent_email || "").toLowerCase();
-              if (saleAgentEmail !== agentEmail) continue;
+            // Detect if this row's product is phone-excluded
+            const prodCol3 = activeConfig?.product_columns?.[0];
+            let rowProduct3 = "";
+            if (prodCol3) rowProduct3 = String(getCaseInsensitive(row.originalRow, prodCol3) || "").trim();
+            if (!rowProduct3) {
+              for (const key of PRODUCT_KEYS) {
+                const val = getCaseInsensitive(row.originalRow, key);
+                if (val && String(val).trim()) { rowProduct3 = String(val).trim(); break; }
+              }
+            }
+            const isPhoneExcludedRow = phoneExcludedProducts.some(p => rowProduct3.toLowerCase().includes(p.toLowerCase()));
 
-              // Check date match (same day)
-              const saleDateObj = new Date(sale.sale_datetime);
-              if (
-                excelDateObj.getFullYear() !== saleDateObj.getFullYear() ||
-                excelDateObj.getMonth() !== saleDateObj.getMonth() ||
-                excelDateObj.getDate() !== saleDateObj.getDate()
-              ) continue;
+            if (isPhoneExcludedRow) {
+              // --- Phone-excluded matching: Seller + Product (required), then Date OR Customer (at least one) ---
+              const candidates: typeof candidateSales = [];
+              for (const sale of candidateSales) {
+                if (existingIds.has(sale.id)) continue;
+                const saleAgentEmail = (sale.agent_email || "").toLowerCase();
+                if (saleAgentEmail !== agentEmail) continue;
+                const items = saleItemsMap.get(sale.id) || [];
+                const hasProduct = items.some(item =>
+                  item.adversus_product_title?.toLowerCase() === resolvedProductTitle!.toLowerCase()
+                );
+                if (!hasProduct) continue;
+                candidates.push(sale);
+              }
 
-              // Check product match via sale_items
-              const items = saleItemsMap.get(sale.id) || [];
-              const hasProduct = items.some(item => 
-                item.adversus_product_title?.toLowerCase() === resolvedProductTitle!.toLowerCase()
-              );
-              if (!hasProduct) continue;
+              let bestMatch: typeof candidateSales[0] | null = null;
+              let bestScore = 0;
 
-              // Match found!
-              const key = `${sale.id}|${resolvedProductTitle}`;
-              if (matchedSaleProductKeys.has(key)) continue;
-              matchedSaleProductKeys.add(key);
-              matchedIndicesLocal.add(idx);
-              const matchedItem = items.find(item => 
-                item.adversus_product_title?.toLowerCase() === resolvedProductTitle!.toLowerCase()
-              );
-              productMatched.push({
-                saleId: sale.id,
-                phone: sale.customer_phone || "",
-                company: sale.customer_company || "",
-                oppNumber: "",
-                saleDate: sale.sale_datetime || "",
-                employee: sale.agent_name || "Ukendt",
-                currentStatus: sale.validation_status || "pending",
-                uploadedRowData: row.originalRow,
-                targetProductName: resolvedProductTitle!,
-                realProductName: matchedItem?.adversus_product_title || resolvedProductTitle!,
-                commission: matchedItem?.mapped_commission ?? undefined,
-                revenue: matchedItem?.mapped_revenue ?? undefined,
-              });
-              break;
+              for (const sale of candidates) {
+                const saleDateObj = new Date(sale.sale_datetime);
+                const dateMatch =
+                  excelDateObj.getFullYear() === saleDateObj.getFullYear() &&
+                  excelDateObj.getMonth() === saleDateObj.getMonth() &&
+                  excelDateObj.getDate() === saleDateObj.getDate();
+
+                const customerMatch = !!excelPhone &&
+                  normalizePhone(sale.customer_phone || "") === excelPhone;
+
+                const score = (dateMatch ? 1 : 0) + (customerMatch ? 1 : 0);
+                if (score === 0) continue;
+                if (score > bestScore) {
+                  bestMatch = sale;
+                  bestScore = score;
+                }
+                if (bestScore === 2) break;
+              }
+
+              if (bestMatch) {
+                const key = `${bestMatch.id}|${resolvedProductTitle}`;
+                if (!matchedSaleProductKeys.has(key)) {
+                  matchedSaleProductKeys.add(key);
+                  matchedIndicesLocal.add(idx);
+                  const items = saleItemsMap.get(bestMatch.id) || [];
+                  const matchedItem = items.find(item =>
+                    item.adversus_product_title?.toLowerCase() === resolvedProductTitle!.toLowerCase()
+                  );
+                  productMatched.push({
+                    saleId: bestMatch.id,
+                    phone: bestMatch.customer_phone || "",
+                    company: bestMatch.customer_company || "",
+                    oppNumber: "",
+                    saleDate: bestMatch.sale_datetime || "",
+                    employee: bestMatch.agent_name || "Ukendt",
+                    currentStatus: bestMatch.validation_status || "pending",
+                    uploadedRowData: row.originalRow,
+                    targetProductName: resolvedProductTitle!,
+                    realProductName: matchedItem?.adversus_product_title || resolvedProductTitle!,
+                    commission: matchedItem?.mapped_commission ?? undefined,
+                    revenue: matchedItem?.mapped_revenue ?? undefined,
+                    matchConfidence: bestScore === 2 ? "high" : "medium",
+                  });
+                }
+              } else {
+                // No match → error queue (unmatched)
+                unmatchedSellers.push({
+                  rowIndex: idx,
+                  excelSellerName: excelSeller,
+                  excelDate,
+                  excelProduct: excelSubName,
+                  originalRow: row.originalRow,
+                });
+              }
+            } else {
+              // --- Standard matching: Seller + Date + Product (all three required) ---
+              for (const sale of candidateSales) {
+                const saleAgentEmail = (sale.agent_email || "").toLowerCase();
+                if (saleAgentEmail !== agentEmail) continue;
+
+                const saleDateObj = new Date(sale.sale_datetime);
+                if (
+                  excelDateObj.getFullYear() !== saleDateObj.getFullYear() ||
+                  excelDateObj.getMonth() !== saleDateObj.getMonth() ||
+                  excelDateObj.getDate() !== saleDateObj.getDate()
+                ) continue;
+
+                const items = saleItemsMap.get(sale.id) || [];
+                const hasProduct = items.some(item =>
+                  item.adversus_product_title?.toLowerCase() === resolvedProductTitle!.toLowerCase()
+                );
+                if (!hasProduct) continue;
+
+                const key = `${sale.id}|${resolvedProductTitle}`;
+                if (matchedSaleProductKeys.has(key)) continue;
+                matchedSaleProductKeys.add(key);
+                matchedIndicesLocal.add(idx);
+                const matchedItem = items.find(item =>
+                  item.adversus_product_title?.toLowerCase() === resolvedProductTitle!.toLowerCase()
+                );
+                productMatched.push({
+                  saleId: sale.id,
+                  phone: sale.customer_phone || "",
+                  company: sale.customer_company || "",
+                  oppNumber: "",
+                  saleDate: sale.sale_datetime || "",
+                  employee: sale.agent_name || "Ukendt",
+                  currentStatus: sale.validation_status || "pending",
+                  uploadedRowData: row.originalRow,
+                  targetProductName: resolvedProductTitle!,
+                  realProductName: matchedItem?.adversus_product_title || resolvedProductTitle!,
+                  commission: matchedItem?.mapped_commission ?? undefined,
+                  revenue: matchedItem?.mapped_revenue ?? undefined,
+                });
+                break;
+              }
             }
           });
 
