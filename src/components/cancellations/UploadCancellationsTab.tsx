@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { extractOpp } from "./utils/extractOpp";
 import { groupConditionsByProduct, findMatchingProductId } from "@/utils/productConditionMatcher";
 import { formatCurrency } from "@/lib/calculations/formatting";
@@ -1573,7 +1573,22 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
   })();
   const unmatchedRows = filteredDataForPreview.filter(row => !matchedRowIndices.has(row.originalIndex));
   const unmatchedCount = unmatchedRows.length;
-  const [previewTab, setPreviewTab] = useState<"matched" | "unmatched" | "seller_unmatched">("matched");
+
+  // Compute duplicates: DB sales matched by multiple file rows
+  const duplicateSalesMap = useMemo(() => {
+    const map = new Map<string, MatchedSale[]>();
+    matchedSales.forEach(sale => {
+      const arr = map.get(sale.saleId) || [];
+      arr.push(sale);
+      map.set(sale.saleId, arr);
+    });
+    return map;
+  }, [matchedSales]);
+  const duplicateEntries = useMemo(() => [...duplicateSalesMap.values()].filter(arr => arr.length > 1), [duplicateSalesMap]);
+  const duplicateSales = useMemo(() => duplicateEntries.flat(), [duplicateEntries]);
+  const duplicateCount = duplicateSales.length;
+
+  const [previewTab, setPreviewTab] = useState<"matched" | "unmatched" | "seller_unmatched" | "duplicates">("matched");
 
   // Handle saving a seller mapping and re-running match
   const handleSellerMappingSave = async (excelSellerName: string, employeeId: string) => {
@@ -1809,7 +1824,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                 className="text-sm px-3 py-1 cursor-pointer"
                 onClick={() => setPreviewTab("matched")}
               >
-                {matchedSales.length} matchede salg
+                {matchedRowIndices.size} matchede rækker ({matchedSales.length} salg)
               </Badge>
               {unmatchedCount > 0 && (
                 <Badge
@@ -1818,6 +1833,16 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                   onClick={() => setPreviewTab("unmatched")}
                 >
                   {unmatchedCount} umatchede rækker
+                </Badge>
+              )}
+              {duplicateCount > 0 && (
+                <Badge
+                  variant={previewTab === "duplicates" ? "destructive" : "outline"}
+                  className="text-sm px-3 py-1 cursor-pointer"
+                  onClick={() => setPreviewTab("duplicates")}
+                >
+                  <Layers className="h-3 w-3 mr-1" />
+                  {duplicateCount} dubletter
                 </Badge>
               )}
               {unmatchedSellerRows.length > 0 && (
@@ -1883,6 +1908,64 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                       ))}
                     </TableBody>
                   </Table>
+                </div>
+              )
+            ) : previewTab === "duplicates" ? (
+              duplicateSales.length === 0 ? (
+                <div className="py-8 text-center text-muted-foreground">
+                  <Check className="h-12 w-12 mx-auto mb-4" />
+                  <p>Ingen dubletter fundet</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Disse salg i databasen er matchet af flere rækker i upload-filen. Gennemgå for at undgå dobbelt-annulleringer.
+                  </p>
+                  <div className="rounded-md border max-h-96 overflow-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Salgs-ID</TableHead>
+                          <TableHead>Salgsdato</TableHead>
+                          <TableHead>Sælger</TableHead>
+                          <TableHead>Telefon</TableHead>
+                          <TableHead>Produkt</TableHead>
+                          <TableHead>Provision</TableHead>
+                          <TableHead>Omsætning</TableHead>
+                          <TableHead>Virksomhed</TableHead>
+                          <TableHead>OPP-nummer</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {duplicateEntries.map((group, gIdx) => (
+                          <React.Fragment key={group[0].saleId}>
+                            {gIdx > 0 && (
+                              <TableRow>
+                                <TableCell colSpan={9} className="py-1 px-0">
+                                  <div className="border-t-2 border-dashed border-destructive/30" />
+                                </TableCell>
+                              </TableRow>
+                            )}
+                            {group.map((sale, idx) => (
+                              <TableRow key={`${sale.saleId}-${idx}`} className="bg-destructive/5">
+                                <TableCell className="font-mono text-xs">{sale.saleId.slice(0, 8)}…</TableCell>
+                                <TableCell>{sale.saleDate}</TableCell>
+                                <TableCell>{resolve(sale.employee)}</TableCell>
+                                <TableCell>{sale.phone || "-"}</TableCell>
+                                <TableCell>
+                                  <Badge variant="outline">{sale.realProductName || sale.targetProductName || "-"}</Badge>
+                                </TableCell>
+                                <TableCell>{sale.commission != null ? formatCurrency(sale.commission) : "-"}</TableCell>
+                                <TableCell>{sale.revenue != null ? formatCurrency(sale.revenue) : "-"}</TableCell>
+                                <TableCell>{sale.company || "-"}</TableCell>
+                                <TableCell>{sale.oppNumber || "-"}</TableCell>
+                              </TableRow>
+                            ))}
+                          </React.Fragment>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
               )
             ) : previewTab === "seller_unmatched" ? (
