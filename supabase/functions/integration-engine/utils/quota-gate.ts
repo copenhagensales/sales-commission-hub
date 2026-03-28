@@ -60,10 +60,10 @@ export async function checkProviderQuota(
       if (resetTime > new Date()) {
         return { exhausted: true, remaining, resetAt, provider };
       }
-      // Reset time has passed — quota should be refreshed
+      // Reset time has passed – quota should be refreshed
       return { exhausted: false, remaining, resetAt, provider };
     }
-    // No reset time known — assume exhausted for safety
+    // No reset time known – assume exhausted for safety
     return { exhausted: true, remaining, resetAt: null, provider };
   }
 

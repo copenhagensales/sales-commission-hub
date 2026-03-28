@@ -195,7 +195,7 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
   const [expandedSaleIds, setExpandedSaleIds] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
 
-  // Submit search — only when user presses Enter or clicks search button
+  // Submit search – only when user presses Enter or clicks search button
   const submitSearch = useCallback(() => {
     const trimmed = searchInput.trim();
     if (trimmed.length >= 2 || trimmed.length === 0) {

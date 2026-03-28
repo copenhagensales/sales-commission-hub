@@ -338,7 +338,7 @@ export default function TeamGoals() {
                   <TableBody>
                     {goals.map((goal: any) => (
                       <TableRow key={goal.id}>
-                        <TableCell className="font-medium">{goal.teams?.name || "—"}</TableCell>
+                        <TableCell className="font-medium">{goal.teams?.name || "–"}</TableCell>
                         <TableCell>
                           <Badge variant="secondary">
                             {MONTH_NAMES[goal.month - 1]} {goal.year}

@@ -77,7 +77,7 @@ export function TabbedRecognitions({ currentWeek, lastWeek }: TabbedRecognitions
             showDate && person.date 
               ? `${formatDateShort(person.date)} - ${formatCommission(person.commission)}`
               : formatCommission(person.commission)
-          ) : "—"}
+          ) : "–"}
         </p>
       </div>
     </div>

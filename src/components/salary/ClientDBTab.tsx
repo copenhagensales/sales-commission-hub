@@ -1102,7 +1102,7 @@ export function ClientDBTab() {
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">{client.teamName || "—"}</span>
+                    <span className="text-muted-foreground">{client.teamName || "–"}</span>
                     <span className={cn(
                       "tabular-nums",
                       client.dbPercent >= 20 ? "text-primary" : 

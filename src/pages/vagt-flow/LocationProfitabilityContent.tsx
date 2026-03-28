@@ -523,7 +523,7 @@ export default function LocationProfitabilityContent() {
                               </SelectContent>
                             </Select>
                           ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
+                            <span className="text-xs text-muted-foreground">–</span>
                           )}
                         </TableCell>
                         <TableCell className="text-right">{loc.bookedDays.length}</TableCell>
@@ -563,7 +563,7 @@ export default function LocationProfitabilityContent() {
                               {!isBooked && <span className="ml-2 text-xs opacity-50">(ikke booket)</span>}
                             </TableCell>
                             <TableCell className="text-sm text-muted-foreground">
-                              {selectedPlacement?.name || "—"}
+                              {selectedPlacement?.name || "–"}
                             </TableCell>
                             <TableCell className="text-right text-sm">{isBooked ? "1" : "–"}</TableCell>
                             <TableCell className="text-right text-sm">{day?.sales || 0}</TableCell>

@@ -31,7 +31,7 @@ export async function enqueueFailed(
         run_id: runId || null,
       });
     } catch (e) {
-      // DLQ itself failed — log but don't crash the sync
+      // DLQ itself failed – log but don't crash the sync
       console.error(`[DLQ] Failed to enqueue ${chunk.length} ${dataset} records:`, e);
     }
   }

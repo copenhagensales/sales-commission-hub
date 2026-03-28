@@ -103,7 +103,7 @@ export function PowerdagSettings() {
       {/* Rules for selected event */}
       {activeEvent && (
         <section className="space-y-4">
-          <h2 className="text-lg font-bold">Pointregler — {activeEvent.name}</h2>
+          <h2 className="text-lg font-bold">Pointregler – {activeEvent.name}</h2>
           <div className="rounded-lg border">
             <Table>
               <TableHeader>
@@ -118,7 +118,7 @@ export function PowerdagSettings() {
                 {rules.map(r => (
                   <TableRow key={r.id}>
                     <TableCell className="font-medium">{r.team_name}</TableCell>
-                    <TableCell className="text-muted-foreground">{r.sub_client_name ?? "—"}</TableCell>
+                    <TableCell className="text-muted-foreground">{r.sub_client_name ?? "–"}</TableCell>
                     <TableCell>
                       <Input
                         type="number"

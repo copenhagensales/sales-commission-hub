@@ -653,7 +653,7 @@ export default function CommissionLeague() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {/* Round navigation — chips */}
+                  {/* Round navigation – chips */}
                   <div className="flex flex-wrap items-center gap-1.5 mb-4 overflow-x-auto pb-1">
                     <Button
                       variant={effectiveIndex === -1 ? "default" : "outline"}

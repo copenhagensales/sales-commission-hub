@@ -368,7 +368,7 @@ export class AdversusAdapter implements DialerAdapter {
     const fromISO = fromDate.toISOString()
     const toISO = toDate.toISOString()
 
-    // Cap lookback to max 7 days — UNLESS uncapped mode
+    // Cap lookback to max 7 days – UNLESS uncapped mode
     if (!uncapped) {
       const MAX_MODIFIED_DAYS = 7;
       const maxLookback = new Date();
@@ -378,7 +378,7 @@ export class AdversusAdapter implements DialerAdapter {
         fromDate.setTime(maxLookback.getTime());
       }
     } else {
-      console.log(`[Adversus] fetchSalesRange: UNCAPPED mode — no lookback cap, fromDate=${fromISO}`);
+      console.log(`[Adversus] fetchSalesRange: UNCAPPED mode – no lookback cap, fromDate=${fromISO}`);
     }
 
     const cappedFromISO = fromDate.toISOString();
@@ -400,7 +400,7 @@ export class AdversusAdapter implements DialerAdapter {
       console.log(`[Adversus] Pre-enrichment campaign filter: ${before} -> ${rawSales.length} sales (campaigns: ${campaignIds.join(",")})`);
     }
 
-    // Pre-enrichment limit — SKIP if uncapped
+    // Pre-enrichment limit – SKIP if uncapped
     if (!uncapped && maxRecords && rawSales.length > maxRecords) {
       rawSales.sort((a: any, b: any) => new Date(b.closedTime || b.created).getTime() - new Date(a.closedTime || a.created).getTime());
       rawSales = rawSales.slice(0, maxRecords);
@@ -579,10 +579,10 @@ export class AdversusAdapter implements DialerAdapter {
     let fetchSuccess = 0;
     let fetchFailed = 0;
 
-    // 2. Fetch leads — use faster rate limiting in "fast" mode (backfill)
+    // 2. Fetch leads – use faster rate limiting in "fast" mode (backfill)
     const fast = options?.fast ?? false;
-    const delayMs = fast ? 1500 : 2000; // 1.5s in fast mode vs 2s normal — safer for rate limits
-    const rateLimiter = new RateLimiter(fast ? 20 : 25, 900); // 20 req/min fast vs 25 normal — stays well under 60/min limit
+    const delayMs = fast ? 1500 : 2000; // 1.5s in fast mode vs 2s normal – safer for rate limits
+    const rateLimiter = new RateLimiter(fast ? 20 : 25, 900); // 20 req/min fast vs 25 normal – stays well under 60/min limit
     console.log(`[Adversus] buildLeadDataMap: mode=${fast ? 'FAST' : 'normal'}, delay=${delayMs}ms, ${uniqueLeadIds.length} leads`);
 
     for (let i = 0; i < uniqueLeadIds.length; i++) {

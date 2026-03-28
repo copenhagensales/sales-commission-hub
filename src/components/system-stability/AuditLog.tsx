@@ -109,8 +109,8 @@ export function AuditLog({ auditLog, integrations, onRollback }: AuditLogProps) 
                   <TableCell>
                     <Badge variant="outline" className="text-xs">{entry.change_type}</Badge>
                   </TableCell>
-                  <TableCell className="text-xs font-mono">{entry.old_schedule || "—"}</TableCell>
-                  <TableCell className="text-xs font-mono">{entry.new_schedule || "—"}</TableCell>
+                  <TableCell className="text-xs font-mono">{entry.old_schedule || "–"}</TableCell>
+                  <TableCell className="text-xs font-mono">{entry.new_schedule || "–"}</TableCell>
                   <TableCell className="text-right">
                     {entry.old_schedule && (
                       <Button

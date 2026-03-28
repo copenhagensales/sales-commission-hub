@@ -117,7 +117,7 @@ export default function EmployeePrivacy() {
             <AccordionContent className="text-sm text-muted-foreground leading-relaxed space-y-3">
               <p>Adgang til medarbejderoplysninger gives efter rolle og arbejdsbehov. Systemet anvender rollebaseret adgangsstyring:</p>
               <ul className="list-disc pl-5 space-y-1">
-                <li><strong>Medarbejder:</strong> kan se egne oplysninger — løn, provision, vagtplan og personlige data</li>
+                <li><strong>Medarbejder:</strong> kan se egne oplysninger – løn, provision, vagtplan og personlige data</li>
                 <li><strong>Teamleder:</strong> kan se salgs- og vagtdata for eget teams medarbejdere</li>
                 <li><strong>Ejer/administrator:</strong> fuld adgang til administration, løn, drift og systemkonfiguration</li>
               </ul>

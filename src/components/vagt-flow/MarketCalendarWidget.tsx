@@ -318,7 +318,7 @@ export function MarketCalendarWidget({ bookings, onBookingClick }: MarketCalenda
         {/* Empty state message */}
         {stats.total === 0 && (
           <p className="text-sm text-muted-foreground text-center py-2 bg-muted/50 rounded-lg">
-            Ingen kommende markeder planlagt — book via "Book uge" fanen
+            Ingen kommende markeder planlagt – book via "Book uge" fanen
           </p>
         )}
 

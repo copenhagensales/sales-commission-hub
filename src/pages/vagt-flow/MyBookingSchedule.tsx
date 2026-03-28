@@ -421,7 +421,7 @@ export default function MyBookingSchedule() {
                   >
                     <span className="font-medium">{day.dayName.slice(0, 3).toUpperCase()} {format(day.date, "d/M")}</span>
                     {isDayToday && <Badge variant="default" className="text-[10px] h-4 px-1.5">I dag</Badge>}
-                    <span className="italic">— Ingen vagt</span>
+                    <span className="italic">– Ingen vagt</span>
                   </div>
                 );
               }

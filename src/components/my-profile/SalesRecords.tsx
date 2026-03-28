@@ -136,7 +136,7 @@ export function SalesRecords({
         )}>
           <p className="text-xs text-muted-foreground mb-1">Bedste dag</p>
           <p className="text-xl font-bold mb-3">
-            {bestDayValue > 0 ? `${bestDayValue.toLocaleString("da-DK")} kr` : "—"}
+            {bestDayValue > 0 ? `${bestDayValue.toLocaleString("da-DK")} kr` : "–"}
           </p>
           
           {bestDayValue > 0 && (
@@ -172,7 +172,7 @@ export function SalesRecords({
         )}>
           <p className="text-xs text-muted-foreground mb-1">Bedste uge</p>
           <p className="text-xl font-bold mb-3">
-            {bestWeekValue > 0 ? `${bestWeekValue.toLocaleString("da-DK")} kr` : "—"}
+            {bestWeekValue > 0 ? `${bestWeekValue.toLocaleString("da-DK")} kr` : "–"}
           </p>
           
           {bestWeekValue > 0 && currentWeekTotal > 0 && (

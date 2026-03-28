@@ -258,7 +258,7 @@ export function SystemArchitectureDiagram({ integrations, metrics, budgets, sync
               const m = metrics.find((mm) => (mm as any).id === i.id);
               return {
                 label: i.name,
-                detail: m ? `${m.successRate1h.toFixed(0)}%` : "—",
+                detail: m ? `${m.successRate1h.toFixed(0)}%` : "–",
                 ok: m ? m.successRate1h >= 80 : true,
                 warn: m ? m.successRate1h < 95 : false,
                 pulse: i.last_status === "running",
@@ -276,7 +276,7 @@ export function SystemArchitectureDiagram({ integrations, metrics, budgets, sync
               const m = metrics.find((mm) => (mm as any).id === i.id);
               return {
                 label: i.name,
-                detail: m ? `${m.successRate1h.toFixed(0)}%` : "—",
+                detail: m ? `${m.successRate1h.toFixed(0)}%` : "–",
                 ok: m ? m.successRate1h >= 80 : true,
                 warn: m ? m.successRate1h < 95 : false,
                 pulse: i.last_status === "running",

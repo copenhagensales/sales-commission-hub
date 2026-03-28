@@ -104,7 +104,7 @@ export function useStabilityAlerts({
         });
       }
 
-      // Last sync checks — suppress for Enreach outside working hours
+      // Last sync checks – suppress for Enreach outside working hours
       const providerLower = (int.provider || "").toLowerCase();
       const isOffHoursProvider = (providerLower === "enreach" || providerLower === "adversus") && isOutsideDanishWorkingHours();
 

@@ -18,7 +18,7 @@ import { format, parseISO, startOfMonth, endOfMonth } from "date-fns";
 import { fetchAllRows } from "@/utils/supabasePagination";
 import { da } from "date-fns/locale";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-// buildFmPricingMap removed — pricing is handled by database triggers
+// buildFmPricingMap removed – pricing is handled by database triggers
 
 interface SaleRecord {
   id: string;
@@ -434,7 +434,7 @@ export default function EditSalesRegistrations() {
         if (error) throw error;
 
         // sale_items are created automatically by the create_fm_sale_items trigger
-        // with correct campaign-aware pricing — no manual creation needed
+        // with correct campaign-aware pricing – no manual creation needed
       }
     },
     onSuccess: () => {

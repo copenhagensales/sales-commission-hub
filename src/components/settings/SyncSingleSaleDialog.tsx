@@ -161,7 +161,7 @@ export function SyncSingleSaleDialog({
   };
 
   const formatDate = (dt: string | null) => {
-    if (!dt) return "—";
+    if (!dt) return "–";
     try {
       return format(new Date(dt), "dd-MM-yyyy HH:mm");
     } catch {
@@ -208,7 +208,7 @@ export function SyncSingleSaleDialog({
                     >
                       <div className="min-w-0">
                         <div className="font-medium truncate">
-                          {sale.adversus_external_id || "—"} · {sale.agent_name || "Ukendt agent"}
+                          {sale.adversus_external_id || "–"} · {sale.agent_name || "Ukendt agent"}
                         </div>
                         <div className="text-xs text-muted-foreground truncate">
                           {sale.customer_company || "Ingen firma"} · {sale.customer_phone || "Ingen tlf"} · {formatDate(sale.sale_datetime)}
@@ -232,11 +232,11 @@ export function SyncSingleSaleDialog({
             <div className="rounded-md border p-3 text-sm space-y-2">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">External ID</span>
-                <span className="font-medium">{selectedSale.adversus_external_id || "—"}</span>
+                <span className="font-medium">{selectedSale.adversus_external_id || "–"}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Agent</span>
-                <span className="font-medium">{selectedSale.agent_name || "—"}</span>
+                <span className="font-medium">{selectedSale.agent_name || "–"}</span>
               </div>
               {selectedSale.agent_email && (
                 <div className="flex justify-between">
@@ -246,7 +246,7 @@ export function SyncSingleSaleDialog({
               )}
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Kunde</span>
-                <span className="font-medium">{selectedSale.customer_company || "—"} {selectedSale.customer_phone ? `(${selectedSale.customer_phone})` : ""}</span>
+                <span className="font-medium">{selectedSale.customer_company || "–"} {selectedSale.customer_phone ? `(${selectedSale.customer_phone})` : ""}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Dato</span>
@@ -255,7 +255,7 @@ export function SyncSingleSaleDialog({
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Enrichment</span>
                 <Badge variant={selectedSale.enrichment_status === "complete" ? "default" : "secondary"}>
-                  {selectedSale.enrichment_status || "—"}
+                  {selectedSale.enrichment_status || "–"}
                 </Badge>
               </div>
               {selectedSale.internal_reference && (

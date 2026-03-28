@@ -145,7 +145,7 @@ export function MyQualificationStatus({
           {zoneInfo.text}
         </div>
 
-        {/* Rival distance bar — moved up for visibility */}
+        {/* Rival distance bar – moved up for visibility */}
         {rivalInfo && (
           <div className="rounded-lg bg-slate-800/40 p-3 mb-4 space-y-2">
             <p className="text-xs font-medium text-muted-foreground">Afstand til rivaler</p>

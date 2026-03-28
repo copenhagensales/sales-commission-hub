@@ -234,7 +234,7 @@ export default function AmoDashboard() {
         </div>
         <div>
           <h1 className="text-2xl font-bold text-foreground">AMO Compliance Hub</h1>
-          <p className="text-sm text-muted-foreground">Copenhagen Sales — Arbejdsmiljøoverblik</p>
+          <p className="text-sm text-muted-foreground">Copenhagen Sales – Arbejdsmiljøoverblik</p>
         </div>
       </div>
 

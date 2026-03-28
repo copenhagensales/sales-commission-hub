@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
 
 // Access level configurations
 const accessLevels: { value: DashboardAccessLevel; label: string; shortLabel: string; description: string }[] = [
-  { value: 'none', label: 'Ingen', shortLabel: '—', description: 'Ingen adgang' },
+  { value: 'none', label: 'Ingen', shortLabel: '–', description: 'Ingen adgang' },
   { value: 'team_leader', label: 'TL', shortLabel: 'TL', description: 'Kun teamleder' },
   { value: 'leadership', label: 'Ledelse', shortLabel: 'Led.', description: 'Teamleder + assisterende' },
   { value: 'all', label: 'Alle', shortLabel: 'Alle', description: 'Hele teamet' },

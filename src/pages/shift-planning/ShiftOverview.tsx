@@ -1869,7 +1869,7 @@ export default function ShiftOverview() {
                 Tilføj dagsbonus
               </DialogTitle>
               <p className="text-sm text-muted-foreground">
-                {bonusDialogEmployeeName} — {bonusDialogDate}
+                {bonusDialogEmployeeName} – {bonusDialogDate}
               </p>
             </DialogHeader>
             <div className="py-4">

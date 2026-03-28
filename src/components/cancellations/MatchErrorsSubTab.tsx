@@ -269,7 +269,7 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
       if (result && result.matched > 0) {
         toast({ title: "Rækken matchet og sendt til godkendelseskøen" });
       } else {
-        toast({ title: "Sælger-mapping gemt — ingen salg fundet for denne række" });
+        toast({ title: "Sælger-mapping gemt – ingen salg fundet for denne række" });
       }
       queryClient.invalidateQueries({ queryKey: ["cancellation-seller-mappings", clientId] });
       queryClient.invalidateQueries({ queryKey: ["match-errors", clientId] });

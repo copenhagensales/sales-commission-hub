@@ -192,7 +192,7 @@ export default function PulseSurvey() {
   };
 
   const handleSubmit = async () => {
-    if (isTestMode) { toast.success('Test afsluttet — ingen data blev gemt'); navigate('/pulse-survey-results'); return; }
+    if (isTestMode) { toast.success('Test afsluttet – ingen data blev gemt'); navigate('/pulse-survey-results'); return; }
 
     const requiredScales = SCALE_QUESTIONS.map(q => q.key);
     for (const key of requiredScales) {
@@ -278,7 +278,7 @@ export default function PulseSurvey() {
           {isTestMode && (
             <Alert className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
               <FlaskConical className="h-4 w-4 text-amber-600" />
-              <AlertDescription className="text-amber-800 dark:text-amber-200">Du er i test-tilstand — svar gemmes ikke.</AlertDescription>
+              <AlertDescription className="text-amber-800 dark:text-amber-200">Du er i test-tilstand – svar gemmes ikke.</AlertDescription>
             </Alert>
           )}
 
@@ -291,7 +291,7 @@ export default function PulseSurvey() {
           <div>
             <h1 className="text-3xl font-bold">{isTestMode ? 'Pulsmåling (Test)' : 'Pulsmåling'}</h1>
             <p className="text-muted-foreground">
-              {isTestMode ? 'Test-tilstand — ingen data gemmes' : activeSurvey ? `${monthNames[activeSurvey.month - 1]} ${activeSurvey.year}` : 'Månedlig trivselsmåling'}
+              {isTestMode ? 'Test-tilstand – ingen data gemmes' : activeSurvey ? `${monthNames[activeSurvey.month - 1]} ${activeSurvey.year}` : 'Månedlig trivselsmåling'}
             </p>
           </div>
 
@@ -426,7 +426,7 @@ export default function PulseSurvey() {
                   {isTestMode ? 'Afslut test (gemmes ikke)' : submitSurvey.isPending ? 'Indsender...' : 'Indsend besvarelse'}
                 </Button>
                 <p className="text-sm text-muted-foreground text-center mt-3">
-                  {isTestMode ? 'Dette er en test — ingen data gemmes.' : 'Din besvarelse er anonym og kan ikke ændres efter indsendelse.'}
+                  {isTestMode ? 'Dette er en test – ingen data gemmes.' : 'Din besvarelse er anonym og kan ikke ændres efter indsendelse.'}
                 </p>
                 {!isTestMode && draftStatus !== 'idle' && (
                   <p className="text-xs text-muted-foreground text-center mt-2 flex items-center justify-center gap-1.5">

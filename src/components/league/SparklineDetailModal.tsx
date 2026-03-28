@@ -43,7 +43,7 @@ export function SparklineDetailModal({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="text-base">
-            {playerName ? `${playerName} — 7-dages provision` : "7-dages provision"}
+            {playerName ? `${playerName} – 7-dages provision` : "7-dages provision"}
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground">
             Daglig provision de seneste 7 dage

@@ -131,11 +131,11 @@ serve(async (req) => {
     });
 
     if (noLeadId.length > 0) {
-      log(`${noLeadId.length} sales have no leadId — cannot fetch automatically`);
+      log(`${noLeadId.length} sales have no leadId – cannot fetch automatically`);
     }
 
     if (needsHealing.length === 0) {
-      log("No more TDC Erhverv sales need OPP backfill — done!");
+      log("No more TDC Erhverv sales need OPP backfill – done!");
       return new Response(JSON.stringify({ success: true, processed: 0, remaining: 0, done: true, logs }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -158,7 +158,7 @@ serve(async (req) => {
       const leadId = sale.raw_payload.leadId || sale.raw_payload.metadata?.leadId;
 
       try {
-        // Fetch lead data — Adversus returns { leads: [...] } format
+        // Fetch lead data – Adversus returns { leads: [...] } format
         const response = await fetch(`https://api.adversus.io/v1/leads/${leadId}`, {
           headers: { Authorization: creds.authHeader },
         });

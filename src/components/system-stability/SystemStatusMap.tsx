@@ -231,7 +231,7 @@ export function SystemStatusMap({ integrations, metrics, budgets, syncRuns }: Pr
 
       {/* ─── ZONE 1: EKSTERNE KILDER ─── */}
       <div className={`transition-all duration-500 ${!isVisible("sources") ? "opacity-20 grayscale pointer-events-none" : ""}`}>
-        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Zone 1 — Eksterne Kilder</p>
+        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Zone 1 – Eksterne Kilder</p>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
           <ZoneCard title="Adversus API" icon={Cloud} status={computed.adversusStatus} dimmed={false}
             items={[{ icon: ShoppingCart, label: "Salg" }, { icon: Users, label: "Agenter" }, { icon: Target, label: "Kampagner" }]} />
@@ -250,7 +250,7 @@ export function SystemStatusMap({ integrations, metrics, budgets, syncRuns }: Pr
 
       {/* ─── ZONE 2: BACKEND PROCESSING ─── */}
       <div className={`transition-all duration-500 ${!isVisible("processing") ? "opacity-20 grayscale pointer-events-none" : ""}`}>
-        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Zone 2 — Backend Processing</p>
+        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Zone 2 – Backend Processing</p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
           <ZoneCard title="Integration Engine" icon={Server} status={computed.engineStatus} dimmed={false}
             items={[{ icon: Layers, label: "Adversus Adapter", status: computed.adversusStatus }, { icon: Layers, label: "Enreach Adapter", status: computed.enreachStatus }, { icon: Clock, label: "Rate Limiter" }, { icon: Activity, label: "Smart Backfill" }]} />
@@ -265,7 +265,7 @@ export function SystemStatusMap({ integrations, metrics, budgets, syncRuns }: Pr
 
       {/* ─── ZONE 3: DATABASE ─── */}
       <div className={`transition-all duration-500 ${!isVisible("database") ? "opacity-20 grayscale pointer-events-none" : ""}`}>
-        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Zone 3 — Database Layer</p>
+        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Zone 3 – Database Layer</p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
           <ZoneCard title="Primær Database" icon={Database} status="ok" dimmed={false}
             items={[{ icon: ShoppingCart, label: "sales" }, { icon: Users, label: "employees" }, { icon: Briefcase, label: "teams" }, { icon: FileText, label: "contracts" }, { icon: Target, label: "campaigns" }, { icon: Activity, label: "sync_runs" }]} />
@@ -280,7 +280,7 @@ export function SystemStatusMap({ integrations, metrics, budgets, syncRuns }: Pr
 
       {/* ─── ZONE 4: APP MODULER ─── */}
       <div className={`transition-all duration-500 ${!isVisible("app") && !isVisible("app-personnel") && !isVisible("app-games") && !isVisible("app-recruitment") && !isVisible("app-onboarding") && !isVisible("app-shifts") && !isVisible("app-fieldmarketing") && !isVisible("app-economy") && !isVisible("app-reports") ? "opacity-20 grayscale pointer-events-none" : ""}`}>
-        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Zone 4 — Applikationsmoduler</p>
+        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Zone 4 – Applikationsmoduler</p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
 
           <ZoneCard title="Personale" icon={Users} status="ok" dimmed={!isVisible("app") && !isVisible("app-personnel")}
@@ -325,7 +325,7 @@ export function SystemStatusMap({ integrations, metrics, budgets, syncRuns }: Pr
 
       {/* ─── ZONE 5: KPI & CACHE ─── */}
       <div className={`transition-all duration-500 ${!isVisible("kpi") ? "opacity-20 grayscale pointer-events-none" : ""}`}>
-        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Zone 5 — KPI & Cache</p>
+        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Zone 5 – KPI & Cache</p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
           <ZoneCard title="pg_cron Scheduler" icon={Clock} status="ok" dimmed={false}
             items={[{ icon: Clock, label: "Periodisk trigger" }, { icon: Activity, label: "Incremental" }]} />
@@ -340,7 +340,7 @@ export function SystemStatusMap({ integrations, metrics, budgets, syncRuns }: Pr
 
       {/* ─── ZONE 6: OUTPUT ─── */}
       <div className={`transition-all duration-500 ${!isVisible("output") ? "opacity-20 grayscale pointer-events-none" : ""}`}>
-        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Zone 6 — Output</p>
+        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Zone 6 – Output</p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
           <ZoneCard title="Klient Dashboards" icon={Monitor} status="ok" dimmed={false}
             items={[

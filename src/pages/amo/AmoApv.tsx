@@ -288,9 +288,9 @@ export default function AmoApv() {
             <div className="space-y-3 text-sm">
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div><strong>Årsag:</strong> {reasonLabels[detailApv.reason]}</div>
-                <div><strong>Risiko:</strong> {detailApv.risk_level || "—"}</div>
-                <div><strong>Ansvarlig:</strong> {detailApv.responsible_owner || "—"}</div>
-                <div><strong>Opfølgning:</strong> {detailApv.follow_up_status || "—"}</div>
+                <div><strong>Risiko:</strong> {detailApv.risk_level || "–"}</div>
+                <div><strong>Ansvarlig:</strong> {detailApv.responsible_owner || "–"}</div>
+                <div><strong>Opfølgning:</strong> {detailApv.follow_up_status || "–"}</div>
               </div>
               {detailApv.physical_env && <div><strong>Fysisk arbejdsmiljø:</strong><p className="text-muted-foreground">{detailApv.physical_env}</p></div>}
               {detailApv.psychological_env && <div><strong>Psykisk arbejdsmiljø:</strong><p className="text-muted-foreground">{detailApv.psychological_env}</p></div>}
