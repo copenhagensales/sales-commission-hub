@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Check, X, ArrowRight, Loader2, Upload } from "lucide-react";
+import { Check, X, ArrowRight, Loader2, Upload, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
+import { useDropzone } from "react-dropzone";
 import { parseExcelFile } from "@/utils/excel";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -70,35 +71,67 @@ const suggestMapping = (columnName: string): string | null => {
   return mappings[normalized] || null;
 };
 
+function UploadZone({ getRootProps, getInputProps, isDragActive }: { getRootProps: any; getInputProps: any; isDragActive: boolean }) {
+  return (
+    <Card>
+      <CardContent className="p-0">
+        <div
+          {...getRootProps()}
+          className={`flex flex-col items-center justify-center gap-4 p-16 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
+            isDragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"
+          }`}
+        >
+          <input {...getInputProps()} />
+          <FileSpreadsheet className="h-12 w-12 text-muted-foreground" />
+          {isDragActive ? (
+            <p className="text-primary font-medium">Slip filen her...</p>
+          ) : (
+            <>
+              <p className="text-muted-foreground font-medium">Træk en .xlsx-fil hertil eller klik for at vælge</p>
+              <p className="text-sm text-muted-foreground">Kun .xlsx-filer understøttes</p>
+            </>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function ExcelFieldMatcher() {
   const [excelColumns, setExcelColumns] = useState<string[]>([]);
   const [sampleData, setSampleData] = useState<Record<string, unknown>[]>([]);
   const [allData, setAllData] = useState<Record<string, unknown>[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const loadExcelFile = async () => {
-      try {
-        const response = await fetch(`/temp/employee-import.xlsx?t=${Date.now()}`);
-        const arrayBuffer = await response.arrayBuffer();
-        const { rows: jsonData, columns: cols } = await parseExcelFile(arrayBuffer);
-
-        if (jsonData.length > 0) {
-          setExcelColumns(cols);
-          setSampleData(jsonData.slice(0, 5));
-          setAllData(jsonData);
-        }
-        setLoading(false);
-      } catch (err) {
-        setError("Kunne ikke læse Excel-filen");
-        setLoading(false);
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    const file = acceptedFiles[0];
+    if (!file) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const { rows: jsonData, columns: cols } = await parseExcelFile(arrayBuffer);
+      if (jsonData.length > 0) {
+        setExcelColumns(cols);
+        setSampleData(jsonData.slice(0, 5));
+        setAllData(jsonData);
+      } else {
+        setError("Filen indeholder ingen data");
       }
-    };
-
-    loadExcelFile();
+    } catch {
+      setError("Kunne ikke læse Excel-filen");
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: { "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"] },
+    maxFiles: 1,
+  });
 
   const handleImport = async () => {
     if (allData.length === 0) {
@@ -195,11 +228,27 @@ export default function ExcelFieldMatcher() {
   };
 
   if (loading) {
-    return <div className="p-8 text-center">Indlæser Excel-fil...</div>;
+    return <div className="p-8 text-center text-muted-foreground">Indlæser Excel-fil...</div>;
   }
 
-  if (error) {
-    return <div className="p-8 text-center text-destructive">{error}</div>;
+  if (error && allData.length === 0) {
+    return (
+      <div className="p-8 max-w-6xl mx-auto space-y-8">
+        <h1 className="text-3xl font-bold">Excel Feltmatcher</h1>
+        <div className="text-center text-destructive mb-4">{error}</div>
+        <UploadZone getRootProps={getRootProps} getInputProps={getInputProps} isDragActive={isDragActive} />
+      </div>
+    );
+  }
+
+  if (allData.length === 0) {
+    return (
+      <div className="p-8 max-w-6xl mx-auto space-y-8">
+        <h1 className="text-3xl font-bold">Excel Feltmatcher</h1>
+        <p className="text-muted-foreground">Upload en Excel-fil for at matche kolonner til stamdata-felter</p>
+        <UploadZone getRootProps={getRootProps} getInputProps={getInputProps} isDragActive={isDragActive} />
+      </div>
+    );
   }
 
   return (
