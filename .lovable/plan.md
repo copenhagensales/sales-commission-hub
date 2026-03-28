@@ -1,46 +1,55 @@
 
 
-## Fix: Hent ALLE rækker i godkendelseskøen
+## Gør junk-row filter konfigurerbart per kunde
 
 ### Problem
-Linje 373 har `.limit(200)` som afskærer data. Med 1000+ ventende rækker vises kun de første 200.
+Rule 3 i junk-filteret fjerner rækker hvor telefon er tom og ingen andre match-kolonner har værdier. For nogle kunder (f.eks. Tryg med pivot-tabeller) er det korrekt. For andre kunder mister vi reelle datarækker (199 rækker i dette tilfælde).
+
+Filteret skal være kundespecifikt — ligesom alle andre upload-logikker allerede er det via `cancellation_upload_configs`.
 
 ### Løsning
 
-**Fil: `src/components/cancellations/ApprovalQueueTab.tsx`, linje 361-373**
+**1. Database: Tilføj kolonne**
 
-Erstat den enkle query med pagineret fetch-loop:
+Tilføj `skip_empty_row_filter` (boolean, default `false`) til `cancellation_upload_configs`. Eksisterende kunder beholder nuværende adfærd (Rule 3 aktiv). Kun kunder der slår det til, bevarer tomme rækker.
 
-```typescript
-// Pagineret fetch - hent alle rækker i batches
-let allData: any[] = [];
-let from = 0;
-const batchSize = 1000;
-
-while (true) {
-  let batchQuery = supabase
-    .from("cancellation_queue")
-    .select("id, sale_id, upload_type, status, reviewed_at, created_at, import_id, uploaded_data, opp_group, client_id")
-    .order("created_at", { ascending: false })
-    .range(from, from + batchSize - 1);
-
-  if (statusFilter !== "all") {
-    batchQuery = batchQuery.eq("status", statusFilter);
-  }
-  if (clientId) {
-    batchQuery = batchQuery.eq("client_id", clientId);
-  }
-
-  const { data: batch, error } = await batchQuery;
-  if (error) throw error;
-  if (!batch || batch.length === 0) break;
-  allData.push(...batch);
-  if (batch.length < batchSize) break;
-  from += batchSize;
-}
-
-const data = allData;
+```sql
+ALTER TABLE cancellation_upload_configs
+ADD COLUMN skip_empty_row_filter boolean NOT NULL DEFAULT false;
 ```
 
-Resten af koden (linje 375+) forbliver uændret — den bruger allerede `data`-variablen.
+**2. UploadCancellationsTab.tsx — Junk-logik (2 steder)**
+
+Læs `activeConfig?.skip_empty_row_filter` og betinget spring Rule 3 over:
+
+**Sted 1 — `handleMatch` (linje 767-769):**
+```typescript
+// Rule 3: Kun aktiv hvis kunden IKKE har slået skip_empty_row_filter til
+if (!activeConfig?.skip_empty_row_filter) {
+  const hasAnyMatchValue = sellerVal.length > 0 || companyVal.length > 0 || oppVal.length > 0 || memberVal.length > 0;
+  if (!hasAnyMatchValue) return true;
+}
+```
+
+**Sted 2 — `filteredDataForPreview` (linje 1526):**
+Samme betingelse wrappet om den eksisterende tomme-række-check.
+
+**3. Config wizard — Tilføj toggle**
+
+I både opret-wizard (`handleSave`, linje 239) og redigerings-dialog (linje 376), tilføj feltet `skip_empty_row_filter`. 
+
+UI: En `Switch` komponent med label "Behold rækker uden telefonnummer" og beskrivelse "Slå til hvis filen indeholder rækker uden telefon/OPP som stadig er reelle data".
+
+Feltet gemmes ved insert og update af config.
+
+**4. Gem/opdater config (3 steder)**
+
+- Wizard insert (linje 239): tilføj `skip_empty_row_filter: cfgSkipEmptyFilter`
+- Edit dialog update (linje 376): tilføj `skip_empty_row_filter: cfgSkipEmptyFilter`  
+- Save config mutation (linje 606): tilføj `skip_empty_row_filter: skipEmptyRowFilter`
+
+### Resultat
+- Alle eksisterende kunder: Ingen ændring — default `false` holder Rule 3 aktiv.
+- Kunder med manglende rækker: Slå toggle til → alle rækker inkluderes, umatchede ender i "Fejl i match" i stedet for at blive slettet.
+- Setup er ensartet på tværs af kunder — kun konfigurationen er kundebestemt.
 
