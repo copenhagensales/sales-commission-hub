@@ -1112,6 +1112,10 @@ export default function MyProfile() {
               <Shield className="h-4 w-4 mr-2" />
               GDPR
             </TabsTrigger>
+            <TabsTrigger value="haandbog">
+              <BookOpen className="h-4 w-4 mr-2" />
+              Håndbog
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="stamdata" className="mt-6">
