@@ -55,8 +55,8 @@ export function HotelExpensesTab() {
             location:location_id(name, address_city)
           )
         `)
-        .gte("check_in", monthStart)
-        .lte("check_in", monthEnd)
+        .gte("check_in", periodStart)
+        .lte("check_in", periodEnd)
         .order("check_in", { ascending: true });
       if (error) throw error;
       return data as any[];
