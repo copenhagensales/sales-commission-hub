@@ -330,6 +330,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   const { user } = useAuth();
   const [statusFilter, setStatusFilter] = useState<string>("pending");
   const [onlyDifferences, setOnlyDifferences] = useState(false);
+  const [onlyDuplicates, setOnlyDuplicates] = useState(false);
   const [subTab, setSubTab] = useState<"cancellation" | "basket_difference" | "match_errors">("cancellation");
   const [searchQuery, setSearchQuery] = useState("");
   const [sellerFilter, setSellerFilter] = useState("all");
