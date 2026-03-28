@@ -6518,6 +6518,7 @@ export type Database = {
       }
       gdpr_consents: {
         Row: {
+          consent_text: string | null
           consent_type: string
           consented_at: string
           created_at: string
@@ -6528,6 +6529,7 @@ export type Database = {
           user_agent: string | null
         }
         Insert: {
+          consent_text?: string | null
           consent_type: string
           consented_at?: string
           created_at?: string
@@ -6538,6 +6540,7 @@ export type Database = {
           user_agent?: string | null
         }
         Update: {
+          consent_text?: string | null
           consent_type?: string
           consented_at?: string
           created_at?: string

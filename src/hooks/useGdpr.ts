@@ -57,7 +57,7 @@ export function useGiveConsent() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ consentType }: { consentType: string }) => {
+    mutationFn: async ({ consentType, consentText }: { consentType: string; consentText?: string }) => {
       // Get current employee id
       const { data: employeeData, error: empError } = await supabase
         .rpc("get_current_employee_id");
@@ -84,9 +84,10 @@ export function useGiveConsent() {
       const { error } = await supabase.from("gdpr_consents").insert({
         employee_id: employeeData,
         consent_type: consentType,
+        consent_text: consentText || null,
         ip_address: null, // Could be captured server-side
         user_agent: navigator.userAgent,
-      });
+      } as any);
 
       if (error) throw error;
     },

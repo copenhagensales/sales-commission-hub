@@ -1,0 +1,1 @@
+ALTER TABLE public.gdpr_consents ADD COLUMN IF NOT EXISTS consent_text text;

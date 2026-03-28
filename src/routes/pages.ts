@@ -225,3 +225,5 @@ export const ComplianceProcessingActivities = lazyPage(() => import("@/pages/com
 export const ComplianceSecurityIncidents = lazyPage(() => import("@/pages/compliance/SecurityIncidents"));
 export const ComplianceDataTransferRegistry = lazyPage(() => import("@/pages/compliance/DataTransferRegistry"));
 export const ComplianceRetentionPolicies = lazyPage(() => import("@/pages/compliance/RetentionPolicies"));
+export const ComplianceDpia = lazyPage(() => import("@/pages/compliance/DpiaDocumentation"));
+export const ComplianceGdprAwareness = lazyPage(() => import("@/pages/compliance/GdprAwareness"));
