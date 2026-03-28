@@ -1124,9 +1124,14 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                         <TableCell>{resolve(item.agentName)}</TableCell>
                         <TableCell>{item.oppNumber || "-"}</TableCell>
                         <TableCell>
-                          <Badge variant={item.upload_type === "cancellation" ? "destructive" : "secondary"}>
-                            {item.upload_type === "cancellation" ? "Annullering" : "Kurv diff."}
-                          </Badge>
+                          <div className="flex flex-wrap gap-1">
+                            <Badge variant={item.upload_type === "cancellation" ? "destructive" : "secondary"}>
+                              {item.upload_type === "cancellation" ? "Annullering" : "Kurv diff."}
+                            </Badge>
+                            {duplicatePhones.has((item.phone || "").trim()) && (item.phone || "").trim() && (
+                              <Badge className="bg-orange-500/15 text-orange-700 border-orange-300">Dublet</Badge>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="text-xs min-w-[280px] align-top">
                           {summarizedItems.length > 0 ? (
