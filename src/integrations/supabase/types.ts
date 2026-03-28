@@ -3985,6 +3985,39 @@ export type Database = {
         }
         Relationships: []
       }
+      data_retention_policies: {
+        Row: {
+          cleanup_mode: string
+          created_at: string
+          data_type: string
+          display_name: string
+          id: string
+          is_active: boolean
+          retention_days: number | null
+          updated_at: string
+        }
+        Insert: {
+          cleanup_mode?: string
+          created_at?: string
+          data_type: string
+          display_name: string
+          id?: string
+          is_active?: boolean
+          retention_days?: number | null
+          updated_at?: string
+        }
+        Update: {
+          cleanup_mode?: string
+          created_at?: string
+          data_type?: string
+          display_name?: string
+          id?: string
+          is_active?: boolean
+          retention_days?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       deactivation_reminder_config: {
         Row: {
           created_at: string
