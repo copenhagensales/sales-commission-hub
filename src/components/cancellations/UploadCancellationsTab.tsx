@@ -49,6 +49,7 @@ interface ParsedRow {
   phone?: string;
   company?: string;
   originalRow: Record<string, unknown>;
+  originalIndex: number;
 }
 
 interface MatchedSale {
