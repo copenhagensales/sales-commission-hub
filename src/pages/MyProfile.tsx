@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, FileText, CalendarX, Thermometer, AlertTriangle, AlarmClock, Pencil, Save, X, Check, Phone, Mail, Shield, History, ChevronDown, Star, TrendingUp, TrendingDown, Calendar, Target, Sparkles, Download } from "lucide-react";
+import { User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, FileText, CalendarX, Thermometer, AlertTriangle, AlarmClock, Pencil, Save, X, Check, Phone, Mail, Shield, History, ChevronDown, Star, TrendingUp, TrendingDown, Calendar, Target, Sparkles, Download, BookOpen } from "lucide-react";
 import { downloadContractAsPdf } from "@/utils/contractPdfGenerator";
 import { GdprSettingsCard } from "@/components/gdpr/GdprSettingsCard";
 import { EmployeeCalendar } from "@/components/employee/EmployeeCalendar";
@@ -23,6 +23,7 @@ import { MyScheduleTabContent } from "@/components/profile/MyScheduleTabContent"
 import { VACATION_PAY_RATES, countWorkDaysInPeriod, getPayrollPeriod } from "@/lib/calculations";
 
 import { CareerWishesTabContent } from "@/components/profile/CareerWishesTabContent";
+import { HandbookTabContent } from "@/components/profile/HandbookTabContent";
 
 
 // Read-only display field
