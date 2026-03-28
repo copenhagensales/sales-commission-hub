@@ -103,14 +103,14 @@ export default function AdminDocumentation() {
                       <TableCell>App-platform / hosting</TableCell>
                       <TableCell><span className="bg-green-200/60 text-green-800 px-1 rounded text-xs">Ja (Business/Enterprise)</span></TableCell>
                       <TableCell><span className="bg-green-200/60 text-green-800 px-1 rounded text-xs">Nej (EU-hostet)</span></TableCell>
-                      <TableCell><span className="bg-yellow-200/60 text-yellow-800 px-1 rounded text-xs">[dato]</span></TableCell>
+                      <TableCell><span className="bg-green-200/60 text-green-800 px-1 rounded text-xs">28.03.2026</span></TableCell>
                     </TableRow>
                     <TableRow>
                       <TableCell className="font-medium">Supabase (via Lovable Cloud)</TableCell>
                       <TableCell>Database / Auth / Storage</TableCell>
                       <TableCell><span className="bg-green-200/60 text-green-800 px-1 rounded text-xs">Ja (inkl. i Lovable Cloud)</span></TableCell>
                       <TableCell><span className="bg-green-200/60 text-green-800 px-1 rounded text-xs">Nej (EU-hostet)</span></TableCell>
-                      <TableCell><span className="bg-yellow-200/60 text-yellow-800 px-1 rounded text-xs">[dato]</span></TableCell>
+                      <TableCell><span className="bg-green-200/60 text-green-800 px-1 rounded text-xs">28.03.2026</span></TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>
