@@ -152,7 +152,7 @@ async function healAdversus(
       healed++;
       log(`Healed Adversus sale ${sale.adversus_external_id} (lead ${leadId})`);
 
-      await new Promise(r => setTimeout(r, turboMode ? 2000 : 3000));
+      await new Promise(r => setTimeout(r, turboMode ? 5000 : 6000));
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
       await supabase.from("sales").update({
@@ -282,6 +282,7 @@ serve(async (req) => {
     const saleExternalId = typeof body.saleExternalId === "string" ? body.saleExternalId.trim() : "";
     const providerFilter = typeof body.provider === "string" ? body.provider.trim() : "";
     const integrationIdFilter = typeof body.integrationId === "string" ? body.integrationId.trim() : "";
+    const clientIdFilter = typeof body.clientId === "string" ? body.clientId.trim() : "";
     const supabase = getSupabase();
     const logs: string[] = [];
     const log = (msg: string) => {
@@ -308,6 +309,10 @@ serve(async (req) => {
 
     if (providerFilter) {
       salesQuery = salesQuery.eq("integration_type", providerFilter);
+    }
+
+    if (clientIdFilter) {
+      salesQuery = salesQuery.eq("client_campaign_id", clientIdFilter);
     }
 
     const { data: pendingSales, error } = await salesQuery;
