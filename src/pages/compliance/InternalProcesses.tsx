@@ -5,6 +5,28 @@ import { Shield, Lock, Users, Database, Wallet, UserCheck, AlertTriangle, Refres
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+
+function OwnerEmail() {
+  const { data: ownerEmail } = useQuery({
+    queryKey: ["owner-email"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("employee_master_data")
+        .select("work_email")
+        .ilike("job_title", "Ejer")
+        .eq("is_active", true)
+        .maybeSingle();
+      return data?.work_email || null;
+    },
+  });
+
+  if (ownerEmail) {
+    return <a href={`mailto:${ownerEmail}`} className="text-primary underline">{ownerEmail}</a>;
+  }
+  return <span>virksomhedens ejer</span>;
+}
 
 export default function InternalProcesses() {
   const navigate = useNavigate();
@@ -114,7 +136,9 @@ export default function InternalProcesses() {
                   <li>kun nødvendige data må behandles</li>
                   <li>data må kun bruges til kontrol, afstemning, dokumentation eller fejlretning</li>
                   <li>data skal slettes eller anonymiseres, når formålet er afsluttet</li>
-                  <li>standardfrist for sletning er <span className="bg-yellow-200/60 text-yellow-800 px-1 rounded font-medium">[indsæt intern frist]</span></li>
+                  <li>kundedata slettes eller anonymiseres som udgangspunkt senest <strong>90 dage</strong> efter, at det konkrete kontrol-, afstemnings-, løn- eller faktureringsformål er afsluttet</li>
+                  <li>for erhvervskampagner, hvor der kan forekomme sene annulleringer eller efterreguleringer, kan relevante data opbevares længere, hvis der foreligger et konkret dokumenteret behov</li>
+                  <li>opbevaringen skal i sådanne tilfælde begrænses til det nødvendige og revurderes løbende</li>
                 </ul>
               </div>
             </AccordionContent>
@@ -195,7 +219,7 @@ export default function InternalProcesses() {
                   <li>læring og forbedringer dokumenteres</li>
                 </ul>
               </div>
-              <p>Sikkerhedshændelser meldes til <span className="bg-yellow-200/60 text-yellow-800 px-1 rounded font-medium">[indsæt funktion eller mail]</span>.</p>
+              <p>Sikkerhedshændelser meldes til <OwnerEmail /> (systemejer).</p>
             </AccordionContent>
           </AccordionItem>
 
@@ -213,7 +237,7 @@ export default function InternalProcesses() {
                 <li>ændringer i datatyper eller formål</li>
                 <li>opdateringsbehov i tekster og procedurer</li>
               </ul>
-              <p>Review gennemføres <span className="bg-yellow-200/60 text-yellow-800 px-1 rounded font-medium">[indsæt frekvens, fx månedligt eller kvartalsvist]</span>.</p>
+              <p>Review gennemføres <strong>kvartalsvist</strong>.</p>
             </AccordionContent>
           </AccordionItem>
         </Accordion>
