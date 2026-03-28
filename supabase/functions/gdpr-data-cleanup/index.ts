@@ -5,18 +5,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-/**
- * GDPR Data Cleanup Edge Function
- * 
- * This function runs daily (via pg_cron or scheduled trigger) to:
- * 1. Find fields with retention_days set
- * 2. Nullify expired data in normalized_data and raw_payload columns
- * 3. Log cleanup actions for audit trail
- * 
- * Invoke via HTTP POST or schedule with pg_cron:
- * SELECT cron.schedule('gdpr-cleanup-daily', '0 3 * * *', ...)
- */
-
 interface FieldDefinition {
   id: string;
   field_key: string;
@@ -25,7 +13,6 @@ interface FieldDefinition {
 }
 
 Deno.serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -42,7 +29,7 @@ Deno.serve(async (req) => {
   try {
     log("INFO", "Starting GDPR data cleanup job");
 
-    // 1. Fetch all field definitions with retention_days > 0
+    // ===== PART 1: Field retention cleanup (existing logic) =====
     const { data: fields, error: fieldsError } = await supabase
       .from("data_field_definitions")
       .select("id, field_key, retention_days, is_pii")
@@ -52,93 +39,128 @@ Deno.serve(async (req) => {
       throw new Error(`Failed to fetch field definitions: ${fieldsError.message}`);
     }
 
-    if (!fields || fields.length === 0) {
-      log("INFO", "No fields with retention policies configured");
-      return new Response(
-        JSON.stringify({ success: true, message: "No fields with retention policies" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    log("INFO", `Found ${fields.length} fields with retention policies`);
-
-    // 2. For each field, find and clean up expired data
     let totalCleaned = 0;
     const cleanupResults: { field_key: string; cleaned: number }[] = [];
 
-    for (const field of fields as FieldDefinition[]) {
-      const retentionDate = new Date();
-      retentionDate.setDate(retentionDate.getDate() - field.retention_days);
-      const cutoffDate = retentionDate.toISOString();
+    if (fields && fields.length > 0) {
+      log("INFO", `Found ${fields.length} fields with retention policies`);
 
-      log("INFO", `Processing field "${field.field_key}" (retention: ${field.retention_days} days, cutoff: ${cutoffDate})`);
+      for (const field of fields as FieldDefinition[]) {
+        const retentionDate = new Date();
+        retentionDate.setDate(retentionDate.getDate() - field.retention_days);
+        const cutoffDate = retentionDate.toISOString();
 
-      // Find sales with this field in normalized_data that are older than retention
-      const { data: expiredSales, error: selectError } = await supabase
-        .from("sales")
-        .select("id, normalized_data, raw_payload")
-        .lt("sale_datetime", cutoffDate)
-        .not("normalized_data", "is", null);
+        log("INFO", `Processing field "${field.field_key}" (retention: ${field.retention_days} days, cutoff: ${cutoffDate})`);
 
-      if (selectError) {
-        log("WARN", `Error querying expired sales for ${field.field_key}: ${selectError.message}`);
-        continue;
-      }
+        const { data: expiredSales, error: selectError } = await supabase
+          .from("sales")
+          .select("id, normalized_data, raw_payload")
+          .lt("sale_datetime", cutoffDate)
+          .not("normalized_data", "is", null);
 
-      if (!expiredSales || expiredSales.length === 0) {
-        log("INFO", `No expired data found for field "${field.field_key}"`);
-        continue;
-      }
+        if (selectError) {
+          log("WARN", `Error querying expired sales for ${field.field_key}: ${selectError.message}`);
+          continue;
+        }
 
-      // Process each expired sale
-      let fieldCleanedCount = 0;
+        if (!expiredSales || expiredSales.length === 0) {
+          log("INFO", `No expired data found for field "${field.field_key}"`);
+          continue;
+        }
 
-      for (const sale of expiredSales) {
-        const normalizedData = sale.normalized_data as Record<string, unknown> | null;
-        const rawPayload = sale.raw_payload as Record<string, unknown> | null;
+        let fieldCleanedCount = 0;
 
-        // Check if this field exists in normalized_data
-        if (normalizedData && field.field_key in normalizedData) {
-          const updatedNormalized = { ...normalizedData };
-          delete updatedNormalized[field.field_key];
-          
-          // Update with GDPR cleanup marker
-          updatedNormalized[`_gdpr_cleaned_${field.field_key}`] = new Date().toISOString();
+        for (const sale of expiredSales) {
+          const normalizedData = sale.normalized_data as Record<string, unknown> | null;
 
-          const { error: updateError } = await supabase
-            .from("sales")
-            .update({ normalized_data: updatedNormalized })
-            .eq("id", sale.id);
+          if (normalizedData && field.field_key in normalizedData) {
+            const updatedNormalized = { ...normalizedData };
+            delete updatedNormalized[field.field_key];
+            updatedNormalized[`_gdpr_cleaned_${field.field_key}`] = new Date().toISOString();
 
-          if (updateError) {
-            log("WARN", `Failed to clean normalized_data for sale ${sale.id}: ${updateError.message}`);
-          } else {
-            fieldCleanedCount++;
+            const { error: updateError } = await supabase
+              .from("sales")
+              .update({ normalized_data: updatedNormalized })
+              .eq("id", sale.id);
+
+            if (updateError) {
+              log("WARN", `Failed to clean normalized_data for sale ${sale.id}: ${updateError.message}`);
+            } else {
+              fieldCleanedCount++;
+            }
           }
         }
-      }
 
-      if (fieldCleanedCount > 0) {
-        cleanupResults.push({ field_key: field.field_key, cleaned: fieldCleanedCount });
-        totalCleaned += fieldCleanedCount;
-        log("INFO", `Cleaned ${fieldCleanedCount} records for field "${field.field_key}"`);
+        if (fieldCleanedCount > 0) {
+          cleanupResults.push({ field_key: field.field_key, cleaned: fieldCleanedCount });
+          totalCleaned += fieldCleanedCount;
+          log("INFO", `Cleaned ${fieldCleanedCount} records for field "${field.field_key}"`);
+        }
       }
+    } else {
+      log("INFO", "No fields with retention policies configured");
     }
 
-    // 3. Log summary
-    log("INFO", `GDPR cleanup complete. Total records cleaned: ${totalCleaned}`, cleanupResults);
+    // ===== PART 2: Candidate data anonymization (6 months after rejection) =====
+    let candidatesAnonymized = 0;
+    try {
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      const cutoff = sixMonthsAgo.toISOString();
 
-    // 4. Create audit log entry
-    if (totalCleaned > 0) {
+      const { data: expiredCandidates, error: candError } = await supabase
+        .from("candidates")
+        .select("id, status, updated_at")
+        .in("status", ["rejected", "withdrawn", "no_show"])
+        .lt("updated_at", cutoff)
+        .not("email", "is", null);
+
+      if (candError) {
+        log("WARN", `Error querying expired candidates: ${candError.message}`);
+      } else if (expiredCandidates && expiredCandidates.length > 0) {
+        log("INFO", `Found ${expiredCandidates.length} candidates for anonymization`);
+
+        for (const candidate of expiredCandidates) {
+          const { error: updateError } = await supabase
+            .from("candidates")
+            .update({
+              first_name: "Anonymiseret",
+              last_name: "Kandidat",
+              email: null,
+              phone: null,
+              notes: "GDPR: Automatisk anonymiseret efter 6 måneder",
+              resume_url: null,
+            })
+            .eq("id", candidate.id);
+
+          if (updateError) {
+            log("WARN", `Failed to anonymize candidate ${candidate.id}: ${updateError.message}`);
+          } else {
+            candidatesAnonymized++;
+          }
+        }
+
+        log("INFO", `Anonymized ${candidatesAnonymized} expired candidates`);
+      } else {
+        log("INFO", "No expired candidates found for anonymization");
+      }
+    } catch (candErr) {
+      log("WARN", `Candidate cleanup error: ${candErr instanceof Error ? candErr.message : String(candErr)}`);
+    }
+
+    // ===== PART 3: Summary and audit log =====
+    log("INFO", `GDPR cleanup complete. Sales cleaned: ${totalCleaned}, Candidates anonymized: ${candidatesAnonymized}`, cleanupResults);
+
+    if (totalCleaned > 0 || candidatesAnonymized > 0) {
       await supabase.from("audit_logs").insert({
         action: "gdpr_data_cleanup",
         details: {
           total_cleaned: totalCleaned,
+          candidates_anonymized: candidatesAnonymized,
           fields_processed: cleanupResults,
           timestamp: new Date().toISOString(),
         },
       }).catch(() => {
-        // Audit log table might not exist - that's OK
         log("WARN", "Could not write to audit_logs table (table may not exist)");
       });
     }
@@ -147,8 +169,9 @@ Deno.serve(async (req) => {
       JSON.stringify({
         success: true,
         totalCleaned,
+        candidatesAnonymized,
         fields: cleanupResults,
-        message: `GDPR cleanup complete. Cleaned ${totalCleaned} records.`,
+        message: `GDPR cleanup complete. Cleaned ${totalCleaned} records, anonymized ${candidatesAnonymized} candidates.`,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

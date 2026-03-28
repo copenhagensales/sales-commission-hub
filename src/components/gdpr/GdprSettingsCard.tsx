@@ -14,8 +14,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { useGdprDataRequests, useRequestDataExport, useRequestDataDeletion, useGdprConsents } from "@/hooks/useGdpr";
-import { Shield, Download, Trash2, FileText, Clock, CheckCircle, XCircle } from "lucide-react";
+import { useGdprDataRequests, useRequestDataExport, useRequestDataDeletion, useGdprConsents, useRevokeConsent } from "@/hooks/useGdpr";
+import { Shield, Download, Trash2, FileText, Clock, CheckCircle, XCircle, Ban } from "lucide-react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 
@@ -25,6 +25,7 @@ export function GdprSettingsCard() {
   const { data: consents = [] } = useGdprConsents();
   const requestExport = useRequestDataExport();
   const requestDeletion = useRequestDataDeletion();
+  const revokeConsent = useRevokeConsent();
 
   const handleExportRequest = async () => {
     try {
@@ -95,9 +96,42 @@ export function GdprSettingsCard() {
             Samtykke
           </h4>
           {consents.length > 0 ? (
-            <div className="text-sm text-muted-foreground">
-              Samtykke givet den{" "}
-              {format(new Date(consents[0].consented_at), "d. MMMM yyyy 'kl.' HH:mm", { locale: da })}
+            <div className="space-y-2">
+              <div className="text-sm text-muted-foreground">
+                Samtykke givet den{" "}
+                {format(new Date(consents[0].consented_at), "d. MMMM yyyy 'kl.' HH:mm", { locale: da })}
+              </div>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1.5 text-destructive hover:text-destructive">
+                    <Ban className="h-3.5 w-3.5" /> Tilbagetræk samtykke
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Tilbagetræk samtykke?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Du er ved at tilbagetrække dit samtykke til databehandling. Dette kan påvirke din adgang til systemet.
+                      Du kan altid give samtykke igen senere.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Annuller</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={async () => {
+                        try {
+                          await revokeConsent.mutateAsync({ consentId: consents[0].id });
+                          toast({ title: "Samtykke tilbagetrukket", description: "Dit samtykke er nu tilbagetrukket." });
+                        } catch {
+                          toast({ title: "Fejl", description: "Kunne ikke tilbagetrække samtykke", variant: "destructive" });
+                        }
+                      }}
+                    >
+                      Bekræft tilbagetrækning
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           ) : (
             <div className="text-sm text-muted-foreground">Intet samtykke registreret</div>
