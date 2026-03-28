@@ -789,9 +789,12 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           if (sellerVal === "total" || sellerVal === "subtotal") return true;
           if (companyVal === "total" || companyVal === "subtotal") return true;
 
-          // Rule 3: phone is empty and no other match-relevant columns have real values → junk
-          const hasAnyMatchValue = sellerVal.length > 0 || companyVal.length > 0 || oppVal.length > 0 || memberVal.length > 0;
-          if (!hasAnyMatchValue) return true;
+           // Rule 3: phone is empty and no other match-relevant columns have real values → junk
+          // Only active if customer has NOT enabled skip_empty_row_filter
+          if (!activeConfig?.skip_empty_row_filter) {
+            const hasAnyMatchValue = sellerVal.length > 0 || companyVal.length > 0 || oppVal.length > 0 || memberVal.length > 0;
+            if (!hasAnyMatchValue) return true;
+          }
         }
 
         return false;
@@ -1548,7 +1551,9 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       if (!phoneVal) {
         if (sellerVal === "total" || sellerVal === "subtotal") return false;
         if (companyVal === "total" || companyVal === "subtotal") return false;
-        if (!sellerVal && !companyVal && !oppVal && !memberVal) return false;
+        if (!activeConfig?.skip_empty_row_filter) {
+          if (!sellerVal && !companyVal && !oppVal && !memberVal) return false;
+        }
       }
       return true;
     });
