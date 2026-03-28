@@ -50,12 +50,14 @@ function EditableSensitiveField({
   value, 
   onSave, 
   placeholder,
-  maskWhenSet = true
+  maskWhenSet = true,
+  onReveal
 }: { 
   value: string | null; 
   onSave: (value: string | null) => void;
   placeholder?: string;
   maskWhenSet?: boolean;
+  onReveal?: () => void;
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
