@@ -98,6 +98,8 @@ interface UploadConfig {
   date_column?: string | null;
   fallback_product_mappings?: FallbackProductMapping[];
   skip_empty_row_filter?: boolean;
+  type_detection_column?: string | null;
+  type_detection_values?: string[] | null;
 }
 
 interface UnmatchedSellerRow {
@@ -377,13 +379,15 @@ function EditConfigDialog({ open, onOpenChange, config, onSaved }: {
   const [cfgProductCol, setCfgProductCol] = useState(config.product_columns?.[0] || "__none__");
   const [cfgName, setCfgName] = useState(config.name);
   const [cfgSkipEmptyFilter, setCfgSkipEmptyFilter] = useState(config.skip_empty_row_filter ?? false);
+  const [cfgTypeDetectionCol, setCfgTypeDetectionCol] = useState(config.type_detection_column || "__none__");
+  const [cfgTypeDetectionVals, setCfgTypeDetectionVals] = useState((config.type_detection_values || []).join(", "));
   const [saving, setSaving] = useState(false);
 
   // We don't have file columns in edit mode, so we use known column names from config
   const knownCols = Array.from(new Set([
     config.phone_column, config.opp_column, config.member_number_column,
     config.company_column, config.filter_column, config.revenue_column,
-    config.commission_column, ...(config.product_columns || []),
+    config.commission_column, config.type_detection_column, ...(config.product_columns || []),
   ].filter(Boolean) as string[]));
 
   const handleSave = async () => {
@@ -401,6 +405,8 @@ function EditConfigDialog({ open, onOpenChange, config, onSaved }: {
           filter_value: cfgFilterVal.trim() || null,
           product_columns: cfgProductCol !== "__none__" ? [cfgProductCol] : [],
           skip_empty_row_filter: cfgSkipEmptyFilter,
+          type_detection_column: cfgTypeDetectionCol !== "__none__" ? cfgTypeDetectionCol : null,
+          type_detection_values: cfgTypeDetectionVals.trim() ? cfgTypeDetectionVals.split(",").map(v => v.trim()).filter(Boolean) : null,
         } as any)
         .eq("id", config.id);
       if (error) throw error;
@@ -463,6 +469,17 @@ function EditConfigDialog({ open, onOpenChange, config, onSaved }: {
                 <p className="text-xs text-muted-foreground">Slå til hvis filen indeholder rækker uden telefon/OPP som stadig er reelle data</p>
               </div>
               <Switch checked={cfgSkipEmptyFilter} onCheckedChange={setCfgSkipEmptyFilter} />
+            </div>
+          </div>
+          <div className="border-t pt-3 space-y-3">
+            <Label className="text-sm font-medium">Type-detektering (Begge-upload)</Label>
+            <p className="text-xs text-muted-foreground">Vælg kolonne og værdier der indikerer at en række er en annullering (resten bliver kurvrettelse)</p>
+            <div className="grid grid-cols-2 gap-3">
+              {colSelect("Type-kolonne", cfgTypeDetectionCol, setCfgTypeDetectionCol)}
+              <div className="space-y-1.5">
+                <Label className="text-sm">Annulleringsværdier</Label>
+                <Input value={cfgTypeDetectionVals} onChange={(e) => setCfgTypeDetectionVals(e.target.value)} placeholder="f.eks. Nedlagt, Annulleret" />
+              </div>
             </div>
           </div>
           <Button onClick={handleSave} disabled={saving} className="w-full">
@@ -1476,8 +1493,16 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       const queueItems = matchedSales.map(sale => {
         let rowUploadType = uploadType as string;
         if (uploadType === "both") {
-          const annulledVal = String(getCaseInsensitive(sale.uploadedRowData, "Annulled Sales") || "").trim();
-          rowUploadType = annulledVal ? "cancellation" : "basket_difference";
+          const typeCol = activeQueueConfig?.type_detection_column;
+          const typeVals = (activeQueueConfig?.type_detection_values as string[]) || [];
+          if (typeCol && typeVals.length > 0) {
+            const cellVal = String(getCaseInsensitive(sale.uploadedRowData, typeCol) || "").trim().toLowerCase();
+            rowUploadType = typeVals.some(v => v.toLowerCase() === cellVal) ? "cancellation" : "basket_difference";
+          } else {
+            // Fallback: gammel logik
+            const annulledVal = String(getCaseInsensitive(sale.uploadedRowData, "Annulled Sales") || "").trim();
+            rowUploadType = annulledVal ? "cancellation" : "basket_difference";
+          }
         }
         return {
           import_id: importId!,
@@ -1897,11 +1922,21 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                           </TableCell>
                           {uploadType === "both" && (
                             <TableCell>
-                              {String(getCaseInsensitive(sale.uploadedRowData, "Annulled Sales") || "").trim() ? (
-                                <Badge variant="destructive">Annullering</Badge>
-                              ) : (
-                                <Badge className="bg-orange-500/15 text-orange-700 border-orange-300">Kurvrettelse</Badge>
-                              )}
+                              {(() => {
+                                const ac = clientConfigs.find(c => c.id === selectedConfigId) || clientConfigs.find(c => c.is_default) || clientConfigs[0];
+                                const typeCol = ac?.type_detection_column;
+                                const typeVals = (ac?.type_detection_values as string[]) || [];
+                                let isCancellation: boolean;
+                                if (typeCol && typeVals.length > 0) {
+                                  const cellVal = String(getCaseInsensitive(sale.uploadedRowData, typeCol) || "").trim().toLowerCase();
+                                  isCancellation = typeVals.some(v => v.toLowerCase() === cellVal);
+                                } else {
+                                  isCancellation = !!String(getCaseInsensitive(sale.uploadedRowData, "Annulled Sales") || "").trim();
+                                }
+                                return isCancellation
+                                  ? <Badge variant="destructive">Annullering</Badge>
+                                  : <Badge className="bg-orange-500/15 text-orange-700 border-orange-300">Kurvrettelse</Badge>;
+                              })()}
                             </TableCell>
                           )}
                         </TableRow>
