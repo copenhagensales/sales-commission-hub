@@ -26,6 +26,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
@@ -95,6 +96,7 @@ interface UploadConfig {
   seller_column?: string | null;
   date_column?: string | null;
   fallback_product_mappings?: FallbackProductMapping[];
+  skip_empty_row_filter?: boolean;
 }
 
 interface UnmatchedSellerRow {
@@ -191,6 +193,7 @@ function ConfigCreationForm({ clientId, columns: parentColumns, setColumns: setP
   const [cfgFilterCol, setCfgFilterCol] = useState("__none__");
   const [cfgFilterVal, setCfgFilterVal] = useState("");
   const [cfgProductCol, setCfgProductCol] = useState("__none__");
+  const [cfgSkipEmptyFilter, setCfgSkipEmptyFilter] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const filteredCount = (cfgFilterCol !== "__none__" && cfgFilterVal.trim())
@@ -248,6 +251,7 @@ function ConfigCreationForm({ clientId, columns: parentColumns, setColumns: setP
         is_default: true,
         filter_column: cfgFilterCol !== "__none__" ? cfgFilterCol : null,
         filter_value: cfgFilterVal.trim() || null,
+        skip_empty_row_filter: cfgSkipEmptyFilter,
       } as any);
       if (error) throw error;
       toast({ title: "Gemt!", description: `Opsætning "${cfgName}" oprettet.` });
@@ -324,6 +328,16 @@ function ConfigCreationForm({ clientId, columns: parentColumns, setColumns: setP
                 {filteredCount} af {sampleData.length} rækker inkluderet
               </Badge>
             )}
+          </div>
+
+          <div className="border-t pt-3 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-sm">Behold rækker uden telefonnummer</Label>
+                <p className="text-xs text-muted-foreground">Slå til hvis filen indeholder rækker uden telefon/OPP som stadig er reelle data</p>
+              </div>
+              <Switch checked={cfgSkipEmptyFilter} onCheckedChange={setCfgSkipEmptyFilter} />
+            </div>
           </div>
 
           <div className="border-t pt-3 space-y-3">
