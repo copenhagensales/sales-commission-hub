@@ -375,6 +375,7 @@ function EditConfigDialog({ open, onOpenChange, config, onSaved }: {
   const [cfgFilterVal, setCfgFilterVal] = useState(config.filter_value || "");
   const [cfgProductCol, setCfgProductCol] = useState(config.product_columns?.[0] || "__none__");
   const [cfgName, setCfgName] = useState(config.name);
+  const [cfgSkipEmptyFilter, setCfgSkipEmptyFilter] = useState(config.skip_empty_row_filter ?? false);
   const [saving, setSaving] = useState(false);
 
   // We don't have file columns in edit mode, so we use known column names from config
@@ -398,6 +399,7 @@ function EditConfigDialog({ open, onOpenChange, config, onSaved }: {
           filter_column: cfgFilterCol !== "__none__" ? cfgFilterCol : null,
           filter_value: cfgFilterVal.trim() || null,
           product_columns: cfgProductCol !== "__none__" ? [cfgProductCol] : [],
+          skip_empty_row_filter: cfgSkipEmptyFilter,
         } as any)
         .eq("id", config.id);
       if (error) throw error;
@@ -451,6 +453,15 @@ function EditConfigDialog({ open, onOpenChange, config, onSaved }: {
                 <Label className="text-sm">Filterværdi</Label>
                 <Input value={cfgFilterVal} onChange={(e) => setCfgFilterVal(e.target.value)} placeholder="f.eks. 1" />
               </div>
+            </div>
+          </div>
+          <div className="border-t pt-3 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-sm">Behold rækker uden telefonnummer</Label>
+                <p className="text-xs text-muted-foreground">Slå til hvis filen indeholder rækker uden telefon/OPP som stadig er reelle data</p>
+              </div>
+              <Switch checked={cfgSkipEmptyFilter} onCheckedChange={setCfgSkipEmptyFilter} />
             </div>
           </div>
           <Button onClick={handleSave} disabled={saving} className="w-full">
