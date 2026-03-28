@@ -3686,6 +3686,41 @@ export type Database = {
         }
         Relationships: []
       }
+      contract_access_log: {
+        Row: {
+          access_type: string
+          contract_id: string
+          created_at: string
+          employee_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          access_type?: string
+          contract_id: string
+          created_at?: string
+          employee_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          access_type?: string
+          contract_id?: string
+          created_at?: string
+          employee_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_access_log_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contract_signatures: {
         Row: {
           acceptance_text: string | null

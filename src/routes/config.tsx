@@ -154,6 +154,7 @@ import {
   ComplianceGdprAwareness,
   ComplianceAiGovernance,
   ComplianceSensitiveAccessLog,
+  ComplianceContractAccessLog,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -455,6 +456,7 @@ export const routes: RouteConfig[] = [
   { path: "/compliance/awareness", component: ComplianceGdprAwareness, access: "role", positionPermission: "menu_compliance_admin" },
   { path: "/compliance/ai-governance", component: ComplianceAiGovernance, access: "role", positionPermission: "menu_compliance_admin" },
   { path: "/compliance/access-log", component: ComplianceSensitiveAccessLog, access: "role", positionPermission: "menu_compliance_admin" },
+  { path: "/compliance/contract-access-log", component: ComplianceContractAccessLog, access: "role", positionPermission: "menu_compliance_admin" },
 
   { path: "*", component: NotFound, access: "public" },
 ];

@@ -118,6 +118,15 @@ export default function ComplianceOverview() {
       href: "/compliance/access-log",
       permKey: "menu_compliance_admin",
     },
+    {
+      title: "Audit-log: Kontraktadgang",
+      description: "Log over hvem der har åbnet, underskrevet eller downloadet kontrakter tilhørende andre medarbejdere.",
+      icon: FileText,
+      badge: "Audit",
+      badgeColor: "bg-amber-500/10 text-amber-700 border-amber-500/30",
+      href: "/compliance/contract-access-log",
+      permKey: "menu_compliance_admin",
+    },
   ];
 
   return (
