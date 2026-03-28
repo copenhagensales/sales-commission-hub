@@ -126,15 +126,16 @@ export default function AdminDocumentation() {
               <span className="flex items-center gap-2"><Globe className="h-4 w-4" /> Tredjelandsoverførsler</span>
             </AccordionTrigger>
             <AccordionContent className="text-sm text-muted-foreground leading-relaxed space-y-3">
-              <p>Hvis data kan behandles uden for EU/EØS, skal dette være dokumenteret.</p>
-              <p>Vi registrerer derfor:</p>
+              <div className="flex items-center gap-2 mb-2">
+                <Badge variant="outline" className="bg-green-200/60 text-green-800 border-green-500/30">Ingen tredjelandsoverførsler</Badge>
+              </div>
+              <p>Alle data behandles og opbevares inden for EU/EØS.</p>
               <ul className="list-disc pl-5 space-y-1">
-                <li>om overførsel sker</li>
-                <li>til hvilke lande</li>
-                <li>hvilket grundlag overførslen sker på</li>
-                <li>hvilke supplerende foranstaltninger der er vurderet</li>
-                <li>dato for seneste vurdering</li>
+                <li>Lovable: EU-hostet platform</li>
+                <li>Database (Lovable Cloud): EU-region</li>
+                <li>Ingen underdatabehandlere uden for EU/EØS</li>
               </ul>
+              <p className="text-xs italic mt-2">Sidst vurderet: 28.03.2026</p>
             </AccordionContent>
           </AccordionItem>
 
@@ -143,19 +144,21 @@ export default function AdminDocumentation() {
               <span className="flex items-center gap-2"><FileText className="h-4 w-4" /> Logging og dokumentation</span>
             </AccordionTrigger>
             <AccordionContent className="text-sm text-muted-foreground leading-relaxed space-y-3">
-              <p>Systemet logger relevante ændringer, så vi kan følge:</p>
+              <p>Systemet logger relevante ændringer i databasen via <code>amo_audit_log</code>-tabellen. Følgende logges:</p>
               <ul className="list-disc pl-5 space-y-1">
-                <li>hvem der ændrede noget</li>
-                <li>hvornår det skete</li>
-                <li>hvad der blev ændret, når muligt</li>
+                <li><strong>Brugerlogin</strong> — hvem loggede ind og hvornår (via auth-systemet)</li>
+                <li><strong>Kontraktændringer</strong> — ændringer i medarbejderkontrakter og lønaftaler</li>
+                <li><strong>Salgsdata-sync</strong> — import og synkronisering fra Adversus og klient-uploads</li>
+                <li><strong>Lønberegninger</strong> — beregning og godkendelse af løn og provision</li>
+                <li><strong>GDPR-anmodninger</strong> — registrering af rettighedsanmodninger og sikkerhedshændelser</li>
+                <li><strong>AMO-ændringer</strong> — ændringer i arbejdsmiljøorganisationen</li>
               </ul>
-              <p>Denne dokumentation bruges til:</p>
+              <p>Logs opbevares i databasen og er tilgængelige for systemadministratorer. Hver log-entry indeholder:</p>
               <ul className="list-disc pl-5 space-y-1">
-                <li>intern kontrol</li>
-                <li>fejlsøgning</li>
-                <li>sikkerhed</li>
-                <li>afvigelseshåndtering</li>
-                <li>dokumentation af løn-, provisions- og fakturaprocesser</li>
+                <li>Bruger-ID og email</li>
+                <li>Tidspunkt</li>
+                <li>Handling (opret/opdater/slet)</li>
+                <li>Tidligere og nye værdier (hvor relevant)</li>
               </ul>
             </AccordionContent>
           </AccordionItem>
@@ -165,15 +168,41 @@ export default function AdminDocumentation() {
               <span className="flex items-center gap-2"><HardDrive className="h-4 w-4" /> Backup og gendannelse</span>
             </AccordionTrigger>
             <AccordionContent className="text-sm text-muted-foreground leading-relaxed space-y-3">
-              <p>Der skal være backup af relevante data og en klar forståelse af, hvordan gendannelse håndteres.</p>
-              <p>Vi dokumenterer:</p>
-              <ul className="list-disc pl-5 space-y-1">
-                <li>om backup findes</li>
-                <li>hvor ofte backup tages</li>
-                <li>hvem der er ansvarlig</li>
-                <li>hvordan restore håndteres</li>
-                <li>hvornår restore sidst blev testet, hvis relevant</li>
-              </ul>
+              <div className="flex items-center gap-2 mb-2">
+                <Badge variant="outline" className="bg-green-200/60 text-green-800 border-green-500/30">Automatisk backup aktiv</Badge>
+              </div>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Parameter</TableHead>
+                      <TableHead>Værdi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell className="font-medium">Backup</TableCell>
+                      <TableCell>Ja — automatisk via Lovable Cloud</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">Frekvens</TableCell>
+                      <TableCell>Dagligt</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">Ansvarlig</TableCell>
+                      <TableCell>Lovable Cloud (platform-administreret)</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">Restore</TableCell>
+                      <TableCell>Håndteres via Lovable Cloud support</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">Dækning</TableCell>
+                      <TableCell>Fuld database inkl. auth, storage og edge functions</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
             </AccordionContent>
           </AccordionItem>
 
@@ -182,15 +211,58 @@ export default function AdminDocumentation() {
               <span className="flex items-center gap-2"><Trash2 className="h-4 w-4" /> Sletning og retention</span>
             </AccordionTrigger>
             <AccordionContent className="text-sm text-muted-foreground leading-relaxed space-y-3">
-              <p>Vi dokumenterer for hver relevant datatype:</p>
-              <ul className="list-disc pl-5 space-y-1">
-                <li>hvorfor data behandles</li>
-                <li>hvor længe de må opbevares</li>
-                <li>hvornår de skal slettes</li>
-                <li>om sletning er automatisk eller manuel</li>
-                <li>hvem der følger op</li>
-                <li>om der findes lovkrav om længere opbevaring</li>
-              </ul>
+              <p>Følgende retentionspolitik gælder:</p>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Datatype</TableHead>
+                      <TableHead>Opbevaringsperiode</TableHead>
+                      <TableHead>Grundlag</TableHead>
+                      <TableHead>Sletning</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell className="font-medium">Løn- og økonomidata</TableCell>
+                      <TableCell>5 år</TableCell>
+                      <TableCell>Bogføringsloven §10</TableCell>
+                      <TableCell>Manuel</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">Salgsdata og provision</TableCell>
+                      <TableCell>5 år</TableCell>
+                      <TableCell>Bogføringsloven §10</TableCell>
+                      <TableCell>Manuel</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">Medarbejderstamdata</TableCell>
+                      <TableCell>Slettes efter fratrædelse, senest 5 år</TableCell>
+                      <TableCell>Berettiget interesse / bogføringsloven</TableCell>
+                      <TableCell>Manuel</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">Samtykker</TableCell>
+                      <TableCell>Så længe samtykke er aktivt</TableCell>
+                      <TableCell>GDPR art. 6(1)(a)</TableCell>
+                      <TableCell>Manuel</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">Ansøgerdata</TableCell>
+                      <TableCell>6 måneder efter afslag</TableCell>
+                      <TableCell>Databeskyttelsesloven §12</TableCell>
+                      <TableCell>Manuel</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">Audit logs</TableCell>
+                      <TableCell>5 år</TableCell>
+                      <TableCell>Intern kontrol / compliance</TableCell>
+                      <TableCell>Manuel</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+              <p className="text-xs italic mt-2">Systemejeren er ansvarlig for at følge op på sletning. Automatiseret sletning kan implementeres efter behov.</p>
             </AccordionContent>
           </AccordionItem>
 
@@ -199,15 +271,46 @@ export default function AdminDocumentation() {
               <span className="flex items-center gap-2"><Brain className="h-4 w-4" /> AI-brug</span>
             </AccordionTrigger>
             <AccordionContent className="text-sm text-muted-foreground leading-relaxed space-y-3">
-              <p>Hvis AI bruges i systemet eller i tilknyttede workflows, skal vi dokumentere:</p>
+              <p>AI anvendes i følgende funktioner:</p>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Funktion</TableHead>
+                      <TableHead>Model</TableHead>
+                      <TableHead>Persondata</TableHead>
+                      <TableHead>Formål</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell className="font-medium">FM Profit Agent</TableCell>
+                      <TableCell>Google Gemini (via Lovable AI Gateway)</TableCell>
+                      <TableCell><Badge variant="outline" className="bg-green-200/60 text-green-800 border-green-500/30 text-xs">Nej — aggregeret data</Badge></TableCell>
+                      <TableCell>Analyse af salgsperformance og omsætning</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">Udgiftsformel-parsing</TableCell>
+                      <TableCell>Google Gemini (via Lovable AI Gateway)</TableCell>
+                      <TableCell><Badge variant="outline" className="bg-green-200/60 text-green-800 border-green-500/30 text-xs">Nej — kun formelstrenge</Badge></TableCell>
+                      <TableCell>Tolkning af provisionsformler til beregningslogik</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+              <p className="font-medium mt-3">Sikkerhedsforanstaltninger:</p>
               <ul className="list-disc pl-5 space-y-1">
-                <li>hvad AI bruges til</li>
-                <li>om persondata indgår</li>
-                <li>hvilke leverandører der bruges</li>
-                <li>om der er særlige risici</li>
-                <li>hvilke begrænsninger og kontroller der gælder</li>
+                <li>Al AI-kommunikation sker via Lovable AI Gateway — ingen direkte API-kald til tredjeparter</li>
+                <li>Persondata sendes ikke til AI-modeller; data aggregeres eller anonymiseres først</li>
+                <li>AI bruges udelukkende som beslutningsstøtte — ingen automatiserede beslutninger om enkeltpersoner</li>
+                <li>AI-output valideres altid af en bruger før det anvendes</li>
               </ul>
-              <p>AI må ikke bruges på en måde, der går videre end nødvendigt eller giver uvedkommende adgang til oplysninger.</p>
+              <p className="font-medium mt-3">Risici og begrænsninger:</p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>AI kan producere forkerte eller misvisende svar (hallucination)</li>
+                <li>Brugere informeres om, at AI-svar skal verificeres</li>
+                <li>Ingen følsomme personoplysninger (CPR, helbred, fagforening) må indgå i AI-prompts</li>
+              </ul>
             </AccordionContent>
           </AccordionItem>
 
@@ -216,17 +319,20 @@ export default function AdminDocumentation() {
               <span className="flex items-center gap-2"><UserCog className="h-4 w-4" /> Ansvar</span>
             </AccordionTrigger>
             <AccordionContent className="text-sm text-muted-foreground leading-relaxed space-y-3">
-              <p>Det overordnede ansvar for systemet ligger hos systemejeren.</p>
-              <p>Systemejeren har ansvar for:</p>
+              <p><strong>Systemejeren (virksomhedens ejer)</strong> er dataansvarlig jf. GDPR art. 4, nr. 7.</p>
+              <p>Dataansvarlig har ansvar for:</p>
               <ul className="list-disc pl-5 space-y-1">
-                <li>at formål og databrug er klare</li>
-                <li>at roller og adgang er passende</li>
-                <li>at sletning og opbevaring følges op</li>
-                <li>at leverandører er vurderet</li>
-                <li>at hændelser håndteres</li>
-                <li>at dokumentation holdes opdateret</li>
-                <li>at relevante reviews bliver gennemført</li>
+                <li>At formål og retsgrundlag for databehandling er klart defineret</li>
+                <li>At roller, adgange og rettigheder er korrekt tildelt og løbende reviewes</li>
+                <li>At retentionspolitik overholdes og sletning gennemføres rettidigt</li>
+                <li>At leverandører og databehandlere vurderes mindst årligt</li>
+                <li>At sikkerhedshændelser håndteres og indberettes inden for 72 timer</li>
+                <li>At rettighedsanmodninger fra registrerede behandles inden for 30 dage</li>
+                <li>At denne dokumentation holdes opdateret ved systemændringer</li>
+                <li>At compliance-notifikationsmodtagere er opdateret</li>
+                <li>At AMO og arbejdsmiljøforhold overholder gældende lovgivning</li>
               </ul>
+              <p className="text-xs italic mt-2">Sidst gennemgået: 28.03.2026</p>
             </AccordionContent>
           </AccordionItem>
         </Accordion>
