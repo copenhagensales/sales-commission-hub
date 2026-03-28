@@ -517,6 +517,11 @@ function EditConfigDialog({ open, onOpenChange, config, onSaved }: {
               </div>
             </div>
           </div>
+          <div className="border-t pt-3 space-y-3">
+            <Label className="text-sm font-medium">Produkter uden telefon-match</Label>
+            <p className="text-xs text-muted-foreground">Produkter der skal skippe telefon-matching og i stedet matches via sælger+dato+produkt (komma-separeret)</p>
+            <Input value={cfgPhoneExcluded} onChange={(e) => setCfgPhoneExcluded(e.target.value)} placeholder="f.eks. 5G Internet, 5G Router" />
+          </div>
           <Button onClick={handleSave} disabled={saving} className="w-full">
             {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
             Gem ændringer
