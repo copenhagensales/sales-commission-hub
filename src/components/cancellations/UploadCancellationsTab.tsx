@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { extractOpp } from "./utils/extractOpp";
 import { groupConditionsByProduct, findMatchingProductId } from "@/utils/productConditionMatcher";
 import { formatCurrency } from "@/lib/calculations/formatting";
