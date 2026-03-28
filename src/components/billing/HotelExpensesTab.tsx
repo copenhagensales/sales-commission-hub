@@ -91,6 +91,15 @@ export function HotelExpensesTab() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
+        <Select value={periodType} onValueChange={(v) => setPeriodType(v as "month" | "payroll")}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="month">Måned</SelectItem>
+            <SelectItem value="payroll">Lønperiode (15.–14.)</SelectItem>
+          </SelectContent>
+        </Select>
         <Select value={selectedMonth} onValueChange={setSelectedMonth}>
           <SelectTrigger className="w-[200px]">
             <SelectValue />
