@@ -1,38 +1,38 @@
 
 
-## Plan: Lokationer netto efter rabat i Udgiftsrapport
+## Plan: Vis booking-konflikter tydeligt inde på Booking-siden
 
-### Hvad der ændres
+### Problem
+Den røde badge ved "Booking" i sidebaren viser antal medarbejdere med konflikter (tildelt bookinger på dage hvor de har godkendt fravær). Men når man åbner Booking-siden, er der ingen indikation af **hvilke** bookinger eller medarbejdere der er berørt.
 
-Udgiftsrapportens auto-beregnede "Lokationer" viser i dag **brutto**. Den ændres til at vise **netto efter leverandørrabat**, identisk med Oversigt-fanens beregning.
+### Hvad den røde badge betyder
+Badgen tæller medarbejdere der er tildelt en booking (`booking_assignment`) på en dato der overlapper med en godkendt fraværsperiode (`absence_request_v2`). F.eks. hvis 1 medarbejder har godkendt ferie men stadig er tildelt en vagt.
 
-### Ændringer i `src/components/billing/ExpenseReportTab.tsx`
+### Ændringer
 
-1. **Tilføj 2 nye queries** — hent `supplier_discount_rules` (aktive) og `supplier_location_exceptions` (aktive)
+**1. Tilføj en advarselsbanner øverst på BookingManagement-siden** (`src/pages/vagt-flow/BookingManagement.tsx`)
+- Hent samme konflikt-data som sidebar-badgen (booking_assignment + absence_request_v2)
+- Vis en synlig advarselsboks med liste over berørte medarbejdere og datoer
+- Klikbar: hver konflikt linker til den relevante booking/uge
 
-2. **Udvid booking-queryen** — tilføj `location_id` og `location:location_id(daily_rate, type, name)` så vi kender lokationstype og -navn
-
-3. **Ny `autoLocationTotal` beregning** — repliker rabatlogikken fra `Billing.tsx`:
-   - Gruppér bookinger efter lokationstype
-   - For hver type: find gældende rabatregler (placement / monthly_revenue / annual_revenue)
-   - Beregn placements og typeGroupTotal (ekskl. excluded lokationer)
-   - Anvend rabat per lokation med exception-håndtering (excluded, max_discount)
-   - Resultat = netto i stedet for brutto
-
-4. **Opdater note** — ændr "Auto-beregnet fra bookinger" til "Auto-beregnet (netto efter rabat)"
+**2. Tilføj tooltip på sidebar-badgen** (`src/components/layout/AppSidebar.tsx`)
+- Wrap badgen i en Tooltip der forklarer: "X medarbejder(e) er tildelt vagter under godkendt fravær"
 
 ### Teknisk detalje
 
-Rabatlogikken kopieres direkte fra `Billing.tsx` linje 215-305. Den:
-- Grupperer lokationer efter `location.type`
-- Finder rabatregler for typen fra `supplier_discount_rules`
-- Håndterer 3 rabattyper: `placement`, `monthly_revenue`, `annual_revenue`
-- Respekterer `supplier_location_exceptions` (excluded / max_discount)
-- Beregner `totalAmount * (1 - discount/100)` per lokation
+Konflikten beregnes allerede i `AppSidebar.tsx` (linje 315–361). Vi genbruger samme logik i en hook, så både sidebar og Booking-siden kan bruge den uden duplikeret kode:
 
-### Fil
+- Ny hook: `src/hooks/useFmBookingConflicts.ts`
+  - Returnerer `{ conflicts: Array<{ employeeId, employeeName, date, bookingId }>, count }`
+  - Bruger samme query som sidebar men med flere detaljer (medarbejdernavn, booking-info)
+- `AppSidebar.tsx`: Brug hooken i stedet for inline query + tilføj Tooltip
+- `BookingManagement.tsx`: Brug hooken og vis advarselsbanner med detaljer
+
+### Filer
 
 | Fil | Ændring |
 |-----|---------|
-| `src/components/billing/ExpenseReportTab.tsx` | Tilføj discount queries, beregn netto i stedet for brutto |
+| `src/hooks/useFmBookingConflicts.ts` | Ny hook med konflikt-logik |
+| `src/pages/vagt-flow/BookingManagement.tsx` | Vis advarselsbanner med konflikter |
+| `src/components/layout/AppSidebar.tsx` | Brug ny hook + tilføj tooltip på badge |
 
