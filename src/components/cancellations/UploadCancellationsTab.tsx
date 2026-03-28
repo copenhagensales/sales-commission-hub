@@ -1012,10 +1012,27 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           if (condProds) condProductNames = new Map(condProds.map(p => [p.id, p.name]));
         }
 
-        const hasPass2Sources = (sellerCol && dateCol && (fallbackMappings.length > 0 || groupedConditions.length > 0));
+        // Fetch legacy cancellation_product_mappings for Pass 2
+        const { data: legacyProductMappings } = await supabase
+          .from("cancellation_product_mappings")
+          .select("excel_product_name, product_id")
+          .eq("client_id", selectedClientId);
+
+        const productMappingLookup = new Map<string, string>();
+        if (legacyProductMappings && legacyProductMappings.length > 0) {
+          const mappedPids = [...new Set(legacyProductMappings.map(m => m.product_id))];
+          const { data: mappedProds } = await supabase.from("products").select("id, name").in("id", mappedPids);
+          const pidToName = new Map((mappedProds || []).map(p => [p.id, p.name]));
+          for (const m of legacyProductMappings) {
+            const prodName = pidToName.get(m.product_id);
+            if (prodName) productMappingLookup.set(m.excel_product_name.toLowerCase().trim(), prodName);
+          }
+        }
+
+        const hasPass2Sources = (sellerCol && dateCol && (fallbackMappings.length > 0 || groupedConditions.length > 0 || productMappingLookup.size > 0));
 
         if (hasPass2Sources) {
-          console.log("[handleMatch] PASS 2: seller+date fallback", { sellerCol, dateCol, fallbackMappings, conditionProducts: groupedConditions.length });
+          console.log("[handleMatch] PASS 2: seller+date fallback", { sellerCol, dateCol, fallbackMappings, conditionProducts: groupedConditions.length, legacyMappings: productMappingLookup.size });
 
           // Build seller name → employee work_email map from persistent mappings
           const sellerToEmployeeId = new Map<string, string>();
@@ -1055,8 +1072,19 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             const excelSeller = String(getCaseInsensitive(row.originalRow, sellerCol) || "").trim();
             const excelDate = String(getCaseInsensitive(row.originalRow, dateCol) || "").trim();
             
-            // Find which product this row matches – try condition-based first, then fallback
-            const excelSubName = String(getCaseInsensitive(row.originalRow, "Subscription Name") || "").trim();
+            // Find which product this row matches – try condition-based first, then mappings, then fallback
+            const productCol = activeConfig?.product_columns?.[0];
+            const PRODUCT_KEYS = ["Subscription Name", "Product", "Produkt", "Abonnement", "Product Name", "Produktnavn"];
+            let excelSubName = "";
+            if (productCol) {
+              excelSubName = String(getCaseInsensitive(row.originalRow, productCol) || "").trim();
+            }
+            if (!excelSubName) {
+              for (const key of PRODUCT_KEYS) {
+                const val = getCaseInsensitive(row.originalRow, key);
+                if (val && String(val).trim()) { excelSubName = String(val).trim(); break; }
+              }
+            }
             let resolvedProductTitle: string | null = null;
 
             // 1. Condition-based matching
@@ -1067,7 +1095,13 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               }
             }
 
-            // 2. Fallback to legacy fallback_product_mappings
+            // 2. Legacy cancellation_product_mappings (from Mapping tab)
+            if (!resolvedProductTitle && excelSubName) {
+              const mappedName = productMappingLookup.get(excelSubName.toLowerCase().trim());
+              if (mappedName) resolvedProductTitle = mappedName;
+            }
+
+            // 3. Fallback to config fallback_product_mappings
             if (!resolvedProductTitle) {
               const matchingFallback = fallbackMappings.find(fm => 
                 excelSubName.toLowerCase().includes(fm.excelProductPattern.toLowerCase())
