@@ -202,11 +202,27 @@ export default function ExcelFieldMatcher() {
   };
 
   if (loading) {
-    return <div className="p-8 text-center">Indlæser Excel-fil...</div>;
+    return <div className="p-8 text-center text-muted-foreground">Indlæser Excel-fil...</div>;
   }
 
-  if (error) {
-    return <div className="p-8 text-center text-destructive">{error}</div>;
+  if (error && allData.length === 0) {
+    return (
+      <div className="p-8 max-w-6xl mx-auto space-y-8">
+        <h1 className="text-3xl font-bold">Excel Feltmatcher</h1>
+        <div className="text-center text-destructive mb-4">{error}</div>
+        <UploadZone getRootProps={getRootProps} getInputProps={getInputProps} isDragActive={isDragActive} />
+      </div>
+    );
+  }
+
+  if (allData.length === 0) {
+    return (
+      <div className="p-8 max-w-6xl mx-auto space-y-8">
+        <h1 className="text-3xl font-bold">Excel Feltmatcher</h1>
+        <p className="text-muted-foreground">Upload en Excel-fil for at matche kolonner til stamdata-felter</p>
+        <UploadZone getRootProps={getRootProps} getInputProps={getInputProps} isDragActive={isDragActive} />
+      </div>
+    );
   }
 
   return (
