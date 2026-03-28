@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Check, X, ArrowRight, Loader2, Upload } from "lucide-react";
+import { Check, X, ArrowRight, Loader2, Upload, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
+import { useDropzone } from "react-dropzone";
 import { parseExcelFile } from "@/utils/excel";
 import { supabase } from "@/integrations/supabase/client";
 
