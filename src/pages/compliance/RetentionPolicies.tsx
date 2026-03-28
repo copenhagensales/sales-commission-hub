@@ -323,6 +323,61 @@ export default function RetentionPolicies() {
             )}
           </CardContent>
         </Card>
+
+        {/* Øvrige datatyper */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Øvrige datatyper</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loadingDataPolicies ? (
+              <p className="text-muted-foreground text-sm py-8 text-center">Indlæser…</p>
+            ) : !dataRetentionPolicies?.length ? (
+              <p className="text-muted-foreground text-sm py-8 text-center">Ingen datatyper konfigureret.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left">
+                      <th className="py-3 pr-4 font-medium text-muted-foreground">Datatype</th>
+                      <th className="py-3 pr-4 font-medium text-muted-foreground w-32">Retention (dage)</th>
+                      <th className="py-3 pr-4 font-medium text-muted-foreground w-48">Rensningstype</th>
+                      <th className="py-3 font-medium text-muted-foreground w-20">Aktiv</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dataRetentionPolicies.map((policy) => (
+                      <tr key={policy.id} className="border-b last:border-0 hover:bg-muted/30">
+                        <td className="py-3 pr-4 text-foreground">{policy.display_name}</td>
+                        <td className="py-3 pr-4">
+                          <Input
+                            type="number"
+                            min={1}
+                            placeholder="—"
+                            className="w-24 h-8 text-sm"
+                            value={policy.retention_days ?? ""}
+                            onChange={(e) => handleDataRetentionDaysChange(policy.data_type, e.target.value)}
+                          />
+                        </td>
+                        <td className="py-3 pr-4">
+                          <Badge variant="outline" className="text-xs">
+                            <Trash2 className="h-3 w-3 mr-1" /> Slet alt
+                          </Badge>
+                        </td>
+                        <td className="py-3">
+                          <Switch
+                            checked={policy.is_active}
+                            onCheckedChange={(v) => handleDataActiveToggle(policy.data_type, v)}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </MainLayout>
   );
