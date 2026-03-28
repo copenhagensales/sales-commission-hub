@@ -1231,28 +1231,43 @@ export default function BookingsContent() {
                               })()}
                               {(() => {
                                 const dateStr = format(dayDate, "yyyy-MM-dd");
-                                if (!dietByBookingDate.has(`${booking.id}_${dateStr}`)) return null;
+                                const dietInfo = dietByBookingDate.get(`${booking.id}_${dateStr}`);
+                                if (!dietInfo) return null;
+                                const creatorName = dietInfo.created_by && dietCreatorNames?.[dietInfo.created_by];
+                                const createdTime = dietInfo.created_at ? format(new Date(dietInfo.created_at), "HH:mm 'd.' dd/MM", { locale: da }) : null;
+                                const tooltipText = creatorName
+                                  ? `Tilføjet af ${creatorName} kl. ${createdTime}`
+                                  : createdTime ? `Tilføjet kl. ${createdTime}` : "Diæt";
                                 return (
                                   <div className="mt-1 flex flex-col items-center">
-                                    <Badge variant="secondary" className="text-[9px] px-1 py-0 gap-0.5 bg-orange-100 text-orange-800 border border-orange-300">
-                                      <Utensils className="h-2 w-2" />
-                                      Diæt
-                                      {canEditFmBookings && (
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            removeDietFromDayMutation.mutate({
-                                              bookingId: booking.id,
-                                              date: dateStr,
-                                            });
-                                          }}
-                                          className="ml-0.5 opacity-0 group-hover/day:opacity-100 transition-opacity hover:text-destructive"
-                                          title="Fjern diæt fra dag"
-                                        >
-                                          <X className="h-2 w-2" />
-                                        </button>
-                                      )}
-                                    </Badge>
+                                    <TooltipProvider delayDuration={200}>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Badge variant="secondary" className="text-[9px] px-1 py-0 gap-0.5 bg-orange-100 text-orange-800 border border-orange-300 cursor-default">
+                                            <Utensils className="h-2 w-2" />
+                                            Diæt
+                                            {canEditFmBookings && (
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  removeDietFromDayMutation.mutate({
+                                                    bookingId: booking.id,
+                                                    date: dateStr,
+                                                  });
+                                                }}
+                                                className="ml-0.5 opacity-0 group-hover/day:opacity-100 transition-opacity hover:text-destructive"
+                                                title="Fjern diæt fra dag"
+                                              >
+                                                <X className="h-2 w-2" />
+                                              </button>
+                                            )}
+                                          </Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top" className="text-xs">
+                                          {tooltipText}
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
                                   </div>
                                 );
                               })()}
@@ -1503,28 +1518,43 @@ export default function BookingsContent() {
                           })()}
                           {(() => {
                             const dateStr = format(dayDate, "yyyy-MM-dd");
-                            if (!dietByBookingDate.has(`${booking.id}_${dateStr}`)) return null;
+                            const dietInfo = dietByBookingDate.get(`${booking.id}_${dateStr}`);
+                            if (!dietInfo) return null;
+                            const creatorName = dietInfo.created_by && dietCreatorNames?.[dietInfo.created_by];
+                            const createdTime = dietInfo.created_at ? format(new Date(dietInfo.created_at), "HH:mm 'd.' dd/MM", { locale: da }) : null;
+                            const tooltipText = creatorName
+                              ? `Tilføjet af ${creatorName} kl. ${createdTime}`
+                              : createdTime ? `Tilføjet kl. ${createdTime}` : "Diæt";
                             return (
                               <div className="mt-1 flex flex-col items-center">
-                                <Badge variant="secondary" className="text-[9px] px-1 py-0 gap-0.5 bg-orange-100 text-orange-800 border border-orange-300">
-                                  <Utensils className="h-2 w-2" />
-                                  Diæt
-                                  {canEditFmBookings && (
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        removeDietFromDayMutation.mutate({
-                                          bookingId: booking.id,
-                                          date: dateStr,
-                                        });
-                                      }}
-                                      className="ml-0.5 opacity-0 group-hover/day:opacity-100 transition-opacity hover:text-destructive"
-                                      title="Fjern diæt fra dag"
-                                    >
-                                      <X className="h-2 w-2" />
-                                    </button>
-                                  )}
-                                </Badge>
+                                <TooltipProvider delayDuration={200}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Badge variant="secondary" className="text-[9px] px-1 py-0 gap-0.5 bg-orange-100 text-orange-800 border border-orange-300 cursor-default">
+                                        <Utensils className="h-2 w-2" />
+                                        Diæt
+                                        {canEditFmBookings && (
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              removeDietFromDayMutation.mutate({
+                                                bookingId: booking.id,
+                                                date: dateStr,
+                                              });
+                                            }}
+                                            className="ml-0.5 opacity-0 group-hover/day:opacity-100 transition-opacity hover:text-destructive"
+                                            title="Fjern diæt fra dag"
+                                          >
+                                            <X className="h-2 w-2" />
+                                          </button>
+                                        )}
+                                      </Badge>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" className="text-xs">
+                                      {tooltipText}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
                               </div>
                             );
                           })()}
