@@ -1,6 +1,6 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Shield, Users, FileText, Lock, ArrowRight, Bell, ClipboardList, AlertTriangle, Globe, Clock } from "lucide-react";
+import { Shield, Users, FileText, Lock, ArrowRight, Bell, ClipboardList, AlertTriangle, Globe, Clock, Search, GraduationCap } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { usePermissions } from "@/hooks/usePositionPermissions";
@@ -80,6 +80,24 @@ export default function ComplianceOverview() {
       badge: "GDPR",
       badgeColor: "bg-yellow-500/10 text-yellow-700 border-yellow-500/30",
       href: "/compliance/retention-policies",
+      permKey: "menu_compliance_admin",
+    },
+    {
+      title: "Konsekvensanalyse (DPIA)",
+      description: "Artikel 35-vurdering af konsekvenser for databeskyttelse ved højrisiko-behandlinger som CPR, løn og bankdata.",
+      icon: Search,
+      badge: "Art. 35",
+      badgeColor: "bg-indigo-500/10 text-indigo-700 border-indigo-500/30",
+      href: "/compliance/dpia",
+      permKey: "menu_compliance_admin",
+    },
+    {
+      title: "Medarbejder-awareness",
+      description: "Dokumentation af GDPR-oplysning og træning: samtykke, Code of Conduct, onboarding og løbende information.",
+      icon: GraduationCap,
+      badge: "Awareness",
+      badgeColor: "bg-teal-500/10 text-teal-700 border-teal-500/30",
+      href: "/compliance/awareness",
       permKey: "menu_compliance_admin",
     },
   ];

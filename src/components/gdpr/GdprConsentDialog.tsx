@@ -20,6 +20,8 @@ interface GdprConsentDialogProps {
   onConsent: () => void;
 }
 
+const CONSENT_TEXT = `Jeg har læst og accepterer, at Copenhagen Sales behandler mine personoplysninger som beskrevet ovenfor i forbindelse med mit ansættelsesforhold. Dette inkluderer: Navn og kontaktoplysninger (email, telefon, adresse), CPR-nummer til lønudbetaling, bankoplysninger til lønudbetaling, ansættelsesdata (stilling, afdeling, arbejdstider), fravær og sygemeldinger, samt login-aktivitet og systemhandlinger.`;
+
 export function GdprConsentDialog({ open, onConsent }: GdprConsentDialogProps) {
   const [accepted, setAccepted] = useState(false);
   const giveConsent = useGiveConsent();
@@ -28,7 +30,7 @@ export function GdprConsentDialog({ open, onConsent }: GdprConsentDialogProps) {
 
   const handleConsent = async () => {
     try {
-      await giveConsent.mutateAsync({ consentType: "data_processing" });
+      await giveConsent.mutateAsync({ consentType: "data_processing", consentText: CONSENT_TEXT });
       toast({
         title: "Samtykke registreret",
         description: "Dit samtykke til databehandling er blevet registreret.",
