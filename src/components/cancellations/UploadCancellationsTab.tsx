@@ -100,6 +100,7 @@ interface UploadConfig {
   skip_empty_row_filter?: boolean;
   type_detection_column?: string | null;
   type_detection_values?: string[] | null;
+  phone_excluded_products?: string[] | null;
 }
 
 interface UnmatchedSellerRow {
@@ -199,6 +200,7 @@ function ConfigCreationForm({ clientId, columns: parentColumns, setColumns: setP
   const [cfgSkipEmptyFilter, setCfgSkipEmptyFilter] = useState(false);
   const [cfgTypeDetCol, setCfgTypeDetCol] = useState("__none__");
   const [cfgTypeDetVals, setCfgTypeDetVals] = useState("");
+  const [cfgPhoneExcluded, setCfgPhoneExcluded] = useState("");
   const [saving, setSaving] = useState(false);
 
   const filteredCount = (cfgFilterCol !== "__none__" && cfgFilterVal.trim())
@@ -259,6 +261,7 @@ function ConfigCreationForm({ clientId, columns: parentColumns, setColumns: setP
         skip_empty_row_filter: cfgSkipEmptyFilter,
         type_detection_column: cfgTypeDetCol !== "__none__" ? cfgTypeDetCol : null,
         type_detection_values: cfgTypeDetVals.trim() ? cfgTypeDetVals.split(",").map(v => v.trim()).filter(Boolean) : null,
+        phone_excluded_products: cfgPhoneExcluded.trim() ? cfgPhoneExcluded.split(",").map(v => v.trim()).filter(Boolean) : null,
       } as any);
       if (error) throw error;
       toast({ title: "Gemt!", description: `Opsætning "${cfgName}" oprettet.` });
@@ -364,6 +367,16 @@ function ConfigCreationForm({ clientId, columns: parentColumns, setColumns: setP
           </div>
 
           <div className="border-t pt-3 space-y-3">
+            <Label className="text-sm font-medium">Produkter uden telefon-match</Label>
+            <p className="text-xs text-muted-foreground">Produkter der skal skippe telefon-matching og i stedet matches via sælger+dato+produkt (komma-separeret)</p>
+            <Input
+              value={cfgPhoneExcluded}
+              onChange={(e) => setCfgPhoneExcluded(e.target.value)}
+              placeholder="f.eks. 5G Internet, 5G Router"
+            />
+          </div>
+
+          <div className="border-t pt-3 space-y-3">
             <div className="space-y-1.5">
               <Label className="text-sm">Opsætningsnavn</Label>
               <Input
@@ -401,6 +414,7 @@ function EditConfigDialog({ open, onOpenChange, config, onSaved }: {
   const [cfgSkipEmptyFilter, setCfgSkipEmptyFilter] = useState(config.skip_empty_row_filter ?? false);
   const [cfgTypeDetectionCol, setCfgTypeDetectionCol] = useState(config.type_detection_column || "__none__");
   const [cfgTypeDetectionVals, setCfgTypeDetectionVals] = useState((config.type_detection_values || []).join(", "));
+  const [cfgPhoneExcluded, setCfgPhoneExcluded] = useState(((config as any).phone_excluded_products || []).join(", "));
   const [saving, setSaving] = useState(false);
 
   // We don't have file columns in edit mode, so we use known column names from config
@@ -427,6 +441,7 @@ function EditConfigDialog({ open, onOpenChange, config, onSaved }: {
           skip_empty_row_filter: cfgSkipEmptyFilter,
           type_detection_column: cfgTypeDetectionCol !== "__none__" ? cfgTypeDetectionCol : null,
           type_detection_values: cfgTypeDetectionVals.trim() ? cfgTypeDetectionVals.split(",").map(v => v.trim()).filter(Boolean) : null,
+          phone_excluded_products: cfgPhoneExcluded.trim() ? cfgPhoneExcluded.split(",").map(v => v.trim()).filter(Boolean) : null,
         } as any)
         .eq("id", config.id);
       if (error) throw error;
