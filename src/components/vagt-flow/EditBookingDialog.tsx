@@ -966,12 +966,14 @@ export function EditBookingDialog({
     mutationFn: async ({ employeeId, dates }: { employeeId: string; dates: string[] }) => {
       if (!dietSalaryType) throw new Error("Diæt lønart ikke fundet");
       
+      const { data: { user } } = await supabase.auth.getUser();
       const inserts = dates.map(date => ({
         booking_id: booking.id,
         employee_id: employeeId,
         salary_type_id: dietSalaryType.id,
         date,
         amount: dietSalaryType.amount || 0,
+        created_by: user?.id || null,
       }));
       
       const { error } = await supabase

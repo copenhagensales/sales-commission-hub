@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useMemo } from "react";
 import { ChevronUp, ChevronDown, Trash2, Plus, Calendar as CalendarIcon, AlertTriangle, X, Pencil, Car, Tent, Utensils, Hotel, CheckCircle2, UserPlus, Undo2 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { useBookingHotels } from "@/hooks/useBookingHotels";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { format, addDays, getWeek, startOfWeek, parseISO } from "date-fns";
@@ -300,7 +301,7 @@ export default function BookingsContent() {
       if (allBookingIds.length === 0) return [];
       const { data, error } = await supabase
         .from("booking_diet")
-        .select("id, booking_id, date")
+        .select("id, booking_id, date, created_at, created_by")
         .in("booking_id", allBookingIds);
       if (error) throw error;
       return data || [];
@@ -324,15 +325,42 @@ export default function BookingsContent() {
     },
   });
 
-  // Build lookup: booking_id + date -> has diet
+  // Build lookup: booking_id + date -> diet info (created_at, created_by)
   const dietByBookingDate = useMemo(() => {
-    const map = new Set<string>();
+    const map = new Map<string, { created_at: string | null; created_by: string | null }>();
     for (const d of bookingDiets as any[]) {
       if (!d.date) continue;
-      map.add(`${d.booking_id}_${d.date}`);
+      const key = `${d.booking_id}_${d.date}`;
+      if (!map.has(key)) {
+        map.set(key, { created_at: d.created_at, created_by: d.created_by });
+      }
     }
     return map;
   }, [bookingDiets]);
+
+  // Fetch employee names for diet created_by user ids
+  const dietCreatorUserIds = useMemo(() => {
+    const ids = new Set<string>();
+    dietByBookingDate.forEach(v => { if (v.created_by) ids.add(v.created_by); });
+    return Array.from(ids);
+  }, [dietByBookingDate]);
+
+  const { data: dietCreatorNames } = useQuery({
+    queryKey: ["diet-creator-names", dietCreatorUserIds],
+    queryFn: async () => {
+      if (dietCreatorUserIds.length === 0) return {};
+      const { data } = await supabase
+        .from("employee_master_data")
+        .select("auth_user_id, first_name, last_name")
+        .in("auth_user_id", dietCreatorUserIds);
+      const map: Record<string, string> = {};
+      for (const e of data || []) {
+        if (e.auth_user_id) map[e.auth_user_id] = `${e.first_name} ${e.last_name}`.trim();
+      }
+      return map;
+    },
+    enabled: dietCreatorUserIds.length > 0,
+  });
 
   // Build lookup: booking_id + date -> unique vehicles
   const vehiclesByBookingDate = useMemo(() => {
@@ -585,12 +613,14 @@ export default function BookingsContent() {
       bookingId: string; date: string; employeeIds: string[];
     }) => {
       if (!dietSalaryType) throw new Error("Diæt lønart ikke fundet");
+      const { data: { user } } = await supabase.auth.getUser();
       const inserts = employeeIds.map(employeeId => ({
         booking_id: bookingId,
         employee_id: employeeId,
         salary_type_id: dietSalaryType.id,
         date,
         amount: dietSalaryType.amount || 0,
+        created_by: user?.id || null,
       }));
       if (inserts.length === 0) throw new Error("Ingen medarbejdere tildelt denne dag");
       const { error } = await supabase.from("booking_diet").upsert(inserts, { onConflict: "booking_id,employee_id,date" });
