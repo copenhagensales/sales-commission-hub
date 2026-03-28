@@ -1,42 +1,28 @@
 
 
-## Opret Medarbejderhåndbog som ny fane under Min Profil
+## Opdater Medarbejderhåndbog – ting der ikke passer med jeres system
 
-### Status
-Der er **ingen** eksisterende medarbejderhåndbog i systemet. Indholdet fra den uploadede DOCX (17 sider) skal omdannes til en læsbar fane.
+### Problemer fundet
+
+**1. Whistleblowing-politik mangler link (linje 418-427)**
+Sektionen nævner "rapporteringskanaler" og "intern whistleblowing-hotline" men linker ikke til jeres faktiske ordning. Skal pege mod `https://copenhagensales.dk/whistleblower`.
+
+**2. Timeregistrering refererer til "Intramanager" (linje 78)**
+Teksten siger "Ansatte skal registrere sine timer i Intramanager" – men I har jeres eget tidsstemplingssystem i denne app (`/time-stamp`).
+
+**3. IT-sikkerhed lister "Intramanager.com" som system (linje 362-367)**
+Systemlisten inkluderer Intramanager.com – bør opdateres til at nævne jeres eget system i stedet.
 
 ### Plan
 
-**1. Ny komponent: `src/components/profile/HandbookTabContent.tsx`**
-- Opretter en accordion-baseret visning af alle 30+ sektioner fra håndbogen
-- Grupperet i logiske kategorier (Ansættelse, Adfærd & Etik, Praktisk, IT & Sikkerhed, Disciplinære forhold, Trivsel & Inklusion, Whistleblowing & Brand)
-- Statisk indhold – ingen database nødvendig, da håndbogen er et fast dokument
-- Inkluderer en "Sidst opdateret: 29. august 2025" badge
+| Ændring | Detalje |
+|---|---|
+| Whistleblowing-sektion | Tilføj eksternt link til `https://copenhagensales.dk/whistleblower` med tekst "Brug vores whistleblowerordning her" |
+| Timeregistrering | Erstat "Intramanager" med reference til jeres interne system |
+| IT-sikkerhedsliste | Fjern "Intramanager.com", tilføj jeres eget system |
 
-**2. Opdater `src/pages/MyProfile.tsx`**
-- Tilføj en ny `TabsTrigger` for "Håndbog" med `BookOpen`-ikon (fra lucide-react)
-- Tilføj tilhørende `TabsContent` der renderer `<HandbookTabContent />`
-
-**3. Indhold der medtages (alle sektioner fra DOCX)**
-- Indledning & Om Copenhagen Sales
-- Ansættelsesvilkår, Arbejdstid, Løn, Ferie, Ferielukning
-- Opførsel & Etik, Arbejdstøj, Drikkevarer, Mobning & Chikane, Fortrolighed
-- Alkohol & Rusmidler, Mobilpolitik, Sociale medier, Internet, Sprog
-- Pauser, Kantine, Parkering, Orlov, Kørselsgodtgørelse, Leje af biler
-- Lægebesøg, Lønudbetaling, Nøgler/adgangskort, Medie/presse, MUS, Mødekultur
-- Forsikring, Førstehjælp, Henvisningshonorar, Straffeattest, Sygdom, Timeregistrering
-- Overenskomst, Børnearbejde, AMO, Pensionsordning, Personalefester, Piercinger, Rygning, Skattekort
-- Kontrol/overvågning/lagring
-- Trivsel & Stresshåndtering, Mangfoldighed & Inklusion, Klageprocedure
-- Advarsler (trin 1-3), Grov misligholdelse, Disciplinære forseelser
-- IT-sikkerhed, Adgangskoder, Adgange, Computere, Hacking
-- Anti-korruption & Whistleblower, Psykologi & Krisehjælp
-- Brandsikkerhed & Beredskab
-- Grønt fokus, Førstehjælpskasse
-
-### Filer
+### Fil
 | Fil | Handling |
 |---|---|
-| `src/components/profile/HandbookTabContent.tsx` | Ny komponent med accordion-sektioner |
-| `src/pages/MyProfile.tsx` | Tilføj "Håndbog" tab |
+| `src/components/profile/HandbookTabContent.tsx` | Opdater 3 sektioner |
 
