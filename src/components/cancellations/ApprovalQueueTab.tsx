@@ -330,6 +330,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   const { user } = useAuth();
   const [statusFilter, setStatusFilter] = useState<string>("pending");
   const [onlyDifferences, setOnlyDifferences] = useState(false);
+  const [onlyDuplicates, setOnlyDuplicates] = useState(false);
   const [subTab, setSubTab] = useState<"cancellation" | "basket_difference" | "match_errors">("cancellation");
   const [searchQuery, setSearchQuery] = useState("");
   const [sellerFilter, setSellerFilter] = useState("all");
@@ -531,6 +532,24 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   const oppGroups = queryResult?.oppGroups || [];
   const flatItems = queryResult?.flatItems || [];
 
+  // Duplicate phone detection: phones appearing >1 time across all pending items
+  const duplicatePhones = useMemo(() => {
+    const phoneCounts = new Map<string, number>();
+    for (const item of flatItems) {
+      const phone = (item.phone || "").trim();
+      if (phone) phoneCounts.set(phone, (phoneCounts.get(phone) || 0) + 1);
+    }
+    const dupes = new Set<string>();
+    for (const [phone, count] of phoneCounts) {
+      if (count > 1) dupes.add(phone);
+    }
+    return dupes;
+  }, [flatItems]);
+
+  const duplicateCount = useMemo(() => {
+    return flatItems.filter(i => duplicatePhones.has((i.phone || "").trim())).length;
+  }, [flatItems, duplicatePhones]);
+
   const approveMutation = useMutation({
     mutationFn: async ({ queueItemIds, saleIds, uploadType }: { queueItemIds: string[]; saleIds: string[]; uploadType: string }) => {
       if (!currentEmployee?.id) throw new Error("Ingen medarbejder fundet");
@@ -725,7 +744,10 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   });
 
   const filteredOppGroups = onlyDifferences ? oppGroups.filter((g) => g.hasDifferences) : oppGroups;
-  const filteredFlatItems = onlyDifferences ? flatItems.filter((i) => i.hasDifferences) : flatItems;
+  let filteredFlatItems = onlyDifferences ? flatItems.filter((i) => i.hasDifferences) : flatItems;
+  if (onlyDuplicates) {
+    filteredFlatItems = filteredFlatItems.filter(i => duplicatePhones.has((i.phone || "").trim()));
+  }
 
   const subOppGroups = useMemo(() => filteredOppGroups.filter((g) => g.uploadType === subTab), [filteredOppGroups, subTab]);
   const subFlatItems = useMemo(() => filteredFlatItems.filter((i) => i.upload_type === subTab), [filteredFlatItems, subTab]);
@@ -889,7 +911,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
 
   useMemo(() => {
     setCurrentPage(1);
-  }, [statusFilter, onlyDifferences, subTab, searchQuery, sellerFilter]);
+  }, [statusFilter, onlyDifferences, onlyDuplicates, subTab, searchQuery, sellerFilter]);
 
   const paginatedOppGroups = useMemo(() => {
     const start = (safeCurrentPage - 1) * PAGE_SIZE;
@@ -1102,9 +1124,14 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                         <TableCell>{resolve(item.agentName)}</TableCell>
                         <TableCell>{item.oppNumber || "-"}</TableCell>
                         <TableCell>
-                          <Badge variant={item.upload_type === "cancellation" ? "destructive" : "secondary"}>
-                            {item.upload_type === "cancellation" ? "Annullering" : "Kurv diff."}
-                          </Badge>
+                          <div className="flex flex-wrap gap-1">
+                            <Badge variant={item.upload_type === "cancellation" ? "destructive" : "secondary"}>
+                              {item.upload_type === "cancellation" ? "Annullering" : "Kurv diff."}
+                            </Badge>
+                            {duplicatePhones.has((item.phone || "").trim()) && (item.phone || "").trim() && (
+                              <Badge className="bg-orange-500/15 text-orange-700 border-orange-300">Dublet</Badge>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="text-xs min-w-[280px] align-top">
                           {summarizedItems.length > 0 ? (
@@ -1325,6 +1352,16 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
               </CardDescription>
             </div>
             <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="only-dupes"
+                  checked={onlyDuplicates}
+                  onCheckedChange={(checked) => setOnlyDuplicates(!!checked)}
+                />
+                <label htmlFor="only-dupes" className="text-sm cursor-pointer">
+                  Kun dubletter {duplicateCount > 0 && `(${duplicateCount})`}
+                </label>
+              </div>
               <div className="flex items-center gap-2">
                 <Checkbox
                   id="only-diff"

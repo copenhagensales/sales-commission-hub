@@ -1515,14 +1515,19 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         if (uploadType === "both") {
           const typeCol = activeQueueConfig?.type_detection_column;
           const typeVals = (activeQueueConfig?.type_detection_values as string[]) || [];
+          
+          // Check 1: Configured column/values
+          let isConfiguredCancellation = false;
           if (typeCol && typeVals.length > 0) {
             const cellVal = String(getCaseInsensitive(sale.uploadedRowData, typeCol) || "").trim().toLowerCase();
-            rowUploadType = typeVals.some(v => v.toLowerCase() === cellVal) ? "cancellation" : "basket_difference";
-          } else {
-            // Fallback: gammel logik
-            const annulledVal = String(getCaseInsensitive(sale.uploadedRowData, "Annulled Sales") || "").trim();
-            rowUploadType = annulledVal ? "cancellation" : "basket_difference";
+            isConfiguredCancellation = typeVals.some(v => v.toLowerCase() === cellVal);
           }
+          
+          // Check 2: Always check "Annulled Sales" as fallback (OR-logik)
+          const annulledVal = String(getCaseInsensitive(sale.uploadedRowData, "Annulled Sales") || "").trim();
+          const isAnnulledSales = annulledVal !== "" && annulledVal !== "0";
+          
+          rowUploadType = (isConfiguredCancellation || isAnnulledSales) ? "cancellation" : "basket_difference";
         }
         return {
           import_id: importId!,
@@ -1946,13 +1951,19 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                                 const ac = clientConfigs.find(c => c.id === selectedConfigId) || clientConfigs.find(c => c.is_default) || clientConfigs[0];
                                 const typeCol = ac?.type_detection_column;
                                 const typeVals = (ac?.type_detection_values as string[]) || [];
-                                let isCancellation: boolean;
+                                
+                                // Check 1: Configured column/values
+                                let isConfiguredCancellation = false;
                                 if (typeCol && typeVals.length > 0) {
                                   const cellVal = String(getCaseInsensitive(sale.uploadedRowData, typeCol) || "").trim().toLowerCase();
-                                  isCancellation = typeVals.some(v => v.toLowerCase() === cellVal);
-                                } else {
-                                  isCancellation = !!String(getCaseInsensitive(sale.uploadedRowData, "Annulled Sales") || "").trim();
+                                  isConfiguredCancellation = typeVals.some(v => v.toLowerCase() === cellVal);
                                 }
+                                
+                                // Check 2: Always check "Annulled Sales" as fallback (OR-logik)
+                                const annulledVal = String(getCaseInsensitive(sale.uploadedRowData, "Annulled Sales") || "").trim();
+                                const isAnnulledSales = annulledVal !== "" && annulledVal !== "0";
+                                
+                                const isCancellation = isConfiguredCancellation || isAnnulledSales;
                                 return isCancellation
                                   ? <Badge variant="destructive">Annullering</Badge>
                                   : <Badge className="bg-orange-500/15 text-orange-700 border-orange-300">Kurvrettelse</Badge>;
