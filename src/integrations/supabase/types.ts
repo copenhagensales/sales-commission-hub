@@ -6603,42 +6603,6 @@ export type Database = {
         }
         Relationships: []
       }
-      fm_agent_settings: {
-        Row: {
-          business_context: string | null
-          data_window_weeks: number
-          focus_priority: string
-          id: string
-          min_observations: number
-          seller_cost_pct: number
-          target_db_pct: number
-          updated_at: string
-          updated_by: string | null
-        }
-        Insert: {
-          business_context?: string | null
-          data_window_weeks?: number
-          focus_priority?: string
-          id?: string
-          min_observations?: number
-          seller_cost_pct?: number
-          target_db_pct?: number
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Update: {
-          business_context?: string | null
-          data_window_weeks?: number
-          focus_priority?: string
-          id?: string
-          min_observations?: number
-          seller_cost_pct?: number
-          target_db_pct?: number
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Relationships: []
-      }
       forecast_settings: {
         Row: {
           churn_established_pct: number
