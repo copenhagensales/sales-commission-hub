@@ -59,6 +59,15 @@ const transfers = [
     dpaUrl: "https://www.adversus.io/legal/dpa",
     purpose: "Dialer-integration og salgsregistrering",
   },
+  {
+    recipient: "Lovable (Supabase)",
+    categories: "Brugerdata, auth-data, database-indhold",
+    location: "EU",
+    legalBasis: "GDPR Art. 28",
+    dpaType: "Standard DPA",
+    dpaUrl: "https://supabase.com/legal/dpa",
+    purpose: "Backend-platform: database, autentificering og serverless funktioner",
+  },
 ];
 
 export default function DataTransferRegistry() {
