@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
+import { format, differenceInDays } from "date-fns";
 import { da } from "date-fns/locale";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -55,6 +55,21 @@ function getPayrollPeriodFromMonth(yearMonth: string) {
   return { periodStart, periodEnd };
 }
 
+function countBookedDays(booking: any): number {
+  const bookedDays = booking.booked_days as number[] | null;
+  if (!bookedDays || bookedDays.length === 0) {
+    return differenceInDays(new Date(booking.end_date), new Date(booking.start_date)) + 1;
+  }
+  let count = 0;
+  const start = new Date(booking.start_date);
+  const end = new Date(booking.end_date);
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const isoDay = d.getDay() === 0 ? 6 : d.getDay() - 1;
+    if (bookedDays.includes(isoDay)) count++;
+  }
+  return count || 1;
+}
+
 export function ExpenseReportTab() {
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(format(now, "yyyy-MM"));
@@ -86,13 +101,39 @@ export function ExpenseReportTab() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("booking")
-        .select("id, booked_days, daily_rate_override, total_price, start_date, end_date, location:location_id(daily_rate)")
+        .select("id, booked_days, daily_rate_override, total_price, start_date, end_date, location:location_id(id, name, daily_rate, type)")
         .eq("status", "confirmed")
         .gte("start_date", periodStart)
-        .lte("start_date", periodEnd)
-        .not("booked_days", "is", null);
+        .lte("start_date", periodEnd);
       if (error) throw error;
       return data as any[];
+    },
+  });
+
+  // Discount rules
+  const { data: discountRules } = useQuery({
+    queryKey: ["billing-all-discount-rules"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("supplier_discount_rules")
+        .select("*")
+        .eq("is_active", true)
+        .order("min_placements", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Location exceptions
+  const { data: locationExceptions } = useQuery({
+    queryKey: ["billing-all-location-exceptions"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("supplier_location_exceptions")
+        .select("*")
+        .eq("is_active", true);
+      if (error) throw error;
+      return data;
     },
   });
 
@@ -110,15 +151,119 @@ export function ExpenseReportTab() {
     },
   });
 
+  // Calculate netto location total using same logic as Billing.tsx
   const autoLocationTotal = useMemo(() => {
     if (!bookings) return 0;
-    return bookings.reduce((sum: number, b: any) => {
-      if (b.total_price != null) return sum + b.total_price;
-      const rate = b.daily_rate_override ?? b.location?.daily_rate ?? 0;
-      const days = b.booked_days?.length || 0;
-      return sum + rate * days;
-    }, 0);
-  }, [bookings]);
+
+    // Group bookings by location
+    const bookingsByLocation: Record<string, any> = {};
+    bookings.forEach((b: any) => {
+      const locationId = b.location?.id || b.location_id || "unknown";
+      const days = countBookedDays(b);
+      let bookingTotal: number;
+
+      if (b.total_price != null) {
+        bookingTotal = b.total_price;
+      } else {
+        const rate = b.daily_rate_override ?? b.location?.daily_rate ?? 1000;
+        bookingTotal = rate * days;
+      }
+
+      if (!bookingsByLocation[locationId]) {
+        bookingsByLocation[locationId] = {
+          location: b.location,
+          totalDays: 0,
+          totalAmount: 0,
+        };
+      }
+      bookingsByLocation[locationId].totalDays += days;
+      bookingsByLocation[locationId].totalAmount += bookingTotal;
+    });
+
+    if (!discountRules) {
+      return Object.values(bookingsByLocation).reduce((s: number, l: any) => s + l.totalAmount, 0);
+    }
+
+    const locationEntries = Object.values(bookingsByLocation) as any[];
+
+    // Group by type
+    const byType: Record<string, any[]> = {};
+    locationEntries.forEach((loc: any) => {
+      const type = loc.location?.type || "unknown";
+      if (!byType[type]) byType[type] = [];
+      byType[type].push(loc);
+    });
+
+    // Exception lookup
+    const exceptionMap = new Map<string, any>();
+    locationExceptions?.forEach((exc: any) => {
+      exceptionMap.set(exc.location_name.toLowerCase(), exc);
+    });
+
+    let totalNetto = 0;
+
+    Object.entries(byType).forEach(([type, locs]) => {
+      const rulesForType = discountRules.filter((r: any) => r.location_type === type);
+
+      if (rulesForType.length === 0) {
+        totalNetto += locs.reduce((s: number, l: any) => s + l.totalAmount, 0);
+        return;
+      }
+
+      const discountType = rulesForType[0]?.discount_type || "placement";
+      const minDaysPerLoc = rulesForType[0]?.min_days_per_location ?? 1;
+
+      const placements = locs.reduce((s: number, l: any) => s + Math.floor(l.totalDays / minDaysPerLoc), 0);
+
+      const typeGroupTotal = locs.reduce((s: number, l: any) => {
+        const locName = l.location?.name?.toLowerCase() || "";
+        const exc = exceptionMap.get(locName);
+        if (exc?.exception_type === "excluded") return s;
+        return s + l.totalAmount;
+      }, 0);
+
+      let appliedDiscount = 0;
+      if (discountType === "monthly_revenue") {
+        const sorted = [...rulesForType].sort((a: any, b: any) => (b.min_revenue ?? 0) - (a.min_revenue ?? 0));
+        for (const rule of sorted) {
+          if (typeGroupTotal >= (rule.min_revenue ?? 0)) {
+            appliedDiscount = Number(rule.discount_percent);
+            break;
+          }
+        }
+      } else if (discountType === "annual_revenue") {
+        const sorted = [...rulesForType].sort((a: any, b: any) => (b.min_revenue ?? 0) - (a.min_revenue ?? 0));
+        appliedDiscount = sorted[sorted.length - 1]?.discount_percent ?? 0;
+      } else {
+        const sorted = [...rulesForType].sort((a: any, b: any) => b.min_placements - a.min_placements);
+        for (const rule of sorted) {
+          if (placements >= rule.min_placements) {
+            appliedDiscount = Number(rule.discount_percent);
+            break;
+          }
+        }
+      }
+
+      locs.forEach((loc: any) => {
+        const locName = loc.location?.name?.toLowerCase() || "";
+        const exc = exceptionMap.get(locName);
+
+        if (exc?.exception_type === "excluded") {
+          totalNetto += loc.totalAmount;
+          return;
+        }
+
+        let effectiveDiscount = appliedDiscount;
+        if (exc?.exception_type === "max_discount" && exc.max_discount_percent != null) {
+          effectiveDiscount = Math.min(appliedDiscount, Number(exc.max_discount_percent));
+        }
+
+        totalNetto += loc.totalAmount * (1 - effectiveDiscount / 100);
+      });
+    });
+
+    return totalNetto;
+  }, [bookings, discountRules, locationExceptions]);
 
   const autoHotelTotal = useMemo(() => {
     if (!hotelBookings) return 0;
@@ -131,7 +276,7 @@ export function ExpenseReportTab() {
     setRows(
       EXPENSE_CATEGORIES.map((c) => {
         if (c.key === "lokationer") {
-          return { category: c.key, amount: autoLocationTotal, note: "Auto-beregnet fra bookinger" };
+          return { category: c.key, amount: autoLocationTotal, note: "Auto-beregnet (netto efter rabat)" };
         }
         if (c.key === "hotel") {
           return { category: c.key, amount: autoHotelTotal, note: "Auto-beregnet fra hotelovernatninger" };
