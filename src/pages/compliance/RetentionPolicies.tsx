@@ -24,6 +24,15 @@ interface RetentionPolicy {
   cleanup_mode: string;
 }
 
+interface DataRetentionPolicy {
+  id: string;
+  data_type: string;
+  display_name: string;
+  retention_days: number | null;
+  is_active: boolean;
+  cleanup_mode: string;
+}
+
 export default function RetentionPolicies() {
   const queryClient = useQueryClient();
 
