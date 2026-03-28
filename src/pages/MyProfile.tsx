@@ -2127,6 +2127,10 @@ export default function MyProfile() {
             <GdprSettingsCard />
           </TabsContent>
 
+          <TabsContent value="haandbog" className="mt-6">
+            <HandbookTabContent />
+          </TabsContent>
+
           {/* Kalender Tab */}
           <TabsContent value="kalender" className="mt-6">
             <MyScheduleTabContent 
