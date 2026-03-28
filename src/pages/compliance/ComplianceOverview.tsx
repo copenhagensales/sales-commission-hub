@@ -1,6 +1,6 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Shield, Users, FileText, Lock, ArrowRight, Bell } from "lucide-react";
+import { Shield, Users, FileText, Lock, ArrowRight, Bell, ClipboardList, AlertTriangle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { usePermissions } from "@/hooks/usePositionPermissions";
@@ -44,6 +44,24 @@ export default function ComplianceOverview() {
       badge: "Admin",
       badgeColor: "bg-red-500/10 text-red-700 border-red-500/30",
       href: "/compliance/notifications",
+      permKey: "menu_compliance_admin",
+    },
+    {
+      title: "Behandlingsaktiviteter",
+      description: "Artikel 30-fortegnelse: Oversigt over alle behandlingsaktiviteter med formål, retsgrundlag og slettefrister.",
+      icon: ClipboardList,
+      badge: "Art. 30",
+      badgeColor: "bg-purple-500/10 text-purple-700 border-purple-500/30",
+      href: "/compliance/processing-activities",
+      permKey: "menu_compliance_admin",
+    },
+    {
+      title: "Sikkerhedsbrud-log",
+      description: "Registrer og spor sikkerhedshændelser iht. GDPR Artikel 33 (72-timers indberetningspligt).",
+      icon: AlertTriangle,
+      badge: "Art. 33",
+      badgeColor: "bg-red-500/10 text-red-700 border-red-500/30",
+      href: "/compliance/security-incidents",
       permKey: "menu_compliance_admin",
     },
   ];

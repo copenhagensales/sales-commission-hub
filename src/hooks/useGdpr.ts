@@ -153,6 +153,24 @@ export function useRequestDataExport() {
   });
 }
 
+export function useRevokeConsent() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ consentId }: { consentId: string }) => {
+      const { error } = await supabase
+        .from("gdpr_consents")
+        .update({ revoked_at: new Date().toISOString() })
+        .eq("id", consentId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["gdpr-consents"] });
+    },
+  });
+}
+
 export function useRequestDataDeletion() {
   const queryClient = useQueryClient();
 
