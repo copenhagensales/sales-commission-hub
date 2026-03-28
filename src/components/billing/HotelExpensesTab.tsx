@@ -32,13 +32,18 @@ const STATUS_LABELS: Record<string, { label: string; variant: "default" | "secon
 export function HotelExpensesTab() {
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(format(now, "yyyy-MM"));
+  const [periodType, setPeriodType] = useState<"month" | "payroll">("month");
 
   const monthDate = new Date(selectedMonth + "-01");
-  const monthStart = format(startOfMonth(monthDate), "yyyy-MM-dd");
-  const monthEnd = format(endOfMonth(monthDate), "yyyy-MM-dd");
+  const periodStart = periodType === "payroll"
+    ? format(new Date(monthDate.getFullYear(), monthDate.getMonth() - 1, 15), "yyyy-MM-dd")
+    : format(startOfMonth(monthDate), "yyyy-MM-dd");
+  const periodEnd = periodType === "payroll"
+    ? format(new Date(monthDate.getFullYear(), monthDate.getMonth(), 14), "yyyy-MM-dd")
+    : format(endOfMonth(monthDate), "yyyy-MM-dd");
 
   const { data: hotelBookings, isLoading } = useQuery({
-    queryKey: ["hotel-expenses", selectedMonth],
+    queryKey: ["hotel-expenses", selectedMonth, periodType],
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("booking_hotel")
@@ -50,8 +55,8 @@ export function HotelExpensesTab() {
             location:location_id(name, address_city)
           )
         `)
-        .gte("check_in", monthStart)
-        .lte("check_in", monthEnd)
+        .gte("check_in", periodStart)
+        .lte("check_in", periodEnd)
         .order("check_in", { ascending: true });
       if (error) throw error;
       return data as any[];
@@ -86,6 +91,15 @@ export function HotelExpensesTab() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
+        <Select value={periodType} onValueChange={(v) => setPeriodType(v as "month" | "payroll")}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="month">Måned</SelectItem>
+            <SelectItem value="payroll">Lønperiode (15.–14.)</SelectItem>
+          </SelectContent>
+        </Select>
         <Select value={selectedMonth} onValueChange={setSelectedMonth}>
           <SelectTrigger className="w-[200px]">
             <SelectValue />
