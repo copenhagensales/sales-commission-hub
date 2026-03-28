@@ -116,7 +116,11 @@ export default function AdminDocumentation() {
                 </Table>
               </div>
               <p className="text-xs text-muted-foreground mt-2 italic">
-                Bekræft at DPA'er er underskrevet og arkiveret.
+                Alle leverandører anvender deres offentligt tilgængelige standard-DPA, som accepteres ved brug af tjenesten. Se{' '}
+                <a href="/compliance/data-transfers" className="underline text-primary hover:text-primary/80">
+                  Dataoverførsler til tredjeparter
+                </a>{' '}
+                for links til de enkelte DPA'er.
               </p>
             </AccordionContent>
           </AccordionItem>
