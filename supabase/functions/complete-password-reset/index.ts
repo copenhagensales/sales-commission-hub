@@ -63,7 +63,7 @@ serve(async (req) => {
     const resetData = tokenData[0];
     const { email, first_name, last_name } = resetData;
 
-    console.log(`Processing password reset for: ${email}`);
+    console.log(`Processing password reset for employee`);
 
     // Check if user exists in auth
     const { data: existingUsers } = await supabase.auth.admin.listUsers();
@@ -84,7 +84,7 @@ serve(async (req) => {
         );
       }
 
-      console.log(`Password updated for existing user: ${email}`);
+      console.log(`Password updated for existing user`);
     } else {
       // Create new user with the password
       const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
@@ -119,7 +119,7 @@ serve(async (req) => {
         }
       }
 
-      console.log(`New user created: ${email}`);
+      console.log(`New user created successfully`);
     }
 
     // Mark token as used

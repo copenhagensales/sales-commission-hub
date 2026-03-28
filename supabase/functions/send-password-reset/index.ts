@@ -125,7 +125,7 @@ serve(async (req) => {
     const token = generateToken();
     const tokenHash = await hashToken(token);
 
-    console.log(`Creating password reset for employee ${employeeId}, email: ${email}`);
+    console.log(`Creating password reset for employee ${employeeId}`);
 
     // Invalidate any existing unused tokens for this employee
     await supabase
@@ -156,7 +156,7 @@ serve(async (req) => {
     const productionUrl = "https://40ce8d9b-c988-4d3b-a8ed-63eb5bed2204.lovableproject.com";
     const resetUrl = `${productionUrl}/reset-password?token=${token}`;
     
-    console.log("Reset URL created for:", email);
+    console.log("Reset URL created for employee:", employeeId);
 
     // Get M365 access token and send email
     const accessToken = await getM365AccessToken();
@@ -210,7 +210,7 @@ serve(async (req) => {
       emailHtml
     );
 
-    console.log(`Password reset email sent to ${email} for employee ${employeeId}`);
+    console.log(`Password reset email sent for employee ${employeeId}`);
 
     return new Response(
       JSON.stringify({ success: true, message: "Password reset email sent" }),
