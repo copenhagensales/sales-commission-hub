@@ -139,10 +139,22 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get active employees with work email
+    // Parse request body for employee_ids
+    const body = await req.json().catch(() => ({}));
+    const employeeIds: string[] | undefined = body.employee_ids;
+
+    if (!employeeIds || !Array.isArray(employeeIds) || employeeIds.length === 0) {
+      return new Response(JSON.stringify({ error: "employee_ids array is required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Get selected employees with work email
     const { data: employees, error: empError } = await supabase
       .from("employee_master_data")
       .select("id, first_name, last_name, work_email")
+      .in("id", employeeIds)
       .eq("is_active", true)
       .not("work_email", "is", null);
 
@@ -150,7 +162,7 @@ Deno.serve(async (req) => {
 
     const validEmployees = (employees || []).filter((e: any) => e.work_email && e.work_email.trim());
     if (validEmployees.length === 0) {
-      return new Response(JSON.stringify({ error: "No employees with work email found" }), {
+      return new Response(JSON.stringify({ error: "No valid employees found with work email" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

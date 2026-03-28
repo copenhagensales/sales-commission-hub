@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 
@@ -89,6 +90,7 @@ export default function AiGovernance() {
   const [editingRole, setEditingRole] = useState<any>(null);
   const [useCaseDialog, setUseCaseDialog] = useState<{ open: boolean; data?: any }>({ open: false });
   const [sendingInstruction, setSendingInstruction] = useState(false);
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<Set<string>>(new Set());
 
   // ─── Queries ───
   const { data: roles = [] } = useQuery({
@@ -173,7 +175,31 @@ export default function AiGovernance() {
     },
   });
 
+  // Employees with work_email for selection
+  const eligibleEmployees = employees.filter((e: any) => e.work_email && e.work_email.trim());
+  const instructedEmployeeIds = new Set(instructionLogs.map((l: any) => l.employee_id));
+
+  const toggleEmployee = (id: string) => {
+    setSelectedEmployeeIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (selectedEmployeeIds.size === eligibleEmployees.length) {
+      setSelectedEmployeeIds(new Set());
+    } else {
+      setSelectedEmployeeIds(new Set(eligibleEmployees.map((e: any) => e.id)));
+    }
+  };
+
   const sendInstruction = async () => {
+    if (selectedEmployeeIds.size === 0) {
+      toast.error("Vælg mindst én medarbejder");
+      return;
+    }
     setSendingInstruction(true);
     try {
       const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
@@ -188,12 +214,13 @@ export default function AiGovernance() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ send_to_all: true }),
+          body: JSON.stringify({ employee_ids: Array.from(selectedEmployeeIds) }),
         }
       );
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "Fejl ved afsendelse");
       toast.success(`AI-instruktion sendt til ${result.sent_count} medarbejder(e)`);
+      setSelectedEmployeeIds(new Set());
       queryClient.invalidateQueries({ queryKey: ["ai-instruction-log"] });
     } catch (e: any) {
       toast.error(e.message);
@@ -438,28 +465,92 @@ export default function AiGovernance() {
 
           {/* ─── Instruktionslog Tab ─── */}
           <TabsContent value="instruktion" className="space-y-6">
+            {/* ── Vælg modtagere ── */}
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Mail className="h-5 w-5" />
-                    AI-instruktionslog
-                  </CardTitle>
-                  <CardDescription>
-                    Dokumentation af AI-instruktion sendt til medarbejdere (EU AI Act Art. 4)
-                  </CardDescription>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Send className="h-5 w-5" />
+                  Send AI-instruktion
+                </CardTitle>
+                <CardDescription>
+                  Vælg de medarbejdere der skal modtage AI-instruktionsmail (EU AI Act Art. 4)
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      checked={eligibleEmployees.length > 0 && selectedEmployeeIds.size === eligibleEmployees.length}
+                      onCheckedChange={toggleAll}
+                    />
+                    <span className="text-sm font-medium">
+                      {selectedEmployeeIds.size === eligibleEmployees.length ? "Fravælg alle" : "Vælg alle"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      ({eligibleEmployees.length} medarbejdere med arbejdsmail)
+                    </span>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={sendInstruction}
+                    disabled={sendingInstruction || selectedEmployeeIds.size === 0}
+                  >
+                    <Send className="h-4 w-4 mr-1" />
+                    {sendingInstruction ? "Sender..." : `Send til valgte (${selectedEmployeeIds.size})`}
+                  </Button>
                 </div>
-                <Button size="sm" onClick={sendInstruction} disabled={sendingInstruction}>
-                  <Send className="h-4 w-4 mr-1" />
-                  {sendingInstruction ? "Sender..." : "Send AI-instruktion til alle"}
-                </Button>
+
+                <div className="border rounded-md max-h-64 overflow-y-auto divide-y">
+                  {eligibleEmployees.map((emp: any) => {
+                    const alreadyInstructed = instructedEmployeeIds.has(emp.id);
+                    return (
+                      <label
+                        key={emp.id}
+                        className="flex items-center gap-3 px-3 py-2 hover:bg-muted/50 cursor-pointer"
+                      >
+                        <Checkbox
+                          checked={selectedEmployeeIds.has(emp.id)}
+                          onCheckedChange={() => toggleEmployee(emp.id)}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <span className="text-sm font-medium">
+                            {emp.first_name} {emp.last_name}
+                          </span>
+                          <span className="text-xs text-muted-foreground ml-2 truncate">
+                            {emp.work_email}
+                          </span>
+                        </div>
+                        {alreadyInstructed && (
+                          <Badge variant="outline" className="bg-green-500/10 text-green-700 border-green-500/30 text-[10px] shrink-0">
+                            <Check className="h-3 w-3 mr-0.5" /> Instrueret
+                          </Badge>
+                        )}
+                      </label>
+                    );
+                  })}
+                  {eligibleEmployees.length === 0 && (
+                    <div className="text-center py-6 text-muted-foreground text-sm">
+                      Ingen aktive medarbejdere med arbejdsmail fundet
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* ── Log ── */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Mail className="h-5 w-5" />
+                  Instruktionslog
+                </CardTitle>
+                <CardDescription>Historik over sendte AI-instruktioner</CardDescription>
               </CardHeader>
               <CardContent>
                 {instructionLogs.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground text-sm">
                     <UserCheck className="h-10 w-10 mx-auto mb-3 opacity-40" />
                     <p>Ingen instruktioner sendt endnu</p>
-                    <p className="text-xs mt-1">Klik "Send AI-instruktion til alle" for at sende instruktionsmail til alle aktive medarbejdere</p>
                   </div>
                 ) : (
                   <Table>
