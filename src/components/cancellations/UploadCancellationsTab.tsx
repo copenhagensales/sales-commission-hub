@@ -1359,16 +1359,24 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         return {};
       };
 
-      const matched: MatchedSale[] = allMatched.map(sale => ({
-        saleId: sale.id,
-        phone: sale.customer_phone || "",
-        company: sale.customer_company || "",
-        oppNumber: extractOpp(sale.raw_payload),
-        saleDate: sale.sale_datetime || "",
-        employee: sale.agent_name || "Ukendt",
-        currentStatus: sale.validation_status || "pending",
-        uploadedRowData: findUploadedRow(sale),
-      }));
+      const matched: MatchedSale[] = allMatched.map(sale => {
+        const items = saleItemsMap.get(sale.id) || [];
+        const firstItem = items[0];
+        return {
+          saleId: sale.id,
+          phone: sale.customer_phone || "",
+          company: sale.customer_company || "",
+          oppNumber: extractOpp(sale.raw_payload),
+          saleDate: sale.sale_datetime || "",
+          employee: sale.agent_name || "Ukendt",
+          currentStatus: sale.validation_status || "pending",
+          uploadedRowData: findUploadedRow(sale),
+          targetProductName: firstItem?.adversus_product_title || undefined,
+          realProductName: firstItem?.adversus_product_title || undefined,
+          commission: firstItem?.mapped_commission ?? undefined,
+          revenue: firstItem?.mapped_revenue ?? undefined,
+        };
+      });
 
       setMatchedSales(matched);
       setMatchedRowIndices(matchedIndices);
