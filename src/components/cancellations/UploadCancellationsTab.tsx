@@ -743,7 +743,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
     try {
       // Apply row filter if configured
-      const filteredData = (filterColumn !== "__none__" && filterValue.trim())
+      const filteredData = (uploadType !== "both" && filterColumn !== "__none__" && filterValue.trim())
         ? parsedData.filter(row => String(getCaseInsensitive(row.originalRow, filterColumn) ?? "").trim() === filterValue.trim())
         : parsedData;
 
