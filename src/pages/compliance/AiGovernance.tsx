@@ -560,7 +560,7 @@ export default function AiGovernance() {
                         <TableHead>Email</TableHead>
                         <TableHead>Dato</TableHead>
                         <TableHead>Metode</TableHead>
-                        <TableHead>Kvittering</TableHead>
+                        <TableHead>Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
