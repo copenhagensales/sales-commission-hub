@@ -148,8 +148,17 @@ export default function ComplianceNotifications() {
           </div>
           <p className="text-muted-foreground">
             Administrer hvem der modtager compliance-relaterede notifikationer,
-            fx GDPR-påmindelser og deadlines.
+            fx GDPR-påmindelser og deadlines. Emails sendes automatisk hver mandag kl. 08:00.
           </p>
+          <Button
+            onClick={handleSendNow}
+            disabled={isSending}
+            variant="outline"
+            className="gap-2 mt-2"
+          >
+            <Send className="h-4 w-4" />
+            {isSending ? "Sender..." : "Send compliance-email nu"}
+          </Button>
         </div>
 
         <Card>
