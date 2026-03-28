@@ -1040,6 +1040,9 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
         // --- PASS 1b: FM phone matching via customer_phone directly ---
         // For rows that have a phone but weren't matched in Pass 1 (FM sales don't have raw_payload.data phone fields)
+        const phoneExcludedProducts: string[] = (activeConfig as any)?.phone_excluded_products || [];
+        const PRODUCT_KEYS_1B = ["Subscription Name", "Product", "Produkt", "Abonnement", "Product Name", "Produktnavn"];
+
         cleanedData.forEach((row) => {
           const idx = row.originalIndex;
           if (matchedIndicesLocal.has(idx)) return; // already matched in pass 1
@@ -1048,6 +1051,21 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           if (!rawExcelPhone) return; // phone-less rows handled in pass 2
           const excelPhone = normalizePhone(String(rawExcelPhone));
           if (!excelPhone) return;
+
+          // Check if this row's product is excluded from phone matching
+          if (phoneExcludedProducts.length > 0) {
+            const prodCol = activeConfig?.product_columns?.[0];
+            let rowProduct = "";
+            if (prodCol) rowProduct = String(getCaseInsensitive(row.originalRow, prodCol) || "").trim();
+            if (!rowProduct) {
+              for (const key of PRODUCT_KEYS_1B) {
+                const val = getCaseInsensitive(row.originalRow, key);
+                if (val && String(val).trim()) { rowProduct = String(val).trim(); break; }
+              }
+            }
+            const isExcluded = phoneExcludedProducts.some(p => rowProduct.toLowerCase().includes(p.toLowerCase()));
+            if (isExcluded) return; // skip phone match, let Pass 2 handle it
+          }
 
           for (const sale of candidateSales) {
             if (existingIds.has(sale.id)) continue;
@@ -1158,7 +1176,20 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
             const rawExcelPhone = phoneColumn !== "__none__" ? getCaseInsensitive(row.originalRow, phoneColumn) : null;
             const excelPhone = rawExcelPhone ? normalizePhone(String(rawExcelPhone)) : "";
-            if (excelPhone) return; // has phone → should have been matched in pass 1 or 1b
+            // Allow phone-excluded products through to Pass 2 even if they have a phone
+            if (excelPhone) {
+              const prodCol2 = activeConfig?.product_columns?.[0];
+              let rowProduct2 = "";
+              if (prodCol2) rowProduct2 = String(getCaseInsensitive(row.originalRow, prodCol2) || "").trim();
+              if (!rowProduct2) {
+                for (const key of PRODUCT_KEYS_1B) {
+                  const val = getCaseInsensitive(row.originalRow, key);
+                  if (val && String(val).trim()) { rowProduct2 = String(val).trim(); break; }
+                }
+              }
+              const isExcluded2 = phoneExcludedProducts.some(p => rowProduct2.toLowerCase().includes(p.toLowerCase()));
+              if (!isExcluded2) return; // has phone and not excluded → should have been matched in pass 1 or 1b
+            }
 
             const excelSeller = String(getCaseInsensitive(row.originalRow, sellerCol) || "").trim();
             const excelDate = String(getCaseInsensitive(row.originalRow, dateCol) || "").trim();
