@@ -1,0 +1,1 @@
+ALTER TABLE public.booking_diet ADD COLUMN created_by uuid REFERENCES auth.users(id);
