@@ -100,9 +100,14 @@ export default function ComplianceOverview() {
         <Card className="border-primary/20 bg-primary/5">
           <CardContent className="p-4 flex items-start gap-3">
             <Shield className="h-5 w-5 text-primary mt-0.5 shrink-0" />
-            <p className="text-sm text-foreground">
-              Vi behandler kun de oplysninger, der er nødvendige for konkrete og saglige formål. Adgang gives efter rolle og arbejdsbehov. Denne sektion samler vores interne dokumentation og processer.
-            </p>
+            <div className="text-sm text-foreground space-y-1">
+              <p>
+                Vi behandler kun de oplysninger, der er nødvendige for konkrete og saglige formål. Adgang gives efter rolle og arbejdsbehov. Denne sektion samler vores interne dokumentation og processer.
+              </p>
+              <p className="text-muted-foreground text-xs">
+                GDPR-ansvarlig: Kasper · Udpeget pr. juni 2025
+              </p>
+            </div>
           </CardContent>
         </Card>
 
