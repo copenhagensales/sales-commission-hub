@@ -166,7 +166,7 @@ export function buildCronExpression(frequencyMinutes: number, offsetMinutes: num
  * Estimate the effective frequency (minimum gap between firings)
  * from a cron expression, including wrap-around across the hour boundary.
  *
- * Uses minimum circular gap — the shortest interval between any two
+ * Uses minimum circular gap – the shortest interval between any two
  * consecutive fire-minutes. This is the correct metric for overlap
  * detection: it answers "how close can two firings get?"
  *

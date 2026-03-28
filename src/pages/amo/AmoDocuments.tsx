@@ -231,7 +231,7 @@ export default function AmoDocuments() {
                     <TableCell>
                       {d.category && <Badge variant="outline" className="text-xs">{d.category}</Badge>}
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{d.related_module ? moduleLabels[d.related_module] || d.related_module : "—"}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{d.related_module ? moduleLabels[d.related_module] || d.related_module : "–"}</TableCell>
                     <TableCell className="text-xs">
                       {d.document_date ? format(new Date(d.document_date), "d. MMM yyyy", { locale: da }) : format(new Date(d.upload_date), "d. MMM yyyy", { locale: da })}
                     </TableCell>
@@ -240,10 +240,10 @@ export default function AmoDocuments() {
                         <span className={cn(isExpiring ? "text-red-400 font-medium" : "text-muted-foreground")}>
                           {format(new Date(d.expiry_date), "d. MMM yyyy", { locale: da })}
                         </span>
-                      ) : "—"}
+                      ) : "–"}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">v{d.version}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{d.doko_reference || "—"}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{d.doko_reference || "–"}</TableCell>
                     <TableCell>
                       <div className="flex gap-1">
                         <Button variant="ghost" size="icon" onClick={() => openEdit(d)}><Pencil className="h-3.5 w-3.5" /></Button>

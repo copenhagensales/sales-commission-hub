@@ -8,7 +8,7 @@ const corsHeaders = {
 const WEEKDAY_SHORT = ["M", "Ti", "O", "To", "F", "L", "S"];
 
 function renderWeekdayBadges(weekdays: Array<{ week: number; days: number[] }> | undefined): string {
-  if (!weekdays || weekdays.length === 0) return '<span style="color:#94a3b8;">—</span>';
+  if (!weekdays || weekdays.length === 0) return '<span style="color:#94a3b8;">–</span>';
 
   return weekdays
     .sort((a, b) => a.week - b.week)

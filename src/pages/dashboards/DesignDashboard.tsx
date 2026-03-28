@@ -485,7 +485,7 @@ export default function DesignDashboard() {
     if (widget.dataSource === "custom") {
       return widget.customValue || "0";
     }
-    return "—";
+    return "–";
   };
 
   const getTeamName = (teamId: string) => {

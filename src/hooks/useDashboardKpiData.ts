@@ -474,7 +474,7 @@ export const useDashboardKpiData = () => {
     } catch (error) {
       console.error(`Error fetching KPI data for ${kpiTypeId}:`, error);
       return {
-        value: "—",
+        value: "–",
         loading: false,
       };
     }
@@ -898,7 +898,7 @@ export const useWidgetKpiData = (widgets: Array<{
               
               if (formulaError || !formulaData?.formula) {
                 console.error(`Formula not found: ${formulaId}`, formulaError);
-                newValues.set(widget.id, "—");
+                newValues.set(widget.id, "–");
                 continue;
               }
               
@@ -907,7 +907,7 @@ export const useWidgetKpiData = (widgets: Array<{
               
               if (tokens.length === 0) {
                 console.error(`Could not parse formula: ${formulaData.formula}`);
-                newValues.set(widget.id, "—");
+                newValues.set(widget.id, "–");
                 continue;
               }
               
@@ -1206,7 +1206,7 @@ export const useWidgetKpiData = (widgets: Array<{
             newValues.set(widget.id, formatValue(value, kpiTypeId));
           } catch (error) {
             console.error(`Error fetching widget ${widget.id}:`, error);
-            newValues.set(widget.id, "—");
+            newValues.set(widget.id, "–");
           }
         }
       }
@@ -1223,7 +1223,7 @@ export const useWidgetKpiData = (widgets: Array<{
   }, [widgetsKey]);
 
   const getValue = (widgetId: string): string => {
-    return values.get(widgetId) || "—";
+    return values.get(widgetId) || "–";
   };
 
   return { getValue, loading };

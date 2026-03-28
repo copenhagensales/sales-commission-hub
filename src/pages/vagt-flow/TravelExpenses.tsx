@@ -187,7 +187,7 @@ const TravelExpenses = () => {
               </div>
 
               <p className="text-sm text-muted-foreground">
-                Diæterne er skattefri, og derfor udbetales de som et fast beløb — og det betyder også, 
+                Diæterne er skattefri, og derfor udbetales de som et fast beløb – og det betyder også, 
                 at virksomheden ikke betaler kost undervejs.
               </p>
             </CardContent>

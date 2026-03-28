@@ -182,7 +182,7 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
     kpiCards.push({ label: "Salg/time (løn)", value: payrollSalesPerHour.toFixed(2), sub: `${payrollHours.toFixed(1)} timer`, icon: TrendingUp });
   }
 
-  // Tailwind needs static classes — map col counts to full class strings
+  // Tailwind needs static classes – map col counts to full class strings
   const colsMap: Record<number, { tv: string; normal: string }> = {
     3: { tv: "grid grid-cols-3 gap-4", normal: "grid grid-cols-3 gap-4" },
     4: { tv: "grid grid-cols-4 gap-4", normal: "grid grid-cols-2 gap-4 md:grid-cols-4" },

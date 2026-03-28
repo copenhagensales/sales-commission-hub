@@ -66,7 +66,7 @@ function DeltaIndicator({ current, previous, suffix = "", invertColors = false }
   current: number; previous: number; suffix?: string; invertColors?: boolean;
 }) {
   const delta = Math.round((current - previous) * 10) / 10;
-  if (delta === 0) return <p className="text-xs text-muted-foreground mt-1.5">— ift. forrige periode</p>;
+  if (delta === 0) return <p className="text-xs text-muted-foreground mt-1.5">– ift. forrige periode</p>;
   const isPositive = delta > 0;
   const isGood = invertColors ? !isPositive : isPositive;
   const Icon = isPositive ? TrendingUp : TrendingDown;
@@ -804,7 +804,7 @@ export default function OnboardingAnalyse() {
                               {format(emp.startDate, "d. MMM yy", { locale: da })}
                             </TableCell>
                             <TableCell className="text-right text-sm text-muted-foreground">
-                              {emp.endDate ? format(emp.endDate, "d. MMM yy", { locale: da }) : "—"}
+                              {emp.endDate ? format(emp.endDate, "d. MMM yy", { locale: da }) : "–"}
                             </TableCell>
                             <TableCell className="text-right text-sm text-muted-foreground">
                               {emp.tenureDays}d
@@ -852,13 +852,13 @@ export default function OnboardingAnalyse() {
                         <TableCell className="text-right">{c.exits30}</TableCell>
                         <TableCell className="text-right">
                           <span className={`font-semibold ${getChurnColor(c.churn30)}`}>
-                            {c.total > 0 ? `${c.churn30}%` : "—"}
+                            {c.total > 0 ? `${c.churn30}%` : "–"}
                           </span>
                         </TableCell>
                         <TableCell className="text-right">{c.exits60}</TableCell>
                         <TableCell className="text-right">
                           <span className={`font-semibold ${getChurnColor(c.churn60)}`}>
-                            {c.total > 0 ? `${c.churn60}%` : "—"}
+                            {c.total > 0 ? `${c.churn60}%` : "–"}
                           </span>
                         </TableCell>
                         <TableCell className="text-right font-medium">{c.avgTenureDays}d</TableCell>

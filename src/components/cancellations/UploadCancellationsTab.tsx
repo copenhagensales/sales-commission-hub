@@ -265,7 +265,7 @@ function ConfigCreationForm({ clientId, columns: parentColumns, setColumns: setP
       <Select value={value} onValueChange={onChange}>
         <SelectTrigger><SelectValue placeholder="Vælg kolonne" /></SelectTrigger>
         <SelectContent>
-          <SelectItem value="__none__">— Ingen —</SelectItem>
+          <SelectItem value="__none__">– Ingen –</SelectItem>
           {sampleColumns.map(col => <SelectItem key={col} value={col}>{col}</SelectItem>)}
         </SelectContent>
       </Select>
@@ -403,7 +403,7 @@ function EditConfigDialog({ open, onOpenChange, config, onSaved }: {
       <Select value={value} onValueChange={onChange}>
         <SelectTrigger><SelectValue /></SelectTrigger>
         <SelectContent>
-          <SelectItem value="__none__">— Ingen —</SelectItem>
+          <SelectItem value="__none__">– Ingen –</SelectItem>
           {knownCols.map(col => <SelectItem key={col} value={col}>{col}</SelectItem>)}
         </SelectContent>
       </Select>
@@ -674,7 +674,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         setColumns(cols);
         setParsedData(jsonData.map(row => ({ originalRow: row })));
 
-        // Check if a default config exists — if so, auto-match
+        // Check if a default config exists – if so, auto-match
         const defaultConfig = clientConfigs.find(c => c.is_default) || (clientConfigs.length > 0 ? clientConfigs[0] : null);
         if (defaultConfig) {
           applyConfig(defaultConfig);
@@ -1055,7 +1055,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             const excelSeller = String(getCaseInsensitive(row.originalRow, sellerCol) || "").trim();
             const excelDate = String(getCaseInsensitive(row.originalRow, dateCol) || "").trim();
             
-            // Find which product this row matches — try condition-based first, then fallback
+            // Find which product this row matches – try condition-based first, then fallback
             const excelSubName = String(getCaseInsensitive(row.originalRow, "Subscription Name") || "").trim();
             let resolvedProductTitle: string | null = null;
 
@@ -1092,7 +1092,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             }
 
             if (!employeeId) {
-              // Unmatched seller — needs manual resolution
+              // Unmatched seller – needs manual resolution
               unmatchedSellers.push({
                 rowIndex: idx,
                 excelSellerName: excelSeller,
@@ -1391,7 +1391,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
       if (!importId) throw new Error("Kunne ikke oprette import-log");
 
-      // Build queue items — each matchedSale entry becomes one queue item
+      // Build queue items – each matchedSale entry becomes one queue item
       // (for product-phone mappings, same saleId may appear multiple times with different targetProductName)
       const queueItems = matchedSales.map(sale => ({
         import_id: importId!,
@@ -1540,7 +1540,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                   <AlertDialogHeader>
                     <AlertDialogTitle>Slet upload og rul alt tilbage?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Dette vil slette uploaden "{activeImport.file_name}" og rulle alle ændringer tilbage — inkl. godkendte annulleringer og kurvrettelser. Salg vil blive gendannet til deres oprindelige status.
+                      Dette vil slette uploaden "{activeImport.file_name}" og rulle alle ændringer tilbage – inkl. godkendte annulleringer og kurvrettelser. Salg vil blive gendannet til deres oprindelige status.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -1680,10 +1680,10 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-warning" />
-              Forhåndsvisning — {matchedSales.length} match
+              Forhåndsvisning – {matchedSales.length} match
             </CardTitle>
             <CardDescription>
-              {uploadType === "cancellation" ? "Annullering" : "Kurv difference"} — gennemgå matchede salg før afsendelse til godkendelseskøen.
+              {uploadType === "cancellation" ? "Annullering" : "Kurv difference"} – gennemgå matchede salg før afsendelse til godkendelseskøen.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -1809,7 +1809,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                                 <SelectValue placeholder="Vælg medarbejder..." />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="__none__">— Vælg —</SelectItem>
+                                <SelectItem value="__none__">– Vælg –</SelectItem>
                                 {allEmployees.map(emp => (
                                   <SelectItem key={emp.id} value={emp.id}>
                                     {`${emp.first_name || ""} ${emp.last_name || ""}`.trim()}

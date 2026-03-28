@@ -343,9 +343,9 @@ export default function AmoTasks() {
                           <span className={isOverdue ? "text-destructive font-medium" : ""}>
                             {format(new Date(task.due_date), "dd/MM/yyyy")}
                           </span>
-                        ) : "—"}
+                        ) : "–"}
                       </TableCell>
-                      <TableCell className="text-xs">{owner?.full_name || "—"}</TableCell>
+                      <TableCell className="text-xs">{owner?.full_name || "–"}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-1 justify-end">
                           {task.status !== "done" && (

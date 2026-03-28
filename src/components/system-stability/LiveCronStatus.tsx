@@ -94,7 +94,7 @@ export function LiveCronStatus({ integrations }: LiveCronStatusProps) {
       <CardContent>
         {cronJobs.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Kunne ikke hente cron jobs — opret en database-funktion for at aktivere denne visning.
+            Kunne ikke hente cron jobs – opret en database-funktion for at aktivere denne visning.
           </p>
         ) : (
           <div className="space-y-4">

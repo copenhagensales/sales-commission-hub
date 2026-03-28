@@ -1,6 +1,6 @@
 /**
  * Utility to generate and download a supplier report as PDF
- * Uses browser's print-to-PDF functionality — optimised for A4 landscape
+ * Uses browser's print-to-PDF functionality – optimised for A4 landscape
  */
 
 interface WeekDays {

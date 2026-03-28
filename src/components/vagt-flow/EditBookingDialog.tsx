@@ -1381,7 +1381,7 @@ export function EditBookingDialog({
                     <SelectItem value="none">Ingen placering (standardpris)</SelectItem>
                     {bookingPlacements.map((p: any) => (
                       <SelectItem key={p.id} value={p.id}>
-                        {p.name} — {p.daily_rate} kr
+                        {p.name} – {p.daily_rate} kr
                       </SelectItem>
                     ))}
                   </SelectContent>

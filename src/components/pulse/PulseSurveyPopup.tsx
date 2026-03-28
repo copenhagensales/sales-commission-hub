@@ -72,8 +72,8 @@ export function PulseSurveyPopup() {
     : "Din pulsmåling skal besvares igen";
 
   const description = hasDraft
-    ? "Du er allerede i gang — det tager kun et par minutter at gøre den færdig. Dine svar er 100% anonyme."
-    : "Vi beklager ulejligheden — din tidligere besvarelse blev desværre ikke registreret korrekt, og vi har derfor brug for, at du besvarer pulsmålingen igen. Det tager kun 2 minutter, og dine svar er fortsat 100% anonyme.";
+    ? "Du er allerede i gang – det tager kun et par minutter at gøre den færdig. Dine svar er 100% anonyme."
+    : "Vi beklager ulejligheden – din tidligere besvarelse blev desværre ikke registreret korrekt, og vi har derfor brug for, at du besvarer pulsmålingen igen. Det tager kun 2 minutter, og dine svar er fortsat 100% anonyme.";
 
   const actionLabel = hasDraft ? "Fortsæt besvarelse" : "Besvar nu";
   const ActionIcon = hasDraft ? PenLine : ClipboardCheck;
@@ -95,12 +95,12 @@ export function PulseSurveyPopup() {
           <DialogDescription className="text-sm text-muted-foreground">
             {hasDraft ? (
               <>
-                Du er allerede i gang — det tager kun et par minutter at gøre den færdig. Dine svar er{" "}
+                Du er allerede i gang – det tager kun et par minutter at gøre den færdig. Dine svar er{" "}
                 <span className="font-medium text-foreground">100% anonyme</span>.
               </>
             ) : (
               <>
-                Vi beklager ulejligheden — din tidligere besvarelse blev desværre ikke registreret korrekt, og vi har derfor brug for, at du besvarer pulsmålingen igen. Det tager kun 2 minutter, og dine svar er fortsat{" "}
+                Vi beklager ulejligheden – din tidligere besvarelse blev desværre ikke registreret korrekt, og vi har derfor brug for, at du besvarer pulsmålingen igen. Det tager kun 2 minutter, og dine svar er fortsat{" "}
                 <span className="font-medium text-foreground">100% anonyme</span>.
               </>
             )}

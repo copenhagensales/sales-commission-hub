@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/utils/supabasePagination";
-// buildFmPricingMap removed — pricing is handled by database triggers
+// buildFmPricingMap removed – pricing is handled by database triggers
 
 export interface FieldmarketingSale {
   id: string;
@@ -254,7 +254,7 @@ export function useCreateFieldmarketingSale() {
       console.log("[FM-SALES] Insert successful!", insertedSales?.length, "rows");
 
       // sale_items are created automatically by the create_fm_sale_items trigger
-      // with correct campaign-aware pricing — no manual creation needed
+      // with correct campaign-aware pricing – no manual creation needed
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sales"] });

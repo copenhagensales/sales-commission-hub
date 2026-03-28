@@ -153,7 +153,7 @@ export async function safeBackfill(
   const availableBudget = calculateSafeMaxRecords(integrationUsage, provider, log);
 
   if (availableBudget <= 0) {
-    log("WARN", `No API budget available for provider ${provider} — skipping`);
+    log("WARN", `No API budget available for provider ${provider} – skipping`);
     return {
       success: true, daysProcessed: 0, totalSales: 0, totalCalls: 0,
       budgetUsed: integrationUsage, budgetAvailable: 0, details: {},

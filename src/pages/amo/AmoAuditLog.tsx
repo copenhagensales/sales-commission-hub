@@ -192,7 +192,7 @@ export default function AmoAuditLog() {
                       </TableCell>
                       <TableCell className="text-xs">{tableLabels[entry.table_name] || entry.table_name}</TableCell>
                       <TableCell className="text-xs">{entry.user_email || "System"}</TableCell>
-                      <TableCell className="text-xs font-mono">{entry.record_id?.slice(0, 8) || "—"}</TableCell>
+                      <TableCell className="text-xs font-mono">{entry.record_id?.slice(0, 8) || "–"}</TableCell>
                       <TableCell className="text-right">
                         <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setSelectedEntry(entry)}>
                           <Eye className="h-3 w-3 mr-1" /> Vis

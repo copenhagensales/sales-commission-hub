@@ -146,12 +146,12 @@ export default function AdminDocumentation() {
             <AccordionContent className="text-sm text-muted-foreground leading-relaxed space-y-3">
               <p>Systemet logger relevante ændringer i databasen via <code>amo_audit_log</code>-tabellen. Følgende logges:</p>
               <ul className="list-disc pl-5 space-y-1">
-                <li><strong>Brugerlogin</strong> — hvem loggede ind og hvornår (via auth-systemet)</li>
-                <li><strong>Kontraktændringer</strong> — ændringer i medarbejderkontrakter og lønaftaler</li>
-                <li><strong>Salgsdata-sync</strong> — import og synkronisering fra Adversus og klient-uploads</li>
-                <li><strong>Lønberegninger</strong> — beregning og godkendelse af løn og provision</li>
-                <li><strong>GDPR-anmodninger</strong> — registrering af rettighedsanmodninger og sikkerhedshændelser</li>
-                <li><strong>AMO-ændringer</strong> — ændringer i arbejdsmiljøorganisationen</li>
+                <li><strong>Brugerlogin</strong> – hvem loggede ind og hvornår (via auth-systemet)</li>
+                <li><strong>Kontraktændringer</strong> – ændringer i medarbejderkontrakter og lønaftaler</li>
+                <li><strong>Salgsdata-sync</strong> – import og synkronisering fra Adversus og klient-uploads</li>
+                <li><strong>Lønberegninger</strong> – beregning og godkendelse af løn og provision</li>
+                <li><strong>GDPR-anmodninger</strong> – registrering af rettighedsanmodninger og sikkerhedshændelser</li>
+                <li><strong>AMO-ændringer</strong> – ændringer i arbejdsmiljøorganisationen</li>
               </ul>
               <p>Logs opbevares i databasen og er tilgængelige for systemadministratorer. Hver log-entry indeholder:</p>
               <ul className="list-disc pl-5 space-y-1">
@@ -182,7 +182,7 @@ export default function AdminDocumentation() {
                   <TableBody>
                     <TableRow>
                       <TableCell className="font-medium">Backup</TableCell>
-                      <TableCell>Ja — automatisk via Lovable Cloud</TableCell>
+                      <TableCell>Ja – automatisk via Lovable Cloud</TableCell>
                     </TableRow>
                     <TableRow>
                       <TableCell className="font-medium">Frekvens</TableCell>
@@ -286,13 +286,13 @@ export default function AdminDocumentation() {
                     <TableRow>
                       <TableCell className="font-medium">FM Profit Agent</TableCell>
                       <TableCell>Google Gemini (via Lovable AI Gateway)</TableCell>
-                      <TableCell><Badge variant="outline" className="bg-green-200/60 text-green-800 border-green-500/30 text-xs">Nej — aggregeret data</Badge></TableCell>
+                      <TableCell><Badge variant="outline" className="bg-green-200/60 text-green-800 border-green-500/30 text-xs">Nej – aggregeret data</Badge></TableCell>
                       <TableCell>Analyse af salgsperformance og omsætning</TableCell>
                     </TableRow>
                     <TableRow>
                       <TableCell className="font-medium">Udgiftsformel-parsing</TableCell>
                       <TableCell>Google Gemini (via Lovable AI Gateway)</TableCell>
-                      <TableCell><Badge variant="outline" className="bg-green-200/60 text-green-800 border-green-500/30 text-xs">Nej — kun formelstrenge</Badge></TableCell>
+                      <TableCell><Badge variant="outline" className="bg-green-200/60 text-green-800 border-green-500/30 text-xs">Nej – kun formelstrenge</Badge></TableCell>
                       <TableCell>Tolkning af provisionsformler til beregningslogik</TableCell>
                     </TableRow>
                   </TableBody>
@@ -300,9 +300,9 @@ export default function AdminDocumentation() {
               </div>
               <p className="font-medium mt-3">Sikkerhedsforanstaltninger:</p>
               <ul className="list-disc pl-5 space-y-1">
-                <li>Al AI-kommunikation sker via Lovable AI Gateway — ingen direkte API-kald til tredjeparter</li>
+                <li>Al AI-kommunikation sker via Lovable AI Gateway – ingen direkte API-kald til tredjeparter</li>
                 <li>Persondata sendes ikke til AI-modeller; data aggregeres eller anonymiseres først</li>
-                <li>AI bruges udelukkende som beslutningsstøtte — ingen automatiserede beslutninger om enkeltpersoner</li>
+                <li>AI bruges udelukkende som beslutningsstøtte – ingen automatiserede beslutninger om enkeltpersoner</li>
                 <li>AI-output valideres altid af en bruger før det anvendes</li>
               </ul>
               <p className="font-medium mt-3">Risici og begrænsninger:</p>

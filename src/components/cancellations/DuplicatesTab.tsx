@@ -319,7 +319,7 @@ export function DuplicatesTab({ clientId: selectedClientId }: DuplicatesTabProps
                             {isTdc ? `OPP: ${group.key}` : group.phone}
                           </span>
                           {group.company && (
-                            <span className="text-muted-foreground ml-2">— {group.company}</span>
+                            <span className="text-muted-foreground ml-2">– {group.company}</span>
                           )}
                           {group.customerName && (
                             <span className="text-muted-foreground ml-2">({group.customerName})</span>

@@ -940,7 +940,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
       <div className="space-y-6">
         {paginatedOppGroups.length > 0 && (
           <div>
-            <h3 className="text-sm font-semibold mb-2 text-muted-foreground">TDC Erhverv — OPP-grupperet</h3>
+            <h3 className="text-sm font-semibold mb-2 text-muted-foreground">TDC Erhverv – OPP-grupperet</h3>
             <div className="rounded-md border max-h-[600px] overflow-auto">
               <Table>
                 <TableHeader>
@@ -1055,7 +1055,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
         {paginatedFlatItems.length > 0 && (
           <div>
             {paginatedOppGroups.length > 0 && (
-              <h3 className="text-sm font-semibold mb-2 text-muted-foreground">Andre kunder — per salg</h3>
+              <h3 className="text-sm font-semibold mb-2 text-muted-foreground">Andre kunder – per salg</h3>
             )}
             <div className="rounded-md border max-h-[600px] overflow-auto">
               <Table>
@@ -1262,7 +1262,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Slet upload og rul alt tilbage?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Dette vil slette uploaden "{activeImport.file_name}" og rulle alle ændringer tilbage — inkl. godkendte annulleringer og kurvrettelser. Salg vil blive gendannet til deres oprindelige status.
+                    Dette vil slette uploaden "{activeImport.file_name}" og rulle alle ændringer tilbage – inkl. godkendte annulleringer og kurvrettelser. Salg vil blive gendannet til deres oprindelige status.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

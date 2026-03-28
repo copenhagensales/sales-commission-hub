@@ -434,7 +434,7 @@ export default function ContractSign() {
           <ContractProgressStepper steps={stepperSteps} />
         </div>
 
-        {/* ═══ Contract Document — formal white paper ═══ */}
+        {/* ═══ Contract Document – formal white paper ═══ */}
         <div className="bg-white rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.12)] border border-neutral-200 overflow-hidden">
           {/* Document header inside paper */}
           <div className="px-8 md:px-12 lg:px-16 pt-10 pb-0">
@@ -498,7 +498,7 @@ export default function ContractSign() {
                     <div className="space-y-1 text-xs text-muted-foreground border-t border-border/50 pt-3 mt-1">
                       <p>
                         <span className="font-medium text-foreground/70">Dato:</span>{" "}
-                        {sig.signed_at ? format(new Date(sig.signed_at), "d. MMM yyyy 'kl.' HH:mm", { locale: da }) : "—"}
+                        {sig.signed_at ? format(new Date(sig.signed_at), "d. MMM yyyy 'kl.' HH:mm", { locale: da }) : "–"}
                       </p>
                       {sig.ip_address && (
                         <p>

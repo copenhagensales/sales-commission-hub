@@ -80,7 +80,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Normalise dates properly — never concatenate T23:59:59 to an existing timestamp
+    // Normalise dates properly – never concatenate T23:59:59 to an existing timestamp
     const sourceStart = toStartOfDay(season.qualification_source_start);
     const sourceEnd = toEndOfDay(season.qualification_source_end);
     const playersPerDivision = season.config?.players_per_division || 14;
@@ -127,7 +127,7 @@ Deno.serve(async (req) => {
     });
 
     if (rpcError) {
-      console.error("[league-calculate-standings] RPC error — ABORTING without overwriting standings:", rpcError);
+      console.error("[league-calculate-standings] RPC error – ABORTING without overwriting standings:", rpcError);
       return new Response(
         JSON.stringify({ error: "RPC failed, standings NOT overwritten", details: rpcError }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -214,7 +214,7 @@ Deno.serve(async (req) => {
 
     const todayStr = new Date().toISOString().slice(0, 10);
 
-    // 7. Upsert standings — only rotate previous_overall_rank on day change
+    // 7. Upsert standings – only rotate previous_overall_rank on day change
     const upsertData = standingsData.map((s) => {
       const prev = existingMap[s.employee_id];
       let previousRank: number | null = null;

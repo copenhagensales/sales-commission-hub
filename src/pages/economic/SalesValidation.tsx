@@ -672,7 +672,7 @@ export default function SalesValidation() {
                         <span className="text-sm font-medium">Matchede annulleringer</span>
                       </div>
                       <p className="text-2xl font-bold">{matchedCancellations.length}</p>
-                      <p className="text-xs text-muted-foreground">Sælger identificeret — kan trækkes</p>
+                      <p className="text-xs text-muted-foreground">Sælger identificeret – kan trækkes</p>
                     </CardContent>
                   </Card>
                   <Card>
@@ -722,7 +722,7 @@ export default function SalesValidation() {
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base flex items-center gap-2">
                       <XCircle className="h-4 w-4 text-destructive" />
-                      Matchede annulleringer — sælger identificeret ({matchedCancellations.length})
+                      Matchede annulleringer – sælger identificeret ({matchedCancellations.length})
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -759,7 +759,7 @@ export default function SalesValidation() {
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base flex items-center gap-2">
                       <AlertTriangle className="h-4 w-4 text-orange-500" />
-                      Umatchede annulleringer — kan ikke placeres ({unmatchedCancellations.length})
+                      Umatchede annulleringer – kan ikke placeres ({unmatchedCancellations.length})
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -790,7 +790,7 @@ export default function SalesValidation() {
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base flex items-center gap-2">
                       <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                      Uverificerede salg — ikke bekræftet af kunden ({unverifiedSales.length})
+                      Uverificerede salg – ikke bekræftet af kunden ({unverifiedSales.length})
                     </CardTitle>
                   </CardHeader>
                   <CardContent>

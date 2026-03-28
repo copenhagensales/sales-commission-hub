@@ -137,7 +137,7 @@ export async function providerSync(
     return { success: true, results: [], budgetUsed: 0, skipped: ["outside_working_hours"] };
   }
 
-  // 1. Global quota gate — skip entire provider if quota exhausted
+  // 1. Global quota gate – skip entire provider if quota exhausted
   const quotaStatus = await checkProviderQuota(supabase, provider);
   if (quotaStatus.exhausted) {
     log("WARN", `Provider-sync quota gate: ${provider} quota exhausted (remaining=${quotaStatus.remaining}, reset=${quotaStatus.resetAt}). Skipping entire provider.`);

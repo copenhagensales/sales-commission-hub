@@ -64,7 +64,7 @@ export function LeagueRulesSheet({ compact = false }: { compact?: boolean }) {
           <div>
             <h4 className="font-semibold mb-1.5 text-yellow-400">🏆 Point</h4>
             <p className="text-sm text-muted-foreground">
-              Point gives baseret på din placering i divisionen. #1 i divisionen får flest point, og hvert trin ned koster 5 point. Højere divisioner giver 20 ekstra basispoint per niveau — så selv sidstepladsen i en højere division slår førstepladsen i divisionen under.
+              Point gives baseret på din placering i divisionen. #1 i divisionen får flest point, og hvert trin ned koster 5 point. Højere divisioner giver 20 ekstra basispoint per niveau – så selv sidstepladsen i en højere division slår førstepladsen i divisionen under.
             </p>
             <div className="text-sm text-muted-foreground mt-1.5 space-y-0.5">
               <p className="font-medium text-foreground/80">Eksempel (5 divisioner, ×1.0):</p>
@@ -86,7 +86,7 @@ export function LeagueRulesSheet({ compact = false }: { compact?: boolean }) {
               Sæsonen består af 1 kvalifikationsuge + 6 aktive runder. Hver uge er én runde. Din provision i ugen bestemmer din placering inden for divisionen. 14 spillere pr. division.
             </p>
             <p className="text-sm text-muted-foreground mt-1.5">
-              Kvalifikationsugen sætter startdivisionerne — derefter begynder point at tælle.
+              Kvalifikationsugen sætter startdivisionerne – derefter begynder point at tælle.
             </p>
           </div>
 
@@ -102,15 +102,15 @@ export function LeagueRulesSheet({ compact = false }: { compact?: boolean }) {
             <ul className="mt-2 space-y-1.5 text-sm text-muted-foreground">
               <li className="flex items-start gap-2">
                 <span>🥇</span>
-                <span><span className="text-yellow-400 font-medium">Nr. 1</span> — Sæsonens vinder. Flest samlede point.</span>
+                <span><span className="text-yellow-400 font-medium">Nr. 1</span> – Sæsonens vinder. Flest samlede point.</span>
               </li>
               <li className="flex items-start gap-2">
                 <span>🥈</span>
-                <span><span className="text-slate-300 font-medium">Nr. 2</span> — Andenpladsen i samlet point.</span>
+                <span><span className="text-slate-300 font-medium">Nr. 2</span> – Andenpladsen i samlet point.</span>
               </li>
               <li className="flex items-start gap-2">
                 <span>🥉</span>
-                <span><span className="text-amber-600 font-medium">Nr. 3</span> — Tredjepladsen i samlet point.</span>
+                <span><span className="text-amber-600 font-medium">Nr. 3</span> – Tredjepladsen i samlet point.</span>
               </li>
             </ul>
           </div>
@@ -124,15 +124,15 @@ export function LeagueRulesSheet({ compact = false }: { compact?: boolean }) {
             <ul className="mt-2 space-y-1.5 text-sm text-muted-foreground">
               <li className="flex items-start gap-2">
                 <span>🔥</span>
-                <span><span className="text-red-400 font-medium">Sæsonens Bedste Runde</span> — Spilleren med flest point i en enkelt runde.</span>
+                <span><span className="text-red-400 font-medium">Sæsonens Bedste Runde</span> – Spilleren med flest point i en enkelt runde.</span>
               </li>
               <li className="flex items-start gap-2">
                 <span>⭐</span>
-                <span><span className="text-purple-400 font-medium">Sæsonens Talent</span> — Nye medarbejdere (&lt; 3 mdr.) med flest point. Friske ben der har vist talent!</span>
+                <span><span className="text-purple-400 font-medium">Sæsonens Talent</span> – Nye medarbejdere (&lt; 3 mdr.) med flest point. Friske ben der har vist talent!</span>
               </li>
               <li className="flex items-start gap-2">
                 <span>🚀</span>
-                <span><span className="text-emerald-400 font-medium">Sæsonens Comeback</span> — Størst stigning i placering fra runde 1 til slutstillingen. Beviset på, at det aldrig er for sent.</span>
+                <span><span className="text-emerald-400 font-medium">Sæsonens Comeback</span> – Størst stigning i placering fra runde 1 til slutstillingen. Beviset på, at det aldrig er for sent.</span>
               </li>
             </ul>
           </div>

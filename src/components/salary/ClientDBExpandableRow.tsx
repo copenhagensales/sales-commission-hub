@@ -102,7 +102,7 @@ export function ClientDBExpandableRow({
 
         {/* Team */}
         <TableCell className="text-muted-foreground text-sm min-w-[100px]">
-          {client.teamName || "—"}
+          {client.teamName || "–"}
         </TableCell>
 
         {/* Sales */}
@@ -205,7 +205,7 @@ export function ClientDBExpandableRow({
               <div>
                 <p className="text-muted-foreground text-xs mb-0.5">Centre/Boder</p>
                 <p className="font-medium text-destructive">
-                  {client.locationCosts > 0 ? `-${formatCurrency(client.locationCosts)}` : "—"}
+                  {client.locationCosts > 0 ? `-${formatCurrency(client.locationCosts)}` : "–"}
                 </p>
                 {client.fullMonthLocationCosts > 0 && client.fullMonthLocationCosts !== client.locationCosts && (
                   <p className="text-xs text-muted-foreground">
@@ -216,7 +216,7 @@ export function ClientDBExpandableRow({
               <div>
                 <p className="text-muted-foreground text-xs mb-0.5">Assist.løn</p>
                 <p className="font-medium text-destructive">
-                  {client.assistantAllocation > 0 ? `-${formatCurrency(client.assistantAllocation)}` : "—"}
+                  {client.assistantAllocation > 0 ? `-${formatCurrency(client.assistantAllocation)}` : "–"}
                 </p>
                 {client.fullMonthAssistantAllocation > 0 && client.fullMonthAssistantAllocation !== client.assistantAllocation && (
                   <p className="text-xs text-muted-foreground">
@@ -229,7 +229,7 @@ export function ClientDBExpandableRow({
                 <p className="font-medium text-destructive">
                   {client.leaderAllocation > 0 
                     ? `-${formatCurrency(client.leaderAllocation + client.leaderVacationPay)}` 
-                    : "—"}
+                    : "–"}
                 </p>
                 {client.fullMonthLeaderAllocation > 0 && client.fullMonthLeaderAllocation !== client.leaderAllocation && (
                   <p className="text-xs text-muted-foreground">
@@ -240,7 +240,7 @@ export function ClientDBExpandableRow({
               <div>
                 <p className="text-muted-foreground text-xs mb-0.5">ATP/Barsel</p>
                 <p className="font-medium text-destructive">
-                  {client.atpBarsselAllocation > 0 ? `-${formatCurrency(client.atpBarsselAllocation)}` : "—"}
+                  {client.atpBarsselAllocation > 0 ? `-${formatCurrency(client.atpBarsselAllocation)}` : "–"}
                 </p>
                 {client.fullMonthAtpBarsselAllocation > 0 && client.fullMonthAtpBarsselAllocation !== client.atpBarsselAllocation && (
                   <p className="text-xs text-muted-foreground">
@@ -255,7 +255,7 @@ export function ClientDBExpandableRow({
                 >
                   <p className="text-muted-foreground text-xs mb-0.5">Annul. %</p>
                   <p className="font-medium">
-                    {client.cancellationPercent > 0 ? formatPercent(client.cancellationPercent) : "—"}
+                    {client.cancellationPercent > 0 ? formatPercent(client.cancellationPercent) : "–"}
                   </p>
                   {client.cancellationRevenueDeduction > 0 && (
                     <p className="text-xs text-destructive">
@@ -271,7 +271,7 @@ export function ClientDBExpandableRow({
                 >
                   <p className="text-muted-foreground text-xs mb-0.5">Sygeløn %</p>
                   <p className="font-medium">
-                    {client.sickPayPercent > 0 ? formatPercent(client.sickPayPercent) : "—"}
+                    {client.sickPayPercent > 0 ? formatPercent(client.sickPayPercent) : "–"}
                   </p>
                   {client.sickPayAmount > 0 && (
                     <p className="text-xs text-muted-foreground">

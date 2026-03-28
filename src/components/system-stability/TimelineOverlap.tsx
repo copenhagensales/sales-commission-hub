@@ -75,7 +75,7 @@ function ProviderTimeline({ provider, jobs }: { provider: string; jobs: Timeline
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-semibold flex items-center gap-2">
           <Clock className="h-4 w-4" />
-          Tidslinje (60 min) — {label}
+          Tidslinje (60 min) – {label}
           {overlapWarnings.length > 0 && (
             <span className="text-xs font-normal text-destructive ml-2">
               {overlapWarnings.length} overlap{overlapWarnings.length > 1 ? "s" : ""}

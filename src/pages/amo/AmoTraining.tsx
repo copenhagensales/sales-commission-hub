@@ -251,7 +251,7 @@ export default function AmoTraining() {
                 const isOverdue = c.requirement_applies && c.deadline_date && !c.completed_date && new Date(c.deadline_date) < today;
                 return (
                   <TableRow key={c.id}>
-                    <TableCell className="font-medium">{c.amo_members?.full_name || "—"}</TableCell>
+                    <TableCell className="font-medium">{c.amo_members?.full_name || "–"}</TableCell>
                     <TableCell className="text-xs">{trainingTypeLabels[c.training_type] || c.training_type}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className={cn("text-xs", statusColors[c.status] || "")}>
@@ -263,10 +263,10 @@ export default function AmoTraining() {
                         <span className={cn(isOverdue ? "text-red-400 font-medium" : "text-muted-foreground")}>
                           {format(new Date(c.deadline_date), "d. MMM yyyy", { locale: da })}
                         </span>
-                      ) : "—"}
+                      ) : "–"}
                     </TableCell>
                     <TableCell className="text-xs">
-                      {c.completed_date ? format(new Date(c.completed_date), "d. MMM yyyy", { locale: da }) : "—"}
+                      {c.completed_date ? format(new Date(c.completed_date), "d. MMM yyyy", { locale: da }) : "–"}
                     </TableCell>
                     <TableCell>
                       {c.certificate_url ? (
@@ -276,10 +276,10 @@ export default function AmoTraining() {
                       ) : c.completed_date ? (
                         <span className="text-xs text-yellow-400">Mangler</span>
                       ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
+                        <span className="text-xs text-muted-foreground">–</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{c.provider || "—"}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{c.provider || "–"}</TableCell>
                     <TableCell>
                       <div className="flex gap-1">
                         <Button variant="ghost" size="icon" onClick={() => openEdit(c)}><Pencil className="h-3.5 w-3.5" /></Button>

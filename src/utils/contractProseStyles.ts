@@ -109,7 +109,7 @@ export const CONTRACT_PROSE_CLASSES = `
 `.replace(/\n\s*/g, ' ').trim();
 
 /**
- * Signing page: formal white paper with black text — no dark mode tokens.
+ * Signing page: formal white paper with black text – no dark mode tokens.
  */
 export const CONTRACT_PROSE_SIGN_CLASSES = `
   prose prose-neutral ${BASE_PROSE}

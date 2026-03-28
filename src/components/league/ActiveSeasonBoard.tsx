@@ -313,7 +313,7 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
           )}
         </div>
 
-        {/* Name + movement — fixed width for sparkline alignment */}
+        {/* Name + movement – fixed width for sparkline alignment */}
         <div className="w-[180px] sm:w-[220px] shrink-0">
           <div className="flex items-center gap-1.5 flex-wrap">
             {/* Live pulse dot */}
@@ -357,7 +357,7 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
           </div>
         </div>
 
-        {/* Sparkline — centrally placed (always rendered for alignment) */}
+        {/* Sparkline – centrally placed (always rendered for alignment) */}
         <div className="hidden sm:flex flex-1 items-center min-w-[120px]">
           {weeklyData && weeklyData.length > 0 && (
             <ProvisionSparkline
@@ -390,7 +390,7 @@ const SeasonPlayerRow = memo(function SeasonPlayerRow({
                 I dag: {todayProvision.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
               </div>
             )}
-            {/* Gap indicators — only for current user */}
+            {/* Gap indicators – only for current user */}
             {isCurrentUser && gapUp !== null && gapUp > 0 && (
               <div className="text-[9px] text-muted-foreground/70 font-mono">
                 ↑ {gapUp.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr til #{rank - 1}

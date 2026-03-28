@@ -182,8 +182,8 @@ export default function AmoKemiApv() {
               {products?.map(p => (
                 <TableRow key={p.id}>
                   <TableCell className="font-medium">{p.product_name}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{p.supplier || "—"}</TableCell>
-                  <TableCell className="text-xs">{p.product_type || "—"}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{p.supplier || "–"}</TableCell>
+                  <TableCell className="text-xs">{p.product_type || "–"}</TableCell>
                   <TableCell>
                     {p.hazard_flag ? (
                       <Badge variant="destructive" className="text-xs"><AlertTriangle className="h-3 w-3 mr-1" />Ja</Badge>
@@ -199,16 +199,16 @@ export default function AmoKemiApv() {
                     ) : p.hazard_flag ? (
                       <span className="text-xs text-red-400">Mangler!</span>
                     ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
+                      <span className="text-xs text-muted-foreground">–</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-xs">{p.responsible_owner || "—"}</TableCell>
+                  <TableCell className="text-xs">{p.responsible_owner || "–"}</TableCell>
                   <TableCell className="text-xs">
                     {p.next_review_due ? (
                       <span className={cn(new Date(p.next_review_due) < today ? "text-red-400" : "text-muted-foreground")}>
                         {format(new Date(p.next_review_due), "d. MMM yyyy", { locale: da })}
                       </span>
-                    ) : "—"}
+                    ) : "–"}
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">

@@ -283,7 +283,7 @@ function getPermissionBadge(canView: boolean, canEdit: boolean, visibility: Visi
   className: string;
 } {
   if (!canView) {
-    return { label: "—", variant: "secondary", className: "bg-muted text-muted-foreground" };
+    return { label: "–", variant: "secondary", className: "bg-muted text-muted-foreground" };
   }
   if (canEdit && visibility === 'all') {
     return { label: "Fuld", variant: "default", className: "bg-green-600 text-white hover:bg-green-700" };
@@ -401,7 +401,7 @@ export function PermissionsTab() {
                 <span>Kun læseadgang</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <Badge variant="secondary" className="text-xs">—</Badge>
+                <Badge variant="secondary" className="text-xs">–</Badge>
                 <span>Ingen adgang</span>
               </div>
               <div className="flex items-center gap-1.5 border-l pl-4">

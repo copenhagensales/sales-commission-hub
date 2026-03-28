@@ -235,7 +235,7 @@ function BillingOverviewTab() {
       const rulesForType = allDiscountRules.filter((r: any) => r.location_type === type);
 
       if (rulesForType.length === 0) {
-        // No discount rules for this type — use brutto
+        // No discount rules for this type – use brutto
         totalNetto += locs.reduce((s: number, l: any) => s + l.totalAmount, 0);
         return;
       }
@@ -266,7 +266,7 @@ function BillingOverviewTab() {
           }
         }
       } else if (discountType === "annual_revenue") {
-        // For annual_revenue, we'd need YTD data — simplify by using the lowest tier
+        // For annual_revenue, we'd need YTD data – simplify by using the lowest tier
         const sorted = [...rulesForType].sort((a: any, b: any) => (b.min_revenue ?? 0) - (a.min_revenue ?? 0));
         // Use lowest tier (0 revenue) as approximation since we don't have YTD in this tab
         appliedDiscount = sorted[sorted.length - 1]?.discount_percent ?? 0;

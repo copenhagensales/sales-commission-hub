@@ -232,7 +232,7 @@ export default function AmoMeetings() {
                     ) : m.status === "completed" ? (
                       <span className="text-xs text-yellow-400">Mangler</span>
                     ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
+                      <span className="text-xs text-muted-foreground">–</span>
                     )}
                   </TableCell>
                   <TableCell onClick={e => e.stopPropagation()}>
@@ -266,7 +266,7 @@ export default function AmoMeetings() {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              {detailMeeting && `${meetingTypeLabels[detailMeeting.meeting_type] || "Møde"} — ${format(new Date(detailMeeting.planned_date), "d. MMM yyyy", { locale: da })}`}
+              {detailMeeting && `${meetingTypeLabels[detailMeeting.meeting_type] || "Møde"} – ${format(new Date(detailMeeting.planned_date), "d. MMM yyyy", { locale: da })}`}
             </DialogTitle>
           </DialogHeader>
           {detailMeeting && (

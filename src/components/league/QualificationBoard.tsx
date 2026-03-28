@@ -299,7 +299,7 @@ const PlayerRow = memo(function PlayerRow({
           )}
         </div>
 
-        {/* Name — fluid on mobile */}
+        {/* Name – fluid on mobile */}
         <div className="min-w-0 flex-1 sm:w-[220px] sm:flex-none sm:shrink-0">
           <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
             {todayProvision > 0 && (
@@ -339,7 +339,7 @@ const PlayerRow = memo(function PlayerRow({
           </div>
         </div>
 
-        {/* Sparkline — hidden on mobile */}
+        {/* Sparkline – hidden on mobile */}
         <div className="hidden sm:flex flex-1 items-center min-w-[120px]">
           {weeklyData && weeklyData.length > 0 && (
             <ProvisionSparkline
@@ -350,7 +350,7 @@ const PlayerRow = memo(function PlayerRow({
           )}
         </div>
 
-        {/* Provision + today — compact on mobile */}
+        {/* Provision + today – compact on mobile */}
         <div className="flex items-center gap-1 sm:gap-3 shrink-0">
           <div className="text-right">
             <div className="flex items-center gap-1 sm:gap-1.5 justify-end">
@@ -367,7 +367,7 @@ const PlayerRow = memo(function PlayerRow({
                 ? `${todayProvision.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr`
                 : "0 kr"}
             </div>
-            {/* Gap indicators — only for current user */}
+            {/* Gap indicators – only for current user */}
             {isCurrentUser && gapUp !== null && gapUp > 0 && (
               <div className="text-[8px] sm:text-[9px] text-muted-foreground/70 font-mono">
                 ↑ {gapUp.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
@@ -387,7 +387,7 @@ const PlayerRow = memo(function PlayerRow({
               />
             )}
           </div>
-          {/* Zone badges — hidden on mobile (shown via color stripe) */}
+          {/* Zone badges – hidden on mobile (shown via color stripe) */}
           <div className="hidden sm:block w-20 text-right">
             {isPromoZone && <Badge className="bg-green-500/20 text-green-600 border-green-500/30 text-[10px] px-1.5 py-0">Oprykker</Badge>}
             {isTopZone && <Badge className="bg-yellow-500/20 text-yellow-600 border-yellow-500/30 text-[10px] px-1.5 py-0">Top 3</Badge>}

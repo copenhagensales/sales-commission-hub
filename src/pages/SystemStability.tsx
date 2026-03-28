@@ -322,7 +322,7 @@ export default function SystemStability() {
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Gns. varighed</span>
                         <span className="text-foreground">
-                          {int.avgDurationMs > 0 ? `${(int.avgDurationMs / 1000).toFixed(1)}s` : "—"}
+                          {int.avgDurationMs > 0 ? `${(int.avgDurationMs / 1000).toFixed(1)}s` : "–"}
                         </span>
                       </div>
                       <div className="flex justify-between">
@@ -345,7 +345,7 @@ export default function SystemStability() {
                       {pb.provider}
                     </CardTitle>
                     <p className="text-xs text-muted-foreground capitalize">
-                      {pb.providerType} — {pb.limit1m}/min, {pb.limit60m}/time
+                      {pb.providerType} – {pb.limit1m}/min, {pb.limit60m}/time
                     </p>
                   </CardHeader>
                   <CardContent className="space-y-3">
@@ -433,7 +433,7 @@ export default function SystemStability() {
                               if (hasSales) return <Badge variant="secondary" className="text-xs bg-emerald-500/10 text-emerald-600 border-emerald-200">Sales</Badge>;
                               if (hasCalls) return <Badge variant="secondary" className="text-xs bg-purple-500/10 text-purple-600 border-purple-200">Calls</Badge>;
                               if (actions.length > 0) return <Badge variant="secondary" className="text-xs">{actions.join(", ")}</Badge>;
-                              return <span className="text-xs text-muted-foreground">—</span>;
+                              return <span className="text-xs text-muted-foreground">–</span>;
                             })()}
                           </TableCell>
                           <TableCell>
@@ -463,7 +463,7 @@ export default function SystemStability() {
                             {(run.records_processed || 0).toLocaleString("da-DK")}
                           </TableCell>
                           <TableCell className="text-xs text-right">
-                            {run.duration_ms != null ? `${(run.duration_ms / 1000).toFixed(1)}s` : "—"}
+                            {run.duration_ms != null ? `${(run.duration_ms / 1000).toFixed(1)}s` : "–"}
                           </TableCell>
                           <TableCell className="text-xs text-right">{run.api_calls_made || 0}</TableCell>
                           <TableCell className={`text-xs text-right ${(run.rate_limit_hits || 0) > 0 ? "text-destructive font-medium" : ""}`}>

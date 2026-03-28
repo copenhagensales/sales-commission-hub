@@ -85,7 +85,7 @@ function useRevenuePosteringer(year: number) {
         .lte("dato", `${year}-12-31`)
         .order("dato", { ascending: false });
       if (error) throw error;
-      // Faktura for fx januar sendes d. 1/2 — tilhører foregående måned
+      // Faktura for fx januar sendes d. 1/2 – tilhører foregående måned
       return (data || []).map((r) => {
         const d = new Date(r.dato + "T00:00:00");
         // Undtagelse: faktura 940 tilhører sin egen måned (ikke -1)
@@ -471,9 +471,9 @@ export default function EconomicRevenueMatch() {
                             <TableCell className="max-w-[300px] truncate text-sm" title={p.tekst || ""}>
                               {p.tekst || <span className="text-muted-foreground italic">Ingen tekst</span>}
                             </TableCell>
-                            <TableCell className="font-mono text-xs">{p.faktura_nr || "—"}</TableCell>
-                            <TableCell className="font-mono text-xs">{p.bilags_nr || "—"}</TableCell>
-                            <TableCell className="text-right font-mono text-xs">{p.antal ?? "—"}</TableCell>
+                            <TableCell className="font-mono text-xs">{p.faktura_nr || "–"}</TableCell>
+                            <TableCell className="font-mono text-xs">{p.bilags_nr || "–"}</TableCell>
+                            <TableCell className="text-right font-mono text-xs">{p.antal ?? "–"}</TableCell>
                             <TableCell className="text-right font-mono text-sm whitespace-nowrap">
                               {formatDKK(p.beloeb_dkk)}
                             </TableCell>
@@ -617,7 +617,7 @@ export default function EconomicRevenueMatch() {
                         </div>
                         <div>
                           <span className="text-muted-foreground">Måneder:</span>{" "}
-                          <span className="font-medium">{matchPreview.months.join(", ") || "—"}</span>
+                          <span className="font-medium">{matchPreview.months.join(", ") || "–"}</span>
                         </div>
                       </div>
                       {matchPreview.examples.length > 0 && (
@@ -707,7 +707,7 @@ export default function EconomicRevenueMatch() {
                           <TableRow key={`${row.clientId}-${row.month}-${i}`}>
                             <TableCell className="font-mono text-sm">{row.month}</TableCell>
                             <TableCell className="font-medium">{row.clientName}</TableCell>
-                            <TableCell className="text-sm text-muted-foreground">{row.invoiceNrs.join(", ") || "—"}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{row.invoiceNrs.join(", ") || "–"}</TableCell>
                             <TableCell className="text-right tabular-nums">{formatDKK(row.invoiced)}</TableCell>
                             <TableCell className="text-right tabular-nums">{formatDKK(row.system)}</TableCell>
                             <TableCell className={cn("text-right tabular-nums font-medium", getDeviationColor(row.deviationPct))}>
@@ -753,7 +753,7 @@ export default function EconomicRevenueMatch() {
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <span className="text-muted-foreground block text-xs">Tekst</span>
-                  <span className="font-medium">{detailPostering.tekst || "—"}</span>
+                  <span className="font-medium">{detailPostering.tekst || "–"}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground block text-xs">Beløb</span>
@@ -765,31 +765,31 @@ export default function EconomicRevenueMatch() {
                 </div>
                 <div>
                   <span className="text-muted-foreground block text-xs">Forfaldsdato</span>
-                  <span className="font-mono">{detailPostering.forfalds_dato || "—"}</span>
+                  <span className="font-mono">{detailPostering.forfalds_dato || "–"}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground block text-xs">Fakturanr.</span>
-                  <span className="font-mono">{detailPostering.faktura_nr || "—"}</span>
+                  <span className="font-mono">{detailPostering.faktura_nr || "–"}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground block text-xs">Bilagsnr.</span>
-                  <span className="font-mono">{detailPostering.bilags_nr || "—"}</span>
+                  <span className="font-mono">{detailPostering.bilags_nr || "–"}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground block text-xs">Kundenr.</span>
-                  <span className="font-mono">{detailPostering.kunde_nr || "—"}</span>
+                  <span className="font-mono">{detailPostering.kunde_nr || "–"}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground block text-xs">Leverandørnr.</span>
-                  <span className="font-mono">{detailPostering.leverandoer_nr || "—"}</span>
+                  <span className="font-mono">{detailPostering.leverandoer_nr || "–"}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground block text-xs">Antal</span>
-                  <span className="font-mono">{detailPostering.antal ?? "—"}</span>
+                  <span className="font-mono">{detailPostering.antal ?? "–"}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground block text-xs">Posteringstype</span>
-                  <span className="font-mono">{detailPostering.posterings_type || "—"}</span>
+                  <span className="font-mono">{detailPostering.posterings_type || "–"}</span>
                 </div>
               </div>
 
@@ -841,7 +841,7 @@ export default function EconomicRevenueMatch() {
                   <div className="space-y-1 max-h-40 overflow-y-auto">
                     {relatedPosteringer.map(rp => (
                       <div key={rp.loebe_nr} className="text-xs flex justify-between bg-muted/50 rounded px-2 py-1">
-                        <span className="truncate flex-1">{rp.tekst || "—"}</span>
+                        <span className="truncate flex-1">{rp.tekst || "–"}</span>
                         <span className="font-mono ml-2">{formatDKK(rp.beloeb_dkk)}</span>
                       </div>
                     ))}

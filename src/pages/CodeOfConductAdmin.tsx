@@ -412,7 +412,7 @@ export default function CodeOfConductAdmin() {
                             {employee.completion ? (
                               format(new Date(employee.completion.passed_at), "d. MMM yyyy", { locale: da })
                             ) : (
-                              <span className="text-muted-foreground">—</span>
+                              <span className="text-muted-foreground">–</span>
                             )}
                           </TableCell>
                           <TableCell className="text-right">

@@ -5,7 +5,7 @@
  *   1. leadResultFields (fuzzy key match)
  *   2. leadResultData array (fuzzy label match)
  *   3. Top-level OPP keys (opp_nr, OPP nr, etc.)
- *   4. legacy_opp_number (last resort — may be truncated)
+ *   4. legacy_opp_number (last resort – may be truncated)
  */
 
 function getCaseInsensitive(obj: Record<string, unknown> | undefined, key: string): unknown {
@@ -29,7 +29,7 @@ export function extractOpp(rawPayload: unknown): string {
   if (!rawPayload || typeof rawPayload !== "object") return "";
   const rp = rawPayload as Record<string, unknown>;
 
-  // 1. leadResultFields — most reliable source
+  // 1. leadResultFields – most reliable source
   const fields = rp["leadResultFields"] as Record<string, unknown> | undefined;
   if (fields) {
     const oppVal = getCaseInsensitive(fields, "OPP nr");
@@ -47,7 +47,7 @@ export function extractOpp(rawPayload: unknown): string {
   const topLevel = getCaseInsensitive(rp, "OPP nr") ?? rp["opp_nr"] ?? rp["opp"] ?? rp["OPP"] ?? rp["opportunity_id"] ?? rp["reference"];
   if (topLevel) return String(topLevel).trim();
 
-  // 4. legacy_opp_number — last resort (may be truncated)
+  // 4. legacy_opp_number – last resort (may be truncated)
   if (rp["legacy_opp_number"]) return String(rp["legacy_opp_number"]).trim();
 
   return "";

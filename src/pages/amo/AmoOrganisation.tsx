@@ -230,8 +230,8 @@ export default function AmoOrganisation() {
                       <TableRow key={m.id}>
                         <TableCell className="font-medium">{m.full_name}</TableCell>
                         <TableCell>{roleLabels[m.role_type] || m.role_type}</TableCell>
-                        <TableCell className="text-muted-foreground text-xs">{m.email || "—"}</TableCell>
-                        <TableCell className="text-xs">{wp?.name || "—"}</TableCell>
+                        <TableCell className="text-muted-foreground text-xs">{m.email || "–"}</TableCell>
+                        <TableCell className="text-xs">{wp?.name || "–"}</TableCell>
                         <TableCell>
                           {m.training_required ? (
                             m.prior_valid_training ? (
@@ -342,7 +342,7 @@ export default function AmoOrganisation() {
                     const status = daysUntil < 0 ? "red" : daysUntil <= 60 ? "yellow" : "green";
                     return (
                       <TableRow key={el.id}>
-                        <TableCell className="font-medium">{el.amo_members?.full_name || "—"}</TableCell>
+                        <TableCell className="font-medium">{el.amo_members?.full_name || "–"}</TableCell>
                         <TableCell>{format(new Date(el.elected_date), "d. MMM yyyy", { locale: da })}</TableCell>
                         <TableCell>{el.election_period_months} mdr.</TableCell>
                         <TableCell>{format(new Date(el.next_election_due), "d. MMM yyyy", { locale: da })}</TableCell>

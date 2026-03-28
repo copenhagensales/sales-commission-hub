@@ -197,7 +197,7 @@ export default function AmoSettings() {
                       <Badge variant="outline" className="text-xs">{ruleTypeLabels[rule.rule_type]}</Badge>
                     </TableCell>
                     <TableCell className="text-xs">
-                      {rule.interval_months ? `${rule.interval_months} mdr.` : "—"}
+                      {rule.interval_months ? `${rule.interval_months} mdr.` : "–"}
                     </TableCell>
                     <TableCell>
                       <Badge className={`text-xs ${rule.active ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" : "bg-muted text-muted-foreground"}`}>

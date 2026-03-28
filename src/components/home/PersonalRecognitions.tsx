@@ -62,7 +62,7 @@ export function PersonalRecognitions({ currentWeek, lastWeek }: PersonalRecognit
       <StatCard
         icon={isCurrent ? Zap : TrendingUp}
         label={isCurrent ? "Tjent denne uge" : "Tjent sidste uge"}
-        value={data.weekTotal > 0 ? formatCommission(data.weekTotal) : "—"}
+        value={data.weekTotal > 0 ? formatCommission(data.weekTotal) : "–"}
         iconColor={isCurrent 
           ? "bg-orange-100 dark:bg-orange-900/50 text-orange-600"
           : "bg-amber-100 dark:bg-amber-900/50 text-amber-600"
@@ -71,7 +71,7 @@ export function PersonalRecognitions({ currentWeek, lastWeek }: PersonalRecognit
       <StatCard
         icon={isCurrent ? Sparkles : CalendarDays}
         label="Din bedste dag"
-        value={data.bestDay ? formatDayName(data.bestDay.date) : "—"}
+        value={data.bestDay ? formatDayName(data.bestDay.date) : "–"}
         subValue={data.bestDay ? formatCommission(data.bestDay.commission) : undefined}
         iconColor={isCurrent
           ? "bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600"

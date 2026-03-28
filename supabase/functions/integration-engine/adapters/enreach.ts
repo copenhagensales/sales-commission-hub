@@ -149,7 +149,7 @@ export class EnreachAdapter implements DialerAdapter {
       }
       const data = await res.json();
       const arr = Array.isArray(data) ? data : (data.Results || data.results || data.Projects || data.projects || []);
-      console.log(`[EnreachAdapter] Accessible projects: ${arr.length} — ${arr.map((p: any) => p.Name || p.name).join(", ")}`);
+      console.log(`[EnreachAdapter] Accessible projects: ${arr.length} – ${arr.map((p: any) => p.Name || p.name).join(", ")}`);
       return arr.map((p: any) => ({
         uniqueId: String(p.UniqueId || p.uniqueId || p.Id || p.id || ""),
         name: String(p.Name || p.name || ""),

@@ -242,7 +242,7 @@ export default function Agents() {
                               </span>
                             </div>
                           ) : (
-                            <span className="text-muted-foreground">—</span>
+                            <span className="text-muted-foreground">–</span>
                           )}
                         </TableCell>
                         <TableCell>
@@ -255,7 +255,7 @@ export default function Agents() {
                         <TableCell className="text-muted-foreground">
                           {agent.created_at
                             ? format(new Date(agent.created_at), "dd/MM/yyyy")
-                            : "—"}
+                            : "–"}
                         </TableCell>
                       </TableRow>
                     ))}

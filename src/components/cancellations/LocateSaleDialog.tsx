@@ -264,7 +264,7 @@ export function LocateSaleDialog({
           {showFallbackWarning && (
             <div className="flex items-center gap-2 rounded-md border border-yellow-500/30 bg-yellow-500/10 p-2 text-xs text-yellow-700 dark:text-yellow-400">
               <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-              <span>Ingen agent-mapping fundet — filteret bruger kun work-email som fallback og kan være bredere end forventet.</span>
+              <span>Ingen agent-mapping fundet – filteret bruger kun work-email som fallback og kan være bredere end forventet.</span>
             </div>
           )}
 

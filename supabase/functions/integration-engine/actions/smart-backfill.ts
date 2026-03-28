@@ -115,7 +115,7 @@ export async function smartBackfill(
       success: true,
       daysProcessed: 0,
       cursor,
-      message: "Backfill complete — all data up to today has been fetched",
+      message: "Backfill complete – all data up to today has been fetched",
     };
   }
 
@@ -126,12 +126,12 @@ export async function smartBackfill(
   log("INFO", `Backfill budget: ${recentUsage} API calls in last ${BUDGET_WINDOW_MINUTES}min, can fetch ${daysToFetch} days`);
 
   if (daysToFetch === 0) {
-    log("WARN", "No API budget available for backfill — skipping this run");
+    log("WARN", "No API budget available for backfill – skipping this run");
     return {
       success: true,
       daysProcessed: 0,
       cursor,
-      message: "No API budget available — will retry next hour",
+      message: "No API budget available – will retry next hour",
     };
   }
 
@@ -252,7 +252,7 @@ export async function smartBackfill(
     daysProcessed: totalDaysProcessed,
     cursor: currentCursor,
     message: isComplete
-      ? "Backfill complete — all data up to today has been fetched"
+      ? "Backfill complete – all data up to today has been fetched"
       : `Backfill progress: cursor at ${currentCursor}, ${totalDaysProcessed} days processed`,
     details: allResults,
   };

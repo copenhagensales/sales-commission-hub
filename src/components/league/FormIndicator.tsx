@@ -24,7 +24,7 @@ export function FormIndicator({ form, className, compact = false }: FormIndicato
             result === "draw" && "bg-muted text-muted-foreground"
           )}
         >
-          {result === "win" ? "✓" : result === "loss" ? "✗" : "—"}
+          {result === "win" ? "✓" : result === "loss" ? "✗" : "–"}
         </div>
       ))}
     </div>

@@ -128,7 +128,7 @@ export async function syncIntegration(
   // === Per-Integration Run Lock ===
   const lockAcquired = await acquireRunLock(supabase, integration.id, runId, log);
   if (!lockAcquired) {
-    // Record as skipped_locked — NOT an error
+    // Record as skipped_locked – NOT an error
     const now = new Date();
     await supabase.from("integration_sync_runs").insert({
       integration_id: integration.id,
@@ -230,7 +230,7 @@ export async function syncIntegration(
       }
     }
 
-    // Check rate-limit status after meta sync — Enreach-specific targeted abort
+    // Check rate-limit status after meta sync – Enreach-specific targeted abort
     const providerForRateCheck = (source || integration.provider || "").toLowerCase();
     if (providerForRateCheck === "enreach") {
       const earlyMetrics = adapter.getMetrics();
@@ -245,14 +245,14 @@ export async function syncIntegration(
         // Reset metrics so any remaining actions get clean budget
         adapter.resetMetrics();
       } else if (earlyMetrics.rateLimitHits > 0) {
-        log("INFO", `Enreach transient rate limits during meta sync for ${integration.name} (${earlyMetrics.rateLimitHits} hits) — retries recovered, continuing`);
+        log("INFO", `Enreach transient rate limits during meta sync for ${integration.name} (${earlyMetrics.rateLimitHits} hits) – retries recovered, continuing`);
       }
     }
-    // Adversus: log but do NOT abort — Adversus has higher rate limits
+    // Adversus: log but do NOT abort – Adversus has higher rate limits
     if (providerForRateCheck === "adversus") {
       const earlyMetrics = adapter.getMetrics();
       if (earlyMetrics.rateLimitHits > 0) {
-        log("INFO", `Adversus transient rate limits for ${integration.name} (${earlyMetrics.rateLimitHits} hits) — continuing without abort`);
+        log("INFO", `Adversus transient rate limits for ${integration.name} (${earlyMetrics.rateLimitHits} hits) – continuing without abort`);
       }
     }
 
@@ -523,7 +523,7 @@ export async function syncIntegration(
     if (heavilyRateLimited && totalRecords === 0) {
       const cbResult = await recordCircuitBreakerFailure(supabase, integration.id, `Sync succeeded but 100% rate-limited (${adapterMetrics.rateLimitHits}/${adapterMetrics.apiCalls})`);
       if (cbResult.pausedMinutes) {
-        log("WARN", `Circuit breaker: ${integration.name} paused for ${cbResult.pausedMinutes} min — sync "succeeded" but yielded 0 records due to rate limits`);
+        log("WARN", `Circuit breaker: ${integration.name} paused for ${cbResult.pausedMinutes} min – sync "succeeded" but yielded 0 records due to rate limits`);
       }
     } else {
       await resetCircuitBreaker(supabase, integration.id);

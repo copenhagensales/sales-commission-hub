@@ -179,7 +179,7 @@ export function ScheduleEditor({ integrations, onScheduleUpdated }: ScheduleEdit
   const humanSchedule = `Kører ${fireMinutes.length} gang${fireMinutes.length !== 1 ? "e" : ""} i timen: ${fireMinutes.map(m => `:${String(m).padStart(2, "0")}`).join(", ")}`;
 
   const recommendedMinutes = generateMinutesFromOffset(freq, recommendation.offset);
-  const recommendedLabel = `Hvert ${freq}. min fra :${String(recommendation.offset).padStart(2, "0")} — giver ${recommendation.minGap} minutters afstand${sameProviderIntegrations.length > 0 ? ` til ${sameProviderIntegrations.map(i => i.name).join(", ")}` : ""}`;
+  const recommendedLabel = `Hvert ${freq}. min fra :${String(recommendation.offset).padStart(2, "0")} – giver ${recommendation.minGap} minutters afstand${sameProviderIntegrations.length > 0 ? ` til ${sameProviderIntegrations.map(i => i.name).join(", ")}` : ""}`;
 
   return (
     <Card>
@@ -274,7 +274,7 @@ export function ScheduleEditor({ integrations, onScheduleUpdated }: ScheduleEdit
         <div className="bg-muted/50 rounded-md p-3 space-y-2">
           <p className="text-sm font-medium">{humanSchedule}</p>
 
-          {/* Conflict status — always visible */}
+          {/* Conflict status – always visible */}
           {overlapWarnings.length === 0 ? (
             <div className="flex items-center gap-2 text-xs text-primary">
               <CheckCircle2 className="h-3.5 w-3.5" />

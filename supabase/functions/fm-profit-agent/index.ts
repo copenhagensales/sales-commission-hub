@@ -193,7 +193,7 @@ function computeScores(observations: Observation[], settings: AgentSettings) {
   const riskFlags: string[] = [];
   for (const loc of locationScores) {
     if (loc.confidence < 30) riskFlags.push(`⚠️ ${loc.name}: For lidt data (${loc.observations} observationer, min. ${confidenceThreshold} anbefalet)`);
-    if (loc.driver === "seller") riskFlags.push(`🔴 ${loc.name}: Sælger-afhængig — resultatet afhænger primært af hvem der står der`);
+    if (loc.driver === "seller") riskFlags.push(`🔴 ${loc.name}: Sælger-afhængig – resultatet afhænger primært af hvem der står der`);
     if (loc.totalRevenue > 50000 && loc.avgDBPct < settings.target_db_pct)
       riskFlags.push(`🟡 ${loc.name}: Høj omsætning (${Math.round(loc.totalRevenue).toLocaleString("da-DK")} kr) men svag DB (${loc.avgDBPct}% < mål ${settings.target_db_pct}%)`);
   }
@@ -496,7 +496,7 @@ serve(async (req) => {
       settingsContext += `\nBrug ovenstående kontekst aktivt i dine analyser og anbefalinger.\n`;
     }
 
-    const systemPrompt = `Du er FM Profit Agent — en analytisk AI-assistent for field marketing managers hos Copenhagen Sales.
+    const systemPrompt = `Du er FM Profit Agent – en analytisk AI-assistent for field marketing managers hos Copenhagen Sales.
 
 Du har adgang til reelle data fra de seneste ${settings.data_window_weeks} uger. Svar altid på dansk.
 

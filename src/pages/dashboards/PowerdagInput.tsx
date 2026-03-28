@@ -110,7 +110,7 @@ export default function PowerdagInput() {
                         {i === 0 && teamRules.length > 1 ? (
                           <div>
                             <span className="font-semibold">{teamName}</span>
-                            <span className="text-muted-foreground"> — {r.sub_client_name}</span>
+                            <span className="text-muted-foreground"> – {r.sub_client_name}</span>
                           </div>
                         ) : teamRules.length > 1 ? (
                           <span className="pl-4 text-muted-foreground">{r.sub_client_name}</span>

@@ -66,10 +66,10 @@ export default function PowerdagBoard() {
         </div>
 
         {standings.length === 0 ? (
-          <p className="text-muted-foreground text-center py-12">Ingen data endnu — start med at indtaste salg.</p>
+          <p className="text-muted-foreground text-center py-12">Ingen data endnu – start med at indtaste salg.</p>
         ) : (
           <>
-            {/* Podium — Top 3 */}
+            {/* Podium – Top 3 */}
             {top3.length >= 3 && (
               <div className={`grid grid-cols-3 gap-3 md:gap-4 items-end ${tv ? "gap-6" : ""}`}>
                 {PODIUM_ORDER.map((idx) => {
@@ -219,7 +219,7 @@ function TopSellersSection({ tv }: { tv: boolean }) {
     <div className="space-y-4">
       <h2 className={`${tv ? "text-2xl" : "text-lg md:text-xl"} font-bold flex items-center gap-2`}>
         <Medal className="h-5 w-5 text-primary" />
-        Top 5 Sælgere — I dag
+        Top 5 Sælgere – I dag
       </h2>
       <div className="space-y-2">
         {topSellers.map((seller, idx) => (

@@ -160,7 +160,7 @@ export default function AmoAnnualDiscussion() {
       {activeReminder && (
         <div className={cn("flex items-start gap-3 rounded-lg border p-4", activeReminder.color)}>
           <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
-          <p className="text-sm">{activeReminder.label} — frist {format(nextDue!, "d. MMMM yyyy", { locale: da })}</p>
+          <p className="text-sm">{activeReminder.label} – frist {format(nextDue!, "d. MMMM yyyy", { locale: da })}</p>
         </div>
       )}
 
@@ -178,7 +178,7 @@ export default function AmoAnnualDiscussion() {
           <CardContent className="p-4">
             <div className="text-xs text-muted-foreground mb-1">Næste frist</div>
             <div className={cn("text-lg font-bold", daysUntilDue !== null && daysUntilDue < 0 ? "text-red-400" : "text-foreground")}>
-              {nextDue ? format(nextDue, "d. MMM yyyy", { locale: da }) : "—"}
+              {nextDue ? format(nextDue, "d. MMM yyyy", { locale: da }) : "–"}
             </div>
           </CardContent>
         </Card>
@@ -203,7 +203,7 @@ export default function AmoAnnualDiscussion() {
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base">
-                  Drøftelse — {format(new Date(d.discussion_date), "d. MMMM yyyy", { locale: da })}
+                  Drøftelse – {format(new Date(d.discussion_date), "d. MMMM yyyy", { locale: da })}
                 </CardTitle>
                 <div className="flex gap-1">
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(d)}>

@@ -54,7 +54,7 @@ export function StickyPerformanceBar({
           <span className={`font-bold tabular-nums text-sm ${
             hasGoal && progressPercent >= 100 ? 'text-emerald-500' : ''
           }`}>
-            {hasGoal ? `${Math.round(progressPercent)}%` : "—"}
+            {hasGoal ? `${Math.round(progressPercent)}%` : "–"}
           </span>
         </div>
 

@@ -40,7 +40,7 @@ interface Product {
   counts_as_sale: boolean | null;
 }
 
-// FM interfaces removed — FM sales now use sale_items via trigger
+// FM interfaces removed – FM sales now use sale_items via trigger
 
 interface TeamMemberShift {
   employee_id: string;
@@ -114,7 +114,7 @@ async function fetchAllSaleItems(
   return allItems;
 }
 
-// Generic batched .in() query helper — avoids PostgREST URL length limit
+// Generic batched .in() query helper – avoids PostgREST URL length limit
 async function queryInBatches<T>(
   supabase: SupabaseClient,
   table: string,
@@ -140,7 +140,7 @@ async function queryInBatches<T>(
   return results;
 }
 
-// Paginated sales ID fetch — avoids 1000-row default limit
+// Paginated sales ID fetch – avoids 1000-row default limit
 async function fetchAllSaleIds(
   supabase: SupabaseClient,
   campaignIds: string[],
@@ -216,7 +216,7 @@ async function fetchAllSalesWithItemsForEmployeeKpi(
   return allSales;
 }
 
-// fetchFmCommissionMap removed — FM sales now use sale_items via trigger
+// fetchFmCommissionMap removed – FM sales now use sale_items via trigger
 
 function formatValue(value: number, category: string): string {
   if (category === "revenue" || category === "commission" || category === "økonomi") {
@@ -478,7 +478,7 @@ Deno.serve(async (req) => {
     
     const clientList = (clients || []) as { id: string; name: string }[];
 
-    // FM commission map no longer needed — FM sales use sale_items via trigger
+    // FM commission map no longer needed – FM sales use sale_items via trigger
 
   if (runKpis) {
     // Fetch all active KPI definitions
@@ -588,7 +588,7 @@ Deno.serve(async (req) => {
     payrollPeriodDates.end.toISOString()
   );
   
-  // FM sales are now included via sale_items trigger — no separate FM fetch needed
+  // FM sales are now included via sale_items trigger – no separate FM fetch needed
   
   // Fetch products for counts_as_sale check
   const allProductIds = [...new Set((allPeriodSales || []).flatMap((s: any) => 
@@ -626,7 +626,7 @@ Deno.serve(async (req) => {
                (saleExternalId && agentData!.externalIds.includes(saleExternalId));
       }) : [];
       
-      // FM sales are included via sale_items trigger — no separate FM processing needed
+      // FM sales are included via sale_items trigger – no separate FM processing needed
       
       let salesCount = 0;
       let totalCommission = 0;
@@ -723,7 +723,7 @@ Deno.serve(async (req) => {
       }
     }
     
-    // FM sales are included via sale_items trigger — no separate FM processing needed
+    // FM sales are included via sale_items trigger – no separate FM processing needed
     
     teamKpis.push({
       kpi_slug: "total_commission",
@@ -1078,7 +1078,7 @@ async function fetchAllSalesWithItems(
   return allSales;
 }
 
-// fetchFmSalesForPeriod removed — FM sales now use sale_items via trigger
+// fetchFmSalesForPeriod removed – FM sales now use sale_items via trigger
 
 async function calculateGlobalLeaderboard(
   supabase: SupabaseClient,
@@ -1199,7 +1199,7 @@ async function calculateGlobalLeaderboard(
     });
   }
 
-  // FM sales are included via sale_items trigger — no separate FM processing needed
+  // FM sales are included via sale_items trigger – no separate FM processing needed
 
   // Convert to leaderboard entries using proper employee mapping
   const entries: LeaderboardEntry[] = [];
@@ -1358,7 +1358,7 @@ async function calculateTeamLeaderboard(
     });
   }
 
-  // FM sales are included via sale_items trigger — no separate FM processing needed
+  // FM sales are included via sale_items trigger – no separate FM processing needed
 
   // Convert to leaderboard entries
   const entries: LeaderboardEntry[] = [];
@@ -1509,7 +1509,7 @@ async function calculateClientLeaderboard(
     });
   }
 
-  // FM sales are included via sale_items trigger — no separate FM processing needed
+  // FM sales are included via sale_items trigger – no separate FM processing needed
 
   // Convert to leaderboard entries
   const entries: LeaderboardEntry[] = [];
@@ -1637,7 +1637,7 @@ async function calculateSalesCount(
     }
   }
 
-  // FM sales are included via sale_items trigger — no separate FM count needed
+  // FM sales are included via sale_items trigger – no separate FM count needed
   return count;
 }
 
@@ -1665,7 +1665,7 @@ async function calculateTotalCommission(
     return sum + (item.mapped_commission || 0);
   }, 0);
 
-  // FM sales are included via sale_items trigger — no separate FM commission needed
+  // FM sales are included via sale_items trigger – no separate FM commission needed
   return telesalesCommission;
 }
 
@@ -1693,7 +1693,7 @@ async function calculateTotalRevenue(
     return sum + (item.mapped_revenue || 0);
   }, 0);
 
-  // FM sales are included via sale_items trigger — no separate FM revenue needed
+  // FM sales are included via sale_items trigger – no separate FM revenue needed
   return telesalesRevenue;
 }
 

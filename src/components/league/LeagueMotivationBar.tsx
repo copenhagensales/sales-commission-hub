@@ -1,4 +1,4 @@
-// LeagueMotivationBar — Intelligent Coach (Dynamic)
+// LeagueMotivationBar – Intelligent Coach (Dynamic)
 import { useMemo } from "react";
 import { Flame, Target, TrendingUp, Swords, Clock, Trophy, Rocket, Star, Sun, Zap } from "lucide-react";
 import { usePersonalWeeklyStats } from "@/hooks/usePersonalWeeklyStats";
@@ -114,7 +114,7 @@ export function LeagueMotivationBar({
         message: (
           <span>
             <span className="text-red-400 font-semibold">🔥 {currentStreak} dage i træk</span>
-            {" — overgå gårsdagen for at holde den i live!"}
+            {" – overgå gårsdagen for at holde den i live!"}
           </span>
         ),
         color: "red",
@@ -130,7 +130,7 @@ export function LeagueMotivationBar({
           <span>
             {"Kun "}
             <span className="text-amber-400 font-semibold">{formatKr(gapUp.gap)} kr</span>
-            {` til at overhale #${gapUp.rank} — inden for rækkevidde i dag`}
+            {` til at overhale #${gapUp.rank} – inden for rækkevidde i dag`}
           </span>
         ),
         color: "amber",
@@ -147,7 +147,7 @@ export function LeagueMotivationBar({
           message: (
             <span>
               <span className="text-amber-400 font-semibold">{formatKr(remaining)} kr</span>
-              {" til dagens mål — du er næsten der!"}
+              {" til dagens mål – du er næsten der!"}
             </span>
           ),
           color: "green",
@@ -178,7 +178,7 @@ export function LeagueMotivationBar({
         message: (
           <span>
             <span className="text-amber-400 font-semibold">🔥 {currentStreak}. dag med stigning!</span>
-            {" Keep going — overgå i morgen også"}
+            {" Keep going – overgå i morgen også"}
           </span>
         ),
         color: "amber",
@@ -194,7 +194,7 @@ export function LeagueMotivationBar({
         message: (
           <span>
             <span className="text-emerald-400 font-semibold">+{pct}%</span>
-            {" vs. forrige uge — hold tempoet de næste 2 timer 📈"}
+            {" vs. forrige uge – hold tempoet de næste 2 timer 📈"}
           </span>
         ),
         color: "green",
@@ -210,7 +210,7 @@ export function LeagueMotivationBar({
           <span>
             {`#${gapDown.rank} er kun `}
             <span className="text-amber-400 font-semibold">{formatKr(gapDown.gap)} kr</span>
-            {" bag dig — hold afstanden!"}
+            {" bag dig – hold afstanden!"}
           </span>
         ),
         color: "amber",
@@ -234,7 +234,7 @@ export function LeagueMotivationBar({
         <span key="v2">
           {"1 ekstra time = "}
           <span className="text-amber-400 font-semibold">{formatKr(hourlyRate)} kr</span>
-          {" mere — push for en stærkere uge"}
+          {" mere – push for en stærkere uge"}
         </span>,
       ];
       // Show Saturday-specific on Fri/Sat
@@ -243,7 +243,7 @@ export function LeagueMotivationBar({
           <span key="sat">
             {"Lørdag = +"}
             <span className="text-amber-400 font-semibold">{formatKr(hourlyRate * 8)} kr</span>
-            {" ekstra — det er det værd!"}
+            {" ekstra – det er det værd!"}
           </span>
         );
       }
@@ -275,7 +275,7 @@ export function LeagueMotivationBar({
         icon: <Zap className="h-4 w-4 text-emerald-400" />,
         message: (
           <span>
-            {"Stærk finish — "}
+            {"Stærk finish – "}
             <span className="text-emerald-400 font-semibold">de sidste timer</span>
             {" tæller mest 🏁"}
           </span>
@@ -292,7 +292,7 @@ export function LeagueMotivationBar({
         message: (
           <span>
             <span className="text-blue-400 font-semibold">Ny uge, nyt mål</span>
-            {" — sæt standarden i dag!"}
+            {" – sæt standarden i dag!"}
           </span>
         ),
         color: "blue",
@@ -304,7 +304,7 @@ export function LeagueMotivationBar({
         message: (
           <span>
             <span className="text-amber-400 font-semibold">Stærk fredag = stærk uge</span>
-            {" — afslut ugen med en topdag! 🔥"}
+            {" – afslut ugen med en topdag! 🔥"}
           </span>
         ),
         color: "amber",
@@ -319,7 +319,7 @@ export function LeagueMotivationBar({
         icon: <TrendingUp className="h-4 w-4 text-amber-400" />,
         message: (
           <span>
-            {"Du er ikke langt fra sidste uge — "}
+            {"Du er ikke langt fra sidste uge – "}
             <span className="text-amber-400 font-semibold">{formatKr(diff)} kr</span>
             {" kan vende den"}
           </span>
@@ -340,7 +340,7 @@ export function LeagueMotivationBar({
             <span>
               {"Du er "}
               <span className="text-amber-400 font-semibold">{pctLeft}%</span>
-              {" fra din personlige rekord — push!"}
+              {" fra din personlige rekord – push!"}
             </span>
           ),
           color: "amber",
@@ -355,7 +355,7 @@ export function LeagueMotivationBar({
         {
           msg: (
             <span>
-              {"Start en ny streak — "}
+              {"Start en ny streak – "}
               <span className="text-amber-400 font-semibold">overgå gårsdagen</span>
               {" og sæt gang i væksten! 🚀"}
             </span>
@@ -366,7 +366,7 @@ export function LeagueMotivationBar({
             <span>
               {"Tjen mere end i går og "}
               <span className="text-amber-400 font-semibold">start en streak</span>
-              {" — dag for dag! 💪"}
+              {" – dag for dag! 💪"}
             </span>
           ),
         },
@@ -374,7 +374,7 @@ export function LeagueMotivationBar({
           msg: (
             <span>
               <span className="text-amber-400 font-semibold">Beat yesterday</span>
-              {" — overgå gårsdagen og byg momentum! 🚀"}
+              {" – overgå gårsdagen og byg momentum! 🚀"}
             </span>
           ),
         },
@@ -387,16 +387,16 @@ export function LeagueMotivationBar({
       });
     }
 
-    // 11. Rank fallback — always available
+    // 11. Rank fallback – always available
     if (myStanding) {
       const rank = getOverallRank(myStanding);
       const totalPlayers = standings.length;
       const topPct = totalPlayers > 0 ? Math.round((rank / totalPlayers) * 100) : 0;
       const rankMsg = rank <= 3
-        ? `Du er #${rank} — hold positionen! 🏆`
+        ? `Du er #${rank} – hold positionen! 🏆`
         : topPct <= 25
-          ? `Du er #${rank} af ${totalPlayers} — du er i top 25%!`
-          : `Du er #${rank} af ${totalPlayers} — kæmp dig opad!`;
+          ? `Du er #${rank} af ${totalPlayers} – du er i top 25%!`
+          : `Du er #${rank} af ${totalPlayers} – kæmp dig opad!`;
       result.push({
         priority: 11,
         icon: <Star className="h-4 w-4 text-blue-400" />,
@@ -418,7 +418,7 @@ export function LeagueMotivationBar({
           <span>
             {"Denne uge: "}
             <span className="text-emerald-400 font-semibold">{formatKr(currentWeek)} kr</span>
-            {" — bliv ved med at bygge!"}
+            {" – bliv ved med at bygge!"}
           </span>
         ),
         color: "green",

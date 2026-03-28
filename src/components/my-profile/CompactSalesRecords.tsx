@@ -91,7 +91,7 @@ export function CompactSalesRecords({
             {brokeNewDayRecord && <Trophy className="h-3 w-3 text-success" />}
           </div>
           <p className="text-base font-bold">
-            {bestDayValue > 0 ? `${bestDayValue.toLocaleString("da-DK")} kr` : "—"}
+            {bestDayValue > 0 ? `${bestDayValue.toLocaleString("da-DK")} kr` : "–"}
           </p>
           {bestDayValue > 0 && !brokeNewDayRecord && todayVsBestDay >= 70 && (
             <p className="text-[10px] text-muted-foreground mt-1">
@@ -109,7 +109,7 @@ export function CompactSalesRecords({
             {brokeNewWeekRecord && <Trophy className="h-3 w-3 text-success" />}
           </div>
           <p className="text-base font-bold">
-            {bestWeekValue > 0 ? `${bestWeekValue.toLocaleString("da-DK")} kr` : "—"}
+            {bestWeekValue > 0 ? `${bestWeekValue.toLocaleString("da-DK")} kr` : "–"}
           </p>
           {bestWeekValue > 0 && !brokeNewWeekRecord && weekVsBestWeek >= 70 && (
             <p className="text-[10px] text-muted-foreground mt-1">

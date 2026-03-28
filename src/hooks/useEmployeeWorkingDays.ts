@@ -11,7 +11,7 @@ interface WorkingDaysResult {
 
 /**
  * Calculates working days for an employee using the shift hierarchy:
- * 1. Individual shifts (shift table) — highest priority
+ * 1. Individual shifts (shift table) – highest priority
  * 2. Employee standard shifts (employee_standard_shifts → team_standard_shift_days)
  * 3. Team standard shifts (team_standard_shifts → team_standard_shift_days)
  * 4. Fallback: weekdays (Mon-Fri)

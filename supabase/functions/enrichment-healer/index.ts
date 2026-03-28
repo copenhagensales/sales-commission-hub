@@ -287,7 +287,7 @@ serve(async (req) => {
 
     log(`Starting enrichment healer (maxBatch=${maxBatch}, turbo=${turboMode}, saleExternalId=${saleExternalId || "none"})`);
 
-    // Fetch sales needing healing — include source for grouping by integration
+    // Fetch sales needing healing – include source for grouping by integration
     let salesQuery = supabase
       .from("sales")
       .select("id, adversus_external_id, integration_type, source, raw_payload, enrichment_status, enrichment_attempts, customer_phone")

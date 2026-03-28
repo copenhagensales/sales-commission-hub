@@ -61,7 +61,7 @@ serve(async (req) => {
     const existingCandidate = existingCandidates && existingCandidates.length > 0 ? existingCandidates[0] : null;
 
     if (existingCandidate) {
-      // Returning applicant — update existing record
+      // Returning applicant – update existing record
       const now = new Date().toISOString().split('T')[0];
       const newCount = (existingCandidate.application_count || 1) + 1;
       const newNote = `Søgte igen ${now} som ${appliedPosition}.${notes ? ' Note: ' + notes.trim() : ''}`;

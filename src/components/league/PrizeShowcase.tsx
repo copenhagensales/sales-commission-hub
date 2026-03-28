@@ -148,7 +148,7 @@ export function PrizeShowcase({ standings, prizeLeaders, seasonStatus, isActive,
               <div key={p.label} className="text-center space-y-1">
                 <span className="text-2xl">{p.emoji}</span>
                 <p className={`text-base font-bold truncate ${p.colorClass}`}>
-                  {p.standing ? formatPlayerName(p.standing.employee) : "—"}
+                  {p.standing ? formatPlayerName(p.standing.employee) : "–"}
                 </p>
                 <p className="text-xs text-muted-foreground">{pointLabel(p.standing)}</p>
               </div>

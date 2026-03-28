@@ -981,7 +981,7 @@ export default function TvLeagueDashboard() {
         />
       )}
       <div className={`bg-slate-900 text-white overflow-hidden flex ${tvMode ? "min-h-screen h-screen" : "h-[calc(100vh-120px)] rounded-xl"}`}>
-        {/* ─── LEFT ZONE (40%) — rotates overview / movements / records / league overview ─── */}
+        {/* ─── LEFT ZONE (40%) – rotates overview / movements / records / league overview ─── */}
         <div className="w-[40%] border-r border-slate-800 p-3 2xl:p-6 flex flex-col">
           {tvMode && (
             <div className="mb-2 2xl:mb-4">
@@ -1106,7 +1106,7 @@ export default function TvLeagueDashboard() {
           </div>
         </div>
 
-        {/* ─── RIGHT ZONE (60%) — always divisions ─── */}
+        {/* ─── RIGHT ZONE (60%) – always divisions ─── */}
         <div className="w-[60%] p-3 2xl:p-6">
           <SceneDivisions divisions={data.divisions} />
         </div>
