@@ -1,40 +1,27 @@
 
 
-## Udfyld compliance-dokumentation med konkrete oplysninger
+## Udfyld EmployeePrivacy.tsx med konkrete oplysninger
 
-Opdaterer alle sektioner i `AdminDocumentation.tsx` fra generiske lister til faktiske, udfyldte oplysninger baseret på dine svar og systemets faktiske opsætning.
+### Ændringer
 
-### Ændringer per sektion
+**1. Kontaktperson (linje 132)** — placeholder `[indsæt kontaktperson eller mail]`
+- Erstat med: "virksomhedens ejer" + en dynamisk visning af ejerens work_email hentet fra `employee_master_data` (job_title = "Ejer"). Fallback til teksten "din nærmeste leder" hvis ingen ejer findes.
 
-**1. Tredjelandsoverførsler**
-- Erstat den generiske liste med en klar konklusion: "Ingen tredjelandsoverførsler. Alle data behandles og opbevares inden for EU/EØS." med grøn badge.
+**2. Opbevaring (linje 111-114)** — generisk tekst
+- Erstat med den konkrete 5-årige retention-politik:
+  - Løn- og økonomidata: 5 år (bogføringsloven)
+  - Salgs- og provisionsdata: 5 år
+  - Øvrig medarbejderdata: slettes senest 5 år efter fratrædelse
+  - Ansøgerdata: 6 måneder efter afslag
 
-**2. Logging og dokumentation**
-- Udfyld med konkrete eksempler fra systemet: login-logning, kontraktændringer, salgsdata-sync, lønberegninger, GDPR-anmodninger. Tilføj at logs opbevares i databasen.
-
-**3. Backup og gendannelse**
-- Udfyld med Lovable Cloud's automatiske backup (daglig, administreret af platformen). Angiv at restore håndteres via Lovable Cloud support.
-
-**4. Sletning og retention**
-- Konkret politik baseret på dit svar:
-  - Økonomi-/løndata: 5 år (bogføringsloven)
-  - Medarbejderdata: slettes efter fratræden, senest 5 år
-  - Samtykker: opbevares så længe de er aktive
-  - Salgsdata: 5 år
-  - Sletning: primært manuel med mulighed for automatisering
-
-**5. AI-brug**
-- Dokumenter de faktiske AI-funktioner i systemet:
-  - FM Profit Agent (Google Gemini) — analyse af salgsdata
-  - Udgiftsformel-parsing (Google Gemini) — tolkning af provisionsformler
-  - Lovable AI Gateway — ingen persondata sendes direkte; data aggregeres først
-  - Risici og begrænsninger dokumenteres
-
-**6. Ansvar**
-- Udfyld med: "Systemejeren (virksomhedens ejer) er dataansvarlig jf. GDPR art. 4, nr. 7." samt konkrete ansvarsområder.
+**3. Adgang (linje 96-103)** — generisk
+- Konkretiser med systemets faktiske roller:
+  - Medarbejder: egne data (løn, provision, vagtplan)
+  - Teamleder: teammedlemmers salgs- og vagtdata
+  - Ejer/admin: fuld adgang til administration, løn og drift
 
 ### Fil
 | Fil | Handling |
 |-----|---------|
-| `src/pages/compliance/AdminDocumentation.tsx` | Opdater alle 6 sektioner med konkret indhold |
+| `src/pages/compliance/EmployeePrivacy.tsx` | Opdater 3 sektioner med konkret indhold |
 
