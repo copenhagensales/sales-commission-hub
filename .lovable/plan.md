@@ -1,55 +1,78 @@
 
 
-## Gør junk-row filter konfigurerbart per kunde
+## Problem: Timing bug — filter ikke anvendt under matching
 
-### Problem
-Rule 3 i junk-filteret fjerner rækker hvor telefon er tom og ingen andre match-kolonner har værdier. For nogle kunder (f.eks. Tryg med pivot-tabeller) er det korrekt. For andre kunder mister vi reelle datarækker (199 rækker i dette tilfælde).
+### Rod-årsag
 
-Filteret skal være kundespecifikt — ligesom alle andre upload-logikker allerede er det via `cancellation_upload_configs`.
+Når en fil uploades, sker der to ting næsten samtidigt:
+1. `applyConfig()` sætter `filterColumn`/`filterValue` via React state (asynkront)
+2. `handleMatch()` køres via `useEffect` — men React har endnu ikke "flushed" state-opdateringerne fra step 1
+
+**Bevis fra konsollen:**
+```
+[handleMatch] total rows: 1550 after filter: 1550 junk rows removed: 0 clean rows: 1550
+```
+Filteret "Annulled Sales = 1" blev aldrig anvendt — `filterColumn` var stadig `"__none__"` da handleMatch kørte.
+
+Resultatet: handleMatch matcher mod alle 1550 rækker og gemmer `matchedRowIndices` som indices i det ufiltrerede array. Men `filteredDataForPreview` (som kører ved render) anvender det nu-opdaterede filter og viser kun 1351 rækker. Indices'ene passer ikke sammen → 199 rækker forsvinder.
 
 ### Løsning
 
-**1. Database: Tilføj kolonne**
+**Fil: `src/components/cancellations/UploadCancellationsTab.tsx`**
 
-Tilføj `skip_empty_row_filter` (boolean, default `false`) til `cancellation_upload_configs`. Eksisterende kunder beholder nuværende adfærd (Rule 3 aktiv). Kun kunder der slår det til, bevarer tomme rækker.
+**1. handleMatch: Læs filter fra config i stedet for state** (linje 770-773)
 
-```sql
-ALTER TABLE cancellation_upload_configs
-ADD COLUMN skip_empty_row_filter boolean NOT NULL DEFAULT false;
-```
+I stedet for at bruge state-variablerne `filterColumn`/`filterValue`, læs direkte fra `activeConfig` (som allerede er hentet på linje 745):
 
-**2. UploadCancellationsTab.tsx — Junk-logik (2 steder)**
-
-Læs `activeConfig?.skip_empty_row_filter` og betinget spring Rule 3 over:
-
-**Sted 1 — `handleMatch` (linje 767-769):**
 ```typescript
-// Rule 3: Kun aktiv hvis kunden IKKE har slået skip_empty_row_filter til
-if (!activeConfig?.skip_empty_row_filter) {
-  const hasAnyMatchValue = sellerVal.length > 0 || companyVal.length > 0 || oppVal.length > 0 || memberVal.length > 0;
-  if (!hasAnyMatchValue) return true;
-}
+// Brug config direkte i stedet for asynkron state
+const cfgFilterColumn = activeConfig?.filter_column || "__none__";
+const cfgFilterValue = activeConfig?.filter_value || "";
+
+const filteredData = (uploadType !== "both" && cfgFilterColumn !== "__none__" && cfgFilterValue.trim())
+  ? parsedData.filter(row => String(getCaseInsensitive(row.originalRow, cfgFilterColumn) ?? "").trim() === cfgFilterValue.trim())
+  : parsedData;
 ```
 
-**Sted 2 — `filteredDataForPreview` (linje 1526):**
-Samme betingelse wrappet om den eksisterende tomme-række-check.
+**2. matchedRowIndices: Brug parsedData-index i stedet for cleanedData-index**
 
-**3. Config wizard — Tilføj toggle**
+Problemet er at indices gemmes relativt til `cleanedData` (et filtreret subset), men bruges mod `filteredDataForPreview` (et andet filtreret subset).
 
-I både opret-wizard (`handleSave`, linje 239) og redigerings-dialog (linje 376), tilføj feltet `skip_empty_row_filter`. 
+Ændring: Gem det **originale parsedData-index** i stedet:
 
-UI: En `Switch` komponent med label "Behold rækker uden telefonnummer" og beskrivelse "Slå til hvis filen indeholder rækker uden telefon/OPP som stadig er reelle data".
+- I `cleanedData`-iterationerne (pass 1, 1b, 2 og standard matching), brug `row.originalIndex` i stedet for det lokale `idx`.
+- Tilføj `originalIndex` når data oprettes: ændre linje 803 til at bevare original index:
 
-Feltet gemmes ved insert og update af config.
+```typescript
+const cleanedDataWithIndex = filteredData
+  .map((row, filteredIdx) => ({ ...row, originalIndex: parsedData.indexOf(row) }))
+  .filter(row => !isJunkRow(row.originalRow));
+```
 
-**4. Gem/opdater config (3 steder)**
+Alternativt (enklere): Tilføj `originalIndex` allerede ved parsing (linje 700):
+```typescript
+setParsedData(jsonData.map((row, idx) => ({ originalRow: row, originalIndex: idx })));
+```
 
-- Wizard insert (linje 239): tilføj `skip_empty_row_filter: cfgSkipEmptyFilter`
-- Edit dialog update (linje 376): tilføj `skip_empty_row_filter: cfgSkipEmptyFilter`  
-- Save config mutation (linje 606): tilføj `skip_empty_row_filter: skipEmptyRowFilter`
+Og brug `row.originalIndex` overalt hvor `idx` bruges til `matchedIndices.add(idx)`.
+
+**3. filteredDataForPreview: Brug originalIndex til at tjekke match** (linje 1562)
+
+```typescript
+const unmatchedRows = filteredDataForPreview.filter(row => !matchedRowIndices.has(row.originalIndex));
+```
+
+**4. sendToQueueMutation: Samme fix** (linje 1435-1436)
+
+```typescript
+const unmatchedRows = filteredForQueue
+  .filter(row => !matchedRowIndices.has(row.originalIndex))
+  .map(r => r.originalRow);
+```
 
 ### Resultat
-- Alle eksisterende kunder: Ingen ændring — default `false` holder Rule 3 aktiv.
-- Kunder med manglende rækker: Slå toggle til → alle rækker inkluderes, umatchede ender i "Fejl i match" i stedet for at blive slettet.
-- Setup er ensartet på tværs af kunder — kun konfigurationen er kundebestemt.
+
+- Filteret "Annulled Sales = 1" anvendes korrekt under matching (1351 rækker, ikke 1550)
+- Matched/unmatched-indices er stabile og passer på tværs af alle visninger
+- Alle 1351 filtrerede rækker vises korrekt (1307 matched + 44 unmatched = 1351)
 
