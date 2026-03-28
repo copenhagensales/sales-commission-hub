@@ -130,12 +130,7 @@ export default function ContractSign() {
     return () => observer.disconnect();
   }, []);
 
-  /* ─── Log contract access (view) ─── */
-  useEffect(() => {
-    if (contract?.id && contract?.employee_id) {
-      logContractAccess(contract.id, contract.employee_id, "view");
-    }
-  }, [contract?.id, contract?.employee_id]);
+
 
   const handleDownloadPdf = async () => {
     if (!id) return;
