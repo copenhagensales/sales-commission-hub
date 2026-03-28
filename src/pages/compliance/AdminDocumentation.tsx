@@ -101,20 +101,23 @@ export default function AdminDocumentation() {
                     <TableRow>
                       <TableCell className="font-medium">Lovable</TableCell>
                       <TableCell>App-platform / hosting</TableCell>
-                      <TableCell><span className="bg-yellow-200/60 text-yellow-800 px-1 rounded text-xs">[afklar]</span></TableCell>
-                      <TableCell><span className="bg-yellow-200/60 text-yellow-800 px-1 rounded text-xs">[afklar]</span></TableCell>
+                      <TableCell><span className="bg-green-200/60 text-green-800 px-1 rounded text-xs">Ja (Business/Enterprise)</span></TableCell>
+                      <TableCell><span className="bg-green-200/60 text-green-800 px-1 rounded text-xs">Nej (EU-hostet)</span></TableCell>
                       <TableCell><span className="bg-yellow-200/60 text-yellow-800 px-1 rounded text-xs">[dato]</span></TableCell>
                     </TableRow>
                     <TableRow>
-                      <TableCell className="font-medium">Supabase</TableCell>
+                      <TableCell className="font-medium">Supabase (via Lovable Cloud)</TableCell>
                       <TableCell>Database / Auth / Storage</TableCell>
-                      <TableCell><span className="bg-yellow-200/60 text-yellow-800 px-1 rounded text-xs">[afklar]</span></TableCell>
-                      <TableCell><span className="bg-yellow-200/60 text-yellow-800 px-1 rounded text-xs">[afklar]</span></TableCell>
+                      <TableCell><span className="bg-green-200/60 text-green-800 px-1 rounded text-xs">Ja (inkl. i Lovable Cloud)</span></TableCell>
+                      <TableCell><span className="bg-green-200/60 text-green-800 px-1 rounded text-xs">Nej (EU-hostet)</span></TableCell>
                       <TableCell><span className="bg-yellow-200/60 text-yellow-800 px-1 rounded text-xs">[dato]</span></TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>
               </div>
+              <p className="text-xs text-muted-foreground mt-2 italic">
+                Bekræft at DPA'er er underskrevet og arkiveret.
+              </p>
             </AccordionContent>
           </AccordionItem>
 
