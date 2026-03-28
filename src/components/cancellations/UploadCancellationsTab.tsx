@@ -197,6 +197,8 @@ function ConfigCreationForm({ clientId, columns: parentColumns, setColumns: setP
   const [cfgFilterVal, setCfgFilterVal] = useState("");
   const [cfgProductCol, setCfgProductCol] = useState("__none__");
   const [cfgSkipEmptyFilter, setCfgSkipEmptyFilter] = useState(false);
+  const [cfgTypeDetCol, setCfgTypeDetCol] = useState("__none__");
+  const [cfgTypeDetVals, setCfgTypeDetVals] = useState("");
   const [saving, setSaving] = useState(false);
 
   const filteredCount = (cfgFilterCol !== "__none__" && cfgFilterVal.trim())
@@ -255,6 +257,8 @@ function ConfigCreationForm({ clientId, columns: parentColumns, setColumns: setP
         filter_column: cfgFilterCol !== "__none__" ? cfgFilterCol : null,
         filter_value: cfgFilterVal.trim() || null,
         skip_empty_row_filter: cfgSkipEmptyFilter,
+        type_detection_column: cfgTypeDetCol !== "__none__" ? cfgTypeDetCol : null,
+        type_detection_values: cfgTypeDetVals.trim() ? cfgTypeDetVals.split(",").map(v => v.trim()).filter(Boolean) : null,
       } as any);
       if (error) throw error;
       toast({ title: "Gemt!", description: `Opsætning "${cfgName}" oprettet.` });
@@ -340,6 +344,22 @@ function ConfigCreationForm({ clientId, columns: parentColumns, setColumns: setP
                 <p className="text-xs text-muted-foreground">Slå til hvis filen indeholder rækker uden telefon/OPP som stadig er reelle data</p>
               </div>
               <Switch checked={cfgSkipEmptyFilter} onCheckedChange={setCfgSkipEmptyFilter} />
+            </div>
+          </div>
+
+          <div className="border-t pt-3 space-y-3">
+            <Label className="text-sm font-medium">Type-detektering (Begge-upload)</Label>
+            <p className="text-xs text-muted-foreground">Vælg kolonne og værdier der indikerer at en række er en annullering (resten bliver kurvrettelse)</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {colSelect("Type-kolonne", cfgTypeDetCol, setCfgTypeDetCol)}
+              <div className="space-y-1.5">
+                <Label className="text-sm">Annulleringsværdier</Label>
+                <Input
+                  value={cfgTypeDetVals}
+                  onChange={(e) => setCfgTypeDetVals(e.target.value)}
+                  placeholder="f.eks. Nedlagt, Annulleret"
+                />
+              </div>
             </div>
           </div>
 
