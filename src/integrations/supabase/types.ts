@@ -10409,6 +10409,57 @@ export type Database = {
           },
         ]
       }
+      security_incidents: {
+        Row: {
+          affected_categories: string[] | null
+          affected_count: number | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          incident_date: string
+          remedial_actions: string | null
+          reported_at: string | null
+          reported_to_authority: boolean | null
+          severity: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          affected_categories?: string[] | null
+          affected_count?: number | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          incident_date?: string
+          remedial_actions?: string | null
+          reported_at?: string | null
+          reported_to_authority?: boolean | null
+          severity?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          affected_categories?: string[] | null
+          affected_count?: number | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          incident_date?: string
+          remedial_actions?: string | null
+          reported_at?: string | null
+          reported_to_authority?: boolean | null
+          severity?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       shift: {
         Row: {
           break_minutes: number | null
