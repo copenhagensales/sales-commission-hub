@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -31,7 +31,8 @@ const EXPENSE_CATEGORIES = [
   { key: "parkering", label: "P-pladser" },
   { key: "bil", label: "Bil udgifter" },
   { key: "dsb", label: "DSB" },
-  { key: "lokationer", label: "Lokationer" },
+  { key: "lokationer", label: "Lokationer", auto: true },
+  { key: "hotel", label: "Hotel", auto: true },
   { key: "corpay", label: "Corpay" },
   { key: "ipads", label: "iPads (eesy betaler 50%)" },
   { key: "team_arrangement", label: "Team arrangement" },
@@ -39,11 +40,21 @@ const EXPENSE_CATEGORIES = [
   { key: "boeder", label: "Bøder" },
 ];
 
+const AUTO_CATEGORIES = new Set(EXPENSE_CATEGORIES.filter(c => c.auto).map(c => c.key));
+
 type ExpenseRow = {
   category: string;
   amount: number;
   note: string;
 };
+
+/** Parse selectedMonth "yyyy-MM" into payroll period: 15th of prev month → 14th of selected month */
+function getPayrollPeriodFromMonth(yearMonth: string) {
+  const [y, m] = yearMonth.split("-").map(Number);
+  const periodStart = format(new Date(y, m - 2, 15), "yyyy-MM-dd");
+  const periodEnd = format(new Date(y, m - 1, 14), "yyyy-MM-dd");
+  return { periodStart, periodEnd };
+}
 
 export function ExpenseReportTab() {
   const now = new Date();
@@ -52,7 +63,13 @@ export function ExpenseReportTab() {
   const [isDirty, setIsDirty] = useState(false);
   const queryClient = useQueryClient();
 
-  const { data: expenses, isLoading } = useQuery({
+  const { periodStart, periodEnd } = useMemo(
+    () => getPayrollPeriodFromMonth(selectedMonth),
+    [selectedMonth]
+  );
+
+  // Saved manual expenses
+  const { data: expenses } = useQuery({
     queryKey: ["billing-manual-expenses", selectedMonth],
     queryFn: async () => {
       const { data, error } = await (supabase as any)
@@ -64,18 +81,68 @@ export function ExpenseReportTab() {
     },
   });
 
-  // Sync fetched data into local state
+  // Auto: Location costs in payroll period
+  const { data: bookings } = useQuery({
+    queryKey: ["billing-location-costs", periodStart, periodEnd],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("booking")
+        .select("id, booked_days, daily_rate_override, start_date, end_date, location:location_id(daily_rate)")
+        .or(`and(start_date.lte.${periodEnd},end_date.gte.${periodStart})`)
+        .not("booked_days", "is", null);
+      if (error) throw error;
+      return data as any[];
+    },
+  });
+
+  // Auto: Hotel costs in payroll period
+  const { data: hotelBookings } = useQuery({
+    queryKey: ["billing-hotel-costs", periodStart, periodEnd],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("booking_hotel")
+        .select("id, price_per_night, check_in")
+        .gte("check_in", periodStart)
+        .lte("check_in", periodEnd);
+      if (error) throw error;
+      return data as { id: string; price_per_night: number | null; check_in: string }[];
+    },
+  });
+
+  const autoLocationTotal = useMemo(() => {
+    if (!bookings) return 0;
+    return bookings.reduce((sum: number, b: any) => {
+      const rate = b.daily_rate_override ?? b.location?.daily_rate ?? 0;
+      const days = b.booked_days?.length || 0;
+      return sum + rate * days;
+    }, 0);
+  }, [bookings]);
+
+  const autoHotelTotal = useMemo(() => {
+    if (!hotelBookings) return 0;
+    return hotelBookings.reduce((sum: number, bh: any) => sum + (bh.price_per_night || 0), 0);
+  }, [hotelBookings]);
+
+  // Sync fetched data + auto values into local state
   useEffect(() => {
     const map = new Map(expenses?.map((e) => [e.category, e]) || []);
     setRows(
-      EXPENSE_CATEGORIES.map((c) => ({
-        category: c.key,
-        amount: map.get(c.key)?.amount ?? 0,
-        note: map.get(c.key)?.note ?? "",
-      }))
+      EXPENSE_CATEGORIES.map((c) => {
+        if (c.key === "lokationer") {
+          return { category: c.key, amount: autoLocationTotal, note: "Auto-beregnet fra bookinger" };
+        }
+        if (c.key === "hotel") {
+          return { category: c.key, amount: autoHotelTotal, note: "Auto-beregnet fra hotelovernatninger" };
+        }
+        return {
+          category: c.key,
+          amount: map.get(c.key)?.amount ?? 0,
+          note: map.get(c.key)?.note ?? "",
+        };
+      })
     );
     setIsDirty(false);
-  }, [expenses]);
+  }, [expenses, autoLocationTotal, autoHotelTotal]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -139,6 +206,9 @@ export function ExpenseReportTab() {
             ))}
           </SelectContent>
         </Select>
+        <span className="text-sm text-muted-foreground">
+          Lønperiode: {periodStart} → {periodEnd}
+        </span>
         <Button onClick={() => saveMutation.mutate()} disabled={!isDirty || saveMutation.isPending}>
           <Save className="h-4 w-4 mr-2" />
           {saveMutation.isPending ? "Gemmer..." : "Gem"}
@@ -175,30 +245,38 @@ export function ExpenseReportTab() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {EXPENSE_CATEGORIES.map((cat, idx) => (
-                <TableRow key={cat.key}>
-                  <TableCell className="font-medium">{cat.label}</TableCell>
-                  <TableCell>
-                    <Input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      placeholder="0"
-                      value={rows[idx]?.amount || ""}
-                      onChange={(e) => updateRow(idx, "amount", e.target.value)}
-                      className="w-[150px]"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      type="text"
-                      placeholder={cat.key === "ipads" ? "Eesy betaler 50%" : "Evt. bemærkning"}
-                      value={rows[idx]?.note || ""}
-                      onChange={(e) => updateRow(idx, "note", e.target.value)}
-                    />
-                  </TableCell>
-                </TableRow>
-              ))}
+              {EXPENSE_CATEGORIES.map((cat, idx) => {
+                const isAuto = AUTO_CATEGORIES.has(cat.key);
+                return (
+                  <TableRow key={cat.key} className={isAuto ? "bg-muted/30" : undefined}>
+                    <TableCell className="font-medium">
+                      {cat.label}
+                      {isAuto && <span className="ml-2 text-xs text-muted-foreground">(auto)</span>}
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        placeholder="0"
+                        value={rows[idx]?.amount || ""}
+                        onChange={(e) => updateRow(idx, "amount", e.target.value)}
+                        className="w-[150px]"
+                        disabled={isAuto}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="text"
+                        placeholder={cat.key === "ipads" ? "Eesy betaler 50%" : "Evt. bemærkning"}
+                        value={rows[idx]?.note || ""}
+                        onChange={(e) => updateRow(idx, "note", e.target.value)}
+                        disabled={isAuto}
+                      />
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
               {/* Total row */}
               <TableRow className="bg-muted/50 font-bold">
                 <TableCell>Total</TableCell>
