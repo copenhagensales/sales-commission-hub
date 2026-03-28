@@ -58,6 +58,7 @@ interface SaleRow {
   agent_name: string | null;
   source: string | null;
   raw_payload: Record<string, unknown> | null;
+  sale_items?: { title: string | null }[];
 }
 
 interface DuplicateGroup {
@@ -107,7 +108,7 @@ export function DuplicatesTab({ clientId: selectedClientId }: DuplicatesTabProps
 
       let query = supabase
         .from("sales")
-        .select("id, sale_datetime, customer_phone, customer_company, validation_status, agent_name, source, raw_payload")
+        .select("id, sale_datetime, customer_phone, customer_company, validation_status, agent_name, source, raw_payload, sale_items(title)")
         .neq("validation_status", "cancelled")
         .order("sale_datetime", { ascending: false });
 
@@ -337,6 +338,7 @@ export function DuplicatesTab({ clientId: selectedClientId }: DuplicatesTabProps
                             <TableHead>Salgsdato</TableHead>
                             <TableHead>Sælger</TableHead>
                             <TableHead>Telefon</TableHead>
+                            <TableHead>Produkt</TableHead>
                             <TableHead>Virksomhed</TableHead>
                             <TableHead>Kilde</TableHead>
                             <TableHead>Status</TableHead>
@@ -353,6 +355,15 @@ export function DuplicatesTab({ clientId: selectedClientId }: DuplicatesTabProps
                               </TableCell>
                               <TableCell>{resolve(sale.agent_name) || "-"}</TableCell>
                               <TableCell>{sale.customer_phone || "-"}</TableCell>
+                              <TableCell>
+                                {sale.sale_items && sale.sale_items.length > 0
+                                  ? sale.sale_items.map((item, i) => (
+                                      <Badge key={i} variant="outline" className="mr-1 mb-0.5">
+                                        {item.title || "-"}
+                                      </Badge>
+                                    ))
+                                  : "-"}
+                              </TableCell>
                               <TableCell>{sale.customer_company || "-"}</TableCell>
                               <TableCell>{sale.source || "-"}</TableCell>
                               <TableCell>{getStatusBadge(sale.validation_status)}</TableCell>
