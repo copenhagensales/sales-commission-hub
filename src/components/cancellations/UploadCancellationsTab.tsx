@@ -771,7 +771,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       // Apply row filter if configured — read from config directly to avoid stale state
       const cfgFilterColumn = activeConfig?.filter_column || "__none__";
       const cfgFilterValue = activeConfig?.filter_value || "";
-      const filteredData = (cfgFilterColumn !== "__none__" && cfgFilterValue.trim())
+      const filteredData = (uploadType !== "both" && cfgFilterColumn !== "__none__" && cfgFilterValue.trim())
         ? parsedData.filter(row => String(getCaseInsensitive(row.originalRow, cfgFilterColumn) ?? "").trim() === cfgFilterValue.trim())
         : parsedData;
 
@@ -1548,7 +1548,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     const sc = activeConfig?.seller_column;
     const previewFilterColumn = activeConfig?.filter_column || "__none__";
     const previewFilterValue = activeConfig?.filter_value || "";
-    let data = (previewFilterColumn !== "__none__" && previewFilterValue.trim())
+    let data = (uploadType !== "both" && previewFilterColumn !== "__none__" && previewFilterValue.trim())
       ? parsedData.filter(row => String(getCaseInsensitive(row.originalRow, previewFilterColumn) ?? "").trim() === previewFilterValue.trim())
       : parsedData;
     // Apply same junk row filter
@@ -1571,7 +1571,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     });
     return data;
   })();
-  const unmatchedRows = parsedData.filter(row => !matchedRowIndices.has(row.originalIndex));
+  const unmatchedRows = filteredDataForPreview.filter(row => !matchedRowIndices.has(row.originalIndex));
   const unmatchedCount = unmatchedRows.length;
   const [previewTab, setPreviewTab] = useState<"matched" | "unmatched" | "seller_unmatched">("matched");
 
