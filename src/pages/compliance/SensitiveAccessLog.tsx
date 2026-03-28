@@ -35,7 +35,7 @@ export default function SensitiveAccessLog() {
     },
   });
 
-  // Fetch employee names for display
+  // Fetch employee names for display (berørt medarbejder)
   const employeeIds = [...new Set(logs?.map(l => l.employee_id) ?? [])];
   const { data: employees } = useQuery({
     queryKey: ["sensitive-log-employees", employeeIds],
@@ -50,12 +50,30 @@ export default function SensitiveAccessLog() {
     enabled: employeeIds.length > 0,
   });
 
+  // Fetch accessor names (tilgået af) via auth_user_id
+  const userIds = [...new Set(logs?.map(l => l.user_id).filter(Boolean) ?? [])];
+  const { data: accessors } = useQuery({
+    queryKey: ["sensitive-log-accessors", userIds],
+    queryFn: async () => {
+      if (!userIds.length) return [];
+      const { data } = await supabase
+        .from("employee_master_data")
+        .select("auth_user_id, first_name, last_name")
+        .in("auth_user_id", userIds);
+      return data ?? [];
+    },
+    enabled: userIds.length > 0,
+  });
+
   const employeeMap = new Map(employees?.map(e => [e.id, `${e.first_name} ${e.last_name}`]));
+  const accessorMap = new Map(accessors?.map(e => [e.auth_user_id, `${e.first_name} ${e.last_name}`]));
 
   const filtered = logs?.filter(l => {
     if (!search) return true;
     const name = employeeMap.get(l.employee_id) ?? "";
+    const accessorName = l.user_id ? (accessorMap.get(l.user_id) ?? "") : "";
     return name.toLowerCase().includes(search.toLowerCase()) ||
+      accessorName.toLowerCase().includes(search.toLowerCase()) ||
       (fieldLabels[l.field_accessed] ?? l.field_accessed).toLowerCase().includes(search.toLowerCase());
   });
 
@@ -104,7 +122,8 @@ export default function SensitiveAccessLog() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Tidspunkt</TableHead>
-                    <TableHead>Medarbejder</TableHead>
+                    <TableHead>Tilgået af</TableHead>
+                    <TableHead>Berørt medarbejder</TableHead>
                     <TableHead>Felt</TableHead>
                     <TableHead>Type</TableHead>
                   </TableRow>
@@ -116,6 +135,9 @@ export default function SensitiveAccessLog() {
                         {format(new Date(log.created_at), "d. MMM yyyy HH:mm", { locale: da })}
                       </TableCell>
                       <TableCell className="text-sm font-medium">
+                        {log.user_id ? (accessorMap.get(log.user_id) ?? "Ukendt bruger") : "–"}
+                      </TableCell>
+                      <TableCell className="text-sm">
                         {employeeMap.get(log.employee_id) ?? log.employee_id}
                       </TableCell>
                       <TableCell>
