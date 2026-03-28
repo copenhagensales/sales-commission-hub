@@ -1546,8 +1546,10 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
   const filteredDataForPreview = (() => {
     const activeConfig = clientConfigs.find(c => c.id === selectedConfigId) || clientConfigs.find(c => c.is_default) || clientConfigs[0];
     const sc = activeConfig?.seller_column;
-    let data = (filterColumn !== "__none__" && filterValue.trim())
-      ? parsedData.filter(row => String(row.originalRow[filterColumn] ?? "").trim() === filterValue.trim())
+    const previewFilterColumn = activeConfig?.filter_column || "__none__";
+    const previewFilterValue = activeConfig?.filter_value || "";
+    let data = (previewFilterColumn !== "__none__" && previewFilterValue.trim())
+      ? parsedData.filter(row => String(getCaseInsensitive(row.originalRow, previewFilterColumn) ?? "").trim() === previewFilterValue.trim())
       : parsedData;
     // Apply same junk row filter
     data = data.filter(row => {
