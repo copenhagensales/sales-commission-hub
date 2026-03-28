@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
+  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
@@ -24,6 +25,7 @@ import { useShouldShowPulseSurvey } from "@/hooks/usePulseSurvey";
 import { useCarQuizCompletion } from "@/hooks/useCarQuiz";
 import { useIsSalgskonsulent, useCodeOfConductLock } from "@/hooks/useCodeOfConduct";
 import { useHasImmediatePaymentSales } from "@/hooks/useHasImmediatePaymentSales";
+import { useFmBookingConflicts } from "@/hooks/useFmBookingConflicts";
 import { useTranslation } from "react-i18next";
 
 type NavItem = { name: string; href: string; icon: typeof Users; badgeKey?: string };
@@ -311,54 +313,8 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
     // NO refetchInterval - reduces DB load significantly
   });
 
-  // Fetch FM booking conflicts count (bookings where employee has approved absence)
-  const { data: fmBookingConflictsCount = 0 } = useQuery({
-    queryKey: ["fm-booking-conflicts-count"],
-    queryFn: async () => {
-      // Get ALL booking assignments (no date restriction)
-      const { data: assignments } = await supabase
-        .from("booking_assignment")
-        .select("employee_id, date");
-      
-      if (!assignments || assignments.length === 0) return 0;
-      
-      // Get ALL approved absences
-      const { data: absences } = await supabase
-        .from("absence_request_v2")
-        .select("employee_id, start_date, end_date")
-        .eq("status", "approved");
-      
-      if (!absences || absences.length === 0) return 0;
-      
-      // Count unique employees with conflicts
-      const employeesWithConflicts = new Set<string>();
-      
-      for (const assignment of assignments) {
-        const hasConflict = absences.some(absence => 
-          absence.employee_id === assignment.employee_id &&
-          assignment.date >= absence.start_date &&
-          assignment.date <= absence.end_date
-        );
-        if (hasConflict && assignment.employee_id) {
-          employeesWithConflicts.add(assignment.employee_id);
-        }
-      }
-      
-      console.log('Booking conflicts debug:', {
-        assignments: assignments?.length,
-        absences: absences?.length,
-        uniqueConflicts: employeesWithConflicts.size,
-        conflictingEmployees: Array.from(employeesWithConflicts)
-      });
-      
-      return employeesWithConflicts.size;
-    },
-    enabled: p.canViewFmBookings || p.canViewFmBookWeek,
-    staleTime: 0,
-    gcTime: 10 * 60 * 1000,
-    refetchOnWindowFocus: true,
-    refetchOnMount: true,
-  });
+  // Fetch FM booking conflicts using shared hook
+  const { count: fmBookingConflictsCount } = useFmBookingConflicts(p.canViewFmBookings || p.canViewFmBookWeek);
 
   const pendingContractsCount = employeeData?.pendingContracts ?? 0;
   const employeeName = employeeData?.name;
@@ -1193,9 +1149,18 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                       {t("sidebar.booking", "Booking")}
                     </div>
                     {fmBookingConflictsCount > 0 && (
-                      <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs animate-pulse">
-                        {fmBookingConflictsCount > 99 ? "99+" : fmBookingConflictsCount}
-                      </Badge>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs animate-pulse">
+                              {fmBookingConflictsCount > 99 ? "99+" : fmBookingConflictsCount}
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {fmBookingConflictsCount} medarbejder(e) er tildelt vagter under godkendt fravær
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     )}
                   </NavLink>
                 )}

@@ -1,10 +1,14 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, MapPin, ListChecks, CalendarDays, Loader2, Tent, Hotel, BarChart3, Brain } from "lucide-react";
+import { Calendar, MapPin, ListChecks, CalendarDays, Loader2, Tent, Hotel, BarChart3, Brain, AlertTriangle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 import { lazy, Suspense, useMemo } from "react";
 import { usePermissions } from "@/hooks/usePositionPermissions";
+import { useFmBookingConflicts } from "@/hooks/useFmBookingConflicts";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { format } from "date-fns";
+import { da } from "date-fns/locale";
 
 // Lazy load tab contents
 const BookWeekContent = lazy(() => import("./BookWeekContent"));
@@ -32,6 +36,7 @@ export default function BookingManagement() {
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const { canView, isLoading, isReady, position, permissions } = usePermissions();
+  const { conflicts, count: conflictCount } = useFmBookingConflicts();
   
   // Filter tabs based on permissions
   const visibleTabs = useMemo(() => 
@@ -99,6 +104,24 @@ export default function BookingManagement() {
           <h1 className="text-2xl font-bold">{t("sidebar.booking", "Booking")}</h1>
           <p className="text-muted-foreground">Administrer bookinger, lokationer og planlægning</p>
         </div>
+
+        {conflictCount > 0 && (
+          <Alert variant="destructive" className="border-destructive/50">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>{conflictCount} medarbejder(e) tildelt vagter under godkendt fravær</AlertTitle>
+            <AlertDescription>
+              <ul className="mt-2 space-y-1 text-sm">
+                {conflicts.map((c, i) => (
+                  <li key={`${c.employeeId}-${c.date}-${i}`}>
+                    <span className="font-medium">{c.employeeName}</span>
+                    {" — "}
+                    {format(new Date(c.date), "EEEE d. MMM yyyy", { locale: da })}
+                  </li>
+                ))}
+              </ul>
+            </AlertDescription>
+          </Alert>
+        )}
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="inline-flex h-10 items-center justify-start rounded-md bg-muted p-1 text-muted-foreground w-auto gap-1">
