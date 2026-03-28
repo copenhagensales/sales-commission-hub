@@ -1,26 +1,33 @@
 
 
-## Plan: Lås P-pladser og Biludgifter som faste månedlige poster
+## Plan: Spor hvem der tilføjer diæt + vis det i UI
 
 ### Problem
-P-pladser og Biludgifter er faste beløb der gentager sig hver måned, men i dag skal de indtastes manuelt hver gang.
+`booking_diet` tabellen har ingen `created_by` kolonne, så det er umuligt at se hvem der har påført en diæt. Kun `created_at` tidspunkt findes.
 
-### Løsning
-Markér "parkering" og "bil" som **recurring** kategorier. Når en ny måned åbnes uden eksisterende data for disse poster, kopieres automatisk beløb og note fra den seneste måned der har en værdi. UI'et viser et låseikon ved disse poster for at indikere de er faste.
+### Ændringer
 
-### Ændringer i `src/components/billing/ExpenseReportTab.tsx`
+**1. Database migration** — Tilføj `created_by` kolonne til `booking_diet`
+```sql
+ALTER TABLE public.booking_diet 
+  ADD COLUMN created_by uuid REFERENCES auth.users(id);
+```
 
-1. **Tilføj `recurring: true`** på "parkering" og "bil" i `EXPENSE_CATEGORIES` (ligesom `auto: true` bruges for lokationer/hotel)
+**2. Upserts i `BookingsContent.tsx`** — Tilføj `created_by: (await supabase.auth.getUser()).data.user?.id` ved indsættelse af diæt (linje ~588-596)
 
-2. **Ny query**: Hent seneste `billing_manual_expenses` for recurring-kategorier hvor `year_month < selectedMonth` og `amount > 0`, sorteret desc, limit 1 per kategori
+**3. Upserts i `EditBookingDialog.tsx`** — Samme tilføjelse af `created_by` ved diæt-upserts (linje ~976, ~1030)
 
-3. **Udvid `useEffect`**: For recurring-kategorier uden eksisterende data → brug forrige måneds værdier som default. Gem automatisk til databasen så de persisteres.
+**4. Query i `BookingsContent.tsx`** — Udvid diæt-query til at hente `created_at, created_by` + join med `employee_master_data` via en separat lookup for at vise navn
 
-4. **UI**: Vis et `Lock`-ikon (fra lucide) ved recurring-poster i stedet for "(auto)". Felterne forbliver redigerbare så beløbet kan justeres.
+**5. UI: Tooltip på Diæt-badge** (2 steder i `BookingsContent.tsx`, linje ~1207 og ~1479)
+- Wrap Diæt-badge i `Tooltip` der viser: "Tilføjet af [Navn] kl. HH:mm d. DD/MM"
+- Hvis `created_by` er null (ældre data): vis kun `created_at` tidspunkt
 
 ### Filer
 
 | Fil | Ændring |
 |-----|---------|
-| `src/components/billing/ExpenseReportTab.tsx` | Tilføj recurring-flag, copy-forward logik, låseikon |
+| `supabase/migrations/...` | Tilføj `created_by` kolonne |
+| `src/pages/vagt-flow/BookingsContent.tsx` | Sæt `created_by` ved upsert, udvid query, tilføj tooltip |
+| `src/components/vagt-flow/EditBookingDialog.tsx` | Sæt `created_by` ved upsert |
 
