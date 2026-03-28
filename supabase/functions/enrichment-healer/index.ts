@@ -128,7 +128,11 @@ async function healAdversus(
         throw new Error("API returned empty lead data");
       }
 
-      const phone = leadData.phone || leadData.contactPhone || leadData.mobile || null;
+      let phone = leadData.phone || leadData.contactPhone || leadData.mobile || null;
+      if (!phone && leadData.contactData) {
+        const cd = leadData.contactData;
+        phone = cd.Telefonnummer1 || cd['Kontakt nummer'] || cd.phone || cd.mobile || cd.Mobil || cd.Telefon || null;
+      }
 
       const updatedPayload = {
         ...rawPayload,
@@ -148,7 +152,7 @@ async function healAdversus(
       healed++;
       log(`Healed Adversus sale ${sale.adversus_external_id} (lead ${leadId})`);
 
-      await new Promise(r => setTimeout(r, turboMode ? 1200 : 1500));
+      await new Promise(r => setTimeout(r, turboMode ? 2000 : 3000));
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
       await supabase.from("sales").update({

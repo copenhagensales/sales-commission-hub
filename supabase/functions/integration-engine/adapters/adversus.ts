@@ -619,7 +619,11 @@ export class AdversusAdapter implements DialerAdapter {
           }
         }
 
-        const phone = leadData.phone || leadData.contactPhone || leadData.mobile || null;
+        let phone = leadData.phone || leadData.contactPhone || leadData.mobile || null;
+        if (!phone && leadData.contactData) {
+          const cd = leadData.contactData;
+          phone = cd.Telefonnummer1 || cd['Kontakt nummer'] || cd.phone || cd.mobile || cd.Mobil || cd.Telefon || null;
+        }
         leadIdToData.set(leadId, { opp, resultData, resultFields, phone });
         fetchSuccess++;
       }
