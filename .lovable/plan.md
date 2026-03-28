@@ -1,27 +1,20 @@
 
 
-## Udfyld EmployeePrivacy.tsx med konkrete oplysninger
+## Udfyld placeholders i InternalProcesses.tsx
 
-### Ændringer
+### 3 placeholders → konkret indhold
 
-**1. Kontaktperson (linje 132)** — placeholder `[indsæt kontaktperson eller mail]`
-- Erstat med: "virksomhedens ejer" + en dynamisk visning af ejerens work_email hentet fra `employee_master_data` (job_title = "Ejer"). Fallback til teksten "din nærmeste leder" hvis ingen ejer findes.
+**1. Kundedata slettefrist (linje 117)**
+- Erstat `[indsæt intern frist]` med den detaljerede tekst du angav: "90 dage som udgangspunkt, med mulighed for forlængelse ved erhvervskampagner med sene annulleringer/efterreguleringer, revurderes løbende."
 
-**2. Opbevaring (linje 111-114)** — generisk tekst
-- Erstat med den konkrete 5-årige retention-politik:
-  - Løn- og økonomidata: 5 år (bogføringsloven)
-  - Salgs- og provisionsdata: 5 år
-  - Øvrig medarbejderdata: slettes senest 5 år efter fratrædelse
-  - Ansøgerdata: 6 måneder efter afslag
+**2. Sikkerhedshændelser kontakt (linje 198)**
+- Erstat `[indsæt funktion eller mail]` med dynamisk visning af ejerens email (samme `OwnerEmail`-komponent som brugt i EmployeePrivacy).
 
-**3. Adgang (linje 96-103)** — generisk
-- Konkretiser med systemets faktiske roller:
-  - Medarbejder: egne data (løn, provision, vagtplan)
-  - Teamleder: teammedlemmers salgs- og vagtdata
-  - Ejer/admin: fuld adgang til administration, løn og drift
+**3. Review-frekvens (linje 216)**
+- Erstat `[indsæt frekvens]` med "kvartalsvist" — matcher det ugentlige compliance-cron der allerede tjekker, og kvartalsvis review er standard for intern governance.
 
 ### Fil
 | Fil | Handling |
 |-----|---------|
-| `src/pages/compliance/EmployeePrivacy.tsx` | Opdater 3 sektioner med konkret indhold |
+| `src/pages/compliance/InternalProcesses.tsx` | Udfyld alle 3 placeholders, tilføj OwnerEmail-komponent med dynamisk ejer-email |
 
