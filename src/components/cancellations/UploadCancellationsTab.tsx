@@ -49,6 +49,7 @@ interface ParsedRow {
   phone?: string;
   company?: string;
   originalRow: Record<string, unknown>;
+  originalIndex: number;
 }
 
 interface MatchedSale {
@@ -697,7 +698,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         }
 
         setColumns(cols);
-        setParsedData(jsonData.map(row => ({ originalRow: row })));
+        setParsedData(jsonData.map((row, idx) => ({ originalRow: row, originalIndex: idx })));
 
         // Check if a default config exists – if so, auto-match
         const defaultConfig = clientConfigs.find(c => c.is_default) || (clientConfigs.length > 0 ? clientConfigs[0] : null);
@@ -767,9 +768,11 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     setIsMatching(true);
 
     try {
-      // Apply row filter if configured
-      const filteredData = (uploadType !== "both" && filterColumn !== "__none__" && filterValue.trim())
-        ? parsedData.filter(row => String(getCaseInsensitive(row.originalRow, filterColumn) ?? "").trim() === filterValue.trim())
+      // Apply row filter if configured — read from config directly to avoid stale state
+      const cfgFilterColumn = activeConfig?.filter_column || "__none__";
+      const cfgFilterValue = activeConfig?.filter_value || "";
+      const filteredData = (uploadType !== "both" && cfgFilterColumn !== "__none__" && cfgFilterValue.trim())
+        ? parsedData.filter(row => String(getCaseInsensitive(row.originalRow, cfgFilterColumn) ?? "").trim() === cfgFilterValue.trim())
         : parsedData;
 
       // Filter out junk rows (Total/subtotal/header rows from pivot tables)
@@ -926,7 +929,8 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         console.log("[handleMatch] candidateSales:", candidateSales.length, "cleanedRows:", cleanedData.length);
         console.log("[handleMatch] mappings:", productPhoneMappings);
 
-        cleanedData.forEach((row, idx) => {
+        cleanedData.forEach((row) => {
+          const idx = row.originalIndex;
           // Get the single phone from Excel's phoneColumn
           const rawExcelPhone = phoneColumn !== "__none__" ? getCaseInsensitive(row.originalRow, phoneColumn) : null;
           if (!rawExcelPhone) return; // phone-less rows handled in pass 2
@@ -979,7 +983,8 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
         // --- PASS 1b: FM phone matching via customer_phone directly ---
         // For rows that have a phone but weren't matched in Pass 1 (FM sales don't have raw_payload.data phone fields)
-        cleanedData.forEach((row, idx) => {
+        cleanedData.forEach((row) => {
+          const idx = row.originalIndex;
           if (matchedIndicesLocal.has(idx)) return; // already matched in pass 1
 
           const rawExcelPhone = phoneColumn !== "__none__" ? getCaseInsensitive(row.originalRow, phoneColumn) : null;
@@ -1090,7 +1095,8 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
 
 
-          cleanedData.forEach((row, idx) => {
+          cleanedData.forEach((row) => {
+            const idx = row.originalIndex;
             if (matchedIndicesLocal.has(idx)) return; // already matched in pass 1
 
             const rawExcelPhone = phoneColumn !== "__none__" ? getCaseInsensitive(row.originalRow, phoneColumn) : null;
@@ -1332,7 +1338,8 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       const indexByPhone = new Map<string, number>();
       const indexByCompany = new Map<string, number>();
       const indexByMemberNr = new Map<string, number>();
-      cleanedData.forEach((row, idx) => {
+      cleanedData.forEach((row) => {
+        const idx = row.originalIndex;
         if (oppColumn !== "__none__") {
           const ov = getCaseInsensitive(row.originalRow, oppColumn);
           if (ov) {
@@ -1428,12 +1435,15 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
   // Send to approval queue mutation
   const sendToQueueMutation = useMutation({
     mutationFn: async () => {
-      const filteredForQueue = (filterColumn !== "__none__" && filterValue.trim())
-        ? parsedData.filter(row => String(row.originalRow[filterColumn] ?? "").trim() === filterValue.trim())
+      const activeQueueConfig = clientConfigs.find(c => c.id === selectedConfigId) || clientConfigs.find(c => c.is_default) || clientConfigs[0];
+      const qFilterColumn = activeQueueConfig?.filter_column || "__none__";
+      const qFilterValue = activeQueueConfig?.filter_value || "";
+      const filteredForQueue = (qFilterColumn !== "__none__" && qFilterValue.trim())
+        ? parsedData.filter(row => String(getCaseInsensitive(row.originalRow, qFilterColumn) ?? "").trim() === qFilterValue.trim())
         : parsedData;
 
       const unmatchedRows = filteredForQueue
-        .filter((_, idx) => !matchedRowIndices.has(idx))
+        .filter(row => !matchedRowIndices.has(row.originalIndex))
         .map(r => r.originalRow);
 
       let importId: string | null = null;
@@ -1536,8 +1546,10 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
   const filteredDataForPreview = (() => {
     const activeConfig = clientConfigs.find(c => c.id === selectedConfigId) || clientConfigs.find(c => c.is_default) || clientConfigs[0];
     const sc = activeConfig?.seller_column;
-    let data = (filterColumn !== "__none__" && filterValue.trim())
-      ? parsedData.filter(row => String(row.originalRow[filterColumn] ?? "").trim() === filterValue.trim())
+    const previewFilterColumn = activeConfig?.filter_column || "__none__";
+    const previewFilterValue = activeConfig?.filter_value || "";
+    let data = (previewFilterColumn !== "__none__" && previewFilterValue.trim())
+      ? parsedData.filter(row => String(getCaseInsensitive(row.originalRow, previewFilterColumn) ?? "").trim() === previewFilterValue.trim())
       : parsedData;
     // Apply same junk row filter
     data = data.filter(row => {
@@ -1559,7 +1571,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     });
     return data;
   })();
-  const unmatchedRows = filteredDataForPreview.filter((_, idx) => !matchedRowIndices.has(idx));
+  const unmatchedRows = filteredDataForPreview.filter(row => !matchedRowIndices.has(row.originalIndex));
   const unmatchedCount = unmatchedRows.length;
   const [previewTab, setPreviewTab] = useState<"matched" | "unmatched" | "seller_unmatched">("matched");
 
