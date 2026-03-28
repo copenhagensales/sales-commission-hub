@@ -237,3 +237,12 @@ verify_jwt = false
 
 [functions.tdc-opp-backfill]
 verify_jwt = false
+
+[functions.gdpr-export-data]
+verify_jwt = false
+
+[functions.gdpr-process-deletion]
+verify_jwt = false
+
+[functions.gdpr-data-cleanup]
+verify_jwt = false
