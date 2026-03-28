@@ -1,45 +1,35 @@
 
 
-## Plan: Udgiftsrapport-fane i Fakturering
+## Plan: Ret hotelberegning i HotelExpensesTab
 
-### Hvad der bygges
+### Problem
+Feltet `price_per_night` i `booking_hotel` er reelt **totalpris for hele opholdet** (ex moms), ikke en pris per nat. Koden ganger fejlagtigt med antal nætter og antal værelser, hvilket giver alt for høje beløb.
 
-En ny fane "Udgiftsrapport" i `/vagt-flow/billing` med faste udgiftsposter der kan indtastes manuelt, gemt i databasen per måned, med totalsum i bunden.
+### Rettelse i `src/components/billing/HotelExpensesTab.tsx`
 
-### Ændringer
+1. **Linje-total**: Brug `bh.price_per_night` direkte som total (ikke ganget med nætter/rooms)
+2. **KPI "Samlet udgift"**: Samme rettelse -- sum af `price_per_night` uden multiplikation
+3. **Kolonne "Pris/nat"**: Omdøb til "Pris (total)" eller beregn den faktiske pris/nat som `price_per_night / nights` til visning
+4. **Nætter-beregning**: Brug `booked_days.length` i stedet for check-in/check-out differens (det er mere præcist jf. jeres booking-model)
 
-**1. Ny tabel: `billing_manual_expenses`**
+### Teknisk detalje
 
-| Kolonne | Type | Beskrivelse |
-|---------|------|-------------|
-| id | uuid PK | |
-| year_month | text NOT NULL | F.eks. "2026-03" |
-| category | text NOT NULL | F.eks. "brobizz", "benzin" |
-| amount | numeric DEFAULT 0 | Beløb i kr. |
-| note | text | Evt. bemærkning |
-| updated_by | uuid | Bruger der sidst ændrede |
-| updated_at | timestamptz | |
+Nuværende (forkert):
+```typescript
+const lineTotal = bh.price_per_night * nights * rooms;
+```
 
-Unique constraint på `(year_month, category)` så der kun er én række per kategori per måned.
+Rettet:
+```typescript
+const lineTotal = bh.price_per_night || 0; // allerede totalpris
+const pricePerNight = nights > 0 ? lineTotal / nights : 0; // til visning
+```
 
-**2. Ny komponent: `src/components/billing/ExpenseReportTab.tsx`**
+Kolonne "Pris/nat" viser den beregnede pris per nat, og "Total" viser `price_per_night` direkte.
 
-- Månedsvælger (samme stil som andre faner)
-- Tabel med faste kategorier: Brobizz, Benzin (Cirkel K), P-pladser, Bil udgifter, DSB, Lokationer, CorpayI, Pads (eesy betaler 50%), Team arrangement, Banken, Bøder
-- Hver række har et input-felt til beløb og et til noter
-- Ændringer gemmes med upsert (debounced eller med "Gem"-knap)
-- iPads-rækken viser en note om 50% eesy-betaling
-- Total-række i bunden summerer alle beløb
-
-**3. Opdater `Billing.tsx`**
-
-- Import + tilføj fane "Udgiftsrapport"
-
-### Filer
+### Fil
 
 | Fil | Handling |
 |-----|---------|
-| SQL migration | Ny `billing_manual_expenses` tabel med RLS |
-| `src/components/billing/ExpenseReportTab.tsx` | **Ny** |
-| `src/pages/vagt-flow/Billing.tsx` | Tilføj fane |
+| `src/components/billing/HotelExpensesTab.tsx` | Ret beregning + kolonnenavne |
 
