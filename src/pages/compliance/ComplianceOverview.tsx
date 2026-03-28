@@ -1,6 +1,6 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Shield, Users, FileText, Lock, ArrowRight } from "lucide-react";
+import { Shield, Users, FileText, Lock, ArrowRight, Bell } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { usePermissions } from "@/hooks/usePositionPermissions";
@@ -35,6 +35,15 @@ export default function ComplianceOverview() {
       badge: "Admin",
       badgeColor: "bg-red-500/10 text-red-700 border-red-500/30",
       href: "/compliance/admin",
+      permKey: "menu_compliance_admin",
+    },
+    {
+      title: "Notifikationsmodtagere",
+      description: "Administrer hvem der modtager compliance-relaterede notifikationer og GDPR-påmindelser.",
+      icon: Bell,
+      badge: "Admin",
+      badgeColor: "bg-red-500/10 text-red-700 border-red-500/30",
+      href: "/compliance/notifications",
       permKey: "menu_compliance_admin",
     },
   ];

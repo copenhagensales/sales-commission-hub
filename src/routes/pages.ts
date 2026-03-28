@@ -220,3 +220,4 @@ export const ComplianceOverview = lazyPage(() => import("@/pages/compliance/Comp
 export const ComplianceEmployeePrivacy = lazyPage(() => import("@/pages/compliance/EmployeePrivacy"));
 export const ComplianceInternalProcesses = lazyPage(() => import("@/pages/compliance/InternalProcesses"));
 export const ComplianceAdminDocumentation = lazyPage(() => import("@/pages/compliance/AdminDocumentation"));
+export const ComplianceNotifications = lazyPage(() => import("@/pages/compliance/ComplianceNotifications"));
