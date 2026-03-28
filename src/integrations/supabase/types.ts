@@ -3391,6 +3391,35 @@ export type Database = {
         }
         Relationships: []
       }
+      compliance_notification_recipients: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          employee_id: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          employee_id: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          employee_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compliance_notification_recipients_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       consent_log: {
         Row: {
           consent_type: string

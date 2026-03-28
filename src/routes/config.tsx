@@ -145,6 +145,7 @@ import {
   ComplianceEmployeePrivacy,
   ComplianceInternalProcesses,
   ComplianceAdminDocumentation,
+  ComplianceNotifications,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -437,6 +438,7 @@ export const routes: RouteConfig[] = [
   { path: "/compliance/employee-privacy", component: ComplianceEmployeePrivacy, access: "role", positionPermission: "menu_compliance_employee" },
   { path: "/compliance/processes", component: ComplianceInternalProcesses, access: "role", positionPermission: "menu_compliance_processes" },
   { path: "/compliance/admin", component: ComplianceAdminDocumentation, access: "role", positionPermission: "menu_compliance_admin" },
+  { path: "/compliance/notifications", component: ComplianceNotifications, access: "role", positionPermission: "menu_compliance_admin" },
 
   { path: "*", component: NotFound, access: "public" },
 ];
