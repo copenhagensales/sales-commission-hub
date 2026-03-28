@@ -193,7 +193,7 @@ export default function ContractSign() {
     }
   }, [contract?.id, contract?.employee_id]);
 
-
+  const { data: currentEmployee } = useQuery({
     queryKey: ["current-employee-for-contract"],
     queryFn: async () => {
       const { data: userData } = await supabase.auth.getUser();
