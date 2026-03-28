@@ -1,6 +1,6 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Shield, Users, FileText, Lock, ArrowRight, Bell, ClipboardList, AlertTriangle, Globe, Clock, Search, GraduationCap, Brain } from "lucide-react";
+import { Shield, Users, FileText, Lock, ArrowRight, Bell, ClipboardList, AlertTriangle, Globe, Clock, Search, GraduationCap, Brain, Eye } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { usePermissions } from "@/hooks/usePositionPermissions";
@@ -107,6 +107,15 @@ export default function ComplianceOverview() {
       badge: "EU AI Act",
       badgeColor: "bg-violet-500/10 text-violet-700 border-violet-500/30",
       href: "/compliance/ai-governance",
+      permKey: "menu_compliance_admin",
+    },
+    {
+      title: "Audit-log: Følsomme data",
+      description: "Log over hvem der har redigeret CPR-numre, bankoplysninger og andre følsomme medarbejderdata.",
+      icon: Eye,
+      badge: "Audit",
+      badgeColor: "bg-amber-500/10 text-amber-700 border-amber-500/30",
+      href: "/compliance/access-log",
       permKey: "menu_compliance_admin",
     },
   ];

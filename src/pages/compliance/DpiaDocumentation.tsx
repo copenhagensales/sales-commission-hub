@@ -24,7 +24,7 @@ const dpias = [
       "CPR-numre er kun synlige for brugere med specifik rolleadgang (ejer/admin/HR)",
       "Row Level Security (RLS) på databaseniveau sikrer at kun autoriserede kan tilgå data",
       "CPR-felter er maskeret i UI — kun de sidste 4 cifre vises som standard",
-      "Al adgang logges i systemets audit-log",
+      "Al redigering af følsomme felter (CPR, bank) logges automatisk i audit-loggen (Compliance → Audit-log)",
       "Data krypteres i transit (TLS) og at rest (AES-256)",
     ],
     conclusion: "Risikoen er acceptabel med de implementerede foranstaltninger. Behandlingen er nødvendig og proportional.",
