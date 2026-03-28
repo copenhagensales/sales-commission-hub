@@ -771,7 +771,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       // Apply row filter if configured — read from config directly to avoid stale state
       const cfgFilterColumn = activeConfig?.filter_column || "__none__";
       const cfgFilterValue = activeConfig?.filter_value || "";
-      const filteredData = (uploadType !== "both" && cfgFilterColumn !== "__none__" && cfgFilterValue.trim())
+      const filteredData = (cfgFilterColumn !== "__none__" && cfgFilterValue.trim())
         ? parsedData.filter(row => String(getCaseInsensitive(row.originalRow, cfgFilterColumn) ?? "").trim() === cfgFilterValue.trim())
         : parsedData;
 
@@ -1571,12 +1571,9 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     });
     return data;
   })();
-  const unmatchedRows = filteredDataForPreview.filter(row => !matchedRowIndices.has(row.originalIndex));
+  const unmatchedRows = parsedData.filter(row => !matchedRowIndices.has(row.originalIndex));
   const unmatchedCount = unmatchedRows.length;
-  const filteredIndicesSet = new Set(filteredDataForPreview.map(r => r.originalIndex));
-  const excludedRows = parsedData.filter(row => !filteredIndicesSet.has(row.originalIndex));
-  const excludedCount = excludedRows.length;
-  const [previewTab, setPreviewTab] = useState<"matched" | "unmatched" | "seller_unmatched" | "excluded">("matched");
+  const [previewTab, setPreviewTab] = useState<"matched" | "unmatched" | "seller_unmatched">("matched");
 
   // Handle saving a seller mapping and re-running match
   const handleSellerMappingSave = async (excelSellerName: string, employeeId: string) => {
@@ -1832,15 +1829,6 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                   {unmatchedSellerRows.length} mangler sælger-mapping
                 </Badge>
               )}
-              {excludedCount > 0 && (
-                <Badge
-                  variant={previewTab === "excluded" ? "secondary" : "outline"}
-                  className="text-sm px-3 py-1 cursor-pointer"
-                  onClick={() => setPreviewTab("excluded")}
-                >
-                  {excludedCount} ikke-uploadede rækker
-                </Badge>
-              )}
             </div>
 
             {previewTab === "matched" ? (
@@ -1968,43 +1956,6 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                   <ArrowRight className="h-4 w-4 mr-2" />
                   Kør matching igen
                 </Button>
-              </div>
-            ) : previewTab === "excluded" ? (
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">
-                  Disse rækker blev ekskluderet pga. filter eller tomme/total-rækker og uploades ikke.
-                </p>
-                <div className="rounded-md border max-h-96 overflow-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Årsag</TableHead>
-                        {columns.slice(0, 6).map((col) => (
-                          <TableHead key={col}>{col}</TableHead>
-                        ))}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {excludedRows.map((row, idx) => {
-                        const activeConfig = clientConfigs.find(c => c.id === selectedConfigId) || clientConfigs.find(c => c.is_default) || clientConfigs[0];
-                        const fc = activeConfig?.filter_column || "__none__";
-                        const fv = activeConfig?.filter_value || "";
-                        const isFiltered = fc !== "__none__" && fv.trim() && String(getCaseInsensitive(row.originalRow, fc) ?? "").trim() !== fv.trim();
-                        const reason = isFiltered ? `Filtreret (${fc} ≠ ${fv})` : "Tom/total-række";
-                        return (
-                          <TableRow key={idx}>
-                            <TableCell>
-                              <Badge variant="outline" className="text-xs">{reason}</Badge>
-                            </TableCell>
-                            {columns.slice(0, 6).map((col) => (
-                              <TableCell key={col}>{String(row.originalRow[col] ?? "-")}</TableCell>
-                            ))}
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
               </div>
             ) : (
               <div className="rounded-md border max-h-96 overflow-auto">
