@@ -1,45 +1,34 @@
 
 
-## Plan: Opsæt ugentligt cron-job for compliance-notifikationer
+## Plan: Hotelfane i Faktureringsrapport
 
 ### Hvad der bygges
 
-Et pg_cron job der kalder `check-compliance-reviews` edge function én gang om ugen (mandag kl. 08:00). Funktionen eksisterer allerede og sender emails via M365 til de modtagere der er konfigureret under `/compliance/notifications`.
+En ny fane "Hoteller" i `/vagt-flow/billing` der viser alle hotelovernatninger samlet som én leverandør, med månedsvælger og overblik over udgifter.
 
-### Ændring
+### Ændringer
 
-**1. Opret cron-job via SQL insert**
+**1. Ny komponent: `src/components/billing/HotelExpensesTab.tsx`**
 
-Bruger `pg_cron` + `pg_net` til at kalde edge function hver mandag kl. 08:00:
+- Månedsvælger (samme stil som BillingOverviewTab)
+- Henter `booking_hotel` med tilhørende `hotel` og `booking` (inkl. lokation) for valgt måned (baseret på check_in dato)
+- KPI-kort: Samlet udgift, antal overnatninger, antal bookinger
+- Tabel med kolonner: Booking (lokation + periode), Hotel, Check-in, Check-out, Dage, Pris, Status
+- Total-række nederst
 
-```sql
-select cron.schedule(
-  'weekly-compliance-review',
-  '0 8 * * 1',
-  $$
-  select net.http_post(
-    url:='https://jwlimmeijpfmaksvmuru.supabase.co/functions/v1/check-compliance-reviews',
-    headers:='{"Content-Type":"application/json","Authorization":"Bearer <anon_key>"}'::jsonb,
-    body:='{}'::jsonb
-  ) as request_id;
-  $$
-);
-```
+**2. Opdater `src/pages/vagt-flow/Billing.tsx`**
 
-**2. Tilføj "Send nu"-knap i ComplianceNotifications.tsx**
-
-En knap så admins kan trigge compliance-mailen manuelt (kalder `supabase.functions.invoke("check-compliance-reviews")`). Giver mulighed for at teste inden cron kører.
+- Import `HotelExpensesTab`
+- Tilføj fane "Hoteller" med Hotel-ikon i TabsList
 
 ### Filer
 
 | Fil | Handling |
 |-----|---------|
-| SQL insert (cron) | Nyt cron-job via insert-tool |
-| `src/pages/compliance/ComplianceNotifications.tsx` | Tilføj "Send nu"-knap |
+| `src/components/billing/HotelExpensesTab.tsx` | **Ny** — hotelovernatninger pr. måned |
+| `src/pages/vagt-flow/Billing.tsx` | Tilføj fane |
 
 ### Teknisk detalje
 
-- Cron-jobbet oprettes via insert-tool (ikke migration) da det indeholder projekt-specifikke værdier (URL + anon key).
-- `verify_jwt` er allerede `false` for denne funktion i config.toml, så cron-kaldet virker uden JWT.
-- Edge function checker: udløbende dokumenter, APV-deadlines, overskredne opgaver — og sender kun mail hvis der er alerts.
+Query henter `booking_hotel` med join til `hotel` og `booking(location:location_id(name, address_city))`, filtreret på `check_in` inden for valgt måned. Bruger eksisterende `(supabase as any)` pattern fra `useBookingHotels`.
 
