@@ -1,34 +1,45 @@
 
 
-## Plan: Hotelfane i Faktureringsrapport
+## Plan: Udgiftsrapport-fane i Fakturering
 
 ### Hvad der bygges
 
-En ny fane "Hoteller" i `/vagt-flow/billing` der viser alle hotelovernatninger samlet som én leverandør, med månedsvælger og overblik over udgifter.
+En ny fane "Udgiftsrapport" i `/vagt-flow/billing` med faste udgiftsposter der kan indtastes manuelt, gemt i databasen per måned, med totalsum i bunden.
 
 ### Ændringer
 
-**1. Ny komponent: `src/components/billing/HotelExpensesTab.tsx`**
+**1. Ny tabel: `billing_manual_expenses`**
 
-- Månedsvælger (samme stil som BillingOverviewTab)
-- Henter `booking_hotel` med tilhørende `hotel` og `booking` (inkl. lokation) for valgt måned (baseret på check_in dato)
-- KPI-kort: Samlet udgift, antal overnatninger, antal bookinger
-- Tabel med kolonner: Booking (lokation + periode), Hotel, Check-in, Check-out, Dage, Pris, Status
-- Total-række nederst
+| Kolonne | Type | Beskrivelse |
+|---------|------|-------------|
+| id | uuid PK | |
+| year_month | text NOT NULL | F.eks. "2026-03" |
+| category | text NOT NULL | F.eks. "brobizz", "benzin" |
+| amount | numeric DEFAULT 0 | Beløb i kr. |
+| note | text | Evt. bemærkning |
+| updated_by | uuid | Bruger der sidst ændrede |
+| updated_at | timestamptz | |
 
-**2. Opdater `src/pages/vagt-flow/Billing.tsx`**
+Unique constraint på `(year_month, category)` så der kun er én række per kategori per måned.
 
-- Import `HotelExpensesTab`
-- Tilføj fane "Hoteller" med Hotel-ikon i TabsList
+**2. Ny komponent: `src/components/billing/ExpenseReportTab.tsx`**
+
+- Månedsvælger (samme stil som andre faner)
+- Tabel med faste kategorier: Brobizz, Benzin (Cirkel K), P-pladser, Bil udgifter, DSB, Lokationer, CorpayI, Pads (eesy betaler 50%), Team arrangement, Banken, Bøder
+- Hver række har et input-felt til beløb og et til noter
+- Ændringer gemmes med upsert (debounced eller med "Gem"-knap)
+- iPads-rækken viser en note om 50% eesy-betaling
+- Total-række i bunden summerer alle beløb
+
+**3. Opdater `Billing.tsx`**
+
+- Import + tilføj fane "Udgiftsrapport"
 
 ### Filer
 
 | Fil | Handling |
 |-----|---------|
-| `src/components/billing/HotelExpensesTab.tsx` | **Ny** — hotelovernatninger pr. måned |
+| SQL migration | Ny `billing_manual_expenses` tabel med RLS |
+| `src/components/billing/ExpenseReportTab.tsx` | **Ny** |
 | `src/pages/vagt-flow/Billing.tsx` | Tilføj fane |
-
-### Teknisk detalje
-
-Query henter `booking_hotel` med join til `hotel` og `booking(location:location_id(name, address_city))`, filtreret på `check_in` inden for valgt måned. Bruger eksisterende `(supabase as any)` pattern fra `useBookingHotels`.
 
