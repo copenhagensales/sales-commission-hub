@@ -311,6 +311,10 @@ serve(async (req) => {
       salesQuery = salesQuery.eq("integration_type", providerFilter);
     }
 
+    if (clientIdFilter) {
+      salesQuery = salesQuery.eq("client_id", clientIdFilter);
+    }
+
     const { data: pendingSales, error } = await salesQuery;
 
     if (error) throw error;
