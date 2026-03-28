@@ -1,25 +1,29 @@
 
 
-## Tilføj 4 nye datatyper til Sletningspolitikker
+## Tilføj forklaringsikoner til Sletningspolitikker
 
-### Ændring
-Indsæt 4 nye rækker i `data_retention_policies` — alle deaktiverede:
+### Hvad sker der
+Tilføj et lille info-ikon (tooltip) ved hver kampagne-række og hver datatype-række, der forklarer præcis hvad der sker ved rensning.
 
-| data_type | display_name | retention_days | cleanup_mode |
-|-----------|-------------|----------------|--------------|
-| `integration_logs` | Integrationslogfiler | 180 | delete_all |
-| `login_events` | Login-historik | 365 | delete_all |
-| `password_reset_tokens` | Password reset tokens | 30 | delete_all |
-| `communication_logs` | Rekrutteringskommunikation | null | delete_all |
+### Ændringer
+
+**Fil: `src/pages/compliance/RetentionPolicies.tsx`**
+
+1. Importér `Tooltip`, `TooltipTrigger`, `TooltipContent` og `Info`-ikonet
+2. Kampagnetabellen: Tilføj en ny "Info"-kolonne med et `Info`-ikon der viser tooltip baseret på den valgte `cleanup_mode`:
+   - **anonymize_customer**: "Kundedata anonymiseres: telefon → null, firma → 'Anonymiseret', raw_payload → null. Salgsdata bevares."
+   - **delete_all**: "Hele salgsrækken slettes inkl. tilknyttede poster."
+3. Øvrige datatyper-tabellen: Tilføj info-ikon ved datatype-navnet med en forklaring per type:
+   - **customer_inquiries**: "Kundehenvendelser slettes permanent efter udløb."
+   - **candidates**: "Kandidatdata anonymiseres eller slettes efter udløb."
+   - **inactive_employees**: "Deaktiverede medarbejdere slettes fra master data efter udløb."
+   - **integration_logs**: "Integrationslogfiler med potentielle persondata slettes."
+   - **login_events**: "Login-historik (email, IP, user agent) slettes."
+   - **password_reset_tokens**: "Udløbne password reset tokens slettes."
+   - **communication_logs**: "Rekrutteringskommunikation (SMS/email) slettes."
 
 ### Teknisk
-- 4× SQL INSERT via insert-værktøjet
-- Alle med `is_active = false`
-- Vises automatisk i "Øvrige datatyper"-sektionen
-- Udvid `gdpr-data-cleanup/index.ts` med cleanup-logik for de 4 nye datatyper
-
-### Fil-ændringer
-| Fil | Ændring |
-|-----|---------|
-| `supabase/functions/gdpr-data-cleanup/index.ts` | Tilføj cleanup-cases for `integration_logs`, `login_events`, `password_reset_tokens`, `communication_logs` |
+- Bruger eksisterende `Tooltip`-komponent fra `@/components/ui/tooltip`
+- Info-ikonet placeres inline ved siden af kampagnenavn / datatype-navn
+- Én fil ændres: `RetentionPolicies.tsx`
 
