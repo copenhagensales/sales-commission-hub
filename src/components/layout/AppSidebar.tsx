@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
+  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
@@ -24,6 +25,7 @@ import { useShouldShowPulseSurvey } from "@/hooks/usePulseSurvey";
 import { useCarQuizCompletion } from "@/hooks/useCarQuiz";
 import { useIsSalgskonsulent, useCodeOfConductLock } from "@/hooks/useCodeOfConduct";
 import { useHasImmediatePaymentSales } from "@/hooks/useHasImmediatePaymentSales";
+import { useFmBookingConflicts } from "@/hooks/useFmBookingConflicts";
 import { useTranslation } from "react-i18next";
 
 type NavItem = { name: string; href: string; icon: typeof Users; badgeKey?: string };
