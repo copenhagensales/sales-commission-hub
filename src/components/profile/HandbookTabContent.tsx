@@ -221,7 +221,12 @@ const categories: Category[] = [
       },
       {
         title: "Henvisningshonorar",
-        content: <p>En medarbejder kan modtage et engangsbeløb pålydende 3.000 kr. ved henvisning og efterfølgende ansættelse af en ny medarbejder, såfremt medarbejderen har været ansat i minimum 60 dage. Udbetalingen sker efter nærmere aftale med ledelsen.</p>,
+        content: (
+          <div className="space-y-3">
+            <p>En medarbejder kan modtage et engangsbeløb pålydende 3.000 kr. ved henvisning og efterfølgende ansættelse af en ny medarbejder, såfremt medarbejderen har været ansat i minimum 60 dage. Udbetalingen sker efter nærmere aftale med ledelsen.</p>
+            <p className="font-semibold">Henvisningen skal ske via "Anbefal en ven"-formularen i systemet. Alle krav i formularen – herunder kandidatens fulde navn, e-mail, evt. telefonnummer og besked – skal udfyldes korrekt. Uden brug af formularen kan henvisningshonoraret ikke udbetales.</p>
+          </div>
+        ),
       },
       {
         title: "Sygdom og fravær",
