@@ -1,31 +1,18 @@
 
 
-## Compliance-link i bunden af sidebar (ved log ud)
+## Opdater leverandørtabel med bekræftede oplysninger
 
-### Ændring
-I stedet for at tilføje Compliance som en sektion i hovednavigationen, placeres et enkelt "Compliance" link i footer-området af sidebar — lige over "Log ud"-knappen. Dette gælder for **AppSidebar** (hovedsystemet).
+**Fil:** `src/pages/compliance/AdminDocumentation.tsx` (linje 100-115)
 
-### Placering
+Erstatter `[afklar]`-placeholders med faktiske værdier:
 
-I `src/components/layout/AppSidebar.tsx` (linje ~1905), tilføj et `NavLink` til `/compliance` med `Shield`-ikonet lige **før** logout-knappen:
+| Leverandør | DPA | Tredjeland | Sidst vurderet |
+|------------|-----|------------|----------------|
+| Lovable | Ja (Business/Enterprise) | Nej (EU-hostet) | [dato] |
+| Supabase (via Lovable Cloud) | Ja (inkl. i Lovable Cloud) | Nej (EU-hostet) | [dato] |
 
-```text
-[... eksisterende nav ...]
-
-── Footer-sektion (border-t) ──
-  🛡 Compliance          ← NY — link til /compliance
-  🚪 Log ud
-  👤 Brugernavn
-```
-
-### Hvad der ændres
-
-| Fil | Ændring |
-|-----|---------|
-| `src/components/layout/AppSidebar.tsx` | Tilføj `NavLink` til `/compliance` med `Shield`-ikon i footer, før logout |
-| `src/components/layout/PreviewSidebar.tsx` | Samme: tilføj Compliance-link i bunden før logout |
-
-Linket vises for alle brugere (alle kan se oversigten + Side 1). Undersiderne styres af permissions som planlagt.
-
-Resten af planen (4 sider, permissions, routes) forbliver uændret.
+- DPA-felter: grøn badge med "Ja" + kort note
+- Tredjeland-felter: grøn badge med "Nej (EU-hostet)"
+- `[dato]` forbliver som gul placeholder — I udfylder selv datoen for seneste vurdering
+- Tilføj en kort note under tabellen: *"Bekræft at DPA'er er underskrevet og arkiveret."*
 
