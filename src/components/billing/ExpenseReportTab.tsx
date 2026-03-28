@@ -86,8 +86,10 @@ export function ExpenseReportTab() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("booking")
-        .select("id, booked_days, daily_rate_override, start_date, end_date, location:location_id(daily_rate)")
-        .or(`and(start_date.lte.${periodEnd},end_date.gte.${periodStart})`)
+        .select("id, booked_days, daily_rate_override, total_price, start_date, end_date, location:location_id(daily_rate)")
+        .eq("status", "confirmed")
+        .gte("start_date", periodStart)
+        .lte("start_date", periodEnd)
         .not("booked_days", "is", null);
       if (error) throw error;
       return data as any[];
@@ -111,6 +113,7 @@ export function ExpenseReportTab() {
   const autoLocationTotal = useMemo(() => {
     if (!bookings) return 0;
     return bookings.reduce((sum: number, b: any) => {
+      if (b.total_price != null) return sum + b.total_price;
       const rate = b.daily_rate_override ?? b.location?.daily_rate ?? 0;
       const days = b.booked_days?.length || 0;
       return sum + rate * days;
