@@ -1,20 +1,30 @@
 
 
-## Fix: Skjul allerede mappede produkter fra dropdown
+## Forenkl operator-valg til 3 muligheder (alle felter)
 
 ### Ændring
 
-**Fil: `src/components/cancellations/SellerMappingTab.tsx`, linje 444**
+**Fil: `src/components/cancellations/SellerMappingTab.tsx`, linje 146-160**
 
-Filtrer produkter der allerede har betingelser ud af dropdown-listen:
+Reducer begge konstanter til kun 3 operatorer:
 
 ```typescript
-// Before
-{products.map(p => (
+const OPERATOR_LABELS: Record<string, string> = {
+  any: "Ligegyldigt",
+  in: "Er en af",
+  not_in: "Er ikke en af",
+};
 
-// After  
-{products.filter(p => !productsWithConditions.includes(p.id)).map(p => (
+const OPERATOR_SYMBOLS: Record<string, string> = {
+  any: "∗",
+  in: "∈",
+  not_in: "∉",
+};
 ```
 
-Produkter med eksisterende betingelser vises allerede i tabellen nedenunder og kan redigeres ved klik. De skal ikke kunne vælges igen i dropdown'en.
+Gælder alle felter (Operator, Subscription Name, Sales Department) da de alle bruger samme `OPERATOR_LABELS` og `OPERATOR_SYMBOLS`.
+
+### Bagudkompatibilitet
+
+`productConditionMatcher.ts` har allerede `equals` og `in` i samme case-branch, og `not_equals`/`not_in` ligeså. Eksisterende data med `equals`/`not_equals` vil stadig matche korrekt — de fjernes kun fra UI-valget.
 
