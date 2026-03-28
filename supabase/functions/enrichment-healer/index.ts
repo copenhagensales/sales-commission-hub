@@ -152,7 +152,7 @@ async function healAdversus(
       healed++;
       log(`Healed Adversus sale ${sale.adversus_external_id} (lead ${leadId})`);
 
-      await new Promise(r => setTimeout(r, turboMode ? 2000 : 3000));
+      await new Promise(r => setTimeout(r, turboMode ? 5000 : 6000));
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
       await supabase.from("sales").update({
