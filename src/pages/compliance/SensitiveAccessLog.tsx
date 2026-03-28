@@ -122,7 +122,8 @@ export default function SensitiveAccessLog() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Tidspunkt</TableHead>
-                    <TableHead>Medarbejder</TableHead>
+                    <TableHead>Tilgået af</TableHead>
+                    <TableHead>Berørt medarbejder</TableHead>
                     <TableHead>Felt</TableHead>
                     <TableHead>Type</TableHead>
                   </TableRow>
@@ -134,6 +135,9 @@ export default function SensitiveAccessLog() {
                         {format(new Date(log.created_at), "d. MMM yyyy HH:mm", { locale: da })}
                       </TableCell>
                       <TableCell className="text-sm font-medium">
+                        {log.user_id ? (accessorMap.get(log.user_id) ?? "Ukendt bruger") : "–"}
+                      </TableCell>
+                      <TableCell className="text-sm">
                         {employeeMap.get(log.employee_id) ?? log.employee_id}
                       </TableCell>
                       <TableCell>
