@@ -71,6 +71,32 @@ const suggestMapping = (columnName: string): string | null => {
   return mappings[normalized] || null;
 };
 
+function UploadZone({ getRootProps, getInputProps, isDragActive }: { getRootProps: any; getInputProps: any; isDragActive: boolean }) {
+  return (
+    <Card>
+      <CardContent className="p-0">
+        <div
+          {...getRootProps()}
+          className={`flex flex-col items-center justify-center gap-4 p-16 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
+            isDragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"
+          }`}
+        >
+          <input {...getInputProps()} />
+          <FileSpreadsheet className="h-12 w-12 text-muted-foreground" />
+          {isDragActive ? (
+            <p className="text-primary font-medium">Slip filen her...</p>
+          ) : (
+            <>
+              <p className="text-muted-foreground font-medium">Træk en .xlsx-fil hertil eller klik for at vælge</p>
+              <p className="text-sm text-muted-foreground">Kun .xlsx-filer understøttes</p>
+            </>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function ExcelFieldMatcher() {
   const [excelColumns, setExcelColumns] = useState<string[]>([]);
   const [sampleData, setSampleData] = useState<Record<string, unknown>[]>([]);
