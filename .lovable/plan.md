@@ -1,43 +1,34 @@
 
 
-## Implementer 3 GDPR-forbedringer
+## Plan: Telefonnummer-fix + auto-normalisering efter turbo-backfill
 
-### 1. Log samtykketekst ved accept
-Tilføj en `consent_text` kolonne til `gdpr_consents`-tabellen og gem den præcise samtykketekst, som medarbejderen accepterede, ved hvert samtykke.
+### Hvad ændres
 
-**Database**: Migration der tilføjer `consent_text text` kolonne til `gdpr_consents`.
+**1. `supabase/functions/integration-engine/adapters/adversus.ts` (linje 622)**
+Tilføj contactData-fallback for fremtidige syncs:
+```typescript
+let phone = leadData.phone || leadData.contactPhone || leadData.mobile || null;
+if (!phone && leadData.contactData) {
+  const cd = leadData.contactData;
+  phone = cd.Telefonnummer1 || cd['Kontakt nummer'] || cd.phone || cd.mobile || cd.Mobil || cd.Telefon || null;
+}
+```
 
-**Kode**:
-- `src/components/gdpr/GdprConsentDialog.tsx`: Definer samtykketeksten som en konstant, send den med til `useGiveConsent`.
-- `src/hooks/useGdpr.ts`: Udvid `useGiveConsent` til at modtage og gemme `consentText` i insert.
+**2. `supabase/functions/enrichment-healer/index.ts` (linje 131)**
+Samme contactData-fallback for healeren.
 
-### 2. DPIA-dokumentationsside
-Ny statisk compliance-side der dokumenterer konsekvensanalyser for højrisiko-behandlinger (CPR, løn, bankdata).
+**3. Healeren forbliver normal efter backfill**
+Healeren kører allerede normalt som standard — `turboMode` og `maxBatch` er request-parametre, ikke persisterede indstillinger. Når vi kalder den med `{ turboMode: true, maxBatch: 200 }` kører den turbo **den ene gang**. Næste kald (fra cron eller manuelt) bruger default `turboMode: false, maxBatch: 20`.
 
-**Filer**:
-- `src/pages/compliance/DpiaDocumentation.tsx` — Ny side med DPIA for relevante behandlingsaktiviteter (CPR-behandling, lønudregning, rekruttering). Indeholder risikovurdering, foranstaltninger og konklusion.
-- `src/routes/pages.ts` — Tilføj lazy import.
-- `src/routes/config.tsx` — Tilføj route `/compliance/dpia` med `menu_compliance_admin` permission.
-- `src/pages/compliance/ComplianceOverview.tsx` — Tilføj DPIA-kort til cards-arrayet.
+Der er altså ingen kodeændring nødvendig for at "gå tilbage til normal" — det sker automatisk. Turbo er kun aktivt for det specifikke kald.
 
-### 3. Medarbejder-awareness dokumentation
-Ny compliance-side der dokumenterer hvornår medarbejdere er blevet informeret om GDPR og datahåndtering.
+### Sekvens
+1. Ret phone-extraction i begge filer (2 edits)
+2. Deploy begge edge functions
+3. Invokér healer én gang med `{ turboMode: true, maxBatch: 200, provider: "adversus" }`
+4. Healeren kører turbo, henter telefonnumre, og er derefter automatisk tilbage på normal ved næste kald
 
-**Filer**:
-- `src/pages/compliance/GdprAwareness.tsx` — Ny side med oversigt over awareness-aktiviteter: onboarding-gennemgang, Code of Conduct quiz (allerede i systemet), løbende påmindelser. Viser at medarbejdere accepterer GDPR ved login (consent dialog) og gennemfører Code of Conduct quiz.
-- `src/routes/pages.ts` — Tilføj lazy import.
-- `src/routes/config.tsx` — Tilføj route `/compliance/awareness` med `menu_compliance_admin` permission.
-- `src/pages/compliance/ComplianceOverview.tsx` — Tilføj awareness-kort til cards-arrayet.
-
-### Fil-oversigt
-| Fil | Ændring |
-|-----|---------|
-| `gdpr_consents` tabel | Migration: tilføj `consent_text text` |
-| `src/hooks/useGdpr.ts` | Gem `consentText` ved insert |
-| `src/components/gdpr/GdprConsentDialog.tsx` | Send samtykketekst med |
-| `src/pages/compliance/DpiaDocumentation.tsx` | **Ny** — DPIA-side |
-| `src/pages/compliance/GdprAwareness.tsx` | **Ny** — Awareness-side |
-| `src/routes/pages.ts` | 2 nye lazy imports |
-| `src/routes/config.tsx` | 2 nye routes |
-| `src/pages/compliance/ComplianceOverview.tsx` | 2 nye kort |
+### Teknisk detalje
+- Linje 275-276 i healeren: `const turboMode = body.turboMode === true; const maxBatch = body.maxBatch || (turboMode ? 80 : 20);`
+- Disse er per-request parametre. Ingen global state ændres.
 
