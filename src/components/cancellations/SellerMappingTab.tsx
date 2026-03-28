@@ -441,7 +441,7 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
                     <CommandList>
                       <CommandEmpty>Ingen produkter fundet.</CommandEmpty>
                       <CommandGroup>
-                        {products.map(p => (
+                        {products.filter(p => !productsWithConditions.includes(p.id)).map(p => (
                           <CommandItem
                             key={p.id}
                             value={p.name}
