@@ -1,0 +1,1 @@
+ALTER TABLE public.cancellation_upload_configs ADD COLUMN skip_empty_row_filter boolean NOT NULL DEFAULT false;
