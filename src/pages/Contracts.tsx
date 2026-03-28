@@ -19,6 +19,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { RichTextEditor } from "@/components/contracts/RichTextEditor";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { CONTRACT_PROSE_SIGN_CLASSES } from "@/utils/contractProseStyles";
+import { logContractAccess } from "@/hooks/useLogContractAccess";
 
 type ContractType = "employment" | "amendment" | "nda" | "company_car" | "termination" | "other";
 type ContractStatus = "draft" | "pending_employee" | "pending_manager" | "signed" | "rejected" | "expired";
@@ -462,7 +463,10 @@ export default function Contracts() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => setPreviewContract(contract)}
+                              onClick={() => {
+                                setPreviewContract(contract);
+                                logContractAccess(contract.id, contract.employee_id, "view");
+                              }}
                             >
                               <Eye className="h-4 w-4" />
                             </Button>

@@ -13,6 +13,7 @@ import { Check, X, FileText, ArrowLeft, Clock, Download, Loader2, PenLine, Shiel
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { CONTRACT_PROSE_CLASSES, CONTRACT_PROSE_SIGN_CLASSES } from "@/utils/contractProseStyles";
+import { logContractAccess } from "@/hooks/useLogContractAccess";
 
 type ContractStatus = "draft" | "pending_employee" | "pending_manager" | "signed" | "rejected" | "expired";
 
@@ -129,6 +130,13 @@ export default function ContractSign() {
     return () => observer.disconnect();
   }, []);
 
+  /* ─── Log contract access (view) ─── */
+  useEffect(() => {
+    if (contract?.id && contract?.employee_id) {
+      logContractAccess(contract.id, contract.employee_id, "view");
+    }
+  }, [contract?.id, contract?.employee_id]);
+
   const handleDownloadPdf = async () => {
     if (!id) return;
     setDownloadingPdf(true);
@@ -158,6 +166,9 @@ export default function ContractSign() {
       URL.revokeObjectURL(url);
       
       toast.success("PDF downloadet");
+      if (contract?.employee_id) {
+        logContractAccess(id, contract.employee_id, "download");
+      }
     } catch (err: any) {
       console.error("PDF download error:", err);
       toast.error("Kunne ikke generere PDF");
