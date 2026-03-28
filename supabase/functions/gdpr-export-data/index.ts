@@ -1,10 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+import { authorizeGdprRequest, corsHeaders } from "../_shared/gdpr-auth.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -12,6 +7,10 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Auth guard: only owner or cron token allowed
+    const authResult = await authorizeGdprRequest(req);
+    if (authResult instanceof Response) return authResult;
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
@@ -110,7 +109,7 @@ Deno.serve(async (req) => {
           file_name: fileName,
           sections: Object.keys(exportPayload).length,
         },
-        triggered_by: "gdpr-export-data",
+        triggered_by: authResult.caller,
       });
 
       processed++;
