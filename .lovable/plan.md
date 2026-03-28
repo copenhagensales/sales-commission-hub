@@ -1,38 +1,43 @@
 
 
-## Plan: Auto-gem udgifter ved ændring
+## Plan: Ensret lokationsberegning i Udgiftsrapport
 
-### Hvad der ændres
+### Problem
+Udgiftsrapportens lokationsberegning afviger fra Oversigt-fanen pga.:
+- Manglende `status = "confirmed"` filter
+- Ingen brug af `total_price`-feltet
+- Overlap-query vs. start_date-query
 
-Fjern "Gem"-knappen og indfør debounced auto-save, så hver gang brugeren ændrer et beløb eller en note, gemmes ændringen automatisk efter ~800ms inaktivitet.
+### Rettelse i `src/components/billing/ExpenseReportTab.tsx`
 
-### Ændringer i `src/components/billing/ExpenseReportTab.tsx`
+1. **Tilføj `status = "confirmed"` filter** på booking-queryen (linje 87–91)
+2. **Brug `total_price`** hvis det findes, ellers fald tilbage til `daily_rate × dage` (match Oversigt-logikken)
+3. **Brug samme dato-filtrering** som Oversigt: `start_date >= periodStart AND start_date <= periodEnd` i stedet for overlap-logik
 
-1. **Tilføj debounce** — brug `useRef` med `setTimeout` til at debounce saves (800ms)
-2. **`updateRow`** opdaterer local state og trigger debounced save af den specifikke række (upsert af én kategori)
-3. **Fjern `isDirty` state og "Gem"-knappen** fra UI
-4. **Mutation** ændres til at upserte én enkelt række i stedet for alle rækker
-5. **Toast** viser diskret "Gemt" ved succes (evt. kun ved fejl for at undgå spam)
-6. **Fjern `Save`-import** fra lucide-react
+### Ændringer
 
-### Teknisk detalje
-
+**Booking-query** (linje 87–91):
 ```typescript
-const saveTimeoutRef = useRef<NodeJS.Timeout>();
-
-const debouncedSave = (category: string, amount: number, note: string) => {
-  clearTimeout(saveTimeoutRef.current);
-  saveTimeoutRef.current = setTimeout(() => {
-    saveSingleMutation.mutate({ category, amount, note });
-  }, 800);
-};
+.from("booking")
+.select("id, booked_days, daily_rate_override, total_price, start_date, end_date, location:location_id(daily_rate)")
+.eq("status", "confirmed")
+.gte("start_date", periodStart)
+.lte("start_date", periodEnd)
 ```
 
-Mutation upsert'er kun den ændrede kategori. Ingen toast ved succes (undgå spam), kun ved fejl.
+**Beregning** (linje 111–117):
+```typescript
+return bookings.reduce((sum, b) => {
+  if (b.total_price != null) return sum + b.total_price;
+  const rate = b.daily_rate_override ?? b.location?.daily_rate ?? 0;
+  const days = b.booked_days?.length || 0;
+  return sum + rate * days;
+}, 0);
+```
 
 ### Fil
 
 | Fil | Handling |
 |-----|---------|
-| `src/components/billing/ExpenseReportTab.tsx` | Debounced auto-save, fjern Gem-knap |
+| `src/components/billing/ExpenseReportTab.tsx` | Ensret query og beregning med Oversigt-fanen |
 
