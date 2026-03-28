@@ -147,16 +147,12 @@ const OPERATOR_LABELS: Record<string, string> = {
   any: "Ligegyldigt",
   in: "Er en af",
   not_in: "Er ikke en af",
-  equals: "Er lig med",
-  not_equals: "Er ikke lig med",
 };
 
 const OPERATOR_SYMBOLS: Record<string, string> = {
   any: "∗",
   in: "∈",
   not_in: "∉",
-  equals: "=",
-  not_equals: "≠",
 };
 
 interface ConditionDraft {
