@@ -29,7 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
-import { Upload, FileSpreadsheet, Check, X, Loader2, AlertCircle, Save, Settings, ArrowLeft, ArrowRight, Ban, ShoppingCart, Pencil, Plus, Trash2 } from "lucide-react";
+import { Upload, FileSpreadsheet, Check, X, Loader2, AlertCircle, Save, Settings, ArrowLeft, ArrowRight, Ban, ShoppingCart, Pencil, Plus, Trash2, Layers } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -467,7 +467,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
   const [matchedSales, setMatchedSales] = useState<MatchedSale[]>([]);
   const [matchedRowIndices, setMatchedRowIndices] = useState<Set<number>>(new Set());
   const [isMatching, setIsMatching] = useState(false);
-  const [uploadType, setUploadType] = useState<"cancellation" | "basket_difference">("cancellation");
+  const [uploadType, setUploadType] = useState<"cancellation" | "basket_difference" | "both">("cancellation");
   const [step, setStep] = useState<WizardStep>("type");
   const [configName, setConfigName] = useState("");
   const [showSaveConfig, setShowSaveConfig] = useState(false);
