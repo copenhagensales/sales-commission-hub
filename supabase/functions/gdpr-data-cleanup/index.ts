@@ -30,7 +30,6 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  try {
     // Auth guard: only owner or cron token allowed
     const authResult = await authorizeGdprRequest(req);
     if (authResult instanceof Response) return authResult;
