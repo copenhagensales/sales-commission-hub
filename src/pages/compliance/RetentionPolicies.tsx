@@ -161,8 +161,23 @@ export default function RetentionPolicies() {
     upsertMutation.mutate({ client_campaign_id: campaignId, cleanup_mode: mode });
   };
 
+  const handleDataRetentionDaysChange = (dataType: string, value: string) => {
+    const days = value === "" ? null : parseInt(value, 10);
+    if (value !== "" && isNaN(days as number)) return;
+    dataUpsertMutation.mutate({ data_type: dataType, retention_days: days });
+  };
+
+  const handleDataActiveToggle = (dataType: string, active: boolean) => {
+    const policy = dataRetentionPolicies?.find(p => p.data_type === dataType);
+    if (active && (!policy || !policy.retention_days)) {
+      toast.error("Angiv først antal retention-dage før aktivering.");
+      return;
+    }
+    dataUpsertMutation.mutate({ data_type: dataType, is_active: active });
+  };
+
   const isLoading = loadingCampaigns || loadingPolicies;
-  const activeCount = policies?.filter((p) => p.is_active).length || 0;
+  const activeCount = (policies?.filter((p) => p.is_active).length || 0) + (dataRetentionPolicies?.filter((p) => p.is_active).length || 0);
 
   return (
     <MainLayout>
