@@ -744,7 +744,10 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   });
 
   const filteredOppGroups = onlyDifferences ? oppGroups.filter((g) => g.hasDifferences) : oppGroups;
-  const filteredFlatItems = onlyDifferences ? flatItems.filter((i) => i.hasDifferences) : flatItems;
+  let filteredFlatItems = onlyDifferences ? flatItems.filter((i) => i.hasDifferences) : flatItems;
+  if (onlyDuplicates) {
+    filteredFlatItems = filteredFlatItems.filter(i => duplicatePhones.has((i.phone || "").trim()));
+  }
 
   const subOppGroups = useMemo(() => filteredOppGroups.filter((g) => g.uploadType === subTab), [filteredOppGroups, subTab]);
   const subFlatItems = useMemo(() => filteredFlatItems.filter((i) => i.upload_type === subTab), [filteredFlatItems, subTab]);
@@ -908,7 +911,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
 
   useMemo(() => {
     setCurrentPage(1);
-  }, [statusFilter, onlyDifferences, subTab, searchQuery, sellerFilter]);
+  }, [statusFilter, onlyDifferences, onlyDuplicates, subTab, searchQuery, sellerFilter]);
 
   const paginatedOppGroups = useMemo(() => {
     const start = (safeCurrentPage - 1) * PAGE_SIZE;
@@ -1344,6 +1347,16 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
               </CardDescription>
             </div>
             <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="only-dupes"
+                  checked={onlyDuplicates}
+                  onCheckedChange={(checked) => setOnlyDuplicates(!!checked)}
+                />
+                <label htmlFor="only-dupes" className="text-sm cursor-pointer">
+                  Kun dubletter {duplicateCount > 0 && `(${duplicateCount})`}
+                </label>
+              </div>
               <div className="flex items-center gap-2">
                 <Checkbox
                   id="only-diff"
