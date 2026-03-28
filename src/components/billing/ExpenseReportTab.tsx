@@ -6,7 +6,7 @@ import { format, differenceInDays } from "date-fns";
 import { da } from "date-fns/locale";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Receipt } from "lucide-react";
+import { Receipt, Lock } from "lucide-react";
 import { toast } from "sonner";
 import {
   Select,
@@ -27,8 +27,8 @@ import {
 const EXPENSE_CATEGORIES = [
   { key: "brobizz", label: "Brobizz" },
   { key: "benzin", label: "Benzin (Cirkel K)" },
-  { key: "parkering", label: "P-pladser" },
-  { key: "bil", label: "Bil udgifter" },
+  { key: "parkering", label: "P-pladser", recurring: true },
+  { key: "bil", label: "Bil udgifter", recurring: true },
   { key: "dsb", label: "DSB" },
   { key: "lokationer", label: "Lokationer", auto: true },
   { key: "hotel", label: "Hotel", auto: true },
@@ -40,6 +40,7 @@ const EXPENSE_CATEGORIES = [
 ];
 
 const AUTO_CATEGORIES = new Set(EXPENSE_CATEGORIES.filter(c => c.auto).map(c => c.key));
+const RECURRING_CATEGORIES = new Set(EXPENSE_CATEGORIES.filter(c => (c as any).recurring).map(c => c.key));
 
 type ExpenseRow = {
   category: string;
@@ -92,6 +93,29 @@ export function ExpenseReportTab() {
         .eq("year_month", selectedMonth);
       if (error) throw error;
       return data as { category: string; amount: number; note: string | null }[];
+    },
+  });
+
+  // Recurring: fetch latest previous values for recurring categories
+  const recurringKeys = Array.from(RECURRING_CATEGORIES);
+  const { data: previousRecurring } = useQuery({
+    queryKey: ["billing-previous-recurring", selectedMonth, recurringKeys],
+    queryFn: async () => {
+      const results: Record<string, { amount: number; note: string }> = {};
+      for (const cat of recurringKeys) {
+        const { data, error } = await (supabase as any)
+          .from("billing_manual_expenses")
+          .select("amount, note")
+          .eq("category", cat)
+          .lt("year_month", selectedMonth)
+          .gt("amount", 0)
+          .order("year_month", { ascending: false })
+          .limit(1);
+        if (!error && data && data.length > 0) {
+          results[cat] = { amount: data[0].amount, note: data[0].note || "" };
+        }
+      }
+      return results;
     },
   });
 
