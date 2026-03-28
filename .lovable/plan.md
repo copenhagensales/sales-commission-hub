@@ -1,44 +1,32 @@
 
 
-## GDPR-rettelser: Punkt 1 (PII-sanitering) + Punkt 2 (Datatransfer-dokumentation)
+## Opdater DPA-references i DataTransferRegistry
 
-Ingen af disse ændringer påvirker eksisterende funktionalitet.
-
----
-
-### Punkt 1: PII-sanitering i edge function logs
-
-**Ny fil:** `supabase/functions/_shared/sanitize.ts`
-
-- `maskPhone("+4512345678")` → `"+45****5678"`
-- `maskEmail("john@test.dk")` → `"j***@test.dk"`
-- `sanitizePayload(obj)` → maskerer kendte PII-nøgler (`email`, `phone`, `From`, `To`, `Body`, `first_name`, `last_name`)
-
-**Berørte edge functions** (kun `console.log` ændres):
-
-`twilio-webhook`, `receive-sms`, `zapier-webhook`, `send-meta-conversion`, `adversus-webhook`, `dialer-webhook`, `economic-webhook`, `send-password-reset`, `complete-password-reset`, `send-employee-invitation`, `delete-auth-user`
+Tilføj klarhed om DPA-type og links til de offentlige DPA-dokumenter.
 
 ---
 
-### Punkt 2: Datatransfer-dokumentationsside
+### Ændringer i `src/pages/compliance/DataTransferRegistry.tsx`
 
-**Ny fil:** `src/pages/compliance/DataTransferRegistry.tsx`
+**Udvid data-modellen** med `dpaType` og `dpaUrl`:
 
-Statisk side med tabel — **alle services er EU-hostede**:
+| Modtager | DPA-type | Link |
+|----------|----------|------|
+| Twilio | Standard DPA | https://www.twilio.com/legal/data-protection-addendum |
+| Meta | Standard vilkår | https://www.facebook.com/legal/terms/dataprocessing |
+| Microsoft 365 | Standard DPA | https://learn.microsoft.com/legal/cognitive-services/openai/data-privacy |
+| e-conomic | Standard DPA | https://www.visma.com/trust-centre/dpa |
+| Adversus | Standard DPA | https://www.adversus.io/legal/dpa |
 
-| Modtager | Datakategorier | Lokation | Retsgrundlag | DPA status |
-|----------|---------------|----------|-------------|------------|
-| Twilio | Telefonnumre, SMS-indhold | **EU** | DPA | Aktiv |
-| Meta (Facebook) | Email, telefon, navn (hashet) | **EU** | DPA | Aktiv |
-| Microsoft 365 | Email-adresser, navne | **EU** | DPA | Aktiv |
-| e-conomic | Faktureringsdata | **EU (DK)** | DPA | Aktiv |
-| Adversus | Agent-emails, kampagnedata | **EU** | DPA | Aktiv |
+**Tabelændringer:**
+- Erstat "DPA"-kolonnen med "DPA-type" der viser fx "Standard DPA" eller "Standard vilkår"
+- Gør DPA-type til et klikbart link (åbner i ny fane) så man kan finde dokumentet
+- Tilføj en note i info-boksen øverst: "DPA-links henviser til leverandørernes offentligt tilgængelige databehandleraftaler"
 
-**Routing:** Tilføj `/compliance/data-transfers` i `pages.ts` og `config.tsx`, samt link fra `ComplianceOverview.tsx`.
+**Links skal verificeres** — jeg slår de korrekte URLs op inden implementering.
 
 ---
 
 ### Risiko
-
-Ingen. Punkt 1 ændrer kun log-output. Punkt 2 tilføjer en ny read-only side.
+Ingen. Kun tekstændringer på en statisk informationsside.
 
