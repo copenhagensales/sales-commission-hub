@@ -1,19 +1,19 @@
 
 
-## Tilføj Jobansøgninger til Sletningspolitikker
+## Tilføj Deaktiverede Medarbejdere til Sletningspolitikker
 
 ### Ændring
-Indsæt én ny række i `data_retention_policies` tabellen:
+Indsæt én ny række i `data_retention_policies`:
 
-- `data_type`: `candidates`
-- `display_name`: `Jobansøgninger`
-- `retention_days`: null (ikke sat endnu)
-- `is_active`: false
+- `data_type`: `inactive_employees`
+- `display_name`: `Deaktiverede medarbejdere (5 år efter stop)`
+- `retention_days`: `1825` (5 år)
+- `is_active`: `false`
 - `cleanup_mode`: `delete_all`
 
-### Teknisk
-Én SQL INSERT via insert-værktøjet. Ingen kodeændringer — den eksisterende "Øvrige datatyper"-sektion på RetentionPolicies-siden viser automatisk den nye række.
+### Kontekst
+Der eksisterer allerede en `cleanup-inactive-employees` edge function der sletter inaktive medarbejdere med `employment_end_date` ældre end 5 år. Denne række fungerer som en synlig påmindelse og konfigurationspunkt i Sletningspolitikker-oversigten.
 
-### Risiko
-Ingen. Kun konfigurationsdata. Cleanup-jobbet er ikke aktiveret.
+### Teknisk
+Én SQL INSERT via insert-værktøjet. Ingen kodeændringer — "Øvrige datatyper"-sektionen viser automatisk den nye række.
 
