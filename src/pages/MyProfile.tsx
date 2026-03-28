@@ -74,6 +74,7 @@ function EditableSensitiveField({
   const handleStartEdit = () => {
     setEditValue(value || "");
     setIsEditing(true);
+    if (onReveal) onReveal();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

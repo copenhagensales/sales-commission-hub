@@ -707,7 +707,7 @@ export default function EmployeeDetail() {
                 <TableSection title="Identitet">
                   <EditableRow label="Fornavn(e)" value={employee.first_name} field="first_name" onSave={handleSave} />
                   <EditableRow label="Efternavn" value={employee.last_name} field="last_name" onSave={handleSave} />
-                  <EditableRow label="CPR-nr." value={employee.cpr_number} field="cpr_number" onSave={handleSave} masked />
+                  <EditableRow label="CPR-nr." value={employee.cpr_number} field="cpr_number" onSave={handleSave} masked onReveal={(f) => id && logSensitiveAccess(id, f, "view")} />
                 </TableSection>
 
                 <TableSection title="Kontakt">
@@ -746,8 +746,8 @@ export default function EmployeeDetail() {
                       displayValue={employee.salary_amount ? `${employee.salary_amount.toLocaleString("da-DK")} DKK` : null}
                     />
                   )}
-                  <EditableRow label="Reg.nr." value={employee.bank_reg_number} field="bank_reg_number" onSave={handleSave} masked />
-                  <EditableRow label="Kontonummer" value={employee.bank_account_number} field="bank_account_number" onSave={handleSave} masked />
+                  <EditableRow label="Reg.nr." value={employee.bank_reg_number} field="bank_reg_number" onSave={handleSave} masked onReveal={(f) => id && logSensitiveAccess(id, f, "view")} />
+                  <EditableRow label="Kontonummer" value={employee.bank_account_number} field="bank_account_number" onSave={handleSave} masked onReveal={(f) => id && logSensitiveAccess(id, f, "view")} />
                 </TableSection>
 
                 <TableSection title="Freelance konsulent">
