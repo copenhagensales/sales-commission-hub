@@ -1,36 +1,49 @@
 
 
-## Tilføj "Ekskluderede rækker" badge i preview
+## Fix: Synkroniser filter-logik og flyt excluded → unmatched
 
-### Problem
-Brugeren kan ikke se hvor mange rækker der blev filtreret væk (af filter-kolonne eller junk-regler). De 199 rækker forsvinder uden synlig forklaring.
+### Ændringer i `src/components/cancellations/UploadCancellationsTab.tsx`
 
-### Løsning
-Tilføj en tredje badge der viser antal ekskluderede rækker, med mulighed for at klikke og se dem.
+**1. Fjern `uploadType !== "both"` fra handleMatch (linje 774)**
 
-### Ændringer i `UploadCancellationsTab.tsx`
+Ændre:
+```typescript
+const filteredData = (uploadType !== "both" && cfgFilterColumn !== "__none__" && cfgFilterValue.trim())
+```
+Til:
+```typescript
+const filteredData = (cfgFilterColumn !== "__none__" && cfgFilterValue.trim())
+```
 
-**1. Beregn ekskluderede rækker (ved `filteredDataForPreview`, linje ~1573)**
+Dette sikrer at config-filteret (f.eks. "Annulled Sales = 1") altid anvendes under matching — uanset uploadType.
+
+**2. Fjern excluded-badge og excluded-tab fra UI (linje 1835-1843 + 1972-2008)**
+
+Slet den separate "ikke-uploadede rækker" badge og dens tab-indhold. De ekskluderede rækker er reelt bare umatchede kurvrettelser og hører under "umatchede rækker".
+
+**3. Inkluder excluded rækker i unmatchedRows (linje 1574)**
+
+Ændre beregningen så `unmatchedRows` inkluderer ALLE rækker der ikke matches — både dem fra `filteredDataForPreview` og de filtrerede/junk rækker:
 
 ```typescript
-const excludedRows = parsedData.filter(row => !filteredDataForPreview.some(fp => fp.originalIndex === row.originalIndex));
-const excludedCount = excludedRows.length;
+const unmatchedRows = parsedData.filter(row => !matchedRowIndices.has(row.originalIndex));
+const unmatchedCount = unmatchedRows.length;
 ```
 
-**2. Udvid `previewTab` type (linje 1576)**
-Tilføj `"excluded"` som mulig tab-værdi.
+Dette giver: matched + unmatched = total parsedData (1550). Unmatched-tabellen viser alle 243 rækker (44 + 199).
 
-**3. Tilføj badge i UI (efter "umatchede rækker" badge, linje ~1822)**
-```
-{excludedCount} ikke-uploadede rækker
-```
-Grå/neutral styling. Klikbar → viser de ekskluderede rækker med årsag (filter eller junk).
+**4. Fjern excludedRows/excludedCount beregning (linje 1576-1578)**
 
-**4. Tilføj tab-indhold for excluded**
-Vis en tabel med de ekskluderede rækker og en kolonne der forklarer årsagen:
-- "Filtreret (kolonnenavn ≠ filterværdi)" for rækker fjernet af filter
-- "Tom række / Total-række" for junk-rækker
+Ikke længere nødvendig.
+
+**5. Fjern `"excluded"` fra previewTab type (linje 1579)**
+
+```typescript
+const [previewTab, setPreviewTab] = useState<"matched" | "unmatched" | "seller_unmatched">("matched");
+```
 
 ### Resultat
-Brugeren ser f.eks.: `1307 matchede salg | 31 umatchede rækker | 199 ikke-uploadede rækker` — fuld gennemsigtighed over alle rækker i filen.
+- Badge: `1307 matchede salg | 243 umatchede rækker`
+- Alle rækker er synlige — ingen forsvinder
+- 1307 + 243 = 1550 ✓
 
