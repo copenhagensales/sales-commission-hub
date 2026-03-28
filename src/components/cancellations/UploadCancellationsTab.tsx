@@ -1412,7 +1412,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             status: "pending_approval",
             rows_processed: parsedData.length,
             rows_matched: matchedSales.length,
-            upload_type: uploadType,
+            upload_type: uploadType === "both" ? "both" : uploadType,
             config_id: configId,
             client_id: selectedClientId || null,
             unmatched_rows: unmatchedRows.length > 0 ? unmatchedRows : null,
@@ -1427,16 +1427,23 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
       // Build queue items – each matchedSale entry becomes one queue item
       // (for product-phone mappings, same saleId may appear multiple times with different targetProductName)
-      const queueItems = matchedSales.map(sale => ({
-        import_id: importId!,
-        sale_id: sale.saleId,
-        upload_type: uploadType,
-        status: "pending",
-        uploaded_data: sale.uploadedRowData || null,
-        opp_group: sale.oppNumber || null,
-        client_id: selectedClientId || null,
-        target_product_name: sale.targetProductName || null,
-      }));
+      const queueItems = matchedSales.map(sale => {
+        let rowUploadType = uploadType as string;
+        if (uploadType === "both") {
+          const annulledVal = String(getCaseInsensitive(sale.uploadedRowData, "Annulled Sales") || "").trim();
+          rowUploadType = annulledVal ? "cancellation" : "basket_difference";
+        }
+        return {
+          import_id: importId!,
+          sale_id: sale.saleId,
+          upload_type: rowUploadType,
+          status: "pending",
+          uploaded_data: sale.uploadedRowData || null,
+          opp_group: sale.oppNumber || null,
+          client_id: selectedClientId || null,
+          target_product_name: sale.targetProductName || null,
+        };
+      });
 
       for (let i = 0; i < queueItems.length; i += 50) {
         const batch = queueItems.slice(i, i + 50);
@@ -1609,7 +1616,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             </CardContent>
           </Card>
         ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto">
           <button
             onClick={() => { setUploadType("cancellation"); setStep("upload"); }}
             className={`group relative rounded-lg border-2 p-6 text-left transition-all hover:border-primary hover:shadow-md
@@ -1631,6 +1638,18 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             <h3 className="font-semibold text-lg">Kurv difference</h3>
             <p className="text-sm text-muted-foreground mt-1">
               Opdater kurv-værdi baseret på kundens fil
+            </p>
+          </button>
+
+          <button
+            onClick={() => { setUploadType("both"); setStep("upload"); }}
+            className={`group relative rounded-lg border-2 p-6 text-left transition-all hover:border-primary hover:shadow-md
+              ${uploadType === "both" ? "border-primary bg-primary/5" : "border-border"}`}
+          >
+            <Layers className="h-8 w-8 mb-3 text-primary" />
+            <h3 className="font-semibold text-lg">Begge</h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              Én fil med både annulleringer og kurvrettelser
             </p>
           </button>
         </div>
