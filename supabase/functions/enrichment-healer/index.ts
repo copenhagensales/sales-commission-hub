@@ -312,7 +312,7 @@ serve(async (req) => {
     }
 
     if (clientIdFilter) {
-      salesQuery = salesQuery.eq("client_id", clientIdFilter);
+      salesQuery = salesQuery.eq("client_campaign_id", clientIdFilter);
     }
 
     const { data: pendingSales, error } = await salesQuery;
