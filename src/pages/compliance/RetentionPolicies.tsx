@@ -24,6 +24,15 @@ interface RetentionPolicy {
   cleanup_mode: string;
 }
 
+interface DataRetentionPolicy {
+  id: string;
+  data_type: string;
+  display_name: string;
+  retention_days: number | null;
+  is_active: boolean;
+  cleanup_mode: string;
+}
+
 export default function RetentionPolicies() {
   const queryClient = useQueryClient();
 
@@ -51,6 +60,50 @@ export default function RetentionPolicies() {
         .select("*");
       if (error) throw error;
       return (data || []) as RetentionPolicy[];
+    },
+  });
+
+  const { data: dataRetentionPolicies, isLoading: loadingDataPolicies } = useQuery({
+    queryKey: ["data-retention-policies"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("data_retention_policies")
+        .select("*");
+      if (error) throw error;
+      return (data || []) as DataRetentionPolicy[];
+    },
+  });
+
+  const dataUpsertMutation = useMutation({
+    mutationFn: async (params: {
+      data_type: string;
+      retention_days?: number | null;
+      is_active?: boolean;
+      cleanup_mode?: string;
+    }) => {
+      const { data, error } = await supabase
+        .from("data_retention_policies")
+        .upsert(
+          {
+            data_type: params.data_type,
+            display_name: dataRetentionPolicies?.find(p => p.data_type === params.data_type)?.display_name || params.data_type,
+            ...(params.retention_days !== undefined && { retention_days: params.retention_days }),
+            ...(params.is_active !== undefined && { is_active: params.is_active }),
+            ...(params.cleanup_mode !== undefined && { cleanup_mode: params.cleanup_mode }),
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "data_type" }
+        )
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["data-retention-policies"] });
+    },
+    onError: (err: any) => {
+      toast.error("Kunne ikke gemme: " + err.message);
     },
   });
 
@@ -108,8 +161,23 @@ export default function RetentionPolicies() {
     upsertMutation.mutate({ client_campaign_id: campaignId, cleanup_mode: mode });
   };
 
+  const handleDataRetentionDaysChange = (dataType: string, value: string) => {
+    const days = value === "" ? null : parseInt(value, 10);
+    if (value !== "" && isNaN(days as number)) return;
+    dataUpsertMutation.mutate({ data_type: dataType, retention_days: days });
+  };
+
+  const handleDataActiveToggle = (dataType: string, active: boolean) => {
+    const policy = dataRetentionPolicies?.find(p => p.data_type === dataType);
+    if (active && (!policy || !policy.retention_days)) {
+      toast.error("Angiv først antal retention-dage før aktivering.");
+      return;
+    }
+    dataUpsertMutation.mutate({ data_type: dataType, is_active: active });
+  };
+
   const isLoading = loadingCampaigns || loadingPolicies;
-  const activeCount = policies?.filter((p) => p.is_active).length || 0;
+  const activeCount = (policies?.filter((p) => p.is_active).length || 0) + (dataRetentionPolicies?.filter((p) => p.is_active).length || 0);
 
   return (
     <MainLayout>
@@ -249,6 +317,61 @@ export default function RetentionPolicies() {
                         </tr>
                       );
                     })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Øvrige datatyper */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Øvrige datatyper</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loadingDataPolicies ? (
+              <p className="text-muted-foreground text-sm py-8 text-center">Indlæser…</p>
+            ) : !dataRetentionPolicies?.length ? (
+              <p className="text-muted-foreground text-sm py-8 text-center">Ingen datatyper konfigureret.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left">
+                      <th className="py-3 pr-4 font-medium text-muted-foreground">Datatype</th>
+                      <th className="py-3 pr-4 font-medium text-muted-foreground w-32">Retention (dage)</th>
+                      <th className="py-3 pr-4 font-medium text-muted-foreground w-48">Rensningstype</th>
+                      <th className="py-3 font-medium text-muted-foreground w-20">Aktiv</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dataRetentionPolicies.map((policy) => (
+                      <tr key={policy.id} className="border-b last:border-0 hover:bg-muted/30">
+                        <td className="py-3 pr-4 text-foreground">{policy.display_name}</td>
+                        <td className="py-3 pr-4">
+                          <Input
+                            type="number"
+                            min={1}
+                            placeholder="—"
+                            className="w-24 h-8 text-sm"
+                            value={policy.retention_days ?? ""}
+                            onChange={(e) => handleDataRetentionDaysChange(policy.data_type, e.target.value)}
+                          />
+                        </td>
+                        <td className="py-3 pr-4">
+                          <Badge variant="outline" className="text-xs">
+                            <Trash2 className="h-3 w-3 mr-1" /> Slet alt
+                          </Badge>
+                        </td>
+                        <td className="py-3">
+                          <Switch
+                            checked={policy.is_active}
+                            onCheckedChange={(v) => handleDataActiveToggle(policy.data_type, v)}
+                          />
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
