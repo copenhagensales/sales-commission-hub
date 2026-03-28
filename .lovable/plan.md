@@ -1,77 +1,40 @@
 
 
-## Fix: Produkt- og sælger-mapping automatisk på nye uploads
+## Plan: "Begge" upload-type for Eesy FM — automatisk type per række
 
-### Problem
-Pass 2 (sælger+dato+produkt fallback for rækker uden telefon) har to huller:
+### Koncept
+Tilføj en tredje knap **"Begge"** i Step 1. Ingen ekstra vælger — logikken er hardcoded: kolonnen **"Annulled Sales"** afgør typen. Har den en værdi → `cancellation`. Tom → `basket_difference`. Brugeren skal bare uploade filen.
 
-1. **Produktkolonnen er hardcoded** til `"Subscription Name"` (linje 1059) i stedet for at bruge den konfigurerede `productColumn` fra upload-config + config's `product_columns`.
-2. **`cancellation_product_mappings`** (produkt-mappings fra Mapping-fanen) bruges **ikke** i Pass 2. Kun `cancellation_product_conditions` og `fallback_product_mappings` fra config tjekkes. Det betyder at produkt-mappings oprettet via auto-match eller manuelt i Mapping-fanen aldrig anvendes til at resolves produktnavne i Pass 2.
+### Ændringer i `src/components/cancellations/UploadCancellationsTab.tsx`
 
-Sælger-mappings (`cancellation_seller_mappings`) hentes og bruges allerede korrekt i Pass 2 (linje 1020-1024). Ingen ændring nødvendig der.
-
-### Ændringer
-
-**Fil: `src/components/cancellations/UploadCancellationsTab.tsx`**
-
-**Ændring 1 — Brug konfigureret produktkolonne i Pass 2 (linje ~1059)**
-
-Erstat hardcoded `"Subscription Name"` med den aktive upload-configs produktkolonne, med fallback til kendte nøgler:
-
+**1. Udvid `uploadType` state (linje ~470)**
 ```typescript
-// Hent produktnavn fra konfigureret kolonne (eller fallback til kendte nøgler)
-const productCol = activeConfig?.product_columns?.[0];
-const PRODUCT_KEYS = ["Subscription Name", "Product", "Produkt", "Abonnement", "Product Name", "Produktnavn"];
-let excelSubName = "";
-if (productCol) {
-  excelSubName = String(getCaseInsensitive(row.originalRow, productCol) || "").trim();
-} 
-if (!excelSubName) {
-  for (const key of PRODUCT_KEYS) {
-    const val = getCaseInsensitive(row.originalRow, key);
-    if (val && String(val).trim()) { excelSubName = String(val).trim(); break; }
-  }
-}
+useState<"cancellation" | "basket_difference" | "both">("cancellation")
 ```
 
-**Ændring 2 — Tilføj `cancellation_product_mappings` som trin 2 i Pass 2 produktresolution (linje ~1070)**
+**2. Tilføj "Begge"-knap i Step 1 (linje ~1612)**
+- Tredje knap med `Layers` ikon, titel "Begge", beskrivelse "Én fil med annulleringer og kurvrettelser"
+- Grid → `grid-cols-3`
 
-Hent `cancellation_product_mappings` for klienten (allerede tilgængelig som query eller kan fetches) og brug dem som et ekstra trin mellem condition-based og fallback:
-
+**3. Per-række type i queue-insert (linje ~1430)**
+Når `uploadType === "both"`:
 ```typescript
-// 2. Legacy cancellation_product_mappings
-if (!resolvedProductTitle && excelSubName) {
-  const mappedName = productMappingLookup.get(excelSubName.toLowerCase().trim());
-  if (mappedName) resolvedProductTitle = mappedName;
-}
-
-// 3. Fallback to config fallback_product_mappings (eksisterende kode)
+const annulledVal = String(getCaseInsensitive(sale.uploadedRowData, "Annulled Sales") || "").trim();
+const rowUploadType = annulledVal ? "cancellation" : "basket_difference";
 ```
+Brug `rowUploadType` i stedet for `uploadType` i queue-item og import-log.
 
-For at bygge `productMappingLookup` skal vi hente `cancellation_product_mappings` + product names én gang før loopet:
+**4. Preview-badge**
+I preview-tabellen, vis en badge per række: "Annullering" (rød) eller "Kurvrettelse" (orange) baseret på "Annulled Sales"-kolonnen.
 
-```typescript
-// Før Pass 2 loop — hent product mappings
-const { data: legacyProductMappings } = await supabase
-  .from("cancellation_product_mappings")
-  .select("excel_product_name, product_id")
-  .eq("client_id", selectedClientId);
+**5. Import-log**
+`cancellation_imports.upload_type` sættes til `"both"` for tracking.
 
-const productMappingLookup = new Map<string, string>();
-if (legacyProductMappings && legacyProductMappings.length > 0) {
-  const mappedPids = [...new Set(legacyProductMappings.map(m => m.product_id))];
-  const { data: mappedProds } = await supabase.from("products").select("id, name").in("id", mappedPids);
-  const pidToName = new Map((mappedProds || []).map(p => [p.id, p.name]));
-  for (const m of legacyProductMappings) {
-    const prodName = pidToName.get(m.product_id);
-    if (prodName) productMappingLookup.set(m.excel_product_name.toLowerCase().trim(), prodName);
-  }
-}
-```
+### Ingen DB-migration nødvendig
+`upload_type` er allerede TEXT — "both" er en gyldig værdi. Ingen ny kolonne behøves da type-kolonnen altid er "Annulled Sales" for denne use case.
 
-### Resultat
-- Nye uploads anvender automatisk eksisterende sælger-mappings (allerede OK) og produkt-mappings fra Mapping-fanen
-- Produktresolution bruger konfigureret kolonne i stedet for hardcoded "Subscription Name"
-- Kurv-rettelser og match virker med tidligere oprettede mappings
-- Ingen breaking changes — eksisterende condition-based og fallback logik bevares
+### Rækkefølge
+1. Udvid state type + tilføj "Begge"-knap
+2. Opdatér queue-insert med per-række type-logik
+3. Tilføj preview-badge
 
