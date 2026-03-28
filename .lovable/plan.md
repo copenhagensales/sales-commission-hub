@@ -1,60 +1,40 @@
 
 
-## Revideret plan: Compliance-notifikationer med dynamiske modtagere
+## Udfyld compliance-dokumentation med konkrete oplysninger
 
-### Hvad ændres i forhold til den tidligere plan
+Opdaterer alle sektioner i `AdminDocumentation.tsx` fra generiske lister til faktiske, udfyldte oplysninger baseret på dine svar og systemets faktiske opsætning.
 
-- **Drop** automatisk påmindelse om leverandør-review (ikke relevant)
-- **Tilføj** en ny fane "Notifikationer" i Compliance-sektionen, hvor admins kan administrere hvem der modtager compliance-relaterede notifikationer
-- **Opdater** "Sidst vurderet"-datoerne til 28.03.2026 i leverandørtabellen
+### Ændringer per sektion
 
-### 1. Opdater dato i leverandørtabel
+**1. Tredjelandsoverførsler**
+- Erstat den generiske liste med en klar konklusion: "Ingen tredjelandsoverførsler. Alle data behandles og opbevares inden for EU/EØS." med grøn badge.
 
-**Fil:** `src/pages/compliance/AdminDocumentation.tsx`
-- Erstat begge `[dato]`-badges med `28.03.2026` i grønne badges
+**2. Logging og dokumentation**
+- Udfyld med konkrete eksempler fra systemet: login-logning, kontraktændringer, salgsdata-sync, lønberegninger, GDPR-anmodninger. Tilføj at logs opbevares i databasen.
 
-### 2. Database — ny tabel `compliance_notification_recipients`
+**3. Backup og gendannelse**
+- Udfyld med Lovable Cloud's automatiske backup (daglig, administreret af platformen). Angiv at restore håndteres via Lovable Cloud support.
 
-| Kolonne | Type | Beskrivelse |
-|---------|------|-------------|
-| id | uuid PK | |
-| employee_id | uuid FK → employee_master_data | Modtager |
-| created_at | timestamptz | |
-| created_by | uuid FK → auth.users | Hvem tilføjede modtageren |
+**4. Sletning og retention**
+- Konkret politik baseret på dit svar:
+  - Økonomi-/løndata: 5 år (bogføringsloven)
+  - Medarbejderdata: slettes efter fratræden, senest 5 år
+  - Samtykker: opbevares så længe de er aktive
+  - Salgsdata: 5 år
+  - Sletning: primært manuel med mulighed for automatisering
 
-RLS: Kun ejere/admins kan læse og skrive.
+**5. AI-brug**
+- Dokumenter de faktiske AI-funktioner i systemet:
+  - FM Profit Agent (Google Gemini) — analyse af salgsdata
+  - Udgiftsformel-parsing (Google Gemini) — tolkning af provisionsformler
+  - Lovable AI Gateway — ingen persondata sendes direkte; data aggregeres først
+  - Risici og begrænsninger dokumenteres
 
-### 3. Ny side/fane: Compliance Notifikationer
+**6. Ansvar**
+- Udfyld med: "Systemejeren (virksomhedens ejer) er dataansvarlig jf. GDPR art. 4, nr. 7." samt konkrete ansvarsområder.
 
-**Fil:** `src/pages/compliance/ComplianceNotifications.tsx` (ny)
-
-- Tilgængelig fra ComplianceOverview som et 4. kort eller en fane på Admin-siden
-- Viser en liste af nuværende modtagere (navn + email fra employee_master_data)
-- Dropdown/søgefelt til at tilføje nye modtagere (fra aktive medarbejdere)
-- Mulighed for at fjerne modtagere
-- Kun synlig for brugere med `menu_compliance_admin` permission
-
-### 4. Route + navigation
-
-- Tilføj route `/compliance/notifications` i App.tsx
-- Tilføj kort i ComplianceOverview med titel "Notifikationsmodtagere" (Bell-ikon, Admin badge)
-
-### 5. Edge Function: `check-compliance-reviews` (ugentlig)
-
-- Finder GDPR-relaterede deadlines/hændelser der kræver opmærksomhed (fx samtykker der nærmer sig udløb, afventende datanmodninger osv.)
-- Slår modtagere op fra `compliance_notification_recipients` (i stedet for hardcoded)
-- Sender email via M365 Graph API
-- Ugentligt cron-job (mandag kl. 08:00): `0 8 * * 1`
-
-### Filer
-
+### Fil
 | Fil | Handling |
 |-----|---------|
-| `src/pages/compliance/AdminDocumentation.tsx` | Opdater `[dato]` → `28.03.2026` |
-| `src/pages/compliance/ComplianceNotifications.tsx` | Ny side: administrer modtagere |
-| `src/pages/compliance/ComplianceOverview.tsx` | Tilføj kort til notifikationer |
-| Migration | Opret `compliance_notification_recipients` tabel |
-| `supabase/functions/check-compliance-reviews/index.ts` | Ny Edge Function |
-| SQL insert (cron) | Ugentligt cron-job |
-| App.tsx | Tilføj route |
+| `src/pages/compliance/AdminDocumentation.tsx` | Opdater alle 6 sektioner med konkret indhold |
 
