@@ -1896,6 +1896,7 @@ export type Database = {
           product_phone_mappings: Json | null
           revenue_column: string | null
           seller_column: string | null
+          skip_empty_row_filter: boolean
         }
         Insert: {
           client_id: string
@@ -1917,6 +1918,7 @@ export type Database = {
           product_phone_mappings?: Json | null
           revenue_column?: string | null
           seller_column?: string | null
+          skip_empty_row_filter?: boolean
         }
         Update: {
           client_id?: string
@@ -1938,6 +1940,7 @@ export type Database = {
           product_phone_mappings?: Json | null
           revenue_column?: string | null
           seller_column?: string | null
+          skip_empty_row_filter?: boolean
         }
         Relationships: [
           {
