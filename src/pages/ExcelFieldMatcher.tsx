@@ -75,31 +75,37 @@ export default function ExcelFieldMatcher() {
   const [excelColumns, setExcelColumns] = useState<string[]>([]);
   const [sampleData, setSampleData] = useState<Record<string, unknown>[]>([]);
   const [allData, setAllData] = useState<Record<string, unknown>[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const loadExcelFile = async () => {
-      try {
-        const response = await fetch(`/temp/employee-import.xlsx?t=${Date.now()}`);
-        const arrayBuffer = await response.arrayBuffer();
-        const { rows: jsonData, columns: cols } = await parseExcelFile(arrayBuffer);
-
-        if (jsonData.length > 0) {
-          setExcelColumns(cols);
-          setSampleData(jsonData.slice(0, 5));
-          setAllData(jsonData);
-        }
-        setLoading(false);
-      } catch (err) {
-        setError("Kunne ikke læse Excel-filen");
-        setLoading(false);
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    const file = acceptedFiles[0];
+    if (!file) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const { rows: jsonData, columns: cols } = await parseExcelFile(arrayBuffer);
+      if (jsonData.length > 0) {
+        setExcelColumns(cols);
+        setSampleData(jsonData.slice(0, 5));
+        setAllData(jsonData);
+      } else {
+        setError("Filen indeholder ingen data");
       }
-    };
-
-    loadExcelFile();
+    } catch {
+      setError("Kunne ikke læse Excel-filen");
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: { "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"] },
+    maxFiles: 1,
+  });
 
   const handleImport = async () => {
     if (allData.length === 0) {
