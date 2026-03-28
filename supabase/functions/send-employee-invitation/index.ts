@@ -158,7 +158,7 @@ serve(async (req) => {
     const appUrl = rawAppUrl.replace(/\/+$/, "");
     const invitationUrl = `${appUrl}/onboarding?token=${token}`;
     
-    console.log("Invitation URL created for:", email);
+    console.log("Invitation URL created for employee:", employeeId);
 
     // Get M365 access token and send email
     const accessToken = await getM365AccessToken();
@@ -225,7 +225,7 @@ serve(async (req) => {
       emailHtml
     );
 
-    console.log(`Invitation sent to ${email} for employee ${employeeId}`);
+    console.log(`Invitation sent for employee ${employeeId}`);
 
     return new Response(
       JSON.stringify({ success: true, message: "Invitation sent successfully" }),
