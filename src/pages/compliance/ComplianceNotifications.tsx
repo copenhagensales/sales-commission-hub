@@ -28,6 +28,29 @@ export default function ComplianceNotifications() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("");
+  const [isSending, setIsSending] = useState(false);
+
+  const handleSendNow = async () => {
+    setIsSending(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("check-compliance-reviews");
+      if (error) throw error;
+      if (data?.message === "No recipients") {
+        toast.info("Ingen modtagere konfigureret");
+      } else if (data?.message === "No active recipients") {
+        toast.info("Ingen aktive modtagere fundet");
+      } else if (data?.message === "No alerts") {
+        toast.info("Ingen compliance-advarsler at sende");
+      } else {
+        toast.success(`Email sendt til ${data?.recipients ?? 0} modtager(e) med ${data?.alerts ?? 0} advarsel(er)`);
+      }
+    } catch (err) {
+      console.error("Send compliance email error:", err);
+      toast.error("Kunne ikke sende compliance-email");
+    } finally {
+      setIsSending(false);
+    }
+  };
 
   // Fetch current recipients with employee info
   const { data: recipients = [], isLoading: loadingRecipients } = useQuery({
