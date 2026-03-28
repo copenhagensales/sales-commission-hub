@@ -577,12 +577,12 @@ export default function AiGovernance() {
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            {log.acknowledged ? (
+                            {log.method === "email" ? (
                               <Badge variant="outline" className="bg-green-500/10 text-green-700 border-green-500/30">
-                                <Check className="h-3 w-3 mr-1" /> Ja
+                                <Check className="h-3 w-3 mr-1" /> Afsendt
                               </Badge>
                             ) : (
-                              <Badge variant="outline" className="text-muted-foreground">Afventer</Badge>
+                              <Badge variant="outline" className="text-muted-foreground">Registreret</Badge>
                             )}
                           </TableCell>
                         </TableRow>
