@@ -1,35 +1,65 @@
 
 
-## Fix: Synkroniser filter-logik korrekt
+## Ny fane: Dubletter (samme DB-salg matchet af flere fil-rækker)
 
-### Problem nu
-Forrige ændring fjernede `uploadType !== "both"` fra handleMatch → filteret anvendes altid → kun 199 annulleringsrækker sendes til matching → kun 183 matcher.
+### Problem
+Når matching kører, kan ét salg i databasen matche flere rækker i upload-filen. Disse dubletter er usynlige i dag — de tæller med i `matchedSales` og kan potentielt skabe dobbelt-annulleringer.
 
-Begge steder (handleMatch OG filteredDataForPreview) skal have **samme** logik.
+### Løsning
 
-### Løsning i `src/components/cancellations/UploadCancellationsTab.tsx`
+**Fil: `src/components/cancellations/UploadCancellationsTab.tsx`**
 
-**1. Gendan `uploadType !== "both"` i handleMatch (linje 774)**
+**1. Beregn dubletter efter matching (ved `filteredDataForPreview`-blokken, ~linje 1574)**
+
+Gruppér `matchedSales` efter `saleId`. Alle entries hvor samme `saleId` forekommer > 1 gang er dubletter:
+
 ```typescript
-const filteredData = (uploadType !== "both" && cfgFilterColumn !== "__none__" && cfgFilterValue.trim())
+const duplicateSaleIds = new Map<string, MatchedSale[]>();
+matchedSales.forEach(sale => {
+  const arr = duplicateSaleIds.get(sale.saleId) || [];
+  arr.push(sale);
+  duplicateSaleIds.set(sale.saleId, arr);
+});
+const duplicateEntries = [...duplicateSaleIds.values()].filter(arr => arr.length > 1);
+const duplicateSales = duplicateEntries.flat();
+const duplicateCount = duplicateSales.length;
 ```
-Tilbage til original — ved "both" springes filteret over, alle 1550 rækker bruges.
 
-**2. Tilføj samme guard i filteredDataForPreview (linje 1551)**
+**2. Tilføj `"duplicates"` til previewTab type (linje 1576)**
+
 ```typescript
-let data = (uploadType !== "both" && previewFilterColumn !== "__none__" && previewFilterValue.trim())
+const [previewTab, setPreviewTab] = useState<"matched" | "unmatched" | "seller_unmatched" | "duplicates">("matched");
 ```
-Nu bruger preview præcis samme logik som handleMatch.
 
-**3. Beregn unmatchedRows fra filteredDataForPreview (linje 1574)**
+**3. Tilføj dublet-badge i stats-sektion (linje 1806-1832)**
+
+Ny badge efter unmatched-badge:
 ```typescript
-const unmatchedRows = filteredDataForPreview.filter(row => !matchedRowIndices.has(row.originalIndex));
+{duplicateCount > 0 && (
+  <Badge
+    variant={previewTab === "duplicates" ? "destructive" : "outline"}
+    className="text-sm px-3 py-1 cursor-pointer"
+    onClick={() => setPreviewTab("duplicates")}
+  >
+    <Layers className="h-3 w-3 mr-1" />
+    {duplicateCount} dubletter
+  </Badge>
+)}
 ```
-Unmatched = rækker der passerede filter+junk men ikke matchede. **Ingen separat excluded-kategori** — alt der ikke matcher er "umatchet".
 
-### Resultat (uploadType="both")
-- Filter springes over → alle 1550 rækker (minus junk) bruges
-- Matched: ~1307, Unmatched: ~243 (inkl. de 199 kurvrettelser der ikke matchede)
-- 1307 + 243 = 1550 ✓
-- Ingen "excluded" badge/tab — kun matched og unmatched
+**4. Tilføj dublet-tabel i preview-indhold (efter seller_unmatched-sektionen)**
+
+Viser grupperet tabel med alle rækker der peger på samme salg. Grupperet efter `saleId` med visuel separator mellem grupper. Kolonner: Salgsdato, Sælger, Telefon, Produkt, Provision, Omsætning, Virksomhed, OPP.
+
+**5. Matched-badge: vis rækker i stedet for salg**
+
+Ændr matched-badge fra `matchedSales.length` til `matchedRowIndices.size` så tallene summerer korrekt med umatchede rækker. Tilføj supplement-tekst med antal salg-matches:
+```
+{matchedRowIndices.size} matchede rækker ({matchedSales.length} salg)
+```
+
+### Resultat
+- Ny "Dubletter" badge+fane synlig kun når der er dubletter
+- Bruger kan se præcis hvilke salg der er ramt af flere rækker
+- Matched-badge bruger nu rækker som enhed → tallene summer korrekt
 
