@@ -1902,6 +1902,19 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
             </NavLink>
           )}
 
+          <NavLink
+            to="/compliance"
+            onClick={handleNavClick}
+            className={cn(
+              "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+              location.pathname.startsWith("/compliance")
+                ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+            )}
+          >
+            <ShieldCheck className="h-5 w-5" />
+            Compliance
+          </NavLink>
           <button onClick={() => { handleLogout(); handleNavClick(); }} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent/50">
             <LogOut className="h-5 w-5" />
             {t("sidebar.logout")}
