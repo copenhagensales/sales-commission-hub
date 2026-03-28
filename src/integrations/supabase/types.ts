@@ -321,6 +321,148 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_governance_roles: {
+        Row: {
+          appointed_by: string | null
+          created_at: string | null
+          id: string
+          notes: string | null
+          responsible_person: string
+          role_name: string
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          appointed_by?: string | null
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          responsible_person: string
+          role_name: string
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          appointed_by?: string | null
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          responsible_person?: string
+          role_name?: string
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      ai_instruction_log: {
+        Row: {
+          acknowledged: boolean | null
+          created_at: string | null
+          employee_email: string | null
+          employee_id: string | null
+          employee_name: string | null
+          id: string
+          instruction_date: string | null
+          method: string
+          notes: string | null
+        }
+        Insert: {
+          acknowledged?: boolean | null
+          created_at?: string | null
+          employee_email?: string | null
+          employee_id?: string | null
+          employee_name?: string | null
+          id?: string
+          instruction_date?: string | null
+          method?: string
+          notes?: string | null
+        }
+        Update: {
+          acknowledged?: boolean | null
+          created_at?: string | null
+          employee_email?: string | null
+          employee_id?: string | null
+          employee_name?: string | null
+          id?: string
+          instruction_date?: string | null
+          method?: string
+          notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_instruction_log_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_instruction_log_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_instruction_log_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_use_case_registry: {
+        Row: {
+          approved_date: string | null
+          created_at: string | null
+          data_types: string | null
+          has_personal_data: boolean | null
+          human_control_requirement: string | null
+          id: string
+          name: string
+          next_review_date: string | null
+          notes: string | null
+          owner: string
+          risk_level: string | null
+          system: string
+          updated_at: string | null
+          user_group: string | null
+        }
+        Insert: {
+          approved_date?: string | null
+          created_at?: string | null
+          data_types?: string | null
+          has_personal_data?: boolean | null
+          human_control_requirement?: string | null
+          id?: string
+          name: string
+          next_review_date?: string | null
+          notes?: string | null
+          owner: string
+          risk_level?: string | null
+          system: string
+          updated_at?: string | null
+          user_group?: string | null
+        }
+        Update: {
+          approved_date?: string | null
+          created_at?: string | null
+          data_types?: string | null
+          has_personal_data?: boolean | null
+          human_control_requirement?: string | null
+          id?: string
+          name?: string
+          next_review_date?: string | null
+          notes?: string | null
+          owner?: string
+          risk_level?: string | null
+          system?: string
+          updated_at?: string | null
+          user_group?: string | null
+        }
+        Relationships: []
+      }
       amo_amr_elections: {
         Row: {
           created_at: string

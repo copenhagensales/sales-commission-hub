@@ -1,6 +1,6 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Shield, Users, FileText, Lock, ArrowRight, Bell, ClipboardList, AlertTriangle, Globe, Clock, Search, GraduationCap } from "lucide-react";
+import { Shield, Users, FileText, Lock, ArrowRight, Bell, ClipboardList, AlertTriangle, Globe, Clock, Search, GraduationCap, Brain } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { usePermissions } from "@/hooks/usePositionPermissions";
@@ -98,6 +98,15 @@ export default function ComplianceOverview() {
       badge: "Awareness",
       badgeColor: "bg-teal-500/10 text-teal-700 border-teal-500/30",
       href: "/compliance/awareness",
+      permKey: "menu_compliance_admin",
+    },
+    {
+      title: "AI Governance",
+      description: "Intern styring af kunstig intelligens: Politik, use case-register, ansvarsfordeling og instruktionslog iht. EU AI Act.",
+      icon: Brain,
+      badge: "EU AI Act",
+      badgeColor: "bg-violet-500/10 text-violet-700 border-violet-500/30",
+      href: "/compliance/ai-governance",
       permKey: "menu_compliance_admin",
     },
   ];
