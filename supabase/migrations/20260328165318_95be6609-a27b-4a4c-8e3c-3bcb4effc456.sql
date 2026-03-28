@@ -1,0 +1,1 @@
+ALTER TABLE public.cancellation_upload_configs ADD COLUMN phone_excluded_products JSONB DEFAULT NULL;

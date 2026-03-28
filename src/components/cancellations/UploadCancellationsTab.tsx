@@ -100,6 +100,7 @@ interface UploadConfig {
   skip_empty_row_filter?: boolean;
   type_detection_column?: string | null;
   type_detection_values?: string[] | null;
+  phone_excluded_products?: string[] | null;
 }
 
 interface UnmatchedSellerRow {
@@ -199,6 +200,7 @@ function ConfigCreationForm({ clientId, columns: parentColumns, setColumns: setP
   const [cfgSkipEmptyFilter, setCfgSkipEmptyFilter] = useState(false);
   const [cfgTypeDetCol, setCfgTypeDetCol] = useState("__none__");
   const [cfgTypeDetVals, setCfgTypeDetVals] = useState("");
+  const [cfgPhoneExcluded, setCfgPhoneExcluded] = useState("");
   const [saving, setSaving] = useState(false);
 
   const filteredCount = (cfgFilterCol !== "__none__" && cfgFilterVal.trim())
@@ -259,6 +261,7 @@ function ConfigCreationForm({ clientId, columns: parentColumns, setColumns: setP
         skip_empty_row_filter: cfgSkipEmptyFilter,
         type_detection_column: cfgTypeDetCol !== "__none__" ? cfgTypeDetCol : null,
         type_detection_values: cfgTypeDetVals.trim() ? cfgTypeDetVals.split(",").map(v => v.trim()).filter(Boolean) : null,
+        phone_excluded_products: cfgPhoneExcluded.trim() ? cfgPhoneExcluded.split(",").map(v => v.trim()).filter(Boolean) : null,
       } as any);
       if (error) throw error;
       toast({ title: "Gemt!", description: `Opsætning "${cfgName}" oprettet.` });
@@ -364,6 +367,16 @@ function ConfigCreationForm({ clientId, columns: parentColumns, setColumns: setP
           </div>
 
           <div className="border-t pt-3 space-y-3">
+            <Label className="text-sm font-medium">Produkter uden telefon-match</Label>
+            <p className="text-xs text-muted-foreground">Produkter der skal skippe telefon-matching og i stedet matches via sælger+dato+produkt (komma-separeret)</p>
+            <Input
+              value={cfgPhoneExcluded}
+              onChange={(e) => setCfgPhoneExcluded(e.target.value)}
+              placeholder="f.eks. 5G Internet, 5G Router"
+            />
+          </div>
+
+          <div className="border-t pt-3 space-y-3">
             <div className="space-y-1.5">
               <Label className="text-sm">Opsætningsnavn</Label>
               <Input
@@ -401,6 +414,7 @@ function EditConfigDialog({ open, onOpenChange, config, onSaved }: {
   const [cfgSkipEmptyFilter, setCfgSkipEmptyFilter] = useState(config.skip_empty_row_filter ?? false);
   const [cfgTypeDetectionCol, setCfgTypeDetectionCol] = useState(config.type_detection_column || "__none__");
   const [cfgTypeDetectionVals, setCfgTypeDetectionVals] = useState((config.type_detection_values || []).join(", "));
+  const [cfgPhoneExcluded, setCfgPhoneExcluded] = useState(((config as any).phone_excluded_products || []).join(", "));
   const [saving, setSaving] = useState(false);
 
   // We don't have file columns in edit mode, so we use known column names from config
@@ -427,6 +441,7 @@ function EditConfigDialog({ open, onOpenChange, config, onSaved }: {
           skip_empty_row_filter: cfgSkipEmptyFilter,
           type_detection_column: cfgTypeDetectionCol !== "__none__" ? cfgTypeDetectionCol : null,
           type_detection_values: cfgTypeDetectionVals.trim() ? cfgTypeDetectionVals.split(",").map(v => v.trim()).filter(Boolean) : null,
+          phone_excluded_products: cfgPhoneExcluded.trim() ? cfgPhoneExcluded.split(",").map(v => v.trim()).filter(Boolean) : null,
         } as any)
         .eq("id", config.id);
       if (error) throw error;
@@ -501,6 +516,11 @@ function EditConfigDialog({ open, onOpenChange, config, onSaved }: {
                 <Input value={cfgTypeDetectionVals} onChange={(e) => setCfgTypeDetectionVals(e.target.value)} placeholder="f.eks. Nedlagt, Annulleret" />
               </div>
             </div>
+          </div>
+          <div className="border-t pt-3 space-y-3">
+            <Label className="text-sm font-medium">Produkter uden telefon-match</Label>
+            <p className="text-xs text-muted-foreground">Produkter der skal skippe telefon-matching og i stedet matches via sælger+dato+produkt (komma-separeret)</p>
+            <Input value={cfgPhoneExcluded} onChange={(e) => setCfgPhoneExcluded(e.target.value)} placeholder="f.eks. 5G Internet, 5G Router" />
           </div>
           <Button onClick={handleSave} disabled={saving} className="w-full">
             {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
@@ -1020,6 +1040,9 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
         // --- PASS 1b: FM phone matching via customer_phone directly ---
         // For rows that have a phone but weren't matched in Pass 1 (FM sales don't have raw_payload.data phone fields)
+        const phoneExcludedProducts: string[] = (activeConfig as any)?.phone_excluded_products || [];
+        const PRODUCT_KEYS_1B = ["Subscription Name", "Product", "Produkt", "Abonnement", "Product Name", "Produktnavn"];
+
         cleanedData.forEach((row) => {
           const idx = row.originalIndex;
           if (matchedIndicesLocal.has(idx)) return; // already matched in pass 1
@@ -1028,6 +1051,21 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           if (!rawExcelPhone) return; // phone-less rows handled in pass 2
           const excelPhone = normalizePhone(String(rawExcelPhone));
           if (!excelPhone) return;
+
+          // Check if this row's product is excluded from phone matching
+          if (phoneExcludedProducts.length > 0) {
+            const prodCol = activeConfig?.product_columns?.[0];
+            let rowProduct = "";
+            if (prodCol) rowProduct = String(getCaseInsensitive(row.originalRow, prodCol) || "").trim();
+            if (!rowProduct) {
+              for (const key of PRODUCT_KEYS_1B) {
+                const val = getCaseInsensitive(row.originalRow, key);
+                if (val && String(val).trim()) { rowProduct = String(val).trim(); break; }
+              }
+            }
+            const isExcluded = phoneExcludedProducts.some(p => rowProduct.toLowerCase().includes(p.toLowerCase()));
+            if (isExcluded) return; // skip phone match, let Pass 2 handle it
+          }
 
           for (const sale of candidateSales) {
             if (existingIds.has(sale.id)) continue;
@@ -1138,7 +1176,20 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
             const rawExcelPhone = phoneColumn !== "__none__" ? getCaseInsensitive(row.originalRow, phoneColumn) : null;
             const excelPhone = rawExcelPhone ? normalizePhone(String(rawExcelPhone)) : "";
-            if (excelPhone) return; // has phone → should have been matched in pass 1 or 1b
+            // Allow phone-excluded products through to Pass 2 even if they have a phone
+            if (excelPhone) {
+              const prodCol2 = activeConfig?.product_columns?.[0];
+              let rowProduct2 = "";
+              if (prodCol2) rowProduct2 = String(getCaseInsensitive(row.originalRow, prodCol2) || "").trim();
+              if (!rowProduct2) {
+                for (const key of PRODUCT_KEYS_1B) {
+                  const val = getCaseInsensitive(row.originalRow, key);
+                  if (val && String(val).trim()) { rowProduct2 = String(val).trim(); break; }
+                }
+              }
+              const isExcluded2 = phoneExcludedProducts.some(p => rowProduct2.toLowerCase().includes(p.toLowerCase()));
+              if (!isExcluded2) return; // has phone and not excluded → should have been matched in pass 1 or 1b
+            }
 
             const excelSeller = String(getCaseInsensitive(row.originalRow, sellerCol) || "").trim();
             const excelDate = String(getCaseInsensitive(row.originalRow, dateCol) || "").trim();

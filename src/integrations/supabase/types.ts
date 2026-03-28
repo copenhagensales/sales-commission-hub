@@ -1891,6 +1891,7 @@ export type Database = {
           name: string
           opp_column: string | null
           phone_column: string | null
+          phone_excluded_products: Json | null
           product_columns: string[] | null
           product_match_mode: string
           product_phone_mappings: Json | null
@@ -1915,6 +1916,7 @@ export type Database = {
           name: string
           opp_column?: string | null
           phone_column?: string | null
+          phone_excluded_products?: Json | null
           product_columns?: string[] | null
           product_match_mode?: string
           product_phone_mappings?: Json | null
@@ -1939,6 +1941,7 @@ export type Database = {
           name?: string
           opp_column?: string | null
           phone_column?: string | null
+          phone_excluded_products?: Json | null
           product_columns?: string[] | null
           product_match_mode?: string
           product_phone_mappings?: Json | null
