@@ -2055,6 +2055,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                         <TableHead>Sælger</TableHead>
                         <TableHead>Telefon</TableHead>
                         <TableHead>Produkt</TableHead>
+                        <TableHead>Match</TableHead>
                         <TableHead>Provision</TableHead>
                         <TableHead>Omsætning</TableHead>
                         <TableHead>Virksomhed</TableHead>
@@ -2071,6 +2072,15 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                           <TableCell>{sale.phone || "-"}</TableCell>
                           <TableCell>
                             <Badge variant="outline">{sale.realProductName || sale.targetProductName || "-"}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            {sale.matchConfidence === "high" ? (
+                              <Badge className="bg-green-100 text-green-800 border-green-300">Dato + Kunde</Badge>
+                            ) : sale.matchConfidence === "medium" ? (
+                              <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">Delvist</Badge>
+                            ) : (
+                              <Badge variant="outline">✓</Badge>
+                            )}
                           </TableCell>
                           <TableCell>{sale.commission != null ? formatCurrency(sale.commission) : "-"}</TableCell>
                           <TableCell>{sale.revenue != null ? formatCurrency(sale.revenue) : "-"}</TableCell>
