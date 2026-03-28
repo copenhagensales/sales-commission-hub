@@ -24,6 +24,7 @@ import { VACATION_PAY_RATES, countWorkDaysInPeriod, getPayrollPeriod } from "@/l
 
 import { CareerWishesTabContent } from "@/components/profile/CareerWishesTabContent";
 import { HandbookTabContent } from "@/components/profile/HandbookTabContent";
+import { logSensitiveAccess } from "@/hooks/useLogSensitiveAccess";
 
 
 // Read-only display field
@@ -1004,6 +1005,9 @@ export default function MyProfile() {
         .eq("id", employee.id);
       
       if (error) throw error;
+
+      // Log sensitive field access
+      logSensitiveAccess(employee.id, field, "self_edit");
       
       toast.success("Oplysninger opdateret");
       queryClient.invalidateQueries({ queryKey: ["my-profile"] });

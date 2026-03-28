@@ -10715,6 +10715,33 @@ export type Database = {
         }
         Relationships: []
       }
+      sensitive_data_access_log: {
+        Row: {
+          access_type: string
+          created_at: string
+          employee_id: string
+          field_accessed: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          access_type?: string
+          created_at?: string
+          employee_id: string
+          field_accessed: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          access_type?: string
+          created_at?: string
+          employee_id?: string
+          field_accessed?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       shift: {
         Row: {
           break_minutes: number | null

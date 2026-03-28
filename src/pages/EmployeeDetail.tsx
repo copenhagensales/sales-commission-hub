@@ -36,6 +36,7 @@ import { da } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { useTwilioDevice } from "@/hooks/useTwilioDevice";
+import { isSensitiveField, logSensitiveAccess } from "@/hooks/useLogSensitiveAccess";
 interface EmployeeMasterDataRecord {
   id: string;
   first_name: string;
@@ -475,6 +476,10 @@ export default function EmployeeDetail() {
       return;
     }
     
+    // Log access to sensitive fields
+    if (isSensitiveField(field) && id) {
+      logSensitiveAccess(id, field, "edit");
+    }
     updateMutation.mutate({ field, value });
   };
 
