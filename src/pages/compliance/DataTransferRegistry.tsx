@@ -22,6 +22,7 @@ const transfers = [
     dpaType: "Standard DPA",
     dpaUrl: "https://www.twilio.com/legal/data-protection-addendum",
     purpose: "SMS-kommunikation med kandidater og medarbejdere",
+    connectedDate: "2025-06-15",
   },
   {
     recipient: "Meta (Facebook)",
@@ -31,6 +32,7 @@ const transfers = [
     dpaType: "Standard vilkår",
     dpaUrl: "https://www.facebook.com/legal/terms/dataprocessing",
     purpose: "Konversionssporing for rekrutteringskampagner (CAPI)",
+    connectedDate: "2025-06-20",
   },
   {
     recipient: "Microsoft 365",
@@ -40,6 +42,7 @@ const transfers = [
     dpaType: "Standard DPA",
     dpaUrl: "https://learn.microsoft.com/legal/cognitive-services/openai/data-privacy",
     purpose: "Afsendelse af systemgenererede emails (invitationer, password reset)",
+    connectedDate: "2025-07-01",
   },
   {
     recipient: "e-conomic",
@@ -49,6 +52,7 @@ const transfers = [
     dpaType: "Standard DPA",
     dpaUrl: "https://www.visma.com/trust-centre/dpa",
     purpose: "Bogføring og økonomi-integration",
+    connectedDate: "2025-07-10",
   },
   {
     recipient: "Adversus",
@@ -58,15 +62,17 @@ const transfers = [
     dpaType: "Standard DPA",
     dpaUrl: "https://www.adversus.io/legal/dpa",
     purpose: "Dialer-integration og salgsregistrering",
+    connectedDate: "2025-06-15",
   },
   {
-    recipient: "Lovable (Supabase)",
+    recipient: "Lovable Cloud",
     categories: "Brugerdata, auth-data, database-indhold",
     location: "EU",
     legalBasis: "GDPR Art. 28",
     dpaType: "Standard DPA",
     dpaUrl: "https://supabase.com/legal/dpa",
     purpose: "Backend-platform: database, autentificering og serverless funktioner",
+    connectedDate: "2025-06-01",
   },
 ];
 
@@ -123,6 +129,7 @@ export default function DataTransferRegistry() {
                   <TableHead>Modtager</TableHead>
                   <TableHead>Datakategorier</TableHead>
                   <TableHead>Lokation</TableHead>
+                  <TableHead>Tilsluttet</TableHead>
                   <TableHead>Retsgrundlag</TableHead>
                   <TableHead>DPA-type</TableHead>
                   <TableHead>Formål</TableHead>
@@ -137,6 +144,9 @@ export default function DataTransferRegistry() {
                       <Badge variant="outline" className="bg-green-500/10 text-green-700 border-green-500/30">
                         {t.location}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                      {new Date(t.connectedDate).toLocaleDateString("da-DK", { day: "numeric", month: "short", year: "numeric" })}
                     </TableCell>
                     <TableCell className="text-sm">{t.legalBasis}</TableCell>
                     <TableCell>
