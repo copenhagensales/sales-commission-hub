@@ -214,3 +214,9 @@ export const PowerdagAdmin = lazyPage(() => import("@/pages/dashboards/PowerdagA
 
 // System Feedback
 export const SystemFeedback = lazyPage(() => import("@/pages/SystemFeedback"));
+
+// Compliance
+export const ComplianceOverview = lazyPage(() => import("@/pages/compliance/ComplianceOverview"));
+export const ComplianceEmployeePrivacy = lazyPage(() => import("@/pages/compliance/EmployeePrivacy"));
+export const ComplianceInternalProcesses = lazyPage(() => import("@/pages/compliance/InternalProcesses"));
+export const ComplianceAdminDocumentation = lazyPage(() => import("@/pages/compliance/AdminDocumentation"));

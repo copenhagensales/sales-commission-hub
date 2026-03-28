@@ -43,6 +43,13 @@ export const PERMISSION_KEYS = {
   menu_section_spil: { label: 'Spil', section: 'sections', parent: null },
   menu_section_economic: { label: 'Økonomi', section: 'sections', parent: null },
   menu_section_amo: { label: 'Arbejdsmiljø (AMO)', section: 'sections', parent: null },
+  menu_section_compliance: { label: 'Compliance', section: 'sections', parent: null },
+
+  // ==================== COMPLIANCE (under menu_section_compliance) ====================
+  menu_compliance_overview: { label: 'Compliance Oversigt', section: 'compliance', parent: 'menu_section_compliance' },
+  menu_compliance_employee: { label: 'Privatliv for medarbejdere', section: 'compliance', parent: 'menu_section_compliance' },
+  menu_compliance_processes: { label: 'Interne processer', section: 'compliance', parent: 'menu_section_compliance' },
+  menu_compliance_admin: { label: 'Admin og dokumentation', section: 'compliance', parent: 'menu_section_compliance' },
 
   // ==================== AMO (under menu_section_amo) ====================
   menu_amo_dashboard: { label: 'AMO Dashboard', section: 'amo', parent: 'menu_section_amo' },

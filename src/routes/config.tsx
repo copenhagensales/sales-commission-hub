@@ -141,6 +141,10 @@ import {
   PowerdagInput,
   PowerdagAdmin,
   SystemFeedback,
+  ComplianceOverview,
+  ComplianceEmployeePrivacy,
+  ComplianceInternalProcesses,
+  ComplianceAdminDocumentation,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -427,6 +431,12 @@ export const routes: RouteConfig[] = [
 
   // System Feedback
   { path: "/system-feedback", component: SystemFeedback, access: "protected" },
+
+  // Compliance
+  { path: "/compliance", component: ComplianceOverview, access: "role", positionPermission: "menu_compliance_overview" },
+  { path: "/compliance/employee-privacy", component: ComplianceEmployeePrivacy, access: "role", positionPermission: "menu_compliance_employee" },
+  { path: "/compliance/processes", component: ComplianceInternalProcesses, access: "role", positionPermission: "menu_compliance_processes" },
+  { path: "/compliance/admin", component: ComplianceAdminDocumentation, access: "role", positionPermission: "menu_compliance_admin" },
 
   { path: "*", component: NotFound, access: "public" },
 ];
