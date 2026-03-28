@@ -366,7 +366,20 @@ export function PreviewSidebar({ isMobile = false, onNavigate, isCollapsed = fal
               <Settings className="h-5 w-5" />
               Indstillinger
             </NavLink>
-          )}
+           )}
+
+          {/* Compliance */}
+          <NavLink
+            to="/compliance"
+            onClick={handleNavClick}
+            className={cn(
+              "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+              location.pathname.startsWith("/compliance") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+            )}
+          >
+            <Shield className="h-5 w-5" />
+            Compliance
+          </NavLink>
         </nav>
       </div>
     </aside>
