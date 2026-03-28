@@ -1,17 +1,24 @@
 
 
-## Tilføj Lovable (Supabase) som databehandler i DataTransferRegistry
+## Ret DPA-tekst i AdminDocumentation
 
-### Ændring i `src/pages/compliance/DataTransferRegistry.tsx`
+### Problem
+Linje 119 i `src/pages/compliance/AdminDocumentation.tsx` siger:
+> *"Bekræft at DPA'er er underskrevet og arkiveret."*
 
-Tilføj en ny entry i `transfers`-arrayet:
+Dette er forkert — I bruger leverandørernes offentlige standard-DPA'er, ikke individuelt underskrevne aftaler.
 
-| Modtager | Datakategorier | Lokation | Retsgrundlag | DPA-type | Link |
-|----------|---------------|----------|-------------|----------|------|
-| Lovable (Supabase) | Brugerdata, auth-data, database-indhold | EU | GDPR Art. 28 | Standard DPA | https://supabase.com/legal/dpa |
+### Ændring
 
-Supabase's offentlige DPA dækker alle business-brugere og accepteres ved brug af tjenesten — samme model som de øvrige leverandører.
+Erstat teksten med noget i stil med:
+
+> *"Alle leverandører anvender deres offentligt tilgængelige standard-DPA, som accepteres ved brug af tjenesten. Se [Dataoverførsler til tredjeparter](/compliance/data-transfers) for links til de enkelte DPA'er."*
+
+Dette linker direkte til den opdaterede DataTransferRegistry-side, hvor alle DPA-links allerede er dokumenteret.
+
+### Fil
+- `src/pages/compliance/AdminDocumentation.tsx` (linje 118-120)
 
 ### Risiko
-Ingen. Én ny række i en statisk tabel.
+Ingen. Kun en tekstrettelse.
 
