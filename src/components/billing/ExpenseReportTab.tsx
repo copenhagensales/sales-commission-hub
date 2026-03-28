@@ -294,26 +294,41 @@ export function ExpenseReportTab() {
     return hotelBookings.reduce((sum: number, bh: any) => sum + (bh.price_per_night || 0), 0);
   }, [hotelBookings]);
 
-  // Sync fetched data + auto values into local state
+  // Sync fetched data + auto values + recurring copy-forward into local state
   useEffect(() => {
     const map = new Map(expenses?.map((e) => [e.category, e]) || []);
-    setRows(
-      EXPENSE_CATEGORIES.map((c) => {
-        if (c.key === "lokationer") {
-          return { category: c.key, amount: autoLocationTotal, note: "Auto-beregnet (netto efter rabat)" };
+    const newRows = EXPENSE_CATEGORIES.map((c) => {
+      if (c.key === "lokationer") {
+        return { category: c.key, amount: autoLocationTotal, note: "Auto-beregnet (netto efter rabat)" };
+      }
+      if (c.key === "hotel") {
+        return { category: c.key, amount: autoHotelTotal, note: "Auto-beregnet fra hotelovernatninger" };
+      }
+      const existing = map.get(c.key);
+      if (existing && existing.amount > 0) {
+        return { category: c.key, amount: existing.amount, note: existing.note ?? "" };
+      }
+      // Recurring: copy forward from previous month if no current data
+      if (RECURRING_CATEGORIES.has(c.key) && previousRecurring?.[c.key]) {
+        return { category: c.key, amount: previousRecurring[c.key].amount, note: previousRecurring[c.key].note };
+      }
+      return {
+        category: c.key,
+        amount: existing?.amount ?? 0,
+        note: existing?.note ?? "",
+      };
+    });
+    setRows(newRows);
+
+    // Auto-save recurring values that were copied forward
+    if (previousRecurring) {
+      newRows.forEach((row) => {
+        if (RECURRING_CATEGORIES.has(row.category) && row.amount > 0 && !map.has(row.category)) {
+          saveSingleMutation.mutate({ category: row.category, amount: row.amount, note: row.note });
         }
-        if (c.key === "hotel") {
-          return { category: c.key, amount: autoHotelTotal, note: "Auto-beregnet fra hotelovernatninger" };
-        }
-        return {
-          category: c.key,
-          amount: map.get(c.key)?.amount ?? 0,
-          note: map.get(c.key)?.note ?? "",
-        };
-      })
-    );
-    
-  }, [expenses, autoLocationTotal, autoHotelTotal]);
+      });
+    }
+  }, [expenses, autoLocationTotal, autoHotelTotal, previousRecurring]);
 
   const saveSingleMutation = useMutation({
     mutationFn: async ({ category, amount, note }: { category: string; amount: number; note: string }) => {
@@ -411,11 +426,14 @@ export function ExpenseReportTab() {
             <TableBody>
               {EXPENSE_CATEGORIES.map((cat, idx) => {
                 const isAuto = AUTO_CATEGORIES.has(cat.key);
+                const isRecurring = RECURRING_CATEGORIES.has(cat.key);
                 return (
-                  <TableRow key={cat.key} className={isAuto ? "bg-muted/30" : undefined}>
-                    <TableCell className="font-medium">
+                  <TableRow key={cat.key} className={isAuto ? "bg-muted/30" : isRecurring ? "bg-muted/15" : undefined}>
+                    <TableCell className="font-medium flex items-center gap-2">
+                      {isRecurring && <Lock className="h-3.5 w-3.5 text-muted-foreground" />}
                       {cat.label}
                       {isAuto && <span className="ml-2 text-xs text-muted-foreground">(auto)</span>}
+                      {isRecurring && <span className="text-xs text-muted-foreground">(fast)</span>}
                     </TableCell>
                     <TableCell>
                       <Input
