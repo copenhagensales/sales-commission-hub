@@ -4,7 +4,8 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Shield, AlertTriangle, Clock, Trash2 } from "lucide-react";
+import { Shield, AlertTriangle, Clock, Trash2, Info } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -179,6 +180,21 @@ export default function RetentionPolicies() {
   const isLoading = loadingCampaigns || loadingPolicies;
   const activeCount = (policies?.filter((p) => p.is_active).length || 0) + (dataRetentionPolicies?.filter((p) => p.is_active).length || 0);
 
+  const cleanupModeTooltip = (mode: string) => {
+    if (mode === "delete_all") return "Hele salgsrækken slettes inkl. tilknyttede poster.";
+    return "Kundedata anonymiseres: telefon → null, firma → 'Anonymiseret', raw_payload → null. Salgsdata bevares.";
+  };
+
+  const dataTypeTooltips: Record<string, string> = {
+    customer_inquiries: "Kundehenvendelser slettes permanent efter udløb.",
+    candidates: "Kandidatdata anonymiseres eller slettes efter udløb.",
+    inactive_employees: "Deaktiverede medarbejdere slettes fra master data efter udløb.",
+    integration_logs: "Integrationslogfiler med potentielle persondata slettes.",
+    login_events: "Login-historik (email, IP, user agent) slettes.",
+    password_reset_tokens: "Udløbne password reset tokens slettes.",
+    communication_logs: "Rekrutteringskommunikation (SMS/email) slettes.",
+  };
+
   return (
     <MainLayout>
       <div className="max-w-6xl mx-auto space-y-6 p-6">
@@ -275,7 +291,21 @@ export default function RetentionPolicies() {
                       return (
                         <tr key={campaign.id} className="border-b last:border-0 hover:bg-muted/30">
                           <td className="py-3 pr-4 text-foreground">{campaign.client_name}</td>
-                          <td className="py-3 pr-4 text-foreground">{campaign.name}</td>
+                          <td className="py-3 pr-4 text-foreground">
+                            <span className="flex items-center gap-1.5">
+                              {campaign.name}
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help shrink-0" />
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-xs">
+                                    <p className="text-xs">{cleanupModeTooltip(policy?.cleanup_mode || "anonymize_customer")}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </span>
+                          </td>
                           <td className="py-3 pr-4">
                             <Input
                               type="number"
@@ -348,7 +378,23 @@ export default function RetentionPolicies() {
                   <tbody>
                     {dataRetentionPolicies.map((policy) => (
                       <tr key={policy.id} className="border-b last:border-0 hover:bg-muted/30">
-                        <td className="py-3 pr-4 text-foreground">{policy.display_name}</td>
+                        <td className="py-3 pr-4 text-foreground">
+                          <span className="flex items-center gap-1.5">
+                            {policy.display_name}
+                            {dataTypeTooltips[policy.data_type] && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help shrink-0" />
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-xs">
+                                    <p className="text-xs">{dataTypeTooltips[policy.data_type]}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                          </span>
+                        </td>
                         <td className="py-3 pr-4">
                           <Input
                             type="number"
