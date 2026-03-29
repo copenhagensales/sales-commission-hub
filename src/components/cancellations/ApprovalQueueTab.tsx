@@ -1286,6 +1286,24 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                                 {" | "}
                                 Provi: {summarizedItems.reduce((s, si) => s + si.mapped_commission, 0).toFixed(0)} kr
                               </div>
+                              {item.upload_type === "basket_difference" && item.status === "pending" && clientProducts.length > 0 && (
+                                <div className="mt-2 pt-2 border-t border-border">
+                                  <div className="font-medium text-muted-foreground mb-1">Ret produkt til:</div>
+                                  <Select
+                                    value={productOverrides[item.id] || summarizedItems[0]?.product_name || ""}
+                                    onValueChange={(val) => setProductOverrides(prev => ({ ...prev, [item.id]: val }))}
+                                  >
+                                    <SelectTrigger className="w-full h-8 text-xs">
+                                      <SelectValue placeholder="Vælg produkt" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {clientProducts.map((p) => (
+                                        <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              )}
                             </div>
                           ) : (
                             <span className="text-muted-foreground">Ingen produkter</span>
