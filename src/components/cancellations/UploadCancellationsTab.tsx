@@ -977,103 +977,108 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         }
       }
 
-      // --- Product-phone mapping matching (reversed: Excel phone → DB raw_payload fields) ---
-      if (hasProductPhoneMappings) {
+      // --- Shared product resolution sources ---
+      const { data: conditionRows } = await supabase
+        .from("cancellation_product_conditions")
+        .select("product_id, column_name, operator, values")
+        .eq("client_id", selectedClientId);
+      const groupedConditions = conditionRows && conditionRows.length > 0
+        ? groupConditionsByProduct(conditionRows)
+        : [];
+      let condProductNames = new Map<string, string>();
+      if (groupedConditions.length > 0) {
+        const condPids = [...new Set(conditionRows!.map(r => r.product_id))];
+        const { data: condProds } = await supabase.from("products").select("id, name").in("id", condPids);
+        if (condProds) condProductNames = new Map(condProds.map(p => [p.id, p.name]));
+      }
+
+      const { data: legacyProductMappings } = await supabase
+        .from("cancellation_product_mappings")
+        .select("excel_product_name, product_id")
+        .eq("client_id", selectedClientId);
+
+      const productMappingLookup = new Map<string, string>();
+      if (legacyProductMappings && legacyProductMappings.length > 0) {
+        const mappedPids = [...new Set(legacyProductMappings.map(m => m.product_id))];
+        const { data: mappedProds } = await supabase.from("products").select("id, name").in("id", mappedPids);
+        const pidToName = new Map((mappedProds || []).map(p => [p.id, p.name]));
+        for (const m of legacyProductMappings) {
+          const prodName = pidToName.get(m.product_id);
+          if (prodName) productMappingLookup.set(m.excel_product_name.toLowerCase().trim(), prodName);
+        }
+      }
+
+      const phoneExcludedProducts: string[] = (activeConfig as any)?.phone_excluded_products || [];
+      const PRODUCT_KEYS_1B = ["Subscription Name", "Product", "Produkt", "Abonnement", "Product Name", "Produktnavn"];
+      const dateCol = activeConfig?.date_column;
+      const fallbackMappings: FallbackProductMapping[] = (activeConfig as any)?.fallback_product_mappings || [];
+      const hasAdvancedProductMatching =
+        hasProductPhoneMappings ||
+        groupedConditions.length > 0 ||
+        productMappingLookup.size > 0 ||
+        fallbackMappings.length > 0;
+
+      // --- Product-aware matching (conditions / mappings / fallback) ---
+      if (hasAdvancedProductMatching) {
         const matchedIndicesLocal = new Set<number>();
         const productMatched: MatchedSale[] = [];
         const matchedSaleProductKeys = new Set<string>(); // saleId|productName dedup
 
-        console.log("[handleMatch] PRODUCT-PHONE MATCHING (reversed)");
-        console.log("[handleMatch] candidateSales:", candidateSales.length, "cleanedRows:", cleanedData.length);
-        console.log("[handleMatch] mappings:", productPhoneMappings);
+        if (hasProductPhoneMappings) {
+          console.log("[handleMatch] PRODUCT-PHONE MATCHING (reversed)");
+          console.log("[handleMatch] candidateSales:", candidateSales.length, "cleanedRows:", cleanedData.length);
+          console.log("[handleMatch] mappings:", productPhoneMappings);
 
-        cleanedData.forEach((row) => {
-          const idx = row.originalIndex;
-          // Get the single phone from Excel's phoneColumn
-          const rawExcelPhone = phoneColumn !== "__none__" ? getCaseInsensitive(row.originalRow, phoneColumn) : null;
-          if (!rawExcelPhone) return; // phone-less rows handled in pass 2
-          const excelPhone = normalizePhone(String(rawExcelPhone));
-          if (!excelPhone) return;
+          cleanedData.forEach((row) => {
+            const idx = row.originalIndex;
+            const rawExcelPhone = phoneColumn !== "__none__" ? getCaseInsensitive(row.originalRow, phoneColumn) : null;
+            if (!rawExcelPhone) return;
+            const excelPhone = normalizePhone(String(rawExcelPhone));
+            if (!excelPhone) return;
 
-          if (idx < 3) console.log(`[handleMatch] row ${idx}: excelPhone="${excelPhone}"`);
+            if (idx < 3) console.log(`[handleMatch] row ${idx}: excelPhone="${excelPhone}"`);
 
-          // Check each candidate sale's raw_payload.data for matching phone
-          for (const sale of candidateSales) {
-            if (existingIds.has(sale.id)) continue;
-            const payloadData = (sale.raw_payload as any)?.data || {};
+            for (const sale of candidateSales) {
+              if (existingIds.has(sale.id)) continue;
+              const payloadData = (sale.raw_payload as any)?.data || {};
 
-            for (const mapping of productPhoneMappings) {
-              const payloadPhoneRaw = payloadData[mapping.payloadPhoneField];
-              if (!payloadPhoneRaw) continue;
-              const payloadPhone = normalizePhone(String(payloadPhoneRaw));
-              if (!payloadPhone) continue;
+              for (const mapping of productPhoneMappings) {
+                const payloadPhoneRaw = payloadData[mapping.payloadPhoneField];
+                if (!payloadPhoneRaw) continue;
+                const payloadPhone = normalizePhone(String(payloadPhoneRaw));
+                if (!payloadPhone) continue;
 
-              if (excelPhone === payloadPhone) {
-                const key = `${sale.id}|${mapping.productName}`;
-                if (matchedSaleProductKeys.has(key)) continue;
-                matchedSaleProductKeys.add(key);
-                matchedIndicesLocal.add(idx);
-                // Resolve real product name + pricing from sale_items
-                // payloadPhoneField "Telefon Abo1" → position index 1 → "Abonnement1"
-                const posIndex = parseInt(mapping.payloadPhoneField?.replace(/\D/g, "") || "0", 10) - 1;
-                const allItems = saleItemsMap.get(sale.id) || [];
-                const matchingItem = posIndex >= 0 && posIndex < allItems.length ? allItems[posIndex] : allItems[0];
-                productMatched.push({
-                  saleId: sale.id,
-                  phone: String(payloadPhoneRaw),
-                  company: sale.customer_company || "",
-                  oppNumber: "",
-                  saleDate: sale.sale_datetime || "",
-                  employee: sale.agent_name || "Ukendt",
-                  currentStatus: sale.validation_status || "pending",
-                  uploadedRowData: row.originalRow,
-                  targetProductName: mapping.productName,
-                  realProductName: matchingItem?.adversus_product_title || allItems[0]?.adversus_product_title || "Ukendt produkt",
-                  commission: matchingItem?.mapped_commission ?? undefined,
-                  revenue: matchingItem?.mapped_revenue ?? undefined,
-                });
+                if (excelPhone === payloadPhone) {
+                  const key = `${sale.id}|${mapping.productName}`;
+                  if (matchedSaleProductKeys.has(key)) continue;
+                  matchedSaleProductKeys.add(key);
+                  matchedIndicesLocal.add(idx);
+                  const posIndex = parseInt(mapping.payloadPhoneField?.replace(/\D/g, "") || "0", 10) - 1;
+                  const allItems = saleItemsMap.get(sale.id) || [];
+                  const matchingItem = posIndex >= 0 && posIndex < allItems.length ? allItems[posIndex] : allItems[0];
+                  productMatched.push({
+                    saleId: sale.id,
+                    phone: String(payloadPhoneRaw),
+                    company: sale.customer_company || "",
+                    oppNumber: "",
+                    saleDate: sale.sale_datetime || "",
+                    employee: sale.agent_name || "Ukendt",
+                    currentStatus: sale.validation_status || "pending",
+                    uploadedRowData: row.originalRow,
+                    targetProductName: mapping.productName,
+                    realProductName: matchingItem?.adversus_product_title || allItems[0]?.adversus_product_title || "Ukendt produkt",
+                    commission: matchingItem?.mapped_commission ?? undefined,
+                    revenue: matchingItem?.mapped_revenue ?? undefined,
+                  });
+                }
               }
             }
-          }
-        });
+          });
+        }
 
         console.log("[handleMatch] productMatched (pass 1):", productMatched.length);
 
-        // --- Fetch condition-based & legacy product matching (shared by Pass 1b & Pass 2) ---
-        const { data: conditionRows } = await supabase
-          .from("cancellation_product_conditions")
-          .select("product_id, column_name, operator, values")
-          .eq("client_id", selectedClientId);
-        const groupedConditions = conditionRows && conditionRows.length > 0
-          ? groupConditionsByProduct(conditionRows)
-          : [];
-        let condProductNames = new Map<string, string>();
-        if (groupedConditions.length > 0) {
-          const condPids = [...new Set(conditionRows!.map(r => r.product_id))];
-          const { data: condProds } = await supabase.from("products").select("id, name").in("id", condPids);
-          if (condProds) condProductNames = new Map(condProds.map(p => [p.id, p.name]));
-        }
-
-        const { data: legacyProductMappings } = await supabase
-          .from("cancellation_product_mappings")
-          .select("excel_product_name, product_id")
-          .eq("client_id", selectedClientId);
-
-        const productMappingLookup = new Map<string, string>();
-        if (legacyProductMappings && legacyProductMappings.length > 0) {
-          const mappedPids = [...new Set(legacyProductMappings.map(m => m.product_id))];
-          const { data: mappedProds } = await supabase.from("products").select("id, name").in("id", mappedPids);
-          const pidToName = new Map((mappedProds || []).map(p => [p.id, p.name]));
-          for (const m of legacyProductMappings) {
-            const prodName = pidToName.get(m.product_id);
-            if (prodName) productMappingLookup.set(m.excel_product_name.toLowerCase().trim(), prodName);
-          }
-        }
-
         // --- PASS 1b: FM phone matching via customer_phone directly ---
-        const phoneExcludedProducts: string[] = (activeConfig as any)?.phone_excluded_products || [];
-        const PRODUCT_KEYS_1B = ["Subscription Name", "Product", "Produkt", "Abonnement", "Product Name", "Produktnavn"];
-
         cleanedData.forEach((row) => {
           const idx = row.originalIndex;
           if (matchedIndicesLocal.has(idx)) return;
@@ -1083,10 +1088,9 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           const excelPhone = normalizePhone(String(rawExcelPhone));
           if (!excelPhone) return;
 
-          // Resolve expected product for this row via conditions/mappings
           let resolvedProduct: string | null = null;
           if (groupedConditions.length > 0) {
-            const matchedPid = findMatchingProductId(groupedConditions, row.originalRow);
+            const matchedPid = findMatchingProductId(groupedConditions, row.originalRow, idx < 3);
             if (matchedPid) resolvedProduct = condProductNames.get(matchedPid) || null;
           }
 
@@ -1116,14 +1120,12 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             if (!salePhone || salePhone !== excelPhone) continue;
 
             const allItems = saleItemsMap.get(sale.id) || [];
-
-            // Product MUST be resolved — no blind phone-only matches
             if (!resolvedProduct) continue;
 
             const hasProduct = allItems.some(item =>
               item.adversus_product_title?.toLowerCase() === resolvedProduct!.toLowerCase()
             );
-            if (!hasProduct) continue; // Skip — wrong product
+            if (!hasProduct) continue;
 
             const matchedItemForProduct = allItems.find(i => i.adversus_product_title?.toLowerCase() === resolvedProduct!.toLowerCase());
             const key = `${sale.id}|${resolvedProduct}`;
@@ -1150,34 +1152,37 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
         console.log("[handleMatch] productMatched (after pass 1b FM):", productMatched.length);
 
-        // --- PASS 2: Seller + Date + Product fallback for phone-less rows ---
-        const dateCol = activeConfig?.date_column;
-        const fallbackMappings: FallbackProductMapping[] = (activeConfig as any)?.fallback_product_mappings || [];
+        // --- PASS 2: Seller + Date + Product fallback for phone-less / phone-excluded rows ---
         const unmatchedSellers: UnmatchedSellerRow[] = [];
-
-        const hasPass2Sources = (sellerCol && dateCol && (fallbackMappings.length > 0 || groupedConditions.length > 0 || productMappingLookup.size > 0));
+        const hasPass2Sources = Boolean(
+          sellerCol &&
+          dateCol &&
+          (fallbackMappings.length > 0 || groupedConditions.length > 0 || productMappingLookup.size > 0)
+        );
 
         if (hasPass2Sources) {
-          console.log("[handleMatch] PASS 2: seller+date fallback", { sellerCol, dateCol, fallbackMappings, conditionProducts: groupedConditions.length, legacyMappings: productMappingLookup.size });
+          console.log("[handleMatch] PASS 2: seller+date fallback", {
+            sellerCol,
+            dateCol,
+            fallbackMappings,
+            conditionProducts: groupedConditions.length,
+            legacyMappings: productMappingLookup.size,
+          });
 
-          // Build seller name → employee work_email map from persistent mappings
           const sellerToEmployeeId = new Map<string, string>();
           for (const sm of sellerMappings) {
             sellerToEmployeeId.set(sm.excel_seller_name.toLowerCase(), sm.employee_id);
           }
 
-          // Build employee_id → work_email map
           const employeeIdToEmail = new Map<string, string>();
           for (const emp of allEmployees) {
             if (emp.work_email) employeeIdToEmail.set(emp.id, emp.work_email.toLowerCase());
           }
 
-          // Also try auto-matching by first name from employee_master_data
           const firstNameToEmployeeId = new Map<string, string>();
           for (const emp of allEmployees) {
             if (emp.first_name) {
               const key = emp.first_name.toLowerCase();
-              // Only use if unique first name
               if (!firstNameToEmployeeId.has(key)) {
                 firstNameToEmployeeId.set(key, emp.id);
               } else {
@@ -1186,15 +1191,12 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             }
           }
 
-
-
           cleanedData.forEach((row) => {
             const idx = row.originalIndex;
-            if (matchedIndicesLocal.has(idx)) return; // already matched in pass 1
+            if (matchedIndicesLocal.has(idx)) return;
 
             const rawExcelPhone = phoneColumn !== "__none__" ? getCaseInsensitive(row.originalRow, phoneColumn) : null;
             const excelPhone = rawExcelPhone ? normalizePhone(String(rawExcelPhone)) : "";
-            // Allow phone-excluded products through to Pass 2 even if they have a phone
             if (excelPhone) {
               const prodCol2 = activeConfig?.product_columns?.[0];
               let rowProduct2 = "";
@@ -1205,14 +1207,15 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                   if (val && String(val).trim()) { rowProduct2 = String(val).trim(); break; }
                 }
               }
-              const isExcluded2 = phoneExcludedProducts.some(p => rowProduct2.toLowerCase().includes(p.toLowerCase()) || p.toLowerCase().includes(rowProduct2.toLowerCase()));
-              if (!isExcluded2) return; // has phone and not excluded → should have been matched in pass 1 or 1b
+              const isExcluded2 = phoneExcludedProducts.some(
+                p => rowProduct2.toLowerCase().includes(p.toLowerCase()) || p.toLowerCase().includes(rowProduct2.toLowerCase())
+              );
+              if (!isExcluded2) return;
             }
 
             const excelSeller = String(getCaseInsensitive(row.originalRow, sellerCol) || "").trim();
             const excelDate = String(getCaseInsensitive(row.originalRow, dateCol) || "").trim();
-            
-            // Find which product this row matches – try condition-based first, then mappings, then fallback
+
             const productCol = activeConfig?.product_columns?.[0];
             const PRODUCT_KEYS = ["Subscription Name", "Product", "Produkt", "Abonnement", "Product Name", "Produktnavn"];
             let excelSubName = "";
@@ -1225,40 +1228,33 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                 if (val && String(val).trim()) { excelSubName = String(val).trim(); break; }
               }
             }
-            let resolvedProductTitle: string | null = null;
 
-            // 1. Condition-based matching
+            let resolvedProductTitle: string | null = null;
             if (groupedConditions.length > 0) {
-              const matchedPid = findMatchingProductId(groupedConditions, row.originalRow);
+              const matchedPid = findMatchingProductId(groupedConditions, row.originalRow, idx < 3);
               if (matchedPid) {
                 resolvedProductTitle = condProductNames.get(matchedPid) || null;
               }
             }
 
-            // 2. Legacy cancellation_product_mappings (from Mapping tab)
             if (!resolvedProductTitle && excelSubName) {
               const mappedName = productMappingLookup.get(excelSubName.toLowerCase().trim());
               if (mappedName) resolvedProductTitle = mappedName;
             }
 
-            // 3. Fallback to config fallback_product_mappings
-            if (!resolvedProductTitle) {
-              const matchingFallback = fallbackMappings.find(fm => 
-                excelSubName.toLowerCase().includes(fm.excelProductPattern.toLowerCase())
+            if (!resolvedProductTitle && excelSubName) {
+              const matchingFallback = fallbackMappings.find(
+                (fm) => excelSubName.toLowerCase().includes(fm.excelProductPattern.toLowerCase())
               );
               if (matchingFallback) {
                 resolvedProductTitle = matchingFallback.saleItemTitle;
               }
             }
 
-            if (!resolvedProductTitle) return; // not a matchable product
+            if (!resolvedProductTitle || !excelSeller || !excelDate) return;
 
-            if (!excelSeller || !excelDate) return;
-
-            // Resolve seller to employee_id
             let employeeId = sellerToEmployeeId.get(excelSeller.toLowerCase());
             if (!employeeId) {
-              // Try auto-match by first name
               const autoMatch = firstNameToEmployeeId.get(excelSeller.toLowerCase());
               if (autoMatch && autoMatch !== "__ambiguous__") {
                 employeeId = autoMatch;
@@ -1266,7 +1262,6 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             }
 
             if (!employeeId) {
-              // Unmatched seller – needs manual resolution
               unmatchedSellers.push({
                 rowIndex: idx,
                 excelSellerName: excelSeller,
@@ -1277,14 +1272,10 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               return;
             }
 
-            // Find agent_email for this employee
             const agentEmail = employeeIdToEmail.get(employeeId);
             if (!agentEmail) return;
 
-            // Parse Excel date for comparison
             const excelDateObj = new Date(excelDate);
-
-            // Detect if this row's product is phone-excluded
             const prodCol3 = activeConfig?.product_columns?.[0];
             let rowProduct3 = "";
             if (prodCol3) rowProduct3 = String(getCaseInsensitive(row.originalRow, prodCol3) || "").trim();
@@ -1300,7 +1291,6 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               : false;
 
             if (isPhoneExcludedRow) {
-              // --- Phone-excluded matching: Seller + Product (required), then Date OR Customer (at least one) ---
               const candidates: typeof candidateSales = [];
               for (const sale of candidateSales) {
                 if (existingIds.has(sale.id)) continue;
@@ -1324,9 +1314,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                   excelDateObj.getMonth() === saleDateObj.getMonth() &&
                   excelDateObj.getDate() === saleDateObj.getDate();
 
-                const customerMatch = !!excelPhone &&
-                  normalizePhone(sale.customer_phone || "") === excelPhone;
-
+                const customerMatch = !!excelPhone && normalizePhone(sale.customer_phone || "") === excelPhone;
                 const score = (dateMatch ? 1 : 0) + (customerMatch ? 1 : 0);
                 if (score === 0) continue;
                 if (score > bestScore) {
@@ -1362,7 +1350,6 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                   });
                 }
               } else {
-                // No match → error queue (unmatched)
                 unmatchedSellers.push({
                   rowIndex: idx,
                   excelSellerName: excelSeller,
@@ -1372,7 +1359,6 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                 });
               }
             } else {
-              // --- Standard matching: Seller + Date + Product (all three required) ---
               for (const sale of candidateSales) {
                 const saleAgentEmail = (sale.agent_email || "").toLowerCase();
                 if (saleAgentEmail !== agentEmail) continue;
@@ -1431,7 +1417,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         return;
       }
 
-      // --- Standard matching (no product-phone mappings) ---
+      // --- Standard matching (no product matching sources) ---
       for (const sale of candidateSales) {
         if (existingIds.has(sale.id)) continue;
         const salePhone = normalizePhone(sale.customer_phone || "");
