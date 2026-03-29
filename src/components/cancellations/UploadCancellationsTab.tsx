@@ -2522,7 +2522,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               Sendt til godkendelse
             </CardTitle>
             <CardDescription>
-              {matchedSales.length} salg er sendt til godkendelseskøen og afventer godkendelse.
+              {mergedMatchedSales.length} salg er sendt til godkendelseskøen og afventer godkendelse.
             </CardDescription>
           </CardHeader>
           <CardContent>
