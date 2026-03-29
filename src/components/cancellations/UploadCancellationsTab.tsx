@@ -1809,20 +1809,37 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         };
       });
 
-      for (let i = 0; i < queueItems.length; i += 50) {
-        const batch = queueItems.slice(i, i + 50);
+      // Deduplicate by normalized phone number — same phone = same sale entered multiple times
+      const phoneLookup = new Map<string, string>();
+      matchedSales.forEach(sale => {
+        if (sale.phone) {
+          phoneLookup.set(sale.saleId, sale.phone.replace(/[\s\-\(\)\.]/g, ''));
+        }
+      });
+
+      const seenPhones = new Set<string>();
+      const deduplicatedItems = queueItems.filter(item => {
+        const phone = phoneLookup.get(item.sale_id);
+        if (!phone) return true; // no phone — keep
+        if (seenPhones.has(phone)) return false; // duplicate — skip
+        seenPhones.add(phone);
+        return true;
+      });
+
+      for (let i = 0; i < deduplicatedItems.length; i += 50) {
+        const batch = deduplicatedItems.slice(i, i + 50);
         const { error } = await supabase
           .from("cancellation_queue")
           .insert(batch as any);
         if (error) throw error;
       }
 
-      return { count: queueItems.length };
+      return { count: deduplicatedItems.length, dedupRemoved: queueItems.length - deduplicatedItems.length };
     },
-    onSuccess: ({ count }) => {
+    onSuccess: ({ count, dedupRemoved }) => {
       toast({
         title: "Sendt til godkendelse",
-        description: `${count} salg er sendt til godkendelseskøen.`,
+        description: `${count} salg er sendt til godkendelseskøen.${dedupRemoved > 0 ? ` ${dedupRemoved} dubletter (samme telefonnummer) blev fjernet.` : ''}`,
       });
       queryClient.invalidateQueries({ queryKey: ["cancellation-imports-history"] });
       queryClient.invalidateQueries({ queryKey: ["cancellation-queue"] });
@@ -1892,13 +1909,14 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
   const unmatchedRows = filteredDataForPreview.filter(row => !matchedRowIndices.has(row.originalIndex));
   const unmatchedCount = unmatchedRows.length;
 
-  // Compute duplicates: DB sales matched by multiple file rows
+  // Compute duplicates: group by normalized phone number to find same sale entered multiple times
   const duplicateSalesMap = useMemo(() => {
     const map = new Map<string, MatchedSale[]>();
     matchedSales.forEach(sale => {
-      const arr = map.get(sale.saleId) || [];
+      const normalizedPhone = sale.phone ? sale.phone.replace(/[\s\-\(\)\.]/g, '') : sale.saleId;
+      const arr = map.get(normalizedPhone) || [];
       arr.push(sale);
-      map.set(sale.saleId, arr);
+      map.set(normalizedPhone, arr);
     });
     return map;
   }, [matchedSales]);
