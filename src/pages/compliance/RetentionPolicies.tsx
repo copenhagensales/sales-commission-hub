@@ -287,6 +287,7 @@ export default function RetentionPolicies() {
                     <tr className="border-b text-left">
                       <th className="py-3 pr-4 font-medium text-muted-foreground">Klient</th>
                       <th className="py-3 pr-4 font-medium text-muted-foreground">Kampagne</th>
+                      <th className="py-3 pr-4 font-medium text-muted-foreground w-24">Ingen data</th>
                       <th className="py-3 pr-4 font-medium text-muted-foreground w-32">Retention (dage)</th>
                       <th className="py-3 pr-4 font-medium text-muted-foreground w-48">Rensningstype</th>
                       <th className="py-3 font-medium text-muted-foreground w-20">Aktiv</th>
