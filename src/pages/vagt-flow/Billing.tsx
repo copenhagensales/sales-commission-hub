@@ -414,7 +414,7 @@ function BillingOverviewTab() {
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Brutto Beløb</p>
-                <p className="text-3xl font-bold mt-1">{totalAmount.toLocaleString("da-DK")}</p>
+                <p className="text-3xl font-bold mt-1">{Math.round(totalAmount).toLocaleString("da-DK")}</p>
                 <p className="text-xs text-muted-foreground mt-1">kr ex moms (før rabat)</p>
               </div>
               <div className="p-2 bg-muted rounded-lg">
@@ -523,11 +523,11 @@ function BillingOverviewTab() {
                       {loc.usesTotalPrice ? (
                         <span className="italic">samlet</span>
                       ) : (
-                        `${loc.dailyRate.toLocaleString("da-DK")} kr`
+                        `${Math.round(loc.dailyRate).toLocaleString("da-DK")} kr`
                       )}
                     </TableCell>
                     <TableCell className="text-right font-semibold">
-                      {loc.totalAmount.toLocaleString("da-DK")} kr
+                      {Math.round(loc.totalAmount).toLocaleString("da-DK")} kr
                     </TableCell>
                   </TableRow>
                 ))}

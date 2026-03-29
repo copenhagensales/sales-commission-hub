@@ -401,7 +401,7 @@ export function ExpenseReportTab() {
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Samlet udgift</p>
-                <p className="text-3xl font-bold mt-1">{total.toLocaleString("da-DK")} kr</p>
+                <p className="text-3xl font-bold mt-1">{Math.round(total).toLocaleString("da-DK")} kr</p>
                 <p className="text-xs text-muted-foreground mt-1">{EXPENSE_CATEGORIES.length} poster</p>
               </div>
               <div className="p-2 bg-muted rounded-lg">
@@ -439,7 +439,7 @@ export function ExpenseReportTab() {
                       <Input
                         type="number"
                         min={0}
-                        step="0.01"
+                        step="1"
                         placeholder="0"
                         value={rows[idx]?.amount || ""}
                         onChange={(e) => updateRow(idx, "amount", e.target.value)}
@@ -462,7 +462,7 @@ export function ExpenseReportTab() {
               {/* Total row */}
               <TableRow className="bg-muted/50 font-bold">
                 <TableCell>Total</TableCell>
-                <TableCell>{total.toLocaleString("da-DK")} kr</TableCell>
+                <TableCell>{Math.round(total).toLocaleString("da-DK")} kr</TableCell>
                 <TableCell />
               </TableRow>
             </TableBody>
