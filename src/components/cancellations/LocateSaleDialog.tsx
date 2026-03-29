@@ -72,6 +72,8 @@ export function LocateSaleDialog({
       return new Set((data || []).map(d => d.sale_id));
     },
     enabled: open,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   // Fetch all agent identities for this employee via agent mappings
