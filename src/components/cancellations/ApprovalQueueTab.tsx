@@ -497,11 +497,15 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
         const saleDateVal = sale?.sale_datetime || "";
         const targetProductName = item.target_product_name || null;
 
-        // Check if the matched product is phone_excluded
+        // Check if the matched product is phone_excluded (check both target and real product)
         const phoneExcludedList = mapping?.phone_excluded_products || [];
         const targetProduct = (targetProductName || "").toLowerCase().trim();
-        const isPhoneExcluded = phoneExcludedList.length > 0 && targetProduct
-          ? phoneExcludedList.some(ep => targetProduct.includes(ep) || ep.includes(targetProduct))
+        const saleRealProduct = (saleItems[0]?.product_name || "").toLowerCase().trim();
+        const isPhoneExcluded = phoneExcludedList.length > 0
+          ? phoneExcludedList.some(ep =>
+              (targetProduct && (targetProduct.includes(ep) || ep.includes(targetProduct))) ||
+              (saleRealProduct && (saleRealProduct.includes(ep) || ep.includes(saleRealProduct)))
+            )
           : false;
 
         const diffs = computeDiff(uploaded, saleItems, mapping, saleDateVal, targetProductName);

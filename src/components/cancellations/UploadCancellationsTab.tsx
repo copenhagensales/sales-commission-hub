@@ -1128,16 +1128,29 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             const firstItem = allItems[0];
             const realProduct = firstItem?.adversus_product_title || "Ukendt produkt";
 
-            // If condition matcher resolved a different product than the sale's,
-            // check if the sale's product also satisfies the row's conditions.
-            // This handles ambiguous conditions (e.g. "med" vs "uden" with identical rules).
-            let finalTarget = resolvedProduct || rawRowProduct || "Ukendt produkt";
-            if (resolvedProduct && realProduct && resolvedProduct.toLowerCase() !== realProduct.toLowerCase()) {
-              const realProdEntry = [...condProductNames.entries()].find(([_, name]) => name.toLowerCase() === realProduct.toLowerCase());
-              if (realProdEntry) {
-                const realProdGroup = groupedConditions.find(g => g.product_id === realProdEntry[0]);
-                if (realProdGroup && evaluateConditions(realProdGroup.conditions, row.originalRow)) {
-                  finalTarget = realProduct;
+            // Check if the sale's real product is phone_excluded (e.g. "5G Internet")
+            const realProductLower = realProduct.toLowerCase().trim();
+            const isRealProductExcluded = phoneExcludedProducts.some(
+              (p) => realProductLower.includes(p.toLowerCase().trim()) || p.toLowerCase().trim().includes(realProductLower)
+            );
+
+            let finalTarget: string;
+            if (isRealProductExcluded) {
+              // For phone_excluded products, use the system's product name as target
+              // so classification correctly identifies it as correct_match
+              finalTarget = realProduct;
+            } else {
+              // If condition matcher resolved a different product than the sale's,
+              // check if the sale's product also satisfies the row's conditions.
+              // This handles ambiguous conditions (e.g. "med" vs "uden" with identical rules).
+              finalTarget = resolvedProduct || rawRowProduct || "Ukendt produkt";
+              if (resolvedProduct && realProduct && resolvedProduct.toLowerCase() !== realProduct.toLowerCase()) {
+                const realProdEntry = [...condProductNames.entries()].find(([_, name]) => name.toLowerCase() === realProduct.toLowerCase());
+                if (realProdEntry) {
+                  const realProdGroup = groupedConditions.find(g => g.product_id === realProdEntry[0]);
+                  if (realProdGroup && evaluateConditions(realProdGroup.conditions, row.originalRow)) {
+                    finalTarget = realProduct;
+                  }
                 }
               }
             }
@@ -1691,9 +1704,10 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             const phoneExcluded: string[] = (activeQueueConfig as any)?.phone_excluded_products || [];
             const targetName = (sale.targetProductName || "").trim().toLowerCase();
             const realName = (sale.realProductName || "").trim().toLowerCase();
-            const isPhoneExcluded = phoneExcluded.some(p => targetName.includes(p.trim().toLowerCase()) || p.trim().toLowerCase().includes(targetName));
+            const isPhoneExcludedTarget = phoneExcluded.some(p => targetName.includes(p.trim().toLowerCase()) || p.trim().toLowerCase().includes(targetName));
+            const isPhoneExcludedReal = phoneExcluded.some(p => realName.includes(p.trim().toLowerCase()) || p.trim().toLowerCase().includes(realName));
             
-            if (isPhoneExcluded || (targetName && realName && targetName === realName)) {
+            if (isPhoneExcludedTarget || isPhoneExcludedReal || (targetName && realName && targetName === realName)) {
               rowUploadType = "correct_match";
             } else {
               rowUploadType = "basket_difference";
