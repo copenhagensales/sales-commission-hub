@@ -1182,6 +1182,32 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                   }
                 }
               }
+
+              // Reverse check: upload product is phone_excluded but sale is not
+              const uploadProductLower = finalTarget.toLowerCase().trim();
+              const isUploadProductExcluded = uploadProductLower && phoneExcludedProducts.some(
+                p => uploadProductLower.includes(p.toLowerCase().trim()) || p.toLowerCase().trim().includes(uploadProductLower)
+              );
+
+              if (isUploadProductExcluded) {
+                let isRowCancellation = uploadType === "cancellation";
+                if (!isRowCancellation && uploadType === "both") {
+                  const typeCol = activeConfig?.type_detection_column;
+                  const typeVals = ((activeConfig?.type_detection_values as string[]) || []);
+                  if (typeCol && typeVals.length > 0) {
+                    const cellVal = String(getCaseInsensitive(row.originalRow, typeCol) || "").trim().toLowerCase();
+                    isRowCancellation = typeVals.some(v => v.toLowerCase() === cellVal);
+                  }
+                  if (!isRowCancellation) {
+                    const annulledVal = String(getCaseInsensitive(row.originalRow, "Annulled Sales") || "").trim();
+                    isRowCancellation = annulledVal !== "" && annulledVal !== "0";
+                  }
+                }
+
+                if (isRowCancellation) {
+                  continue; // Upload is 5G but sale is not → skip, Pass 2 handles
+                }
+              }
             }
 
             productMatched.push({
