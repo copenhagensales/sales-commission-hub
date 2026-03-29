@@ -1490,6 +1490,10 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                   </div>
                 )}
               </TabsContent>
+  const correctMatchCount = useMemo(() =>
+    filteredOppGroups.filter((g) => g.uploadType === "correct_match").length +
+    filteredFlatItems.filter((i) => i.upload_type === "correct_match").length,
+    [filteredOppGroups, filteredFlatItems]);
 
 
               <TabsContent value="match_errors" className="mt-4">
