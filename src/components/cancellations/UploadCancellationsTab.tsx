@@ -2217,7 +2217,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                 className="text-sm px-3 py-1 cursor-pointer"
                 onClick={() => setPreviewTab("matched")}
               >
-                {matchedRowIndices.size} matchede rækker ({matchedSales.length} salg)
+                {coveredRowIndices.size} matchede rækker ({mergedMatchedSales.length} salg)
               </Badge>
               {unmatchedCount > 0 && (
                 <Badge
