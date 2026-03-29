@@ -1950,17 +1950,18 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
   // Build coveredRowIndices: matchedRowIndices + any Excel rows whose phone matches a merged phone
   const coveredRowIndices = useMemo(() => {
     const covered = new Set(matchedRowIndices);
-    if (matchedPhones.size > 0) {
+    if (matchedPhones.size > 0 && phoneColumn !== "__none__") {
       for (const row of filteredDataForPreview) {
         if (covered.has(row.originalIndex)) continue;
-        const rowPhone = row.phone ? normalizePhone(row.phone) : null;
+        const rawPhone = String(getCaseInsensitive(row.originalRow, phoneColumn) ?? "").trim();
+        const rowPhone = rawPhone ? normalizePhone(rawPhone) : null;
         if (rowPhone && matchedPhones.has(rowPhone)) {
           covered.add(row.originalIndex);
         }
       }
     }
     return covered;
-  }, [matchedRowIndices, matchedPhones, filteredDataForPreview]);
+  }, [matchedRowIndices, matchedPhones, filteredDataForPreview, phoneColumn]);
 
   const unmatchedRows = filteredDataForPreview.filter(row => !coveredRowIndices.has(row.originalIndex));
   const unmatchedCount = unmatchedRows.length;
