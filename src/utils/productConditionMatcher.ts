@@ -97,13 +97,27 @@ export function evaluateConditions(
  */
 export function findMatchingProductId(
   groupedConditions: GroupedProductConditions[],
-  rowData: Record<string, unknown>
+  rowData: Record<string, unknown>,
+  debug = false
 ): string | null {
   for (const group of groupedConditions) {
-    if (evaluateConditions(group.conditions, rowData)) {
+    const match = evaluateConditions(group.conditions, rowData);
+    if (debug) {
+      console.log(`[ProductMatcher] product=${group.product_id} match=${match}`, {
+        conditions: group.conditions.map(c => ({
+          col: c.column_name,
+          op: c.operator,
+          vals: c.values,
+          cellValue: String(rowData[c.column_name] ?? "").trim().toLowerCase(),
+        })),
+      });
+    }
+    if (match) {
+      if (debug) console.log(`[ProductMatcher] ✅ Matched product: ${group.product_id}`);
       return group.product_id;
     }
   }
+  if (debug) console.log(`[ProductMatcher] ❌ No product matched for row`, rowData);
   return null;
 }
 
