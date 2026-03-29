@@ -450,6 +450,10 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
 
   const processed = useMemo(() => {
     let result = [...rows];
+    // Filter out rows that have been locally matched
+    if (localManualMatches.size > 0) {
+      result = result.filter(r => !localManualMatches.has(rowKey(r)));
+    }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(r => {
@@ -458,7 +462,7 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
       });
     }
     return result;
-  }, [rows, searchQuery]);
+  }, [rows, searchQuery, localManualMatches]);
 
   // Helper to resolve employee for a given row
   const getAssignedEmployeeId = useCallback((rk: string, row: FlatUnmatchedRow): string => {
