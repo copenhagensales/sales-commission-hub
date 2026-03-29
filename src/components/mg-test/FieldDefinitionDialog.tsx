@@ -47,6 +47,7 @@ const formSchema = z.object({
   is_required: z.boolean(),
   is_hidden: z.boolean(),
   retention_days: z.string().optional(),
+  dialer_retention_days: z.string().optional(),
   description: z.string().optional(),
 });
 
@@ -77,6 +78,7 @@ export function FieldDefinitionDialog({
       is_required: false,
       is_hidden: false,
       retention_days: "",
+      dialer_retention_days: "180",
       description: "",
     },
   });
@@ -92,6 +94,7 @@ export function FieldDefinitionDialog({
         is_required: field.is_required,
         is_hidden: field.is_hidden,
         retention_days: field.retention_days?.toString() ?? "",
+        dialer_retention_days: field.dialer_retention_days?.toString() ?? "180",
         description: field.description ?? "",
       });
     } else if (open) {
@@ -104,6 +107,7 @@ export function FieldDefinitionDialog({
         is_required: false,
         is_hidden: false,
         retention_days: "",
+        dialer_retention_days: "180",
         description: "",
       });
     }
@@ -112,6 +116,7 @@ export function FieldDefinitionDialog({
   const mutation = useMutation({
     mutationFn: async (data: FormData) => {
       const retentionDays = data.retention_days === "" ? null : parseInt(data.retention_days ?? "");
+      const dialerRetentionDays = data.dialer_retention_days === "" ? null : parseInt(data.dialer_retention_days ?? "180");
       
       const payload = {
         field_key: data.field_key,
@@ -122,6 +127,7 @@ export function FieldDefinitionDialog({
         is_required: data.is_required,
         is_hidden: data.is_hidden,
         retention_days: isNaN(retentionDays as number) ? null : retentionDays,
+        dialer_retention_days: isNaN(dialerRetentionDays as number) ? null : dialerRetentionDays,
         description: data.description || null,
       };
 
@@ -267,6 +273,27 @@ export function FieldDefinitionDialog({
                   </FormControl>
                   <FormDescription>
                     Antal dage før data slettes. Tom = permanent opbevaring. 0 = slet straks (gem aldrig).
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="dialer_retention_days"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Dialer retention (dage)</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      type="number"
+                      placeholder="180"
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Standard opbevaringsperiode i dialer (default 180 dage / 6 mdr). Kun til dokumentation.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
