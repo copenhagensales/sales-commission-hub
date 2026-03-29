@@ -562,7 +562,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   }, [flatItems]);
 
   const duplicateCount = useMemo(() => {
-    return flatItems.filter(i => duplicatePhones.has((i.phone || "").trim())).length;
+    return flatItems.filter(i => !i.isPhoneExcluded && duplicatePhones.has((i.phone || "").trim())).length;
   }, [flatItems, duplicatePhones]);
 
   const approveMutation = useMutation({
