@@ -195,7 +195,7 @@ function computeDiff(
         diffs.push({
           label: colName,
           systemValue: systemProducts.join(", ") || "-",
-          uploadedValue: comparisonUploadedProduct,
+          uploadedValue: rawUploadedProduct,
           isDifferent: !matchesAny && systemProducts.length > 0,
         });
       }
