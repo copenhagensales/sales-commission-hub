@@ -1428,13 +1428,16 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
           {isLoading ? (
             <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
           ) : (
-            <Tabs value={subTab} onValueChange={(v) => setSubTab(v as "cancellation" | "basket_difference" | "match_errors")}>
+            <Tabs value={subTab} onValueChange={(v) => setSubTab(v as "cancellation" | "basket_difference" | "correct_match" | "match_errors")}>
               <TabsList>
                 <TabsTrigger value="cancellation">
                   Annulleringer {cancellationCount > 0 && `(${cancellationCount})`}
                 </TabsTrigger>
                 <TabsTrigger value="basket_difference">
                   Kurv-rettelser {basketCount > 0 && `(${basketCount})`}
+                </TabsTrigger>
+                <TabsTrigger value="correct_match">
+                  Korrekte match {correctMatchCount > 0 && `(${correctMatchCount})`}
                 </TabsTrigger>
                 <TabsTrigger value="match_errors">
                   Fejl i match {matchErrorsCount > 0 && `(${matchErrorsCount})`}
