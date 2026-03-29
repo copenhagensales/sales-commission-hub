@@ -727,7 +727,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
       if (uploadType === "basket_difference" && overrideProductName) {
         const overrideSaleIds = [...new Set(resolvedQueueItems.map((qi: any) => qi.sale_id))];
         const [overrideSaleItems, overrideProduct] = await Promise.all([
-          fetchByIds<any>("sale_items", "sale_id", overrideSaleIds, "id, sale_id, product_id, adversus_product_title"),
+          fetchByIds<any>("sale_items", "sale_id", overrideSaleIds, "id, sale_id, product_id, adversus_product_title, mapped_commission, mapped_revenue"),
           supabase.from("products").select("id, name, commission_dkk, revenue_dkk").eq("name", overrideProductName).maybeSingle(),
         ]);
         
@@ -869,6 +869,8 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
     onSuccess: ({ count }) => {
       toast({ title: "Godkendt", description: `${count} items er godkendt.` });
       queryClient.invalidateQueries({ queryKey: ["cancellation-queue"] });
+      queryClient.invalidateQueries({ queryKey: ["approved-queue"] });
+      queryClient.invalidateQueries({ queryKey: ["sales"] });
     },
     onError: (error: Error) => {
       toast({ title: "Fejl", description: error.message, variant: "destructive" });
