@@ -143,16 +143,16 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
       const { data: { user } } = await supabase.auth.getUser();
       let empId: string | null = null;
       if (user?.email) {
-        const { data: emp } = await (supabase.from("employee_master_data").select("id").eq("email", user.email) as any).maybeSingle();
-        empId = emp?.id || null;
+        const res = await (supabase as any).from("employee_master_data").select("id").eq("email", user.email).maybeSingle();
+        empId = res.data?.id || null;
       }
 
       // Mark log entries as rolled back
       for (const log of logs) {
-        await supabase.from("product_change_log").update({
+        await (supabase as any).from("product_change_log").update({
           rolled_back_at: new Date().toISOString(),
-          rolled_back_by: emp?.id || null,
-        } as any).eq("id", (log as any).id);
+          rolled_back_by: empId,
+        }).eq("id", (log as any).id);
       }
     },
     onSuccess: () => {
