@@ -110,6 +110,7 @@ function computeDiff(
   saleItems: SaleItem[],
   mapping: ColumnMapping | null,
   saleDate?: string,
+  targetProductName?: string | null,
 ): DiffField[] {
   if (!uploadedData || Object.keys(uploadedData).length === 0) return [];
   if (!mapping) return [];
@@ -187,11 +188,16 @@ function computeDiff(
         const isDiff = Math.abs(uploadedQty - systemQty) > 0.01;
         diffs.push({ label: colName, systemValue: `${systemQty}`, uploadedValue: `${uploadedQty}`, isDifferent: isDiff });
       } else {
-      const uploadedProduct = String(val).trim();
-        const normalizedUploaded = normalizeProductName(uploadedProduct, matchMode);
+        const rawUploadedProduct = String(val).trim();
+        const comparisonUploadedProduct = String(targetProductName || rawUploadedProduct).trim();
+        const normalizedUploaded = normalizeProductName(comparisonUploadedProduct, matchMode);
         const matchesAny = systemProducts.some((sp) => normalizeProductName(sp, matchMode) === normalizedUploaded);
-        const isDiff = !matchesAny && systemProducts.length > 0;
-        diffs.push({ label: colName, systemValue: systemProducts.join(", ") || "-", uploadedValue: uploadedProduct, isDifferent: isDiff });
+        diffs.push({
+          label: colName,
+          systemValue: systemProducts.join(", ") || "-",
+          uploadedValue: comparisonUploadedProduct,
+          isDifferent: !matchesAny && systemProducts.length > 0,
+        });
       }
     }
   }
@@ -220,6 +226,30 @@ function summarizeSaleItems(saleItems: SaleItem[]): SaleItem[] {
   }
 
   return Array.from(map.values()).sort((a, b) => b.quantity - a.quantity || a.product_name.localeCompare(b.product_name));
+}
+
+function getDiffTone(diff: DiffField) {
+  if (diff.isExpected) {
+    return {
+      container: "bg-muted/60 border-border",
+      text: "text-foreground",
+      icon: "ℹ",
+    };
+  }
+
+  if (diff.isDifferent) {
+    return {
+      container: "bg-destructive/10 border-destructive/20",
+      text: "text-destructive",
+      icon: "✗",
+    };
+  }
+
+  return {
+    container: "bg-secondary/40 border-border",
+    text: "text-foreground",
+    icon: "✓",
+  };
 }
 
 function buildUploadedPreview(
@@ -303,6 +333,7 @@ interface FlatQueueRow {
   id: string;
   sale_id: string;
   upload_type: string;
+  target_product_name?: string | null;
   status: string;
   reviewed_at: string | null;
   created_at: string;
@@ -464,15 +495,16 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
         const configId = imp?.config_id;
         const mapping = configId ? configsMap.get(configId) || null : null;
         const saleDateVal = sale?.sale_datetime || "";
+        const targetProductName = item.target_product_name || null;
+
         // Check if the matched product is phone_excluded
         const phoneExcludedList = mapping?.phone_excluded_products || [];
-        const targetProduct = (item.target_product_name || "").toLowerCase().trim();
+        const targetProduct = (targetProductName || "").toLowerCase().trim();
         const isPhoneExcluded = phoneExcludedList.length > 0 && targetProduct
           ? phoneExcludedList.some(ep => targetProduct.includes(ep) || ep.includes(targetProduct))
           : false;
 
-        const diffs = computeDiff(uploaded, saleItems, mapping, saleDateVal);
-        // For phone_excluded or basket_difference items, mark product diffs as expected
+        const diffs = computeDiff(uploaded, saleItems, mapping, saleDateVal, targetProductName);
         if (isPhoneExcluded || item.upload_type === "basket_difference") {
           for (const d of diffs) {
             if (d.isDifferent && mapping?.product_columns?.some(pc => d.label === pc)) {
@@ -529,7 +561,17 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
           if (!earliest) return i.saleDate;
           return i.saleDate < earliest ? i.saleDate : earliest;
         }, "" as string);
-        const diffs = computeDiff(uploaded, aggregatedItems, mapping, earliestDate);
+        const groupTargetProducts = [...new Set(items.map((i) => i.target_product_name).filter(Boolean))];
+        const groupTargetProductName = groupTargetProducts.length === 1 ? groupTargetProducts[0] : null;
+        const diffs = computeDiff(uploaded, aggregatedItems, mapping, earliestDate, groupTargetProductName);
+        const isPhoneExcludedGroup = items.some((i) => i.isPhoneExcluded);
+        if (isPhoneExcludedGroup || items[0]?.upload_type === "basket_difference") {
+          for (const d of diffs) {
+            if (d.isDifferent && mapping?.product_columns?.some((pc) => d.label === pc)) {
+              d.isExpected = true;
+            }
+          }
+        }
 
         oppGroups.push({
           oppGroup,
@@ -1077,15 +1119,18 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                         <TableCell className="text-xs min-w-[220px] align-top">
                           {g.diffs.length > 0 ? (
                             <div className="space-y-1">
-                              {g.diffs.map((d, idx) => (
-                                <div key={idx} className={`p-1 rounded border ${d.isExpected ? 'bg-blue-500/10 border-blue-500/20' : d.isDifferent ? 'bg-destructive/10 border-destructive/20' : 'bg-green-500/10 border-green-500/20'}`}>
-                                  <div className={`font-medium ${d.isExpected ? 'text-blue-600' : d.isDifferent ? 'text-destructive' : 'text-green-600'}`}>
-                                    {d.isExpected ? 'ℹ' : d.isDifferent ? '✗' : '✓'} {d.label}
+                              {g.diffs.map((d, idx) => {
+                                const tone = getDiffTone(d);
+                                return (
+                                  <div key={idx} className={`p-1 rounded border ${tone.container}`}>
+                                    <div className={`font-medium ${tone.text}`}>
+                                      {tone.icon} {d.label}
+                                    </div>
+                                    <div>System: <span className="font-mono">{d.systemValue}</span></div>
+                                    <div>Upload: <span className="font-mono">{d.uploadedValue}</span></div>
                                   </div>
-                                  <div>System: <span className="font-mono">{d.systemValue}</span></div>
-                                  <div>Upload: <span className="font-mono">{d.uploadedValue}</span></div>
-                                </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           ) : (
                             <Badge variant="outline">✓ Match</Badge>
@@ -1199,15 +1244,18 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                         <TableCell className="text-xs min-w-[220px] align-top">
                           {item.diffs.length > 0 ? (
                             <div className="space-y-1">
-                              {item.diffs.map((d, idx) => (
-                                <div key={idx} className={`p-1 rounded border ${d.isExpected ? 'bg-blue-500/10 border-blue-500/20' : d.isDifferent ? 'bg-destructive/10 border-destructive/20' : 'bg-green-500/10 border-green-500/20'}`}>
-                                  <div className={`font-medium ${d.isExpected ? 'text-blue-600' : d.isDifferent ? 'text-destructive' : 'text-green-600'}`}>
-                                    {d.isExpected ? 'ℹ' : d.isDifferent ? '✗' : '✓'} {d.label}
+                              {item.diffs.map((d, idx) => {
+                                const tone = getDiffTone(d);
+                                return (
+                                  <div key={idx} className={`p-1 rounded border ${tone.container}`}>
+                                    <div className={`font-medium ${tone.text}`}>
+                                      {tone.icon} {d.label}
+                                    </div>
+                                    <div>System: <span className="font-mono">{d.systemValue}</span></div>
+                                    <div>Upload: <span className="font-mono">{d.uploadedValue}</span></div>
                                   </div>
-                                  <div>System: <span className="font-mono">{d.systemValue}</span></div>
-                                  <div>Upload: <span className="font-mono">{d.uploadedValue}</span></div>
-                                </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           ) : (
                             <span className="text-muted-foreground">Ingen forskelle</span>
