@@ -114,6 +114,7 @@ export default function RetentionPolicies() {
     mutationFn: async (params: {
       client_campaign_id: string;
       retention_days?: number | null;
+      dialer_retention_days?: number | null;
       is_active?: boolean;
       cleanup_mode?: string;
       no_data_held?: boolean;
@@ -124,6 +125,7 @@ export default function RetentionPolicies() {
           {
             client_campaign_id: params.client_campaign_id,
             ...(params.retention_days !== undefined && { retention_days: params.retention_days }),
+            ...(params.dialer_retention_days !== undefined && { dialer_retention_days: params.dialer_retention_days }),
             ...(params.is_active !== undefined && { is_active: params.is_active }),
             ...(params.cleanup_mode !== undefined && { cleanup_mode: params.cleanup_mode }),
             ...(params.no_data_held !== undefined && { no_data_held: params.no_data_held }),
@@ -168,6 +170,12 @@ export default function RetentionPolicies() {
 
   const handleNoDataHeldToggle = (campaignId: string, noData: boolean) => {
     upsertMutation.mutate({ client_campaign_id: campaignId, no_data_held: noData });
+  };
+
+  const handleDialerRetentionDaysChange = (campaignId: string, value: string) => {
+    const days = value === "" ? null : parseInt(value, 10);
+    if (value !== "" && isNaN(days as number)) return;
+    upsertMutation.mutate({ client_campaign_id: campaignId, dialer_retention_days: days });
   };
 
   const handleDataRetentionDaysChange = (dataType: string, value: string) => {
