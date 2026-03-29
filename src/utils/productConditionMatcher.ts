@@ -80,10 +80,10 @@ export function evaluateConditions(
     switch (c.operator) {
       case "equals":
       case "in":
-        return valueMatchesAny(cellValue, vals);
+        return vals.includes(cellValue);
       case "not_equals":
       case "not_in":
-        return !valueMatchesAny(cellValue, vals);
+        return !vals.includes(cellValue);
       default:
         return true;
     }
