@@ -1,18 +1,29 @@
 
 
-## Plan: Simplificér matcher til ren exact-match + fix kø-rækker
+## Problem
 
-### Trin 1: Fix `src/utils/productConditionMatcher.ts`
-- **Slet** `valueMatchesAny` funktionen (linje 62-79) helt
-- **Erstat** `valueMatchesAny(cellValue, vals)` med `vals.includes(cellValue)` i `evaluateConditions` (linje 101, 104)
-- **Tilføj** console.log i `findMatchingProductId` til debugging
+I **Pass 1b** (linje 1122-1128) og **Pass 2** (linje 1374-1377) kræver koden, at salget indeholder et produkt der matcher `resolvedProduct` eksakt (`hasProduct` check). Hvis produktet er anderledes — hvilket er selve definitionen af en kurvrettelse — springes rækken over med `continue`.
 
-### Trin 2: Slet de 53 forkerte kø-rækker (database migration)
-- Slet rækker fra `cancellation_queue` hvor `target_product_name = '5G Internet'` men uploaded_data's Subscription Name IKKE er "5G Internet" eller "Ubegrænset data"
-- Flyt disse rækkers data til `unmatched_rows` i `cancellation_imports` så de kan re-matches korrekt
-- Opdatér `rows_matched` tæller
+## Løsning
 
-### Berørte filer
-- `src/utils/productConditionMatcher.ts`
-- Database: `cancellation_queue` + `cancellation_imports`
+Fjern `hasProduct`-kravet som gate/filter. Match i stedet salget på telefon/sælger/dato som hidtil, og gem **begge** produktnavne (`targetProductName` fra Excel, `realProductName` fra salget). Klassificeringen (annullering vs. korrekt match vs. kurvrettelse) sker allerede downstream baseret på om de to navne matcher.
+
+## Ændringer i `src/components/cancellations/UploadCancellationsTab.tsx`
+
+### Pass 1b (ca. linje 1117-1149)
+- Fjern `if (!resolvedProduct) continue;` (linje 1123)
+- Fjern `hasProduct` check + `if (!hasProduct) continue;` (linje 1125-1128)
+- Brug `resolvedProduct` som `targetProductName` (uændret)
+- Sæt `realProductName` til salgets første item's `adversus_product_title` (i stedet for kun det matchende items)
+- Behold dedup-key som `saleId|phone` i stedet for `saleId|resolvedProduct`
+
+### Pass 2 non-excluded (ca. linje 1362-1401)
+- Fjern `hasProduct` check + `if (!hasProduct) continue;` (linje 1374-1377)
+- Sæt `realProductName` til salgets første items produkt
+- Behold sælger+dato matching uændret
+
+### Ingen ændringer i:
+- `productConditionMatcher.ts` (exact-match logik er korrekt)
+- Klassificeringslogik downstream (bruger allerede `targetProductName` vs `realProductName`)
+- ApprovalQueueTab (viser allerede diffs korrekt)
 
