@@ -1813,7 +1813,10 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       const phoneLookup = new Map<string, string>();
       matchedSales.forEach(sale => {
         if (sale.phone) {
-          phoneLookup.set(sale.saleId, sale.phone.replace(/[\s\-\(\)\.]/g, ''));
+          const normalized = sale.phone.replace(/[\s\-\(\)\.]/g, '');
+          if (normalized) {
+            phoneLookup.set(sale.saleId, normalized);
+          }
         }
       });
 
@@ -1821,10 +1824,14 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       const deduplicatedItems = queueItems.filter(item => {
         const phone = phoneLookup.get(item.sale_id);
         if (!phone) return true; // no phone — keep
-        if (seenPhones.has(phone)) return false; // duplicate — skip
+        if (seenPhones.has(phone)) {
+          console.log(`[dedup] Removing duplicate queue item for phone=${phone}, sale_id=${item.sale_id}, type=${item.upload_type}`);
+          return false;
+        }
         seenPhones.add(phone);
         return true;
       });
+      console.log(`[dedup] Before: ${queueItems.length}, After: ${deduplicatedItems.length}, Removed: ${queueItems.length - deduplicatedItems.length}`);
 
       for (let i = 0; i < deduplicatedItems.length; i += 50) {
         const batch = deduplicatedItems.slice(i, i + 50);
