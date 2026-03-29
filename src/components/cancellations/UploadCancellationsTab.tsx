@@ -1139,8 +1139,8 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               // Determine if this row is a cancellation
               let isRowCancellation = uploadType === "cancellation";
               if (!isRowCancellation && uploadType === "both") {
-                const typeCol = activeQueueConfig?.type_detection_column;
-                const typeVals = ((activeQueueConfig?.type_detection_values as string[]) || []);
+                const typeCol = activeConfig?.type_detection_column;
+                const typeVals = ((activeConfig?.type_detection_values as string[]) || []);
                 if (typeCol && typeVals.length > 0) {
                   const cellVal = String(getCaseInsensitive(row.originalRow, typeCol) || "").trim().toLowerCase();
                   isRowCancellation = typeVals.some(v => v.toLowerCase() === cellVal);
