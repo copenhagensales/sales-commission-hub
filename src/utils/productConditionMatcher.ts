@@ -68,16 +68,12 @@ function valueMatchesAny(cellValue: string, vals: string[]): boolean {
   // Exact match
   if (vals.includes(cellValue)) return true;
   // Check if cellValue matches a space-separated token within a stored value
+  // (handles legacy concatenated values like "5G Internet Ubegrænset data")
   for (const v of vals) {
     if (v.includes(" ")) {
       const tokens = v.split(/\s+/).filter(Boolean);
       if (tokens.includes(cellValue)) return true;
     }
-  }
-  // Check if any stored value is a substring of the cell value or vice versa
-  // This handles cases like stored "5G Internet Ubegrænset data" vs cell "5G Internet"
-  for (const v of vals) {
-    if (cellValue.includes(v) || v.includes(cellValue)) return true;
   }
   return false;
 }
