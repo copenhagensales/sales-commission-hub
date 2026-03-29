@@ -1,0 +1,1 @@
+ALTER TABLE public.campaign_retention_policies ADD COLUMN dialer_retention_days integer DEFAULT 180;

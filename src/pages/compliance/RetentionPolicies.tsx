@@ -21,6 +21,7 @@ interface RetentionPolicy {
   id: string;
   client_campaign_id: string;
   retention_days: number | null;
+  dialer_retention_days: number | null;
   is_active: boolean;
   cleanup_mode: string;
   no_data_held: boolean;
