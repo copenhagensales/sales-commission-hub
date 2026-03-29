@@ -11,11 +11,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, Loader2, Check, AlertTriangle } from "lucide-react";
+import { Search, Loader2, Check, AlertTriangle, CalendarIcon, X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 interface FlatUnmatchedRow {
   importId: string;
@@ -53,8 +56,23 @@ export function LocateSaleDialog({
   assignedEmployeeName,
 }: LocateSaleDialogProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined);
   const [filterByEmployee, setFilterByEmployee] = useState(!!assignedEmployeeId);
   const queryClient = useQueryClient();
+
+  // Fetch sale_ids already in the queue (exclude rejected)
+  const { data: usedSaleIds } = useQuery({
+    queryKey: ["used-sale-ids", clientId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("cancellation_queue")
+        .select("sale_id")
+        .eq("client_id", clientId)
+        .neq("status", "rejected");
+      return new Set((data || []).map(d => d.sale_id));
+    },
+    enabled: open,
+  });
 
   // Fetch all agent identities for this employee via agent mappings
   const { data: agentIdentities, isLoading: agentLoading } = useQuery({
@@ -153,19 +171,34 @@ export function LocateSaleDialog({
   });
 
   const filtered = useMemo(() => {
-    if (!searchQuery.trim()) return sales;
-    const q = searchQuery.toLowerCase();
-    return sales.filter(s => {
-      const searchable = [
-        s.agent_name,
-        s.agent_email,
-        s.customer_phone,
-        s.customer_company,
-        s.sale_items?.map(i => i.display_name).join(" "),
-      ].filter(Boolean).join(" ").toLowerCase();
-      return searchable.includes(q);
-    });
-  }, [sales, searchQuery]);
+    let result = sales;
+    // Exclude sales already in queue
+    if (usedSaleIds?.size) {
+      result = result.filter(s => !usedSaleIds.has(s.id));
+    }
+    // Date filter
+    if (dateFilter) {
+      const target = format(dateFilter, "yyyy-MM-dd");
+      result = result.filter(s =>
+        s.sale_datetime && format(new Date(s.sale_datetime), "yyyy-MM-dd") === target
+      );
+    }
+    // Search filter
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(s => {
+        const searchable = [
+          s.agent_name,
+          s.agent_email,
+          s.customer_phone,
+          s.customer_company,
+          s.sale_items?.map(i => i.display_name).join(" "),
+        ].filter(Boolean).join(" ").toLowerCase();
+        return searchable.includes(q);
+      });
+    }
+    return result;
+  }, [sales, searchQuery, usedSaleIds, dateFilter]);
 
   const linkSaleMutation = useMutation({
     mutationFn: async (saleId: string) => {
@@ -236,8 +269,8 @@ export function LocateSaleDialog({
           </div>
 
           {/* Search + filter */}
-          <div className="flex items-center gap-4">
-            <div className="relative flex-1">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative flex-1 min-w-[180px]">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Søg telefon, firma, sælger..."
@@ -245,6 +278,42 @@ export function LocateSaleDialog({
                 onChange={e => setSearchQuery(e.target.value)}
                 className="pl-9"
               />
+            </div>
+            <div className="flex items-center gap-1">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={cn(
+                      "h-9 gap-1.5 text-xs",
+                      !dateFilter && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="h-3.5 w-3.5" />
+                    {dateFilter ? format(dateFilter, "dd-MM-yyyy") : "Dato"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={dateFilter}
+                    onSelect={setDateFilter}
+                    initialFocus
+                    className="pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+              {dateFilter && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 w-9 p-0"
+                  onClick={() => setDateFilter(undefined)}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              )}
             </div>
             {assignedEmployeeId && (
               <div className="flex items-center gap-2">
