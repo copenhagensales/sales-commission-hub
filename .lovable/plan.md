@@ -1,37 +1,74 @@
 
-
-## Plan: Ekskluder phone_excluded produkter fra dublet-detektering
+## Plan: Fix produkt-matching i upload-flowet (Pass 1b)
 
 ### Problem
-Phone_excluded produkter (f.eks. 5G Internet) har irrelevante/placeholder telefonnumre, som skaber falske "Dublet"-markeringer i godkendelseskøen.
+Når en Excel-række med "5G Internet Ubegrænset data" uploades, matcher Pass 1b den til et salg baseret udelukkende på telefonnummer — uden at verificere om salgets produkt stemmer overens med den konfigurerede produkt-mapping. Resultatet er, at en 5G Internet-række kobles til et Eesy-salg, fordi kunden tilfældigvis har begge salg med samme telefonnummer.
+
+Derudover sætter Pass 1b `targetProductName` til salgets første `adversus_product_title` (f.eks. "Eesy uden første måned"), i stedet for det resolvede produkt fra betingelserne. Derfor viser godkendelseskøen forkert produkt og `target_product_name` er `null` i databasen.
 
 ### Løsning
 
-**Fil: `src/components/cancellations/ApprovalQueueTab.tsx`**
+**Fil: `src/components/cancellations/UploadCancellationsTab.tsx`**
 
-1. **Udvid config-fetch** — tilføj `phone_excluded_products` til `cancellation_upload_configs` select-query (linje ~414)
+**Ændring i Pass 1b (linje ~1070-1098):**
 
-2. **Udvid `ColumnMapping` interface** — tilføj `phone_excluded_products: string[]`
+Før Pass 1b starter telefonmatching, resolv først produktet via condition-based matching og legacy mappings (samme logik som Pass 2 allerede bruger). Derefter:
 
-3. **Marker items som phone_excluded i flatItems** — i mapping-fasen (linje ~451-478), tjek om rækkens produkt (fra `uploaded_data` via product_columns) matcher et phone_excluded produkt. Tilføj `isPhoneExcluded: boolean` til `FlatQueueRow`
+1. Hvis et produkt resolves (f.eks. "5G Internet"), kræv at det matchede salg har det produkt i sine `sale_items` — ellers spring salget over
+2. Sæt `targetProductName` til det resolvede produkt, ikke til salgets første item
+3. Hvis intet produkt kan resolves, behold nuværende adfærd (match på telefon alene)
 
-4. **Filtrér dublet-logikken** (linje ~536-547) — spring items over hvor `isPhoneExcluded === true`:
 ```typescript
-const duplicatePhones = useMemo(() => {
-  const phoneCounts = new Map<string, number>();
-  for (const item of flatItems) {
-    if (item.isPhoneExcluded) continue; // Skip phone_excluded produkter
-    const phone = (item.phone || "").trim();
-    if (phone) phoneCounts.set(phone, (phoneCounts.get(phone) || 0) + 1);
+// Resolve expected product for this row via conditions/mappings
+let resolvedProduct: string | null = null;
+if (groupedConditions.length > 0) {
+  const matchedPid = findMatchingProductId(groupedConditions, row.originalRow);
+  if (matchedPid) resolvedProduct = condProductNames.get(matchedPid) || null;
+}
+if (!resolvedProduct) {
+  // Try legacy mapping
+  let excelSubName = "";
+  // ... (same product column lookup as Pass 2)
+  if (excelSubName) {
+    resolvedProduct = productMappingLookup.get(excelSubName.toLowerCase().trim()) || null;
   }
-  // ...
-}, [flatItems]);
+}
+
+for (const sale of candidateSales) {
+  // ... phone match check ...
+  
+  const allItems = saleItemsMap.get(sale.id) || [];
+  
+  // If we resolved a product, verify the sale has it
+  if (resolvedProduct) {
+    const hasProduct = allItems.some(item =>
+      item.adversus_product_title?.toLowerCase() === resolvedProduct!.toLowerCase()
+    );
+    if (!hasProduct) continue; // Skip — wrong product
+  }
+  
+  const firstItem = allItems[0];
+  productMatched.push({
+    // ...
+    targetProductName: resolvedProduct || firstItem?.adversus_product_title || "Ukendt produkt",
+    realProductName: resolvedProduct 
+      ? (allItems.find(i => i.adversus_product_title?.toLowerCase() === resolvedProduct!.toLowerCase())?.adversus_product_title || resolvedProduct)
+      : firstItem?.adversus_product_title || "Ukendt produkt",
+  });
+}
 ```
 
-5. **Opdater dublet-badge rendering** (linje ~1131) — vis ikke "Dublet" badge for phone_excluded items
+**Forudsætning:** `groupedConditions`, `condProductNames`, og `productMappingLookup` er allerede tilgængelige i scope, da de hentes før Pass 2 (linje ~1108-1139). Disse skal flyttes op FØR Pass 1b, så de også er tilgængelige der.
 
-### Filer
-| Fil | Ændring |
-|-----|---------|
-| `src/components/cancellations/ApprovalQueueTab.tsx` | Alt ovenfor — interface, config-fetch, isPhoneExcluded flag, dublet-filtrering |
+### Ændringer i detaljer
 
+| Hvad | Linje (ca.) | Ændring |
+|------|-------------|---------|
+| Flyt condition/mapping-fetch op | ~1108-1139 → ~1042 | Flyt fetch af `conditionRows`, `groupedConditions`, `condProductNames`, `productMappingLookup` til FØR Pass 1b |
+| Pass 1b produkt-verifikation | ~1070-1098 | Resolv produkt og verificér match mod sale_items |
+| `targetProductName` | ~1092 | Brug resolvet produkt i stedet for salgets første item |
+
+### Effekt
+- "5G Internet Ubegrænset data" vil kun matche salg der faktisk har et 5G Internet-produkt i sine sale_items
+- Eesy-salg springes over, selv om telefonnummeret er det samme
+- `target_product_name` sættes korrekt i køen, så godkendelsesvisningen også viser korrekt produktmatch
