@@ -60,6 +60,25 @@ function normalizeConditionValues(rawValues: string[]): string[] {
 }
 
 /**
+ * For in/not_in matching: check if a cell value matches any of the
+ * normalized condition values. Handles both exact matches and
+ * substring token matching for legacy concatenated values.
+ */
+function valueMatchesAny(cellValue: string, vals: string[]): boolean {
+  // Exact match
+  if (vals.includes(cellValue)) return true;
+  // Check if cellValue matches a space-separated token within a stored value
+  // (handles legacy concatenated values like "5G Internet Ubegrænset data")
+  for (const v of vals) {
+    if (v.includes(" ")) {
+      const tokens = v.split(/\s+/).filter(Boolean);
+      if (tokens.includes(cellValue)) return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Evaluate whether a single row matches ALL conditions for a product.
  */
 export function evaluateConditions(
@@ -79,31 +98,10 @@ export function evaluateConditions(
     switch (c.operator) {
       case "equals":
       case "in":
-        // Exact match first
-        if (vals.includes(cellValue)) return true;
-        // Tolerant: if a stored value contains spaces and looks like
-        // multiple concatenated tokens, check if cellValue matches any token
-        for (const v of vals) {
-          if (v.includes(" ")) {
-            const tokens = v.split(/\s+/).filter(Boolean);
-            if (tokens.includes(cellValue)) return true;
-          }
-        }
-        // Also check if cellValue (which may be multi-word) is a substring
-        // match against any stored value or vice versa
-        return false;
+        return valueMatchesAny(cellValue, vals);
       case "not_equals":
       case "not_in":
-        // Exact exclusion
-        if (vals.includes(cellValue)) return false;
-        // Also check space-separated tokens within stored values
-        for (const v of vals) {
-          if (v.includes(" ")) {
-            const tokens = v.split(/\s+/).filter(Boolean);
-            if (tokens.includes(cellValue)) return false;
-          }
-        }
-        return true;
+        return !valueMatchesAny(cellValue, vals);
       default:
         return true;
     }
