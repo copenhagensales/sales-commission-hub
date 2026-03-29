@@ -1578,6 +1578,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         }
       }
 
+      const uploadedRowsByOpp = new Map<string, Record<string, unknown>[]>();
       const uploadedRowsByPhone = new Map<string, Record<string, unknown>[]>();
       const uploadedRowByCompany = new Map<string, Record<string, unknown>>();
       const uploadedRowByMemberNr = new Map<string, Record<string, unknown>>();
