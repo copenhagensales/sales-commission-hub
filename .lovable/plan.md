@@ -1,62 +1,47 @@
 
-Do I know what the issue is? Yes.
 
-Problemet er ikke længere kun UI. Der er mindst 3 fejl i selve match-logikken, og de forklarer præcis de to eksempler du har sendt:
+## Problem: Værdier gemmes som sammenkædede strenge
 
-1. `src/utils/productConditionMatcher.ts`
-- `in` / `not_in` regler er for skrøbelige.
-- Matcher’en splitter kun på komma/semikolon.
-- Dine Eesy-regler ser ud til at være gemt som samlede tekstværdier som fx `Yousee Telmore` eller flere subscriptions i én streng.
-- Konsekvens: `in` fejler ofte, mens brede `not_in` regler bliver for nemme at matche, så rækker havner på et forkert Eesy-produkt.
+Databasen indeholder:
+```text
+5G Internet produkt:
+  Subscription Name IN {"5G Internet Ubegrænset data"}   ← 1 element
 
-2. `src/components/cancellations/UploadCancellationsTab.tsx` i Pass 1b
-- Når `resolvedProduct` ikke findes, tillader koden stadig et rent telefon-match.
-- Derefter sættes `targetProductName` til salgets første produkt.
-- Det fabrikerer et falsk produktmatch og giver `correct_match`, selv når upload-produktet slet ikke matcher salget.
+Eesy produkter:
+  Subscription Name NOT_IN {"5G Internet Ubegrænset data", "Fri tale + 20 GB data (5G) (6 mdr. binding)"}
+```
 
-3. Samme fil i 5G-flowet
-- 5G / `phone_excluded` afgøres stadig via for snævre streng-sammenligninger.
-- En upload-række som `Fri tale + fri data (5G)` eller `Fri tale + 70 GB data (5G)` bliver ikke sikkert genkendt som den særlige 5G-type.
-- Derfor ryger den ikke ind i den rigtige speciallogik og ender med at blive behandlet som et almindeligt produktmatch.
+Det burde være:
+```text
+5G Internet produkt:
+  Subscription Name IN {"5G Internet", "Ubegrænset data"}   ← 2 elementer
 
-Det jeg vil bygge:
-1. Gør condition-matching robust
-- Opdatér `productConditionMatcher.ts`, så `in` / `not_in` også kan håndtere fejlagtigt sammensmeltede værdier.
-- Behold eksakte matches først, men tilføj tolerant evaluering for kombinerede strengværdier.
-- Prioritér mere specifikke regler over brede negative regler, så generelle `not_in` regler ikke “sluger” 5G-rækker.
+Eesy produkter:
+  Subscription Name NOT_IN {"5G Internet", "Ubegrænset data", "Fri tale + 20 GB data (5G) (6 mdr. binding)"}
+```
 
-2. Stop falske produktmatches i Pass 1b
-- I `UploadCancellationsTab.tsx` må en række uden løst produkt ikke længere blive sendt videre som produktmatch kun fordi telefonen matcher.
-- Hvis produktet ikke kan løses, skal rækken enten:
-  - gå videre til korrekt specialflow, eller
-  - havne som ikke sikkert matchet
-- `targetProductName` må aldrig igen blive kopieret fra salgets første item.
+Når brugeren vælger flere checkboxes i UI'et, gemmes de korrekt som separate værdier. Men "5G Internet Ubegrænset data" blev sandsynligvis indtastet som en enkelt custom-værdi eller migreret forkert.
 
-3. Lav én fælles og sikker 5G-detektion
-- Udtræk en hjælper i `UploadCancellationsTab.tsx`, som afgør om en upload-række tilhører `phone_excluded`-familien.
-- Den skal bruge både:
-  - canonical produkt-resolution
-  - rå upload-værdier
-  - eksisterende mapping/conditions
-- Så 5G-rækker ikke afhænger af et enkelt eksakt tekstmatch.
+## Plan
 
-4. Re-klassificér køen for den aktuelle import
-- De nuværende kø-rækker er allerede gemt med forkert `target_product_name` og `upload_type`.
-- Efter logik-fix skal jeg re-beregne den aktive Eesy FM import, så de forkerte `correct_match` bliver rettet til enten:
-  - `basket_difference`, eller
-  - korrekt 5G-match
-- Ellers vil gamle fejl blive stående i Godkendelseskø, selv om koden er rettet.
+### 1. Fix data i databasen (migration)
+- Split `"5G Internet Ubegrænset data"` til `["5G Internet", "Ubegrænset data"]` i alle rækker der indeholder denne sammenkædede streng
+- Gælder alle `cancellation_product_conditions` rækker for dette client_id
 
-Berørte filer:
-- `src/utils/productConditionMatcher.ts`
-- `src/components/cancellations/UploadCancellationsTab.tsx`
-- evt. `src/components/cancellations/ApprovalQueueTab.tsx` kun for at sikre visning følger den nye klassificering
+### 2. Tilføj validering ved gem (SellerMappingTab.tsx)
+- I save-logikken: tjek om en valgt værdi matcher en kendt kolonne-værdi fra Excel-data
+- Hvis ikke, forsøg at splitte den mod de kendte værdier for at undgå sammenkædning fremover
 
-Forventet resultat:
-- 5G Internet bliver ikke længere matchet via almindelig produktlogik
-- En række uden reelt produktmatch kan ikke længere ende som `correct_match`
-- Dine to eksempler vil efter re-beregning ikke længere stå som falske korrekte matches
+### 3. Tilføj robusthed i matcher (productConditionMatcher.ts)  
+- I `normalizeConditionValues`: Hvis en enkelt array-værdi ikke matcher nogen cellværdi, forsøg at splitte den mod kendte delimiter-mønstre
+- Backup-sikkerhed så gamle/fejlagtige data stadig evalueres korrekt
 
-Tekniske noter:
-- Jeg har verificeret i data, at den aktuelle Eesy FM import allerede indeholder rækker hvor uploadens `Subscription Name` er 5G-varianter, men `target_product_name` er gemt som almindelige Eesy-produkter.
-- Jeg har også verificeret, at Eesy FM-konfigurationen kun har `phone_excluded_products = ["5G Internet"]`, så den nuværende eksakte streng-sammenligning er for snæver til de uploadede 5G-navne.
+### 4. Re-klassificér kø-rækker (migration)
+- Genberegn `upload_type` for pending rækker i den aktive import, nu med korrekte array-værdier
+- Rul den tidligere migration tilbage der fejlagtigt satte alle 5G-rækker til `basket_difference`
+
+### Berørte filer
+- `src/utils/productConditionMatcher.ts` — robustere value-normalisering
+- `src/components/cancellations/SellerMappingTab.tsx` — validering ved gem
+- Ny migration — data-fix + re-klassificering
+
