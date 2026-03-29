@@ -551,6 +551,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
   const [matchedSales, setMatchedSales] = useState<MatchedSale[]>([]);
   const [matchedRowIndices, setMatchedRowIndices] = useState<Set<number>>(new Set());
   const [isMatching, setIsMatching] = useState(false);
+  const [excelDuplicateIndices, setExcelDuplicateIndices] = useState<Set<number>>(new Set());
   const [uploadType, setUploadType] = useState<"cancellation" | "basket_difference" | "both">("cancellation");
   const [step, setStep] = useState<WizardStep>("type");
   const [configName, setConfigName] = useState("");
@@ -864,22 +865,51 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       const cleanedData = filteredData.filter(row => !isJunkRow(row.originalRow));
       const junkRowCount = filteredData.length - cleanedData.length;
 
-      console.log("[handleMatch] total rows:", parsedData.length, "after filter:", filteredData.length, "junk rows removed:", junkRowCount, "clean rows:", cleanedData.length);
+      // === Excel-internal dedup: group by normalized phone, keep first as representative ===
+      const excelDupIndices = new Set<number>();
+      if (phoneColumn !== "__none__") {
+        const phoneGroupMap = new Map<string, number[]>();
+        cleanedData.forEach((row, idx) => {
+          const rawPhone = String(getCaseInsensitive(row.originalRow, phoneColumn) ?? "").trim();
+          const nPhone = rawPhone ? normalizePhone(rawPhone) : null;
+          if (nPhone) {
+            const existing = phoneGroupMap.get(nPhone);
+            if (existing) {
+              existing.push(idx);
+              excelDupIndices.add(idx);
+            } else {
+              phoneGroupMap.set(nPhone, [idx]);
+            }
+          }
+        });
+      }
+      // Store indices mapped back to originalIndex for coveredRowIndices
+      const excelDupOriginalIndices = new Set<number>();
+      excelDupIndices.forEach(idx => excelDupOriginalIndices.add(cleanedData[idx].originalIndex));
+      setExcelDuplicateIndices(excelDupOriginalIndices);
 
-      if (junkRowCount > 0) {
+      // Filter out Excel duplicates — only representatives proceed to matching
+      const dedupedData = cleanedData.filter((_, idx) => !excelDupIndices.has(idx));
+
+      console.log("[handleMatch] total rows:", parsedData.length, "after filter:", filteredData.length, "junk rows removed:", junkRowCount, "clean rows:", cleanedData.length, "excel duplicates:", excelDupIndices.size, "deduped rows:", dedupedData.length);
+
+      if (junkRowCount > 0 || excelDupIndices.size > 0) {
+        const parts: string[] = [];
+        if (junkRowCount > 0) parts.push(`${junkRowCount} header/total-rækker ignoreret`);
+        if (excelDupIndices.size > 0) parts.push(`${excelDupIndices.size} Excel-dubletter fjernet`);
         toast({
-          title: `${junkRowCount} header/total-rækker ignoreret`,
-          description: `${cleanedData.length} datarækker bruges til matching.`,
+          title: parts.join(", "),
+          description: `${dedupedData.length} unikke datarækker bruges til matching.`,
         });
       }
 
-      // Extract values from cleaned data
+      // Extract values from cleaned data (using dedupedData)
       const phones: string[] = [];
       const companies: string[] = [];
       const oppNumbers: string[] = [];
       const memberNumbers: string[] = [];
 
-      cleanedData.forEach(row => {
+      dedupedData.forEach(row => {
         if (phoneColumn !== "__none__") {
           const pv = getCaseInsensitive(row.originalRow, phoneColumn);
           if (pv) phones.push(normalizePhone(String(pv)));
@@ -1026,10 +1056,10 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
         if (hasProductPhoneMappings) {
           console.log("[handleMatch] PRODUCT-PHONE MATCHING (reversed)");
-          console.log("[handleMatch] candidateSales:", candidateSales.length, "cleanedRows:", cleanedData.length);
+          console.log("[handleMatch] candidateSales:", candidateSales.length, "cleanedRows:", dedupedData.length);
           console.log("[handleMatch] mappings:", productPhoneMappings);
 
-          cleanedData.forEach((row) => {
+          dedupedData.forEach((row) => {
             const idx = row.originalIndex;
             const rawExcelPhone = phoneColumn !== "__none__" ? getCaseInsensitive(row.originalRow, phoneColumn) : null;
             if (!rawExcelPhone) return;
@@ -1079,7 +1109,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         console.log("[handleMatch] productMatched (pass 1):", productMatched.length);
 
         // --- PASS 1b: FM phone matching via customer_phone directly ---
-        cleanedData.forEach((row) => {
+        dedupedData.forEach((row) => {
           const idx = row.originalIndex;
           if (matchedIndicesLocal.has(idx)) return;
 
@@ -1283,7 +1313,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             }
           }
 
-          cleanedData.forEach((row) => {
+          dedupedData.forEach((row) => {
             const idx = row.originalIndex;
             if (matchedIndicesLocal.has(idx)) return;
 
@@ -1583,7 +1613,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       const uploadedRowByCompany = new Map<string, Record<string, unknown>>();
       const uploadedRowByMemberNr = new Map<string, Record<string, unknown>>();
       
-      cleanedData.forEach(row => {
+      dedupedData.forEach(row => {
         if (oppColumn !== "__none__") {
           const ov = getCaseInsensitive(row.originalRow, oppColumn);
           if (ov) {
@@ -1633,7 +1663,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       const indexByPhone = new Map<string, number[]>();
       const indexByCompany = new Map<string, number>();
       const indexByMemberNr = new Map<string, number>();
-      cleanedData.forEach((row) => {
+      dedupedData.forEach((row) => {
         const idx = row.originalIndex;
         if (oppColumn !== "__none__") {
           const ov = getCaseInsensitive(row.originalRow, oppColumn);
@@ -1869,6 +1899,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     setMatchedSales([]);
     setMatchedRowIndices(new Set());
     setUnmatchedSellerRows([]);
+    setExcelDuplicateIndices(new Set());
     setSellerDropdownSelections({});
     setStep("type");
   };
@@ -1969,6 +2000,8 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
   // Build coveredRowIndices: matchedRowIndices + any Excel rows whose phone matches a merged phone
   const coveredRowIndices = useMemo(() => {
     const covered = new Set(matchedRowIndices);
+    // Include Excel-internal duplicates as covered
+    excelDuplicateIndices.forEach(idx => covered.add(idx));
     if (matchedPhones.size > 0 && phoneColumn !== "__none__") {
       for (const row of filteredDataForPreview) {
         if (covered.has(row.originalIndex)) continue;
@@ -1980,7 +2013,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       }
     }
     return covered;
-  }, [matchedRowIndices, matchedPhones, filteredDataForPreview, phoneColumn]);
+  }, [matchedRowIndices, matchedPhones, filteredDataForPreview, phoneColumn, excelDuplicateIndices]);
 
   const unmatchedRows = filteredDataForPreview.filter(row => !coveredRowIndices.has(row.originalIndex));
   const unmatchedCount = unmatchedRows.length;
