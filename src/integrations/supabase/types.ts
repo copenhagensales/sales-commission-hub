@@ -9512,6 +9512,81 @@ export type Database = {
           },
         ]
       }
+      product_change_log: {
+        Row: {
+          cancellation_queue_id: string | null
+          change_reason: string | null
+          changed_by: string | null
+          created_at: string | null
+          id: string
+          new_commission: number | null
+          new_product_id: string | null
+          new_product_name: string | null
+          new_revenue: number | null
+          old_commission: number | null
+          old_product_id: string | null
+          old_product_name: string | null
+          old_revenue: number | null
+          rolled_back_at: string | null
+          rolled_back_by: string | null
+          sale_id: string
+          sale_item_id: string
+        }
+        Insert: {
+          cancellation_queue_id?: string | null
+          change_reason?: string | null
+          changed_by?: string | null
+          created_at?: string | null
+          id?: string
+          new_commission?: number | null
+          new_product_id?: string | null
+          new_product_name?: string | null
+          new_revenue?: number | null
+          old_commission?: number | null
+          old_product_id?: string | null
+          old_product_name?: string | null
+          old_revenue?: number | null
+          rolled_back_at?: string | null
+          rolled_back_by?: string | null
+          sale_id: string
+          sale_item_id: string
+        }
+        Update: {
+          cancellation_queue_id?: string | null
+          change_reason?: string | null
+          changed_by?: string | null
+          created_at?: string | null
+          id?: string
+          new_commission?: number | null
+          new_product_id?: string | null
+          new_product_name?: string | null
+          new_revenue?: number | null
+          old_commission?: number | null
+          old_product_id?: string | null
+          old_product_name?: string | null
+          old_revenue?: number | null
+          rolled_back_at?: string | null
+          rolled_back_by?: string | null
+          sale_id?: string
+          sale_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_change_log_cancellation_queue_id_fkey"
+            columns: ["cancellation_queue_id"]
+            isOneToOne: false
+            referencedRelation: "cancellation_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_change_log_sale_item_id_fkey"
+            columns: ["sale_item_id"]
+            isOneToOne: false
+            referencedRelation: "sale_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_price_history: {
         Row: {
           applied_at: string | null
