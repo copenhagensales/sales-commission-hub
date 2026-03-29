@@ -1136,9 +1136,38 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
             let finalTarget: string;
             if (isRealProductExcluded) {
-              // For phone_excluded products, use the system's product name as target
-              // so classification correctly identifies it as correct_match
-              finalTarget = realProduct;
+              // Determine if this row is a cancellation
+              let isRowCancellation = uploadType === "cancellation";
+              if (!isRowCancellation && uploadType === "both") {
+                const typeCol = activeQueueConfig?.type_detection_column;
+                const typeVals = ((activeQueueConfig?.type_detection_values as string[]) || []);
+                if (typeCol && typeVals.length > 0) {
+                  const cellVal = String(getCaseInsensitive(row.originalRow, typeCol) || "").trim().toLowerCase();
+                  isRowCancellation = typeVals.some(v => v.toLowerCase() === cellVal);
+                }
+                if (!isRowCancellation) {
+                  const annulledVal = String(getCaseInsensitive(row.originalRow, "Annulled Sales") || "").trim();
+                  isRowCancellation = annulledVal !== "" && annulledVal !== "0";
+                }
+              }
+
+              if (isRowCancellation) {
+                // Strict matching for cancellations: only match if upload product is also phone_excluded
+                const uploadProduct = (resolvedProduct || rawRowProduct || "").toLowerCase().trim();
+                const isUploadAlsoExcluded = !uploadProduct || phoneExcludedProducts.some(
+                  p => uploadProduct.includes(p.toLowerCase().trim()) || p.toLowerCase().trim().includes(uploadProduct)
+                );
+                if (isUploadAlsoExcluded) {
+                  finalTarget = realProduct;
+                } else {
+                  // Upload has a different product — skip this phone match,
+                  // let Pass 2 handle with seller+product+date/customer logic
+                  continue;
+                }
+              } else {
+                // Non-cancellation: keep current behavior
+                finalTarget = realProduct;
+              }
             } else {
               // If condition matcher resolved a different product than the sale's,
               // check if the sale's product also satisfies the row's conditions.
