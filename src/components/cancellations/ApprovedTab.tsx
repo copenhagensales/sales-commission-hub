@@ -6,10 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { ArrowUpDown, ArrowUp, ArrowDown, Search, CalendarIcon } from "lucide-react";
+import { ArrowUpDown, ArrowUp, ArrowDown, Search, CalendarIcon, Undo2 } from "lucide-react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { getPayrollPeriod } from "@/lib/calculations/dates";
@@ -22,8 +23,6 @@ interface ApprovedTabProps {
 
 type SortKey = "date" | "agent" | "opp" | "type" | "status" | "deduction" | "reviewed_at";
 type SortDir = "asc" | "desc";
-
-// extractOpp imported from shared utility
 
 export function ApprovedTab({ clientId }: ApprovedTabProps) {
   const { resolve } = useAgentNameResolver();
@@ -68,6 +67,7 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
           oppGroup: item.opp_group,
           agentName: item.sale?.agent_name || item.sale?.agent_email || "",
           saleDate: item.sale?.sale_datetime || "",
+          saleId: item.sale?.id || "",
           opp: extractOpp(item.sale?.raw_payload) || item.opp_group || "",
           reviewerName: item.reviewer
             ? `${item.reviewer.first_name || ""} ${item.reviewer.last_name || ""}`.trim()
@@ -76,6 +76,90 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
       });
     },
     enabled: !!clientId,
+  });
+
+  // Check which approved basket_difference items have change log entries (for rollback)
+  const approvedBasketIds = useMemo(
+    () => items.filter(i => i.status === "approved" && i.uploadType === "basket_difference").map(i => i.id),
+    [items]
+  );
+
+  const { data: changeLogMap = {} } = useQuery({
+    queryKey: ["product-change-log", approvedBasketIds],
+    queryFn: async () => {
+      if (approvedBasketIds.length === 0) return {};
+      const { data } = await supabase
+        .from("product_change_log")
+        .select("id, cancellation_queue_id, old_product_name, new_product_name, rolled_back_at")
+        .in("cancellation_queue_id", approvedBasketIds as any)
+        .is("rolled_back_at", null);
+      const map: Record<string, { logId: string; oldName: string; newName: string }> = {};
+      for (const entry of data || []) {
+        const e = entry as any;
+        if (e.cancellation_queue_id && !map[e.cancellation_queue_id]) {
+          map[e.cancellation_queue_id] = {
+            logId: e.id,
+            oldName: e.old_product_name || "",
+            newName: e.new_product_name || "",
+          };
+        }
+      }
+      return map;
+    },
+    enabled: approvedBasketIds.length > 0,
+  });
+
+  const rollbackMutation = useMutation({
+    mutationFn: async (cancellationQueueId: string) => {
+      // Get all change log entries for this queue item
+      const { data: logs, error: logError } = await supabase
+        .from("product_change_log")
+        .select("*")
+        .eq("cancellation_queue_id", cancellationQueueId as any)
+        .is("rolled_back_at", null);
+      if (logError) throw logError;
+      if (!logs || logs.length === 0) throw new Error("Ingen rettelser fundet at rulle tilbage");
+
+      const saleIds = new Set<string>();
+
+      // Restore old product on each sale_item
+      for (const log of logs) {
+        const l = log as any;
+        await supabase.from("sale_items").update({
+          product_id: l.old_product_id,
+          adversus_product_title: l.old_product_name,
+        } as any).eq("id", l.sale_item_id);
+        saleIds.add(l.sale_id);
+      }
+
+      // Trigger rematch to recalculate prices with original product
+      if (saleIds.size > 0) {
+        await supabase.functions.invoke("rematch-pricing-rules", {
+          body: { sale_ids: Array.from(saleIds) },
+        });
+      }
+
+      // Get current user for audit
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: emp } = user?.email
+        ? await supabase.from("employee_master_data").select("id").eq("email", user.email).maybeSingle()
+        : { data: null };
+
+      // Mark log entries as rolled back
+      for (const log of logs) {
+        await supabase.from("product_change_log").update({
+          rolled_back_at: new Date().toISOString(),
+          rolled_back_by: emp?.id || null,
+        } as any).eq("id", (log as any).id);
+      }
+    },
+    onSuccess: () => {
+      toast.success("Produktrettelse er rullet tilbage");
+      queryClient.invalidateQueries({ queryKey: ["approved-queue", clientId] });
+      queryClient.invalidateQueries({ queryKey: ["product-change-log"] });
+      queryClient.invalidateQueries({ queryKey: ["sales"] });
+    },
+    onError: (err: Error) => toast.error("Kunne ikke rulle tilbage: " + err.message),
   });
 
   const updateDeductionDate = useMutation({
@@ -184,53 +268,75 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
                 <TableHead className="cursor-pointer" onClick={() => toggleSort("deduction")}>Trækkes i <SortIcon col="deduction" /></TableHead>
                 <TableHead>Behandlet af</TableHead>
                 <TableHead className="cursor-pointer" onClick={() => toggleSort("reviewed_at")}>Behandlet dato <SortIcon col="reviewed_at" /></TableHead>
+                <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell>{item.saleDate ? format(new Date(item.saleDate), "dd-MM-yyyy") : "-"}</TableCell>
-                  <TableCell>{resolve(item.agentName) || "-"}</TableCell>
-                  <TableCell className="font-mono text-xs">{item.opp || "-"}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">
-                      {item.uploadType === "cancellation" ? "Annullering" : "Kurvrettelse"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={item.status === "approved" ? "default" : "destructive"}>
-                      {item.status === "approved" ? "Godkendt" : "Afvist"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {item.status === "approved" && item.deductionPeriod ? (
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <button className="inline-flex items-center gap-1 text-sm hover:underline text-primary cursor-pointer bg-transparent border-none p-0">
-                            <CalendarIcon className="h-3 w-3" />
-                            {format(item.deductionPeriod.start, "d. MMM", { locale: da })} – {format(item.deductionPeriod.end, "d. MMM", { locale: da })}
-                          </button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={item.deductionDate ? new Date(item.deductionDate + "T00:00:00") : item.reviewedAt ? new Date(item.reviewedAt) : undefined}
-                            onSelect={(date) => {
-                              if (date) {
-                                updateDeductionDate.mutate({ id: item.id, date: format(date, "yyyy-MM-dd") });
-                              }
-                            }}
-                            className="pointer-events-auto"
-                            locale={da}
-                          />
-                        </PopoverContent>
-                      </Popover>
-                    ) : "-"}
-                  </TableCell>
-                  <TableCell>{item.reviewerName || "-"}</TableCell>
-                  <TableCell>{item.reviewedAt ? format(new Date(item.reviewedAt), "dd-MM-yyyy HH:mm") : "-"}</TableCell>
-                </TableRow>
-              ))}
+              {filtered.map((item) => {
+                const changeLog = changeLogMap[item.id];
+                return (
+                  <TableRow key={item.id}>
+                    <TableCell>{item.saleDate ? format(new Date(item.saleDate), "dd-MM-yyyy") : "-"}</TableCell>
+                    <TableCell>{resolve(item.agentName) || "-"}</TableCell>
+                    <TableCell className="font-mono text-xs">{item.opp || "-"}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">
+                        {item.uploadType === "cancellation" ? "Annullering" : "Kurvrettelse"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={item.status === "approved" ? "default" : "destructive"}>
+                        {item.status === "approved" ? "Godkendt" : "Afvist"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {item.status === "approved" && item.deductionPeriod ? (
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button className="inline-flex items-center gap-1 text-sm hover:underline text-primary cursor-pointer bg-transparent border-none p-0">
+                              <CalendarIcon className="h-3 w-3" />
+                              {format(item.deductionPeriod.start, "d. MMM", { locale: da })} – {format(item.deductionPeriod.end, "d. MMM", { locale: da })}
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={item.deductionDate ? new Date(item.deductionDate + "T00:00:00") : item.reviewedAt ? new Date(item.reviewedAt) : undefined}
+                              onSelect={(date) => {
+                                if (date) {
+                                  updateDeductionDate.mutate({ id: item.id, date: format(date, "yyyy-MM-dd") });
+                                }
+                              }}
+                              className="pointer-events-auto"
+                              locale={da}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      ) : "-"}
+                    </TableCell>
+                    <TableCell>{item.reviewerName || "-"}</TableCell>
+                    <TableCell>{item.reviewedAt ? format(new Date(item.reviewedAt), "dd-MM-yyyy HH:mm") : "-"}</TableCell>
+                    <TableCell>
+                      {changeLog && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            if (confirm(`Vil du rulle produktrettelsen tilbage?\n\n${changeLog.oldName} → ${changeLog.newName}\n\nDette gendanner det oprindelige produkt og genberegner priser.`)) {
+                              rollbackMutation.mutate(item.id);
+                            }
+                          }}
+                          disabled={rollbackMutation.isPending}
+                          title={`Fortryd: ${changeLog.oldName} → ${changeLog.newName}`}
+                        >
+                          <Undo2 className="h-4 w-4 mr-1" />
+                          Fortryd
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         )}
