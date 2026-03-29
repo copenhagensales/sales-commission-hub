@@ -1,47 +1,18 @@
 
 
-## Problem: Værdier gemmes som sammenkædede strenge
+## Plan: Simplificér matcher til ren exact-match + fix kø-rækker
 
-Databasen indeholder:
-```text
-5G Internet produkt:
-  Subscription Name IN {"5G Internet Ubegrænset data"}   ← 1 element
+### Trin 1: Fix `src/utils/productConditionMatcher.ts`
+- **Slet** `valueMatchesAny` funktionen (linje 62-79) helt
+- **Erstat** `valueMatchesAny(cellValue, vals)` med `vals.includes(cellValue)` i `evaluateConditions` (linje 101, 104)
+- **Tilføj** console.log i `findMatchingProductId` til debugging
 
-Eesy produkter:
-  Subscription Name NOT_IN {"5G Internet Ubegrænset data", "Fri tale + 20 GB data (5G) (6 mdr. binding)"}
-```
-
-Det burde være:
-```text
-5G Internet produkt:
-  Subscription Name IN {"5G Internet", "Ubegrænset data"}   ← 2 elementer
-
-Eesy produkter:
-  Subscription Name NOT_IN {"5G Internet", "Ubegrænset data", "Fri tale + 20 GB data (5G) (6 mdr. binding)"}
-```
-
-Når brugeren vælger flere checkboxes i UI'et, gemmes de korrekt som separate værdier. Men "5G Internet Ubegrænset data" blev sandsynligvis indtastet som en enkelt custom-værdi eller migreret forkert.
-
-## Plan
-
-### 1. Fix data i databasen (migration)
-- Split `"5G Internet Ubegrænset data"` til `["5G Internet", "Ubegrænset data"]` i alle rækker der indeholder denne sammenkædede streng
-- Gælder alle `cancellation_product_conditions` rækker for dette client_id
-
-### 2. Tilføj validering ved gem (SellerMappingTab.tsx)
-- I save-logikken: tjek om en valgt værdi matcher en kendt kolonne-værdi fra Excel-data
-- Hvis ikke, forsøg at splitte den mod de kendte værdier for at undgå sammenkædning fremover
-
-### 3. Tilføj robusthed i matcher (productConditionMatcher.ts)  
-- I `normalizeConditionValues`: Hvis en enkelt array-værdi ikke matcher nogen cellværdi, forsøg at splitte den mod kendte delimiter-mønstre
-- Backup-sikkerhed så gamle/fejlagtige data stadig evalueres korrekt
-
-### 4. Re-klassificér kø-rækker (migration)
-- Genberegn `upload_type` for pending rækker i den aktive import, nu med korrekte array-værdier
-- Rul den tidligere migration tilbage der fejlagtigt satte alle 5G-rækker til `basket_difference`
+### Trin 2: Slet de 53 forkerte kø-rækker (database migration)
+- Slet rækker fra `cancellation_queue` hvor `target_product_name = '5G Internet'` men uploaded_data's Subscription Name IKKE er "5G Internet" eller "Ubegrænset data"
+- Flyt disse rækkers data til `unmatched_rows` i `cancellation_imports` så de kan re-matches korrekt
+- Opdatér `rows_matched` tæller
 
 ### Berørte filer
-- `src/utils/productConditionMatcher.ts` — robustere value-normalisering
-- `src/components/cancellations/SellerMappingTab.tsx` — validering ved gem
-- Ny migration — data-fix + re-klassificering
+- `src/utils/productConditionMatcher.ts`
+- Database: `cancellation_queue` + `cancellation_imports`
 
