@@ -1,50 +1,41 @@
 
-Årsagen er nu ret tydelig: `51759867` står stadig under “Fejl i match”, fordi merge/dedup først sker i `sendToQueueMutation`, mens “Fejl i match” bygges tidligere ud fra `matchedRowIndices` og `unmatched_rows`. Derfor bliver ekstra Excel-rækker for samme telefon stadig behandlet som umatchede, selv om de senere merges til ét salg.
 
-Planen for at rette det uden at ændre jeres øvrige logikker er:
+## Problem
 
-1. Flyt merge-begrebet frem til preview-laget
-- Lav én fælles beregning i `UploadCancellationsTab.tsx`, som grupperer `matchedSales` pr. normaliseret telefonnummer allerede efter matching.
-- Beregningen skal returnere:
-  - `mergedMatchedSales` = én række/salg pr. telefonnummer
-  - `mergedAwayRows` = de ekstra Excel-rækker som er opslugt af merge
-  - `coveredRowIndices` = alle originale Excel-rækker, der enten blev direkte matchet eller merged ind i et andet match
+"Lokaliser salg" gemmer ændringer direkte i databasen (`cancellation_queue` + fjerner fra `unmatched_rows`) med det samme. Ved rollback slettes import og kø-poster, men hvis noget går galt, efterlader det "spøgelsesdata". Brugeren ønsker at "Lokaliser salg" først persisterer ved godkendelse — ligesom sælger-mappings er fine at gemme med det samme.
 
-2. Brug “coveredRowIndices” i stedet for kun `matchedRowIndices`
-- Når previewets `unmatchedRows` beregnes, skal rækker som er merged ind i et andet salg ikke længere tælles som “Fejl i match”.
-- Det løser præcis problemet med numre som `51759867`, der i dag bliver vist som annullering under fejl, selv om de reelt er del af et merge.
+## Løsning
 
-3. Behold klassificeringslogikken uændret
-- Selve klassificeringen for combined upload (`both`) skal fortsat være den samme.
-- Den merged række skal stadig kun blive klassificeret som annullering, hvis alle tilhørende Excel-rækker for det telefonnummer er annulleringer.
-- Hvis bare én af de merged rækker ikke er annullering, skal det merged salg ikke behandles som annullering.
+Ændre "Lokaliser salg" til at gemme matches lokalt i UI-state frem for direkte i databasen. Først når brugeren klikker "Send til godkendelse" (eller tilsvarende bekræftelse), persisteres de manuelle matches til `cancellation_queue`.
 
-4. Brug samme merge-resultat i hele previewet
-- “Matched”-tab skal vise `mergedMatchedSales` i stedet for rå `matchedSales`, så preview matcher det der faktisk sendes videre.
-- “Dubletter”-tab skal vise de rækker der blev merged væk, ikke bare rå grupper fra `matchedSales`.
-- “Send til godkendelse”-knappen og counts skal bruge samme merged datasæt.
+### Ændringer
 
-5. Behold “Fejl i match” til reelle fejl
-- “Fejl i match” skal kun vise rækker der hverken:
-  - blev matched direkte
-  - eller blev opslugt af et telefon-merge
-- På den måde bliver samme salg ikke vist både som match og som fejl.
+**1. `MatchErrorsSubTab.tsx`** — Tilføj lokal state for manuelle matches
+- Tilføj `localManualMatches: Map<string, { saleId: string; row: FlatUnmatchedRow }>` state
+- Når `LocateSaleDialog` returnerer et match, gem det i denne state i stedet for at kalde DB
+- Vis matchede rækker visuelt som "afventer bekræftelse" (f.eks. grøn markering + salg-ID badge)
+- Tilføj en "Bekræft manuelle matches" knap der batch-inserter alle lokale matches til `cancellation_queue` og fjerner dem fra `unmatched_rows`
+- Rækker med lokalt match fjernes fra fejl-listen
 
-6. Løs React key-advarslen samtidig
-- Der er også en konsol-advarsel om duplicate keys i preview-tabellen.
-- Row keys skal ændres til en stabil nøgle, der inkluderer `saleId` + telefon/rowIndex eller anden unik markør, så UI’et ikke duplikerer eller skjuler rækker forkert.
+**2. `LocateSaleDialog.tsx`** — Returnér match i stedet for at persistere
+- Fjern den direkte `supabase.from("cancellation_queue").insert()` og `unmatched_rows`-opdatering fra `linkSaleMutation`
+- I stedet kald en ny `onMatch(saleId, row)` callback prop der sender data op til parent
+- Behold salg-søgning og UI uændret
 
-Teknisk scope
-- Fil: `src/components/cancellations/UploadCancellationsTab.tsx`
-- Ingen ændringer i backend-tabeller eller eksisterende godkendelseslogik
-- Ingen ændringer i selve match-motoren
-- Kun synkronisering af merge/dedup mellem:
-  - preview
-  - unmatched/match errors
-  - send-to-queue
+**3. Ingen ændring af:**
+- `upsertMapping` (sælger-mapping) — den gemmes stadig med det samme som ønsket
+- Rollback-funktionen
+- Godkendelseskø-logikken
 
-Forventet resultat
-- `51759867` forsvinder fra “Fejl i match”, hvis rækken allerede er dækket af et merge med samme telefonnummer.
-- Uploaden opfører sig fortsat sådan, at flere Excel-rækker bliver til ét salg.
-- En merged række tæller kun som annullering, hvis alle merged rækker er annulleringer.
-- Øvrige logikker for matching, produktmatch og godkendelseskø forbliver uændrede.
+### Teknisk detalje
+
+```text
+Nuværende flow:
+  Lokaliser salg → INSERT cancellation_queue + UPDATE unmatched_rows → Godkendelse
+
+Nyt flow:
+  Lokaliser salg → lokal state i MatchErrorsSubTab → "Bekræft" knap → INSERT + UPDATE → Godkendelse
+```
+
+Filer: `LocateSaleDialog.tsx`, `MatchErrorsSubTab.tsx`
+
