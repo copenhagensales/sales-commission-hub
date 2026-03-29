@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
-import { Search, Loader2, AlertTriangle, Check, ChevronsUpDown, Trash2, SearchCheck, X } from "lucide-react";
+import { Search, Loader2, AlertTriangle, Check, ChevronsUpDown, Trash2, SearchCheck, X, SendHorizonal } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -71,6 +71,7 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
   const [openPopoverKey, setOpenPopoverKey] = useState<string | null>(null);
   const [locateDialogRow, setLocateDialogRow] = useState<{ row: FlatUnmatchedRow; key: string } | null>(null);
   const [ignorePendingKey, setIgnorePendingKey] = useState<string | null>(null);
+  const [localManualMatches, setLocalManualMatches] = useState<Map<string, { saleId: string; row: FlatUnmatchedRow }>>(new Map());
   const queryClient = useQueryClient();
 
   // Fetch unmatched rows
