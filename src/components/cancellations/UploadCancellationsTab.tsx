@@ -1120,18 +1120,12 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             if (!salePhone || salePhone !== excelPhone) continue;
 
             const allItems = saleItemsMap.get(sale.id) || [];
-            if (!resolvedProduct) continue;
 
-            const hasProduct = allItems.some(item =>
-              item.adversus_product_title?.toLowerCase() === resolvedProduct!.toLowerCase()
-            );
-            if (!hasProduct) continue;
-
-            const matchedItemForProduct = allItems.find(i => i.adversus_product_title?.toLowerCase() === resolvedProduct!.toLowerCase());
-            const key = `${sale.id}|${resolvedProduct}`;
+            const key = `${sale.id}|${excelPhone}`;
             if (matchedSaleProductKeys.has(key)) continue;
             matchedSaleProductKeys.add(key);
             matchedIndicesLocal.add(idx);
+            const firstItem = allItems[0];
             productMatched.push({
               saleId: sale.id,
               phone: sale.customer_phone || "",
@@ -1141,10 +1135,10 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               employee: sale.agent_name || "Ukendt",
               currentStatus: sale.validation_status || "pending",
               uploadedRowData: row.originalRow,
-              targetProductName: resolvedProduct,
-              realProductName: matchedItemForProduct?.adversus_product_title || allItems[0]?.adversus_product_title || "Ukendt produkt",
-              commission: matchedItemForProduct?.mapped_commission ?? undefined,
-              revenue: matchedItemForProduct?.mapped_revenue ?? undefined,
+              targetProductName: resolvedProduct || rawRowProduct || "Ukendt produkt",
+              realProductName: firstItem?.adversus_product_title || "Ukendt produkt",
+              commission: firstItem?.mapped_commission ?? undefined,
+              revenue: firstItem?.mapped_revenue ?? undefined,
             });
             break;
           }
@@ -1371,18 +1365,12 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                 ) continue;
 
                 const items = saleItemsMap.get(sale.id) || [];
-                const hasProduct = items.some(item =>
-                  item.adversus_product_title?.toLowerCase() === resolvedProductTitle!.toLowerCase()
-                );
-                if (!hasProduct) continue;
 
                 const key = `${sale.id}|${resolvedProductTitle}`;
                 if (matchedSaleProductKeys.has(key)) continue;
                 matchedSaleProductKeys.add(key);
                 matchedIndicesLocal.add(idx);
-                const matchedItem = items.find(item =>
-                  item.adversus_product_title?.toLowerCase() === resolvedProductTitle!.toLowerCase()
-                );
+                const firstItem = items[0];
                 productMatched.push({
                   saleId: sale.id,
                   phone: sale.customer_phone || "",
@@ -1393,9 +1381,9 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                   currentStatus: sale.validation_status || "pending",
                   uploadedRowData: row.originalRow,
                   targetProductName: resolvedProductTitle!,
-                  realProductName: matchedItem?.adversus_product_title || items[0]?.adversus_product_title || "Ukendt produkt",
-                  commission: matchedItem?.mapped_commission ?? undefined,
-                  revenue: matchedItem?.mapped_revenue ?? undefined,
+                  realProductName: firstItem?.adversus_product_title || "Ukendt produkt",
+                  commission: firstItem?.mapped_commission ?? undefined,
+                  revenue: firstItem?.mapped_revenue ?? undefined,
                 });
                 break;
               }
