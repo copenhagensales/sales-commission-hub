@@ -630,6 +630,53 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
         </Table>
       </div>
 
+      {/* Pending manual matches section */}
+      {localManualMatches.size > 0 && (
+        <div className="rounded-md border border-green-500/30 bg-green-500/5 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-green-700 dark:text-green-400">
+              {localManualMatches.size} manuelle matches afventer bekræftelse
+            </p>
+            <Button
+              size="sm"
+              onClick={() => confirmManualMatchesMutation.mutate()}
+              disabled={confirmManualMatchesMutation.isPending}
+            >
+              {confirmManualMatchesMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <SendHorizonal className="h-4 w-4 mr-1" />
+              )}
+              Send til godkendelse
+            </Button>
+          </div>
+          <div className="space-y-1">
+            {[...localManualMatches.entries()].map(([rk, { saleId, row: matchedRow }]) => (
+              <div key={rk} className="flex items-center gap-2 text-xs">
+                <Badge variant="outline" className="bg-green-500/10 border-green-500/30 text-green-700 dark:text-green-400">
+                  Salg: {saleId.slice(0, 8)}…
+                </Badge>
+                <span className="text-muted-foreground truncate max-w-[300px]">
+                  {Object.entries(matchedRow.rowData)
+                    .filter(([k]) => k !== "_product_rows")
+                    .slice(0, 3)
+                    .map(([k, v]) => `${k}: ${v ?? "-"}`)
+                    .join(" | ")}
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 w-6 p-0 ml-auto text-muted-foreground hover:text-destructive"
+                  onClick={() => handleRemoveLocalMatch(rk)}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-end">
         <AlertDialog>
           <AlertDialogTrigger asChild>
@@ -670,6 +717,7 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
               return emp ? `${emp.first_name} ${emp.last_name}` : undefined;
             })()
           }
+          onMatch={handleLocalMatch}
         />
       )}
     </div>
