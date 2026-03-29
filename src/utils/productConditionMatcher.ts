@@ -59,24 +59,6 @@ function normalizeConditionValues(rawValues: string[]): string[] {
   return result;
 }
 
-/**
- * For in/not_in matching: check if a cell value matches any of the
- * normalized condition values. Handles both exact matches and
- * substring token matching for legacy concatenated values.
- */
-function valueMatchesAny(cellValue: string, vals: string[]): boolean {
-  // Exact match
-  if (vals.includes(cellValue)) return true;
-  // Check if cellValue matches a space-separated token within a stored value
-  // (handles legacy concatenated values like "5G Internet Ubegrænset data")
-  for (const v of vals) {
-    if (v.includes(" ")) {
-      const tokens = v.split(/\s+/).filter(Boolean);
-      if (tokens.includes(cellValue)) return true;
-    }
-  }
-  return false;
-}
 
 /**
  * Evaluate whether a single row matches ALL conditions for a product.
@@ -98,10 +80,10 @@ export function evaluateConditions(
     switch (c.operator) {
       case "equals":
       case "in":
-        return valueMatchesAny(cellValue, vals);
+        return vals.includes(cellValue);
       case "not_equals":
       case "not_in":
-        return !valueMatchesAny(cellValue, vals);
+        return !vals.includes(cellValue);
       default:
         return true;
     }
@@ -115,13 +97,27 @@ export function evaluateConditions(
  */
 export function findMatchingProductId(
   groupedConditions: GroupedProductConditions[],
-  rowData: Record<string, unknown>
+  rowData: Record<string, unknown>,
+  debug = false
 ): string | null {
   for (const group of groupedConditions) {
-    if (evaluateConditions(group.conditions, rowData)) {
+    const match = evaluateConditions(group.conditions, rowData);
+    if (debug) {
+      console.log(`[ProductMatcher] product=${group.product_id} match=${match}`, {
+        conditions: group.conditions.map(c => ({
+          col: c.column_name,
+          op: c.operator,
+          vals: c.values,
+          cellValue: String(rowData[c.column_name] ?? "").trim().toLowerCase(),
+        })),
+      });
+    }
+    if (match) {
+      if (debug) console.log(`[ProductMatcher] ✅ Matched product: ${group.product_id}`);
       return group.product_id;
     }
   }
+  if (debug) console.log(`[ProductMatcher] ❌ No product matched for row`, rowData);
   return null;
 }
 
