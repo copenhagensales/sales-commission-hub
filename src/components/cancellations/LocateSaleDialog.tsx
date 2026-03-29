@@ -269,8 +269,8 @@ export function LocateSaleDialog({
           </div>
 
           {/* Search + filter */}
-          <div className="flex items-center gap-4">
-            <div className="relative flex-1">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative flex-1 min-w-[180px]">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Søg telefon, firma, sælger..."
@@ -278,6 +278,42 @@ export function LocateSaleDialog({
                 onChange={e => setSearchQuery(e.target.value)}
                 className="pl-9"
               />
+            </div>
+            <div className="flex items-center gap-1">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={cn(
+                      "h-9 gap-1.5 text-xs",
+                      !dateFilter && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="h-3.5 w-3.5" />
+                    {dateFilter ? format(dateFilter, "dd-MM-yyyy") : "Dato"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={dateFilter}
+                    onSelect={setDateFilter}
+                    initialFocus
+                    className="pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+              {dateFilter && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 w-9 p-0"
+                  onClick={() => setDateFilter(undefined)}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              )}
             </div>
             {assignedEmployeeId && (
               <div className="flex items-center gap-2">
