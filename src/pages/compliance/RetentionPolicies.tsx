@@ -4,7 +4,7 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Shield, AlertTriangle, Clock, Trash2, Info } from "lucide-react";
+import { Shield, AlertTriangle, Clock, Trash2, Info, Ban } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,6 +23,7 @@ interface RetentionPolicy {
   retention_days: number | null;
   is_active: boolean;
   cleanup_mode: string;
+  no_data_held: boolean;
 }
 
 interface DataRetentionPolicy {
@@ -114,6 +115,7 @@ export default function RetentionPolicies() {
       retention_days?: number | null;
       is_active?: boolean;
       cleanup_mode?: string;
+      no_data_held?: boolean;
     }) => {
       const { data, error } = await supabase
         .from("campaign_retention_policies")
@@ -123,6 +125,7 @@ export default function RetentionPolicies() {
             ...(params.retention_days !== undefined && { retention_days: params.retention_days }),
             ...(params.is_active !== undefined && { is_active: params.is_active }),
             ...(params.cleanup_mode !== undefined && { cleanup_mode: params.cleanup_mode }),
+            ...(params.no_data_held !== undefined && { no_data_held: params.no_data_held }),
             updated_at: new Date().toISOString(),
           },
           { onConflict: "client_campaign_id" }
@@ -160,6 +163,10 @@ export default function RetentionPolicies() {
 
   const handleCleanupModeChange = (campaignId: string, mode: string) => {
     upsertMutation.mutate({ client_campaign_id: campaignId, cleanup_mode: mode });
+  };
+
+  const handleNoDataHeldToggle = (campaignId: string, noData: boolean) => {
+    upsertMutation.mutate({ client_campaign_id: campaignId, no_data_held: noData });
   };
 
   const handleDataRetentionDaysChange = (dataType: string, value: string) => {
