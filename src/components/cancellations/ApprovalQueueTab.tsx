@@ -402,7 +402,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
       while (true) {
         let batchQuery = supabase
           .from("cancellation_queue")
-          .select("id, sale_id, upload_type, status, reviewed_at, created_at, import_id, uploaded_data, opp_group, client_id")
+          .select("id, sale_id, upload_type, target_product_name, status, reviewed_at, created_at, import_id, uploaded_data, opp_group, client_id")
           .order("created_at", { ascending: false })
           .range(from, from + batchSize - 1);
 
