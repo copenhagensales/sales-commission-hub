@@ -723,6 +723,51 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
       const productLevelItems = resolvedQueueItems.filter((qi: any) => qi.target_product_name);
       const wholeSaleItems = resolvedQueueItems.filter((qi: any) => !qi.target_product_name);
 
+      // Handle basket_difference with product override: update sale_item product instead of cancelling
+      if (uploadType === "basket_difference" && overrideProductName) {
+        const overrideSaleIds = [...new Set(resolvedQueueItems.map((qi: any) => qi.sale_id))];
+        const [overrideSaleItems, overrideProduct] = await Promise.all([
+          fetchByIds<any>("sale_items", "sale_id", overrideSaleIds, "id, sale_id, product_id, adversus_product_title"),
+          supabase.from("products").select("id, name, commission_dkk, revenue_dkk").eq("name", overrideProductName).maybeSingle(),
+        ]);
+        
+        if (overrideProduct.data) {
+          const newProduct = overrideProduct.data;
+          // Find pricing rule for the new product (universal, highest priority)
+          const { data: pricingRules } = await supabase
+            .from("product_pricing_rules")
+            .select("commission_dkk, revenue_dkk, priority, campaign_mapping_ids")
+            .eq("product_id", newProduct.id)
+            .eq("is_active", true)
+            .order("priority", { ascending: false });
+          
+          const universalRule = (pricingRules || []).find((r: any) => !r.campaign_mapping_ids || r.campaign_mapping_ids.length === 0);
+          const finalCommission = universalRule?.commission_dkk ?? newProduct.commission_dkk ?? 0;
+          const finalRevenue = universalRule?.revenue_dkk ?? newProduct.revenue_dkk ?? 0;
+
+          // Update all sale_items for these sales
+          const saleItemIds = (overrideSaleItems as any[]).map((si: any) => si.id);
+          if (saleItemIds.length > 0) {
+            await supabase.from("sale_items").update({
+              product_id: newProduct.id,
+              adversus_product_title: newProduct.name,
+              mapped_commission: finalCommission,
+              mapped_revenue: finalRevenue,
+            } as any).in("id", saleItemIds);
+          }
+        }
+
+        // Mark queue items as approved
+        const { error: approveError } = await supabase.from("cancellation_queue").update({
+          status: "approved",
+          reviewed_by: currentEmployee.id,
+          reviewed_at: new Date().toISOString(),
+        }).in("id", queueItemIds);
+        if (approveError) throw approveError;
+
+        return { count: queueItemIds.length };
+      }
+
       if (productLevelItems.length > 0) {
         const productSaleIds = [...new Set(productLevelItems.map((qi: any) => qi.sale_id))];
         
