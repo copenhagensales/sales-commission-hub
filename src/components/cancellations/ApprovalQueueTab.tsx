@@ -53,6 +53,7 @@ interface ColumnMapping {
   commission_column: string | null;
   product_match_mode: string;
   date_column: string | null;
+  phone_excluded_products: string[];
 }
 
 interface SaleItem {
@@ -318,6 +319,7 @@ interface FlatQueueRow {
   mapping: ColumnMapping | null;
   diffs: DiffField[];
   hasDifferences: boolean;
+  isPhoneExcluded: boolean;
 }
 
 interface ApprovalQueueTabProps {
@@ -411,7 +413,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
 
       const [configsResult, productsResult] = await Promise.all([
         configIds.length > 0
-          ? supabase.from("cancellation_upload_configs").select("id, product_columns, revenue_column, commission_column, product_match_mode, date_column").in("id", configIds) as any
+          ? supabase.from("cancellation_upload_configs").select("id, product_columns, revenue_column, commission_column, product_match_mode, date_column, phone_excluded_products").in("id", configIds) as any
           : { data: [] },
         productIds.length > 0
           ? fetchByIds<any>("products", "id", productIds, "id, name")
@@ -420,12 +422,16 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
 
       const configsMap = new Map<string, ColumnMapping>();
       for (const cfg of (configsResult?.data || [])) {
+        const phoneExcluded: string[] = Array.isArray(cfg.phone_excluded_products)
+          ? (cfg.phone_excluded_products as any[]).map((p: any) => String(p).toLowerCase().trim())
+          : [];
         configsMap.set(cfg.id, {
           product_columns: cfg.product_columns || [],
           revenue_column: cfg.revenue_column,
           commission_column: cfg.commission_column,
           product_match_mode: cfg.product_match_mode || "exact",
           date_column: cfg.date_column || null,
+          phone_excluded_products: phoneExcluded,
         });
       }
 
@@ -458,6 +464,13 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
         const saleDateVal = sale?.sale_datetime || "";
         const diffs = computeDiff(uploaded, saleItems, mapping, saleDateVal);
 
+        // Check if the matched product is phone_excluded
+        const phoneExcludedList = mapping?.phone_excluded_products || [];
+        const targetProduct = (item.target_product_name || "").toLowerCase().trim();
+        const isPhoneExcluded = phoneExcludedList.length > 0 && targetProduct
+          ? phoneExcludedList.some(ep => targetProduct.includes(ep) || ep.includes(targetProduct))
+          : false;
+
         return {
           ...item,
           opp_group: item.opp_group || null,
@@ -474,6 +487,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
           mapping,
           diffs,
           hasDifferences: diffs.length > 0,
+          isPhoneExcluded,
         };
       });
 
@@ -536,6 +550,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   const duplicatePhones = useMemo(() => {
     const phoneCounts = new Map<string, number>();
     for (const item of flatItems) {
+      if (item.isPhoneExcluded) continue; // Skip phone_excluded produkter
       const phone = (item.phone || "").trim();
       if (phone) phoneCounts.set(phone, (phoneCounts.get(phone) || 0) + 1);
     }
@@ -1128,7 +1143,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                             <Badge variant={item.upload_type === "cancellation" ? "destructive" : "secondary"}>
                               {item.upload_type === "cancellation" ? "Annullering" : "Kurv diff."}
                             </Badge>
-                            {duplicatePhones.has((item.phone || "").trim()) && (item.phone || "").trim() && (
+                            {!item.isPhoneExcluded && duplicatePhones.has((item.phone || "").trim()) && (item.phone || "").trim() && (
                               <Badge className="bg-orange-500/15 text-orange-700 border-orange-300">Dublet</Badge>
                             )}
                           </div>
