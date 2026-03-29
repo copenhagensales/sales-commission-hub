@@ -370,6 +370,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [sellerFilter, setSellerFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [productOverrides, setProductOverrides] = useState<Record<string, string>>({});
   type QueueSortKey = "date" | "agent" | "opp" | "type";
   type QueueSortDir = "asc" | "desc";
   const [sortKey, setSortKey] = useState<QueueSortKey>("date");
@@ -389,6 +390,19 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
       return data;
     },
     enabled: !!user?.email,
+  });
+
+  const { data: clientProducts = [] } = useQuery({
+    queryKey: ["client-products-for-dropdown", clientId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, name")
+        .order("name");
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 60_000,
   });
 
   const { data: queryResult, isLoading } = useQuery({
