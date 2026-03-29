@@ -2191,7 +2191,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-warning" />
-              Forhåndsvisning – {matchedSales.length} match
+              Forhåndsvisning – {mergedMatchedSales.length} match
             </CardTitle>
             <CardDescription>
               {uploadType === "cancellation" ? "Annullering" : "Kurv difference"} – gennemgå matchede salg før afsendelse til godkendelseskøen.
@@ -2250,7 +2250,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             </div>
 
             {previewTab === "matched" ? (
-              matchedSales.length === 0 ? (
+              mergedMatchedSales.length === 0 ? (
                 <div className="py-8 text-center text-muted-foreground">
                   <X className="h-12 w-12 mx-auto mb-4" />
                   <p>Ingen matchende salg fundet</p>
@@ -2274,7 +2274,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {matchedSales.map((sale, idx) => (
+                      {mergedMatchedSales.map((sale, idx) => (
                         <TableRow key={`${sale.saleId}-${sale.targetProductName || idx}`}>
                           <TableCell>{sale.saleDate}</TableCell>
                           <TableCell>{resolve(sale.employee)}</TableCell>
@@ -2483,7 +2483,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             )}
 
             <div className="flex gap-2">
-              {matchedSales.length > 0 && (
+              {mergedMatchedSales.length > 0 && (
                 <Button
                   onClick={() => sendToQueueMutation.mutate()}
                   disabled={sendToQueueMutation.isPending}
@@ -2496,7 +2496,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                   ) : (
                     <>
                       <Check className="h-4 w-4 mr-2" />
-                      Send {matchedSales.length} til godkendelse
+                      Send {mergedMatchedSales.length} til godkendelse
                     </>
                   )}
                 </Button>
