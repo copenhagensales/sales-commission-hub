@@ -171,19 +171,34 @@ export function LocateSaleDialog({
   });
 
   const filtered = useMemo(() => {
-    if (!searchQuery.trim()) return sales;
-    const q = searchQuery.toLowerCase();
-    return sales.filter(s => {
-      const searchable = [
-        s.agent_name,
-        s.agent_email,
-        s.customer_phone,
-        s.customer_company,
-        s.sale_items?.map(i => i.display_name).join(" "),
-      ].filter(Boolean).join(" ").toLowerCase();
-      return searchable.includes(q);
-    });
-  }, [sales, searchQuery]);
+    let result = sales;
+    // Exclude sales already in queue
+    if (usedSaleIds?.size) {
+      result = result.filter(s => !usedSaleIds.has(s.id));
+    }
+    // Date filter
+    if (dateFilter) {
+      const target = format(dateFilter, "yyyy-MM-dd");
+      result = result.filter(s =>
+        s.sale_datetime && format(new Date(s.sale_datetime), "yyyy-MM-dd") === target
+      );
+    }
+    // Search filter
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(s => {
+        const searchable = [
+          s.agent_name,
+          s.agent_email,
+          s.customer_phone,
+          s.customer_company,
+          s.sale_items?.map(i => i.display_name).join(" "),
+        ].filter(Boolean).join(" ").toLowerCase();
+        return searchable.includes(q);
+      });
+    }
+    return result;
+  }, [sales, searchQuery, usedSaleIds, dateFilter]);
 
   const linkSaleMutation = useMutation({
     mutationFn: async (saleId: string) => {
