@@ -4,7 +4,7 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Shield, AlertTriangle, Clock, Trash2, Info } from "lucide-react";
+import { Shield, AlertTriangle, Clock, Trash2, Info, Ban } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,6 +23,7 @@ interface RetentionPolicy {
   retention_days: number | null;
   is_active: boolean;
   cleanup_mode: string;
+  no_data_held: boolean;
 }
 
 interface DataRetentionPolicy {
@@ -114,6 +115,7 @@ export default function RetentionPolicies() {
       retention_days?: number | null;
       is_active?: boolean;
       cleanup_mode?: string;
+      no_data_held?: boolean;
     }) => {
       const { data, error } = await supabase
         .from("campaign_retention_policies")
@@ -123,6 +125,7 @@ export default function RetentionPolicies() {
             ...(params.retention_days !== undefined && { retention_days: params.retention_days }),
             ...(params.is_active !== undefined && { is_active: params.is_active }),
             ...(params.cleanup_mode !== undefined && { cleanup_mode: params.cleanup_mode }),
+            ...(params.no_data_held !== undefined && { no_data_held: params.no_data_held }),
             updated_at: new Date().toISOString(),
           },
           { onConflict: "client_campaign_id" }
@@ -160,6 +163,10 @@ export default function RetentionPolicies() {
 
   const handleCleanupModeChange = (campaignId: string, mode: string) => {
     upsertMutation.mutate({ client_campaign_id: campaignId, cleanup_mode: mode });
+  };
+
+  const handleNoDataHeldToggle = (campaignId: string, noData: boolean) => {
+    upsertMutation.mutate({ client_campaign_id: campaignId, no_data_held: noData });
   };
 
   const handleDataRetentionDaysChange = (dataType: string, value: string) => {
@@ -280,6 +287,7 @@ export default function RetentionPolicies() {
                     <tr className="border-b text-left">
                       <th className="py-3 pr-4 font-medium text-muted-foreground">Klient</th>
                       <th className="py-3 pr-4 font-medium text-muted-foreground">Kampagne</th>
+                      <th className="py-3 pr-4 font-medium text-muted-foreground w-24">Ingen data</th>
                       <th className="py-3 pr-4 font-medium text-muted-foreground w-32">Retention (dage)</th>
                       <th className="py-3 pr-4 font-medium text-muted-foreground w-48">Rensningstype</th>
                       <th className="py-3 font-medium text-muted-foreground w-20">Aktiv</th>
@@ -288,12 +296,18 @@ export default function RetentionPolicies() {
                   <tbody>
                     {campaigns.map((campaign) => {
                       const policy = getPolicy(campaign.id);
+                      const noData = policy?.no_data_held || false;
                       return (
-                        <tr key={campaign.id} className="border-b last:border-0 hover:bg-muted/30">
+                        <tr key={campaign.id} className={`border-b last:border-0 hover:bg-muted/30 ${noData ? "opacity-60" : ""}`}>
                           <td className="py-3 pr-4 text-foreground">{campaign.client_name}</td>
                           <td className="py-3 pr-4 text-foreground">
                             <span className="flex items-center gap-1.5">
                               {campaign.name}
+                              {noData && (
+                                <Badge variant="outline" className="text-xs ml-1">
+                                  <Ban className="h-3 w-3 mr-1" /> Ingen data
+                                </Badge>
+                              )}
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
@@ -307,6 +321,12 @@ export default function RetentionPolicies() {
                             </span>
                           </td>
                           <td className="py-3 pr-4">
+                            <Switch
+                              checked={noData}
+                              onCheckedChange={(v) => handleNoDataHeldToggle(campaign.id, v)}
+                            />
+                          </td>
+                          <td className="py-3 pr-4">
                             <Input
                               type="number"
                               min={1}
@@ -314,12 +334,14 @@ export default function RetentionPolicies() {
                               className="w-24 h-8 text-sm"
                               value={policy?.retention_days ?? ""}
                               onChange={(e) => handleRetentionDaysChange(campaign.id, e.target.value)}
+                              disabled={noData}
                             />
                           </td>
                           <td className="py-3 pr-4">
                             <Select
                               value={policy?.cleanup_mode || "anonymize_customer"}
                               onValueChange={(v) => handleCleanupModeChange(campaign.id, v)}
+                              disabled={noData}
                             >
                               <SelectTrigger className="w-44 h-8 text-sm">
                                 <SelectValue />
@@ -342,6 +364,7 @@ export default function RetentionPolicies() {
                             <Switch
                               checked={policy?.is_active || false}
                               onCheckedChange={(v) => handleActiveToggle(campaign.id, v)}
+                              disabled={noData}
                             />
                           </td>
                         </tr>

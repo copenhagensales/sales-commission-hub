@@ -1710,6 +1710,7 @@ export type Database = {
           created_at: string
           id: string
           is_active: boolean
+          no_data_held: boolean
           retention_days: number | null
           updated_at: string
         }
@@ -1719,6 +1720,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          no_data_held?: boolean
           retention_days?: number | null
           updated_at?: string
         }
@@ -1728,6 +1730,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          no_data_held?: boolean
           retention_days?: number | null
           updated_at?: string
         }
@@ -4171,6 +4174,7 @@ export type Database = {
           created_at: string
           data_type: string
           description: string | null
+          dialer_retention_days: number | null
           display_name: string
           field_key: string
           id: string
@@ -4185,6 +4189,7 @@ export type Database = {
           created_at?: string
           data_type?: string
           description?: string | null
+          dialer_retention_days?: number | null
           display_name: string
           field_key: string
           id?: string
@@ -4199,6 +4204,7 @@ export type Database = {
           created_at?: string
           data_type?: string
           description?: string | null
+          dialer_retention_days?: number | null
           display_name?: string
           field_key?: string
           id?: string

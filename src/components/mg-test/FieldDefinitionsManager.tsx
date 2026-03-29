@@ -33,6 +33,7 @@ export interface FieldDefinition {
   is_required: boolean;
   is_hidden: boolean;
   retention_days: number | null;
+  dialer_retention_days: number | null;
   description: string | null;
   created_at: string;
   updated_at: string;
@@ -156,6 +157,7 @@ export function FieldDefinitionsManager() {
                     <TableHead className="w-[60px] text-center">PII</TableHead>
                     <TableHead className="w-[60px] text-center">Skjult</TableHead>
                     <TableHead className="w-[100px]">Retention</TableHead>
+                    <TableHead className="w-[100px]">Dialer ret.</TableHead>
                     <TableHead className="w-[60px] text-center">Obl.</TableHead>
                     <TableHead className="w-[60px]"></TableHead>
                   </TableRow>
@@ -192,6 +194,14 @@ export function FieldDefinitionsManager() {
                           <div className="flex items-center gap-1 text-sm text-muted-foreground">
                             <Clock className="h-3 w-3" />
                             {formatRetention(field.retention_days)}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {field.dialer_retention_days !== null && (
+                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                            <Clock className="h-3 w-3" />
+                            {formatRetention(field.dialer_retention_days)}
                           </div>
                         )}
                       </TableCell>
