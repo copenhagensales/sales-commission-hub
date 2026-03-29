@@ -1297,9 +1297,13 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                                       <SelectValue placeholder="Vælg produkt" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      {clientProducts.map((p) => (
-                                        <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>
-                                      ))}
+                                      {(() => {
+                                        const filtered = clientProducts.filter(p => p.name === item.target_product_name);
+                                        const productsToShow = filtered.length > 0 ? filtered : clientProducts;
+                                        return productsToShow.map((p) => (
+                                          <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>
+                                        ));
+                                      })()}
                                     </SelectContent>
                                   </Select>
                                 </div>
