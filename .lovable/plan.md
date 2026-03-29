@@ -1,46 +1,31 @@
 
 
-## Plan: Tilføj dialer-retention felt og "ingen data" markering
+## Plan: Fix kampagne-retention — to retentionsfelter + "ingen dialer-data" ændring
 
-### Overblik
-1. Nyt felt `dialer_retention_days` (integer, default 180) på `data_field_definitions` — rent dokumentationsformål
-2. Nyt felt `no_data_held` (boolean, default false) på `campaign_retention_policies` — markerer at vi ikke opbevarer kundedata for den kampagne
+### Problem
+1. "Ingen data" toggle blokerer hele rækken (opacity + disabled felter) — forkert. Det skal kun betyde "vi har ingen dialer-data" (kunden bruger eget system), ikke at vi ikke har data overhovedet.
+2. Der mangler et separat felt til dialer-retention (dage). Der er to forskellige intervaller: vores system og dialerens.
 
-### Database migration
+### Ændringer
 
+**Database migration** — Tilføj `dialer_retention_days` kolonne
 ```sql
--- Tilføj dialer retention felt (standard 6 mdr = 180 dage)
-ALTER TABLE public.data_field_definitions
-  ADD COLUMN dialer_retention_days integer DEFAULT 180;
-
--- Tilføj "ingen data" flag på kampagne-retention
 ALTER TABLE public.campaign_retention_policies
-  ADD COLUMN no_data_held boolean NOT NULL DEFAULT false;
+  ADD COLUMN dialer_retention_days integer DEFAULT 180;
 ```
 
-### UI-ændringer
-
-**`src/components/mg-test/FieldDefinitionDialog.tsx`**
-- Tilføj nyt felt "Dialer retention (dage)" under det eksisterende retention-felt
-- FormDescription: "Standard opbevaringsperiode i dialer (default 180 dage / 6 mdr). Kun til dokumentation."
-- Opdater form schema og mutation
-
-**`src/components/mg-test/FieldDefinitionsManager.tsx`**
-- Opdater `FieldDefinition` interface med `dialer_retention_days: number | null`
-- Tilføj kolonne "Dialer ret." i tabellen med ikon og dage-visning
-- Vis "6 mdr" for 180 dage osv.
-
 **`src/pages/compliance/RetentionPolicies.tsx`**
-- I kampagnetabellen: tilføj en "Ingen data" kolonne med en `Switch` eller `Checkbox`
-- Når `no_data_held` er true: vis badge "Ingen data opbevaret", og gør retention/rensning felter disabled/dimmed
-- Upsert mutation opdateres til at inkludere `no_data_held`
+1. **Fjern opacity/disabled-logik** fra "Ingen data" toggle — rækken skal aldrig dimmes eller blokeres
+2. **Omdøb "Ingen data"** til "Ingen dialer-data" med tooltip: "Kunden bruger eget system — vi ringer ikke ud fra vores dialer"
+3. **Tilføj kolonne "Dialer ret. (dage)"** — et separat input-felt til dialer-retention (default 180)
+4. **Omdøb eksisterende "Retention (dage)"** til "Vores retention (dage)" for klarhed
+5. Når "Ingen dialer-data" er slået til: kun dialer-retention feltet disables (ikke resten)
+6. Opdater `RetentionPolicy` interface + upsert mutation med `dialer_retention_days`
 
 ### Filer
 
 | Fil | Ændring |
 |-----|---------|
-| `supabase/migrations/...` | Tilføj `dialer_retention_days` + `no_data_held` |
-| `src/components/mg-test/FieldDefinitionDialog.tsx` | Nyt formfelt for dialer retention |
-| `src/components/mg-test/FieldDefinitionsManager.tsx` | Ny kolonne + interface |
-| `src/pages/compliance/RetentionPolicies.tsx` | "Ingen data" toggle per kampagne |
+| `supabase/migrations/...` | Tilføj `dialer_retention_days` på `campaign_retention_policies` |
+| `src/pages/compliance/RetentionPolicies.tsx` | To retention-felter, ændret "ingen data" semantik |
 
