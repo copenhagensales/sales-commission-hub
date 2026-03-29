@@ -1943,21 +1943,91 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     });
     return data;
   })();
-  const unmatchedRows = filteredDataForPreview.filter(row => !matchedRowIndices.has(row.originalIndex));
+  // === PRE-CLASSIFICATION DEDUP (preview layer) ===
+  // Merge matchedSales by normalized phone so preview, counts, and send-to-queue all use the same data
+  const activePreviewConfig = clientConfigs.find(c => c.id === selectedConfigId) || clientConfigs.find(c => c.is_default) || clientConfigs[0];
+
+  const { mergedMatchedSales, mergedAwayEntries, matchedPhones } = useMemo(() => {
+    const phoneGroups = new Map<string, MatchedSale[]>();
+    matchedSales.forEach(sale => {
+      const phone = sale.phone ? normalizePhone(sale.phone) : null;
+      const key = phone || `__no_phone_${sale.saleId}`;
+      const group = phoneGroups.get(key) || [];
+      group.push(sale);
+      phoneGroups.set(key, group);
+    });
+
+    const merged: MatchedSale[] = [];
+    const away: MatchedSale[] = [];
+    const phones = new Set<string>();
+
+    const typeCol = activePreviewConfig?.type_detection_column;
+    const typeVals = (activePreviewConfig?.type_detection_values as string[]) || [];
+
+    phoneGroups.forEach((group, key) => {
+      // Track all phones that were matched
+      if (!key.startsWith("__no_phone_")) phones.add(key);
+
+      if (group.length === 1) {
+        merged.push(group[0]);
+        return;
+      }
+      // Multiple rows for same phone — merge
+      const allAreCancellations = group.every(sale => {
+        let isConfiguredCancellation = false;
+        if (typeCol && typeVals.length > 0) {
+          const cellVal = String(getCaseInsensitive(sale.uploadedRowData, typeCol) || "").trim().toLowerCase();
+          isConfiguredCancellation = typeVals.some(v => v.toLowerCase() === cellVal);
+        }
+        const annulledVal = String(getCaseInsensitive(sale.uploadedRowData, "Annulled Sales") || "").trim();
+        const isAnnulledSales = annulledVal !== "" && annulledVal !== "0";
+        return isConfiguredCancellation || isAnnulledSales;
+      });
+
+      const first = group[0];
+      const mergedRowData = { ...first.uploadedRowData };
+      if (!allAreCancellations) {
+        mergedRowData["Annulled Sales"] = "0";
+        if (typeCol) mergedRowData[typeCol] = "";
+      }
+      merged.push({ ...first, uploadedRowData: mergedRowData });
+      for (let i = 1; i < group.length; i++) away.push(group[i]);
+    });
+
+    return { mergedMatchedSales: merged, mergedAwayEntries: away, matchedPhones: phones };
+  }, [matchedSales, activePreviewConfig]);
+
+  // Build coveredRowIndices: matchedRowIndices + any Excel rows whose phone matches a merged phone
+  const coveredRowIndices = useMemo(() => {
+    const covered = new Set(matchedRowIndices);
+    if (matchedPhones.size > 0) {
+      for (const row of filteredDataForPreview) {
+        if (covered.has(row.originalIndex)) continue;
+        const rowPhone = row.phone ? normalizePhone(row.phone) : null;
+        if (rowPhone && matchedPhones.has(rowPhone)) {
+          covered.add(row.originalIndex);
+        }
+      }
+    }
+    return covered;
+  }, [matchedRowIndices, matchedPhones, filteredDataForPreview]);
+
+  const unmatchedRows = filteredDataForPreview.filter(row => !coveredRowIndices.has(row.originalIndex));
   const unmatchedCount = unmatchedRows.length;
 
-  // Compute duplicates: group by normalized phone number to find rows that will be merged
-  const duplicateSalesMap = useMemo(() => {
-    const map = new Map<string, MatchedSale[]>();
-    matchedSales.forEach(sale => {
+  // Compute duplicates from merged-away entries
+  const duplicateEntries = useMemo(() => {
+    if (mergedAwayEntries.length === 0) return [];
+    // Group by phone to show which rows were merged
+    const phoneGroups = new Map<string, MatchedSale[]>();
+    [...mergedMatchedSales, ...mergedAwayEntries].forEach(sale => {
       const phone = sale.phone ? normalizePhone(sale.phone) : sale.saleId;
-      const arr = map.get(phone) || [];
+      const arr = phoneGroups.get(phone) || [];
       arr.push(sale);
-      map.set(phone, arr);
+      phoneGroups.set(phone, arr);
     });
-    return map;
-  }, [matchedSales]);
-  const duplicateEntries = useMemo(() => [...duplicateSalesMap.values()].filter(arr => arr.length > 1), [duplicateSalesMap]);
+    return [...phoneGroups.values()].filter(arr => arr.length > 1);
+  }, [mergedMatchedSales, mergedAwayEntries]);
   const duplicateSales = useMemo(() => duplicateEntries.flat(), [duplicateEntries]);
   const duplicateCount = duplicateSales.length;
 
