@@ -56,8 +56,23 @@ export function LocateSaleDialog({
   assignedEmployeeName,
 }: LocateSaleDialogProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined);
   const [filterByEmployee, setFilterByEmployee] = useState(!!assignedEmployeeId);
   const queryClient = useQueryClient();
+
+  // Fetch sale_ids already in the queue (exclude rejected)
+  const { data: usedSaleIds } = useQuery({
+    queryKey: ["used-sale-ids", clientId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("cancellation_queue")
+        .select("sale_id")
+        .eq("client_id", clientId)
+        .neq("status", "rejected");
+      return new Set((data || []).map(d => d.sale_id));
+    },
+    enabled: open,
+  });
 
   // Fetch all agent identities for this employee via agent mappings
   const { data: agentIdentities, isLoading: agentLoading } = useQuery({
