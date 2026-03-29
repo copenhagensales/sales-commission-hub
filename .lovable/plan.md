@@ -1,23 +1,24 @@
 
 
-## Plan: Vis hvem der har tilgået data i begge audit-logs
+## Plan: Vis datoperiode under hver udgiftspost
 
 ### Problem
-Sensitive access log viser kun hvilken medarbejders data der blev tilgået, men **ikke hvem der tilgik den**. Tabellen har allerede `user_id` — det vises bare ikke i UI'et.
+Det er utydeligt hvilken datoperiode (15.–14.) tallene dækker, inkl. hvilken måned.
 
-Contract access log viser allerede begge dele, men kolonnenavnene kan tydeliggøres.
+### Løsning
+Tilføj en lille tekst under hver udgiftspost-label der viser den aktuelle lønperiode, f.eks. *"15. feb – 14. mar"*. Formatteres med `date-fns` og dansk locale.
 
-### Ændringer
+### Ændring
 
-**`src/pages/compliance/SensitiveAccessLog.tsx`**
-1. Tilføj en query der resolver `user_id` til medarbejdernavn (via `employee_master_data.auth_user_id`)
-2. Tilføj en "Tilgået af" kolonne i tabellen der viser brugerens navn
-3. Opdater søgefunktionen til også at søge på brugernavnet
-4. Omdøb "Medarbejder" kolonnen til "Berørt medarbejder" for klarhed
+**`src/components/billing/ExpenseReportTab.tsx`**
+- I tabelrækken under `cat.label`, tilføj en `<span>` med klassen `text-xs text-muted-foreground block` der viser:
+  `"15. feb – 14. mar 2026"` (formateret fra `periodStart` og `periodEnd`)
+- Brug `format(new Date(periodStart), "d. MMM", { locale: da })` og tilsvarende for `periodEnd` inkl. år
+- Gælder alle rækker (både auto, recurring og manuelle)
 
 ### Filer
 
 | Fil | Ændring |
 |-----|---------|
-| `src/pages/compliance/SensitiveAccessLog.tsx` | Tilføj bruger-lookup + "Tilgået af" kolonne |
+| `src/components/billing/ExpenseReportTab.tsx` | Tilføj periodevisning under hver udgiftslabel |
 
