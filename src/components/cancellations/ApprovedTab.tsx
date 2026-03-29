@@ -141,9 +141,11 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
 
       // Get current user for audit
       const { data: { user } } = await supabase.auth.getUser();
-      const { data: emp } = user?.email
-        ? await supabase.from("employee_master_data").select("id").eq("email", user.email).maybeSingle()
-        : { data: null };
+      let empId: string | null = null;
+      if (user?.email) {
+        const { data: emp } = await supabase.from("employee_master_data").select("id").eq("email", user.email).maybeSingle();
+        empId = emp?.id || null;
+      }
 
       // Mark log entries as rolled back
       for (const log of logs) {
