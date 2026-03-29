@@ -602,7 +602,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
           hasDifferences: diffs.length > 0,
           queueItemIds: items.map((i) => i.id),
           saleIds: items.map((i) => i.sale_id),
-          uploadType: items[0]?.upload_type || "cancellation",
+          uploadType: (items[0]?.upload_type === "both" ? "cancellation" : items[0]?.upload_type) || "cancellation",
           status: items[0]?.status || "pending",
           fileName: items[0]?.fileName || "",
           createdAt: items[0]?.created_at || "",
@@ -903,8 +903,9 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
     filteredFlatItems = filteredFlatItems.filter(i => duplicatePhones.has((i.phone || "").trim()));
   }
 
-  const subOppGroups = useMemo(() => filteredOppGroups.filter((g) => g.uploadType === subTab), [filteredOppGroups, subTab]);
-  const subFlatItems = useMemo(() => filteredFlatItems.filter((i) => i.upload_type === subTab), [filteredFlatItems, subTab]);
+  const resolveUploadType = (t: string | null | undefined) => t === "both" ? "cancellation" : t;
+  const subOppGroups = useMemo(() => filteredOppGroups.filter((g) => resolveUploadType(g.uploadType) === subTab), [filteredOppGroups, subTab]);
+  const subFlatItems = useMemo(() => filteredFlatItems.filter((i) => resolveUploadType(i.upload_type) === subTab), [filteredFlatItems, subTab]);
 
   const allSellers = useMemo(() => {
     const names = new Set<string>();
@@ -971,16 +972,16 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
     [subFlatItems, sellerFilter, searchQuery, sortKey, sortDir]);
 
   const cancellationCount = useMemo(() =>
-    filteredOppGroups.filter((g) => g.uploadType === "cancellation").length +
-    filteredFlatItems.filter((i) => i.upload_type === "cancellation").length,
+    filteredOppGroups.filter((g) => resolveUploadType(g.uploadType) === "cancellation").length +
+    filteredFlatItems.filter((i) => resolveUploadType(i.upload_type) === "cancellation").length,
     [filteredOppGroups, filteredFlatItems]);
   const basketCount = useMemo(() =>
-    filteredOppGroups.filter((g) => g.uploadType === "basket_difference").length +
-    filteredFlatItems.filter((i) => i.upload_type === "basket_difference").length,
+    filteredOppGroups.filter((g) => resolveUploadType(g.uploadType) === "basket_difference").length +
+    filteredFlatItems.filter((i) => resolveUploadType(i.upload_type) === "basket_difference").length,
     [filteredOppGroups, filteredFlatItems]);
   const correctMatchCount = useMemo(() =>
-    filteredOppGroups.filter((g) => g.uploadType === "correct_match").length +
-    filteredFlatItems.filter((i) => i.upload_type === "correct_match").length,
+    filteredOppGroups.filter((g) => resolveUploadType(g.uploadType) === "correct_match").length +
+    filteredFlatItems.filter((i) => resolveUploadType(i.upload_type) === "correct_match").length,
     [filteredOppGroups, filteredFlatItems]);
 
   const { data: activeImport } = useQuery({
