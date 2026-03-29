@@ -909,7 +909,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       const oppNumbers: string[] = [];
       const memberNumbers: string[] = [];
 
-      cleanedData.forEach(row => {
+      dedupedData.forEach(row => {
         if (phoneColumn !== "__none__") {
           const pv = getCaseInsensitive(row.originalRow, phoneColumn);
           if (pv) phones.push(normalizePhone(String(pv)));
@@ -1056,10 +1056,10 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
         if (hasProductPhoneMappings) {
           console.log("[handleMatch] PRODUCT-PHONE MATCHING (reversed)");
-          console.log("[handleMatch] candidateSales:", candidateSales.length, "cleanedRows:", cleanedData.length);
+          console.log("[handleMatch] candidateSales:", candidateSales.length, "cleanedRows:", dedupedData.length);
           console.log("[handleMatch] mappings:", productPhoneMappings);
 
-          cleanedData.forEach((row) => {
+          dedupedData.forEach((row) => {
             const idx = row.originalIndex;
             const rawExcelPhone = phoneColumn !== "__none__" ? getCaseInsensitive(row.originalRow, phoneColumn) : null;
             if (!rawExcelPhone) return;
@@ -1109,7 +1109,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         console.log("[handleMatch] productMatched (pass 1):", productMatched.length);
 
         // --- PASS 1b: FM phone matching via customer_phone directly ---
-        cleanedData.forEach((row) => {
+        dedupedData.forEach((row) => {
           const idx = row.originalIndex;
           if (matchedIndicesLocal.has(idx)) return;
 
@@ -1313,7 +1313,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             }
           }
 
-          cleanedData.forEach((row) => {
+          dedupedData.forEach((row) => {
             const idx = row.originalIndex;
             if (matchedIndicesLocal.has(idx)) return;
 
@@ -1613,7 +1613,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       const uploadedRowByCompany = new Map<string, Record<string, unknown>>();
       const uploadedRowByMemberNr = new Map<string, Record<string, unknown>>();
       
-      cleanedData.forEach(row => {
+      dedupedData.forEach(row => {
         if (oppColumn !== "__none__") {
           const ov = getCaseInsensitive(row.originalRow, oppColumn);
           if (ov) {
@@ -1663,7 +1663,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       const indexByPhone = new Map<string, number[]>();
       const indexByCompany = new Map<string, number>();
       const indexByMemberNr = new Map<string, number>();
-      cleanedData.forEach((row) => {
+      dedupedData.forEach((row) => {
         const idx = row.originalIndex;
         if (oppColumn !== "__none__") {
           const ov = getCaseInsensitive(row.originalRow, oppColumn);
