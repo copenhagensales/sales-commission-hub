@@ -1,7 +1,6 @@
 import { useState, useMemo } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import type { Json } from "@/integrations/supabase/types";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
@@ -34,6 +33,7 @@ interface LocateSaleDialogProps {
   campaignIds: string[];
   assignedEmployeeId?: string;
   assignedEmployeeName?: string;
+  onMatch?: (saleId: string, row: FlatUnmatchedRow) => void;
 }
 
 interface SaleRow {
@@ -54,11 +54,11 @@ export function LocateSaleDialog({
   campaignIds,
   assignedEmployeeId,
   assignedEmployeeName,
+  onMatch,
 }: LocateSaleDialogProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined);
   const [filterByEmployee, setFilterByEmployee] = useState(!!assignedEmployeeId);
-  const queryClient = useQueryClient();
 
   // Fetch sale_ids already in the queue (exclude rejected)
   const { data: usedSaleIds } = useQuery({
@@ -202,53 +202,13 @@ export function LocateSaleDialog({
     return result;
   }, [sales, searchQuery, usedSaleIds, dateFilter]);
 
-  const linkSaleMutation = useMutation({
-    mutationFn: async (saleId: string) => {
-      // When uploadType is "both" (combined upload), classify as "cancellation"
-      // since match-error rows are overwhelmingly cancellations that couldn't be auto-matched.
-      const resolvedUploadType = row.uploadType === "both" ? "cancellation" : row.uploadType;
-
-      const { error: queueError } = await supabase
-        .from("cancellation_queue")
-        .insert([{
-          import_id: row.importId,
-          sale_id: saleId,
-          upload_type: resolvedUploadType,
-          status: "pending",
-          uploaded_data: row.rowData as unknown as Json,
-          client_id: clientId,
-        }]);
-      if (queueError) throw queueError;
-
-      const { data: importData } = await supabase
-        .from("cancellation_imports")
-        .select("unmatched_rows")
-        .eq("id", row.importId)
-        .single();
-
-      if (importData?.unmatched_rows && Array.isArray(importData.unmatched_rows)) {
-        const rowJson = JSON.stringify(row.rowData);
-        const updated = (importData.unmatched_rows as Record<string, unknown>[]).filter(
-          ur => JSON.stringify(ur) !== rowJson
-        );
-        await supabase
-          .from("cancellation_imports")
-          .update({ unmatched_rows: (updated.length > 0 ? updated : null) as Json })
-          .eq("id", row.importId);
-      }
-    },
-    onSuccess: () => {
-      toast({ title: "Salg koblet til annullering og sendt til godkendelseskøen" });
-      queryClient.invalidateQueries({ queryKey: ["used-sale-ids", clientId] });
-      queryClient.invalidateQueries({ queryKey: ["match-errors", clientId] });
-      queryClient.invalidateQueries({ queryKey: ["match-errors-count"] });
-      queryClient.invalidateQueries({ queryKey: ["cancellation-queue"] });
+  const handleSelectSale = (saleId: string) => {
+    if (onMatch) {
+      onMatch(saleId, row);
+      toast({ title: "Salg valgt – afventer bekræftelse" });
       onOpenChange(false);
-    },
-    onError: () => {
-      toast({ title: "Fejl ved kobling af salg", variant: "destructive" });
-    },
-  });
+    }
+  };
 
   const showFallbackWarning = filterByEmployee && agentIdentities && !agentIdentities.isMappingBased;
 
@@ -389,8 +349,7 @@ export function LocateSaleDialog({
                           size="sm"
                           variant="outline"
                           className="h-7 text-xs"
-                          disabled={linkSaleMutation.isPending}
-                          onClick={() => linkSaleMutation.mutate(sale.id)}
+                          onClick={() => handleSelectSale(sale.id)}
                         >
                           <Check className="h-3 w-3 mr-1" /> Vælg
                         </Button>

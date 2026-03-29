@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
+
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -10,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
-import { Search, Loader2, AlertTriangle, Check, ChevronsUpDown, Trash2, SearchCheck, X } from "lucide-react";
+import { Search, Loader2, AlertTriangle, Check, ChevronsUpDown, Trash2, SearchCheck, X, SendHorizonal } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -70,6 +71,7 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
   const [openPopoverKey, setOpenPopoverKey] = useState<string | null>(null);
   const [locateDialogRow, setLocateDialogRow] = useState<{ row: FlatUnmatchedRow; key: string } | null>(null);
   const [ignorePendingKey, setIgnorePendingKey] = useState<string | null>(null);
+  const [localManualMatches, setLocalManualMatches] = useState<Map<string, { saleId: string; row: FlatUnmatchedRow }>>(new Map());
   const queryClient = useQueryClient();
 
   // Fetch unmatched rows
@@ -351,6 +353,86 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
     },
   });
 
+  // Handle local match from LocateSaleDialog
+  const handleLocalMatch = useCallback((saleId: string, matchedRow: FlatUnmatchedRow) => {
+    const rk = rowKey(matchedRow);
+    setLocalManualMatches(prev => {
+      const next = new Map(prev);
+      next.set(rk, { saleId, row: matchedRow });
+      return next;
+    });
+  }, []);
+
+  // Remove a local match
+  const handleRemoveLocalMatch = useCallback((rk: string) => {
+    setLocalManualMatches(prev => {
+      const next = new Map(prev);
+      next.delete(rk);
+      return next;
+    });
+  }, []);
+
+  // Confirm all local manual matches → persist to DB
+  const confirmManualMatchesMutation = useMutation({
+    mutationFn: async () => {
+      const entries = [...localManualMatches.values()];
+      if (entries.length === 0) return;
+
+      // Batch insert into cancellation_queue
+      const inserts = entries.map(({ saleId, row: r }) => ({
+        import_id: r.importId,
+        sale_id: saleId,
+        upload_type: r.uploadType === "both" ? "cancellation" : r.uploadType,
+        status: "pending",
+        uploaded_data: r.rowData as unknown as Json,
+        client_id: clientId,
+      }));
+
+      const { error: queueError } = await supabase
+        .from("cancellation_queue")
+        .insert(inserts);
+      if (queueError) throw queueError;
+
+      // Group by importId and remove from unmatched_rows
+      const grouped = new Map<string, Record<string, unknown>[]>();
+      for (const { row: r } of entries) {
+        const existing = grouped.get(r.importId) || [];
+        existing.push(r.rowData);
+        grouped.set(r.importId, existing);
+      }
+
+      for (const [importId, rowsToRemove] of grouped) {
+        const { data: importData } = await supabase
+          .from("cancellation_imports")
+          .select("unmatched_rows")
+          .eq("id", importId)
+          .single();
+
+        if (importData?.unmatched_rows && Array.isArray(importData.unmatched_rows)) {
+          const removeSet = new Set(rowsToRemove.map(r => JSON.stringify(r)));
+          const updated = (importData.unmatched_rows as Record<string, unknown>[]).filter(
+            ur => !removeSet.has(JSON.stringify(ur))
+          );
+          await supabase
+            .from("cancellation_imports")
+            .update({ unmatched_rows: (updated.length > 0 ? updated : null) as unknown as Json })
+            .eq("id", importId);
+        }
+      }
+    },
+    onSuccess: () => {
+      toast({ title: `${localManualMatches.size} manuelle matches sendt til godkendelseskøen` });
+      setLocalManualMatches(new Map());
+      queryClient.invalidateQueries({ queryKey: ["match-errors", clientId] });
+      queryClient.invalidateQueries({ queryKey: ["match-errors-count"] });
+      queryClient.invalidateQueries({ queryKey: ["cancellation-queue"] });
+      queryClient.invalidateQueries({ queryKey: ["used-sale-ids", clientId] });
+    },
+    onError: () => {
+      toast({ title: "Fejl ved bekræftelse af manuelle matches", variant: "destructive" });
+    },
+  });
+
   const allKeys = useMemo(() => {
     const keys = new Set<string>();
     for (const r of rows) {
@@ -368,6 +450,10 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
 
   const processed = useMemo(() => {
     let result = [...rows];
+    // Filter out rows that have been locally matched
+    if (localManualMatches.size > 0) {
+      result = result.filter(r => !localManualMatches.has(rowKey(r)));
+    }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(r => {
@@ -376,7 +462,7 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
       });
     }
     return result;
-  }, [rows, searchQuery]);
+  }, [rows, searchQuery, localManualMatches]);
 
   // Helper to resolve employee for a given row
   const getAssignedEmployeeId = useCallback((rk: string, row: FlatUnmatchedRow): string => {
@@ -544,6 +630,53 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
         </Table>
       </div>
 
+      {/* Pending manual matches section */}
+      {localManualMatches.size > 0 && (
+        <div className="rounded-md border border-green-500/30 bg-green-500/5 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-green-700 dark:text-green-400">
+              {localManualMatches.size} manuelle matches afventer bekræftelse
+            </p>
+            <Button
+              size="sm"
+              onClick={() => confirmManualMatchesMutation.mutate()}
+              disabled={confirmManualMatchesMutation.isPending}
+            >
+              {confirmManualMatchesMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <SendHorizonal className="h-4 w-4 mr-1" />
+              )}
+              Send til godkendelse
+            </Button>
+          </div>
+          <div className="space-y-1">
+            {[...localManualMatches.entries()].map(([rk, { saleId, row: matchedRow }]) => (
+              <div key={rk} className="flex items-center gap-2 text-xs">
+                <Badge variant="outline" className="bg-green-500/10 border-green-500/30 text-green-700 dark:text-green-400">
+                  Salg: {saleId.slice(0, 8)}…
+                </Badge>
+                <span className="text-muted-foreground truncate max-w-[300px]">
+                  {Object.entries(matchedRow.rowData)
+                    .filter(([k]) => k !== "_product_rows")
+                    .slice(0, 3)
+                    .map(([k, v]) => `${k}: ${v ?? "-"}`)
+                    .join(" | ")}
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 w-6 p-0 ml-auto text-muted-foreground hover:text-destructive"
+                  onClick={() => handleRemoveLocalMatch(rk)}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-end">
         <AlertDialog>
           <AlertDialogTrigger asChild>
@@ -584,6 +717,7 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
               return emp ? `${emp.first_name} ${emp.last_name}` : undefined;
             })()
           }
+          onMatch={handleLocalMatch}
         />
       )}
     </div>
