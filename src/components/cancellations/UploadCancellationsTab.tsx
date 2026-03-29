@@ -1039,73 +1039,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
         console.log("[handleMatch] productMatched (pass 1):", productMatched.length);
 
-        // --- PASS 1b: FM phone matching via customer_phone directly ---
-        // For rows that have a phone but weren't matched in Pass 1 (FM sales don't have raw_payload.data phone fields)
-        const phoneExcludedProducts: string[] = (activeConfig as any)?.phone_excluded_products || [];
-        const PRODUCT_KEYS_1B = ["Subscription Name", "Product", "Produkt", "Abonnement", "Product Name", "Produktnavn"];
-
-        cleanedData.forEach((row) => {
-          const idx = row.originalIndex;
-          if (matchedIndicesLocal.has(idx)) return; // already matched in pass 1
-
-          const rawExcelPhone = phoneColumn !== "__none__" ? getCaseInsensitive(row.originalRow, phoneColumn) : null;
-          if (!rawExcelPhone) return; // phone-less rows handled in pass 2
-          const excelPhone = normalizePhone(String(rawExcelPhone));
-          if (!excelPhone) return;
-
-          // Check if this row's product is excluded from phone matching
-          if (phoneExcludedProducts.length > 0) {
-            const prodCol = activeConfig?.product_columns?.[0];
-            let rowProduct = "";
-            if (prodCol) rowProduct = String(getCaseInsensitive(row.originalRow, prodCol) || "").trim();
-            if (!rowProduct) {
-              for (const key of PRODUCT_KEYS_1B) {
-                const val = getCaseInsensitive(row.originalRow, key);
-                if (val && String(val).trim()) { rowProduct = String(val).trim(); break; }
-              }
-            }
-            const isExcluded = phoneExcludedProducts.some(p => rowProduct.toLowerCase().includes(p.toLowerCase()));
-            if (isExcluded) return; // skip phone match, let Pass 2 handle it
-          }
-
-          for (const sale of candidateSales) {
-            if (existingIds.has(sale.id)) continue;
-            const salePhone = normalizePhone(sale.customer_phone || "");
-            if (!salePhone || salePhone !== excelPhone) continue;
-
-            // Direct phone match found (typically FM sales)
-            const allItems = saleItemsMap.get(sale.id) || [];
-            const firstItem = allItems[0];
-            const key = `${sale.id}|${firstItem?.adversus_product_title || "direct-phone"}`;
-            if (matchedSaleProductKeys.has(key)) continue;
-            matchedSaleProductKeys.add(key);
-            matchedIndicesLocal.add(idx);
-            productMatched.push({
-              saleId: sale.id,
-              phone: sale.customer_phone || "",
-              company: sale.customer_company || "",
-              oppNumber: "",
-              saleDate: sale.sale_datetime || "",
-              employee: sale.agent_name || "Ukendt",
-              currentStatus: sale.validation_status || "pending",
-              uploadedRowData: row.originalRow,
-              targetProductName: firstItem?.adversus_product_title || "Ukendt produkt",
-              realProductName: firstItem?.adversus_product_title || "Ukendt produkt",
-              commission: firstItem?.mapped_commission ?? undefined,
-              revenue: firstItem?.mapped_revenue ?? undefined,
-            });
-            break; // one match per row
-          }
-        });
-
-        console.log("[handleMatch] productMatched (after pass 1b FM):", productMatched.length);
-
-        // --- PASS 2: Seller + Date + Product fallback for phone-less rows ---
-        const dateCol = activeConfig?.date_column;
-        const fallbackMappings: FallbackProductMapping[] = (activeConfig as any)?.fallback_product_mappings || [];
-        const unmatchedSellers: UnmatchedSellerRow[] = [];
-
-        // Fetch condition-based product matching
+        // --- Fetch condition-based & legacy product matching (shared by Pass 1b & Pass 2) ---
         const { data: conditionRows } = await supabase
           .from("cancellation_product_conditions")
           .select("product_id, column_name, operator, values")
@@ -1113,7 +1047,6 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         const groupedConditions = conditionRows && conditionRows.length > 0
           ? groupConditionsByProduct(conditionRows)
           : [];
-        // Build condition product_id → product name map
         let condProductNames = new Map<string, string>();
         if (groupedConditions.length > 0) {
           const condPids = [...new Set(conditionRows!.map(r => r.product_id))];
@@ -1121,7 +1054,6 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           if (condProds) condProductNames = new Map(condProds.map(p => [p.id, p.name]));
         }
 
-        // Fetch legacy cancellation_product_mappings for Pass 2
         const { data: legacyProductMappings } = await supabase
           .from("cancellation_product_mappings")
           .select("excel_product_name, product_id")
@@ -1137,6 +1069,103 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             if (prodName) productMappingLookup.set(m.excel_product_name.toLowerCase().trim(), prodName);
           }
         }
+
+        // --- PASS 1b: FM phone matching via customer_phone directly ---
+        const phoneExcludedProducts: string[] = (activeConfig as any)?.phone_excluded_products || [];
+        const PRODUCT_KEYS_1B = ["Subscription Name", "Product", "Produkt", "Abonnement", "Product Name", "Produktnavn"];
+
+        cleanedData.forEach((row) => {
+          const idx = row.originalIndex;
+          if (matchedIndicesLocal.has(idx)) return;
+
+          const rawExcelPhone = phoneColumn !== "__none__" ? getCaseInsensitive(row.originalRow, phoneColumn) : null;
+          if (!rawExcelPhone) return;
+          const excelPhone = normalizePhone(String(rawExcelPhone));
+          if (!excelPhone) return;
+
+          // Check if this row's product is excluded from phone matching
+          if (phoneExcludedProducts.length > 0) {
+            const prodCol = activeConfig?.product_columns?.[0];
+            let rowProduct = "";
+            if (prodCol) rowProduct = String(getCaseInsensitive(row.originalRow, prodCol) || "").trim();
+            if (!rowProduct) {
+              for (const key of PRODUCT_KEYS_1B) {
+                const val = getCaseInsensitive(row.originalRow, key);
+                if (val && String(val).trim()) { rowProduct = String(val).trim(); break; }
+              }
+            }
+            const isExcluded = phoneExcludedProducts.some(p => rowProduct.toLowerCase().includes(p.toLowerCase()));
+            if (isExcluded) return;
+          }
+
+          // Resolve expected product for this row via conditions/mappings
+          let resolvedProduct: string | null = null;
+          if (groupedConditions.length > 0) {
+            const matchedPid = findMatchingProductId(groupedConditions, row.originalRow);
+            if (matchedPid) resolvedProduct = condProductNames.get(matchedPid) || null;
+          }
+          if (!resolvedProduct) {
+            const prodCol = activeConfig?.product_columns?.[0];
+            let excelSubName = "";
+            if (prodCol) excelSubName = String(getCaseInsensitive(row.originalRow, prodCol) || "").trim();
+            if (!excelSubName) {
+              for (const key of PRODUCT_KEYS_1B) {
+                const val = getCaseInsensitive(row.originalRow, key);
+                if (val && String(val).trim()) { excelSubName = String(val).trim(); break; }
+              }
+            }
+            if (excelSubName) {
+              resolvedProduct = productMappingLookup.get(excelSubName.toLowerCase().trim()) || null;
+            }
+          }
+
+          for (const sale of candidateSales) {
+            if (existingIds.has(sale.id)) continue;
+            const salePhone = normalizePhone(sale.customer_phone || "");
+            if (!salePhone || salePhone !== excelPhone) continue;
+
+            const allItems = saleItemsMap.get(sale.id) || [];
+
+            // If we resolved a product, verify the sale actually has it
+            if (resolvedProduct) {
+              const hasProduct = allItems.some(item =>
+                item.adversus_product_title?.toLowerCase() === resolvedProduct!.toLowerCase()
+              );
+              if (!hasProduct) continue; // Skip — wrong product
+            }
+
+            const firstItem = allItems[0];
+            const matchedItemForProduct = resolvedProduct
+              ? allItems.find(i => i.adversus_product_title?.toLowerCase() === resolvedProduct!.toLowerCase())
+              : firstItem;
+            const key = `${sale.id}|${resolvedProduct || firstItem?.adversus_product_title || "direct-phone"}`;
+            if (matchedSaleProductKeys.has(key)) continue;
+            matchedSaleProductKeys.add(key);
+            matchedIndicesLocal.add(idx);
+            productMatched.push({
+              saleId: sale.id,
+              phone: sale.customer_phone || "",
+              company: sale.customer_company || "",
+              oppNumber: "",
+              saleDate: sale.sale_datetime || "",
+              employee: sale.agent_name || "Ukendt",
+              currentStatus: sale.validation_status || "pending",
+              uploadedRowData: row.originalRow,
+              targetProductName: resolvedProduct || firstItem?.adversus_product_title || "Ukendt produkt",
+              realProductName: matchedItemForProduct?.adversus_product_title || resolvedProduct || "Ukendt produkt",
+              commission: matchedItemForProduct?.mapped_commission ?? undefined,
+              revenue: matchedItemForProduct?.mapped_revenue ?? undefined,
+            });
+            break;
+          }
+        });
+
+        console.log("[handleMatch] productMatched (after pass 1b FM):", productMatched.length);
+
+        // --- PASS 2: Seller + Date + Product fallback for phone-less rows ---
+        const dateCol = activeConfig?.date_column;
+        const fallbackMappings: FallbackProductMapping[] = (activeConfig as any)?.fallback_product_mappings || [];
+        const unmatchedSellers: UnmatchedSellerRow[] = [];
 
         const hasPass2Sources = (sellerCol && dateCol && (fallbackMappings.length > 0 || groupedConditions.length > 0 || productMappingLookup.size > 0));
 
