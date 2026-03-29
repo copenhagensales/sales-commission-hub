@@ -551,6 +551,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
   const [matchedSales, setMatchedSales] = useState<MatchedSale[]>([]);
   const [matchedRowIndices, setMatchedRowIndices] = useState<Set<number>>(new Set());
   const [isMatching, setIsMatching] = useState(false);
+  const [excelDuplicateIndices, setExcelDuplicateIndices] = useState<Set<number>>(new Set());
   const [uploadType, setUploadType] = useState<"cancellation" | "basket_difference" | "both">("cancellation");
   const [step, setStep] = useState<WizardStep>("type");
   const [configName, setConfigName] = useState("");
