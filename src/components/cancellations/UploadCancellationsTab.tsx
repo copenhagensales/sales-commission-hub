@@ -1106,7 +1106,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
           const exclusionBasis = (resolvedProduct || rawRowProduct).toLowerCase().trim();
           const isExcluded = exclusionBasis
-            ? phoneExcludedProducts.some((p) => p.toLowerCase().trim() === exclusionBasis)
+            ? phoneExcludedProducts.some((p) => exclusionBasis.includes(p.toLowerCase().trim()) || p.toLowerCase().trim().includes(exclusionBasis))
             : false;
           if (isExcluded) return;
 
@@ -1117,19 +1117,16 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
             const allItems = saleItemsMap.get(sale.id) || [];
 
-            // If we resolved a product, verify the sale actually has it
-            if (resolvedProduct) {
-              const hasProduct = allItems.some(item =>
-                item.adversus_product_title?.toLowerCase() === resolvedProduct!.toLowerCase()
-              );
-              if (!hasProduct) continue; // Skip — wrong product
-            }
+            // Product MUST be resolved — no blind phone-only matches
+            if (!resolvedProduct) continue;
 
-            const firstItem = allItems[0];
-            const matchedItemForProduct = resolvedProduct
-              ? allItems.find(i => i.adversus_product_title?.toLowerCase() === resolvedProduct!.toLowerCase())
-              : firstItem;
-            const key = `${sale.id}|${resolvedProduct || firstItem?.adversus_product_title || "direct-phone"}`;
+            const hasProduct = allItems.some(item =>
+              item.adversus_product_title?.toLowerCase() === resolvedProduct!.toLowerCase()
+            );
+            if (!hasProduct) continue; // Skip — wrong product
+
+            const matchedItemForProduct = allItems.find(i => i.adversus_product_title?.toLowerCase() === resolvedProduct!.toLowerCase());
+            const key = `${sale.id}|${resolvedProduct}`;
             if (matchedSaleProductKeys.has(key)) continue;
             matchedSaleProductKeys.add(key);
             matchedIndicesLocal.add(idx);
@@ -1142,8 +1139,8 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               employee: sale.agent_name || "Ukendt",
               currentStatus: sale.validation_status || "pending",
               uploadedRowData: row.originalRow,
-              targetProductName: resolvedProduct || firstItem?.adversus_product_title || "Ukendt produkt",
-              realProductName: matchedItemForProduct?.adversus_product_title || firstItem?.adversus_product_title || "Ukendt produkt",
+              targetProductName: resolvedProduct,
+              realProductName: matchedItemForProduct?.adversus_product_title || allItems[0]?.adversus_product_title || "Ukendt produkt",
               commission: matchedItemForProduct?.mapped_commission ?? undefined,
               revenue: matchedItemForProduct?.mapped_revenue ?? undefined,
             });

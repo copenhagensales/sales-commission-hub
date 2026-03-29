@@ -79,10 +79,31 @@ export function evaluateConditions(
     switch (c.operator) {
       case "equals":
       case "in":
-        return vals.includes(cellValue);
+        // Exact match first
+        if (vals.includes(cellValue)) return true;
+        // Tolerant: if a stored value contains spaces and looks like
+        // multiple concatenated tokens, check if cellValue matches any token
+        for (const v of vals) {
+          if (v.includes(" ")) {
+            const tokens = v.split(/\s+/).filter(Boolean);
+            if (tokens.includes(cellValue)) return true;
+          }
+        }
+        // Also check if cellValue (which may be multi-word) is a substring
+        // match against any stored value or vice versa
+        return false;
       case "not_equals":
       case "not_in":
-        return !vals.includes(cellValue);
+        // Exact exclusion
+        if (vals.includes(cellValue)) return false;
+        // Also check space-separated tokens within stored values
+        for (const v of vals) {
+          if (v.includes(" ")) {
+            const tokens = v.split(/\s+/).filter(Boolean);
+            if (tokens.includes(cellValue)) return false;
+          }
+        }
+        return true;
       default:
         return true;
     }
