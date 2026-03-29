@@ -1690,7 +1690,21 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           const annulledVal = String(getCaseInsensitive(sale.uploadedRowData, "Annulled Sales") || "").trim();
           const isAnnulledSales = annulledVal !== "" && annulledVal !== "0";
           
-          rowUploadType = (isConfiguredCancellation || isAnnulledSales) ? "cancellation" : "basket_difference";
+          if (isConfiguredCancellation || isAnnulledSales) {
+            rowUploadType = "cancellation";
+          } else {
+            // Classify as correct_match or basket_difference based on product comparison
+            const phoneExcluded: string[] = (activeQueueConfig as any)?.phone_excluded_products || [];
+            const targetName = (sale.targetProductName || "").trim().toLowerCase();
+            const realName = (sale.realProductName || "").trim().toLowerCase();
+            const isPhoneExcluded = phoneExcluded.some(p => p.trim().toLowerCase() === targetName);
+            
+            if (isPhoneExcluded || (targetName && realName && targetName === realName)) {
+              rowUploadType = "correct_match";
+            } else {
+              rowUploadType = "basket_difference";
+            }
+          }
         }
         return {
           import_id: importId!,
