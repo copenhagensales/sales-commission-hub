@@ -1023,7 +1023,8 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
         return sum + (Array.isArray(rows) ? rows.length : 0);
       }, 0);
     },
-    staleTime: 30_000,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   const pendingOppGroups = processedOppGroups.filter((g) => g.status === "pending");

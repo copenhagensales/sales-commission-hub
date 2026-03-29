@@ -103,6 +103,9 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
       }
       return flat;
     },
+    enabled: !!clientId,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   // Fetch active employees
@@ -276,6 +279,7 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
       }
       queryClient.invalidateQueries({ queryKey: ["cancellation-seller-mappings", clientId] });
       queryClient.invalidateQueries({ queryKey: ["match-errors", clientId] });
+      queryClient.invalidateQueries({ queryKey: ["match-errors-count", clientId] });
       queryClient.invalidateQueries({ queryKey: ["cancellation-queue"] });
     },
     onError: () => {
