@@ -1761,9 +1761,63 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
       if (!importId) throw new Error("Kunne ikke oprette import-log");
 
-      // Build queue items – each matchedSale entry becomes one queue item
-      // (for product-phone mappings, same saleId may appear multiple times with different targetProductName)
-      const queueItems = matchedSales.map(sale => {
+      // === PRE-CLASSIFICATION DEDUP: Merge matchedSales by normalized phone ===
+      const phoneGroups = new Map<string, typeof matchedSales>();
+      const mergedAwayEntries: typeof matchedSales = [];
+      matchedSales.forEach(sale => {
+        const phone = sale.phone ? normalizePhone(sale.phone) : null;
+        const key = phone || `__no_phone_${sale.saleId}`;
+        const group = phoneGroups.get(key) || [];
+        group.push(sale);
+        phoneGroups.set(key, group);
+      });
+
+      const deduplicatedMatchedSales: typeof matchedSales = [];
+      phoneGroups.forEach((group, key) => {
+        const first = group[0];
+        if (group.length === 1) {
+          deduplicatedMatchedSales.push(first);
+          return;
+        }
+        // Multiple rows for same phone — merge
+        // Cancellation: only if ALL rows in group are cancellations
+        const typeCol = activeQueueConfig?.type_detection_column;
+        const typeVals = (activeQueueConfig?.type_detection_values as string[]) || [];
+
+        const allAreCancellations = group.every(sale => {
+          let isConfiguredCancellation = false;
+          if (typeCol && typeVals.length > 0) {
+            const cellVal = String(getCaseInsensitive(sale.uploadedRowData, typeCol) || "").trim().toLowerCase();
+            isConfiguredCancellation = typeVals.some(v => v.toLowerCase() === cellVal);
+          }
+          const annulledVal = String(getCaseInsensitive(sale.uploadedRowData, "Annulled Sales") || "").trim();
+          const isAnnulledSales = annulledVal !== "" && annulledVal !== "0";
+          return isConfiguredCancellation || isAnnulledSales;
+        });
+
+        // Build merged uploadedRowData from first entry, but override cancellation markers
+        const mergedRowData = { ...first.uploadedRowData };
+        if (!allAreCancellations) {
+          // Force non-cancellation
+          mergedRowData["Annulled Sales"] = "0";
+          if (typeCol) {
+            mergedRowData[typeCol] = "";
+          }
+        }
+        // else: keep first entry's cancellation markers as-is (they're already cancellation)
+
+        deduplicatedMatchedSales.push({ ...first, uploadedRowData: mergedRowData });
+        // Track merged-away entries for preview
+        for (let i = 1; i < group.length; i++) {
+          mergedAwayEntries.push(group[i]);
+        }
+        console.log(`[dedup] Merged ${group.length} rows for phone=${key}, allCancellations=${allAreCancellations}`);
+      });
+
+      console.log(`[dedup] matchedSales: ${matchedSales.length} → ${deduplicatedMatchedSales.length}, merged away: ${mergedAwayEntries.length}`);
+
+      // Build queue items from deduplicated sales
+      const queueItems = deduplicatedMatchedSales.map(sale => {
         let rowUploadType = uploadType as string;
         if (uploadType === "both") {
           const typeCol = activeQueueConfig?.type_detection_column;
@@ -1809,39 +1863,15 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         };
       });
 
-      // Deduplicate by normalized phone number — same phone = same sale entered multiple times
-      const phoneLookup = new Map<string, string>();
-      matchedSales.forEach(sale => {
-        if (sale.phone) {
-          const normalized = sale.phone.replace(/[\s\-\(\)\.]/g, '');
-          if (normalized) {
-            phoneLookup.set(sale.saleId, normalized);
-          }
-        }
-      });
-
-      const seenPhones = new Set<string>();
-      const deduplicatedItems = queueItems.filter(item => {
-        const phone = phoneLookup.get(item.sale_id);
-        if (!phone) return true; // no phone — keep
-        if (seenPhones.has(phone)) {
-          console.log(`[dedup] Removing duplicate queue item for phone=${phone}, sale_id=${item.sale_id}, type=${item.upload_type}`);
-          return false;
-        }
-        seenPhones.add(phone);
-        return true;
-      });
-      console.log(`[dedup] Before: ${queueItems.length}, After: ${deduplicatedItems.length}, Removed: ${queueItems.length - deduplicatedItems.length}`);
-
-      for (let i = 0; i < deduplicatedItems.length; i += 50) {
-        const batch = deduplicatedItems.slice(i, i + 50);
+      for (let i = 0; i < queueItems.length; i += 50) {
+        const batch = queueItems.slice(i, i + 50);
         const { error } = await supabase
           .from("cancellation_queue")
           .insert(batch as any);
         if (error) throw error;
       }
 
-      return { count: deduplicatedItems.length, dedupRemoved: queueItems.length - deduplicatedItems.length };
+      return { count: queueItems.length, dedupRemoved: mergedAwayEntries.length };
     },
     onSuccess: ({ count, dedupRemoved }) => {
       toast({
@@ -1916,14 +1946,14 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
   const unmatchedRows = filteredDataForPreview.filter(row => !matchedRowIndices.has(row.originalIndex));
   const unmatchedCount = unmatchedRows.length;
 
-  // Compute duplicates: group by normalized phone number to find same sale entered multiple times
+  // Compute duplicates: group by normalized phone number to find rows that will be merged
   const duplicateSalesMap = useMemo(() => {
     const map = new Map<string, MatchedSale[]>();
     matchedSales.forEach(sale => {
-      const normalizedPhone = sale.phone ? sale.phone.replace(/[\s\-\(\)\.]/g, '') : sale.saleId;
-      const arr = map.get(normalizedPhone) || [];
+      const phone = sale.phone ? normalizePhone(sale.phone) : sale.saleId;
+      const arr = map.get(phone) || [];
       arr.push(sale);
-      map.set(normalizedPhone, arr);
+      map.set(phone, arr);
     });
     return map;
   }, [matchedSales]);
