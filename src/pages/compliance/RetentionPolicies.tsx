@@ -21,6 +21,7 @@ interface RetentionPolicy {
   id: string;
   client_campaign_id: string;
   retention_days: number | null;
+  dialer_retention_days: number | null;
   is_active: boolean;
   cleanup_mode: string;
   no_data_held: boolean;
@@ -113,6 +114,7 @@ export default function RetentionPolicies() {
     mutationFn: async (params: {
       client_campaign_id: string;
       retention_days?: number | null;
+      dialer_retention_days?: number | null;
       is_active?: boolean;
       cleanup_mode?: string;
       no_data_held?: boolean;
@@ -123,6 +125,7 @@ export default function RetentionPolicies() {
           {
             client_campaign_id: params.client_campaign_id,
             ...(params.retention_days !== undefined && { retention_days: params.retention_days }),
+            ...(params.dialer_retention_days !== undefined && { dialer_retention_days: params.dialer_retention_days }),
             ...(params.is_active !== undefined && { is_active: params.is_active }),
             ...(params.cleanup_mode !== undefined && { cleanup_mode: params.cleanup_mode }),
             ...(params.no_data_held !== undefined && { no_data_held: params.no_data_held }),
@@ -167,6 +170,12 @@ export default function RetentionPolicies() {
 
   const handleNoDataHeldToggle = (campaignId: string, noData: boolean) => {
     upsertMutation.mutate({ client_campaign_id: campaignId, no_data_held: noData });
+  };
+
+  const handleDialerRetentionDaysChange = (campaignId: string, value: string) => {
+    const days = value === "" ? null : parseInt(value, 10);
+    if (value !== "" && isNaN(days as number)) return;
+    upsertMutation.mutate({ client_campaign_id: campaignId, dialer_retention_days: days });
   };
 
   const handleDataRetentionDaysChange = (dataType: string, value: string) => {
@@ -287,8 +296,20 @@ export default function RetentionPolicies() {
                     <tr className="border-b text-left">
                       <th className="py-3 pr-4 font-medium text-muted-foreground">Klient</th>
                       <th className="py-3 pr-4 font-medium text-muted-foreground">Kampagne</th>
-                      <th className="py-3 pr-4 font-medium text-muted-foreground w-24">Ingen data</th>
-                      <th className="py-3 pr-4 font-medium text-muted-foreground w-32">Retention (dage)</th>
+                      <th className="py-3 pr-4 font-medium text-muted-foreground w-24">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="flex items-center gap-1 cursor-help">Ingen dialer-data <Info className="h-3 w-3" /></span>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p className="text-xs">Kunden bruger eget system — vi ringer ikke ud fra vores dialer</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </th>
+                      <th className="py-3 pr-4 font-medium text-muted-foreground w-32">Vores ret. (dage)</th>
+                      <th className="py-3 pr-4 font-medium text-muted-foreground w-32">Dialer ret. (dage)</th>
                       <th className="py-3 pr-4 font-medium text-muted-foreground w-48">Rensningstype</th>
                       <th className="py-3 font-medium text-muted-foreground w-20">Aktiv</th>
                     </tr>
@@ -298,26 +319,16 @@ export default function RetentionPolicies() {
                       const policy = getPolicy(campaign.id);
                       const noData = policy?.no_data_held || false;
                       return (
-                        <tr key={campaign.id} className={`border-b last:border-0 hover:bg-muted/30 ${noData ? "opacity-60" : ""}`}>
+                        <tr key={campaign.id} className="border-b last:border-0 hover:bg-muted/30">
                           <td className="py-3 pr-4 text-foreground">{campaign.client_name}</td>
                           <td className="py-3 pr-4 text-foreground">
                             <span className="flex items-center gap-1.5">
                               {campaign.name}
                               {noData && (
                                 <Badge variant="outline" className="text-xs ml-1">
-                                  <Ban className="h-3 w-3 mr-1" /> Ingen data
+                                  <Ban className="h-3 w-3 mr-1" /> Ingen dialer-data
                                 </Badge>
                               )}
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help shrink-0" />
-                                  </TooltipTrigger>
-                                  <TooltipContent className="max-w-xs">
-                                    <p className="text-xs">{cleanupModeTooltip(policy?.cleanup_mode || "anonymize_customer")}</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
                             </span>
                           </td>
                           <td className="py-3 pr-4">
@@ -334,6 +345,16 @@ export default function RetentionPolicies() {
                               className="w-24 h-8 text-sm"
                               value={policy?.retention_days ?? ""}
                               onChange={(e) => handleRetentionDaysChange(campaign.id, e.target.value)}
+                            />
+                          </td>
+                          <td className="py-3 pr-4">
+                            <Input
+                              type="number"
+                              min={1}
+                              placeholder="180"
+                              className="w-24 h-8 text-sm"
+                              value={policy?.dialer_retention_days ?? ""}
+                              onChange={(e) => handleDialerRetentionDaysChange(campaign.id, e.target.value)}
                               disabled={noData}
                             />
                           </td>
@@ -341,7 +362,6 @@ export default function RetentionPolicies() {
                             <Select
                               value={policy?.cleanup_mode || "anonymize_customer"}
                               onValueChange={(v) => handleCleanupModeChange(campaign.id, v)}
-                              disabled={noData}
                             >
                               <SelectTrigger className="w-44 h-8 text-sm">
                                 <SelectValue />
@@ -364,7 +384,6 @@ export default function RetentionPolicies() {
                             <Switch
                               checked={policy?.is_active || false}
                               onCheckedChange={(v) => handleActiveToggle(campaign.id, v)}
-                              disabled={noData}
                             />
                           </td>
                         </tr>

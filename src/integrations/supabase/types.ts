@@ -1708,6 +1708,7 @@ export type Database = {
           cleanup_mode: string
           client_campaign_id: string
           created_at: string
+          dialer_retention_days: number | null
           id: string
           is_active: boolean
           no_data_held: boolean
@@ -1718,6 +1719,7 @@ export type Database = {
           cleanup_mode?: string
           client_campaign_id: string
           created_at?: string
+          dialer_retention_days?: number | null
           id?: string
           is_active?: boolean
           no_data_held?: boolean
@@ -1728,6 +1730,7 @@ export type Database = {
           cleanup_mode?: string
           client_campaign_id?: string
           created_at?: string
+          dialer_retention_days?: number | null
           id?: string
           is_active?: boolean
           no_data_held?: boolean
