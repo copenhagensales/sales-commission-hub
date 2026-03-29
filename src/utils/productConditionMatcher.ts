@@ -59,24 +59,6 @@ function normalizeConditionValues(rawValues: string[]): string[] {
   return result;
 }
 
-/**
- * For in/not_in matching: check if a cell value matches any of the
- * normalized condition values. Handles both exact matches and
- * substring token matching for legacy concatenated values.
- */
-function valueMatchesAny(cellValue: string, vals: string[]): boolean {
-  // Exact match
-  if (vals.includes(cellValue)) return true;
-  // Check if cellValue matches a space-separated token within a stored value
-  // (handles legacy concatenated values like "5G Internet Ubegrænset data")
-  for (const v of vals) {
-    if (v.includes(" ")) {
-      const tokens = v.split(/\s+/).filter(Boolean);
-      if (tokens.includes(cellValue)) return true;
-    }
-  }
-  return false;
-}
 
 /**
  * Evaluate whether a single row matches ALL conditions for a product.
