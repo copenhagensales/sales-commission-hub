@@ -731,29 +731,51 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
           supabase.from("products").select("id, name, commission_dkk, revenue_dkk").eq("name", overrideProductName).maybeSingle(),
         ]);
         
-        if (overrideProduct.data) {
+      if (overrideProduct.data) {
           const newProduct = overrideProduct.data;
-          // Find pricing rule for the new product (universal, highest priority)
-          const { data: pricingRules } = await supabase
-            .from("product_pricing_rules")
-            .select("commission_dkk, revenue_dkk, priority, campaign_mapping_ids")
-            .eq("product_id", newProduct.id)
-            .eq("is_active", true)
-            .order("priority", { ascending: false });
-          
-          const universalRule = (pricingRules || []).find((r: any) => !r.campaign_mapping_ids || r.campaign_mapping_ids.length === 0);
-          const finalCommission = universalRule?.commission_dkk ?? newProduct.commission_dkk ?? 0;
-          const finalRevenue = universalRule?.revenue_dkk ?? newProduct.revenue_dkk ?? 0;
-
-          // Update all sale_items for these sales
           const saleItemIds = (overrideSaleItems as any[]).map((si: any) => si.id);
+
           if (saleItemIds.length > 0) {
+            // 1. Snapshot current values for audit trail
+            const logEntries = (overrideSaleItems as any[]).map((si: any) => ({
+              sale_item_id: si.id,
+              sale_id: si.sale_id,
+              cancellation_queue_id: resolvedQueueItems[0]?.id || null,
+              old_product_id: si.product_id,
+              new_product_id: newProduct.id,
+              old_product_name: si.adversus_product_title || null,
+              new_product_name: newProduct.name,
+              old_commission: si.mapped_commission ?? null,
+              old_revenue: si.mapped_revenue ?? null,
+              changed_by: currentEmployee.id,
+              change_reason: "basket_difference_approval",
+            }));
+            await supabase.from("product_change_log").insert(logEntries as any);
+
+            // 2. Update product on sale_items (price will be set by rematch)
             await supabase.from("sale_items").update({
               product_id: newProduct.id,
               adversus_product_title: newProduct.name,
-              mapped_commission: finalCommission,
-              mapped_revenue: finalRevenue,
             } as any).in("id", saleItemIds);
+
+            // 3. Trigger campaign-aware repricing via edge function
+            await supabase.functions.invoke("rematch-pricing-rules", {
+              body: { sale_ids: overrideSaleIds },
+            });
+
+            // 4. Read back new prices and update the log
+            const { data: updatedItems } = await supabase
+              .from("sale_items")
+              .select("id, mapped_commission, mapped_revenue")
+              .in("id", saleItemIds);
+            if (updatedItems) {
+              for (const ui of updatedItems) {
+                await supabase.from("product_change_log").update({
+                  new_commission: (ui as any).mapped_commission,
+                  new_revenue: (ui as any).mapped_revenue,
+                } as any).eq("sale_item_id", ui.id).is("rolled_back_at", null).order("created_at", { ascending: false }).limit(1);
+              }
+            }
           }
         }
 
