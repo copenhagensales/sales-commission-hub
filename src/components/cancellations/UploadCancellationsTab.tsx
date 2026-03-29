@@ -1088,12 +1088,6 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           const excelPhone = normalizePhone(String(rawExcelPhone));
           if (!excelPhone) return;
 
-          let resolvedProduct: string | null = null;
-          if (groupedConditions.length > 0) {
-            const matchedPid = findMatchingProductId(groupedConditions, row.originalRow, idx < 3);
-            if (matchedPid) resolvedProduct = condProductNames.get(matchedPid) || null;
-          }
-
           const prodCol = activeConfig?.product_columns?.[0];
           let rawRowProduct = "";
           if (prodCol) rawRowProduct = String(getCaseInsensitive(row.originalRow, prodCol) || "").trim();
@@ -1102,6 +1096,26 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               const val = getCaseInsensitive(row.originalRow, key);
               if (val && String(val).trim()) { rawRowProduct = String(val).trim(); break; }
             }
+          }
+
+          // Check explicit mapping FIRST — if it resolves to a phone_excluded product, lock it
+          let resolvedProduct: string | null = null;
+          if (rawRowProduct) {
+            const explicitMatch = productMappingLookup.get(rawRowProduct.toLowerCase().trim()) || null;
+            if (explicitMatch) {
+              const isExplicitExcluded = phoneExcludedProducts.some(
+                p => explicitMatch.toLowerCase().includes(p.toLowerCase().trim()) || p.toLowerCase().trim().includes(explicitMatch.toLowerCase())
+              );
+              if (isExplicitExcluded) {
+                resolvedProduct = explicitMatch; // Locked — don't let conditions override
+              }
+            }
+          }
+
+          // Only try condition-based matching if not already locked to a phone_excluded product
+          if (!resolvedProduct && groupedConditions.length > 0) {
+            const matchedPid = findMatchingProductId(groupedConditions, row.originalRow, idx < 3);
+            if (matchedPid) resolvedProduct = condProductNames.get(matchedPid) || null;
           }
 
           if (!resolvedProduct && rawRowProduct) {
@@ -1307,8 +1321,22 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               }
             }
 
+            // Check explicit mapping FIRST — if it resolves to a phone_excluded product, lock it
             let resolvedProductTitle: string | null = null;
-            if (groupedConditions.length > 0) {
+            if (excelSubName) {
+              const explicitMatch = productMappingLookup.get(excelSubName.toLowerCase().trim()) || null;
+              if (explicitMatch) {
+                const isExplicitExcluded = phoneExcludedProducts.some(
+                  p => explicitMatch.toLowerCase().includes(p.toLowerCase().trim()) || p.toLowerCase().trim().includes(explicitMatch.toLowerCase())
+                );
+                if (isExplicitExcluded) {
+                  resolvedProductTitle = explicitMatch; // Locked — don't let conditions override
+                }
+              }
+            }
+
+            // Only try condition-based matching if not already locked to a phone_excluded product
+            if (!resolvedProductTitle && groupedConditions.length > 0) {
               const matchedPid = findMatchingProductId(groupedConditions, row.originalRow, idx < 3);
               if (matchedPid) {
                 resolvedProductTitle = condProductNames.get(matchedPid) || null;
