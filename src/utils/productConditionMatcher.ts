@@ -34,6 +34,34 @@ function getCaseInsensitive(obj: Record<string, unknown>, key: string): unknown 
 /**
  * Evaluate whether a single row matches ALL conditions for a product.
  */
+/**
+ * Normalize stored values: split concatenated strings that were
+ * accidentally saved as a single array element into individual values.
+ * E.g. ["A B C"] where A, B, C are known distinct values won't auto-split,
+ * but we DO split each value by common delimiters when the array has only one
+ * element and it looks like multiple values were concatenated.
+ */
+function normalizeConditionValues(rawValues: string[]): string[] {
+  const result: string[] = [];
+  for (const v of rawValues) {
+    const trimmed = v.trim();
+    if (!trimmed) continue;
+    // If value contains a comma or semicolon, split on those
+    if (trimmed.includes(",") || trimmed.includes(";")) {
+      for (const part of trimmed.split(/[,;]/)) {
+        const p = part.trim();
+        if (p) result.push(p.toLowerCase());
+      }
+    } else {
+      result.push(trimmed.toLowerCase());
+    }
+  }
+  return result;
+}
+
+/**
+ * Evaluate whether a single row matches ALL conditions for a product.
+ */
 export function evaluateConditions(
   conditions: ProductCondition[],
   rowData: Record<string, unknown>
@@ -46,7 +74,7 @@ export function evaluateConditions(
     const cellValue = String(getCaseInsensitive(rowData, c.column_name) ?? "")
       .trim()
       .toLowerCase();
-    const vals = c.values.map((v) => v.toLowerCase().trim());
+    const vals = normalizeConditionValues(c.values);
 
     switch (c.operator) {
       case "equals":

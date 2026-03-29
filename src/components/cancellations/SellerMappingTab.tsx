@@ -341,6 +341,17 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
             .eq("product_id", selectedProductId)
             .eq("column_name", col);
         } else {
+          // Sanitize: ensure each value is a separate array element
+          // Split on commas/semicolons and trim whitespace
+          const sanitizedValues = draft.values.flatMap((v: string) => {
+            const trimmed = v.trim();
+            if (!trimmed) return [];
+            if (trimmed.includes(",") || trimmed.includes(";")) {
+              return trimmed.split(/[,;]/).map((p: string) => p.trim()).filter(Boolean);
+            }
+            return [trimmed];
+          });
+
           // Upsert
           const { error } = await supabase
             .from("cancellation_product_conditions")
@@ -350,7 +361,7 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
                 product_id: selectedProductId,
                 column_name: col,
                 operator: draft.operator,
-                values: draft.values,
+                values: sanitizedValues,
               },
               { onConflict: "client_id,product_id,column_name" }
             );
