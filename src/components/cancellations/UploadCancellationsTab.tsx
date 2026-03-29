@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { extractOpp } from "./utils/extractOpp";
-import { groupConditionsByProduct, findMatchingProductId } from "@/utils/productConditionMatcher";
+import { groupConditionsByProduct, findMatchingProductId, evaluateConditions } from "@/utils/productConditionMatcher";
 import { formatCurrency } from "@/lib/calculations/formatting";
 import { useAgentNameResolver } from "@/hooks/useAgentNameResolver";
 import { useDropzone } from "react-dropzone";
@@ -1126,6 +1126,22 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             matchedSaleProductKeys.add(key);
             matchedIndicesLocal.add(idx);
             const firstItem = allItems[0];
+            const realProduct = firstItem?.adversus_product_title || "Ukendt produkt";
+
+            // If condition matcher resolved a different product than the sale's,
+            // check if the sale's product also satisfies the row's conditions.
+            // This handles ambiguous conditions (e.g. "med" vs "uden" with identical rules).
+            let finalTarget = resolvedProduct || rawRowProduct || "Ukendt produkt";
+            if (resolvedProduct && realProduct && resolvedProduct.toLowerCase() !== realProduct.toLowerCase()) {
+              const realProdEntry = [...condProductNames.entries()].find(([_, name]) => name.toLowerCase() === realProduct.toLowerCase());
+              if (realProdEntry) {
+                const realProdGroup = groupedConditions.find(g => g.product_id === realProdEntry[0]);
+                if (realProdGroup && evaluateConditions(realProdGroup.conditions, row.originalRow)) {
+                  finalTarget = realProduct;
+                }
+              }
+            }
+
             productMatched.push({
               saleId: sale.id,
               phone: sale.customer_phone || "",
@@ -1135,7 +1151,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               employee: sale.agent_name || "Ukendt",
               currentStatus: sale.validation_status || "pending",
               uploadedRowData: row.originalRow,
-              targetProductName: resolvedProduct || rawRowProduct || "Ukendt produkt",
+              targetProductName: finalTarget,
               realProductName: firstItem?.adversus_product_title || "Ukendt produkt",
               commission: firstItem?.mapped_commission ?? undefined,
               revenue: firstItem?.mapped_revenue ?? undefined,
@@ -1371,6 +1387,19 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                 matchedSaleProductKeys.add(key);
                 matchedIndicesLocal.add(idx);
                 const firstItem = items[0];
+                const realProduct = firstItem?.adversus_product_title || "Ukendt produkt";
+
+                let finalTarget = resolvedProductTitle!;
+                if (resolvedProductTitle && realProduct && resolvedProductTitle.toLowerCase() !== realProduct.toLowerCase()) {
+                  const realProdEntry = [...condProductNames.entries()].find(([_, name]) => name.toLowerCase() === realProduct.toLowerCase());
+                  if (realProdEntry) {
+                    const realProdGroup = groupedConditions.find(g => g.product_id === realProdEntry[0]);
+                    if (realProdGroup && evaluateConditions(realProdGroup.conditions, row.originalRow)) {
+                      finalTarget = realProduct;
+                    }
+                  }
+                }
+
                 productMatched.push({
                   saleId: sale.id,
                   phone: sale.customer_phone || "",
@@ -1380,7 +1409,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                   employee: sale.agent_name || "Ukendt",
                   currentStatus: sale.validation_status || "pending",
                   uploadedRowData: row.originalRow,
-                  targetProductName: resolvedProductTitle!,
+                  targetProductName: finalTarget,
                   realProductName: firstItem?.adversus_product_title || "Ukendt produkt",
                   commission: firstItem?.mapped_commission ?? undefined,
                   revenue: firstItem?.mapped_revenue ?? undefined,
