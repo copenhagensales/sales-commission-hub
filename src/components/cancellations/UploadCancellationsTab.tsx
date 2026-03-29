@@ -865,16 +865,45 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       const cleanedData = filteredData.filter(row => !isJunkRow(row.originalRow));
       const junkRowCount = filteredData.length - cleanedData.length;
 
-      console.log("[handleMatch] total rows:", parsedData.length, "after filter:", filteredData.length, "junk rows removed:", junkRowCount, "clean rows:", cleanedData.length);
+      // === Excel-internal dedup: group by normalized phone, keep first as representative ===
+      const excelDupIndices = new Set<number>();
+      if (phoneColumn !== "__none__") {
+        const phoneGroupMap = new Map<string, number[]>();
+        cleanedData.forEach((row, idx) => {
+          const rawPhone = String(getCaseInsensitive(row.originalRow, phoneColumn) ?? "").trim();
+          const nPhone = rawPhone ? normalizePhone(rawPhone) : null;
+          if (nPhone) {
+            const existing = phoneGroupMap.get(nPhone);
+            if (existing) {
+              existing.push(idx);
+              excelDupIndices.add(idx);
+            } else {
+              phoneGroupMap.set(nPhone, [idx]);
+            }
+          }
+        });
+      }
+      // Store indices mapped back to originalIndex for coveredRowIndices
+      const excelDupOriginalIndices = new Set<number>();
+      excelDupIndices.forEach(idx => excelDupOriginalIndices.add(cleanedData[idx].originalIndex));
+      setExcelDuplicateIndices(excelDupOriginalIndices);
 
-      if (junkRowCount > 0) {
+      // Filter out Excel duplicates — only representatives proceed to matching
+      const dedupedData = cleanedData.filter((_, idx) => !excelDupIndices.has(idx));
+
+      console.log("[handleMatch] total rows:", parsedData.length, "after filter:", filteredData.length, "junk rows removed:", junkRowCount, "clean rows:", cleanedData.length, "excel duplicates:", excelDupIndices.size, "deduped rows:", dedupedData.length);
+
+      if (junkRowCount > 0 || excelDupIndices.size > 0) {
+        const parts: string[] = [];
+        if (junkRowCount > 0) parts.push(`${junkRowCount} header/total-rækker ignoreret`);
+        if (excelDupIndices.size > 0) parts.push(`${excelDupIndices.size} Excel-dubletter fjernet`);
         toast({
-          title: `${junkRowCount} header/total-rækker ignoreret`,
-          description: `${cleanedData.length} datarækker bruges til matching.`,
+          title: parts.join(", "),
+          description: `${dedupedData.length} unikke datarækker bruges til matching.`,
         });
       }
 
-      // Extract values from cleaned data
+      // Extract values from cleaned data (using dedupedData)
       const phones: string[] = [];
       const companies: string[] = [];
       const oppNumbers: string[] = [];
@@ -1870,6 +1899,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     setMatchedSales([]);
     setMatchedRowIndices(new Set());
     setUnmatchedSellerRows([]);
+    setExcelDuplicateIndices(new Set());
     setSellerDropdownSelections({});
     setStep("type");
   };
@@ -1970,6 +2000,8 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
   // Build coveredRowIndices: matchedRowIndices + any Excel rows whose phone matches a merged phone
   const coveredRowIndices = useMemo(() => {
     const covered = new Set(matchedRowIndices);
+    // Include Excel-internal duplicates as covered
+    excelDuplicateIndices.forEach(idx => covered.add(idx));
     if (matchedPhones.size > 0 && phoneColumn !== "__none__") {
       for (const row of filteredDataForPreview) {
         if (covered.has(row.originalIndex)) continue;
@@ -1981,7 +2013,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       }
     }
     return covered;
-  }, [matchedRowIndices, matchedPhones, filteredDataForPreview, phoneColumn]);
+  }, [matchedRowIndices, matchedPhones, filteredDataForPreview, phoneColumn, excelDuplicateIndices]);
 
   const unmatchedRows = filteredDataForPreview.filter(row => !coveredRowIndices.has(row.originalIndex));
   const unmatchedCount = unmatchedRows.length;
