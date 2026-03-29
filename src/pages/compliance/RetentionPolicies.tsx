@@ -296,8 +296,20 @@ export default function RetentionPolicies() {
                     <tr className="border-b text-left">
                       <th className="py-3 pr-4 font-medium text-muted-foreground">Klient</th>
                       <th className="py-3 pr-4 font-medium text-muted-foreground">Kampagne</th>
-                      <th className="py-3 pr-4 font-medium text-muted-foreground w-24">Ingen data</th>
-                      <th className="py-3 pr-4 font-medium text-muted-foreground w-32">Retention (dage)</th>
+                      <th className="py-3 pr-4 font-medium text-muted-foreground w-24">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="flex items-center gap-1 cursor-help">Ingen dialer-data <Info className="h-3 w-3" /></span>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p className="text-xs">Kunden bruger eget system — vi ringer ikke ud fra vores dialer</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </th>
+                      <th className="py-3 pr-4 font-medium text-muted-foreground w-32">Vores ret. (dage)</th>
+                      <th className="py-3 pr-4 font-medium text-muted-foreground w-32">Dialer ret. (dage)</th>
                       <th className="py-3 pr-4 font-medium text-muted-foreground w-48">Rensningstype</th>
                       <th className="py-3 font-medium text-muted-foreground w-20">Aktiv</th>
                     </tr>
@@ -307,26 +319,16 @@ export default function RetentionPolicies() {
                       const policy = getPolicy(campaign.id);
                       const noData = policy?.no_data_held || false;
                       return (
-                        <tr key={campaign.id} className={`border-b last:border-0 hover:bg-muted/30 ${noData ? "opacity-60" : ""}`}>
+                        <tr key={campaign.id} className="border-b last:border-0 hover:bg-muted/30">
                           <td className="py-3 pr-4 text-foreground">{campaign.client_name}</td>
                           <td className="py-3 pr-4 text-foreground">
                             <span className="flex items-center gap-1.5">
                               {campaign.name}
                               {noData && (
                                 <Badge variant="outline" className="text-xs ml-1">
-                                  <Ban className="h-3 w-3 mr-1" /> Ingen data
+                                  <Ban className="h-3 w-3 mr-1" /> Ingen dialer-data
                                 </Badge>
                               )}
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help shrink-0" />
-                                  </TooltipTrigger>
-                                  <TooltipContent className="max-w-xs">
-                                    <p className="text-xs">{cleanupModeTooltip(policy?.cleanup_mode || "anonymize_customer")}</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
                             </span>
                           </td>
                           <td className="py-3 pr-4">
@@ -343,6 +345,16 @@ export default function RetentionPolicies() {
                               className="w-24 h-8 text-sm"
                               value={policy?.retention_days ?? ""}
                               onChange={(e) => handleRetentionDaysChange(campaign.id, e.target.value)}
+                            />
+                          </td>
+                          <td className="py-3 pr-4">
+                            <Input
+                              type="number"
+                              min={1}
+                              placeholder="180"
+                              className="w-24 h-8 text-sm"
+                              value={policy?.dialer_retention_days ?? ""}
+                              onChange={(e) => handleDialerRetentionDaysChange(campaign.id, e.target.value)}
                               disabled={noData}
                             />
                           </td>
@@ -350,7 +362,6 @@ export default function RetentionPolicies() {
                             <Select
                               value={policy?.cleanup_mode || "anonymize_customer"}
                               onValueChange={(v) => handleCleanupModeChange(campaign.id, v)}
-                              disabled={noData}
                             >
                               <SelectTrigger className="w-44 h-8 text-sm">
                                 <SelectValue />
@@ -373,7 +384,6 @@ export default function RetentionPolicies() {
                             <Switch
                               checked={policy?.is_active || false}
                               onCheckedChange={(v) => handleActiveToggle(campaign.id, v)}
-                              disabled={noData}
                             />
                           </td>
                         </tr>
