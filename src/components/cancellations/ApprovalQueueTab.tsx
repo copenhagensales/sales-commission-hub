@@ -333,6 +333,7 @@ interface FlatQueueRow {
   id: string;
   sale_id: string;
   upload_type: string;
+  target_product_name?: string | null;
   status: string;
   reviewed_at: string | null;
   created_at: string;
@@ -563,6 +564,14 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
         const groupTargetProducts = [...new Set(items.map((i) => i.target_product_name).filter(Boolean))];
         const groupTargetProductName = groupTargetProducts.length === 1 ? groupTargetProducts[0] : null;
         const diffs = computeDiff(uploaded, aggregatedItems, mapping, earliestDate, groupTargetProductName);
+        const isPhoneExcludedGroup = items.some((i) => i.isPhoneExcluded);
+        if (isPhoneExcludedGroup || items[0]?.upload_type === "basket_difference") {
+          for (const d of diffs) {
+            if (d.isDifferent && mapping?.product_columns?.some((pc) => d.label === pc)) {
+              d.isExpected = true;
+            }
+          }
+        }
 
         oppGroups.push({
           oppGroup,
