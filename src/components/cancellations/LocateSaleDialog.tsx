@@ -202,12 +202,16 @@ export function LocateSaleDialog({
 
   const linkSaleMutation = useMutation({
     mutationFn: async (saleId: string) => {
+      // When uploadType is "both" (combined upload), classify as "cancellation"
+      // since match-error rows are overwhelmingly cancellations that couldn't be auto-matched.
+      const resolvedUploadType = row.uploadType === "both" ? "cancellation" : row.uploadType;
+
       const { error: queueError } = await supabase
         .from("cancellation_queue")
         .insert([{
           import_id: row.importId,
           sale_id: saleId,
-          upload_type: row.uploadType,
+          upload_type: resolvedUploadType,
           status: "pending",
           uploaded_data: row.rowData as unknown as Json,
           client_id: clientId,
