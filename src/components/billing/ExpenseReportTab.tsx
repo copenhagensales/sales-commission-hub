@@ -429,11 +429,16 @@ export function ExpenseReportTab() {
                 const isRecurring = RECURRING_CATEGORIES.has(cat.key);
                 return (
                   <TableRow key={cat.key} className={isAuto ? "bg-muted/30" : isRecurring ? "bg-muted/15" : undefined}>
-                    <TableCell className="font-medium flex items-center gap-2">
-                      {isRecurring && <Lock className="h-3.5 w-3.5 text-muted-foreground" />}
-                      {cat.label}
-                      {isAuto && <span className="ml-2 text-xs text-muted-foreground">(auto)</span>}
-                      {isRecurring && <span className="text-xs text-muted-foreground">(fast)</span>}
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        {isRecurring && <Lock className="h-3.5 w-3.5 text-muted-foreground" />}
+                        {cat.label}
+                        {isAuto && <span className="ml-2 text-xs text-muted-foreground">(auto)</span>}
+                        {isRecurring && <span className="text-xs text-muted-foreground">(fast)</span>}
+                      </div>
+                      <span className="text-xs text-muted-foreground block">
+                        {format(new Date(periodStart), "d. MMM", { locale: da })} – {format(new Date(periodEnd), "d. MMM yyyy", { locale: da })}
+                      </span>
                     </TableCell>
                     <TableCell>
                       <Input
