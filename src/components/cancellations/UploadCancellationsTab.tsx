@@ -1083,41 +1083,32 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           const excelPhone = normalizePhone(String(rawExcelPhone));
           if (!excelPhone) return;
 
-          // Check if this row's product is excluded from phone matching
-          if (phoneExcludedProducts.length > 0) {
-            const prodCol = activeConfig?.product_columns?.[0];
-            let rowProduct = "";
-            if (prodCol) rowProduct = String(getCaseInsensitive(row.originalRow, prodCol) || "").trim();
-            if (!rowProduct) {
-              for (const key of PRODUCT_KEYS_1B) {
-                const val = getCaseInsensitive(row.originalRow, key);
-                if (val && String(val).trim()) { rowProduct = String(val).trim(); break; }
-              }
-            }
-            const isExcluded = phoneExcludedProducts.some(p => rowProduct.toLowerCase().includes(p.toLowerCase()));
-            if (isExcluded) return;
-          }
-
           // Resolve expected product for this row via conditions/mappings
           let resolvedProduct: string | null = null;
           if (groupedConditions.length > 0) {
             const matchedPid = findMatchingProductId(groupedConditions, row.originalRow);
             if (matchedPid) resolvedProduct = condProductNames.get(matchedPid) || null;
           }
-          if (!resolvedProduct) {
-            const prodCol = activeConfig?.product_columns?.[0];
-            let excelSubName = "";
-            if (prodCol) excelSubName = String(getCaseInsensitive(row.originalRow, prodCol) || "").trim();
-            if (!excelSubName) {
-              for (const key of PRODUCT_KEYS_1B) {
-                const val = getCaseInsensitive(row.originalRow, key);
-                if (val && String(val).trim()) { excelSubName = String(val).trim(); break; }
-              }
-            }
-            if (excelSubName) {
-              resolvedProduct = productMappingLookup.get(excelSubName.toLowerCase().trim()) || null;
+
+          const prodCol = activeConfig?.product_columns?.[0];
+          let rawRowProduct = "";
+          if (prodCol) rawRowProduct = String(getCaseInsensitive(row.originalRow, prodCol) || "").trim();
+          if (!rawRowProduct) {
+            for (const key of PRODUCT_KEYS_1B) {
+              const val = getCaseInsensitive(row.originalRow, key);
+              if (val && String(val).trim()) { rawRowProduct = String(val).trim(); break; }
             }
           }
+
+          if (!resolvedProduct && rawRowProduct) {
+            resolvedProduct = productMappingLookup.get(rawRowProduct.toLowerCase().trim()) || null;
+          }
+
+          const exclusionBasis = (resolvedProduct || rawRowProduct).toLowerCase().trim();
+          const isExcluded = exclusionBasis
+            ? phoneExcludedProducts.some((p) => p.toLowerCase().trim() === exclusionBasis)
+            : false;
+          if (isExcluded) return;
 
           for (const sale of candidateSales) {
             if (existingIds.has(sale.id)) continue;
@@ -1306,7 +1297,10 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                 if (val && String(val).trim()) { rowProduct3 = String(val).trim(); break; }
               }
             }
-            const isPhoneExcludedRow = phoneExcludedProducts.some(p => rowProduct3.toLowerCase().includes(p.toLowerCase()));
+            const exclusionBasis = (resolvedProductTitle || rowProduct3).toLowerCase().trim();
+            const isPhoneExcludedRow = exclusionBasis
+              ? phoneExcludedProducts.some((p) => p.toLowerCase().trim() === exclusionBasis)
+              : false;
 
             if (isPhoneExcludedRow) {
               // --- Phone-excluded matching: Seller + Product (required), then Date OR Customer (at least one) ---
