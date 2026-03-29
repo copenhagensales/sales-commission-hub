@@ -1,66 +1,60 @@
 
 
-## Fix: 5G Internet phone-matching kun strengere for annulleringer
+## Fix: Omvendt 5G Internet-match (upload=5G, salg≠5G)
 
 ### Problem
-Pass 1b matcher på telefonnummer. Når salgets produkt er "5G Internet" (phone_excluded), tvinges `finalTarget = realProduct` — uanset upload-rækkens produkt. En upload-række med "Fri tale + 70 GB data" matches fejlagtigt til et "5G Internet"-salg.
+Den nuværende fix håndterer kun: **salg** er phone_excluded → tjek om upload også er det.
 
-### Krav
-- **Annulleringer:** Kræver match på Produkt + Sælger + (Dato ELLER Kunde via andet salg). Telefon alene er ikke nok.
-- **Ikke-annulleringer (correct_match/basket_difference):** Nuværende phone-matching-logik beholdes.
+Men det omvendte mangler: Når **upload-produktet** er phone_excluded (f.eks. "5G Internet") men **salgets** produkt er noget andet (f.eks. "Eesy"), falder koden ind i `else`-grenen (linje 1171) og accepterer matchet via telefon. Det er forkert for annulleringer.
 
 ### Løsning
 
-**Ændring i `src/components/cancellations/UploadCancellationsTab.tsx` — Pass 1b (linje ~1137-1156)**
+**Fil:** `src/components/cancellations/UploadCancellationsTab.tsx` — `else`-grenen i Pass 1b (linje ~1171-1185)
 
-Når `isRealProductExcluded` er true, tilføj et tjek:
-
-1. **Bestem om rækken er en annullering:** Hvis `uploadType === "cancellation"` → altid annullering. Hvis `uploadType === "both"` → tjek `type_detection_column`/`type_detection_values` og "Annulled Sales" på rækkens data (samme logik som linje 1686-1700, men udført inline her).
-
-2. **Hvis rækken ER en annullering:** Tjek om upload-rækkens produkt også er phone_excluded. Hvis ja → `finalTarget = realProduct` (behold match). Hvis nej → `continue` (skip, lad Pass 2 håndtere med sælger+produkt+dato/kunde).
-
-3. **Hvis rækken IKKE er en annullering:** Behold nuværende logik (`finalTarget = realProduct` for phone_excluded).
+Tilføj et spejlet tjek i `else`-grenen: Hvis upload-produktet er phone_excluded men salgets produkt ikke er det, og rækken er en annullering → `continue`.
 
 ```text
-if (isRealProductExcluded) {
-  // Determine if this row is a cancellation
-  let isRowCancellation = uploadType === "cancellation";
-  if (!isRowCancellation && uploadType === "both") {
-    const typeCol = activeQueueConfig?.type_detection_column;
-    const typeVals = (activeQueueConfig?.type_detection_values as string[]) || [];
-    if (typeCol && typeVals.length > 0) {
-      const cellVal = String(getCaseInsensitive(row.originalRow, typeCol) || "").trim().toLowerCase();
-      isRowCancellation = typeVals.some(v => v.toLowerCase() === cellVal);
-    }
-    if (!isRowCancellation) {
-      const annulledVal = String(getCaseInsensitive(row.originalRow, "Annulled Sales") || "").trim();
-      isRowCancellation = annulledVal !== "" && annulledVal !== "0";
-    }
+} else {
+  // Standard product resolution
+  finalTarget = resolvedProduct || rawRowProduct || "Ukendt produkt";
+  if (resolvedProduct && realProduct && resolvedProduct.toLowerCase() !== realProduct.toLowerCase()) {
+    // ... existing ambiguous condition check (unchanged) ...
   }
 
-  if (isRowCancellation) {
-    // Strict: only match if upload product is also phone_excluded
-    const uploadProduct = (resolvedProduct || rawRowProduct || "").toLowerCase().trim();
-    const isUploadAlsoExcluded = !uploadProduct || phoneExcludedProducts.some(
-      p => uploadProduct.includes(p.toLowerCase().trim()) || p.toLowerCase().trim().includes(uploadProduct)
-    );
-    if (isUploadAlsoExcluded) {
-      finalTarget = realProduct;
-    } else {
-      continue; // Skip → Pass 2 handles with seller+product+date/customer
+  // NEW: Reverse check — upload product is phone_excluded but sale is not
+  const uploadProductLower = finalTarget.toLowerCase().trim();
+  const isUploadProductExcluded = uploadProductLower && phoneExcludedProducts.some(
+    p => uploadProductLower.includes(p.toLowerCase().trim()) || p.toLowerCase().trim().includes(uploadProductLower)
+  );
+
+  if (isUploadProductExcluded) {
+    // Determine if this row is a cancellation (same logic as above)
+    let isRowCancellation = uploadType === "cancellation";
+    if (!isRowCancellation && uploadType === "both") {
+      const typeCol = activeConfig?.type_detection_column;
+      const typeVals = ((activeConfig?.type_detection_values as string[]) || []);
+      if (typeCol && typeVals.length > 0) {
+        const cellVal = String(getCaseInsensitive(row.originalRow, typeCol) || "").trim().toLowerCase();
+        isRowCancellation = typeVals.some(v => v.toLowerCase() === cellVal);
+      }
+      if (!isRowCancellation) {
+        const annulledVal = String(getCaseInsensitive(row.originalRow, "Annulled Sales") || "").trim();
+        isRowCancellation = annulledVal !== "" && annulledVal !== "0";
+      }
     }
-  } else {
-    // Non-cancellation: keep current behavior
-    finalTarget = realProduct;
+
+    if (isRowCancellation) {
+      continue; // Upload is 5G but sale is not → skip, Pass 2 handles
+    }
   }
 }
 ```
 
 ### Effekt
-- Annulleringsrækker med "Fri tale + 70 GB data" vil **ikke** fejlagtigt matche et "5G Internet"-salg via telefon — de falder til Pass 2 som matcher med sælger+produkt+dato/kunde
-- Ikke-annulleringsrækker (correct_match, basket_difference) beholder nuværende phone-matching
-- Ægte 5G Internet annulleringer (hvor upload-produktet også er 5G Internet) fungerer stadig i Pass 1b
+- Upload "5G Internet" + salg "Eesy" → phone-match afvises for annulleringer → falder til Pass 2
+- Ikke-annulleringer bevarer nuværende logik
+- Den eksisterende fix (salg=5G, upload≠5G) bevares uændret
 
 ### Fil
-- `src/components/cancellations/UploadCancellationsTab.tsx`
+- `src/components/cancellations/UploadCancellationsTab.tsx` (linje ~1171-1185)
 
