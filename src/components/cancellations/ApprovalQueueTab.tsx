@@ -370,6 +370,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [sellerFilter, setSellerFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [productOverrides, setProductOverrides] = useState<Record<string, string>>({});
   type QueueSortKey = "date" | "agent" | "opp" | "type";
   type QueueSortDir = "asc" | "desc";
   const [sortKey, setSortKey] = useState<QueueSortKey>("date");
@@ -389,6 +390,19 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
       return data;
     },
     enabled: !!user?.email,
+  });
+
+  const { data: clientProducts = [] } = useQuery({
+    queryKey: ["client-products-for-dropdown", clientId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, name")
+        .order("name");
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 60_000,
   });
 
   const { data: queryResult, isLoading } = useQuery({
@@ -622,7 +636,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   }, [flatItems, duplicatePhones]);
 
   const approveMutation = useMutation({
-    mutationFn: async ({ queueItemIds, saleIds, uploadType }: { queueItemIds: string[]; saleIds: string[]; uploadType: string }) => {
+    mutationFn: async ({ queueItemIds, saleIds, uploadType, overrideProductName }: { queueItemIds: string[]; saleIds: string[]; uploadType: string; overrideProductName?: string }) => {
       if (!currentEmployee?.id) throw new Error("Ingen medarbejder fundet");
       const newStatus = uploadType === "cancellation" ? "cancelled" : "basket_changed";
 
@@ -708,6 +722,51 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
 
       const productLevelItems = resolvedQueueItems.filter((qi: any) => qi.target_product_name);
       const wholeSaleItems = resolvedQueueItems.filter((qi: any) => !qi.target_product_name);
+
+      // Handle basket_difference with product override: update sale_item product instead of cancelling
+      if (uploadType === "basket_difference" && overrideProductName) {
+        const overrideSaleIds = [...new Set(resolvedQueueItems.map((qi: any) => qi.sale_id))];
+        const [overrideSaleItems, overrideProduct] = await Promise.all([
+          fetchByIds<any>("sale_items", "sale_id", overrideSaleIds, "id, sale_id, product_id, adversus_product_title"),
+          supabase.from("products").select("id, name, commission_dkk, revenue_dkk").eq("name", overrideProductName).maybeSingle(),
+        ]);
+        
+        if (overrideProduct.data) {
+          const newProduct = overrideProduct.data;
+          // Find pricing rule for the new product (universal, highest priority)
+          const { data: pricingRules } = await supabase
+            .from("product_pricing_rules")
+            .select("commission_dkk, revenue_dkk, priority, campaign_mapping_ids")
+            .eq("product_id", newProduct.id)
+            .eq("is_active", true)
+            .order("priority", { ascending: false });
+          
+          const universalRule = (pricingRules || []).find((r: any) => !r.campaign_mapping_ids || r.campaign_mapping_ids.length === 0);
+          const finalCommission = universalRule?.commission_dkk ?? newProduct.commission_dkk ?? 0;
+          const finalRevenue = universalRule?.revenue_dkk ?? newProduct.revenue_dkk ?? 0;
+
+          // Update all sale_items for these sales
+          const saleItemIds = (overrideSaleItems as any[]).map((si: any) => si.id);
+          if (saleItemIds.length > 0) {
+            await supabase.from("sale_items").update({
+              product_id: newProduct.id,
+              adversus_product_title: newProduct.name,
+              mapped_commission: finalCommission,
+              mapped_revenue: finalRevenue,
+            } as any).in("id", saleItemIds);
+          }
+        }
+
+        // Mark queue items as approved
+        const { error: approveError } = await supabase.from("cancellation_queue").update({
+          status: "approved",
+          reviewed_by: currentEmployee.id,
+          reviewed_at: new Date().toISOString(),
+        }).in("id", queueItemIds);
+        if (approveError) throw approveError;
+
+        return { count: queueItemIds.length };
+      }
 
       if (productLevelItems.length > 0) {
         const productSaleIds = [...new Set(productLevelItems.map((qi: any) => qi.sale_id))];
@@ -1227,6 +1286,24 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                                 {" | "}
                                 Provi: {summarizedItems.reduce((s, si) => s + si.mapped_commission, 0).toFixed(0)} kr
                               </div>
+                              {item.upload_type === "basket_difference" && item.status === "pending" && clientProducts.length > 0 && (
+                                <div className="mt-2 pt-2 border-t border-border">
+                                  <div className="font-medium text-muted-foreground mb-1">Ret produkt til:</div>
+                                  <Select
+                                    value={productOverrides[item.id] || summarizedItems[0]?.product_name || ""}
+                                    onValueChange={(val) => setProductOverrides(prev => ({ ...prev, [item.id]: val }))}
+                                  >
+                                    <SelectTrigger className="w-full h-8 text-xs">
+                                      <SelectValue placeholder="Vælg produkt" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {clientProducts.map((p) => (
+                                        <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              )}
                             </div>
                           ) : (
                             <span className="text-muted-foreground">Ingen produkter</span>
@@ -1273,7 +1350,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                         {statusFilter === "pending" && (
                           <TableCell>
                             <div className="flex gap-1">
-                              <Button size="sm" variant="ghost" onClick={() => approveMutation.mutate({ queueItemIds: [item.id], saleIds: [item.sale_id], uploadType: item.upload_type })} disabled={isPending}>
+                              <Button size="sm" variant="ghost" onClick={() => approveMutation.mutate({ queueItemIds: [item.id], saleIds: [item.sale_id], uploadType: item.upload_type, overrideProductName: productOverrides[item.id] })} disabled={isPending}>
                                 <Check className="h-4 w-4" />
                               </Button>
                               <Button size="sm" variant="ghost" onClick={() => rejectMutation.mutate([item.id])} disabled={isPending}>
