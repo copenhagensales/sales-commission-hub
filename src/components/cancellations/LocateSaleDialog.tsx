@@ -260,7 +260,7 @@ export function LocateSaleDialog({
           <div className="rounded-md border bg-muted/30 p-3">
             <p className="text-xs font-medium text-muted-foreground mb-1">Annulleringsdata:</p>
             <div className="flex flex-wrap gap-2">
-              {Object.entries(row.rowData).filter(([k]) => k !== "_product_rows").slice(0, 6).map(([key, val]) => (
+              {Object.entries(row.rowData).filter(([k]) => k !== "_product_rows").map(([key, val]) => (
                 <Badge key={key} variant="outline" className="text-xs font-normal">
                   {key}: {val != null ? String(val) : "-"}
                 </Badge>
