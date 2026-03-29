@@ -1,7 +1,6 @@
 import { useState, useMemo } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import type { Json } from "@/integrations/supabase/types";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
@@ -60,7 +59,6 @@ export function LocateSaleDialog({
   const [searchQuery, setSearchQuery] = useState("");
   const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined);
   const [filterByEmployee, setFilterByEmployee] = useState(!!assignedEmployeeId);
-  const queryClient = useQueryClient();
 
   // Fetch sale_ids already in the queue (exclude rejected)
   const { data: usedSaleIds } = useQuery({
