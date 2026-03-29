@@ -237,6 +237,7 @@ export function LocateSaleDialog({
     },
     onSuccess: () => {
       toast({ title: "Salg koblet til annullering og sendt til godkendelseskøen" });
+      queryClient.invalidateQueries({ queryKey: ["used-sale-ids", clientId] });
       queryClient.invalidateQueries({ queryKey: ["match-errors", clientId] });
       queryClient.invalidateQueries({ queryKey: ["match-errors-count"] });
       queryClient.invalidateQueries({ queryKey: ["cancellation-queue"] });
