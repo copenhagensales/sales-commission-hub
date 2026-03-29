@@ -1,63 +1,41 @@
 
-## Problem
-Den sidste fejl ligger ikke i den generelle kurv-logik, men i hvordan `5G Internet` bliver identificeret som et `phone_excluded` produkt.
 
-Lige nu sker dette i praksis:
-- I `UploadCancellationsTab.tsx` kan rækken falde igennem **Pass 1b** som et almindeligt telefon-match.
-- Her bliver `targetProductName` bevaret som rå upload-værdi (`"Fri tale + 70 GB data (5G)..."`) i stedet for det interne produkt (`"5G Internet"`).
-- Når rækken sendes til køen, afgør klassificeringen `correct_match` vs `basket_difference` kun ud fra `targetProductName`.
-- Derfor ender 5G-rækken forkert som **Kurv-rettelse**.
+## Produkt-dropdown i Kurv-rettelser
 
-## Løsning
-Jeg vil rette det helt lokalt omkring `phone_excluded`-flowet, uden at røre den øvrige kurv-logik.
+### Hvad
+Tilføj en dropdown i "System data"-kolonnen for kurv-rettelser (basket_difference), så brugeren kan vælge det korrekte produkt, der skal erstatte det nuværende produkt på salget.
 
-### 1. Gør `phone_excluded`-detektion robust
-I `src/components/cancellations/UploadCancellationsTab.tsx`:
-- indføre én fælles helper til at afgøre, om et produkt matcher `phone_excluded_products`
-- bruge den mod både:
-  - uploadens/resolved produktnavn
-  - systemets faktiske produkt på salget (`realProductName`)
+### Ændringer i `src/components/cancellations/ApprovalQueueTab.tsx`
 
-Det fjerner afhængigheden af, at uploadteksten skal ligne `"5G Internet"` ordret.
+**1. Hent produkter for klienten**
+- Tilføj en `useQuery` der henter alle produkter fra `products`-tabellen knyttet til klientens kampagner (`client_campaigns` → `sale_items` → `products`, eller direkte fra `products` med relevant filtrering).
+- Alternativt: hent produkter fra de eksisterende `saleItems` data + `cancellation_product_mappings` for klienten, så dropdown kun viser relevante produkter.
 
-### 2. Ret Pass 1b for 5G Internet
-I `src/components/cancellations/UploadCancellationsTab.tsx` omkring **Pass 1b**:
-- efter et telefon-match er fundet, læse `realProductName` fra salget
-- hvis systemproduktet er `phone_excluded` (fx `5G Internet`), så:
-  - sætte `targetProductName` til systemproduktet
-  - springe den nuværende “ambiguity override”/rå upload fallback over for netop disse produkter
+**2. Lokal state til produkt-override**
+- Tilføj `const [productOverrides, setProductOverrides] = useState<Record<string, string>>({})` — map fra queue item id til valgt produktnavn.
 
-Effekt:
-- 5G-rækker bliver behandlet som validerede specialmatches
-- de havner ikke som falske kurvrettelser
+**3. UI: Dropdown i "System data"-kolonnen**
+- Kun for rækker hvor `upload_type === "basket_difference"` og `status === "pending"`:
+  - Vis en `<Select>` dropdown under "Produkter solgt" med de tilgængelige produkter for klienten.
+  - Default-value er det nuværende system-produkt (`saleItems[0].product_name`).
+  - Ved ændring: gem i `productOverrides[item.id]`.
 
-### 3. Ret klassificeringen ved afsendelse til kø
-I `sendToQueueMutation` i samme fil:
-- ændre `isPhoneExcluded`-beregningen til at bruge **`targetProductName OR realProductName`**
-- klassificere rækken som `correct_match`, hvis enten target eller systemprodukt er `phone_excluded`
+**4. Godkendelse med det valgte produkt**
+- Udvid `approveMutation` til at acceptere en optional `overrideProductName`.
+- Når en kurv-rettelse godkendes: brug `productOverrides[item.id]` (hvis sat) som `target_product_name` i stedet for den automatisk resolvede.
+- Mutationen skal finde det korrekte `sale_item` baseret på det nuværende produkt og opdatere dets `product_id` til det valgte produkt.
 
-Det sikrer korrekt `upload_type` i køen.
+**5. Mutation: Opdater sale_item produkt**
+- Ved approve af basket_difference med override:
+  1. Find `sale_item` med det nuværende produkt.
+  2. Slå det nye produkt op i `products` tabellen (by name).
+  3. Opdater `sale_item.product_id` til det nye produkts id.
+  4. Opdater `sale_item.adversus_product_title` til det nye produktnavn.
+  5. Hent priser for det nye produkt (fra `product_pricing_rules` eller `products` base prices) og opdater `mapped_commission`/`mapped_revenue`.
 
-### 4. Gør køvisningen konsekvent
-I `src/components/cancellations/ApprovalQueueTab.tsx`:
-- opdatere `isPhoneExcluded`-beregningen til også at kunne falde tilbage på systemets salgsprodukter, ikke kun `target_product_name`
+### Ingen databaseændringer
+Alt håndteres med eksisterende tabeller (`products`, `sale_items`, `cancellation_queue`).
 
-Det gør visningen robust, også hvis et ældre queue-item har et mindre præcist target-navn.
-
-## Teknisk scope
-Filer:
-- `src/components/cancellations/UploadCancellationsTab.tsx`
+### Filer
 - `src/components/cancellations/ApprovalQueueTab.tsx`
 
-Ingen databaseændringer.
-Ingen ændring af den generelle produktmatcher i `productConditionMatcher.ts`.
-
-## Verificering
-Jeg vil verificere på den konkrete 5G-case fra dit screenshot:
-
-1. Upload samme række igen
-2. Bekræft at den klassificeres som **Korrekt match**
-3. Bekræft at den **ikke** vises under **Kurv-rettelser**
-4. Bekræft at almindelige ikke-5G kurvrettelser stadig lander korrekt som `basket_difference`
-
-Hvis der allerede ligger en forkert 5G-række i den nuværende kø, skal den gamle pending import ryddes/genkøres for at se den nye klassificering rent.
