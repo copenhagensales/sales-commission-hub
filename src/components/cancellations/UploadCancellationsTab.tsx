@@ -1767,7 +1767,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       console.log(`[sendToQueue] using mergedMatchedSales: ${mergedMatchedSales.length}, merged away: ${dedupRemoved}`);
 
       // Build queue items from deduplicated sales
-      const queueItems = deduplicatedMatchedSales.map(sale => {
+      const queueItems = mergedMatchedSales.map(sale => {
         let rowUploadType = uploadType as string;
         if (uploadType === "both") {
           const typeCol = activeQueueConfig?.type_detection_column;
