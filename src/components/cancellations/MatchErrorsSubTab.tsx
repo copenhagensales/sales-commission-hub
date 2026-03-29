@@ -103,6 +103,9 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
       }
       return flat;
     },
+    enabled: !!clientId,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   // Fetch active employees
