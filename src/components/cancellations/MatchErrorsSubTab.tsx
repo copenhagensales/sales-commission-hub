@@ -229,12 +229,15 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
 
       if (!sales || sales.length === 0) return { matched: 0 };
 
+      // When uploadType is "both", classify as "cancellation" for match-error re-matches
+      const resolvedUploadType = row.uploadType === "both" ? "cancellation" : row.uploadType;
+
       const { error: queueError } = await supabase
         .from("cancellation_queue")
         .insert([{
           import_id: row.importId,
           sale_id: sales[0].id,
-          upload_type: row.uploadType,
+          upload_type: resolvedUploadType,
           status: "pending",
           uploaded_data: row.rowData as unknown as Json,
           client_id: clientId,
