@@ -143,7 +143,7 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
       const { data: { user } } = await supabase.auth.getUser();
       let empId: string | null = null;
       if (user?.email) {
-        const { data: emp } = await supabase.from("employee_master_data").select("id").eq("email", user.email).maybeSingle();
+        const { data: emp } = await (supabase.from("employee_master_data").select("id").eq("email", user.email) as any).maybeSingle();
         empId = emp?.id || null;
       }
 
