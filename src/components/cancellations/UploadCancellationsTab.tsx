@@ -1028,7 +1028,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                   currentStatus: sale.validation_status || "pending",
                   uploadedRowData: row.originalRow,
                   targetProductName: mapping.productName,
-                  realProductName: matchingItem?.adversus_product_title || mapping.productName,
+                  realProductName: matchingItem?.adversus_product_title || allItems[0]?.adversus_product_title || "Ukendt produkt",
                   commission: matchingItem?.mapped_commission ?? undefined,
                   revenue: matchingItem?.mapped_revenue ?? undefined,
                 });
@@ -1152,7 +1152,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               currentStatus: sale.validation_status || "pending",
               uploadedRowData: row.originalRow,
               targetProductName: resolvedProduct || firstItem?.adversus_product_title || "Ukendt produkt",
-              realProductName: matchedItemForProduct?.adversus_product_title || resolvedProduct || "Ukendt produkt",
+              realProductName: matchedItemForProduct?.adversus_product_title || firstItem?.adversus_product_title || "Ukendt produkt",
               commission: matchedItemForProduct?.mapped_commission ?? undefined,
               revenue: matchedItemForProduct?.mapped_revenue ?? undefined,
             });
@@ -1364,7 +1364,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                     currentStatus: bestMatch.validation_status || "pending",
                     uploadedRowData: row.originalRow,
                     targetProductName: resolvedProductTitle!,
-                    realProductName: matchedItem?.adversus_product_title || resolvedProductTitle!,
+                    realProductName: matchedItem?.adversus_product_title || items[0]?.adversus_product_title || "Ukendt produkt",
                     commission: matchedItem?.mapped_commission ?? undefined,
                     revenue: matchedItem?.mapped_revenue ?? undefined,
                     matchConfidence: bestScore === 2 ? "high" : "medium",
@@ -1416,7 +1416,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                   currentStatus: sale.validation_status || "pending",
                   uploadedRowData: row.originalRow,
                   targetProductName: resolvedProductTitle!,
-                  realProductName: matchedItem?.adversus_product_title || resolvedProductTitle!,
+                  realProductName: matchedItem?.adversus_product_title || items[0]?.adversus_product_title || "Ukendt produkt",
                   commission: matchedItem?.mapped_commission ?? undefined,
                   revenue: matchedItem?.mapped_revenue ?? undefined,
                 });

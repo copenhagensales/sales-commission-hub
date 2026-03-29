@@ -45,6 +45,7 @@ interface DiffField {
   systemValue: string;
   uploadedValue: string;
   isDifferent: boolean;
+  isExpected?: boolean;
 }
 
 interface ColumnMapping {
@@ -186,10 +187,11 @@ function computeDiff(
         const isDiff = Math.abs(uploadedQty - systemQty) > 0.01;
         diffs.push({ label: colName, systemValue: `${systemQty}`, uploadedValue: `${uploadedQty}`, isDifferent: isDiff });
       } else {
-        const uploadedProduct = String(val).trim();
+      const uploadedProduct = String(val).trim();
         const normalizedUploaded = normalizeProductName(uploadedProduct, matchMode);
         const matchesAny = systemProducts.some((sp) => normalizeProductName(sp, matchMode) === normalizedUploaded);
-        diffs.push({ label: colName, systemValue: systemProducts.join(", ") || "-", uploadedValue: uploadedProduct, isDifferent: !matchesAny && systemProducts.length > 0 });
+        const isDiff = !matchesAny && systemProducts.length > 0;
+        diffs.push({ label: colName, systemValue: systemProducts.join(", ") || "-", uploadedValue: uploadedProduct, isDifferent: isDiff });
       }
     }
   }
@@ -462,14 +464,22 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
         const configId = imp?.config_id;
         const mapping = configId ? configsMap.get(configId) || null : null;
         const saleDateVal = sale?.sale_datetime || "";
-        const diffs = computeDiff(uploaded, saleItems, mapping, saleDateVal);
-
         // Check if the matched product is phone_excluded
         const phoneExcludedList = mapping?.phone_excluded_products || [];
         const targetProduct = (item.target_product_name || "").toLowerCase().trim();
         const isPhoneExcluded = phoneExcludedList.length > 0 && targetProduct
           ? phoneExcludedList.some(ep => targetProduct.includes(ep) || ep.includes(targetProduct))
           : false;
+
+        const diffs = computeDiff(uploaded, saleItems, mapping, saleDateVal);
+        // For phone_excluded or basket_difference items, mark product diffs as expected
+        if (isPhoneExcluded || item.upload_type === "basket_difference") {
+          for (const d of diffs) {
+            if (d.isDifferent && mapping?.product_columns?.some(pc => d.label === pc)) {
+              d.isExpected = true;
+            }
+          }
+        }
 
         return {
           ...item,
@@ -1026,8 +1036,8 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                           <div className="text-muted-foreground">({g.saleCount} salg)</div>
                         </TableCell>
                         <TableCell className="align-top">
-                          <Badge variant={g.uploadType === "cancellation" ? "destructive" : "secondary"}>
-                            {g.uploadType === "cancellation" ? "Annullering" : "Kurv diff."}
+                          <Badge variant={g.uploadType === "cancellation" ? "destructive" : g.uploadType === "correct_match" ? "default" : "secondary"}>
+                            {g.uploadType === "cancellation" ? "Annullering" : g.uploadType === "correct_match" ? "Korrekt match" : "Kurv diff."}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-xs min-w-[300px] align-top">
@@ -1068,9 +1078,9 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                           {g.diffs.length > 0 ? (
                             <div className="space-y-1">
                               {g.diffs.map((d, idx) => (
-                                <div key={idx} className={`p-1 rounded border ${d.isDifferent ? 'bg-destructive/10 border-destructive/20' : 'bg-green-500/10 border-green-500/20'}`}>
-                                  <div className={`font-medium ${d.isDifferent ? 'text-destructive' : 'text-green-600'}`}>
-                                    {d.isDifferent ? '✗' : '✓'} {d.label}
+                                <div key={idx} className={`p-1 rounded border ${d.isExpected ? 'bg-blue-500/10 border-blue-500/20' : d.isDifferent ? 'bg-destructive/10 border-destructive/20' : 'bg-green-500/10 border-green-500/20'}`}>
+                                  <div className={`font-medium ${d.isExpected ? 'text-blue-600' : d.isDifferent ? 'text-destructive' : 'text-green-600'}`}>
+                                    {d.isExpected ? 'ℹ' : d.isDifferent ? '✗' : '✓'} {d.label}
                                   </div>
                                   <div>System: <span className="font-mono">{d.systemValue}</span></div>
                                   <div>Upload: <span className="font-mono">{d.uploadedValue}</span></div>
@@ -1144,8 +1154,8 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                         <TableCell>{item.oppNumber || "-"}</TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
-                            <Badge variant={item.upload_type === "cancellation" ? "destructive" : "secondary"}>
-                              {item.upload_type === "cancellation" ? "Annullering" : "Kurv diff."}
+                            <Badge variant={item.upload_type === "cancellation" ? "destructive" : item.upload_type === "correct_match" ? "default" : "secondary"}>
+                              {item.upload_type === "cancellation" ? "Annullering" : item.upload_type === "correct_match" ? "Korrekt match" : "Kurv diff."}
                             </Badge>
                             {!item.isPhoneExcluded && duplicatePhones.has((item.phone || "").trim()) && (item.phone || "").trim() && (
                               <Badge className="bg-orange-500/15 text-orange-700 border-orange-300">Dublet</Badge>
@@ -1190,9 +1200,9 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                           {item.diffs.length > 0 ? (
                             <div className="space-y-1">
                               {item.diffs.map((d, idx) => (
-                                <div key={idx} className={`p-1 rounded border ${d.isDifferent ? 'bg-destructive/10 border-destructive/20' : 'bg-green-500/10 border-green-500/20'}`}>
-                                  <div className={`font-medium ${d.isDifferent ? 'text-destructive' : 'text-green-600'}`}>
-                                    {d.isDifferent ? '✗' : '✓'} {d.label}
+                                <div key={idx} className={`p-1 rounded border ${d.isExpected ? 'bg-blue-500/10 border-blue-500/20' : d.isDifferent ? 'bg-destructive/10 border-destructive/20' : 'bg-green-500/10 border-green-500/20'}`}>
+                                  <div className={`font-medium ${d.isExpected ? 'text-blue-600' : d.isDifferent ? 'text-destructive' : 'text-green-600'}`}>
+                                    {d.isExpected ? 'ℹ' : d.isDifferent ? '✗' : '✓'} {d.label}
                                   </div>
                                   <div>System: <span className="font-mono">{d.systemValue}</span></div>
                                   <div>Upload: <span className="font-mono">{d.uploadedValue}</span></div>
