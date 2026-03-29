@@ -1578,8 +1578,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         }
       }
 
-      const uploadedRowsByOpp = new Map<string, Record<string, unknown>[]>();
-      const uploadedRowByPhone = new Map<string, Record<string, unknown>>();
+      const uploadedRowsByPhone = new Map<string, Record<string, unknown>[]>();
       const uploadedRowByCompany = new Map<string, Record<string, unknown>>();
       const uploadedRowByMemberNr = new Map<string, Record<string, unknown>>();
       
@@ -1595,7 +1594,12 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         }
         if (phoneColumn !== "__none__") {
           const pv = getCaseInsensitive(row.originalRow, phoneColumn);
-          if (pv) uploadedRowByPhone.set(normalizePhone(String(pv)), row.originalRow);
+          if (pv) {
+            const key = normalizePhone(String(pv));
+            const arr = uploadedRowsByPhone.get(key) || [];
+            arr.push(row.originalRow);
+            uploadedRowsByPhone.set(key, arr);
+          }
         }
         if (companyColumn !== "__none__") {
           const cv = getCaseInsensitive(row.originalRow, companyColumn);
@@ -1625,7 +1629,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       };
 
       const indexByOpp = new Map<string, number[]>();
-      const indexByPhone = new Map<string, number>();
+      const indexByPhone = new Map<string, number[]>();
       const indexByCompany = new Map<string, number>();
       const indexByMemberNr = new Map<string, number>();
       cleanedData.forEach((row) => {
@@ -1641,7 +1645,12 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         }
         if (phoneColumn !== "__none__") {
           const pv = getCaseInsensitive(row.originalRow, phoneColumn);
-          if (pv) indexByPhone.set(normalizePhone(String(pv)), idx);
+          if (pv) {
+            const key = normalizePhone(String(pv));
+            const arr = indexByPhone.get(key) || [];
+            arr.push(idx);
+            indexByPhone.set(key, arr);
+          }
         }
         if (companyColumn !== "__none__") {
           const cv = getCaseInsensitive(row.originalRow, companyColumn);
@@ -1662,10 +1671,9 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           return consolidateOppRows(uploadedRowsByOpp.get(saleOpp)!);
         }
         const salePhone = normalizePhone(sale.customer_phone || "");
-        if (salePhone && uploadedRowByPhone.has(salePhone)) {
-          const idx = indexByPhone.get(salePhone);
-          if (idx !== undefined) matchedIndices.add(idx);
-          return uploadedRowByPhone.get(salePhone)!;
+        if (salePhone && uploadedRowsByPhone.has(salePhone)) {
+          (indexByPhone.get(salePhone) || []).forEach(i => matchedIndices.add(i));
+          return uploadedRowsByPhone.get(salePhone)![0];
         }
         const saleCompany = (sale.customer_company || "").toLowerCase().trim();
         if (saleCompany && uploadedRowByCompany.has(saleCompany)) {
@@ -1901,7 +1909,11 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     const phoneGroups = new Map<string, MatchedSale[]>();
     matchedSales.forEach(sale => {
       const phone = sale.phone ? normalizePhone(sale.phone) : null;
-      const key = phone || `__no_phone_${sale.saleId}`;
+      const uploadedPhone = phoneColumn !== "__none__"
+        ? String(getCaseInsensitive(sale.uploadedRowData, phoneColumn) ?? "").trim()
+        : "";
+      const normalizedUploadedPhone = uploadedPhone ? normalizePhone(uploadedPhone) : null;
+      const key = phone || normalizedUploadedPhone || `__no_phone_${sale.saleId}`;
       const group = phoneGroups.get(key) || [];
       group.push(sale);
       phoneGroups.set(key, group);
@@ -1915,14 +1927,20 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     const typeVals = (activePreviewConfig?.type_detection_values as string[]) || [];
 
     phoneGroups.forEach((group, key) => {
-      // Track all phones that were matched
       if (!key.startsWith("__no_phone_")) phones.add(key);
+
+      group.forEach((sale) => {
+        if (phoneColumn !== "__none__") {
+          const uploadedPhone = String(getCaseInsensitive(sale.uploadedRowData, phoneColumn) ?? "").trim();
+          if (uploadedPhone) phones.add(normalizePhone(uploadedPhone));
+        }
+      });
 
       if (group.length === 1) {
         merged.push(group[0]);
         return;
       }
-      // Multiple rows for same phone — merge
+
       const allAreCancellations = group.every(sale => {
         let isConfiguredCancellation = false;
         if (typeCol && typeVals.length > 0) {
@@ -1945,7 +1963,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     });
 
     return { mergedMatchedSales: merged, mergedAwayEntries: away, matchedPhones: phones };
-  }, [matchedSales, activePreviewConfig]);
+  }, [matchedSales, activePreviewConfig, phoneColumn]);
 
   // Build coveredRowIndices: matchedRowIndices + any Excel rows whose phone matches a merged phone
   const coveredRowIndices = useMemo(() => {
