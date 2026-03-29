@@ -351,8 +351,7 @@ export function LocateSaleDialog({
                           size="sm"
                           variant="outline"
                           className="h-7 text-xs"
-                          disabled={linkSaleMutation.isPending}
-                          onClick={() => linkSaleMutation.mutate(sale.id)}
+                          onClick={() => handleSelectSale(sale.id)}
                         >
                           <Check className="h-3 w-3 mr-1" /> Vælg
                         </Button>
