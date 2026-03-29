@@ -839,6 +839,10 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
     filteredOppGroups.filter((g) => g.uploadType === "basket_difference").length +
     filteredFlatItems.filter((i) => i.upload_type === "basket_difference").length,
     [filteredOppGroups, filteredFlatItems]);
+  const correctMatchCount = useMemo(() =>
+    filteredOppGroups.filter((g) => g.uploadType === "correct_match").length +
+    filteredFlatItems.filter((i) => i.upload_type === "correct_match").length,
+    [filteredOppGroups, filteredFlatItems]);
 
   const { data: activeImport } = useQuery({
     queryKey: ["active-import-info", clientId],
