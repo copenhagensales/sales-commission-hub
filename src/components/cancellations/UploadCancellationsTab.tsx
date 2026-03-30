@@ -1546,7 +1546,9 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               }
             }
 
-            if (!resolvedProductTitle || !excelSeller || !excelDate) return;
+            // For Eesy TM: allow continuation without resolved product if seller+date are present
+            if (!resolvedProductTitle && !(selectedClientId === CLIENT_IDS["Eesy TM"] && excelSeller && excelDate)) return;
+            if (!excelSeller || !excelDate) return;
 
             let employeeId = sellerToEmployeeId.get(excelSeller.toLowerCase());
             if (!employeeId) {
