@@ -396,6 +396,28 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   const { data: clientProducts = [] } = useQuery({
     queryKey: ["client-products-for-dropdown", clientId],
     queryFn: async () => {
+      if (clientId === EESY_FM_CLIENT_ID) {
+        // Scope products to Eesy FM's campaigns
+        const { data: campaigns } = await supabase
+          .from("client_campaigns")
+          .select("id")
+          .eq("client_id", clientId);
+        if (campaigns && campaigns.length > 0) {
+          const campaignIds = campaigns.map(c => c.id);
+          const { data, error } = await supabase
+            .from("products")
+            .select("id, name, client_campaign_id")
+            .in("client_campaign_id", campaignIds)
+            .order("name");
+          if (error) throw error;
+          // Deduplicate by name, keep first ID per unique name
+          const seen = new Map<string, { id: string; name: string }>();
+          for (const p of data || []) {
+            if (!seen.has(p.name)) seen.set(p.name, { id: p.id, name: p.name });
+          }
+          return Array.from(seen.values());
+        }
+      }
       const { data, error } = await supabase
         .from("products")
         .select("id, name")
