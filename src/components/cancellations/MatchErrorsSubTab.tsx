@@ -533,16 +533,182 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
     );
   }
 
+  // Bulk re-match mutation for Eesy TM
+  const isEesyTmClient = clientId === CLIENT_IDS["Eesy TM"];
+
+  const bulkRematchMutation = useMutation({
+    mutationFn: async () => {
+      if (!uploadConfig?.date_column || !sellerField || campaignIds.length === 0) {
+        throw new Error("Mangler konfiguration for re-match");
+      }
+
+      const dateCol = uploadConfig.date_column;
+      let matched = 0;
+
+      for (const row of rows) {
+        const rk = rowKey(row);
+        // Skip rows already locally matched
+        if (localManualMatches.has(rk)) continue;
+
+        const excelSeller = String(row.rowData[sellerField] ?? "").trim();
+        const dateValue = parseFlexibleDate(row.rowData[dateCol]);
+        if (!dateValue || !excelSeller) continue;
+
+        // Resolve employee from seller mappings or employee list
+        let employeeId = mappingsByName.get(excelSeller.toLowerCase());
+        let workEmail: string | undefined;
+        let empFullName = "";
+
+        if (employeeId) {
+          const emp = employees.find(e => e.id === employeeId);
+          workEmail = emp?.work_email;
+          empFullName = emp ? `${emp.first_name} ${emp.last_name}`.trim().toLowerCase() : "";
+        } else {
+          // Try full name match against employees
+          const emp = employees.find(e => {
+            const full = `${e.first_name} ${e.last_name}`.trim().toLowerCase();
+            return full === excelSeller.toLowerCase();
+          });
+          if (emp) {
+            employeeId = emp.id;
+            workEmail = emp.work_email;
+            empFullName = `${emp.first_name} ${emp.last_name}`.trim().toLowerCase();
+          } else {
+            // Try first name match
+            const emp2 = employees.find(e => e.first_name?.toLowerCase() === excelSeller.toLowerCase());
+            if (emp2) {
+              employeeId = emp2.id;
+              workEmail = emp2.work_email;
+              empFullName = `${emp2.first_name} ${emp2.last_name}`.trim().toLowerCase();
+            }
+          }
+        }
+
+        if (!workEmail && !empFullName) continue;
+
+        // Search for sales
+        let sales: { id: string }[] | null = null;
+
+        if (workEmail) {
+          const { data } = await supabase
+            .from("sales")
+            .select("id")
+            .eq("agent_email", workEmail.toLowerCase())
+            .gte("sale_datetime", `${dateValue}T00:00:00`)
+            .lte("sale_datetime", `${dateValue}T23:59:59`)
+            .in("client_campaign_id", campaignIds)
+            .limit(1);
+          sales = data;
+        }
+
+        if ((!sales || sales.length === 0) && empFullName) {
+          const { data } = await supabase
+            .from("sales")
+            .select("id")
+            .ilike("agent_name", empFullName)
+            .gte("sale_datetime", `${dateValue}T00:00:00`)
+            .lte("sale_datetime", `${dateValue}T23:59:59`)
+            .in("client_campaign_id", campaignIds)
+            .limit(1);
+          sales = data;
+        }
+
+        if (!sales || sales.length === 0) continue;
+
+        // Get target product name
+        let targetProductName: string | null = null;
+        const { data: matchedSaleItems } = await supabase
+          .from("sale_items")
+          .select("adversus_product_title")
+          .eq("sale_id", sales[0].id)
+          .limit(1);
+        targetProductName = matchedSaleItems?.[0]?.adversus_product_title || null;
+
+        const resolvedUploadType = row.uploadType === "both" ? "cancellation" : row.uploadType;
+
+        const { error: queueError } = await supabase
+          .from("cancellation_queue")
+          .insert([{
+            import_id: row.importId,
+            sale_id: sales[0].id,
+            upload_type: resolvedUploadType,
+            status: "pending",
+            uploaded_data: row.rowData as unknown as Json,
+            client_id: clientId,
+            target_product_name: targetProductName,
+          }]);
+
+        if (queueError) {
+          console.error("Bulk re-match insert error:", queueError);
+          continue;
+        }
+
+        // Remove from unmatched_rows
+        const { data: importData } = await supabase
+          .from("cancellation_imports")
+          .select("unmatched_rows")
+          .eq("id", row.importId)
+          .single();
+
+        if (importData?.unmatched_rows && Array.isArray(importData.unmatched_rows)) {
+          const updatedRows = (importData.unmatched_rows as Record<string, unknown>[]).filter(
+            (ur) => JSON.stringify(ur) !== JSON.stringify(row.rowData)
+          );
+          await supabase
+            .from("cancellation_imports")
+            .update({
+              unmatched_rows: (updatedRows.length > 0 ? updatedRows : null) as Json,
+            })
+            .eq("id", row.importId);
+        }
+
+        matched++;
+      }
+
+      return { matched, total: rows.length };
+    },
+    onSuccess: (result) => {
+      if (result) {
+        toast({ title: `${result.matched} af ${result.total} rækker matchet og sendt til godkendelseskøen` });
+      }
+      queryClient.invalidateQueries({ queryKey: ["match-errors", clientId] });
+      queryClient.invalidateQueries({ queryKey: ["match-errors-count", clientId] });
+      queryClient.invalidateQueries({ queryKey: ["cancellation-queue"] });
+      queryClient.invalidateQueries({ queryKey: ["used-sale-ids", clientId] });
+    },
+    onError: () => {
+      toast({ title: "Fejl ved re-match", variant: "destructive" });
+    },
+  });
+
   return (
     <div className="space-y-4">
-      <div className="relative max-w-sm">
-        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Søg i fejlede rækker..."
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-          className="pl-9"
-        />
+      <div className="flex items-center gap-3">
+        <div className="relative max-w-sm">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Søg i fejlede rækker..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+
+        {isEesyTmClient && rows.length > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => bulkRematchMutation.mutate()}
+            disabled={bulkRematchMutation.isPending}
+          >
+            {bulkRematchMutation.isPending ? (
+              <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+            ) : (
+              <SearchCheck className="h-4 w-4 mr-1.5" />
+            )}
+            Re-match alle
+          </Button>
+        )}
       </div>
 
       <div className="text-sm text-muted-foreground">
