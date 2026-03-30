@@ -1140,16 +1140,18 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                     employee: sale.agent_name || "Ukendt",
                     currentStatus: sale.validation_status || "pending",
                     uploadedRowData: row.originalRow,
-                    targetProductName: mapping.productName,
+                    targetProductName: selectedClientId === CLIENT_IDS["Eesy TM"]
+                      ? (matchingItem?.adversus_product_title || mapping.productName)
+                      : mapping.productName,
                     realProductName: matchingItem?.adversus_product_title || allItems[0]?.adversus_product_title || "Ukendt produkt",
                     commission: matchingItem?.mapped_commission ?? undefined,
                     revenue: matchingItem?.mapped_revenue ?? undefined,
                   });
-                  break; // Only one match per sale — stop checking more Abo fields
+                  if (selectedClientId === CLIENT_IDS["Eesy TM"]) break; // Eesy TM: only one match per sale
                 }
               }
               // If this row already matched, stop checking more sales
-              if (matchedIndicesLocal.has(idx)) break;
+              if (selectedClientId === CLIENT_IDS["Eesy TM"] && matchedIndicesLocal.has(idx)) break;
             }
           });
         }
