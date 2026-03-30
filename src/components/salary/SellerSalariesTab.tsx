@@ -194,6 +194,10 @@ export function SellerSalariesTab() {
                     <span>{formatCurrency(seller.dailyBonus)}</span>
                   </div>
                   <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Opstartsbonus</span>
+                    <span>{formatCurrency(seller.startupBonus)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">Henvisning</span>
                     <span>{formatCurrency(seller.referralBonus)}</span>
                   </div>
