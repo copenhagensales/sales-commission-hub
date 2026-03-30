@@ -82,6 +82,7 @@ export function SellerSalariesTab() {
   const totalDiet = filteredData.reduce((sum, s) => sum + s.diet, 0);
   const totalSickDays = filteredData.reduce((sum, s) => sum + s.sickDays, 0);
   const totalDailyBonus = filteredData.reduce((sum, s) => sum + s.dailyBonus, 0);
+  const totalStartupBonus = filteredData.reduce((sum, s) => sum + s.startupBonus, 0);
   const totalReferralBonus = filteredData.reduce((sum, s) => sum + s.referralBonus, 0);
 
   const SortIcon = ({ col }: { col: SortKey }) => {
