@@ -210,6 +210,7 @@ export function SellerSalariesTab() {
                 <div className="flex justify-between text-xs"><span>Total diet</span><span>{formatCurrency(totalDiet)}</span></div>
                 <div className="flex justify-between text-xs"><span>Total sygdom</span><span>{totalSickDays} dage</span></div>
                 <div className="flex justify-between text-xs"><span>Total dagsbonus</span><span>{formatCurrency(totalDailyBonus)}</span></div>
+                <div className="flex justify-between text-xs"><span>Total opstartsbonus</span><span>{formatCurrency(totalStartupBonus)}</span></div>
                 <div className="flex justify-between text-xs"><span>Total henvisning</span><span>{formatCurrency(totalReferralBonus)}</span></div>
               </div>
             </div>
