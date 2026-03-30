@@ -72,7 +72,7 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
   const [openPopoverKey, setOpenPopoverKey] = useState<string | null>(null);
   const [locateDialogRow, setLocateDialogRow] = useState<{ row: FlatUnmatchedRow; key: string } | null>(null);
   const [ignorePendingKey, setIgnorePendingKey] = useState<string | null>(null);
-  const [localManualMatches, setLocalManualMatches] = useState<Map<string, { saleId: string; row: FlatUnmatchedRow }>>(new Map());
+  const [localManualMatches, setLocalManualMatches] = useState<Map<string, { saleId: string; row: FlatUnmatchedRow; saleItemTitle?: string }>>(new Map());
   const queryClient = useQueryClient();
 
   // Fetch unmatched rows
@@ -367,11 +367,11 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
   });
 
   // Handle local match from LocateSaleDialog
-  const handleLocalMatch = useCallback((saleId: string, matchedRow: FlatUnmatchedRow) => {
+  const handleLocalMatch = useCallback((saleId: string, matchedRow: FlatUnmatchedRow, saleItemTitle?: string) => {
     const rk = rowKey(matchedRow);
     setLocalManualMatches(prev => {
       const next = new Map(prev);
-      next.set(rk, { saleId, row: matchedRow });
+      next.set(rk, { saleId, row: matchedRow, saleItemTitle });
       return next;
     });
   }, []);
@@ -391,32 +391,50 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
       const entries = [...localManualMatches.values()];
       if (entries.length === 0) return;
 
-      // Fetch target_product_name only for Eesy TM
+      // Resolve target_product_name for Eesy TM
       const isEesyTm = clientId === CLIENT_IDS["Eesy TM"];
       const saleItemMap = new Map<string, string>();
       if (isEesyTm) {
-        const saleIds = entries.map(e => e.saleId);
-        const { data: saleItemsData } = await supabase
-          .from("sale_items")
-          .select("sale_id, adversus_product_title")
-          .in("sale_id", saleIds);
-        for (const si of (saleItemsData || [])) {
-          if (!saleItemMap.has(si.sale_id)) {
-            saleItemMap.set(si.sale_id, si.adversus_product_title || "");
+        // Use saleItemTitle from local match if available
+        for (const entry of entries) {
+          if (entry.saleItemTitle) {
+            const rk = rowKey(entry.row);
+            saleItemMap.set(rk, entry.saleItemTitle);
+          }
+        }
+        // Fallback: fetch from DB for entries without saleItemTitle
+        const missingEntries = entries.filter(e => !e.saleItemTitle);
+        if (missingEntries.length > 0) {
+          const saleIds = missingEntries.map(e => e.saleId);
+          const { data: saleItemsData } = await supabase
+            .from("sale_items")
+            .select("sale_id, adversus_product_title")
+            .in("sale_id", saleIds);
+          for (const si of (saleItemsData || [])) {
+            const matchingEntry = missingEntries.find(e => e.saleId === si.sale_id);
+            if (matchingEntry) {
+              const rk = rowKey(matchingEntry.row);
+              if (!saleItemMap.has(rk)) {
+                saleItemMap.set(rk, si.adversus_product_title || "");
+              }
+            }
           }
         }
       }
 
       // Batch insert into cancellation_queue
-      const inserts = entries.map(({ saleId, row: r }) => ({
-        import_id: r.importId,
-        sale_id: saleId,
-        upload_type: r.uploadType === "both" ? "cancellation" : r.uploadType,
-        status: "pending",
-        uploaded_data: r.rowData as unknown as Json,
-        client_id: clientId,
-        target_product_name: isEesyTm ? (saleItemMap.get(saleId) || null) : null,
-      }));
+      const inserts = entries.map(({ saleId, row: r }) => {
+        const rk = rowKey(r);
+        return {
+          import_id: r.importId,
+          sale_id: saleId,
+          upload_type: r.uploadType === "both" ? "cancellation" : r.uploadType,
+          status: "pending",
+          uploaded_data: r.rowData as unknown as Json,
+          client_id: clientId,
+          target_product_name: isEesyTm ? (saleItemMap.get(rk) || null) : null,
+        };
+      });
 
       const { error: queueError } = await supabase
         .from("cancellation_queue")
@@ -681,11 +699,16 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
             </Button>
           </div>
           <div className="space-y-1">
-            {[...localManualMatches.entries()].map(([rk, { saleId, row: matchedRow }]) => (
+            {[...localManualMatches.entries()].map(([rk, { saleId, row: matchedRow, saleItemTitle }]) => (
               <div key={rk} className="flex items-center gap-2 text-xs">
                 <Badge variant="outline" className="bg-green-500/10 border-green-500/30 text-green-700 dark:text-green-400">
                   Salg: {saleId.slice(0, 8)}…
                 </Badge>
+                {saleItemTitle && (
+                  <Badge variant="secondary" className="text-xs">
+                    {saleItemTitle}
+                  </Badge>
+                )}
                 <span className="text-muted-foreground truncate max-w-[300px]">
                   {Object.entries(matchedRow.rowData)
                     .filter(([k]) => k !== "_product_rows")
