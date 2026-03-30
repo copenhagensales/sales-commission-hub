@@ -245,6 +245,7 @@ export function SellerSalariesTab() {
                     <SalaryAdditionCell value={seller.diet} columnKey="diet" items={seller.salaryAdditions?.diet} />
                     <SalaryAdditionCell value={seller.sickDays} columnKey="sickDays" items={seller.salaryAdditions?.sickDays} isCurrency={false} />
                     <SalaryAdditionCell value={seller.dailyBonus} columnKey="dailyBonus" items={seller.salaryAdditions?.dailyBonus} />
+                    <SalaryAdditionCell value={seller.startupBonus} columnKey="startupBonus" items={seller.salaryAdditions?.startupBonus} />
                     <SalaryAdditionCell value={seller.referralBonus} columnKey="referralBonus" items={seller.salaryAdditions?.referralBonus} />
                   </TableRow>
                 ))}
