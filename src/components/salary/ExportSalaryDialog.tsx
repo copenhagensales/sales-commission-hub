@@ -22,7 +22,7 @@ import { da } from "date-fns/locale";
 import { toast } from "sonner";
 import { useSellerSalariesCached } from "@/hooks/useSellerSalariesCached";
 import { getPayrollPeriod } from "@/lib/calculations";
-import Workbook from "exceljs/dist/exceljs.min.js";
+import ExcelJS from "exceljs";
 
 const ALL_COLUMNS = [
   { key: "name", label: "Navn", default: true },
