@@ -1546,7 +1546,9 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               }
             }
 
-            if (!resolvedProductTitle || !excelSeller || !excelDate) return;
+            // For Eesy TM: allow continuation without resolved product if seller+date are present
+            if (!resolvedProductTitle && !(selectedClientId === CLIENT_IDS["Eesy TM"] && excelSeller && excelDate)) return;
+            if (!excelSeller || !excelDate) return;
 
             let employeeId = sellerToEmployeeId.get(excelSeller.toLowerCase());
             if (!employeeId) {
@@ -1711,6 +1713,53 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                   revenue: firstItem?.mapped_revenue ?? undefined,
                 });
                 break;
+              }
+            }
+
+            // Eesy TM fallback: seller+date only when product couldn't be resolved
+            if (!resolvedProductTitle && selectedClientId === CLIENT_IDS["Eesy TM"]) {
+              const dateCandidates = candidateSales.filter(sale => {
+                if (existingIds.has(sale.id)) return false;
+                const saleAgentEmail = (sale.agent_email || "").toLowerCase();
+                if (saleAgentEmail !== agentEmail) return false;
+                const saleDateObj = new Date(sale.sale_datetime);
+                return excelDateObj.getFullYear() === saleDateObj.getFullYear()
+                    && excelDateObj.getMonth() === saleDateObj.getMonth()
+                    && excelDateObj.getDate() === saleDateObj.getDate();
+              });
+
+              if (dateCandidates.length === 1) {
+                const sale = dateCandidates[0];
+                const items = saleItemsMap.get(sale.id) || [];
+                const firstItem = items[0];
+                const targetName = firstItem?.adversus_product_title || "Ukendt produkt";
+                const key = `${sale.id}|${targetName}`;
+                if (!matchedSaleProductKeys.has(key)) {
+                  matchedSaleProductKeys.add(key);
+                  matchedIndicesLocal.add(idx);
+                  productMatched.push({
+                    saleId: sale.id,
+                    phone: sale.customer_phone || "",
+                    company: sale.customer_company || "",
+                    oppNumber: "",
+                    saleDate: sale.sale_datetime || "",
+                    employee: sale.agent_name || "Ukendt",
+                    currentStatus: sale.validation_status || "pending",
+                    uploadedRowData: row.originalRow,
+                    targetProductName: targetName,
+                    realProductName: targetName,
+                    commission: firstItem?.mapped_commission ?? undefined,
+                    revenue: firstItem?.mapped_revenue ?? undefined,
+                  });
+                }
+              } else {
+                unmatchedSellers.push({
+                  rowIndex: idx,
+                  excelSellerName: excelSeller,
+                  excelDate,
+                  excelProduct: excelSubName,
+                  originalRow: row.originalRow,
+                });
               }
             }
           });
