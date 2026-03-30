@@ -1,25 +1,20 @@
 
 
-## Plan: Vis også inaktive medarbejdere i sælger-dropdowns på annulleringssiden
+## Fix: Filtrer "Korrekt match" fra Godkendte/Afviste-fanen + tilføj pagination
 
-### Baggrund
-Annulleringer kan vedrøre salg fra medarbejdere, der siden er blevet deaktiveret. Lige nu viser begge sælger-dropdowns (i UploadCancellationsTab og MatchErrorsSubTab) kun aktive medarbejdere, hvilket gør det umuligt at tildele annulleringer til tidligere ansatte.
+### Problem
+Fanen viser 1000 rækker fordi den inkluderer 997 `correct_match`-rækker (automatisk godkendte korrekte matches) sammen med de ægte annulleringer (230) og kurv-rettelser (19). Supabase's 1000-rækkers grænse afskærer desuden reelle data.
 
 ### Ændringer
 
-**1. `src/components/cancellations/UploadCancellationsTab.tsx`**
-- Fjern `.eq("is_active", true)` filteret i `allEmployees`-queryen (linje 637), så både aktive og inaktive medarbejdere hentes.
-- Tilføj `is_active` til select-felterne.
-- Sortér listen så aktive vises først, derefter inaktive.
-- Vis inaktive medarbejdere med en visuel markering i dropdown (f.eks. grå tekst + "(inaktiv)"-suffix).
+**`src/components/cancellations/ApprovedTab.tsx`**
 
-**2. `src/components/cancellations/MatchErrorsSubTab.tsx`**
-- Samme ændring: fjern `.eq("is_active", true)` (linje 121), tilføj `is_active` til select.
-- Sortér aktive først, inaktive sidst.
-- Vis "(inaktiv)"-markering i dropdown-valgene.
+1. **Filtrer `correct_match` fra queryen** — tilføj `.in("upload_type", ["cancellation", "basket_difference"])` til Supabase-queryen (linje 49), så kun ægte annulleringer og kurv-rettelser vises.
+
+2. **Tilføj pagination** — brug `fetchAllRows` eller `.range()` med load-more for at undgå 1000-rækkers grænsen, så alle relevante rækker kan ses.
 
 ### Tekniske detaljer
-- Begge steder ændres queryen fra `.eq("is_active", true)` til at hente alle medarbejdere med `is_active` inkluderet i select.
-- Dropdown-items renderes med betinget styling: `className="text-muted-foreground"` og suffix `(inaktiv)` for `is_active === false`.
-- Sortering: `.order("is_active", { ascending: false }).order("first_name")` sikrer aktive først.
+- Queryen på linje 42-55 mangler et `upload_type`-filter og pagination
+- `correct_match` er auto-godkendte rækker der bekræfter at salget er korrekt — de hører ikke til i denne oversigt
+- Efter filtreringen reduceres Eesy FM fra ~1246 til ~249 rækker (230 annulleringer + 19 kurv-rettelser)
 
