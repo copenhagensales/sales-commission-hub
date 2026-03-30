@@ -226,6 +226,7 @@ export function SellerSalariesTab() {
                   <SortableHead col="diet" className="text-right">Diet</SortableHead>
                   <SortableHead col="sickDays" className="text-right">Sygdom</SortableHead>
                   <SortableHead col="dailyBonus" className="text-right">Dagsbonus</SortableHead>
+                  <SortableHead col="startupBonus" className="text-right">Opstartsbonus</SortableHead>
                   <SortableHead col="referralBonus" className="text-right">Henvisning</SortableHead>
                 </TableRow>
               </TableHeader>
