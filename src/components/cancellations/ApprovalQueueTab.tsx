@@ -676,7 +676,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   }, [flatItems, duplicateKeys, isEesyTm]);
 
   const approveMutation = useMutation({
-    mutationFn: async ({ queueItemIds, saleIds, uploadType, overrideProductName }: { queueItemIds: string[]; saleIds: string[]; uploadType: string; overrideProductName?: string }) => {
+    mutationFn: async ({ queueItemIds, saleIds, uploadType, overrideProductName, overrideProductId }: { queueItemIds: string[]; saleIds: string[]; uploadType: string; overrideProductName?: string; overrideProductId?: string }) => {
       if (!currentEmployee?.id) throw new Error("Ingen medarbejder fundet");
       const newStatus = uploadType === "cancellation" ? "cancelled" : "basket_changed";
 
