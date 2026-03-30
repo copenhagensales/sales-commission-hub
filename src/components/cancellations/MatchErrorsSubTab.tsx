@@ -238,6 +238,17 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
       // When uploadType is "both", classify as "cancellation" for match-error re-matches
       const resolvedUploadType = row.uploadType === "both" ? "cancellation" : row.uploadType;
 
+      // Fetch target_product_name only for Eesy TM
+      let targetProductName: string | null = null;
+      if (clientId === CLIENT_IDS["Eesy TM"]) {
+        const { data: matchedSaleItems } = await supabase
+          .from("sale_items")
+          .select("adversus_product_title")
+          .eq("sale_id", sales[0].id)
+          .limit(1);
+        targetProductName = matchedSaleItems?.[0]?.adversus_product_title || null;
+      }
+
       const { error: queueError } = await supabase
         .from("cancellation_queue")
         .insert([{
@@ -247,6 +258,7 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
           status: "pending",
           uploaded_data: row.rowData as unknown as Json,
           client_id: clientId,
+          target_product_name: targetProductName,
         }]);
       if (queueError) {
         console.error("Failed to insert into cancellation_queue:", queueError);
