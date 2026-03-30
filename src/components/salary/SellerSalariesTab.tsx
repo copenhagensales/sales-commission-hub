@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Search, Users, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { AddSalaryAdditionDialog } from "@/components/salary/AddSalaryAdditionDialog";
+import { ExportSalaryDialog } from "@/components/salary/ExportSalaryDialog";
 import { SalaryAdditionCell } from "@/components/salary/SalaryAdditionCell";
 import { useSellerSalariesCached } from "@/hooks/useSellerSalariesCached";
 import { format } from "date-fns";
