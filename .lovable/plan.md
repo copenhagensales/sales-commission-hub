@@ -1,27 +1,29 @@
 
 
-## Fix: Kurv-rettelser skal kun trække differencen — ikke hele provisionen
+## Fix: Annulleringer trækker hele salgets provision i stedet for kun det annullerede produkt
 
 ### Problem
-Når en kurv-rettelse (basket_difference) godkendes, beregner lønsystemet hele salgets provision som "tabt". Men en kurv-rettelse ændrer kun produktet — den korrekte modregning er **differencen** mellem gammel og ny provision, ikke hele beløbet.
+Når en annullering godkendes, summerer lønsystemet **alle** sale_items på salget — ikke kun det produkt der er annulleret. For Eesy TM-salg med flere produkter (typisk 2-3 items) betyder det f.eks. at en annullering af "Lønsikring" (400 kr.) trækker hele salgets 1.400 kr. fra sælgerens provision.
 
-Desuden mangler `upload_type`-filteret stadig i queryen, så `correct_match`-rækker medtages fejlagtigt.
+**Bevist eksempel:** Annullering af "Lønsikring" på salg med 2 items:
+- Salg = 1.000 kr. (hovedprodukt) + 400 kr. (Lønsikring)  
+- Target = "Lønsikring" → korrekt fradrag = 400 kr.  
+- Nuværende fradrag = 1.400 kr. (hele salget)
 
 ### Løsning
 
 **`src/hooks/useSellerSalariesCached.ts`**
 
-1. **Tilføj `upload_type` til queryen** — hent `upload_type` og filtrer med `.in("upload_type", ["cancellation", "basket_difference"])` så `correct_match` udelukkes.
+1. **Hent `target_product_name` fra cancellation_queue** — tilføj feltet til select-queryen (linje 239-248).
 
-2. **Hent `product_change_log` for kurv-rettelser** — ny query der henter `old_commission` og `new_commission` fra `product_change_log` for godkendte basket_difference-rækker (hvor `rolled_back_at IS NULL`).
+2. **Hent produktnavne for matching** — ny query der slår `product_id → name` op fra `products`-tabellen, så vi kan matche `target_product_name` mod de faktiske sale_items.
 
-3. **Beregn korrekt fradrag baseret på type**:
-   - **Annullering** (`upload_type = "cancellation"`): Hele salgets provision fratrækkes (som nu).
-   - **Kurv-rettelse** (`upload_type = "basket_difference"`): Kun differencen `old_commission - new_commission` fratrækkes. Denne data kommer fra `product_change_log`, som allerede gemmer de kampagne-aware priser sat af `rematch-pricing-rules`.
+3. **Beregn kun den målrettede provision**:
+   - Hvis `target_product_name` findes: find den matchende sale_item og træk kun dennes `mapped_commission` fra.
+   - Hvis `target_product_name` er null (ældre rækker uden produktmål): fald tilbage til at trække hele salgets provision fra (nuværende adfærd).
 
 ### Tekniske detaljer
-
-- `product_change_log` indeholder: `old_commission`, `new_commission`, `old_product_name`, `new_product_name`, `cancellation_queue_id` — alt hvad vi behøver.
-- Priserne i loggen er allerede kampagne-korrekte, da de sættes af `rematch-pricing-rules` ved godkendelse.
-- Pagination tilføjes også til cancellation-queryen for at undgå 1000-rækkers grænsen.
+- `cancellation_queue.target_product_name` gemmes allerede ved matching/godkendelse
+- Matching sker ved at sammenligne `target_product_name` med `products.name` via `sale_items.product_id`
+- Fallback-logikken sikrer bagudkompatibilitet med ældre annulleringer
 
