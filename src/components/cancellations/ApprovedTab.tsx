@@ -189,6 +189,22 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
     onError: () => toast.error("Kunne ikke opdatere fradragsdato"),
   });
 
+  const bulkUpdateDeductionDate = useMutation({
+    mutationFn: async ({ ids, date }: { ids: string[]; date: string }) => {
+      const { error } = await supabase
+        .from("cancellation_queue")
+        .update({ deduction_date: date } as any)
+        .in("id", ids);
+      if (error) throw error;
+      return ids.length;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ["approved-queue", clientId] });
+      toast.success(`Fradragsdato opdateret for ${count} sager`);
+    },
+    onError: () => toast.error("Kunne ikke opdatere fradragsdatoer"),
+  });
+
   const sellers = useMemo(() => {
     const set = new Set(items.map((i) => i.agentName).filter(Boolean));
     return Array.from(set).sort();
