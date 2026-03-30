@@ -44,7 +44,7 @@ interface SaleRow {
   agent_email: string | null;
   customer_phone: string | null;
   customer_company: string | null;
-  sale_items: { display_name: string | null; quantity: number | null; mapped_revenue: number | null }[];
+  sale_items: { id: string; display_name: string | null; adversus_product_title: string | null; quantity: number | null; mapped_revenue: number | null }[];
 }
 
 export function LocateSaleDialog({
