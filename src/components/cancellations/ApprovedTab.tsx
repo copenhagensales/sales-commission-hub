@@ -79,7 +79,7 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
           reviewerName: item.reviewer
             ? `${item.reviewer.first_name || ""} ${item.reviewer.last_name || ""}`.trim()
             : "",
-          product: ud?.["A-kasse"] || "",
+          product: (item.sale?.sale_items || []).map((si: any) => si.product?.name).filter(Boolean).join(", ") || "",
           memberNumber: ud?.["Medlemsnummer"] != null ? String(ud["Medlemsnummer"]) : "",
           provision: typeof provValue === "number" ? provValue : null,
         };
