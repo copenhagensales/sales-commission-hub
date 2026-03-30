@@ -107,17 +107,41 @@ export function useSellerSalariesCached(
     staleTime: 300000,
   });
 
-  // Query 4: Diet (booking_diet) for the period
+  // Query 3b: Fetch training bonus salary_type_id to separate it from diet
+  const { data: trainingBonusSalaryType } = useQuery({
+    queryKey: ["training-bonus-salary-type"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("salary_types")
+        .select("id")
+        .ilike("name", "%oplæringsbonus%")
+        .eq("is_active", true)
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    staleTime: 300000,
+  });
+
+  const trainingBonusTypeId = trainingBonusSalaryType?.id;
+
+  // Query 4: Diet (booking_diet) for the period — excludes training bonus rows
   const { data: dietData, isLoading: dietLoading } = useQuery({
-    queryKey: ["seller-diet", periodStartISO, periodEndISO],
+    queryKey: ["seller-diet", periodStartISO, periodEndISO, trainingBonusTypeId],
     queryFn: async () => {
       if (!periodStartISO || !periodEndISO) return [];
-      const { data, error } = await supabase
+      let query = supabase
         .from("booking_diet")
         .select("employee_id, amount")
         .gte("date", periodStartISO)
         .lte("date", periodEndISO);
       
+      if (trainingBonusTypeId) {
+        query = query.neq("salary_type_id", trainingBonusTypeId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data || [];
     },
