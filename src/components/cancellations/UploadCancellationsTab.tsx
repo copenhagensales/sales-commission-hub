@@ -1540,8 +1540,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
             // Eesy TM 5G fallback: if no product resolved but Excel has "5G Internet..."
             if (!resolvedProductTitle && selectedClientId === CLIENT_IDS["Eesy TM"]) {
-              const productSource = excelSubName || rowProduct3;
-              if (productSource && isEesyTm5gExcelProduct(productSource)) {
+              if (excelSubName && isEesyTm5gExcelProduct(excelSubName)) {
                 resolvedProductTitle = "5G Internet";
               }
             }
