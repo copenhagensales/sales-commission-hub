@@ -1,30 +1,30 @@
 
 
-## Begræns Excel-intern dublet-logik til kun Eesy TM og Eesy FM
+## Giv 4 roller adgang til annullerings-faner
 
 ### Problem
-Excel-intern deduplikering (gruppering af rækker med samme telefonnummer og merge til én repræsentant) kører for **alle** kunder. Den skal kun gælde for **Eesy TM** og **Eesy FM**.
+Rollerne `assisterendetm`, `assisterende_teamleder_fm`, `fm_leder` og `teamleder` mangler `can_view` på nogle annullerings-faner, så de ikke kan se Upload, Godkendelseskø og Godkendte.
 
-### Ændringer — `src/components/cancellations/UploadCancellationsTab.tsx`
+### Nuværende status i databasen
 
-**1. Import `CLIENT_IDS`**
-- Tilføj import af `CLIENT_IDS` fra `@/utils/clientIds`
+| Rolle | upload | approval | approved |
+|-------|--------|----------|----------|
+| assisterende_teamleder_fm | ✅ view+edit | ❌ | mangler |
+| assisterendetm | ❌ | ❌ | mangler |
+| fm_leder | ✅ view+edit | ❌ | mangler |
+| teamleder | ✅ view | ❌ | mangler |
 
-**2. Betingelse på Excel-intern dedup (linje ~868-892)**
-- Wrap hele dedup-blokken i et tjek: kun kør hvis `selectedClientId` er Eesy TM eller Eesy FM
-- For andre kunder: `excelDupIndices` forbliver tom, og `dedupedData = cleanedData` (ingen dedup)
+### Ændringer (kun data-opdateringer, ingen kode)
 
-**3. Betingelse på preview-layer merge (linje ~1940-1998)**
-- Wrap phone-gruppering/merge-logikken: kun kør for Eesy TM/FM
-- For andre kunder: `mergedMatchedSales = matchedSales`, `mergedAwayEntries = []`, og `matchedPhones` bygges uden merge
+**1. Opdater eksisterende rækker — sæt `can_view = true`:**
+- `assisterendetm` → `tab_cancellations_upload`
+- `assisterendetm` → `tab_cancellations_approval`
+- `assisterende_teamleder_fm` → `tab_cancellations_approval`
+- `fm_leder` → `tab_cancellations_approval`
+- `teamleder` → `tab_cancellations_approval`
 
-**4. Betingelse på duplicate-tab visning (linje ~2022-2033)**
-- `duplicateEntries` vil naturligt blive tom for ikke-Eesy kunder da `mergedAwayEntries` er tom
+**2. Opret manglende rækker — `tab_cancellations_approved`:**
+- Indsæt nye permission-rækker for alle 4 roller med `can_view = true, can_edit = false`
 
-### Logik
-```typescript
-const isEesyClient = selectedClientId === CLIENT_IDS["Eesy TM"] || selectedClientId === CLIENT_IDS["Eesy FM"];
-```
-
-Bruges som guard omkring begge dedup-steder. Resten af flowet (matching, unmatched, send-to-queue) fungerer uændret.
+Ingen kodeændringer nødvendige — UI'et bruger allerede `canView('tab_cancellations_*')` korrekt.
 
