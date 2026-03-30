@@ -28,6 +28,7 @@ const COLUMN_OPTIONS: { value: string; label: string }[] = [
   { value: "diet", label: "Diet" },
   { value: "sickDays", label: "Sygdom" },
   { value: "dailyBonus", label: "Dagsbonus" },
+  { value: "startupBonus", label: "Opstartsbonus" },
   { value: "referralBonus", label: "Henvisning" },
 ];
 

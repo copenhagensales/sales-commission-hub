@@ -258,6 +258,7 @@ export function SellerSalariesTab() {
                   <TableCell className="text-right">{formatCurrency(totalDiet)}</TableCell>
                   <TableCell className="text-right">{totalSickDays}</TableCell>
                   <TableCell className="text-right">{formatCurrency(totalDailyBonus)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(totalStartupBonus)}</TableCell>
                   <TableCell className="text-right">{formatCurrency(totalReferralBonus)}</TableCell>
                 </TableRow>
               </TableBody>
