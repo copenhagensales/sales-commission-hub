@@ -1,82 +1,39 @@
 
 
-## Fix: Scope alle ændringer til kun Eesy TM
+## Fix: Pass 2 dato-parsing fejler for europæiske datoformater
 
-### Nuværende status
-- **Dedup-nøgle** (ApprovalQueueTab linje 635-650): ✅ Allerede scopet til Eesy TM via `isEesyTm` check
-- **Produkt-filtrering** (ApprovalQueueTab linje 515): ✅ Allerede scopet via `clientId === CLIENT_IDS["Eesy TM"]`
-- **Batch confirm target_product_name** (MatchErrorsSubTab linje 382-403): ⚠️ Henter `target_product_name` for **alle** klienter — skal scopes
-- **Individuel re-match** (MatchErrorsSubTab linje 240-249): ⚠️ Mangler `target_product_name` helt — skal tilføjes kun for Eesy TM
+### Problem
+Sælger-mappings eksisterer og er korrekte (som vist i screenshot). Pass 2-logikken finder også korrekt `employeeId` og `agentEmail`. Men **dato-sammenligningen fejler** fordi:
 
-### Ændringer
+- Excel-datoen er i europæisk format: `"30.3.2026"` (DD.MM.YYYY)
+- `new Date("30.3.2026")` returnerer `Invalid Date` i JavaScript
+- Alle datosammenligninger (linje 1573-1576 og 1628-1632) fejler → `score = 0` → ingen match
 
-#### 1. MatchErrorsSubTab.tsx — Batch confirm (linje 382-403)
-Wrap `target_product_name`-hentning i en Eesy TM-check:
+### Løsning
+
+**Fil: `src/components/cancellations/UploadCancellationsTab.tsx`**
+
+Tilføj en robust dato-parser der håndterer europæiske formater (DD.MM.YYYY, DD/MM/YYYY, DD-MM-YYYY) samt standard ISO-format. Erstat `new Date(excelDate)` på linje 1539 med en parser-funktion:
 
 ```typescript
-const isEesyTm = clientId === CLIENT_IDS["Eesy TM"];
-
-let saleItemMap = new Map<string, string>();
-if (isEesyTm) {
-  const saleIds = entries.map(e => e.saleId);
-  const { data: saleItemsData } = await supabase
-    .from("sale_items")
-    .select("sale_id, adversus_product_title")
-    .in("sale_id", saleIds);
-  for (const si of (saleItemsData || [])) {
-    if (!saleItemMap.has(si.sale_id)) {
-      saleItemMap.set(si.sale_id, si.adversus_product_title || "");
-    }
+function parseFlexibleDate(dateStr: string): Date {
+  // Try DD.MM.YYYY, DD/MM/YYYY, DD-MM-YYYY (European format)
+  const euMatch = dateStr.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
+  if (euMatch) {
+    return new Date(Number(euMatch[3]), Number(euMatch[2]) - 1, Number(euMatch[1]));
   }
-}
-
-const inserts = entries.map(({ saleId, row: r }) => ({
-  ...existing fields...,
-  target_product_name: isEesyTm ? (saleItemMap.get(saleId) || null) : null,
-}));
-```
-
-#### 2. MatchErrorsSubTab.tsx — Individuel re-match / upsertMapping (linje 240-249)
-Tilføj `target_product_name` kun for Eesy TM:
-
-```typescript
-let targetProductName: string | null = null;
-if (clientId === CLIENT_IDS["Eesy TM"]) {
-  const { data: matchedSaleItems } = await supabase
-    .from("sale_items")
-    .select("adversus_product_title")
-    .eq("sale_id", sales[0].id)
-    .limit(1);
-  targetProductName = matchedSaleItems?.[0]?.adversus_product_title || null;
-}
-
-const { error: queueError } = await supabase
-  .from("cancellation_queue")
-  .insert([{
-    ...existing fields...,
-    target_product_name: targetProductName,
-  }]);
-```
-
-#### 3. ApprovalQueueTab.tsx — Begræns "×2" fix (linje 515-520)
-Allerede korrekt scopet — ingen ændring nødvendig. Tilføj dog `[filtered[0]]` begrænsningen:
-
-```typescript
-if (clientId === CLIENT_IDS["Eesy TM"] && targetProductName) {
-  const filtered = saleItems.filter(si =>
-    si.product_name.toLowerCase().trim() === targetProductName.toLowerCase().trim()
-  );
-  if (filtered.length > 0) saleItems = [filtered[0]]; // Kun 1 pr. annullering
+  // Fallback to native Date parsing (handles ISO, US formats, etc.)
+  return new Date(dateStr);
 }
 ```
 
-### Import
-Tilføj `CLIENT_IDS` import i `MatchErrorsSubTab.tsx`:
+Brug den på linje 1539:
 ```typescript
-import { CLIENT_IDS } from "@/utils/clientIds";
+const excelDateObj = parseFlexibleDate(excelDate);
 ```
 
 ### Konsekvens
-- Alle tre ændringer er nu **eksplicit scopet til Eesy TM**
-- Andre klienter påvirkes ikke — `target_product_name` forbliver `null` for dem
+- 5G Internet-rækker med europæiske datoer (`30.3.2026`) vil nu matche korrekt i Pass 2
+- Eksisterende ISO/US-datoer håndteres stadig via fallback
+- Ingen påvirkning af andre klienter eller passes
 
