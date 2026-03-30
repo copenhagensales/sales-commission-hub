@@ -1145,8 +1145,11 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                     commission: matchingItem?.mapped_commission ?? undefined,
                     revenue: matchingItem?.mapped_revenue ?? undefined,
                   });
+                  break; // Only one match per sale — stop checking more Abo fields
                 }
               }
+              // If this row already matched, stop checking more sales
+              if (matchedIndicesLocal.has(idx)) break;
             }
           });
         }
