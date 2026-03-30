@@ -187,21 +187,22 @@ export function useSellerSalariesCached(
     staleTime: 60000,
   });
 
-  // Query 6b: Startup bonus (booking_startup_bonus) for the period
+  // Query 6b: Training/startup bonus from booking_diet filtered by oplæringsbonus salary_type
   const { data: startupBonusData, isLoading: startupBonusLoading } = useQuery({
-    queryKey: ["seller-startup-bonus", periodStartISO, periodEndISO],
+    queryKey: ["seller-startup-bonus", periodStartISO, periodEndISO, trainingBonusTypeId],
     queryFn: async () => {
-      if (!periodStartISO || !periodEndISO) return [];
-      const { data, error } = await (supabase
-        .from("booking_startup_bonus") as any)
+      if (!periodStartISO || !periodEndISO || !trainingBonusTypeId) return [];
+      const { data, error } = await supabase
+        .from("booking_diet")
         .select("employee_id, amount")
+        .eq("salary_type_id", trainingBonusTypeId)
         .gte("date", periodStartISO)
         .lte("date", periodEndISO);
       
       if (error) throw error;
       return data || [];
     },
-    enabled: !!periodStartISO && !!periodEndISO,
+    enabled: !!periodStartISO && !!periodEndISO && !!trainingBonusTypeId,
     staleTime: 60000,
   });
 
