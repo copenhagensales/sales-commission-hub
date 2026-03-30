@@ -377,7 +377,7 @@ export function useSellerSalariesCached(
 
   return {
     sellerData,
-    isLoading: employeesLoading || commissionLoading || salaryTypesLoading || dietLoading || sickLoading || dailyBonusLoading || cancellationLoading || salaryAdditionsLoading,
+    isLoading: employeesLoading || commissionLoading || salaryTypesLoading || dietLoading || sickLoading || dailyBonusLoading || startupBonusLoading || cancellationLoading || salaryAdditionsLoading,
     lastUpdated,
   };
 }
