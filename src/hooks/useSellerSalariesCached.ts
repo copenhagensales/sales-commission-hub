@@ -290,6 +290,12 @@ export function useSellerSalariesCached(
       dailyBonusMap[db.employee_id] = (dailyBonusMap[db.employee_id] || 0) + (db.amount || 0);
     }
 
+    // Build startup bonus map
+    const startupBonusMap: Record<string, number> = {};
+    for (const sb of startupBonusData || []) {
+      startupBonusMap[sb.employee_id] = (startupBonusMap[sb.employee_id] || 0) + (sb.amount || 0);
+    }
+
     // Build cancellation map (agent_email → employee_id → total lost commission)
     const cancellationMap: Record<string, number> = {};
     for (const cq of cancellationData || []) {
