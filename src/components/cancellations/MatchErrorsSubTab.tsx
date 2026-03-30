@@ -72,7 +72,7 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
   const [openPopoverKey, setOpenPopoverKey] = useState<string | null>(null);
   const [locateDialogRow, setLocateDialogRow] = useState<{ row: FlatUnmatchedRow; key: string } | null>(null);
   const [ignorePendingKey, setIgnorePendingKey] = useState<string | null>(null);
-  const [localManualMatches, setLocalManualMatches] = useState<Map<string, { saleId: string; row: FlatUnmatchedRow }>>(new Map());
+  const [localManualMatches, setLocalManualMatches] = useState<Map<string, { saleId: string; row: FlatUnmatchedRow; saleItemTitle?: string }>>(new Map());
   const queryClient = useQueryClient();
 
   // Fetch unmatched rows
