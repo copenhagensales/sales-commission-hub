@@ -213,7 +213,7 @@ export function DuplicatesTab({ clientId: selectedClientId }: DuplicatesTabProps
 
     groups.sort((a, b) => b.sales.length - a.sales.length);
     return groups;
-  }, [sales, isTdc]);
+  }, [sales, isTdc, isEesyTm]);
 
   // Agents that appear in duplicate groups
   const agentsWithDuplicates = useMemo(() => {
