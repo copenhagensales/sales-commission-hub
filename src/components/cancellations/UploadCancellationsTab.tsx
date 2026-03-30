@@ -1151,7 +1151,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                 }
               }
               // If this row already matched, stop checking more sales
-              if (matchedIndicesLocal.has(idx)) break;
+              if (selectedClientId === CLIENT_IDS["Eesy TM"] && matchedIndicesLocal.has(idx)) break;
             }
           });
         }
