@@ -1435,7 +1435,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                         {statusFilter === "pending" && (
                           <TableCell>
                             <div className="flex gap-1">
-                              <Button size="sm" variant="ghost" onClick={() => approveMutation.mutate({ queueItemIds: [item.id], saleIds: [item.sale_id], uploadType: item.upload_type, overrideProductName: productOverrides[item.id] })} disabled={isPending}>
+                              <Button size="sm" variant="ghost" onClick={() => approveMutation.mutate({ queueItemIds: [item.id], saleIds: [item.sale_id], uploadType: item.upload_type, ...(clientId === EESY_FM_CLIENT_ID ? { overrideProductId: productOverrides[item.id] } : { overrideProductName: productOverrides[item.id] }) })} disabled={isPending}>
                                 <Check className="h-4 w-4" />
                               </Button>
                               <Button size="sm" variant="ghost" onClick={() => rejectMutation.mutate([item.id])} disabled={isPending}>
