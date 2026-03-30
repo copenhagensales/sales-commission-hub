@@ -133,6 +133,15 @@ function getCaseInsensitive(obj: Record<string, unknown> | undefined, key: strin
   return undefined;
 }
 
+/** Parse dates flexibly: DD.MM.YYYY, DD/MM/YYYY, DD-MM-YYYY (European) + fallback */
+function parseFlexibleDate(dateStr: string): Date {
+  const euMatch = dateStr.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
+  if (euMatch) {
+    return new Date(Number(euMatch[3]), Number(euMatch[2]) - 1, Number(euMatch[1]));
+  }
+  return new Date(dateStr);
+}
+
 /** Normalize phone: strip non-digits + remove Danish country code prefix */
 function normalizePhone(raw: string): string {
   const digits = raw.replace(/\D/g, "");
