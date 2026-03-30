@@ -633,7 +633,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
     for (const item of flatItems) {
       if (item.isPhoneExcluded) continue;
       const key = isEesyTm
-        ? (item.sale_id || "").trim()
+        ? `${(item.sale_id || "").trim()}|${(item.target_product_name || "").trim()}`
         : (item.phone || "").trim();
       if (key) counts.set(key, (counts.get(key) || 0) + 1);
     }
@@ -647,7 +647,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   const duplicateCount = useMemo(() => {
     return flatItems.filter(i => {
       if (i.isPhoneExcluded) return false;
-      const key = isEesyTm ? (i.sale_id || "").trim() : (i.phone || "").trim();
+      const key = isEesyTm ? `${(i.sale_id || "").trim()}|${(i.target_product_name || "").trim()}` : (i.phone || "").trim();
       return duplicateKeys.has(key);
     }).length;
   }, [flatItems, duplicateKeys, isEesyTm]);
@@ -918,7 +918,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   let filteredFlatItems = onlyDifferences ? flatItems.filter((i) => i.hasDifferences) : flatItems;
   if (onlyDuplicates) {
     filteredFlatItems = filteredFlatItems.filter(i => {
-      const key = isEesyTm ? (i.sale_id || "").trim() : (i.phone || "").trim();
+      const key = isEesyTm ? `${(i.sale_id || "").trim()}|${(i.target_product_name || "").trim()}` : (i.phone || "").trim();
       return duplicateKeys.has(key);
     });
   }
@@ -1312,7 +1312,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                               {item.upload_type === "cancellation" ? "Annullering" : item.upload_type === "correct_match" ? "Korrekt match" : "Kurv diff."}
                             </Badge>
                             {(() => {
-                              const dupeKey = isEesyTm ? (item.sale_id || "").trim() : (item.phone || "").trim();
+                              const dupeKey = isEesyTm ? `${(item.sale_id || "").trim()}|${(item.target_product_name || "").trim()}` : (item.phone || "").trim();
                               return !item.isPhoneExcluded && duplicateKeys.has(dupeKey) && dupeKey && (
                                 <Badge className="bg-orange-500/15 text-orange-700 border-orange-300">Dublet</Badge>
                               );
