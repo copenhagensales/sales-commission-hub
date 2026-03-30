@@ -270,7 +270,20 @@ export function useSellerSalariesCached(
     staleTime: 60000,
   });
 
-  // Query 9: Product change log for basket_difference commission differences
+  // Query 9a: Products lookup for target_product_name matching
+  const { data: productsLookup } = useQuery({
+    queryKey: ["products-name-lookup"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, name");
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 300000,
+  });
+
+  // Query 9b: Product change log for basket_difference commission differences
   const basketDiffIds = useMemo(() => {
     if (!cancellationData) return [];
     return cancellationData
