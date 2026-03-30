@@ -276,6 +276,9 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
                 <TableHead className="cursor-pointer" onClick={() => toggleSort("agent")}>Sælger <SortIcon col="agent" /></TableHead>
                 <TableHead className="cursor-pointer" onClick={() => toggleSort("opp")}>OPP <SortIcon col="opp" /></TableHead>
                 <TableHead className="cursor-pointer" onClick={() => toggleSort("type")}>Type <SortIcon col="type" /></TableHead>
+                {isAse && <TableHead>Produkt</TableHead>}
+                {isAse && <TableHead>Medlemsnr.</TableHead>}
+                {isAse && <TableHead>Provision</TableHead>}
                 <TableHead className="cursor-pointer" onClick={() => toggleSort("status")}>Status <SortIcon col="status" /></TableHead>
                 <TableHead className="cursor-pointer" onClick={() => toggleSort("deduction")}>Trækkes i <SortIcon col="deduction" /></TableHead>
                 <TableHead>Behandlet af</TableHead>
@@ -296,6 +299,9 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
                         {item.uploadType === "cancellation" ? "Annullering" : "Kurvrettelse"}
                       </Badge>
                     </TableCell>
+                    {isAse && <TableCell>{item.product || "-"}</TableCell>}
+                    {isAse && <TableCell className="font-mono text-xs">{item.memberNumber || "-"}</TableCell>}
+                    {isAse && <TableCell>{item.provision != null ? `${item.provision.toLocaleString("da-DK")} kr.` : "-"}</TableCell>}
                     <TableCell>
                       <Badge variant={item.status === "approved" ? "default" : "destructive"}>
                         {item.status === "approved" ? "Godkendt" : "Afvist"}
