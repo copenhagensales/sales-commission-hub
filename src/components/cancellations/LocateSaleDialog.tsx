@@ -149,7 +149,7 @@ export function LocateSaleDialog({
 
         const { data, error } = await supabase
           .from("sales")
-          .select("id, sale_datetime, agent_name, agent_email, customer_phone, customer_company, sale_items(display_name, quantity, mapped_revenue)")
+          .select("id, sale_datetime, agent_name, agent_email, customer_phone, customer_company, sale_items(id, display_name, adversus_product_title, quantity, mapped_revenue)")
           .in("client_campaign_id", campaignIds)
           .or(orClauses.join(","))
           .order("sale_datetime", { ascending: false })
