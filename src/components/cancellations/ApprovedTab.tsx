@@ -248,6 +248,11 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
     return sortDir === "asc" ? <ArrowUp className="ml-1 h-3 w-3 inline" /> : <ArrowDown className="ml-1 h-3 w-3 inline" />;
   };
 
+  const approvedFilteredIds = useMemo(
+    () => filtered.filter(i => i.status === "approved").map(i => i.id),
+    [filtered]
+  );
+
   if (!clientId) return <p className="text-muted-foreground">Vælg en kunde for at se godkendte/afviste sager.</p>;
 
   return (
