@@ -637,8 +637,12 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   }, [flatItems, isEesyTm]);
 
   const duplicateCount = useMemo(() => {
-    return flatItems.filter(i => !i.isPhoneExcluded && duplicatePhones.has((i.phone || "").trim())).length;
-  }, [flatItems, duplicatePhones]);
+    return flatItems.filter(i => {
+      if (i.isPhoneExcluded) return false;
+      const key = isEesyTm ? (i.sale_id || "").trim() : (i.phone || "").trim();
+      return duplicateKeys.has(key);
+    }).length;
+  }, [flatItems, duplicateKeys, isEesyTm]);
 
   const approveMutation = useMutation({
     mutationFn: async ({ queueItemIds, saleIds, uploadType, overrideProductName }: { queueItemIds: string[]; saleIds: string[]; uploadType: string; overrideProductName?: string }) => {
@@ -905,7 +909,10 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   const filteredOppGroups = onlyDifferences ? oppGroups.filter((g) => g.hasDifferences) : oppGroups;
   let filteredFlatItems = onlyDifferences ? flatItems.filter((i) => i.hasDifferences) : flatItems;
   if (onlyDuplicates) {
-    filteredFlatItems = filteredFlatItems.filter(i => duplicatePhones.has((i.phone || "").trim()));
+    filteredFlatItems = filteredFlatItems.filter(i => {
+      const key = isEesyTm ? (i.sale_id || "").trim() : (i.phone || "").trim();
+      return duplicateKeys.has(key);
+    });
   }
 
   const resolveUploadType = (t: string | null | undefined) => t === "both" ? "cancellation" : t;
@@ -1296,9 +1303,12 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                             <Badge variant={item.upload_type === "cancellation" ? "destructive" : item.upload_type === "correct_match" ? "default" : "secondary"}>
                               {item.upload_type === "cancellation" ? "Annullering" : item.upload_type === "correct_match" ? "Korrekt match" : "Kurv diff."}
                             </Badge>
-                            {!item.isPhoneExcluded && duplicatePhones.has((item.phone || "").trim()) && (item.phone || "").trim() && (
-                              <Badge className="bg-orange-500/15 text-orange-700 border-orange-300">Dublet</Badge>
-                            )}
+                            {(() => {
+                              const dupeKey = isEesyTm ? (item.sale_id || "").trim() : (item.phone || "").trim();
+                              return !item.isPhoneExcluded && duplicateKeys.has(dupeKey) && dupeKey && (
+                                <Badge className="bg-orange-500/15 text-orange-700 border-orange-300">Dublet</Badge>
+                              );
+                            })()}
                           </div>
                         </TableCell>
                         <TableCell className="text-xs min-w-[280px] align-top">
