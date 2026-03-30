@@ -239,12 +239,13 @@ export function useSellerSalariesCached(
           .select(`
             id,
             upload_type,
+            target_product_name,
             deduction_date,
             reviewed_at,
             sale_id,
             sales!inner(
               agent_email,
-              sale_items(mapped_commission)
+              sale_items(mapped_commission, product_id)
             )
           `)
           .eq("status", "approved")
