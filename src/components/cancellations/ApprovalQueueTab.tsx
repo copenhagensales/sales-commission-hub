@@ -633,7 +633,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
     for (const item of flatItems) {
       if (item.isPhoneExcluded) continue;
       const key = isEesyTm
-        ? `${(item.sale_id || "").trim()}|${(item.target_product_name || "").trim()}`
+        ? `${(item.sale_id || "").trim()}|${(item.target_product_name || "").trim()}|${(item.phone || "").trim()}`
         : (item.phone || "").trim();
       if (key) counts.set(key, (counts.get(key) || 0) + 1);
     }
@@ -647,7 +647,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   const duplicateCount = useMemo(() => {
     return flatItems.filter(i => {
       if (i.isPhoneExcluded) return false;
-      const key = isEesyTm ? `${(i.sale_id || "").trim()}|${(i.target_product_name || "").trim()}` : (i.phone || "").trim();
+      const key = isEesyTm ? `${(i.sale_id || "").trim()}|${(i.target_product_name || "").trim()}|${(i.phone || "").trim()}` : (i.phone || "").trim();
       return duplicateKeys.has(key);
     }).length;
   }, [flatItems, duplicateKeys, isEesyTm]);
