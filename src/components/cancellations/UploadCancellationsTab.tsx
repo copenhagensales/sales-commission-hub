@@ -2000,8 +2000,18 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       return { mergedMatchedSales: matchedSales, mergedAwayEntries: [] as MatchedSale[], matchedPhones: phones };
     }
 
+    const mergePhoneExcluded: string[] = (activePreviewConfig as any)?.phone_excluded_products || [];
     const phoneGroups = new Map<string, MatchedSale[]>();
     matchedSales.forEach(sale => {
+      // For phone_excluded products (e.g. 5G Internet), use saleId as key to prevent merging with other rows
+      const targetLower = (sale.targetProductName || "").toLowerCase().trim();
+      const isPhoneExcludedSale = mergePhoneExcluded.some(p => targetLower.includes(p.toLowerCase().trim()) || p.toLowerCase().trim().includes(targetLower));
+      if (isPhoneExcludedSale) {
+        const key = `__excluded_${sale.saleId}_${Date.now()}_${Math.random()}`;
+        phoneGroups.set(key, [sale]);
+        return;
+      }
+
       const phone = sale.phone ? normalizePhone(sale.phone) : null;
       const uploadedPhone = phoneColumn !== "__none__"
         ? String(getCaseInsensitive(sale.uploadedRowData, phoneColumn) ?? "").trim()
