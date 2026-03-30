@@ -1592,9 +1592,13 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                 const saleAgentEmail = (sale.agent_email || "").toLowerCase();
                 if (saleAgentEmail !== agentEmail) continue;
                 const items = saleItemsMap.get(sale.id) || [];
-                const hasProduct = items.some(item =>
-                  item.adversus_product_title?.toLowerCase() === resolvedProductTitle!.toLowerCase()
-                );
+                const hasProduct = items.some(item => {
+                  const title = item.adversus_product_title?.toLowerCase() || "";
+                  if (resolvedProductTitle!.toLowerCase() === "5g internet") {
+                    return isEesyTm5gSaleItem(title);
+                  }
+                  return title === resolvedProductTitle!.toLowerCase();
+                });
                 if (!hasProduct) continue;
                 candidates.push(sale);
               }
