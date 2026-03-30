@@ -103,7 +103,7 @@ export function ExportSalaryDialog({ currentPeriodStart }: ExportSalaryDialogPro
     }
     setExporting(true);
     try {
-      const wb = new Workbook();
+      const wb = new ExcelJS.Workbook();
       const ws = wb.addWorksheet("Sælgerlønninger");
 
       const cols = ALL_COLUMNS.filter(c => selectedCols.has(c.key));
