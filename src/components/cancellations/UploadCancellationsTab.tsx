@@ -45,6 +45,21 @@ import {
 } from "@/components/ui/alert-dialog";
 import { CancellationHistoryTable } from "./CancellationHistoryTable";
 import { useAuth } from "@/hooks/useAuth";
+// ── Eesy TM 5G Internet helpers (scoped) ──
+const EESY_TM_5G_EXCEL_PATTERNS = ["5g internet"];
+const EESY_TM_5G_SALE_PATTERNS = ["5gi"];
+
+function isEesyTm5gExcelProduct(value: string): boolean {
+  const lower = value.toLowerCase().trim();
+  return EESY_TM_5G_EXCEL_PATTERNS.some(p => lower.includes(p));
+}
+
+function isEesyTm5gSaleItem(title: string): boolean {
+  const lower = title.toLowerCase().trim();
+  return EESY_TM_5G_SALE_PATTERNS.some(p =>
+    lower === p || lower.startsWith(p + " ") || lower.startsWith(p + " -")
+  );
+}
 
 interface ParsedRow {
   phone?: string;
@@ -1466,7 +1481,9 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               const isExcluded2 = phoneExcludedProducts.some(
                 p => rowProduct2.toLowerCase().includes(p.toLowerCase()) || p.toLowerCase().includes(rowProduct2.toLowerCase())
               );
-              if (!isExcluded2) return;
+              const isEesyTm5g = selectedClientId === CLIENT_IDS["Eesy TM"]
+                && isEesyTm5gExcelProduct(rowProduct2);
+              if (!isExcluded2 && !isEesyTm5g) return;
             }
 
             const excelSeller = String(getCaseInsensitive(row.originalRow, sellerCol) || "").trim();
@@ -1521,6 +1538,13 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               }
             }
 
+            // Eesy TM 5G fallback: if no product resolved but Excel has "5G Internet..."
+            if (!resolvedProductTitle && selectedClientId === CLIENT_IDS["Eesy TM"]) {
+              if (excelSubName && isEesyTm5gExcelProduct(excelSubName)) {
+                resolvedProductTitle = "5G Internet";
+              }
+            }
+
             if (!resolvedProductTitle || !excelSeller || !excelDate) return;
 
             let employeeId = sellerToEmployeeId.get(excelSeller.toLowerCase());
@@ -1559,17 +1583,24 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             const isPhoneExcludedRow = exclusionBasis
               ? phoneExcludedProducts.some((p) => exclusionBasis.includes(p.toLowerCase().trim()) || p.toLowerCase().trim().includes(exclusionBasis))
               : false;
+            // Eesy TM 5G: treat as phone-excluded row for product-aware matching
+            const isEesyTm5gRow = selectedClientId === CLIENT_IDS["Eesy TM"]
+              && resolvedProductTitle?.toLowerCase() === "5g internet";
 
-            if (isPhoneExcludedRow) {
+            if (isPhoneExcludedRow || isEesyTm5gRow) {
               const candidates: typeof candidateSales = [];
               for (const sale of candidateSales) {
                 if (existingIds.has(sale.id)) continue;
                 const saleAgentEmail = (sale.agent_email || "").toLowerCase();
                 if (saleAgentEmail !== agentEmail) continue;
                 const items = saleItemsMap.get(sale.id) || [];
-                const hasProduct = items.some(item =>
-                  item.adversus_product_title?.toLowerCase() === resolvedProductTitle!.toLowerCase()
-                );
+                const hasProduct = items.some(item => {
+                  const title = item.adversus_product_title?.toLowerCase() || "";
+                  if (resolvedProductTitle!.toLowerCase() === "5g internet") {
+                    return isEesyTm5gSaleItem(title);
+                  }
+                  return title === resolvedProductTitle!.toLowerCase();
+                });
                 if (!hasProduct) continue;
                 candidates.push(sale);
               }
@@ -1600,9 +1631,13 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                   matchedSaleProductKeys.add(key);
                   matchedIndicesLocal.add(idx);
                   const items = saleItemsMap.get(bestMatch.id) || [];
-                  const matchedItem = items.find(item =>
-                    item.adversus_product_title?.toLowerCase() === resolvedProductTitle!.toLowerCase()
-                  );
+                  const matchedItem = items.find(item => {
+                    const title = item.adversus_product_title?.toLowerCase() || "";
+                    if (resolvedProductTitle!.toLowerCase() === "5g internet") {
+                      return isEesyTm5gSaleItem(title);
+                    }
+                    return title === resolvedProductTitle!.toLowerCase();
+                  });
                   productMatched.push({
                     saleId: bestMatch.id,
                     phone: bestMatch.customer_phone || "",
