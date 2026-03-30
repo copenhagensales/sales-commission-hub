@@ -225,34 +225,78 @@ export function useSellerSalariesCached(
   });
 
   // Query 8: Approved cancellations for the period (deduction_date within period)
+  // Excludes correct_match rows and paginates to avoid 1000-row limit
   const { data: cancellationData, isLoading: cancellationLoading } = useQuery({
     queryKey: ["seller-cancellations", periodStartISO, periodEndISO],
     queryFn: async () => {
       if (!periodStartISO || !periodEndISO) return [];
-      const { data, error } = await (supabase
-        .from("cancellation_queue") as any)
-        .select(`
-          id,
-          deduction_date,
-          reviewed_at,
-          sale_id,
-          sales!inner(
-            agent_email,
-            sale_items(mapped_commission)
-          )
-        `)
-        .eq("status", "approved");
-      
-      if (error) throw error;
+      const PAGE_SIZE = 500;
+      let allData: any[] = [];
+      let from = 0;
+      while (true) {
+        const { data, error } = await (supabase
+          .from("cancellation_queue") as any)
+          .select(`
+            id,
+            upload_type,
+            deduction_date,
+            reviewed_at,
+            sale_id,
+            sales!inner(
+              agent_email,
+              sale_items(mapped_commission)
+            )
+          `)
+          .eq("status", "approved")
+          .in("upload_type", ["cancellation", "basket_difference"])
+          .range(from, from + PAGE_SIZE - 1);
+        
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        allData = allData.concat(data);
+        if (data.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+      }
       
       // Filter by deduction_date (fallback to reviewed_at) within period
-      return (data || []).filter((item: any) => {
+      return allData.filter((item: any) => {
         const effectiveDate = item.deduction_date || (item.reviewed_at ? item.reviewed_at.split('T')[0] : null);
         if (!effectiveDate) return false;
         return effectiveDate >= periodStartISO && effectiveDate <= periodEndISO;
       });
     },
     enabled: !!periodStartISO && !!periodEndISO,
+    staleTime: 60000,
+  });
+
+  // Query 9: Product change log for basket_difference commission differences
+  const basketDiffIds = useMemo(() => {
+    if (!cancellationData) return [];
+    return cancellationData
+      .filter((c: any) => c.upload_type === "basket_difference")
+      .map((c: any) => c.id);
+  }, [cancellationData]);
+
+  const { data: productChangeLogData, isLoading: changeLogLoading } = useQuery({
+    queryKey: ["product-change-log-basket", basketDiffIds],
+    queryFn: async () => {
+      if (basketDiffIds.length === 0) return [];
+      // Fetch in batches if needed (Supabase .in() limit)
+      const BATCH = 100;
+      let allLogs: any[] = [];
+      for (let i = 0; i < basketDiffIds.length; i += BATCH) {
+        const batch = basketDiffIds.slice(i, i + BATCH);
+        const { data, error } = await supabase
+          .from("product_change_log")
+          .select("cancellation_queue_id, old_commission, new_commission")
+          .in("cancellation_queue_id", batch)
+          .is("rolled_back_at", null);
+        if (error) throw error;
+        if (data) allLogs = allLogs.concat(data);
+      }
+      return allLogs;
+    },
+    enabled: basketDiffIds.length > 0,
     staleTime: 60000,
   });
 
@@ -321,6 +365,15 @@ export function useSellerSalariesCached(
       startupBonusMap[sb.employee_id] = (startupBonusMap[sb.employee_id] || 0) + (sb.amount || 0);
     }
 
+    // Build product change log lookup: cancellation_queue_id → commission difference
+    const basketDiffMap: Record<string, number> = {};
+    for (const log of productChangeLogData || []) {
+      const cqId = log.cancellation_queue_id;
+      if (!cqId) continue;
+      const diff = (log.old_commission || 0) - (log.new_commission || 0);
+      basketDiffMap[cqId] = (basketDiffMap[cqId] || 0) + diff;
+    }
+
     // Build cancellation map (agent_email → employee_id → total lost commission)
     const cancellationMap: Record<string, number> = {};
     for (const cq of cancellationData || []) {
@@ -329,10 +382,20 @@ export function useSellerSalariesCached(
       const agentEmail = sale.agent_email.toLowerCase();
       const employeeId = emailToEmployeeId[agentEmail];
       if (!employeeId) continue;
-      const totalCommission = (sale.sale_items || []).reduce(
-        (sum: number, si: any) => sum + (si.mapped_commission || 0), 0
-      );
-      cancellationMap[employeeId] = (cancellationMap[employeeId] || 0) + totalCommission;
+
+      let deduction = 0;
+      if (cq.upload_type === "basket_difference") {
+        // Use commission difference from product_change_log
+        deduction = basketDiffMap[cq.id] || 0;
+      } else {
+        // Full cancellation — deduct entire commission
+        deduction = (sale.sale_items || []).reduce(
+          (sum: number, si: any) => sum + (si.mapped_commission || 0), 0
+        );
+      }
+      if (deduction > 0) {
+        cancellationMap[employeeId] = (cancellationMap[employeeId] || 0) + deduction;
+      }
     }
 
     // Build salary additions map with individual items for display/delete
@@ -398,11 +461,11 @@ export function useSellerSalariesCached(
     sellers.sort((a, b) => b.commission - a.commission);
 
     return { sellerData: sellers, lastUpdated: new Date() };
-  }, [employees, salesAggregates, selectedTeam, salaryTypes, dietData, sickData, dailyBonusData, startupBonusData, cancellationData, salaryAdditionsData]);
+  }, [employees, salesAggregates, selectedTeam, salaryTypes, dietData, sickData, dailyBonusData, startupBonusData, cancellationData, productChangeLogData, salaryAdditionsData]);
 
   return {
     sellerData,
-    isLoading: employeesLoading || commissionLoading || salaryTypesLoading || dietLoading || sickLoading || dailyBonusLoading || startupBonusLoading || cancellationLoading || salaryAdditionsLoading,
+    isLoading: employeesLoading || commissionLoading || salaryTypesLoading || dietLoading || sickLoading || dailyBonusLoading || startupBonusLoading || cancellationLoading || changeLogLoading || salaryAdditionsLoading,
     lastUpdated,
   };
 }
