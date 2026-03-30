@@ -2013,7 +2013,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           import_id: importId!,
           sale_id: sale.saleId,
           upload_type: rowUploadType,
-          status: "pending",
+          status: rowUploadType === "correct_match" ? "approved" : "pending",
           uploaded_data: sale.uploadedRowData || null,
           opp_group: sale.oppNumber || null,
           client_id: selectedClientId || null,

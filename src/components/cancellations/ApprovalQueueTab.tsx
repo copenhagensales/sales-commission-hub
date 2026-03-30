@@ -367,7 +367,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   const [statusFilter, setStatusFilter] = useState<string>("pending");
   const [onlyDifferences, setOnlyDifferences] = useState(false);
   const [onlyDuplicates, setOnlyDuplicates] = useState(false);
-  const [subTab, setSubTab] = useState<"cancellation" | "basket_difference" | "correct_match" | "match_errors">("cancellation");
+  const [subTab, setSubTab] = useState<"cancellation" | "basket_difference" | "match_errors">("cancellation");
   const [searchQuery, setSearchQuery] = useState("");
   const [sellerFilter, setSellerFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
@@ -1652,16 +1652,13 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
           {isLoading ? (
             <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
           ) : (
-            <Tabs value={subTab} onValueChange={(v) => setSubTab(v as "cancellation" | "basket_difference" | "correct_match" | "match_errors")}>
+            <Tabs value={subTab} onValueChange={(v) => setSubTab(v as "cancellation" | "basket_difference" | "match_errors")}>
               <TabsList>
                 <TabsTrigger value="cancellation">
                   Annulleringer {cancellationCount > 0 && `(${cancellationCount})`}
                 </TabsTrigger>
                 <TabsTrigger value="basket_difference">
                   Kurv-rettelser {basketCount > 0 && `(${basketCount})`}
-                </TabsTrigger>
-                <TabsTrigger value="correct_match">
-                  Korrekte match {correctMatchCount > 0 && `(${correctMatchCount})`}
                 </TabsTrigger>
                 <TabsTrigger value="match_errors">
                   Fejl i match {matchErrorsCount > 0 && `(${matchErrorsCount})`}
@@ -1722,9 +1719,6 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                 )}
               </TabsContent>
 
-              <TabsContent value="correct_match" className="mt-4">
-                {renderTable()}
-              </TabsContent>
 
               <TabsContent value="match_errors" className="mt-4">
                 <MatchErrorsSubTab clientId={clientId} />
