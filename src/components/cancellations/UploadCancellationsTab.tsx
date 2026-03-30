@@ -869,10 +869,33 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       // === Excel-internal dedup: group by normalized phone, keep first as representative ===
       // Only applies to Eesy TM and Eesy FM clients
       const isEesyClient = selectedClientId === CLIENT_IDS["Eesy TM"] || selectedClientId === CLIENT_IDS["Eesy FM"];
+      const localPhoneExcluded: string[] = (activeConfig as any)?.phone_excluded_products || [];
       const excelDupIndices = new Set<number>();
       if (isEesyClient && phoneColumn !== "__none__") {
         const phoneGroupMap = new Map<string, number[]>();
+        const prodCols = activeConfig?.product_columns || [];
+        const PRODUCT_KEYS_DEDUP = ["Subscription Name", "Product", "Produkt", "Abonnement", "Product Name", "Produktnavn"];
         cleanedData.forEach((row, idx) => {
+          // Skip phone_excluded products (e.g. 5G Internet) from dedup — each must be treated individually
+          if (localPhoneExcluded.length > 0) {
+            let rawProd = "";
+            for (const col of prodCols) {
+              const v = getCaseInsensitive(row.originalRow, col);
+              if (v && String(v).trim()) { rawProd = String(v).trim(); break; }
+            }
+            if (!rawProd) {
+              for (const key of PRODUCT_KEYS_DEDUP) {
+                const v = getCaseInsensitive(row.originalRow, key);
+                if (v && String(v).trim()) { rawProd = String(v).trim(); break; }
+              }
+            }
+            if (rawProd) {
+              const rawProdLower = rawProd.toLowerCase();
+              const isExcluded = localPhoneExcluded.some(p => rawProdLower.includes(p.toLowerCase().trim()) || p.toLowerCase().trim().includes(rawProdLower));
+              if (isExcluded) return; // Don't add to phone groups — skip dedup for this row
+            }
+          }
+
           const rawPhone = String(getCaseInsensitive(row.originalRow, phoneColumn) ?? "").trim();
           const nPhone = rawPhone ? normalizePhone(rawPhone) : null;
           if (nPhone) {
