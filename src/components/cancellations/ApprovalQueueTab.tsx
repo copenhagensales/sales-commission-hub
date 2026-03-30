@@ -918,7 +918,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   let filteredFlatItems = onlyDifferences ? flatItems.filter((i) => i.hasDifferences) : flatItems;
   if (onlyDuplicates) {
     filteredFlatItems = filteredFlatItems.filter(i => {
-      const key = isEesyTm ? (i.sale_id || "").trim() : (i.phone || "").trim();
+      const key = isEesyTm ? `${(i.sale_id || "").trim()}|${(i.target_product_name || "").trim()}` : (i.phone || "").trim();
       return duplicateKeys.has(key);
     });
   }
