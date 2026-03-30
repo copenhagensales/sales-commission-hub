@@ -668,6 +668,19 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
     },
   });
 
+  if (isLoading) {
+    return <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
+  }
+
+  if (rows.length === 0) {
+    return (
+      <div className="py-8 text-center text-muted-foreground">
+        <AlertTriangle className="h-6 w-6 mx-auto mb-2 opacity-50" />
+        Ingen fejl i match fundet.
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
