@@ -1,35 +1,25 @@
 
 
-## Fix Eesy TM match-fejl: Tillad Pass 2 fallback + automatisk re-match
+## Plan: Vis også inaktive medarbejdere i sælger-dropdowns på annulleringssiden
 
-### Problem
-36 rækker sidder fast i "Fejl i match" fordi Pass 2 (sælger+dato) blokerer rækker med telefonnummer. Brugeren vil have dem re-matchet **uden ny upload**.
+### Baggrund
+Annulleringer kan vedrøre salg fra medarbejdere, der siden er blevet deaktiveret. Lige nu viser begge sælger-dropdowns (i UploadCancellationsTab og MatchErrorsSubTab) kun aktive medarbejdere, hvilket gør det umuligt at tildele annulleringer til tidligere ansatte.
 
-### Løsning (2 dele)
+### Ændringer
 
-**A) Fjern Pass 2 guard — kun for Eesy TM**
-- **Fil:** `src/components/cancellations/UploadCancellationsTab.tsx`
-- Linje ~1486: Ændr `return`-guarden så den kun gælder for klienter der **ikke** er Eesy TM.
-- Rækker med telefonnummer for Eesy TM fortsætter nu til sælger+dato matching som fallback.
+**1. `src/components/cancellations/UploadCancellationsTab.tsx`**
+- Fjern `.eq("is_active", true)` filteret i `allEmployees`-queryen (linje 637), så både aktive og inaktive medarbejdere hentes.
+- Tilføj `is_active` til select-felterne.
+- Sortér listen så aktive vises først, derefter inaktive.
+- Vis inaktive medarbejdere med en visuel markering i dropdown (f.eks. grå tekst + "(inaktiv)"-suffix).
 
-```typescript
-// Før:
-if (!isExcluded2 && !isEesyTm5g) return;
+**2. `src/components/cancellations/MatchErrorsSubTab.tsx`**
+- Samme ændring: fjern `.eq("is_active", true)` (linje 121), tilføj `is_active` til select.
+- Sortér aktive først, inaktive sidst.
+- Vis "(inaktiv)"-markering i dropdown-valgene.
 
-// Efter:
-const isEesyTm = selectedClientId === CLIENT_IDS["Eesy TM"];
-if (!isExcluded2 && !isEesyTm5g && !isEesyTm) return;
-```
-
-**B) "Re-match alle" knap i MatchErrorsSubTab — kun for Eesy TM**
-- **Fil:** `src/components/cancellations/MatchErrorsSubTab.tsx`
-- Tilføj en "Re-match alle" knap der kun vises for Eesy TM.
-- Logikken itererer over alle match-fejl rækker og kører den eksisterende re-match logik (sælger+dato søgning mod `sales` tabellen).
-- For hver matchet række: indsæt i `cancellation_queue` og fjern fra `unmatched_rows`.
-- Toast med resultat: "X af Y rækker matchet".
-
-### Scope
-- 2 filer ændres
-- Ingen databaseændringer
-- Ingen ny upload nødvendig
+### Tekniske detaljer
+- Begge steder ændres queryen fra `.eq("is_active", true)` til at hente alle medarbejdere med `is_active` inkluderet i select.
+- Dropdown-items renderes med betinget styling: `className="text-muted-foreground"` og suffix `(inaktiv)` for `is_active === false`.
+- Sortering: `.order("is_active", { ascending: false }).order("first_name")` sikrer aktive først.
 
