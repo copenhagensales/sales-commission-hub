@@ -22,7 +22,7 @@ import { da } from "date-fns/locale";
 import { toast } from "sonner";
 import { useSellerSalariesCached } from "@/hooks/useSellerSalariesCached";
 import { getPayrollPeriod } from "@/lib/calculations";
-import Workbook from "exceljs/dist/exceljs.min.js";
+import ExcelJS from "exceljs";
 
 const ALL_COLUMNS = [
   { key: "name", label: "Navn", default: true },
@@ -103,7 +103,7 @@ export function ExportSalaryDialog({ currentPeriodStart }: ExportSalaryDialogPro
     }
     setExporting(true);
     try {
-      const wb = new Workbook();
+      const wb = new ExcelJS.Workbook();
       const ws = wb.addWorksheet("Sælgerlønninger");
 
       const cols = ALL_COLUMNS.filter(c => selectedCols.has(c.key));
