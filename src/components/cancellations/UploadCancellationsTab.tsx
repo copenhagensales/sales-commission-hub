@@ -1003,6 +1003,36 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           if (data.length < pageSize) break;
           from += pageSize;
         }
+        // Fallback: for Eesy TM, also fetch sales with NULL campaign (unmapped enreach sales)
+        if (selectedClientId === CLIENT_IDS["Eesy TM"]) {
+          let from2 = 0;
+          while (true) {
+            const { data: nullData, error: nullError } = await supabase
+              .from("sales")
+              .select(`
+                id,
+                sale_datetime,
+                customer_phone,
+                customer_company,
+                validation_status,
+                agent_name,
+                agent_email,
+                raw_payload,
+                normalized_data
+              `)
+              .is("client_campaign_id", null)
+              .eq("source", "Eesy")
+              .eq("integration_type", "enreach")
+              .neq("validation_status", "cancelled")
+              .order("sale_datetime", { ascending: false })
+              .range(from2, from2 + pageSize - 1);
+            if (nullError) throw nullError;
+            if (!nullData || nullData.length === 0) break;
+            candidates.push(...nullData);
+            if (nullData.length < pageSize) break;
+            from2 += pageSize;
+          }
+        }
         return candidates;
       };
 
