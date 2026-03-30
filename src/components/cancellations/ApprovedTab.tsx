@@ -43,7 +43,7 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
         .from("cancellation_queue")
         .select(`
           id, status, upload_type, reviewed_at, reviewed_by, created_at, opp_group, deduction_date, uploaded_data,
-          sale:sales!cancellation_queue_sale_id_fkey(id, sale_datetime, agent_name, agent_email, raw_payload),
+          sale:sales!cancellation_queue_sale_id_fkey(id, sale_datetime, agent_name, agent_email, raw_payload, sale_items(product:products(name))),
           reviewer:employee_master_data!cancellation_queue_reviewed_by_fkey(first_name, last_name)
         `)
         .in("status", ["approved", "rejected"]);
@@ -79,7 +79,7 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
           reviewerName: item.reviewer
             ? `${item.reviewer.first_name || ""} ${item.reviewer.last_name || ""}`.trim()
             : "",
-          product: ud?.["A-kasse"] || "",
+          product: (item.sale?.sale_items || []).map((si: any) => si.product?.name).filter(Boolean).join(", ") || "",
           memberNumber: ud?.["Medlemsnummer"] != null ? String(ud["Medlemsnummer"]) : "",
           provision: typeof provValue === "number" ? provValue : null,
         };
