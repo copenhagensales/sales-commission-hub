@@ -46,13 +46,34 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
           sale:sales!cancellation_queue_sale_id_fkey(id, sale_datetime, agent_name, agent_email, raw_payload, sale_items(product:products(name))),
           reviewer:employee_master_data!cancellation_queue_reviewed_by_fkey(first_name, last_name)
         `)
-        .in("status", ["approved", "rejected"]);
+        .in("status", ["approved", "rejected"])
+        .in("upload_type", ["cancellation", "basket_difference"]);
 
       if (clientId) {
         query = query.eq("client_id", clientId);
       }
 
-      const { data, error } = await query.order("reviewed_at", { ascending: false });
+      // Paginate to avoid 1000-row limit
+      const allData: any[] = [];
+      let offset = 0;
+      const pageSize = 500;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data, error } = await query
+          .order("reviewed_at", { ascending: false })
+          .range(offset, offset + pageSize - 1);
+        if (error) throw error;
+        if (data && data.length > 0) {
+          allData.push(...data);
+          offset += data.length;
+          hasMore = data.length === pageSize;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      const data = allData;
       if (error) throw error;
       return (data || []).map((item: any) => {
         const deductionSource = item.deduction_date
