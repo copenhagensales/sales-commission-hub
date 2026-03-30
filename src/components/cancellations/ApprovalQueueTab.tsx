@@ -647,7 +647,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   const duplicateCount = useMemo(() => {
     return flatItems.filter(i => {
       if (i.isPhoneExcluded) return false;
-      const key = isEesyTm ? `${(i.sale_id || "").trim()}|${(i.target_product_name || "").trim()}` : (i.phone || "").trim();
+      const key = isEesyTm ? `${(i.sale_id || "").trim()}|${(i.target_product_name || "").trim()}|${(i.phone || "").trim()}` : (i.phone || "").trim();
       return duplicateKeys.has(key);
     }).length;
   }, [flatItems, duplicateKeys, isEesyTm]);
