@@ -195,7 +195,7 @@ export function LocateSaleDialog({
           s.agent_email,
           s.customer_phone,
           s.customer_company,
-          s.sale_items?.map(i => i.display_name).join(" "),
+          s.sale_items?.map(i => i.adversus_product_title || i.display_name).join(" "),
         ].filter(Boolean).join(" ").toLowerCase();
         return searchable.includes(q);
       });
