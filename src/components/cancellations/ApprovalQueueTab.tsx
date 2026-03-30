@@ -764,11 +764,14 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
       const wholeSaleItems = resolvedQueueItems.filter((qi: any) => !qi.target_product_name);
 
       // Handle basket_difference with product override: update sale_item product instead of cancelling
-      if (uploadType === "basket_difference" && overrideProductName) {
+      if (uploadType === "basket_difference" && (overrideProductId || overrideProductName)) {
         const overrideSaleIds = [...new Set(resolvedQueueItems.map((qi: any) => qi.sale_id))];
+        const productQuery = overrideProductId
+          ? supabase.from("products").select("id, name, commission_dkk, revenue_dkk").eq("id", overrideProductId).single()
+          : supabase.from("products").select("id, name, commission_dkk, revenue_dkk").eq("name", overrideProductName!).maybeSingle();
         const [overrideSaleItems, overrideProduct] = await Promise.all([
           fetchByIds<any>("sale_items", "sale_id", overrideSaleIds, "id, sale_id, product_id, adversus_product_title, mapped_commission, mapped_revenue"),
-          supabase.from("products").select("id, name, commission_dkk, revenue_dkk").eq("name", overrideProductName).maybeSingle(),
+          productQuery,
         ]);
         
       if (overrideProduct.data) {
