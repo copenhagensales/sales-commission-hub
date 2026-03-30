@@ -1,82 +1,34 @@
 
 
-## Fix: Udvid Eesy TM-matching til alle Abo-felter (ikke kun Abo1-3)
+## Fix: Dedup-nøgle skal inkludere telefonnummer for Eesy TM
 
-### Problem fundet
-Eesy TM's `product_phone_mappings` dækker kun `Telefon Abo1`, `Abo2`, `Abo3`. Men databasen viser:
-- **142 salg** med `Telefon Abo4`
-- **60 salg** med `Telefon Abo5`  
-- **10 salg** med `Abo6`, **4** med `Abo7`, **1** med `Abo8`
+### Problem
+Salg `42fb3086...` (Kjærgaard) har 4 abonnementer. Abo1 (`23614960`) og Abo2 (`23616630`) har **samme** produktnavn: "Fri tale + 70 GB data (5G) (6 mdr. binding)".
 
-Salg med op til 8 abonnementer har også 5+ `sale_items`. Når en Excel-annulleringsrække indeholder et telefonnummer der kun findes i Abo4-8, kan hverken Pass 1 (tjekker kun Abo1-3) eller Pass 1b (tjekker `customer_phone`) finde det.
+Dedup-nøglen er `sale_id|produktnavn`. Når Abo1 matcher først, blokeres Abo2 — selvom det er et **andet SIM-kort/telefonnummer** og dermed en separat annullering.
 
 ### Løsning
-For **Eesy TM** udvides Pass 1 til dynamisk at scanne ALLE `Telefon Abo*`-felter i `raw_payload.data`, i stedet for kun at bruge de 3 konfigurerede mappings.
+Udvid dedup-nøglen for Eesy TM til at inkludere **telefonnummeret**, så to forskellige telefonnumre med samme produkt begge kan annulleres:
 
-### Teknisk ændring
-
-**Fil: `src/components/cancellations/UploadCancellationsTab.tsx`** — Pass 1 matchingloop (~linje 1146-1193)
-
-Tilføj dynamisk Abo-scanning for Eesy TM inden i sale-loopet:
+**Fil: `src/components/cancellations/UploadCancellationsTab.tsx`** — linje 1171-1172
 
 ```typescript
-// Inside the sale loop, for Eesy TM: dynamically find ALL Telefon Abo fields
-if (selectedClientId === CLIENT_IDS["Eesy TM"]) {
-  const payloadData = (sale.raw_payload as any)?.data || {};
-  
-  // Collect all "Telefon AboN" fields dynamically
-  const aboEntries: { field: string; index: number }[] = [];
-  for (const key of Object.keys(payloadData)) {
-    const match = key.match(/^Telefon Abo(\d+)$/);
-    if (match) {
-      aboEntries.push({ field: key, index: parseInt(match[1], 10) });
-    }
-  }
-  
-  for (const abo of aboEntries) {
-    const payloadPhoneRaw = payloadData[abo.field];
-    if (!payloadPhoneRaw) continue;
-    const payloadPhone = normalizePhone(String(payloadPhoneRaw));
-    if (!payloadPhone || payloadPhone !== excelPhone) continue;
-    
-    // Resolve matching sale_item by position (0-indexed)
-    const allItems = saleItemsMap.get(sale.id) || [];
-    const posIndex = abo.index - 1;
-    const matchingItem = posIndex >= 0 && posIndex < allItems.length 
-      ? allItems[posIndex] : allItems[0];
-    
-    // Dedup by resolved product name
-    const resolvedName = matchingItem?.adversus_product_title || `Abonnement${abo.index}`;
-    const key = `${sale.id}|${resolvedName}`;
-    if (matchedSaleProductKeys.has(key)) continue;
-    matchedSaleProductKeys.add(key);
-    matchedIndicesLocal.add(idx);
-    
-    productMatched.push({
-      saleId: sale.id,
-      phone: String(payloadPhoneRaw),
-      company: sale.customer_company || "",
-      oppNumber: "",
-      saleDate: sale.sale_datetime || "",
-      employee: sale.agent_name || "Ukendt",
-      currentStatus: sale.validation_status || "pending",
-      uploadedRowData: row.originalRow,
-      targetProductName: matchingItem?.adversus_product_title || `Abonnement${abo.index}`,
-      realProductName: matchingItem?.adversus_product_title || allItems[0]?.adversus_product_title || "Ukendt produkt",
-      commission: matchingItem?.mapped_commission ?? undefined,
-      revenue: matchingItem?.mapped_revenue ?? undefined,
-    });
-    break; // One match per Excel row
-  }
-  if (matchedIndicesLocal.has(idx)) break; // Move to next Excel row
-}
+// Nuværende:
+const resolvedName = matchingItem?.adversus_product_title || `Abonnement${abo.index}`;
+const dedupKey = `${sale.id}|${resolvedName}`;
+
+// Nyt:
+const resolvedName = matchingItem?.adversus_product_title || `Abonnement${abo.index}`;
+const dedupKey = `${sale.id}|${resolvedName}|${excelPhone}`;
 ```
 
-Denne erstatning **erstatter** den eksisterende mapping-baserede loop for Eesy TM. De konfigurerede mappings (Abo1-3) bruges fortsat for andre klienter.
+Ved at tilføje `excelPhone` til nøglen sikres:
+- Abo1 (23614960) + "70 GB" → nøgle: `sale_id|70 GB...|23614960` ✓
+- Abo2 (23616630) + "70 GB" → nøgle: `sale_id|70 GB...|23616630` ✓ (ny unik nøgle)
+- Samme telefonnummer der matcher to gange → stadig blokeret (korrekt dedup)
 
 ### Konsekvens
-- Abo4-8 matcher nu korrekt → op til **217 flere salg** kan matches
-- Abo1-3 fungerer uændret (samme logik, dynamisk fundet)
-- Andre klienter: Uberørte (bruger stadig konfigurerede mappings)
-- Dedup-logik bevares (sale_id + resolved product name)
+- To **forskellige** telefonnumre med **samme** produkt → begge matches (korrekt)
+- Samme telefonnummer der matcher flere gange → stadig dedupet (korrekt)
+- Andre klienter: Uberørte (ændringen er kun i Eesy TM-blokken)
 
