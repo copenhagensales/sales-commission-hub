@@ -1583,6 +1583,9 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             const isPhoneExcludedRow = exclusionBasis
               ? phoneExcludedProducts.some((p) => exclusionBasis.includes(p.toLowerCase().trim()) || p.toLowerCase().trim().includes(exclusionBasis))
               : false;
+            // Eesy TM 5G: treat as phone-excluded row for product-aware matching
+            const isEesyTm5gRow = selectedClientId === CLIENT_IDS["Eesy TM"]
+              && resolvedProductTitle?.toLowerCase() === "5g internet";
 
             if (isPhoneExcludedRow) {
               const candidates: typeof candidateSales = [];
