@@ -1,35 +1,19 @@
 
 
-## Excel-intern dedup af dublet-rækker (før database-matching)
+## Vis medlemsnummer i straksbetaling-tabellen
 
-### Problem
-Når Excel-arket indeholder flere rækker med samme telefonnummer (f.eks. to 5G Internet-rækker for `51759867`), og disse rækker aldrig matches mod databasen (fordi de er `phone_excluded`), ender de alle i "Fejl i match". Den eksisterende dedup-logik (`mergedMatchedSales`) virker kun på rækker der **allerede er matchet** — den fanger aldrig rækker der blev sprunget over.
+### Ændringer i `src/pages/ImmediatePaymentASE.tsx`
 
-### Løsning
-Tilføj et Excel-internt dedup-step **umiddelbart efter `cleanedData`** (linje ~864), **før** Pass 1a/1b/2 kører. Rækker med samme normaliserede telefonnummer merges, så kun én repræsentant sendes videre. De øvrige markeres som "Excel-dubletter" og inkluderes i `coveredRowIndices`.
+**1. Udvid query til at hente medlemsnummer (linje 198-213)**
+- Tilføj `normalized_data, raw_payload` til select-query på `sales`-tabellen
 
-### Hvad ændres IKKE
-- Pass 1a, 1b, 2 matching-logik
-- `phone_excluded_products` håndtering (`if (isExcluded) return;`)
-- Merge-logik for matchede salg (`mergedMatchedSales`)
-- Rollback, godkendelseskø, LocateSaleDialog
-- Klassificering (cancellation/correct_match/basket_difference)
+**2. Udvid `ImmediatePaymentSale` interface (linje 30-39)**
+- Tilføj `member_number: string | null`
 
-### Ændringer — kun `UploadCancellationsTab.tsx`
+**3. Udlæs medlemsnummer ved mapping (linje 248-257)**
+- Hent fra `normalized_data.member_number` med fallback til `raw_payload.data.Medlemsnummer`
 
-**1. Nyt pre-processing step i `handleMatch` (efter linje 864)**
-- Gruppér `cleanedData` rækker efter normaliseret telefonnummer
-- For grupper med >1 række: behold første som repræsentant, gem resten i et `excelDuplicateIndices: Set<number>` (state)
-- Kun repræsentant-rækker bruges videre i `cleanedData` til matching
-
-**2. Udvid `coveredRowIndices` (linje ~1970)**
-- Tilføj `excelDuplicateIndices` til `covered`-settet, så dublet-rækkerne ikke vises som umatched og heller ikke ender i annulleringer/kurvrettelser-fanerne
-
-**3. Vis Excel-dubletter i preview**
-- Tilføj en info-sektion i preview der viser antal Excel-interne dubletter der er fjernet
-
-### Resultat
-- Dublet-rækker i Excel fjernes automatisk før matching og vises ikke i "Fejl i match", "Annulleringer" eller "Kurvrettelser"
-- Kun én repræsentant per telefonnummer sendes til database-matching
-- Alle eksisterende matching-regler forbliver 100% uændrede
+**4. Erstat "Kunde"-kolonnen med "Medlemsnr." (linje 315 + 329-331)**
+- Kolonne-header: "Medlemsnr." i stedet for "Kunde"
+- Vis `sale.member_number || "-"` i stedet for `customer_company || customer_phone || "Ukendt"`
 
