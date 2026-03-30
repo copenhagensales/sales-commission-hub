@@ -699,11 +699,16 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
             </Button>
           </div>
           <div className="space-y-1">
-            {[...localManualMatches.entries()].map(([rk, { saleId, row: matchedRow }]) => (
+            {[...localManualMatches.entries()].map(([rk, { saleId, row: matchedRow, saleItemTitle }]) => (
               <div key={rk} className="flex items-center gap-2 text-xs">
                 <Badge variant="outline" className="bg-green-500/10 border-green-500/30 text-green-700 dark:text-green-400">
                   Salg: {saleId.slice(0, 8)}…
                 </Badge>
+                {saleItemTitle && (
+                  <Badge variant="secondary" className="text-xs">
+                    {saleItemTitle}
+                  </Badge>
+                )}
                 <span className="text-muted-foreground truncate max-w-[300px]">
                   {Object.entries(matchedRow.rowData)
                     .filter(([k]) => k !== "_product_rows")
