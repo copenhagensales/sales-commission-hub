@@ -1,38 +1,32 @@
 
 
-## Fix Dublet-logik for Eesy TM — brug abo-telefonnumre i stedet for customer_phone
+## Fix: Dublet-detektion i Godkendelseskøen for Eesy TM
 
 ### Problem
-DuplicatesTab grupperer salg efter `customer_phone`. For Eesy TM har ét salg op til 3 telefonnumre i `raw_payload.data` (Telefon Abo1, Telefon Abo2, Telefon Abo3), men kun ét gemmes i `customer_phone`. Det betyder, at flere salg deler samme `customer_phone` og fejlagtigt vises som dubletter — selvom de reelt dækker forskellige abonnementer/telefonnumre.
+Godkendelseskøen (ApprovalQueueTab) markerer items som "Dublet" baseret på `customer_phone`. For Eesy TM kan én kunde have flere abonnementer (Abo1, Abo2, Abo3) med forskellige telefonnumre, men kun ét `customer_phone`. Når kunden annullerer 1 produkt pr. upload-række, ender flere rækker med samme `customer_phone` — og de markeres fejlagtigt som dubletter.
 
 ### Løsning
 
-**Fil: `src/components/cancellations/DuplicatesTab.tsx`**
+**Fil: `src/components/cancellations/ApprovalQueueTab.tsx`** (linje 619-632)
 
-1. **Tilføj Eesy TM-specifik gruppering**: Når klienten er Eesy TM, skal hvert salg "udfoldes" til op til 3 rækker — én pr. abo-telefonnummer (Telefon Abo1, Telefon Abo2, Telefon Abo3). Gruppering sker derefter pr. abo-telefonnummer i stedet for `customer_phone`.
+Ændre dublet-detekteringslogikken:
+- Import `CLIENT_IDS` fra `src/utils/clientIds.ts`
+- Tilføj `isEesyTm` check baseret på `clientId`
+- **For Eesy TM**: Brug `sale_id` som grupperingsnøgle i stedet for `phone`. To items er kun dubletter hvis de har **samme `sale_id`** (dvs. samme salg uploadet flere gange)
+- **For andre klienter**: Bevar nuværende logik (gruppering via `phone`)
 
-2. **Logik**:
-   - Detect `isEesyTm` via `CLIENT_IDS["Eesy TM"]`
-   - For hvert Eesy TM-salg: udtræk `raw_payload.data["Telefon Abo1"]`, `["Telefon Abo2"]`, `["Telefon Abo3"]`
-   - Normaliser hvert telefonnummer og brug det som grupperingsnøgle
-   - Et salg kan optræde i flere grupper (hvis det har flere abo-numre der matcher andre salg)
-   - Kun grupper med 2+ salg vises (som nu)
-
-3. **Eesy FM bevarer nuværende logik** (gruppering via `customer_phone`)
-
-### Tekniske detaljer
+### Teknisk ændring
 
 ```text
-Nuværende flow (alle klienter undtagen TDC):
-  sale.customer_phone → groupMap[phone].push(sale)
+Nuværende logik:
+  phoneCounts[item.phone]++ → dublet hvis count > 1
 
-Nyt flow for Eesy TM:
-  for each aboField in ["Telefon Abo1", "Telefon Abo2", "Telefon Abo3"]:
-    phone = normalize(sale.raw_payload.data[aboField])
-    if phone: groupMap[phone].push(sale)
-
-Eesy FM + andre: uændret (customer_phone)
+Ny logik:
+  if (isEesyTm):
+    saleIdCounts[item.sale_id]++ → dublet hvis count > 1
+  else:
+    phoneCounts[item.phone]++ → dublet hvis count > 1  (uændret)
 ```
 
-Ingen database-ændringer. Kun ændring i `DuplicatesTab.tsx`.
+Kun én fil ændres. Ingen database-ændringer.
 
