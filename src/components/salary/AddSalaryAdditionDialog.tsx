@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -20,6 +20,8 @@ import {
 } from "@/components/ui/select";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
+import { format } from "date-fns";
+import { da } from "date-fns/locale";
 
 const COLUMN_OPTIONS: { value: string; label: string }[] = [
   { value: "commission", label: "Provision" },
@@ -50,6 +52,26 @@ function toLocalDateString(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+/** Generate salary periods (15th to 14th) around a reference date */
+function generatePeriodOptions(referencePeriodStart: Date): { start: Date; end: Date; label: string }[] {
+  const periods: { start: Date; end: Date; label: string }[] = [];
+  
+  // Generate 3 months back and 2 months forward from the reference
+  for (let offset = -3; offset <= 2; offset++) {
+    const refYear = referencePeriodStart.getFullYear();
+    const refMonth = referencePeriodStart.getMonth();
+    
+    const startMonth = refMonth + offset;
+    const start = new Date(refYear, startMonth, 15);
+    const end = new Date(refYear, startMonth + 1, 14);
+    
+    const label = `${format(start, "d. MMM", { locale: da })} - ${format(end, "d. MMM yyyy", { locale: da })}`;
+    periods.push({ start, end, label });
+  }
+  
+  return periods;
+}
+
 export function AddSalaryAdditionDialog({
   employees,
   periodStart,
@@ -61,7 +83,20 @@ export function AddSalaryAdditionDialog({
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [employeeSearch, setEmployeeSearch] = useState("");
+  const [selectedPeriodIdx, setSelectedPeriodIdx] = useState<string>("");
   const queryClient = useQueryClient();
+
+  const periodOptions = useMemo(() => generatePeriodOptions(periodStart), [periodStart]);
+
+  // Find the index of the current period to use as default
+  const currentPeriodIdx = useMemo(() => {
+    const refStr = toLocalDateString(periodStart);
+    const idx = periodOptions.findIndex(p => toLocalDateString(p.start) === refStr);
+    return idx >= 0 ? String(idx) : "0";
+  }, [periodOptions, periodStart]);
+
+  const activePeriodIdx = selectedPeriodIdx || currentPeriodIdx;
+  const activePeriod = periodOptions[parseInt(activePeriodIdx)] || { start: periodStart, end: periodEnd };
 
   const filteredEmployees = employees.filter((e) =>
     e.name.toLowerCase().includes(employeeSearch.toLowerCase())
@@ -73,8 +108,8 @@ export function AddSalaryAdditionDialog({
         employee_id: employeeId,
         column_key: columnKey,
         amount: parseFloat(amount),
-        period_start: toLocalDateString(periodStart),
-        period_end: toLocalDateString(periodEnd),
+        period_start: toLocalDateString(activePeriod.start),
+        period_end: toLocalDateString(activePeriod.end),
         note: note || null,
       });
       if (error) throw error;
@@ -96,6 +131,7 @@ export function AddSalaryAdditionDialog({
     setAmount("");
     setNote("");
     setEmployeeSearch("");
+    setSelectedPeriodIdx("");
   };
 
   const canSubmit =
@@ -148,6 +184,22 @@ export function AddSalaryAdditionDialog({
                 {COLUMN_OPTIONS.map((opt) => (
                   <SelectItem key={opt.value} value={opt.value}>
                     {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Lønperiode</Label>
+            <Select value={activePeriodIdx} onValueChange={setSelectedPeriodIdx}>
+              <SelectTrigger>
+                <SelectValue placeholder="Vælg lønperiode" />
+              </SelectTrigger>
+              <SelectContent>
+                {periodOptions.map((p, idx) => (
+                  <SelectItem key={idx} value={String(idx)}>
+                    {p.label}
                   </SelectItem>
                 ))}
               </SelectContent>
