@@ -203,9 +203,11 @@ export function LocateSaleDialog({
     return result;
   }, [sales, searchQuery, usedSaleIds, dateFilter]);
 
-  const handleSelectSale = (saleId: string) => {
+  const isEesyTm = clientId === CLIENT_IDS["Eesy TM"];
+
+  const handleSelectSale = (saleId: string, saleItemTitle?: string) => {
     if (onMatch) {
-      onMatch(saleId, row);
+      onMatch(saleId, row, saleItemTitle);
       toast({ title: "Salg valgt – afventer bekræftelse" });
       onOpenChange(false);
     }
