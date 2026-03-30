@@ -1,20 +1,27 @@
 
 
-## Fix: Filtrer "Korrekt match" fra Godkendte/Afviste-fanen + tilføj pagination
+## Fix: Kurv-rettelser skal kun trække differencen — ikke hele provisionen
 
 ### Problem
-Fanen viser 1000 rækker fordi den inkluderer 997 `correct_match`-rækker (automatisk godkendte korrekte matches) sammen med de ægte annulleringer (230) og kurv-rettelser (19). Supabase's 1000-rækkers grænse afskærer desuden reelle data.
+Når en kurv-rettelse (basket_difference) godkendes, beregner lønsystemet hele salgets provision som "tabt". Men en kurv-rettelse ændrer kun produktet — den korrekte modregning er **differencen** mellem gammel og ny provision, ikke hele beløbet.
 
-### Ændringer
+Desuden mangler `upload_type`-filteret stadig i queryen, så `correct_match`-rækker medtages fejlagtigt.
 
-**`src/components/cancellations/ApprovedTab.tsx`**
+### Løsning
 
-1. **Filtrer `correct_match` fra queryen** — tilføj `.in("upload_type", ["cancellation", "basket_difference"])` til Supabase-queryen (linje 49), så kun ægte annulleringer og kurv-rettelser vises.
+**`src/hooks/useSellerSalariesCached.ts`**
 
-2. **Tilføj pagination** — brug `fetchAllRows` eller `.range()` med load-more for at undgå 1000-rækkers grænsen, så alle relevante rækker kan ses.
+1. **Tilføj `upload_type` til queryen** — hent `upload_type` og filtrer med `.in("upload_type", ["cancellation", "basket_difference"])` så `correct_match` udelukkes.
+
+2. **Hent `product_change_log` for kurv-rettelser** — ny query der henter `old_commission` og `new_commission` fra `product_change_log` for godkendte basket_difference-rækker (hvor `rolled_back_at IS NULL`).
+
+3. **Beregn korrekt fradrag baseret på type**:
+   - **Annullering** (`upload_type = "cancellation"`): Hele salgets provision fratrækkes (som nu).
+   - **Kurv-rettelse** (`upload_type = "basket_difference"`): Kun differencen `old_commission - new_commission` fratrækkes. Denne data kommer fra `product_change_log`, som allerede gemmer de kampagne-aware priser sat af `rematch-pricing-rules`.
 
 ### Tekniske detaljer
-- Queryen på linje 42-55 mangler et `upload_type`-filter og pagination
-- `correct_match` er auto-godkendte rækker der bekræfter at salget er korrekt — de hører ikke til i denne oversigt
-- Efter filtreringen reduceres Eesy FM fra ~1246 til ~249 rækker (230 annulleringer + 19 kurv-rettelser)
+
+- `product_change_log` indeholder: `old_commission`, `new_commission`, `old_product_name`, `new_product_name`, `cancellation_queue_id` — alt hvad vi behøver.
+- Priserne i loggen er allerede kampagne-korrekte, da de sættes af `rematch-pricing-rules` ved godkendelse.
+- Pagination tilføjes også til cancellation-queryen for at undgå 1000-rækkers grænsen.
 
