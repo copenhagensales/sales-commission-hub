@@ -1,40 +1,29 @@
 
 
-## Fix: Kurv-rettelser dropdown viser forkerte/duplikerede produkter (kun Eesy FM)
+## Bulk-ændring af lønperiode på alle godkendte sager
 
 ### Problem
-"Ret produkt til" dropdownen henter **alle** produkter globalt (ingen kampagne-scope). Den filtrerer kun på `target_product_name` (string), så brugeren ser enten kun ét match eller alle produkter — ofte med duplikater. Godkendelsen slår op med `.eq("name", ...)` som er tvetydigt.
+I dag kan man kun ændre "Trækkes i" (deduction_date) én ad gangen via en kalender-popover på hver række. Brugeren vil gerne kunne ændre lønperioden for **alle** (filtrerede) sager på én gang.
 
-### Root cause (linje 395-406)
-```typescript
-// Henter ALLE produkter uden filter
-const { data } = await supabase.from("products").select("id, name").order("name");
-```
+### Løsning
+Tilføj en "Ændr alle" knap ved siden af header-kolonnen "Trækkes i", der åbner en kalender-popover. Når en dato vælges, opdateres `deduction_date` for alle filtrerede godkendte sager i ét batch-kald.
 
-### Ændringer — `src/components/cancellations/ApprovalQueueTab.tsx`
+### Ændringer — `src/components/cancellations/ApprovedTab.tsx`
 
-**A) Scope produkter til klientens kampagner**
-- Hent kampagne-IDs for `clientId` (allerede tilgængelig i komponenten eller kan tilføjes).
-- Ændr `clientProducts`-query til at filtrere produkter via `campaign_mappings` eller `client_campaigns` → `products` relationen, så kun relevante produkter for den valgte klients kampagner vises.
-- Alternativt: hent produkter via `sale_items` der allerede er knyttet til kampagnens salg.
+**A) Tilføj bulk-mutation**
+- Ny `useMutation` der tager en liste af IDs + en dato og kører batch-update på `cancellation_queue.deduction_date` for alle IDs.
 
-**B) Brug produkt-ID i stedet for navn**
-- Ændr `SelectItem value={p.id}` (UUID) i stedet for `value={p.name}`.
-- `productOverrides` gemmer nu produkt-ID i stedet for produktnavn.
-- Dropdown viser `p.name` som label, men value er `p.id` → ingen duplikat-problemer.
+**B) Tilføj "Ændr alle" knap i header**
+- Ved siden af søg/filter-kontrollerne, tilføj en `Popover` med `Calendar` (same som individuel).
+- Knaptekst: "Ændr lønperiode for alle" med `CalendarIcon`.
+- Kun aktiv når der er filtrerede godkendte sager.
 
-**C) Opdater godkendelses-mutation (linje 746-749)**
-- Ændr fra: `.eq("name", overrideProductName).maybeSingle()`
-- Til: `.eq("id", overrideProductId).single()`
-- Omdøb parameter fra `overrideProductName` til `overrideProductId`.
-
-**D) Dedupliker dropdown på navn (Eesy FM)**
-- Da flere produkter kan have samme navn men forskellige IDs, dedupliker visningen på navn så brugeren ser hvert unikt produktnavn én gang.
-- Behold det første produkt-ID for hvert unikt navn.
+**C) Batch-update logik**
+- Ved dato-valg: hent alle `filtered` items med `status === "approved"`, udtræk deres IDs, og kald bulk-mutation.
+- Supabase `.update()` med `.in("id", ids)` for at opdatere alle på én gang.
+- Toast med antal opdaterede sager.
 
 ### Scope
-- Ændringer kun i `ApprovalQueueTab.tsx`
-- Kun Eesy FM påvirkes af kampagne-scopet
-- Andre klienter får også bedre produktvalg (ID-baseret) men er funktionelt upåvirkede
+- Kun `ApprovedTab.tsx`
 - Ingen databaseændringer
 
