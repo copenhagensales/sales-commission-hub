@@ -225,34 +225,78 @@ export function useSellerSalariesCached(
   });
 
   // Query 8: Approved cancellations for the period (deduction_date within period)
+  // Excludes correct_match rows and paginates to avoid 1000-row limit
   const { data: cancellationData, isLoading: cancellationLoading } = useQuery({
     queryKey: ["seller-cancellations", periodStartISO, periodEndISO],
     queryFn: async () => {
       if (!periodStartISO || !periodEndISO) return [];
-      const { data, error } = await (supabase
-        .from("cancellation_queue") as any)
-        .select(`
-          id,
-          deduction_date,
-          reviewed_at,
-          sale_id,
-          sales!inner(
-            agent_email,
-            sale_items(mapped_commission)
-          )
-        `)
-        .eq("status", "approved");
-      
-      if (error) throw error;
+      const PAGE_SIZE = 500;
+      let allData: any[] = [];
+      let from = 0;
+      while (true) {
+        const { data, error } = await (supabase
+          .from("cancellation_queue") as any)
+          .select(`
+            id,
+            upload_type,
+            deduction_date,
+            reviewed_at,
+            sale_id,
+            sales!inner(
+              agent_email,
+              sale_items(mapped_commission)
+            )
+          `)
+          .eq("status", "approved")
+          .in("upload_type", ["cancellation", "basket_difference"])
+          .range(from, from + PAGE_SIZE - 1);
+        
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        allData = allData.concat(data);
+        if (data.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+      }
       
       // Filter by deduction_date (fallback to reviewed_at) within period
-      return (data || []).filter((item: any) => {
+      return allData.filter((item: any) => {
         const effectiveDate = item.deduction_date || (item.reviewed_at ? item.reviewed_at.split('T')[0] : null);
         if (!effectiveDate) return false;
         return effectiveDate >= periodStartISO && effectiveDate <= periodEndISO;
       });
     },
     enabled: !!periodStartISO && !!periodEndISO,
+    staleTime: 60000,
+  });
+
+  // Query 9: Product change log for basket_difference commission differences
+  const basketDiffIds = useMemo(() => {
+    if (!cancellationData) return [];
+    return cancellationData
+      .filter((c: any) => c.upload_type === "basket_difference")
+      .map((c: any) => c.id);
+  }, [cancellationData]);
+
+  const { data: productChangeLogData, isLoading: changeLogLoading } = useQuery({
+    queryKey: ["product-change-log-basket", basketDiffIds],
+    queryFn: async () => {
+      if (basketDiffIds.length === 0) return [];
+      // Fetch in batches if needed (Supabase .in() limit)
+      const BATCH = 100;
+      let allLogs: any[] = [];
+      for (let i = 0; i < basketDiffIds.length; i += BATCH) {
+        const batch = basketDiffIds.slice(i, i + BATCH);
+        const { data, error } = await supabase
+          .from("product_change_log")
+          .select("cancellation_queue_id, old_commission, new_commission")
+          .in("cancellation_queue_id", batch)
+          .is("rolled_back_at", null);
+        if (error) throw error;
+        if (data) allLogs = allLogs.concat(data);
+      }
+      return allLogs;
+    },
+    enabled: basketDiffIds.length > 0,
     staleTime: 60000,
   });
 
