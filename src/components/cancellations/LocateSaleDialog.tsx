@@ -330,35 +330,70 @@ export function LocateSaleDialog({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filtered.map(sale => (
-                    <TableRow key={sale.id}>
-                      <TableCell className="text-xs whitespace-nowrap">
-                        {sale.sale_datetime ? format(new Date(sale.sale_datetime), "dd-MM-yyyy") : "-"}
-                      </TableCell>
-                      <TableCell className="text-xs">{sale.agent_name || sale.agent_email || "-"}</TableCell>
-                      <TableCell className="text-xs">{sale.customer_phone || "-"}</TableCell>
-                      <TableCell className="text-xs">{sale.customer_company || "-"}</TableCell>
-                      <TableCell className="text-xs max-w-[200px] truncate">
-                        {sale.sale_items?.map(i => i.display_name).filter(Boolean).join(", ") || "-"}
-                      </TableCell>
-                      <TableCell className="text-xs text-right">
-                        {(() => {
-                          const total = sale.sale_items?.reduce((sum, i) => sum + (i.mapped_revenue || 0), 0) || 0;
-                          return total > 0 ? `${total.toLocaleString("da-DK")} kr` : "-";
-                        })()}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 text-xs"
-                          onClick={() => handleSelectSale(sale.id)}
-                        >
-                          <Check className="h-3 w-3 mr-1" /> Vælg
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {filtered.flatMap(sale => {
+                    if (isEesyTm && sale.sale_items && sale.sale_items.length > 0) {
+                      // Eesy TM: one row per sale_item
+                      return sale.sale_items.map(item => {
+                        const productName = item.adversus_product_title || item.display_name || "-";
+                        return (
+                          <TableRow key={`${sale.id}-${item.id}`}>
+                            <TableCell className="text-xs whitespace-nowrap">
+                              {sale.sale_datetime ? format(new Date(sale.sale_datetime), "dd-MM-yyyy") : "-"}
+                            </TableCell>
+                            <TableCell className="text-xs">{sale.agent_name || sale.agent_email || "-"}</TableCell>
+                            <TableCell className="text-xs">{sale.customer_phone || "-"}</TableCell>
+                            <TableCell className="text-xs">{sale.customer_company || "-"}</TableCell>
+                            <TableCell className="text-xs max-w-[200px] truncate font-medium">
+                              {productName}
+                            </TableCell>
+                            <TableCell className="text-xs text-right">
+                              {item.mapped_revenue ? `${item.mapped_revenue.toLocaleString("da-DK")} kr` : "-"}
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs"
+                                onClick={() => handleSelectSale(sale.id, productName)}
+                              >
+                                <Check className="h-3 w-3 mr-1" /> Vælg
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      });
+                    }
+                    // Default: one row per sale
+                    return [(
+                      <TableRow key={sale.id}>
+                        <TableCell className="text-xs whitespace-nowrap">
+                          {sale.sale_datetime ? format(new Date(sale.sale_datetime), "dd-MM-yyyy") : "-"}
+                        </TableCell>
+                        <TableCell className="text-xs">{sale.agent_name || sale.agent_email || "-"}</TableCell>
+                        <TableCell className="text-xs">{sale.customer_phone || "-"}</TableCell>
+                        <TableCell className="text-xs">{sale.customer_company || "-"}</TableCell>
+                        <TableCell className="text-xs max-w-[200px] truncate">
+                          {sale.sale_items?.map(i => i.adversus_product_title || i.display_name).filter(Boolean).join(", ") || "-"}
+                        </TableCell>
+                        <TableCell className="text-xs text-right">
+                          {(() => {
+                            const total = sale.sale_items?.reduce((sum, i) => sum + (i.mapped_revenue || 0), 0) || 0;
+                            return total > 0 ? `${total.toLocaleString("da-DK")} kr` : "-";
+                          })()}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs"
+                            onClick={() => handleSelectSale(sale.id)}
+                          >
+                            <Check className="h-3 w-3 mr-1" /> Vælg
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    )];
+                  })}
                 </TableBody>
               </Table>
             </div>
