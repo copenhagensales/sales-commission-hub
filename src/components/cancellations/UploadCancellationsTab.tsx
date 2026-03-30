@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { CLIENT_IDS } from "@/utils/clientIds";
 import { extractOpp } from "./utils/extractOpp";
 import { groupConditionsByProduct, findMatchingProductId, evaluateConditions } from "@/utils/productConditionMatcher";
 import { formatCurrency } from "@/lib/calculations/formatting";
@@ -866,8 +867,10 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       const junkRowCount = filteredData.length - cleanedData.length;
 
       // === Excel-internal dedup: group by normalized phone, keep first as representative ===
+      // Only applies to Eesy TM and Eesy FM clients
+      const isEesyClient = selectedClientId === CLIENT_IDS["Eesy TM"] || selectedClientId === CLIENT_IDS["Eesy FM"];
       const excelDupIndices = new Set<number>();
-      if (phoneColumn !== "__none__") {
+      if (isEesyClient && phoneColumn !== "__none__") {
         const phoneGroupMap = new Map<string, number[]>();
         cleanedData.forEach((row, idx) => {
           const rawPhone = String(getCaseInsensitive(row.originalRow, phoneColumn) ?? "").trim();
@@ -1937,7 +1940,24 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
   // Merge matchedSales by normalized phone so preview, counts, and send-to-queue all use the same data
   const activePreviewConfig = clientConfigs.find(c => c.id === selectedConfigId) || clientConfigs.find(c => c.is_default) || clientConfigs[0];
 
+  const isEesyClient = selectedClientId === CLIENT_IDS["Eesy TM"] || selectedClientId === CLIENT_IDS["Eesy FM"];
+
   const { mergedMatchedSales, mergedAwayEntries, matchedPhones } = useMemo(() => {
+    const phones = new Set<string>();
+
+    // For non-Eesy clients, skip phone-based merge entirely
+    if (!isEesyClient) {
+      matchedSales.forEach(sale => {
+        const phone = sale.phone ? normalizePhone(sale.phone) : null;
+        if (phone) phones.add(phone);
+        if (phoneColumn !== "__none__") {
+          const uploadedPhone = String(getCaseInsensitive(sale.uploadedRowData, phoneColumn) ?? "").trim();
+          if (uploadedPhone) phones.add(normalizePhone(uploadedPhone));
+        }
+      });
+      return { mergedMatchedSales: matchedSales, mergedAwayEntries: [] as MatchedSale[], matchedPhones: phones };
+    }
+
     const phoneGroups = new Map<string, MatchedSale[]>();
     matchedSales.forEach(sale => {
       const phone = sale.phone ? normalizePhone(sale.phone) : null;
@@ -1953,7 +1973,6 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
     const merged: MatchedSale[] = [];
     const away: MatchedSale[] = [];
-    const phones = new Set<string>();
 
     const typeCol = activePreviewConfig?.type_detection_column;
     const typeVals = (activePreviewConfig?.type_detection_values as string[]) || [];
@@ -1995,7 +2014,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     });
 
     return { mergedMatchedSales: merged, mergedAwayEntries: away, matchedPhones: phones };
-  }, [matchedSales, activePreviewConfig, phoneColumn]);
+  }, [matchedSales, activePreviewConfig, phoneColumn, isEesyClient]);
 
   // Build coveredRowIndices: matchedRowIndices + any Excel rows whose phone matches a merged phone
   const coveredRowIndices = useMemo(() => {
