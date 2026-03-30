@@ -1,21 +1,38 @@
 
 
-## Tilføj Produkt, Medlemsnummer og Provision — kun for ASE
+## Fix Dublet-logik for Eesy TM — brug abo-telefonnumre i stedet for customer_phone
 
-### Ændringer — `src/components/cancellations/ApprovedTab.tsx`
+### Problem
+DuplicatesTab grupperer salg efter `customer_phone`. For Eesy TM har ét salg op til 3 telefonnumre i `raw_payload.data` (Telefon Abo1, Telefon Abo2, Telefon Abo3), men kun ét gemmes i `customer_phone`. Det betyder, at flere salg deler samme `customer_phone` og fejlagtigt vises som dubletter — selvom de reelt dækker forskellige abonnementer/telefonnumre.
 
-**1. Import `CLIENT_IDS`** fra `@/utils/clientIds` og definer `ASE_CLIENT_ID`.
+### Løsning
 
-**2. Udvid query** til at inkludere `uploaded_data` i select-strengen.
+**Fil: `src/components/cancellations/DuplicatesTab.tsx`**
 
-**3. Parse ASE-felter i mapping** (kun når `clientId === ASE_CLIENT_ID`):
-- `product`: fra `uploaded_data["A-kasse"]`
-- `memberNumber`: fra `uploaded_data["Medlemsnummer"]`
-- `provision`: fra `uploaded_data["Provision"]?.result` eller direkte tal
+1. **Tilføj Eesy TM-specifik gruppering**: Når klienten er Eesy TM, skal hvert salg "udfoldes" til op til 3 rækker — én pr. abo-telefonnummer (Telefon Abo1, Telefon Abo2, Telefon Abo3). Gruppering sker derefter pr. abo-telefonnummer i stedet for `customer_phone`.
 
-**4. Betinget visning af 3 ekstra kolonner** i tabellen:
-- Kun vis kolonnerne **Produkt**, **Medlemsnr.** og **Provision** når `clientId === ASE_CLIENT_ID`
-- Provision formateres som DKK med `formatCurrency`
+2. **Logik**:
+   - Detect `isEesyTm` via `CLIENT_IDS["Eesy TM"]`
+   - For hvert Eesy TM-salg: udtræk `raw_payload.data["Telefon Abo1"]`, `["Telefon Abo2"]`, `["Telefon Abo3"]`
+   - Normaliser hvert telefonnummer og brug det som grupperingsnøgle
+   - Et salg kan optræde i flere grupper (hvis det har flere abo-numre der matcher andre salg)
+   - Kun grupper med 2+ salg vises (som nu)
 
-Ingen andre filer skal ændres.
+3. **Eesy FM bevarer nuværende logik** (gruppering via `customer_phone`)
+
+### Tekniske detaljer
+
+```text
+Nuværende flow (alle klienter undtagen TDC):
+  sale.customer_phone → groupMap[phone].push(sale)
+
+Nyt flow for Eesy TM:
+  for each aboField in ["Telefon Abo1", "Telefon Abo2", "Telefon Abo3"]:
+    phone = normalize(sale.raw_payload.data[aboField])
+    if phone: groupMap[phone].push(sale)
+
+Eesy FM + andre: uændret (customer_phone)
+```
+
+Ingen database-ændringer. Kun ændring i `DuplicatesTab.tsx`.
 
