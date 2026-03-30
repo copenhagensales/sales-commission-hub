@@ -19,6 +19,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { LocateSaleDialog } from "./LocateSaleDialog";
+import { CLIENT_IDS } from "@/utils/clientIds";
 
 interface UnmatchedRow {
   [key: string]: unknown;
@@ -237,6 +238,17 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
       // When uploadType is "both", classify as "cancellation" for match-error re-matches
       const resolvedUploadType = row.uploadType === "both" ? "cancellation" : row.uploadType;
 
+      // Fetch target_product_name only for Eesy TM
+      let targetProductName: string | null = null;
+      if (clientId === CLIENT_IDS["Eesy TM"]) {
+        const { data: matchedSaleItems } = await supabase
+          .from("sale_items")
+          .select("adversus_product_title")
+          .eq("sale_id", sales[0].id)
+          .limit(1);
+        targetProductName = matchedSaleItems?.[0]?.adversus_product_title || null;
+      }
+
       const { error: queueError } = await supabase
         .from("cancellation_queue")
         .insert([{
@@ -246,6 +258,7 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
           status: "pending",
           uploaded_data: row.rowData as unknown as Json,
           client_id: clientId,
+          target_product_name: targetProductName,
         }]);
       if (queueError) {
         console.error("Failed to insert into cancellation_queue:", queueError);
@@ -378,17 +391,19 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
       const entries = [...localManualMatches.values()];
       if (entries.length === 0) return;
 
-      // Fetch target_product_name for each matched sale
-      const saleIds = entries.map(e => e.saleId);
-      const { data: saleItemsData } = await supabase
-        .from("sale_items")
-        .select("sale_id, adversus_product_title")
-        .in("sale_id", saleIds);
-
+      // Fetch target_product_name only for Eesy TM
+      const isEesyTm = clientId === CLIENT_IDS["Eesy TM"];
       const saleItemMap = new Map<string, string>();
-      for (const si of (saleItemsData || [])) {
-        if (!saleItemMap.has(si.sale_id)) {
-          saleItemMap.set(si.sale_id, si.adversus_product_title || "");
+      if (isEesyTm) {
+        const saleIds = entries.map(e => e.saleId);
+        const { data: saleItemsData } = await supabase
+          .from("sale_items")
+          .select("sale_id, adversus_product_title")
+          .in("sale_id", saleIds);
+        for (const si of (saleItemsData || [])) {
+          if (!saleItemMap.has(si.sale_id)) {
+            saleItemMap.set(si.sale_id, si.adversus_product_title || "");
+          }
         }
       }
 
@@ -400,7 +415,7 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
         status: "pending",
         uploaded_data: r.rowData as unknown as Json,
         client_id: clientId,
-        target_product_name: saleItemMap.get(saleId) || null,
+        target_product_name: isEesyTm ? (saleItemMap.get(saleId) || null) : null,
       }));
 
       const { error: queueError } = await supabase
