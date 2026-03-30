@@ -1169,7 +1169,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                     ? allItems[posIndex] : allItems[0];
 
                   const resolvedName = matchingItem?.adversus_product_title || `Abonnement${abo.index}`;
-                  const dedupKey = `${sale.id}|${resolvedName}`;
+                  const dedupKey = `${sale.id}|${resolvedName}|${excelPhone}`;
                   if (matchedSaleProductKeys.has(dedupKey)) continue;
                   matchedSaleProductKeys.add(dedupKey);
                   matchedIndicesLocal.add(idx);
