@@ -32,6 +32,7 @@ interface ImmediatePaymentSale {
   sale_datetime: string;
   customer_company: string | null;
   customer_phone: string | null;
+  member_number: string | null;
   rule_name: string;
   sale_item_id: string;
   matched_pricing_rule_id: string;
@@ -45,9 +46,6 @@ function canActivateImmediate(saleDatetime: string): { allowed: boolean; reason?
 
   if (saleDate.getMonth() !== now.getMonth() || saleDate.getFullYear() !== now.getFullYear()) {
     return { allowed: false, reason: "Salget er fra forrige måned" };
-  }
-  if (daysDiff > 7) {
-    return { allowed: false, reason: "Mere end 7 dage siden salget" };
   }
   return { allowed: true };
 }
@@ -203,6 +201,8 @@ export default function ImmediatePaymentASE() {
           customer_company,
           customer_phone,
           agent_email,
+          normalized_data,
+          raw_payload,
           sale_items!inner(
             id,
             matched_pricing_rule_id,
@@ -245,11 +245,19 @@ export default function ImmediatePaymentASE() {
           si.matched_pricing_rule_id && immediatePaymentRuleIds.has(si.matched_pricing_rule_id)
         );
         if (matchingItem) {
+          const normalizedData = sale.normalized_data as Record<string, any> | null;
+          const rawPayload = sale.raw_payload as Record<string, any> | null;
+          const memberNumber =
+            normalizedData?.member_number ??
+            rawPayload?.data?.Medlemsnummer ??
+            null;
+
           result.push({
             id: sale.id,
             sale_datetime: sale.sale_datetime,
             customer_company: sale.customer_company,
             customer_phone: sale.customer_phone,
+            member_number: memberNumber ? String(memberNumber) : null,
             rule_name: immediatePaymentRules.get((matchingItem as any).matched_pricing_rule_id) || "Ukendt regel",
             sale_item_id: (matchingItem as any).id,
             matched_pricing_rule_id: (matchingItem as any).matched_pricing_rule_id,
@@ -280,8 +288,7 @@ export default function ImmediatePaymentASE() {
           <Info className="h-4 w-4" />
           <AlertTitle>Regler for straksbetaling</AlertTitle>
           <AlertDescription>
-            Du kan tilføje straksbetaling op til <strong>7 dage</strong> efter salget er registreret.
-            Ved månedsskift kan straksbetaling kun tilføjes på salg fra den <strong>aktuelle måned</strong>.
+            Du kan tilføje straksbetaling på salg fra den <strong>aktuelle måned</strong>.
             Annullering af allerede aktiveret straksbetaling er altid muligt.
           </AlertDescription>
         </Alert>
@@ -312,7 +319,7 @@ export default function ImmediatePaymentASE() {
                   <TableRow>
                     <TableHead>Dato</TableHead>
                     <TableHead>Regel</TableHead>
-                    <TableHead>Kunde</TableHead>
+                    <TableHead>Medlemsnr.</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Handling</TableHead>
                   </TableRow>
@@ -327,7 +334,7 @@ export default function ImmediatePaymentASE() {
                         </TableCell>
                         <TableCell>{sale.rule_name}</TableCell>
                         <TableCell>
-                          {sale.customer_company || sale.customer_phone || "Ukendt"}
+                          {sale.member_number || "-"}
                         </TableCell>
                         <TableCell>
                           {sale.is_immediate_payment ? (
