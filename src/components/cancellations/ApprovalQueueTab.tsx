@@ -38,6 +38,7 @@ import { FileSpreadsheet, AlertTriangle } from "lucide-react";
 import { groupConditionsByProduct, findMatchingProductId } from "@/utils/productConditionMatcher";
 
 const TDC_ERHVERV_CLIENT_ID = CLIENT_IDS["TDC Erhverv"];
+const EESY_FM_CLIENT_ID = CLIENT_IDS["Eesy FM"];
 const PAGE_SIZE = 50;
 
 interface DiffField {
