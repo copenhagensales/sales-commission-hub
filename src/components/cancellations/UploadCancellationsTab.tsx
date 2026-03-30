@@ -1147,7 +1147,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                     commission: matchingItem?.mapped_commission ?? undefined,
                     revenue: matchingItem?.mapped_revenue ?? undefined,
                   });
-                  break; // Only one match per sale — stop checking more Abo fields
+                  if (selectedClientId === CLIENT_IDS["Eesy TM"]) break; // Eesy TM: only one match per sale
                 }
               }
               // If this row already matched, stop checking more sales
