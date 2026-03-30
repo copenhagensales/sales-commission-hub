@@ -33,7 +33,7 @@ interface LocateSaleDialogProps {
   campaignIds: string[];
   assignedEmployeeId?: string;
   assignedEmployeeName?: string;
-  onMatch?: (saleId: string, row: FlatUnmatchedRow) => void;
+  onMatch?: (saleId: string, row: FlatUnmatchedRow, saleItemTitle?: string) => void;
 }
 
 interface SaleRow {
