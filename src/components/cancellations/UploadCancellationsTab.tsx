@@ -45,6 +45,21 @@ import {
 } from "@/components/ui/alert-dialog";
 import { CancellationHistoryTable } from "./CancellationHistoryTable";
 import { useAuth } from "@/hooks/useAuth";
+// ── Eesy TM 5G Internet helpers (scoped) ──
+const EESY_TM_5G_EXCEL_PATTERNS = ["5g internet"];
+const EESY_TM_5G_SALE_PATTERNS = ["5gi"];
+
+function isEesyTm5gExcelProduct(value: string): boolean {
+  const lower = value.toLowerCase().trim();
+  return EESY_TM_5G_EXCEL_PATTERNS.some(p => lower.includes(p));
+}
+
+function isEesyTm5gSaleItem(title: string): boolean {
+  const lower = title.toLowerCase().trim();
+  return EESY_TM_5G_SALE_PATTERNS.some(p =>
+    lower === p || lower.startsWith(p + " ") || lower.startsWith(p + " -")
+  );
+}
 
 interface ParsedRow {
   phone?: string;
