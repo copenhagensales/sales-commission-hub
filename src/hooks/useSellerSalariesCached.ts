@@ -239,12 +239,13 @@ export function useSellerSalariesCached(
           .select(`
             id,
             upload_type,
+            target_product_name,
             deduction_date,
             reviewed_at,
             sale_id,
             sales!inner(
               agent_email,
-              sale_items(mapped_commission)
+              sale_items(mapped_commission, product_id)
             )
           `)
           .eq("status", "approved")
@@ -269,7 +270,20 @@ export function useSellerSalariesCached(
     staleTime: 60000,
   });
 
-  // Query 9: Product change log for basket_difference commission differences
+  // Query 9a: Products lookup for target_product_name matching
+  const { data: productsLookup } = useQuery({
+    queryKey: ["products-name-lookup"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, name");
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 300000,
+  });
+
+  // Query 9b: Product change log for basket_difference commission differences
   const basketDiffIds = useMemo(() => {
     if (!cancellationData) return [];
     return cancellationData
@@ -374,6 +388,12 @@ export function useSellerSalariesCached(
       basketDiffMap[cqId] = (basketDiffMap[cqId] || 0) + diff;
     }
 
+    // Build product_id → name lookup
+    const productIdToName: Record<string, string> = {};
+    for (const p of productsLookup || []) {
+      productIdToName[p.id] = p.name;
+    }
+
     // Build cancellation map (agent_email → employee_id → total lost commission)
     const cancellationMap: Record<string, number> = {};
     for (const cq of cancellationData || []) {
@@ -388,10 +408,21 @@ export function useSellerSalariesCached(
         // Use commission difference from product_change_log
         deduction = basketDiffMap[cq.id] || 0;
       } else {
-        // Full cancellation — deduct entire commission
-        deduction = (sale.sale_items || []).reduce(
-          (sum: number, si: any) => sum + (si.mapped_commission || 0), 0
-        );
+        // Cancellation — deduct only the targeted product's commission
+        const targetName = (cq as any).target_product_name;
+        if (targetName) {
+          // Find sale_item matching the target product
+          const matchingItem = (sale.sale_items || []).find((si: any) => {
+            const itemProductName = productIdToName[si.product_id] || "";
+            return itemProductName === targetName;
+          });
+          deduction = matchingItem ? (matchingItem.mapped_commission || 0) : 0;
+        } else {
+          // Fallback for older records without target: deduct full sale commission
+          deduction = (sale.sale_items || []).reduce(
+            (sum: number, si: any) => sum + (si.mapped_commission || 0), 0
+          );
+        }
       }
       if (deduction > 0) {
         cancellationMap[employeeId] = (cancellationMap[employeeId] || 0) + deduction;
@@ -461,7 +492,7 @@ export function useSellerSalariesCached(
     sellers.sort((a, b) => b.commission - a.commission);
 
     return { sellerData: sellers, lastUpdated: new Date() };
-  }, [employees, salesAggregates, selectedTeam, salaryTypes, dietData, sickData, dailyBonusData, startupBonusData, cancellationData, productChangeLogData, salaryAdditionsData]);
+  }, [employees, salesAggregates, selectedTeam, salaryTypes, dietData, sickData, dailyBonusData, startupBonusData, cancellationData, productChangeLogData, productsLookup, salaryAdditionsData]);
 
   return {
     sellerData,
