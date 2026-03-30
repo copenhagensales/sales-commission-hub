@@ -423,15 +423,18 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
       }
 
       // Batch insert into cancellation_queue
-      const inserts = entries.map(({ saleId, row: r }) => ({
-        import_id: r.importId,
-        sale_id: saleId,
-        upload_type: r.uploadType === "both" ? "cancellation" : r.uploadType,
-        status: "pending",
-        uploaded_data: r.rowData as unknown as Json,
-        client_id: clientId,
-        target_product_name: isEesyTm ? (saleItemMap.get(saleId) || null) : null,
-      }));
+      const inserts = entries.map(({ saleId, row: r }) => {
+        const rk = rowKey(r);
+        return {
+          import_id: r.importId,
+          sale_id: saleId,
+          upload_type: r.uploadType === "both" ? "cancellation" : r.uploadType,
+          status: "pending",
+          uploaded_data: r.rowData as unknown as Json,
+          client_id: clientId,
+          target_product_name: isEesyTm ? (saleItemMap.get(rk) || null) : null,
+        };
+      });
 
       const { error: queueError } = await supabase
         .from("cancellation_queue")
