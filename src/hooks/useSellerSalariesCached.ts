@@ -163,6 +163,24 @@ export function useSellerSalariesCached(
     staleTime: 60000,
   });
 
+  // Query 6b: Startup bonus (booking_startup_bonus) for the period
+  const { data: startupBonusData, isLoading: startupBonusLoading } = useQuery({
+    queryKey: ["seller-startup-bonus", periodStartISO, periodEndISO],
+    queryFn: async () => {
+      if (!periodStartISO || !periodEndISO) return [];
+      const { data, error } = await (supabase
+        .from("booking_startup_bonus") as any)
+        .select("employee_id, amount")
+        .gte("date", periodStartISO)
+        .lte("date", periodEndISO);
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!periodStartISO && !!periodEndISO,
+    staleTime: 60000,
+  });
+
   // Query 7: Salary additions for the period
   const { data: salaryAdditionsData, isLoading: salaryAdditionsLoading } = useQuery({
     queryKey: ["salary-additions", periodStartISO, periodEndISO],
