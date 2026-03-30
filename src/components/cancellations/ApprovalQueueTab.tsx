@@ -1660,9 +1660,6 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                 <TabsTrigger value="basket_difference">
                   Kurv-rettelser {basketCount > 0 && `(${basketCount})`}
                 </TabsTrigger>
-                <TabsTrigger value="correct_match">
-                  Korrekte match {correctMatchCount > 0 && `(${correctMatchCount})`}
-                </TabsTrigger>
                 <TabsTrigger value="match_errors">
                   Fejl i match {matchErrorsCount > 0 && `(${matchErrorsCount})`}
                 </TabsTrigger>
