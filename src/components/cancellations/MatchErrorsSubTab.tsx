@@ -532,6 +532,8 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
       const dateCol = uploadConfig.date_column;
       let matched = 0;
 
+      console.log("[bulk-rematch] Starting. rows:", rows.length, "dateCol:", dateCol, "sellerField:", sellerField, "campaignIds:", campaignIds);
+
       for (const row of rows) {
         const rk = rowKey(row);
         // Skip rows already locally matched
@@ -539,7 +541,10 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
 
         const excelSeller = String(row.rowData[sellerField] ?? "").trim();
         const dateValue = parseFlexibleDate(row.rowData[dateCol]);
-        if (!dateValue || !excelSeller) continue;
+        if (!dateValue || !excelSeller) {
+          console.log("[bulk-rematch] Skipped row — missing date or seller:", { excelSeller, dateValue, rowData: row.rowData });
+          continue;
+        }
 
         // Resolve employee from seller mappings or employee list
         let employeeId = mappingsByName.get(excelSeller.toLowerCase());
@@ -571,7 +576,12 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
           }
         }
 
-        if (!workEmail && !empFullName) continue;
+        if (!workEmail && !empFullName) {
+          console.log("[bulk-rematch] No employee found for seller:", excelSeller);
+          continue;
+        }
+
+        console.log("[bulk-rematch] Resolved seller:", excelSeller, "→ email:", workEmail, "name:", empFullName, "date:", dateValue);
 
         // Search for sales
         let sales: { id: string }[] | null = null;
@@ -600,7 +610,10 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
           sales = data;
         }
 
-        if (!sales || sales.length === 0) continue;
+        if (!sales || sales.length === 0) {
+          console.log("[bulk-rematch] No sales found for:", { excelSeller, workEmail, empFullName, dateValue });
+          continue;
+        }
 
         // Get target product name
         let targetProductName: string | null = null;
