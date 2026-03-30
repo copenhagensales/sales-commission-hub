@@ -17,7 +17,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { PayrollPeriodSelector } from "@/components/employee/PayrollPeriodSelector";
 import { getPayrollPeriod } from "@/lib/calculations";
 
-type SortKey = "name" | "team" | "commission" | "cancellations" | "vacationPay" | "diet" | "sickDays" | "dailyBonus" | "referralBonus";
+type SortKey = "name" | "team" | "commission" | "cancellations" | "vacationPay" | "diet" | "sickDays" | "dailyBonus" | "startupBonus" | "referralBonus";
 type SortDir = "asc" | "desc";
 
 export function SellerSalariesTab() {
