@@ -1,31 +1,33 @@
 
 
-## Fix: Vis kun det målrettede produkt i Godkendelseskøen for Eesy TM
+## Fix: Kun ét match per Excel-række i Pass 1 for Eesy TM
 
 ### Problem
-Godkendelseskøen viser ALLE produkter på et salg under "Produkter solgt" (f.eks. både Abo1 og Abo2). For Eesy TM skal der kun vises det ENE produkt, der er målrettet for annullering — bestemt af `target_product_name` på køelementet.
+Når et telefonnummer optræder i FLERE Abo-felter på det samme salg (f.eks. "Telefon Abo1" OG "Telefon Abo2" begge har samme nummer), opretter Pass 1 ét match per felt — altså to annulleringer for den samme Excel-række. Brugeren ser derfor to produkter i godkendelseskøen, selvom der kun bør være ét.
+
+### Årsag
+I Pass 1 (linje ~1120-1149) itererer koden over ALLE `productPhoneMappings` for hvert salg uden at stoppe efter første match. Dedup-nøglen `saleId|productName` er unik per mapping, så begge passerer.
 
 ### Løsning
+Tilføj et `break` efter første phone-match per sale i Pass 1, så kun DET FØRSTE matchende Abo-felt bruges. Derudover tilføj en per-row dedup (`matchedIndicesLocal.has(idx)`) guard, så en Excel-række kun kan producere ét match i alt.
 
-**Fil: `src/components/cancellations/ApprovalQueueTab.tsx`** (linje ~507)
+**Fil: `src/components/cancellations/UploadCancellationsTab.tsx`** (linje ~1126-1149)
 
-Filtrér `saleItems` ned til kun det produkt, der matcher `target_product_name`, når klienten er Eesy TM og `target_product_name` er sat:
-
-```text
-Nuværende (linje 507):
-  const saleItems = saleItemsBySale.get(item.sale_id) || [];
-
-Ny logik:
-  let saleItems = saleItemsBySale.get(item.sale_id) || [];
-  
-  // For Eesy TM: filter to only the targeted product
-  if (clientId === CLIENT_IDS["Eesy TM"] && targetProductName) {
-    const filtered = saleItems.filter(si => 
-      si.product_name.toLowerCase().trim() === targetProductName.toLowerCase().trim()
-    );
-    if (filtered.length > 0) saleItems = filtered;
+Ændring:
+```typescript
+// After line 1126: if (excelPhone === payloadPhone) {
+//   ... push to productMatched ...
+//   Add break to stop matching more Abo fields on same sale
+    break; // Only one cancellation per Excel row per sale
   }
+}
+// Also break out of sales loop after first match for this row
 ```
 
-Kun én ændring, ~5 linjer. Ingen database-ændringer. Andre klienter er uberørte.
+Konkret: Når en Excel-række finder sit første telefon-match (Abo1, Abo2 eller Abo3), stopper den straks — ingen yderligere matches oprettes for den række.
+
+### Konsekvens
+- Hver Excel-række producerer præcis ÉT match i godkendelseskøen
+- Det første matchende Abo-felt (typisk Abo1) vinder
+- Ingen ændringer i database eller andre faner
 
