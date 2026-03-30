@@ -74,7 +74,6 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
       }
 
       const data = allData;
-      if (error) throw error;
       return (data || []).map((item: any) => {
         const deductionSource = item.deduction_date
           ? new Date(item.deduction_date + "T00:00:00")
