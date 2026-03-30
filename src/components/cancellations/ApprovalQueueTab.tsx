@@ -633,7 +633,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
     for (const item of flatItems) {
       if (item.isPhoneExcluded) continue;
       const key = isEesyTm
-        ? `${(item.sale_id || "").trim()}|${(item.target_product_name || "").trim()}`
+        ? `${(item.sale_id || "").trim()}|${(item.target_product_name || "").trim()}|${(item.phone || "").trim()}`
         : (item.phone || "").trim();
       if (key) counts.set(key, (counts.get(key) || 0) + 1);
     }
