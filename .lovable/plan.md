@@ -1,46 +1,33 @@
 
 
-## Fix: Scope breaks og targetProductName til kun Eesy TM
+## Fix: Dublet-detektion for Eesy TM i Godkendelseskøen
 
 ### Problem
-De to `break`-statements (linje 1148 og 1152) og `targetProductName`-logikken blev implementeret uden Eesy TM-guard — de påvirker **alle klienter** der bruger `productPhoneMappings`. Det er forkert.
+For Eesy TM bruger dublet-detektionen `sale_id` som nøgle. Men ét Eesy TM-salg kan have op til 3 abonnementer (Abo1, Abo2, Abo3) med forskellige telefonnumre. Når alle tre annulleres, oprettes 3 kø-elementer med **samme sale_id** — og alle markeres fejlagtigt som "Dublet".
+
+I virkeligheden er de tre kø-elementer **forskellige produkter** på samme salg, ikke dubletter.
+
+### Løsning
+Ændr dublet-nøglen for Eesy TM fra `sale_id` til `sale_id + target_product_name`. Dermed er det kun en dublet, hvis det **samme produkt** på **samme salg** optræder mere end én gang i køen.
 
 ### Ændringer
 
-**Fil: `src/components/cancellations/UploadCancellationsTab.tsx`**
+**Fil: `src/components/cancellations/ApprovalQueueTab.tsx`**
 
-**1. Tilføj `isEesyTM` flag** (før Pass 1 loopet, ca. linje 1080):
-```typescript
-const isEesyTM = selectedClientId === CLIENT_IDS["Eesy TM"];
-```
+**4 steder** hvor dublet-nøglen beregnes (linje 635, 650, 921, 1315):
 
-**2. Scope inner break til Eesy TM** (linje 1148):
-```
+```text
 // Nuværende:
-break;
-// Ny:
-if (isEesyTM) break;
-```
+const key = isEesyTm ? (item.sale_id || "").trim() : (item.phone || "").trim();
 
-**3. Scope outer break til Eesy TM** (linje 1152):
-```
-// Nuværende:
-if (matchedIndicesLocal.has(idx)) break;
 // Ny:
-if (isEesyTM && matchedIndicesLocal.has(idx)) break;
-```
-
-**4. Brug faktisk produktnavn for Eesy TM** (linje 1143):
-```
-// Nuværende:
-targetProductName: mapping.productName,
-// Ny:
-targetProductName: isEesyTM
-  ? (matchingItem?.adversus_product_title || mapping.productName)
-  : mapping.productName,
+const key = isEesyTm 
+  ? `${(item.sale_id || "").trim()}|${(item.target_product_name || "").trim()}`
+  : (item.phone || "").trim();
 ```
 
 ### Konsekvens
-- **Andre klienter**: Helt uberørte — ingen breaks, original targetProductName
-- **Eesy TM**: Kun ét match per Excel-række, og godkendelseskøen viser det korrekte produktnavn (ikke "Abonnement1")
+- 3 forskellige Abo-produkter på samme salg → **ingen** "Dublet" badge (korrekt)
+- 2 kø-elementer med **samme** sale_id OG **samme** target_product_name → "Dublet" badge (ægte dublet)
+- Andre klienter: Uberørte (bruger stadig `phone`)
 
