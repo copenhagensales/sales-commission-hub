@@ -1,29 +1,35 @@
 
 
-## Bulk-ændring af lønperiode på alle godkendte sager
+## Fix Eesy TM match-fejl: Tillad Pass 2 fallback + automatisk re-match
 
 ### Problem
-I dag kan man kun ændre "Trækkes i" (deduction_date) én ad gangen via en kalender-popover på hver række. Brugeren vil gerne kunne ændre lønperioden for **alle** (filtrerede) sager på én gang.
+36 rækker sidder fast i "Fejl i match" fordi Pass 2 (sælger+dato) blokerer rækker med telefonnummer. Brugeren vil have dem re-matchet **uden ny upload**.
 
-### Løsning
-Tilføj en "Ændr alle" knap ved siden af header-kolonnen "Trækkes i", der åbner en kalender-popover. Når en dato vælges, opdateres `deduction_date` for alle filtrerede godkendte sager i ét batch-kald.
+### Løsning (2 dele)
 
-### Ændringer — `src/components/cancellations/ApprovedTab.tsx`
+**A) Fjern Pass 2 guard — kun for Eesy TM**
+- **Fil:** `src/components/cancellations/UploadCancellationsTab.tsx`
+- Linje ~1486: Ændr `return`-guarden så den kun gælder for klienter der **ikke** er Eesy TM.
+- Rækker med telefonnummer for Eesy TM fortsætter nu til sælger+dato matching som fallback.
 
-**A) Tilføj bulk-mutation**
-- Ny `useMutation` der tager en liste af IDs + en dato og kører batch-update på `cancellation_queue.deduction_date` for alle IDs.
+```typescript
+// Før:
+if (!isExcluded2 && !isEesyTm5g) return;
 
-**B) Tilføj "Ændr alle" knap i header**
-- Ved siden af søg/filter-kontrollerne, tilføj en `Popover` med `Calendar` (same som individuel).
-- Knaptekst: "Ændr lønperiode for alle" med `CalendarIcon`.
-- Kun aktiv når der er filtrerede godkendte sager.
+// Efter:
+const isEesyTm = selectedClientId === CLIENT_IDS["Eesy TM"];
+if (!isExcluded2 && !isEesyTm5g && !isEesyTm) return;
+```
 
-**C) Batch-update logik**
-- Ved dato-valg: hent alle `filtered` items med `status === "approved"`, udtræk deres IDs, og kald bulk-mutation.
-- Supabase `.update()` med `.in("id", ids)` for at opdatere alle på én gang.
-- Toast med antal opdaterede sager.
+**B) "Re-match alle" knap i MatchErrorsSubTab — kun for Eesy TM**
+- **Fil:** `src/components/cancellations/MatchErrorsSubTab.tsx`
+- Tilføj en "Re-match alle" knap der kun vises for Eesy TM.
+- Logikken itererer over alle match-fejl rækker og kører den eksisterende re-match logik (sælger+dato søgning mod `sales` tabellen).
+- For hver matchet række: indsæt i `cancellation_queue` og fjern fra `unmatched_rows`.
+- Toast med resultat: "X af Y rækker matchet".
 
 ### Scope
-- Kun `ApprovedTab.tsx`
+- 2 filer ændres
 - Ingen databaseændringer
+- Ingen ny upload nødvendig
 
