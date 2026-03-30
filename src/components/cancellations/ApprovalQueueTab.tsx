@@ -38,6 +38,7 @@ import { FileSpreadsheet, AlertTriangle } from "lucide-react";
 import { groupConditionsByProduct, findMatchingProductId } from "@/utils/productConditionMatcher";
 
 const TDC_ERHVERV_CLIENT_ID = CLIENT_IDS["TDC Erhverv"];
+const EESY_FM_CLIENT_ID = CLIENT_IDS["Eesy FM"];
 const PAGE_SIZE = 50;
 
 interface DiffField {
@@ -395,6 +396,28 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   const { data: clientProducts = [] } = useQuery({
     queryKey: ["client-products-for-dropdown", clientId],
     queryFn: async () => {
+      if (clientId === EESY_FM_CLIENT_ID) {
+        // Scope products to Eesy FM's campaigns
+        const { data: campaigns } = await supabase
+          .from("client_campaigns")
+          .select("id")
+          .eq("client_id", clientId);
+        if (campaigns && campaigns.length > 0) {
+          const campaignIds = campaigns.map(c => c.id);
+          const { data, error } = await supabase
+            .from("products")
+            .select("id, name, client_campaign_id")
+            .in("client_campaign_id", campaignIds)
+            .order("name");
+          if (error) throw error;
+          // Deduplicate by name, keep first ID per unique name
+          const seen = new Map<string, { id: string; name: string }>();
+          for (const p of data || []) {
+            if (!seen.has(p.name)) seen.set(p.name, { id: p.id, name: p.name });
+          }
+          return Array.from(seen.values());
+        }
+      }
       const { data, error } = await supabase
         .from("products")
         .select("id, name")
@@ -653,7 +676,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   }, [flatItems, duplicateKeys, isEesyTm]);
 
   const approveMutation = useMutation({
-    mutationFn: async ({ queueItemIds, saleIds, uploadType, overrideProductName }: { queueItemIds: string[]; saleIds: string[]; uploadType: string; overrideProductName?: string }) => {
+    mutationFn: async ({ queueItemIds, saleIds, uploadType, overrideProductName, overrideProductId }: { queueItemIds: string[]; saleIds: string[]; uploadType: string; overrideProductName?: string; overrideProductId?: string }) => {
       if (!currentEmployee?.id) throw new Error("Ingen medarbejder fundet");
       const newStatus = uploadType === "cancellation" ? "cancelled" : "basket_changed";
 
@@ -741,11 +764,14 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
       const wholeSaleItems = resolvedQueueItems.filter((qi: any) => !qi.target_product_name);
 
       // Handle basket_difference with product override: update sale_item product instead of cancelling
-      if (uploadType === "basket_difference" && overrideProductName) {
+      if (uploadType === "basket_difference" && (overrideProductId || overrideProductName)) {
         const overrideSaleIds = [...new Set(resolvedQueueItems.map((qi: any) => qi.sale_id))];
+        const productQuery = overrideProductId
+          ? supabase.from("products").select("id, name, commission_dkk, revenue_dkk").eq("id", overrideProductId).single()
+          : supabase.from("products").select("id, name, commission_dkk, revenue_dkk").eq("name", overrideProductName!).maybeSingle();
         const [overrideSaleItems, overrideProduct] = await Promise.all([
           fetchByIds<any>("sale_items", "sale_id", overrideSaleIds, "id, sale_id, product_id, adversus_product_title, mapped_commission, mapped_revenue"),
-          supabase.from("products").select("id, name, commission_dkk, revenue_dkk").eq("name", overrideProductName).maybeSingle(),
+          productQuery,
         ]);
         
       if (overrideProduct.data) {
@@ -1339,7 +1365,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                                 <div className="mt-2 pt-2 border-t border-border">
                                   <div className="font-medium text-muted-foreground mb-1">Ret produkt til:</div>
                                   <Select
-                                    value={productOverrides[item.id] || summarizedItems[0]?.product_name || ""}
+                                    value={productOverrides[item.id] || (clientId === EESY_FM_CLIENT_ID ? (clientProducts.find(p => p.name === (summarizedItems[0]?.product_name))?.id || "") : (summarizedItems[0]?.product_name || ""))}
                                     onValueChange={(val) => setProductOverrides(prev => ({ ...prev, [item.id]: val }))}
                                   >
                                     <SelectTrigger className="w-full h-8 text-xs">
@@ -1347,6 +1373,12 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                                     </SelectTrigger>
                                     <SelectContent>
                                       {(() => {
+                                        if (clientId === EESY_FM_CLIENT_ID) {
+                                          // Show all campaign-scoped products by ID (already deduplicated)
+                                          return clientProducts.map((p) => (
+                                            <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                                          ));
+                                        }
                                         const filtered = clientProducts.filter(p => p.name === item.target_product_name);
                                         const productsToShow = filtered.length > 0 ? filtered : clientProducts;
                                         return productsToShow.map((p) => (
@@ -1403,7 +1435,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                         {statusFilter === "pending" && (
                           <TableCell>
                             <div className="flex gap-1">
-                              <Button size="sm" variant="ghost" onClick={() => approveMutation.mutate({ queueItemIds: [item.id], saleIds: [item.sale_id], uploadType: item.upload_type, overrideProductName: productOverrides[item.id] })} disabled={isPending}>
+                              <Button size="sm" variant="ghost" onClick={() => approveMutation.mutate({ queueItemIds: [item.id], saleIds: [item.sale_id], uploadType: item.upload_type, ...(clientId === EESY_FM_CLIENT_ID ? { overrideProductId: productOverrides[item.id] } : { overrideProductName: productOverrides[item.id] }) })} disabled={isPending}>
                                 <Check className="h-4 w-4" />
                               </Button>
                               <Button size="sm" variant="ghost" onClick={() => rejectMutation.mutate([item.id])} disabled={isPending}>
