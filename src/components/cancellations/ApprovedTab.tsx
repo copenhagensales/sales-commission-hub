@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { CLIENT_IDS } from "@/utils/clientIds";
 import { useAgentNameResolver } from "@/hooks/useAgentNameResolver";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,8 +25,11 @@ interface ApprovedTabProps {
 type SortKey = "date" | "agent" | "opp" | "type" | "status" | "deduction" | "reviewed_at";
 type SortDir = "asc" | "desc";
 
+const ASE_CLIENT_ID = CLIENT_IDS["Ase"];
+
 export function ApprovedTab({ clientId }: ApprovedTabProps) {
   const { resolve } = useAgentNameResolver();
+  const isAse = clientId === ASE_CLIENT_ID;
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [sellerFilter, setSellerFilter] = useState("all");
@@ -38,7 +42,7 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
       let query = supabase
         .from("cancellation_queue")
         .select(`
-          id, status, upload_type, reviewed_at, reviewed_by, created_at, opp_group, deduction_date,
+          id, status, upload_type, reviewed_at, reviewed_by, created_at, opp_group, deduction_date, uploaded_data,
           sale:sales!cancellation_queue_sale_id_fkey(id, sale_datetime, agent_name, agent_email, raw_payload),
           reviewer:employee_master_data!cancellation_queue_reviewed_by_fkey(first_name, last_name)
         `)
@@ -57,6 +61,9 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
         const period = item.status === "approved" && deductionSource
           ? getPayrollPeriod(deductionSource)
           : null;
+        const ud = item.uploaded_data as Record<string, any> | null;
+        const provRaw = ud?.["Provision"];
+        const provValue = typeof provRaw === "object" && provRaw !== null ? provRaw.result : (typeof provRaw === "number" ? provRaw : null);
         return {
           id: item.id,
           status: item.status,
@@ -72,6 +79,9 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
           reviewerName: item.reviewer
             ? `${item.reviewer.first_name || ""} ${item.reviewer.last_name || ""}`.trim()
             : "",
+          product: ud?.["A-kasse"] || "",
+          memberNumber: ud?.["Medlemsnummer"] != null ? String(ud["Medlemsnummer"]) : "",
+          provision: typeof provValue === "number" ? provValue : null,
         };
       });
     },
@@ -266,6 +276,9 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
                 <TableHead className="cursor-pointer" onClick={() => toggleSort("agent")}>Sælger <SortIcon col="agent" /></TableHead>
                 <TableHead className="cursor-pointer" onClick={() => toggleSort("opp")}>OPP <SortIcon col="opp" /></TableHead>
                 <TableHead className="cursor-pointer" onClick={() => toggleSort("type")}>Type <SortIcon col="type" /></TableHead>
+                {isAse && <TableHead>Produkt</TableHead>}
+                {isAse && <TableHead>Medlemsnr.</TableHead>}
+                {isAse && <TableHead>Provision</TableHead>}
                 <TableHead className="cursor-pointer" onClick={() => toggleSort("status")}>Status <SortIcon col="status" /></TableHead>
                 <TableHead className="cursor-pointer" onClick={() => toggleSort("deduction")}>Trækkes i <SortIcon col="deduction" /></TableHead>
                 <TableHead>Behandlet af</TableHead>
@@ -286,6 +299,9 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
                         {item.uploadType === "cancellation" ? "Annullering" : "Kurvrettelse"}
                       </Badge>
                     </TableCell>
+                    {isAse && <TableCell>{item.product || "-"}</TableCell>}
+                    {isAse && <TableCell className="font-mono text-xs">{item.memberNumber || "-"}</TableCell>}
+                    {isAse && <TableCell>{item.provision != null ? `${item.provision.toLocaleString("da-DK")} kr.` : "-"}</TableCell>}
                     <TableCell>
                       <Badge variant={item.status === "approved" ? "default" : "destructive"}>
                         {item.status === "approved" ? "Godkendt" : "Afvist"}
