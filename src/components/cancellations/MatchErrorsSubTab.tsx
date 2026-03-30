@@ -367,11 +367,11 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
   });
 
   // Handle local match from LocateSaleDialog
-  const handleLocalMatch = useCallback((saleId: string, matchedRow: FlatUnmatchedRow) => {
+  const handleLocalMatch = useCallback((saleId: string, matchedRow: FlatUnmatchedRow, saleItemTitle?: string) => {
     const rk = rowKey(matchedRow);
     setLocalManualMatches(prev => {
       const next = new Map(prev);
-      next.set(rk, { saleId, row: matchedRow });
+      next.set(rk, { saleId, row: matchedRow, saleItemTitle });
       return next;
     });
   }, []);
