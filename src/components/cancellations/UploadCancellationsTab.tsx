@@ -1538,6 +1538,14 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               }
             }
 
+            // Eesy TM 5G fallback: if no product resolved but Excel has "5G Internet..."
+            if (!resolvedProductTitle && selectedClientId === CLIENT_IDS["Eesy TM"]) {
+              const productSource = excelSubName || rowProduct3;
+              if (productSource && isEesyTm5gExcelProduct(productSource)) {
+                resolvedProductTitle = "5G Internet";
+              }
+            }
+
             if (!resolvedProductTitle || !excelSeller || !excelDate) return;
 
             let employeeId = sellerToEmployeeId.get(excelSeller.toLowerCase());
