@@ -1365,7 +1365,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                                 <div className="mt-2 pt-2 border-t border-border">
                                   <div className="font-medium text-muted-foreground mb-1">Ret produkt til:</div>
                                   <Select
-                                    value={productOverrides[item.id] || summarizedItems[0]?.product_name || ""}
+                                    value={productOverrides[item.id] || (clientId === EESY_FM_CLIENT_ID ? (clientProducts.find(p => p.name === (summarizedItems[0]?.product_name))?.id || "") : (summarizedItems[0]?.product_name || ""))}
                                     onValueChange={(val) => setProductOverrides(prev => ({ ...prev, [item.id]: val }))}
                                   >
                                     <SelectTrigger className="w-full h-8 text-xs">
@@ -1373,6 +1373,12 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                                     </SelectTrigger>
                                     <SelectContent>
                                       {(() => {
+                                        if (clientId === EESY_FM_CLIENT_ID) {
+                                          // Show all campaign-scoped products by ID (already deduplicated)
+                                          return clientProducts.map((p) => (
+                                            <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                                          ));
+                                        }
                                         const filtered = clientProducts.filter(p => p.name === item.target_product_name);
                                         const productsToShow = filtered.length > 0 ? filtered : clientProducts;
                                         return productsToShow.map((p) => (
