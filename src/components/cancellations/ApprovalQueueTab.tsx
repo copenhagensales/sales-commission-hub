@@ -1652,7 +1652,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
           {isLoading ? (
             <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
           ) : (
-            <Tabs value={subTab} onValueChange={(v) => setSubTab(v as "cancellation" | "basket_difference" | "correct_match" | "match_errors")}>
+            <Tabs value={subTab} onValueChange={(v) => setSubTab(v as "cancellation" | "basket_difference" | "match_errors")}>
               <TabsList>
                 <TabsTrigger value="cancellation">
                   Annulleringer {cancellationCount > 0 && `(${cancellationCount})`}
