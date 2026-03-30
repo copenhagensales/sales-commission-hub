@@ -1,0 +1,1 @@
+ALTER TABLE public.booking_vehicle DROP CONSTRAINT booking_vehicle_vehicle_id_date_key;
