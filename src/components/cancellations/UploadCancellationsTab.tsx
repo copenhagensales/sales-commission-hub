@@ -869,10 +869,33 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       // === Excel-internal dedup: group by normalized phone, keep first as representative ===
       // Only applies to Eesy TM and Eesy FM clients
       const isEesyClient = selectedClientId === CLIENT_IDS["Eesy TM"] || selectedClientId === CLIENT_IDS["Eesy FM"];
+      const localPhoneExcluded: string[] = (activeConfig as any)?.phone_excluded_products || [];
       const excelDupIndices = new Set<number>();
       if (isEesyClient && phoneColumn !== "__none__") {
         const phoneGroupMap = new Map<string, number[]>();
+        const prodCols = activeConfig?.product_columns || [];
+        const PRODUCT_KEYS_DEDUP = ["Subscription Name", "Product", "Produkt", "Abonnement", "Product Name", "Produktnavn"];
         cleanedData.forEach((row, idx) => {
+          // Skip phone_excluded products (e.g. 5G Internet) from dedup — each must be treated individually
+          if (localPhoneExcluded.length > 0) {
+            let rawProd = "";
+            for (const col of prodCols) {
+              const v = getCaseInsensitive(row.originalRow, col);
+              if (v && String(v).trim()) { rawProd = String(v).trim(); break; }
+            }
+            if (!rawProd) {
+              for (const key of PRODUCT_KEYS_DEDUP) {
+                const v = getCaseInsensitive(row.originalRow, key);
+                if (v && String(v).trim()) { rawProd = String(v).trim(); break; }
+              }
+            }
+            if (rawProd) {
+              const rawProdLower = rawProd.toLowerCase();
+              const isExcluded = localPhoneExcluded.some(p => rawProdLower.includes(p.toLowerCase().trim()) || p.toLowerCase().trim().includes(rawProdLower));
+              if (isExcluded) return; // Don't add to phone groups — skip dedup for this row
+            }
+          }
+
           const rawPhone = String(getCaseInsensitive(row.originalRow, phoneColumn) ?? "").trim();
           const nPhone = rawPhone ? normalizePhone(rawPhone) : null;
           if (nPhone) {
@@ -1064,6 +1087,25 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
           dedupedData.forEach((row) => {
             const idx = row.originalIndex;
+
+            // Skip phone_excluded products (e.g. 5G Internet) from Pass 1 phone matching — let Pass 2 handle
+            const prodCol1 = activeConfig?.product_columns?.[0];
+            let rawRowProd1 = prodCol1 ? String(getCaseInsensitive(row.originalRow, prodCol1) || "").trim() : "";
+            if (!rawRowProd1) {
+              for (const key of PRODUCT_KEYS_1B) {
+                const val = getCaseInsensitive(row.originalRow, key);
+                if (val && String(val).trim()) { rawRowProd1 = String(val).trim(); break; }
+              }
+            }
+            if (rawRowProd1 && phoneExcludedProducts.length > 0) {
+              // Check both raw product name and mapped product name
+              const rawLower = rawRowProd1.toLowerCase();
+              const mappedName = productMappingLookup.get(rawLower) || null;
+              const checkVal = (mappedName || rawRowProd1).toLowerCase().trim();
+              const isPass1Excluded = phoneExcludedProducts.some(p => checkVal.includes(p.toLowerCase().trim()) || p.toLowerCase().trim().includes(checkVal));
+              if (isPass1Excluded) return; // Skip — Pass 2 will match by seller+date+product
+            }
+
             const rawExcelPhone = phoneColumn !== "__none__" ? getCaseInsensitive(row.originalRow, phoneColumn) : null;
             if (!rawExcelPhone) return;
             const excelPhone = normalizePhone(String(rawExcelPhone));
@@ -1958,8 +2000,18 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       return { mergedMatchedSales: matchedSales, mergedAwayEntries: [] as MatchedSale[], matchedPhones: phones };
     }
 
+    const mergePhoneExcluded: string[] = (activePreviewConfig as any)?.phone_excluded_products || [];
     const phoneGroups = new Map<string, MatchedSale[]>();
     matchedSales.forEach(sale => {
+      // For phone_excluded products (e.g. 5G Internet), use saleId as key to prevent merging with other rows
+      const targetLower = (sale.targetProductName || "").toLowerCase().trim();
+      const isPhoneExcludedSale = mergePhoneExcluded.some(p => targetLower.includes(p.toLowerCase().trim()) || p.toLowerCase().trim().includes(targetLower));
+      if (isPhoneExcludedSale) {
+        const key = `__excluded_${sale.saleId}_${Date.now()}_${Math.random()}`;
+        phoneGroups.set(key, [sale]);
+        return;
+      }
+
       const phone = sale.phone ? normalizePhone(sale.phone) : null;
       const uploadedPhone = phoneColumn !== "__none__"
         ? String(getCaseInsensitive(sale.uploadedRowData, phoneColumn) ?? "").trim()
