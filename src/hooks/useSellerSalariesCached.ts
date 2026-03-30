@@ -461,11 +461,11 @@ export function useSellerSalariesCached(
     sellers.sort((a, b) => b.commission - a.commission);
 
     return { sellerData: sellers, lastUpdated: new Date() };
-  }, [employees, salesAggregates, selectedTeam, salaryTypes, dietData, sickData, dailyBonusData, startupBonusData, cancellationData, salaryAdditionsData]);
+  }, [employees, salesAggregates, selectedTeam, salaryTypes, dietData, sickData, dailyBonusData, startupBonusData, cancellationData, productChangeLogData, salaryAdditionsData]);
 
   return {
     sellerData,
-    isLoading: employeesLoading || commissionLoading || salaryTypesLoading || dietLoading || sickLoading || dailyBonusLoading || startupBonusLoading || cancellationLoading || salaryAdditionsLoading,
+    isLoading: employeesLoading || commissionLoading || salaryTypesLoading || dietLoading || sickLoading || dailyBonusLoading || startupBonusLoading || cancellationLoading || changeLogLoading || salaryAdditionsLoading,
     lastUpdated,
   };
 }
