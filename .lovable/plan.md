@@ -1,55 +1,82 @@
 
 
-## Fix: Inkluder Eesy TM-salg uden kampagne-mapping — kun for Eesy TM
+## Fix: Udvid Eesy TM-matching til alle Abo-felter (ikke kun Abo1-3)
 
-### Problem
-611 salg med `source = 'Eesy'` og `integration_type = 'enreach'` har `client_campaign_id = NULL`. Disse udelukkes fra annulleringsmatching, fordi queryen filtrerer med `.in("client_campaign_id", campaignIds)`.
+### Problem fundet
+Eesy TM's `product_phone_mappings` dækker kun `Telefon Abo1`, `Abo2`, `Abo3`. Men databasen viser:
+- **142 salg** med `Telefon Abo4`
+- **60 salg** med `Telefon Abo5`  
+- **10 salg** med `Abo6`, **4** med `Abo7`, **1** med `Abo8`
 
-Eesy TM har kun **én** kampagne: `d031126c-aec0-4b80-bbe2-bbc31c4f04ba`.
+Salg med op til 8 abonnementer har også 5+ `sale_items`. Når en Excel-annulleringsrække indeholder et telefonnummer der kun findes i Abo4-8, kan hverken Pass 1 (tjekker kun Abo1-3) eller Pass 1b (tjekker `customer_phone`) finde det.
 
-### Del 1: Data-migration (SQL)
-Opdater de 611 salg til Eesy TM's kampagne — scoped med `client_campaign_id` for Eesy TM specifikt:
+### Løsning
+For **Eesy TM** udvides Pass 1 til dynamisk at scanne ALLE `Telefon Abo*`-felter i `raw_payload.data`, i stedet for kun at bruge de 3 konfigurerede mappings.
 
-```sql
-UPDATE sales
-SET client_campaign_id = 'd031126c-aec0-4b80-bbe2-bbc31c4f04ba'
-WHERE source = 'Eesy'
-  AND integration_type = 'enreach'
-  AND client_campaign_id IS NULL;
-```
+### Teknisk ændring
 
-Da Eesy TM er den eneste klient der bruger `source = 'Eesy'` + `integration_type = 'enreach'` med NULL kampagne, og alle disse salg tilhører Eesy TM, er dette allerede korrekt scoped. Eesy FM bruger andre kampagne-IDs og har ikke NULL-problemer.
+**Fil: `src/components/cancellations/UploadCancellationsTab.tsx`** — Pass 1 matchingloop (~linje 1146-1193)
 
-### Del 2: Kode-fix — kun for Eesy TM
-**Fil: `src/components/cancellations/UploadCancellationsTab.tsx`** (linje ~978-1007)
-
-Udvid `fetchCandidateSales` med en ekstra fallback-query **kun for Eesy TM** (ikke Eesy FM):
+Tilføj dynamisk Abo-scanning for Eesy TM inden i sale-loopet:
 
 ```typescript
-// After existing campaign-based query, add fallback for Eesy TM only
+// Inside the sale loop, for Eesy TM: dynamically find ALL Telefon Abo fields
 if (selectedClientId === CLIENT_IDS["Eesy TM"]) {
-  let from2 = 0;
-  while (true) {
-    const { data, error } = await supabase
-      .from("sales")
-      .select(/* same columns */)
-      .is("client_campaign_id", null)
-      .eq("source", "Eesy")
-      .eq("integration_type", "enreach")
-      .neq("validation_status", "cancelled")
-      .order("sale_datetime", { ascending: false })
-      .range(from2, from2 + pageSize - 1);
-    if (error) throw error;
-    if (!data || data.length === 0) break;
-    candidates.push(...data);
-    if (data.length < pageSize) break;
-    from2 += pageSize;
+  const payloadData = (sale.raw_payload as any)?.data || {};
+  
+  // Collect all "Telefon AboN" fields dynamically
+  const aboEntries: { field: string; index: number }[] = [];
+  for (const key of Object.keys(payloadData)) {
+    const match = key.match(/^Telefon Abo(\d+)$/);
+    if (match) {
+      aboEntries.push({ field: key, index: parseInt(match[1], 10) });
+    }
   }
+  
+  for (const abo of aboEntries) {
+    const payloadPhoneRaw = payloadData[abo.field];
+    if (!payloadPhoneRaw) continue;
+    const payloadPhone = normalizePhone(String(payloadPhoneRaw));
+    if (!payloadPhone || payloadPhone !== excelPhone) continue;
+    
+    // Resolve matching sale_item by position (0-indexed)
+    const allItems = saleItemsMap.get(sale.id) || [];
+    const posIndex = abo.index - 1;
+    const matchingItem = posIndex >= 0 && posIndex < allItems.length 
+      ? allItems[posIndex] : allItems[0];
+    
+    // Dedup by resolved product name
+    const resolvedName = matchingItem?.adversus_product_title || `Abonnement${abo.index}`;
+    const key = `${sale.id}|${resolvedName}`;
+    if (matchedSaleProductKeys.has(key)) continue;
+    matchedSaleProductKeys.add(key);
+    matchedIndicesLocal.add(idx);
+    
+    productMatched.push({
+      saleId: sale.id,
+      phone: String(payloadPhoneRaw),
+      company: sale.customer_company || "",
+      oppNumber: "",
+      saleDate: sale.sale_datetime || "",
+      employee: sale.agent_name || "Ukendt",
+      currentStatus: sale.validation_status || "pending",
+      uploadedRowData: row.originalRow,
+      targetProductName: matchingItem?.adversus_product_title || `Abonnement${abo.index}`,
+      realProductName: matchingItem?.adversus_product_title || allItems[0]?.adversus_product_title || "Ukendt produkt",
+      commission: matchingItem?.mapped_commission ?? undefined,
+      revenue: matchingItem?.mapped_revenue ?? undefined,
+    });
+    break; // One match per Excel row
+  }
+  if (matchedIndicesLocal.has(idx)) break; // Move to next Excel row
 }
 ```
 
+Denne erstatning **erstatter** den eksisterende mapping-baserede loop for Eesy TM. De konfigurerede mappings (Abo1-3) bruges fortsat for andre klienter.
+
 ### Konsekvens
-- **Eesy TM**: 611 eksisterende salg får kampagne-ID med det samme (migration). Fremtidige NULL-salg fanges af fallback-query.
-- **Eesy FM**: Helt uberørt — hverken migration eller kode-fallback rører FM.
-- **Andre klienter**: Uberørte.
+- Abo4-8 matcher nu korrekt → op til **217 flere salg** kan matches
+- Abo1-3 fungerer uændret (samme logik, dynamisk fundet)
+- Andre klienter: Uberørte (bruger stadig konfigurerede mappings)
+- Dedup-logik bevares (sale_id + resolved product name)
 
