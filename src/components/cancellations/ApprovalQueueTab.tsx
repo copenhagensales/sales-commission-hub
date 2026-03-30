@@ -616,20 +616,25 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   const oppGroups = queryResult?.oppGroups || [];
   const flatItems = queryResult?.flatItems || [];
 
-  // Duplicate phone detection: phones appearing >1 time across all pending items
-  const duplicatePhones = useMemo(() => {
-    const phoneCounts = new Map<string, number>();
+  // Duplicate detection: for Eesy TM use sale_id (multiple abos per customer_phone),
+  // for other clients use phone
+  const isEesyTm = clientId === CLIENT_IDS["Eesy TM"];
+
+  const duplicateKeys = useMemo(() => {
+    const counts = new Map<string, number>();
     for (const item of flatItems) {
-      if (item.isPhoneExcluded) continue; // Skip phone_excluded produkter
-      const phone = (item.phone || "").trim();
-      if (phone) phoneCounts.set(phone, (phoneCounts.get(phone) || 0) + 1);
+      if (item.isPhoneExcluded) continue;
+      const key = isEesyTm
+        ? (item.sale_id || "").trim()
+        : (item.phone || "").trim();
+      if (key) counts.set(key, (counts.get(key) || 0) + 1);
     }
     const dupes = new Set<string>();
-    for (const [phone, count] of phoneCounts) {
-      if (count > 1) dupes.add(phone);
+    for (const [k, count] of counts) {
+      if (count > 1) dupes.add(k);
     }
     return dupes;
-  }, [flatItems]);
+  }, [flatItems, isEesyTm]);
 
   const duplicateCount = useMemo(() => {
     return flatItems.filter(i => !i.isPhoneExcluded && duplicatePhones.has((i.phone || "").trim())).length;
