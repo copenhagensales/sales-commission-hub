@@ -362,6 +362,7 @@ export function useSellerSalariesCached(
         diet: (dietMap[emp.id] || 0) + (adds?.diet || 0),
         sickDays: (sickMap[emp.id] || 0) + (adds?.sickDays || 0),
         dailyBonus: (dailyBonusMap[emp.id] || 0) + (adds?.dailyBonus || 0),
+        startupBonus: (startupBonusMap[emp.id] || 0) + (adds?.startupBonus || 0),
         referralBonus: (emp.referral_bonus || 0) + (adds?.referralBonus || 0),
         isActive: emp.is_active ?? true,
         isFreelanceConsultant: emp.is_freelance_consultant ?? false,
