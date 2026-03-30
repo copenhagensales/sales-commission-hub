@@ -504,12 +504,20 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
       const flatItems: FlatQueueRow[] = data.map((item) => {
         const sale = salesMap.get(item.sale_id);
         const imp = importsMap.get(item.import_id);
-        const saleItems = saleItemsBySale.get(item.sale_id) || [];
+        let saleItems = saleItemsBySale.get(item.sale_id) || [];
         const uploaded = (item.uploaded_data || null) as Record<string, unknown> | null;
         const configId = imp?.config_id;
         const mapping = configId ? configsMap.get(configId) || null : null;
         const saleDateVal = sale?.sale_datetime || "";
         const targetProductName = item.target_product_name || null;
+
+        // For Eesy TM: filter to only the targeted product for cancellation
+        if (clientId === CLIENT_IDS["Eesy TM"] && targetProductName) {
+          const filtered = saleItems.filter(si =>
+            si.product_name.toLowerCase().trim() === targetProductName.toLowerCase().trim()
+          );
+          if (filtered.length > 0) saleItems = filtered;
+        }
 
         // Check if the matched product is phone_excluded (check both target and real product)
         const phoneExcludedList = mapping?.phone_excluded_products || [];
