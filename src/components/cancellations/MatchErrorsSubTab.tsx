@@ -814,13 +814,12 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
                                   <CommandItem
                                     key={emp.id}
                                     value={`${emp.first_name} ${emp.last_name}`}
-                                    className={emp.is_active === false ? "text-muted-foreground" : ""}
+                                    className={cn("text-xs", emp.is_active === false && "text-muted-foreground")}
                                     onSelect={() => {
                                       setLocalAssignments(prev => ({ ...prev, [rk]: emp.id }));
                                       upsertMapping.mutate({ row, rKey: rk, employeeId: emp.id });
                                       setOpenPopoverKey(null);
                                     }}
-                                    className="text-xs"
                                   >
                                     <Check className={cn("mr-2 h-3 w-3", currentMapping === emp.id ? "opacity-100" : "opacity-0")} />
                                     {emp.first_name} {emp.last_name}{emp.is_active === false ? " (inaktiv)" : ""}
