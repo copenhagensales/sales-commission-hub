@@ -17,7 +17,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { PayrollPeriodSelector } from "@/components/employee/PayrollPeriodSelector";
 import { getPayrollPeriod } from "@/lib/calculations";
 
-type SortKey = "name" | "team" | "commission" | "cancellations" | "vacationPay" | "diet" | "sickDays" | "dailyBonus" | "referralBonus";
+type SortKey = "name" | "team" | "commission" | "cancellations" | "vacationPay" | "diet" | "sickDays" | "dailyBonus" | "startupBonus" | "referralBonus";
 type SortDir = "asc" | "desc";
 
 export function SellerSalariesTab() {
@@ -82,6 +82,7 @@ export function SellerSalariesTab() {
   const totalDiet = filteredData.reduce((sum, s) => sum + s.diet, 0);
   const totalSickDays = filteredData.reduce((sum, s) => sum + s.sickDays, 0);
   const totalDailyBonus = filteredData.reduce((sum, s) => sum + s.dailyBonus, 0);
+  const totalStartupBonus = filteredData.reduce((sum, s) => sum + s.startupBonus, 0);
   const totalReferralBonus = filteredData.reduce((sum, s) => sum + s.referralBonus, 0);
 
   const SortIcon = ({ col }: { col: SortKey }) => {
@@ -193,6 +194,10 @@ export function SellerSalariesTab() {
                     <span>{formatCurrency(seller.dailyBonus)}</span>
                   </div>
                   <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Opstartsbonus</span>
+                    <span>{formatCurrency(seller.startupBonus)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">Henvisning</span>
                     <span>{formatCurrency(seller.referralBonus)}</span>
                   </div>
@@ -205,6 +210,7 @@ export function SellerSalariesTab() {
                 <div className="flex justify-between text-xs"><span>Total diet</span><span>{formatCurrency(totalDiet)}</span></div>
                 <div className="flex justify-between text-xs"><span>Total sygdom</span><span>{totalSickDays} dage</span></div>
                 <div className="flex justify-between text-xs"><span>Total dagsbonus</span><span>{formatCurrency(totalDailyBonus)}</span></div>
+                <div className="flex justify-between text-xs"><span>Total opstartsbonus</span><span>{formatCurrency(totalStartupBonus)}</span></div>
                 <div className="flex justify-between text-xs"><span>Total henvisning</span><span>{formatCurrency(totalReferralBonus)}</span></div>
               </div>
             </div>
@@ -220,6 +226,7 @@ export function SellerSalariesTab() {
                   <SortableHead col="diet" className="text-right">Diet</SortableHead>
                   <SortableHead col="sickDays" className="text-right">Sygdom</SortableHead>
                   <SortableHead col="dailyBonus" className="text-right">Dagsbonus</SortableHead>
+                  <SortableHead col="startupBonus" className="text-right">Opstartsbonus</SortableHead>
                   <SortableHead col="referralBonus" className="text-right">Henvisning</SortableHead>
                 </TableRow>
               </TableHeader>
@@ -238,6 +245,7 @@ export function SellerSalariesTab() {
                     <SalaryAdditionCell value={seller.diet} columnKey="diet" items={seller.salaryAdditions?.diet} />
                     <SalaryAdditionCell value={seller.sickDays} columnKey="sickDays" items={seller.salaryAdditions?.sickDays} isCurrency={false} />
                     <SalaryAdditionCell value={seller.dailyBonus} columnKey="dailyBonus" items={seller.salaryAdditions?.dailyBonus} />
+                    <SalaryAdditionCell value={seller.startupBonus} columnKey="startupBonus" items={seller.salaryAdditions?.startupBonus} />
                     <SalaryAdditionCell value={seller.referralBonus} columnKey="referralBonus" items={seller.salaryAdditions?.referralBonus} />
                   </TableRow>
                 ))}
@@ -250,6 +258,7 @@ export function SellerSalariesTab() {
                   <TableCell className="text-right">{formatCurrency(totalDiet)}</TableCell>
                   <TableCell className="text-right">{totalSickDays}</TableCell>
                   <TableCell className="text-right">{formatCurrency(totalDailyBonus)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(totalStartupBonus)}</TableCell>
                   <TableCell className="text-right">{formatCurrency(totalReferralBonus)}</TableCell>
                 </TableRow>
               </TableBody>

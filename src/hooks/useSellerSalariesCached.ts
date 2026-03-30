@@ -32,6 +32,7 @@ interface SellerData {
   diet: number;
   sickDays: number;
   dailyBonus: number;
+  startupBonus: number;
   referralBonus: number;
   isActive: boolean;
   isFreelanceConsultant: boolean;
@@ -162,6 +163,24 @@ export function useSellerSalariesCached(
     staleTime: 60000,
   });
 
+  // Query 6b: Startup bonus (booking_startup_bonus) for the period
+  const { data: startupBonusData, isLoading: startupBonusLoading } = useQuery({
+    queryKey: ["seller-startup-bonus", periodStartISO, periodEndISO],
+    queryFn: async () => {
+      if (!periodStartISO || !periodEndISO) return [];
+      const { data, error } = await (supabase
+        .from("booking_startup_bonus") as any)
+        .select("employee_id, amount")
+        .gte("date", periodStartISO)
+        .lte("date", periodEndISO);
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!periodStartISO && !!periodEndISO,
+    staleTime: 60000,
+  });
+
   // Query 7: Salary additions for the period
   const { data: salaryAdditionsData, isLoading: salaryAdditionsLoading } = useQuery({
     queryKey: ["salary-additions", periodStartISO, periodEndISO],
@@ -271,6 +290,12 @@ export function useSellerSalariesCached(
       dailyBonusMap[db.employee_id] = (dailyBonusMap[db.employee_id] || 0) + (db.amount || 0);
     }
 
+    // Build startup bonus map
+    const startupBonusMap: Record<string, number> = {};
+    for (const sb of startupBonusData || []) {
+      startupBonusMap[sb.employee_id] = (startupBonusMap[sb.employee_id] || 0) + (sb.amount || 0);
+    }
+
     // Build cancellation map (agent_email → employee_id → total lost commission)
     const cancellationMap: Record<string, number> = {};
     for (const cq of cancellationData || []) {
@@ -337,6 +362,7 @@ export function useSellerSalariesCached(
         diet: (dietMap[emp.id] || 0) + (adds?.diet || 0),
         sickDays: (sickMap[emp.id] || 0) + (adds?.sickDays || 0),
         dailyBonus: (dailyBonusMap[emp.id] || 0) + (adds?.dailyBonus || 0),
+        startupBonus: (startupBonusMap[emp.id] || 0) + (adds?.startupBonus || 0),
         referralBonus: (emp.referral_bonus || 0) + (adds?.referralBonus || 0),
         isActive: emp.is_active ?? true,
         isFreelanceConsultant: emp.is_freelance_consultant ?? false,
@@ -347,11 +373,11 @@ export function useSellerSalariesCached(
     sellers.sort((a, b) => b.commission - a.commission);
 
     return { sellerData: sellers, lastUpdated: new Date() };
-  }, [employees, salesAggregates, selectedTeam, salaryTypes, dietData, sickData, dailyBonusData, cancellationData, salaryAdditionsData]);
+  }, [employees, salesAggregates, selectedTeam, salaryTypes, dietData, sickData, dailyBonusData, startupBonusData, cancellationData, salaryAdditionsData]);
 
   return {
     sellerData,
-    isLoading: employeesLoading || commissionLoading || salaryTypesLoading || dietLoading || sickLoading || dailyBonusLoading || cancellationLoading || salaryAdditionsLoading,
+    isLoading: employeesLoading || commissionLoading || salaryTypesLoading || dietLoading || sickLoading || dailyBonusLoading || startupBonusLoading || cancellationLoading || salaryAdditionsLoading,
     lastUpdated,
   };
 }
