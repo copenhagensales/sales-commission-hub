@@ -189,6 +189,22 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
     onError: () => toast.error("Kunne ikke opdatere fradragsdato"),
   });
 
+  const bulkUpdateDeductionDate = useMutation({
+    mutationFn: async ({ ids, date }: { ids: string[]; date: string }) => {
+      const { error } = await supabase
+        .from("cancellation_queue")
+        .update({ deduction_date: date } as any)
+        .in("id", ids);
+      if (error) throw error;
+      return ids.length;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ["approved-queue", clientId] });
+      toast.success(`Fradragsdato opdateret for ${count} sager`);
+    },
+    onError: () => toast.error("Kunne ikke opdatere fradragsdatoer"),
+  });
+
   const sellers = useMemo(() => {
     const set = new Set(items.map((i) => i.agentName).filter(Boolean));
     return Array.from(set).sort();
@@ -232,6 +248,11 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
     return sortDir === "asc" ? <ArrowUp className="ml-1 h-3 w-3 inline" /> : <ArrowDown className="ml-1 h-3 w-3 inline" />;
   };
 
+  const approvedFilteredIds = useMemo(
+    () => filtered.filter(i => i.status === "approved").map(i => i.id),
+    [filtered]
+  );
+
   if (!clientId) return <p className="text-muted-foreground">Vælg en kunde for at se godkendte/afviste sager.</p>;
 
   return (
@@ -240,6 +261,33 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
         <CardTitle className="flex items-center justify-between flex-wrap gap-4">
           <span>Godkendte / Afviste ({filtered.length})</span>
           <div className="flex items-center gap-2">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={approvedFilteredIds.length === 0 || bulkUpdateDeductionDate.isPending}
+                >
+                  <CalendarIcon className="h-4 w-4 mr-1" />
+                  Ændr lønperiode for alle ({approvedFilteredIds.length})
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  mode="single"
+                  onSelect={(date) => {
+                    if (date && approvedFilteredIds.length > 0) {
+                      bulkUpdateDeductionDate.mutate({
+                        ids: approvedFilteredIds,
+                        date: format(date, "yyyy-MM-dd"),
+                      });
+                    }
+                  }}
+                  className="pointer-events-auto"
+                  locale={da}
+                />
+              </PopoverContent>
+            </Popover>
             <div className="relative">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
