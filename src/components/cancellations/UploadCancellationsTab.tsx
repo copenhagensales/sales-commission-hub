@@ -1481,7 +1481,9 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               const isExcluded2 = phoneExcludedProducts.some(
                 p => rowProduct2.toLowerCase().includes(p.toLowerCase()) || p.toLowerCase().includes(rowProduct2.toLowerCase())
               );
-              if (!isExcluded2) return;
+              const isEesyTm5g = selectedClientId === CLIENT_IDS["Eesy TM"]
+                && isEesyTm5gExcelProduct(rowProduct2);
+              if (!isExcluded2 && !isEesyTm5g) return;
             }
 
             const excelSeller = String(getCaseInsensitive(row.originalRow, sellerCol) || "").trim();
