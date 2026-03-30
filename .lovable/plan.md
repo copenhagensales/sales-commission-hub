@@ -1,29 +1,50 @@
 
 
-## Fix: Annulleringer trækker hele salgets provision i stedet for kun det annullerede produkt
+## Fix: Eesy TM — Sælger+Dato fallback når produkt ikke kan resolves
 
 ### Problem
-Når en annullering godkendes, summerer lønsystemet **alle** sale_items på salget — ikke kun det produkt der er annulleret. For Eesy TM-salg med flere produkter (typisk 2-3 items) betyder det f.eks. at en annullering af "Lønsikring" (400 kr.) trækker hele salgets 1.400 kr. fra sælgerens provision.
-
-**Bevist eksempel:** Annullering af "Lønsikring" på salg med 2 items:
-- Salg = 1.000 kr. (hovedprodukt) + 400 kr. (Lønsikring)  
-- Target = "Lønsikring" → korrekt fradrag = 400 kr.  
-- Nuværende fradrag = 1.400 kr. (hele salget)
+Når Excel-kolonnen indeholder en annulleringsårsag (f.eks. "Brug af fortrydelsesret") i stedet for et produktnavn, returnerer linje 1549 tidligt fordi `resolvedProductTitle` er null — selvom sælger og dato matcher perfekt. Dette rammer kun Eesy TM, da andre kunder har korrekte produktnavne i deres uploads.
 
 ### Løsning
 
-**`src/hooks/useSellerSalariesCached.ts`**
+**`src/components/cancellations/UploadCancellationsTab.tsx`** — Pass 2 (~linje 1549)
 
-1. **Hent `target_product_name` fra cancellation_queue** — tilføj feltet til select-queryen (linje 239-248).
+**Kun for Eesy TM** (`selectedClientId === CLIENT_IDS["Eesy TM"]`):
 
-2. **Hent produktnavne for matching** — ny query der slår `product_id → name` op fra `products`-tabellen, så vi kan matche `target_product_name` mod de faktiske sale_items.
+1. **Ændr early-return** på linje 1549: Hvis `resolvedProductTitle` er null men `excelSeller` og `excelDate` er tilgængelige, og kunden er Eesy TM → fortsæt i stedet for at returnere.
 
-3. **Beregn kun den målrettede provision**:
-   - Hvis `target_product_name` findes: find den matchende sale_item og træk kun dennes `mapped_commission` fra.
-   - Hvis `target_product_name` er null (ældre rækker uden produktmål): fald tilbage til at trække hele salgets provision fra (nuværende adfærd).
+2. **Sælger+Dato fallback-blok** (ny kode efter den eksisterende logik):
+   - Filtrer `candidateSales` på `agentEmail` + eksakt dato-match.
+   - **1 kandidat**: Match automatisk. Brug salgets første item's `adversus_product_title` som både `targetProductName` og `realProductName`.
+   - **Flere kandidater**: Tilføj til `unmatchedSellers` for manuel håndtering.
+   - **0 kandidater**: Tilføj til `unmatchedSellers`.
 
-### Tekniske detaljer
-- `cancellation_queue.target_product_name` gemmes allerede ved matching/godkendelse
-- Matching sker ved at sammenligne `target_product_name` med `products.name` via `sale_items.product_id`
-- Fallback-logikken sikrer bagudkompatibilitet med ældre annulleringer
+3. **Eksisterende logik uændret** for alle andre kunder og for Eesy TM-rækker hvor produktet resolves korrekt.
+
+### Ændring i kode (pseudokode)
+```text
+Linje 1549:
+- if (!resolvedProductTitle || !excelSeller || !excelDate) return;
++ if (!resolvedProductTitle && !(selectedClientId === CLIENT_IDS["Eesy TM"] && excelSeller && excelDate)) return;
++ if (!excelSeller || !excelDate) return;
+
+Efter linje 1715 (slutningen af else-blokken), tilføj:
+  if (!resolvedProductTitle && selectedClientId === CLIENT_IDS["Eesy TM"]) {
+    // Sælger+dato fallback — find kandidater uden produktkrav
+    const dateCandidates = candidateSales.filter(sale => {
+      if (existingIds.has(sale.id)) return false;
+      if ((sale.agent_email||"").toLowerCase() !== agentEmail) return false;
+      const sd = new Date(sale.sale_datetime);
+      return excelDateObj.getFullYear() === sd.getFullYear()
+          && excelDateObj.getMonth() === sd.getMonth()
+          && excelDateObj.getDate() === sd.getDate();
+    });
+    if (dateCandidates.length === 1) {
+      // Auto-match med salgets produkt
+      → push til productMatched med salgets item-data
+    } else {
+      → push til unmatchedSellers
+    }
+  }
+```
 
