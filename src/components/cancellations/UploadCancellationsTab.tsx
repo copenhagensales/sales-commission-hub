@@ -1587,7 +1587,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             const isEesyTm5gRow = selectedClientId === CLIENT_IDS["Eesy TM"]
               && resolvedProductTitle?.toLowerCase() === "5g internet";
 
-            if (isPhoneExcludedRow) {
+            if (isPhoneExcludedRow || isEesyTm5gRow) {
               const candidates: typeof candidateSales = [];
               for (const sale of candidateSales) {
                 if (existingIds.has(sale.id)) continue;
