@@ -814,6 +814,7 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
                                   <CommandItem
                                     key={emp.id}
                                     value={`${emp.first_name} ${emp.last_name}`}
+                                    className={emp.is_active === false ? "text-muted-foreground" : ""}
                                     onSelect={() => {
                                       setLocalAssignments(prev => ({ ...prev, [rk]: emp.id }));
                                       upsertMapping.mutate({ row, rKey: rk, employeeId: emp.id });
