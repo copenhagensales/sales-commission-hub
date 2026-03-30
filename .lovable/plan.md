@@ -1,92 +1,55 @@
 
 
-## Fix: Forhindre duplikerede produkt-matches på samme salg (Eesy TM)
+## Fix: Inkluder Eesy TM-salg uden kampagne-mapping — kun for Eesy TM
 
-### Rodårsag
+### Problem
+611 salg med `source = 'Eesy'` og `integration_type = 'enreach'` har `client_campaign_id = NULL`. Disse udelukkes fra annulleringsmatching, fordi queryen filtrerer med `.in("client_campaign_id", campaignIds)`.
 
-I Pass 1 bruges `matchedSaleProductKeys` til at forhindre dubletter. Men nøglen er `sale.id|mapping.productName` — altså `saleId|Abonnement2` vs `saleId|Abonnement3`. Disse er **forskellige**, selvom begge Abo-felter peger på **det samme faktiske produkt** (f.eks. "Fri tale + 70 GB...").
+Eesy TM har kun **én** kampagne: `d031126c-aec0-4b80-bbe2-bbc31c4f04ba`.
 
-Resultat: 3 Excel-rækker med 3 forskellige telefonnumre matcher Abo1, Abo2 og Abo3 på ét salg. To af dem resolver til samme produkt → ægte dublet i godkendelseskøen.
+### Del 1: Data-migration (SQL)
+Opdater de 611 salg til Eesy TM's kampagne — scoped med `client_campaign_id` for Eesy TM specifikt:
 
-### Løsning
-
-**Fil: `src/components/cancellations/UploadCancellationsTab.tsx`** — linje ~1127-1128
-
-Ændr dedup-nøglen for Eesy TM til at bruge det **resolved** produktnavn i stedet for mapping-navnet:
-
-```typescript
-// Nuværende (linje 1127):
-const key = `${sale.id}|${mapping.productName}`;
-
-// Ny:
-const resolvedName = selectedClientId === CLIENT_IDS["Eesy TM"]
-  ? (matchingItem?.adversus_product_title || mapping.productName)
-  : mapping.productName;
-const key = `${sale.id}|${resolvedName}`;
+```sql
+UPDATE sales
+SET client_campaign_id = 'd031126c-aec0-4b80-bbe2-bbc31c4f04ba'
+WHERE source = 'Eesy'
+  AND integration_type = 'enreach'
+  AND client_campaign_id IS NULL;
 ```
 
-Men `matchingItem` beregnes EFTER denne linje (linje 1131-1133). Så vi skal flytte dedup-checket til EFTER matchingItem er resolved:
+Da Eesy TM er den eneste klient der bruger `source = 'Eesy'` + `integration_type = 'enreach'` med NULL kampagne, og alle disse salg tilhører Eesy TM, er dette allerede korrekt scoped. Eesy FM bruger andre kampagne-IDs og har ikke NULL-problemer.
 
-```text
-Nuværende rækkefølge (linje 1126-1149):
-  1. if (excelPhone === payloadPhone)
-  2. const key = sale.id|mapping.productName  ← dedup check
-  3. matchedSaleProductKeys.has(key) → skip
-  4. beregn posIndex + matchingItem
-  5. push match
-  6. break
+### Del 2: Kode-fix — kun for Eesy TM
+**Fil: `src/components/cancellations/UploadCancellationsTab.tsx`** (linje ~978-1007)
 
-Ny rækkefølge:
-  1. if (excelPhone === payloadPhone)
-  2. beregn posIndex + matchingItem          ← flyttes op
-  3. const key = sale.id|resolvedName         ← bruger faktisk produktnavn
-  4. matchedSaleProductKeys.has(key) → skip
-  5. push match
-  6. break
+Udvid `fetchCandidateSales` med en ekstra fallback-query **kun for Eesy TM** (ikke Eesy FM):
+
+```typescript
+// After existing campaign-based query, add fallback for Eesy TM only
+if (selectedClientId === CLIENT_IDS["Eesy TM"]) {
+  let from2 = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from("sales")
+      .select(/* same columns */)
+      .is("client_campaign_id", null)
+      .eq("source", "Eesy")
+      .eq("integration_type", "enreach")
+      .neq("validation_status", "cancelled")
+      .order("sale_datetime", { ascending: false })
+      .range(from2, from2 + pageSize - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    candidates.push(...data);
+    if (data.length < pageSize) break;
+    from2 += pageSize;
+  }
+}
 ```
 
 ### Konsekvens
-- Abo2 og Abo3 med **samme** produkt → kun ét match (korrekt)
-- Abo1 og Abo2 med **forskellige** produkter → to matches (korrekt)
-- Andre klienter: Uberørte (bruger stadig `mapping.productName` i nøglen)
-
-### Teknisk ændring — én blok
-
-Linje ~1126-1149 i `UploadCancellationsTab.tsx` omskrives til:
-
-```typescript
-if (excelPhone === payloadPhone) {
-  // Resolve the matched sale_item FIRST (for Eesy TM dedup by actual product)
-  const posIndex = parseInt(mapping.payloadPhoneField?.replace(/\D/g, "") || "0", 10) - 1;
-  const allItems = saleItemsMap.get(sale.id) || [];
-  const matchingItem = posIndex >= 0 && posIndex < allItems.length ? allItems[posIndex] : allItems[0];
-  
-  // Dedup key: use resolved product name for Eesy TM, mapping name for others
-  const resolvedName = selectedClientId === CLIENT_IDS["Eesy TM"]
-    ? (matchingItem?.adversus_product_title || mapping.productName)
-    : mapping.productName;
-  const key = `${sale.id}|${resolvedName}`;
-  if (matchedSaleProductKeys.has(key)) continue;
-  matchedSaleProductKeys.add(key);
-  matchedIndicesLocal.add(idx);
-  
-  productMatched.push({
-    saleId: sale.id,
-    phone: String(payloadPhoneRaw),
-    company: sale.customer_company || "",
-    oppNumber: "",
-    saleDate: sale.sale_datetime || "",
-    employee: sale.agent_name || "Ukendt",
-    currentStatus: sale.validation_status || "pending",
-    uploadedRowData: row.originalRow,
-    targetProductName: selectedClientId === CLIENT_IDS["Eesy TM"]
-      ? (matchingItem?.adversus_product_title || mapping.productName)
-      : mapping.productName,
-    realProductName: matchingItem?.adversus_product_title || allItems[0]?.adversus_product_title || "Ukendt produkt",
-    commission: matchingItem?.mapped_commission ?? undefined,
-    revenue: matchingItem?.mapped_revenue ?? undefined,
-  });
-  if (selectedClientId === CLIENT_IDS["Eesy TM"]) break;
-}
-```
+- **Eesy TM**: 611 eksisterende salg får kampagne-ID med det samme (migration). Fremtidige NULL-salg fanges af fallback-query.
+- **Eesy FM**: Helt uberørt — hverken migration eller kode-fallback rører FM.
+- **Andre klienter**: Uberørte.
 
