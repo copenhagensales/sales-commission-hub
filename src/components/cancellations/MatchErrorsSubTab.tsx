@@ -520,20 +520,7 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
     return mappingsByName.get(sellerValue.toLowerCase()) ?? "";
   }, [localAssignments, sellerField, mappingsByName]);
 
-  if (isLoading) {
-    return <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
-  }
-
-  if (rows.length === 0) {
-    return (
-      <div className="py-8 text-center text-muted-foreground">
-        <AlertTriangle className="h-6 w-6 mx-auto mb-2 opacity-50" />
-        Ingen fejl i match fundet.
-      </div>
-    );
-  }
-
-  // Bulk re-match mutation for Eesy TM
+  // Bulk re-match mutation for Eesy TM — must be before early returns to avoid hook order issues
   const isEesyTmClient = clientId === CLIENT_IDS["Eesy TM"];
 
   const bulkRematchMutation = useMutation({
@@ -680,6 +667,19 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
       toast({ title: "Fejl ved re-match", variant: "destructive" });
     },
   });
+
+  if (isLoading) {
+    return <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
+  }
+
+  if (rows.length === 0) {
+    return (
+      <div className="py-8 text-center text-muted-foreground">
+        <AlertTriangle className="h-6 w-6 mx-auto mb-2 opacity-50" />
+        Ingen fejl i match fundet.
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
