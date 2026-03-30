@@ -504,7 +504,16 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
       const flatItems: FlatQueueRow[] = data.map((item) => {
         const sale = salesMap.get(item.sale_id);
         const imp = importsMap.get(item.import_id);
-        const saleItems = saleItemsBySale.get(item.sale_id) || [];
+        let saleItems = saleItemsBySale.get(item.sale_id) || [];
+
+        // For Eesy TM: filter to only the targeted product for cancellation
+        const eesyTmId = CLIENT_IDS["Eesy TM"];
+        if (clientId === eesyTmId && targetProductName) {
+          const filtered = saleItems.filter(si =>
+            si.product_name.toLowerCase().trim() === targetProductName.toLowerCase().trim()
+          );
+          if (filtered.length > 0) saleItems = filtered;
+        }
         const uploaded = (item.uploaded_data || null) as Record<string, unknown> | null;
         const configId = imp?.config_id;
         const mapping = configId ? configsMap.get(configId) || null : null;
