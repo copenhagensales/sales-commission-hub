@@ -32,6 +32,7 @@ interface SellerData {
   diet: number;
   sickDays: number;
   dailyBonus: number;
+  startupBonus: number;
   referralBonus: number;
   isActive: boolean;
   isFreelanceConsultant: boolean;
