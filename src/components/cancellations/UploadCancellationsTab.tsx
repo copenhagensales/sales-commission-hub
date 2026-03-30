@@ -627,14 +627,14 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     },
   });
 
-  // Fetch all active employees for seller dropdown
+  // Fetch all employees (including inactive) for seller dropdown
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["employees-for-seller-dropdown"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name, work_email")
-        .eq("is_active", true)
+        .select("id, first_name, last_name, work_email, is_active")
+        .order("is_active", { ascending: false })
         .order("first_name");
       if (error) throw error;
       return data || [];
