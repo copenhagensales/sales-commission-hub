@@ -261,6 +261,33 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
         <CardTitle className="flex items-center justify-between flex-wrap gap-4">
           <span>Godkendte / Afviste ({filtered.length})</span>
           <div className="flex items-center gap-2">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={approvedFilteredIds.length === 0 || bulkUpdateDeductionDate.isPending}
+                >
+                  <CalendarIcon className="h-4 w-4 mr-1" />
+                  Ændr lønperiode for alle ({approvedFilteredIds.length})
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  mode="single"
+                  onSelect={(date) => {
+                    if (date && approvedFilteredIds.length > 0) {
+                      bulkUpdateDeductionDate.mutate({
+                        ids: approvedFilteredIds,
+                        date: format(date, "yyyy-MM-dd"),
+                      });
+                    }
+                  }}
+                  className="pointer-events-auto"
+                  locale={da}
+                />
+              </PopoverContent>
+            </Popover>
             <div className="relative">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
