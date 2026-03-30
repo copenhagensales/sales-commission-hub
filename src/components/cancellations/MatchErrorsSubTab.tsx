@@ -111,14 +111,14 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
     refetchOnMount: "always",
   });
 
-  // Fetch active employees
+  // Fetch all employees (including inactive) for mapping
   const { data: employees = [] } = useQuery({
-    queryKey: ["active-employees-for-mapping"],
+    queryKey: ["all-employees-for-mapping"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name, work_email")
-        .eq("is_active", true)
+        .select("id, first_name, last_name, work_email, is_active")
+        .order("is_active", { ascending: false })
         .order("first_name");
       if (error) throw error;
       return data || [];
@@ -814,15 +814,15 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
                                   <CommandItem
                                     key={emp.id}
                                     value={`${emp.first_name} ${emp.last_name}`}
+                                    className={cn("text-xs", emp.is_active === false && "text-muted-foreground")}
                                     onSelect={() => {
                                       setLocalAssignments(prev => ({ ...prev, [rk]: emp.id }));
                                       upsertMapping.mutate({ row, rKey: rk, employeeId: emp.id });
                                       setOpenPopoverKey(null);
                                     }}
-                                    className="text-xs"
                                   >
                                     <Check className={cn("mr-2 h-3 w-3", currentMapping === emp.id ? "opacity-100" : "opacity-0")} />
-                                    {emp.first_name} {emp.last_name}
+                                    {emp.first_name} {emp.last_name}{emp.is_active === false ? " (inaktiv)" : ""}
                                   </CommandItem>
                                 ))}
                               </CommandGroup>
