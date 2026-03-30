@@ -111,14 +111,14 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
     refetchOnMount: "always",
   });
 
-  // Fetch active employees
+  // Fetch all employees (including inactive) for mapping
   const { data: employees = [] } = useQuery({
-    queryKey: ["active-employees-for-mapping"],
+    queryKey: ["all-employees-for-mapping"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name, work_email")
-        .eq("is_active", true)
+        .select("id, first_name, last_name, work_email, is_active")
+        .order("is_active", { ascending: false })
         .order("first_name");
       if (error) throw error;
       return data || [];
