@@ -1124,13 +1124,20 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                 if (!payloadPhone) continue;
 
                 if (excelPhone === payloadPhone) {
-                  const key = `${sale.id}|${mapping.productName}`;
-                  if (matchedSaleProductKeys.has(key)) continue;
-                  matchedSaleProductKeys.add(key);
-                  matchedIndicesLocal.add(idx);
+                  // Resolve the matched sale_item FIRST (for Eesy TM dedup by actual product)
                   const posIndex = parseInt(mapping.payloadPhoneField?.replace(/\D/g, "") || "0", 10) - 1;
                   const allItems = saleItemsMap.get(sale.id) || [];
                   const matchingItem = posIndex >= 0 && posIndex < allItems.length ? allItems[posIndex] : allItems[0];
+
+                  // Dedup key: use resolved product name for Eesy TM, mapping name for others
+                  const resolvedName = selectedClientId === CLIENT_IDS["Eesy TM"]
+                    ? (matchingItem?.adversus_product_title || mapping.productName)
+                    : mapping.productName;
+                  const key = `${sale.id}|${resolvedName}`;
+                  if (matchedSaleProductKeys.has(key)) continue;
+                  matchedSaleProductKeys.add(key);
+                  matchedIndicesLocal.add(idx);
+
                   productMatched.push({
                     saleId: sale.id,
                     phone: String(payloadPhoneRaw),
@@ -1147,7 +1154,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                     commission: matchingItem?.mapped_commission ?? undefined,
                     revenue: matchingItem?.mapped_revenue ?? undefined,
                   });
-                  if (selectedClientId === CLIENT_IDS["Eesy TM"]) break; // Eesy TM: only one match per sale
+                  if (selectedClientId === CLIENT_IDS["Eesy TM"]) break;
                 }
               }
               // If this row already matched, stop checking more sales
