@@ -1719,9 +1719,6 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                 )}
               </TabsContent>
 
-              <TabsContent value="correct_match" className="mt-4">
-                {renderTable()}
-              </TabsContent>
 
               <TabsContent value="match_errors" className="mt-4">
                 <MatchErrorsSubTab clientId={clientId} />
