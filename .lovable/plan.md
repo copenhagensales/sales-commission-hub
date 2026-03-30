@@ -1,32 +1,52 @@
 
 
-## Fix: Dublet-detektion i Godkendelseskøen for Eesy TM
+## Fix: Eesy TM matching-logik for annulleringer og 5G Internet
 
 ### Problem
-Godkendelseskøen (ApprovalQueueTab) markerer items som "Dublet" baseret på `customer_phone`. For Eesy TM kan én kunde have flere abonnementer (Abo1, Abo2, Abo3) med forskellige telefonnumre, men kun ét `customer_phone`. Når kunden annullerer 1 produkt pr. upload-række, ender flere rækker med samme `customer_phone` — og de markeres fejlagtigt som dubletter.
+Der er to problemer i den nuværende matching-logik for Eesy TM:
 
-### Løsning
+1. **Telefon-matching for annulleringer**: Systemet matcher allerede Excel-telefonnummer mod Abo1/2/3 i databasen (Pass 1 via product_phone_mappings), men Excel-intern deduplikering (linje 873) kan fejlagtigt fjerne rækker med samme telefonnummer — selvom de repræsenterer forskellige annulleringer.
 
-**Fil: `src/components/cancellations/ApprovalQueueTab.tsx`** (linje 619-632)
+2. **5G Internet Ubegrænset data**: Disse rækker skal for Eesy TM IKKE matche via telefonnummer. I stedet skal de bruge Pass 2-logik: **sælgernavn** (via seller mapping) + **dato** + **produkt** (skal matche vores interne 5G Internet-produkt).
 
-Ændre dublet-detekteringslogikken:
-- Import `CLIENT_IDS` fra `src/utils/clientIds.ts`
-- Tilføj `isEesyTm` check baseret på `clientId`
-- **For Eesy TM**: Brug `sale_id` som grupperingsnøgle i stedet for `phone`. To items er kun dubletter hvis de har **samme `sale_id`** (dvs. samme salg uploadet flere gange)
-- **For andre klienter**: Bevar nuværende logik (gruppering via `phone`)
+### Ændringer
 
-### Teknisk ændring
+**Fil: `src/components/cancellations/UploadCancellationsTab.tsx`**
+
+#### 1. Excel-intern deduplikering: Undtag 5G-rækker (linje ~873)
+- Før en række tilføjes til phone-dedup-gruppen, tjek om rækkens produkt matcher et `phone_excluded_products` entry (f.eks. "5G Internet")
+- Hvis ja → spring dedup over for denne række (den skal behandles individuelt)
+
+#### 2. Pass 1 (product_phone_mappings): Undtag 5G-rækker for Eesy TM (linje ~1065)
+- I Pass 1-loopet: Hvis rækken resolver til et `phone_excluded` produkt → spring over (lad Pass 2 håndtere)
+
+#### 3. Pass 1b (customer_phone matching): Allerede håndteret
+- Den eksisterende logik (linje 1158-1162) springer allerede `phone_excluded` rækker over — dette er korrekt
+
+#### 4. Post-match merge: Undtag 5G-rækker fra telefon-merge (linje ~1961)
+- I Eesy-mergelogikken: Hvis en matched sale har et `phone_excluded` targetProductName → brug `sale.saleId` som grupperingsnøgle i stedet for telefonnummer
+- Dette forhindrer at 5G-rækker merges med andre rækker der deler telefonnummer
+
+### Teknisk overblik
 
 ```text
-Nuværende logik:
-  phoneCounts[item.phone]++ → dublet hvis count > 1
+Eesy TM matching-flow (efter fix):
 
-Ny logik:
-  if (isEesyTm):
-    saleIdCounts[item.sale_id]++ → dublet hvis count > 1
-  else:
-    phoneCounts[item.phone]++ → dublet hvis count > 1  (uændret)
+Excel-række med telefonnummer:
+  ├── Er produktet "5G Internet"? 
+  │   ├── JA → Skip telefon-match, gå til Pass 2 (sælger + dato + produkt)
+  │   └── NEJ → Pass 1: Match telefon mod Abo1/Abo2/Abo3
+  │            → Det matchende Abo-felt bestemmer hvilket produkt der annulleres
+
+Excel-intern dedup:
+  ├── 5G-rækker: ALDRIG dedup'et (hver er unik)
+  └── Andre rækker: Dedup på telefonnummer (som nu)
+
+Post-match merge:
+  ├── 5G-salg: Gruppér via saleId (ingen telefon-merge)
+  └── Andre salg: Gruppér via telefonnummer (som nu)
 ```
 
-Kun én fil ændres. Ingen database-ændringer.
+### Ingen database-ændringer
+Al logik er klientside i `UploadCancellationsTab.tsx`. Forudsætter at "5G Internet" allerede er konfigureret i `phone_excluded_products` for Eesy TM.
 
