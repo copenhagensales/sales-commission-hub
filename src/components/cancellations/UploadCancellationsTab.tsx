@@ -1147,25 +1147,31 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               if (existingIds.has(sale.id)) continue;
               const payloadData = (sale.raw_payload as any)?.data || {};
 
-              for (const mapping of productPhoneMappings) {
-                const payloadPhoneRaw = payloadData[mapping.payloadPhoneField];
-                if (!payloadPhoneRaw) continue;
-                const payloadPhone = normalizePhone(String(payloadPhoneRaw));
-                if (!payloadPhone) continue;
+              // For Eesy TM: dynamically scan ALL "Telefon AboN" fields (not just configured 1-3)
+              if (selectedClientId === CLIENT_IDS["Eesy TM"]) {
+                const aboEntries: { field: string; index: number }[] = [];
+                for (const pKey of Object.keys(payloadData)) {
+                  const aboMatch = pKey.match(/^Telefon Abo(\d+)$/);
+                  if (aboMatch) {
+                    aboEntries.push({ field: pKey, index: parseInt(aboMatch[1], 10) });
+                  }
+                }
 
-                if (excelPhone === payloadPhone) {
-                  // Resolve the matched sale_item FIRST (for Eesy TM dedup by actual product)
-                  const posIndex = parseInt(mapping.payloadPhoneField?.replace(/\D/g, "") || "0", 10) - 1;
+                for (const abo of aboEntries) {
+                  const payloadPhoneRaw = payloadData[abo.field];
+                  if (!payloadPhoneRaw) continue;
+                  const payloadPhone = normalizePhone(String(payloadPhoneRaw));
+                  if (!payloadPhone || payloadPhone !== excelPhone) continue;
+
                   const allItems = saleItemsMap.get(sale.id) || [];
-                  const matchingItem = posIndex >= 0 && posIndex < allItems.length ? allItems[posIndex] : allItems[0];
+                  const posIndex = abo.index - 1;
+                  const matchingItem = posIndex >= 0 && posIndex < allItems.length
+                    ? allItems[posIndex] : allItems[0];
 
-                  // Dedup key: use resolved product name for Eesy TM, mapping name for others
-                  const resolvedName = selectedClientId === CLIENT_IDS["Eesy TM"]
-                    ? (matchingItem?.adversus_product_title || mapping.productName)
-                    : mapping.productName;
-                  const key = `${sale.id}|${resolvedName}`;
-                  if (matchedSaleProductKeys.has(key)) continue;
-                  matchedSaleProductKeys.add(key);
+                  const resolvedName = matchingItem?.adversus_product_title || `Abonnement${abo.index}`;
+                  const dedupKey = `${sale.id}|${resolvedName}`;
+                  if (matchedSaleProductKeys.has(dedupKey)) continue;
+                  matchedSaleProductKeys.add(dedupKey);
                   matchedIndicesLocal.add(idx);
 
                   productMatched.push({
@@ -1177,18 +1183,50 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                     employee: sale.agent_name || "Ukendt",
                     currentStatus: sale.validation_status || "pending",
                     uploadedRowData: row.originalRow,
-                    targetProductName: selectedClientId === CLIENT_IDS["Eesy TM"]
-                      ? (matchingItem?.adversus_product_title || mapping.productName)
-                      : mapping.productName,
+                    targetProductName: matchingItem?.adversus_product_title || `Abonnement${abo.index}`,
                     realProductName: matchingItem?.adversus_product_title || allItems[0]?.adversus_product_title || "Ukendt produkt",
                     commission: matchingItem?.mapped_commission ?? undefined,
                     revenue: matchingItem?.mapped_revenue ?? undefined,
                   });
-                  if (selectedClientId === CLIENT_IDS["Eesy TM"]) break;
+                  break; // One match per Excel row
+                }
+                if (matchedIndicesLocal.has(idx)) break; // Move to next sale
+              } else {
+                // Non-Eesy TM: use configured productPhoneMappings as before
+                for (const mapping of productPhoneMappings) {
+                  const payloadPhoneRaw = payloadData[mapping.payloadPhoneField];
+                  if (!payloadPhoneRaw) continue;
+                  const payloadPhone = normalizePhone(String(payloadPhoneRaw));
+                  if (!payloadPhone) continue;
+
+                  if (excelPhone === payloadPhone) {
+                    const posIndex = parseInt(mapping.payloadPhoneField?.replace(/\D/g, "") || "0", 10) - 1;
+                    const allItems = saleItemsMap.get(sale.id) || [];
+                    const matchingItem = posIndex >= 0 && posIndex < allItems.length ? allItems[posIndex] : allItems[0];
+
+                    const resolvedName = mapping.productName;
+                    const dedupKey = `${sale.id}|${resolvedName}`;
+                    if (matchedSaleProductKeys.has(dedupKey)) continue;
+                    matchedSaleProductKeys.add(dedupKey);
+                    matchedIndicesLocal.add(idx);
+
+                    productMatched.push({
+                      saleId: sale.id,
+                      phone: String(payloadPhoneRaw),
+                      company: sale.customer_company || "",
+                      oppNumber: "",
+                      saleDate: sale.sale_datetime || "",
+                      employee: sale.agent_name || "Ukendt",
+                      currentStatus: sale.validation_status || "pending",
+                      uploadedRowData: row.originalRow,
+                      targetProductName: mapping.productName,
+                      realProductName: matchingItem?.adversus_product_title || allItems[0]?.adversus_product_title || "Ukendt produkt",
+                      commission: matchingItem?.mapped_commission ?? undefined,
+                      revenue: matchingItem?.mapped_revenue ?? undefined,
+                    });
+                  }
                 }
               }
-              // If this row already matched, stop checking more sales
-              if (selectedClientId === CLIENT_IDS["Eesy TM"] && matchedIndicesLocal.has(idx)) break;
             }
           });
         }
