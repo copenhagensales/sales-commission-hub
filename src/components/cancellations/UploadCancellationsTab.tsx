@@ -1588,7 +1588,8 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               : false;
             // Eesy TM 5G: treat as phone-excluded row for product-aware matching
             const isEesyTm5gRow = selectedClientId === CLIENT_IDS["Eesy TM"]
-              && resolvedProductTitle?.toLowerCase() === "5g internet";
+              && (resolvedProductTitle?.toLowerCase() === "5g internet"
+                  || isEesyTm5gSaleItem(resolvedProductTitle || ""));
 
             if (isPhoneExcludedRow || isEesyTm5gRow) {
               const candidates: typeof candidateSales = [];
@@ -1636,7 +1637,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                   const items = saleItemsMap.get(bestMatch.id) || [];
                   const matchedItem = items.find(item => {
                     const title = item.adversus_product_title?.toLowerCase() || "";
-                    if (resolvedProductTitle!.toLowerCase() === "5g internet") {
+                    if (resolvedProductTitle!.toLowerCase() === "5g internet" || isEesyTm5gSaleItem(resolvedProductTitle || "")) {
                       return isEesyTm5gSaleItem(title);
                     }
                     return title === resolvedProductTitle!.toLowerCase();
@@ -1655,6 +1656,15 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                     commission: matchedItem?.mapped_commission ?? undefined,
                     revenue: matchedItem?.mapped_revenue ?? undefined,
                     matchConfidence: bestScore === 2 ? "high" : "medium",
+                  });
+                } else {
+                  // Key collision — route to manual matching (Eesy TM 5G only)
+                  unmatchedSellers.push({
+                    rowIndex: idx,
+                    excelSellerName: excelSeller,
+                    excelDate,
+                    excelProduct: excelSubName,
+                    originalRow: row.originalRow,
                   });
                 }
               } else {
