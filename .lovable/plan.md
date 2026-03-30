@@ -1,30 +1,21 @@
 
 
-## Giv 4 roller adgang til annullerings-faner
+## Tilføj Produkt, Medlemsnummer og Provision — kun for ASE
 
-### Problem
-Rollerne `assisterendetm`, `assisterende_teamleder_fm`, `fm_leder` og `teamleder` mangler `can_view` på nogle annullerings-faner, så de ikke kan se Upload, Godkendelseskø og Godkendte.
+### Ændringer — `src/components/cancellations/ApprovedTab.tsx`
 
-### Nuværende status i databasen
+**1. Import `CLIENT_IDS`** fra `@/utils/clientIds` og definer `ASE_CLIENT_ID`.
 
-| Rolle | upload | approval | approved |
-|-------|--------|----------|----------|
-| assisterende_teamleder_fm | ✅ view+edit | ❌ | mangler |
-| assisterendetm | ❌ | ❌ | mangler |
-| fm_leder | ✅ view+edit | ❌ | mangler |
-| teamleder | ✅ view | ❌ | mangler |
+**2. Udvid query** til at inkludere `uploaded_data` i select-strengen.
 
-### Ændringer (kun data-opdateringer, ingen kode)
+**3. Parse ASE-felter i mapping** (kun når `clientId === ASE_CLIENT_ID`):
+- `product`: fra `uploaded_data["A-kasse"]`
+- `memberNumber`: fra `uploaded_data["Medlemsnummer"]`
+- `provision`: fra `uploaded_data["Provision"]?.result` eller direkte tal
 
-**1. Opdater eksisterende rækker — sæt `can_view = true`:**
-- `assisterendetm` → `tab_cancellations_upload`
-- `assisterendetm` → `tab_cancellations_approval`
-- `assisterende_teamleder_fm` → `tab_cancellations_approval`
-- `fm_leder` → `tab_cancellations_approval`
-- `teamleder` → `tab_cancellations_approval`
+**4. Betinget visning af 3 ekstra kolonner** i tabellen:
+- Kun vis kolonnerne **Produkt**, **Medlemsnr.** og **Provision** når `clientId === ASE_CLIENT_ID`
+- Provision formateres som DKK med `formatCurrency`
 
-**2. Opret manglende rækker — `tab_cancellations_approved`:**
-- Indsæt nye permission-rækker for alle 4 roller med `can_view = true, can_edit = false`
-
-Ingen kodeændringer nødvendige — UI'et bruger allerede `canView('tab_cancellations_*')` korrekt.
+Ingen andre filer skal ændres.
 
