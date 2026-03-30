@@ -1536,7 +1536,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             const agentEmail = employeeIdToEmail.get(employeeId);
             if (!agentEmail) return;
 
-            const excelDateObj = new Date(excelDate);
+            const excelDateObj = parseFlexibleDate(excelDate);
             const prodCol3 = activeConfig?.product_columns?.[0];
             let rowProduct3 = "";
             if (prodCol3) rowProduct3 = String(getCaseInsensitive(row.originalRow, prodCol3) || "").trim();
