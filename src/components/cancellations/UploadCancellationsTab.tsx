@@ -1087,6 +1087,25 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
           dedupedData.forEach((row) => {
             const idx = row.originalIndex;
+
+            // Skip phone_excluded products (e.g. 5G Internet) from Pass 1 phone matching — let Pass 2 handle
+            const prodCol1 = activeConfig?.product_columns?.[0];
+            let rawRowProd1 = prodCol1 ? String(getCaseInsensitive(row.originalRow, prodCol1) || "").trim() : "";
+            if (!rawRowProd1) {
+              for (const key of PRODUCT_KEYS_1B) {
+                const val = getCaseInsensitive(row.originalRow, key);
+                if (val && String(val).trim()) { rawRowProd1 = String(val).trim(); break; }
+              }
+            }
+            if (rawRowProd1 && phoneExcludedProducts.length > 0) {
+              // Check both raw product name and mapped product name
+              const rawLower = rawRowProd1.toLowerCase();
+              const mappedName = productMappingLookup.get(rawLower) || null;
+              const checkVal = (mappedName || rawRowProd1).toLowerCase().trim();
+              const isPass1Excluded = phoneExcludedProducts.some(p => checkVal.includes(p.toLowerCase().trim()) || p.toLowerCase().trim().includes(checkVal));
+              if (isPass1Excluded) return; // Skip — Pass 2 will match by seller+date+product
+            }
+
             const rawExcelPhone = phoneColumn !== "__none__" ? getCaseInsensitive(row.originalRow, phoneColumn) : null;
             if (!rawExcelPhone) return;
             const excelPhone = normalizePhone(String(rawExcelPhone));
