@@ -391,17 +391,19 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
       const entries = [...localManualMatches.values()];
       if (entries.length === 0) return;
 
-      // Fetch target_product_name for each matched sale
-      const saleIds = entries.map(e => e.saleId);
-      const { data: saleItemsData } = await supabase
-        .from("sale_items")
-        .select("sale_id, adversus_product_title")
-        .in("sale_id", saleIds);
-
+      // Fetch target_product_name only for Eesy TM
+      const isEesyTm = clientId === CLIENT_IDS["Eesy TM"];
       const saleItemMap = new Map<string, string>();
-      for (const si of (saleItemsData || [])) {
-        if (!saleItemMap.has(si.sale_id)) {
-          saleItemMap.set(si.sale_id, si.adversus_product_title || "");
+      if (isEesyTm) {
+        const saleIds = entries.map(e => e.saleId);
+        const { data: saleItemsData } = await supabase
+          .from("sale_items")
+          .select("sale_id, adversus_product_title")
+          .in("sale_id", saleIds);
+        for (const si of (saleItemsData || [])) {
+          if (!saleItemMap.has(si.sale_id)) {
+            saleItemMap.set(si.sale_id, si.adversus_product_title || "");
+          }
         }
       }
 
@@ -413,7 +415,7 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
         status: "pending",
         uploaded_data: r.rowData as unknown as Json,
         client_id: clientId,
-        target_product_name: saleItemMap.get(saleId) || null,
+        target_product_name: isEesyTm ? (saleItemMap.get(saleId) || null) : null,
       }));
 
       const { error: queueError } = await supabase

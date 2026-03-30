@@ -516,7 +516,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
           const filtered = saleItems.filter(si =>
             si.product_name.toLowerCase().trim() === targetProductName.toLowerCase().trim()
           );
-          if (filtered.length > 0) saleItems = filtered;
+          if (filtered.length > 0) saleItems = [filtered[0]]; // Kun 1 pr. annullering
         }
 
         // Check if the matched product is phone_excluded (check both target and real product)
