@@ -365,6 +365,15 @@ export function useSellerSalariesCached(
       startupBonusMap[sb.employee_id] = (startupBonusMap[sb.employee_id] || 0) + (sb.amount || 0);
     }
 
+    // Build product change log lookup: cancellation_queue_id → commission difference
+    const basketDiffMap: Record<string, number> = {};
+    for (const log of productChangeLogData || []) {
+      const cqId = log.cancellation_queue_id;
+      if (!cqId) continue;
+      const diff = (log.old_commission || 0) - (log.new_commission || 0);
+      basketDiffMap[cqId] = (basketDiffMap[cqId] || 0) + diff;
+    }
+
     // Build cancellation map (agent_email → employee_id → total lost commission)
     const cancellationMap: Record<string, number> = {};
     for (const cq of cancellationData || []) {
@@ -373,10 +382,20 @@ export function useSellerSalariesCached(
       const agentEmail = sale.agent_email.toLowerCase();
       const employeeId = emailToEmployeeId[agentEmail];
       if (!employeeId) continue;
-      const totalCommission = (sale.sale_items || []).reduce(
-        (sum: number, si: any) => sum + (si.mapped_commission || 0), 0
-      );
-      cancellationMap[employeeId] = (cancellationMap[employeeId] || 0) + totalCommission;
+
+      let deduction = 0;
+      if (cq.upload_type === "basket_difference") {
+        // Use commission difference from product_change_log
+        deduction = basketDiffMap[cq.id] || 0;
+      } else {
+        // Full cancellation — deduct entire commission
+        deduction = (sale.sale_items || []).reduce(
+          (sum: number, si: any) => sum + (si.mapped_commission || 0), 0
+        );
+      }
+      if (deduction > 0) {
+        cancellationMap[employeeId] = (cancellationMap[employeeId] || 0) + deduction;
+      }
     }
 
     // Build salary additions map with individual items for display/delete
