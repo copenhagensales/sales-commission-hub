@@ -42,6 +42,16 @@ import { extractOpp } from "./utils/extractOpp";
 
 const DUMMY_PHONES = new Set(["0000000", "00000000", "99999999", "", null]);
 
+/** Normalize phone: strip non-digits + remove Danish country code prefix */
+function normalizePhone(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  if (digits.startsWith("0045")) return digits.slice(4);
+  if (digits.startsWith("45") && digits.length === 10) return digits.slice(2);
+  return digits;
+}
+
+const EESY_ABO_PHONE_FIELDS = ["Telefon Abo1", "Telefon Abo2", "Telefon Abo3"] as const;
+
 // Wrapper returning null instead of "" for backward compat
 function extractOppNullable(raw: Record<string, unknown> | null): string | null {
   if (!raw) return null;
@@ -143,22 +153,41 @@ export function DuplicatesTab({ clientId: selectedClientId }: DuplicatesTabProps
   });
 
   const isTdc = selectedClientId === CLIENT_IDS["TDC Erhverv"];
+  const isEesyTm = selectedClientId === CLIENT_IDS["Eesy TM"];
 
   const duplicateGroups = useMemo(() => {
     const groupMap = new Map<string, SaleRow[]>();
 
     for (const sale of sales) {
-      let key: string | null = null;
       if (isTdc) {
-        key = extractOppNullable(sale.raw_payload);
+        const key = extractOppNullable(sale.raw_payload);
+        if (key) {
+          const existing = groupMap.get(key) || [];
+          existing.push(sale);
+          groupMap.set(key, existing);
+        }
+      } else if (isEesyTm) {
+        // For Eesy TM: group by each abo phone number from raw_payload.data
+        const payloadData = (sale.raw_payload as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+        if (payloadData) {
+          for (const field of EESY_ABO_PHONE_FIELDS) {
+            const rawPhone = payloadData[field];
+            if (!rawPhone) continue;
+            const phone = normalizePhone(String(rawPhone));
+            if (phone && !DUMMY_PHONES.has(phone)) {
+              const existing = groupMap.get(phone) || [];
+              existing.push(sale);
+              groupMap.set(phone, existing);
+            }
+          }
+        }
       } else {
         const phone = sale.customer_phone?.trim();
-        if (isValidPhone(phone)) key = phone;
-      }
-      if (key) {
-        const existing = groupMap.get(key) || [];
-        existing.push(sale);
-        groupMap.set(key, existing);
+        if (isValidPhone(phone)) {
+          const existing = groupMap.get(phone) || [];
+          existing.push(sale);
+          groupMap.set(phone, existing);
+        }
       }
     }
 
@@ -184,7 +213,7 @@ export function DuplicatesTab({ clientId: selectedClientId }: DuplicatesTabProps
 
     groups.sort((a, b) => b.sales.length - a.sales.length);
     return groups;
-  }, [sales, isTdc]);
+  }, [sales, isTdc, isEesyTm]);
 
   // Agents that appear in duplicate groups
   const agentsWithDuplicates = useMemo(() => {
