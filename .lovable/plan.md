@@ -1,31 +1,40 @@
 
 
-## Vis og vælg individuelle produkter i Lokaliser salg (kun Eesy TM)
+## Fix: Kurv-rettelser dropdown viser forkerte/duplikerede produkter (kun Eesy FM)
 
 ### Problem
-Produkter vises som "-" fordi `display_name` er null — navnene ligger i `adversus_product_title`. For Eesy TM skal brugeren kunne vælge et specifikt produkt fra salget.
+"Ret produkt til" dropdownen henter **alle** produkter globalt (ingen kampagne-scope). Den filtrerer kun på `target_product_name` (string), så brugeren ser enten kun ét match eller alle produkter — ofte med duplikater. Godkendelsen slår op med `.eq("name", ...)` som er tvetydigt.
 
-### Ændringer
+### Root cause (linje 395-406)
+```typescript
+// Henter ALLE produkter uden filter
+const { data } = await supabase.from("products").select("id, name").order("name");
+```
 
-**1. `src/components/cancellations/LocateSaleDialog.tsx`**
+### Ændringer — `src/components/cancellations/ApprovalQueueTab.tsx`
 
-- Tilføj `clientId` check mod `CLIENT_IDS["Eesy TM"]` for at aktivere produkt-niveau visning
-- Udvid `sale_items` select med `id, adversus_product_title`
-- Vis produktnavne via `adversus_product_title ?? display_name` (fix for "-" problemet)
-- **Kun Eesy TM**: Ekspander hver salgsrække til én række pr. sale_item med individuel "Vælg" knap
-- **Andre klienter**: Behold nuværende adfærd (én "Vælg" pr. salg)
-- Udvid `onMatch` callback signatur: `onMatch(saleId, row, saleItemTitle?)` — tredje parameter er valgfri
-- Søgefeltet inkluderer `adversus_product_title` i søgebare felter
+**A) Scope produkter til klientens kampagner**
+- Hent kampagne-IDs for `clientId` (allerede tilgængelig i komponenten eller kan tilføjes).
+- Ændr `clientProducts`-query til at filtrere produkter via `campaign_mappings` eller `client_campaigns` → `products` relationen, så kun relevante produkter for den valgte klients kampagner vises.
+- Alternativt: hent produkter via `sale_items` der allerede er knyttet til kampagnens salg.
 
-**2. `src/components/cancellations/MatchErrorsSubTab.tsx`**
+**B) Brug produkt-ID i stedet for navn**
+- Ændr `SelectItem value={p.id}` (UUID) i stedet for `value={p.name}`.
+- `productOverrides` gemmer nu produkt-ID i stedet for produktnavn.
+- Dropdown viser `p.name` som label, men value er `p.id` → ingen duplikat-problemer.
 
-- Opdater `handleLocalMatch` til at modtage `saleItemTitle`
-- Gem `saleItemTitle` i `localManualMatches` state
-- I `confirmManualMatchesMutation`: Brug den gemte `saleItemTitle` som `target_product_name` for Eesy TM i stedet for at hente første sale_item blindt
-- Vis valgt produktnavn i pending matches sektionen
+**C) Opdater godkendelses-mutation (linje 746-749)**
+- Ændr fra: `.eq("name", overrideProductName).maybeSingle()`
+- Til: `.eq("id", overrideProductId).single()`
+- Omdøb parameter fra `overrideProductName` til `overrideProductId`.
+
+**D) Dedupliker dropdown på navn (Eesy FM)**
+- Da flere produkter kan have samme navn men forskellige IDs, dedupliker visningen på navn så brugeren ser hvert unikt produktnavn én gang.
+- Behold det første produkt-ID for hvert unikt navn.
 
 ### Scope
-- Kun Eesy TM får produkt-niveau valg
-- Andre klienter er upåvirkede
+- Ændringer kun i `ApprovalQueueTab.tsx`
+- Kun Eesy FM påvirkes af kampagne-scopet
+- Andre klienter får også bedre produktvalg (ID-baseret) men er funktionelt upåvirkede
 - Ingen databaseændringer
 
