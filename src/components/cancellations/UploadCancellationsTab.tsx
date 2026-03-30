@@ -2675,8 +2675,8 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                               <SelectContent>
                                 <SelectItem value="__none__">– Vælg –</SelectItem>
                                 {allEmployees.map(emp => (
-                                  <SelectItem key={emp.id} value={emp.id}>
-                                    {`${emp.first_name || ""} ${emp.last_name || ""}`.trim()}
+                                  <SelectItem key={emp.id} value={emp.id} className={emp.is_active === false ? "text-muted-foreground" : ""}>
+                                    {`${emp.first_name || ""} ${emp.last_name || ""}`.trim()}{emp.is_active === false ? " (inaktiv)" : ""}
                                   </SelectItem>
                                 ))}
                               </SelectContent>

@@ -823,7 +823,7 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
                                     className="text-xs"
                                   >
                                     <Check className={cn("mr-2 h-3 w-3", currentMapping === emp.id ? "opacity-100" : "opacity-0")} />
-                                    {emp.first_name} {emp.last_name}
+                                    {emp.first_name} {emp.last_name}{emp.is_active === false ? " (inaktiv)" : ""}
                                   </CommandItem>
                                 ))}
                               </CommandGroup>
