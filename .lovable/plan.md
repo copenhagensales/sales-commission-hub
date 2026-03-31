@@ -1,38 +1,38 @@
 
+
 ## Problem
-Skærmbilledet bekræfter symptomet: Alexander står med `-0 kr.` i “Annulleringer”, selv om hans godkendte annulleringer ligger i perioden 15/2–14/3.
 
-## Root cause
-Fejlen ligger i `src/hooks/useSellerSalariesCached.ts`.
+På jeres 65" TCL-skærm (sandsynligvis 4K / 3840×2160) ser liga-dashboardet for småt ud. Layoutet er designet til 1920×1080, men skalerer ikke ordentligt op til højere opløsninger — tekst, badges og spacing forbliver for småt til at læse på afstand.
 
-Provision bliver beregnet via den centrale salgsaggregering, som kan mappe en sælger via:
-- `employee_agent_mapping`, eller
-- fallback til `work_email`
+## Løsning
 
-Men annulleringer i samme hook bliver kun mappet sådan her:
-- `sales.agent_email` -> `employee_master_data.work_email`
+Brug den allerede eksisterende `useTvScreenAdapter`-hook til at skalere hele liga-dashboardet op i TV-mode. Hooket beregner en `scaleFactor` baseret på skærmens opløsning vs. en 1920×1080-reference og anvender en CSS `transform: scale()`.
 
-Det virker ikke for Alexander, fordi hans annulleringer ligger på agent-emailen `algc1@...`, mens hans `work_email` er `algc@...`. Han er korrekt koblet via `employee_agent_mapping`, men den mapping bliver slet ikke brugt i annulleringsdelen.
+### Ændring i `TvLeagueDashboard.tsx`
 
-## Plan
-1. Opdatér `useSellerSalariesCached.ts` så hooket også henter `employee_agent_mapping` med tilhørende agent-email.
-2. Byg et fælles `emailToEmployeeId` lookup, som inkluderer:
-   - `work_email`
-   - alle mapped agent-emails fra `employee_agent_mapping`
-3. Brug det fælles lookup både til annulleringer og øvrige email-baserede opslag i hooket.
-4. Behold den eksisterende annulleringslogik for `target_product_name` og `basket_difference`; vi ændrer kun medarbejder-resolveren.
-5. Verificér at Alexander nu får sine annulleringer med i perioden 15/2–14/3, og at andre sælgere stadig vises korrekt.
+Når `tvMode === true`:
+1. Importér `useTvScreenAdapter`, `getTvScaleStyles` og `getTvCenteringStyles`
+2. Wrap hele indholdet i en centering-container + scale-wrapper
+3. Layoutet renderes i faste 1920×1080 dimensioner og skaleres op til den faktiske skærmstørrelse (f.eks. ×2 på 4K)
+
+Dette vil gøre at dashboardet ser identisk ud på alle skærmstørrelser — bare større/mindre proportionelt.
+
+### Teknisk detalje
+
+```text
+┌─── Viewport (3840×2160) ───────────────┐
+│  ┌─ Centering wrapper (padding) ─────┐ │
+│  │  ┌─ Scale wrapper (scale: 2.0) ─┐ │ │
+│  │  │  1920×1080 layout             │ │ │
+│  │  │  (same as Full HD)            │ │ │
+│  │  └───────────────────────────────┘ │ │
+│  └────────────────────────────────────┘ │
+└─────────────────────────────────────────┘
+```
 
 ## Berørte filer
-- `src/hooks/useSellerSalariesCached.ts`
 
-## Forventet resultat
-Alexander bliver korrekt identificeret via `employee_agent_mapping`, så hans godkendte annulleringer bliver samlet op og vist i kolonnen “Annulleringer” i lønoversigten.
+| Fil | Ændring |
+|-----|---------|
+| `src/pages/tv-board/TvLeagueDashboard.tsx` | Wrap TV-mode output i scale-adapter |
 
-## Tekniske detaljer
-- Ingen databaseændringer er nødvendige.
-- Den sikreste løsning er at følge samme mappingsprincip som den centrale salgsaggregering, så provision og annulleringer bruger samme identitetslogik.
-- Den konkrete forskel i data er:
-  - medarbejderens `work_email`: `algc@...`
-  - annulleringernes `sales.agent_email`: `algc1@...`
-  - mapping findes allerede i `employee_agent_mapping`, men ignoreres i nuværende hook.
