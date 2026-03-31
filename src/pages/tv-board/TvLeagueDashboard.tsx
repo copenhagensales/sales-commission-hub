@@ -885,7 +885,7 @@ export default function TvLeagueDashboard() {
                 transition={{ duration: 0.3 }}
               >
                 {mobileTab === "divisions" && (
-                  <SceneDivisions divisions={data.divisions} />
+                  <SceneDivisions divisions={data.divisions.filter(d => d.division <= 4)} />
                 )}
                 {mobileTab === "overview" && (
                   <div className="space-y-4">
@@ -949,9 +949,9 @@ export default function TvLeagueDashboard() {
                 {mobileTab === "league-overview" && (
                   <SceneLeagueOverview
                     raceToTop={data.raceToTop || []}
-                    divisions={data.divisions}
+                    divisions={data.divisions.filter(d => d.division <= 4)}
                     totalPlayers={data.totalPlayers}
-                    totalDivisions={data.totalDivisions}
+                    totalDivisions={data.divisions.filter(d => d.division <= 4).length}
                     todayLeagueTotal={data.todayLeagueTotal || 0}
                     activeLast15Min={data.activeLast15Min || 0}
                   />
@@ -1088,9 +1088,9 @@ export default function TvLeagueDashboard() {
                 {currentLeftScene === "league-overview" && (
                   <SceneLeagueOverview
                     raceToTop={data.raceToTop || []}
-                    divisions={data.divisions}
+                    divisions={data.divisions.filter(d => d.division <= 4)}
                     totalPlayers={data.totalPlayers}
-                    totalDivisions={data.totalDivisions}
+                    totalDivisions={data.divisions.filter(d => d.division <= 4).length}
                     todayLeagueTotal={data.todayLeagueTotal || 0}
                     activeLast15Min={data.activeLast15Min || 0}
                   />
