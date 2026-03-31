@@ -6,6 +6,7 @@ import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { isTvMode } from "@/utils/tvMode";
+import { useTvScreenAdapter, getTvScaleStyles, getTvCenteringStyles } from "@/hooks/useTvScreenAdapter";
 
 // ─── Types ────────────────────────────────────────────────────
 interface PlayerEntry {
