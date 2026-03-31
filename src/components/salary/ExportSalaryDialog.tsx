@@ -64,6 +64,7 @@ export function ExportSalaryDialog({ currentPeriodStart }: ExportSalaryDialogPro
   );
   const [selectedPeriodIdx, setSelectedPeriodIdx] = useState<string>("");
   const [exporting, setExporting] = useState(false);
+  const [includeConsultants, setIncludeConsultants] = useState(true);
 
   const periods = useMemo(() => generatePeriods(currentPeriodStart), [currentPeriodStart]);
 
