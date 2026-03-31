@@ -135,37 +135,39 @@ export default function FmChecklistContent() {
   const weekLabel = `Uge ${format(weekStart, "w", { locale: da })} — ${format(weekStart, "d. MMM", { locale: da })} – ${format(addDays(weekStart, 6), "d. MMM yyyy", { locale: da })}`;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="icon" onClick={() => setWeekOffset((o) => o - 1)}>
-            <ChevronLeft className="h-4 w-4" />
+    <div className="flex flex-col h-[calc(100vh-12rem)]">
+      {/* Header row */}
+      <div className="flex items-center justify-between mb-2 shrink-0">
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setWeekOffset((o) => o - 1)}>
+            <ChevronLeft className="h-3.5 w-3.5" />
           </Button>
-          <h2 className="text-lg font-semibold">{weekLabel}</h2>
-          <Button variant="outline" size="icon" onClick={() => setWeekOffset((o) => o + 1)}>
-            <ChevronRight className="h-4 w-4" />
+          <h2 className="text-sm font-semibold">{weekLabel}</h2>
+          <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setWeekOffset((o) => o + 1)}>
+            <ChevronRight className="h-3.5 w-3.5" />
           </Button>
           {weekOffset !== 0 && (
-            <Button variant="ghost" size="sm" onClick={() => setWeekOffset(0)}>
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setWeekOffset(0)}>
               I dag
             </Button>
           )}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {streak > 0 && (
-            <Badge variant="secondary" className="gap-1 text-orange-600 bg-orange-100 dark:bg-orange-900/30 dark:text-orange-400">
-              <Flame className="h-3.5 w-3.5" />
+            <Badge variant="secondary" className="gap-1 text-xs text-orange-600 bg-orange-100 dark:bg-orange-900/30 dark:text-orange-400">
+              <Flame className="h-3 w-3" />
               {streak} dage i træk
             </Badge>
           )}
-          <Button variant="outline" size="sm" onClick={() => setShowAdmin(!showAdmin)}>
-            <Settings className="h-4 w-4 mr-1" />
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setShowAdmin(!showAdmin)}>
+            <Settings className="h-3.5 w-3.5 mr-1" />
             Administrer
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-7 gap-2">
+      {/* Week grid - fills remaining space */}
+      <div className="grid grid-cols-7 gap-1.5 flex-1 min-h-0">
         {weekDates.map((date, dayIdx) => {
           const dateStr = format(date, "yyyy-MM-dd");
           const tasks = getTasksForDay(dayIdx);
@@ -173,158 +175,151 @@ export default function FmChecklistContent() {
           const isToday = isSameDay(date, today);
 
           return (
-            <Card
+            <div
               key={dayIdx}
               className={cn(
-                "transition-all",
+                "rounded-lg border flex flex-col overflow-hidden",
                 isToday && "ring-2 ring-primary/50",
                 progress.pct === 100 && progress.total > 0 && "bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-800"
               )}
             >
-              <CardHeader className="pb-2 pt-3 px-3">
+              {/* Day header */}
+              <div className="px-2 py-1.5 border-b bg-muted/30 shrink-0">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-medium">
-                    {DAY_NAMES[dayIdx]}
-                  </CardTitle>
-                  <span className="text-xs text-muted-foreground">
-                    {format(date, "d/M")}
-                  </span>
+                  <span className="text-xs font-semibold">{DAY_NAMES[dayIdx]}</span>
+                  <span className="text-[10px] text-muted-foreground">{format(date, "d/M")}</span>
                 </div>
                 {tasks.length > 0 && (
-                  <div className="space-y-1">
-                    <Progress value={progress.pct} className="h-1.5" />
-                    <p className="text-[10px] text-muted-foreground text-right">
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <Progress value={progress.pct} className="h-1 flex-1" />
+                    <span className="text-[9px] text-muted-foreground whitespace-nowrap">
                       {progress.done}/{progress.total}
-                    </p>
+                    </span>
                   </div>
                 )}
-              </CardHeader>
-              <CardContent className="px-3 pb-3 space-y-1.5">
-                {tasks.length === 0 && (
-                  <p className="text-xs text-muted-foreground italic">Ingen opgaver</p>
-                )}
-                <AnimatePresence>
-                  {tasks.map((task) => {
-                    const completion = getCompletion(task.id, dateStr);
-                    const isChecked = !!completion;
-                    const taskKey = `${task.id}-${dateStr}`;
+              </div>
 
-                    return (
-                      <motion.div
-                        key={task.id}
-                        initial={false}
-                        animate={{ opacity: 1 }}
-                        className={cn(
-                          "flex items-start gap-1.5 p-1.5 rounded-md transition-colors text-xs",
-                          isChecked
-                            ? "bg-green-100/60 dark:bg-green-900/20"
-                            : "hover:bg-muted/50"
-                        )}
-                      >
-                        <Checkbox
-                          checked={isChecked}
-                          onCheckedChange={() => handleToggle(task.id, dateStr)}
-                          className="mt-0.5 shrink-0"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p
-                            className={cn(
-                              "text-xs leading-tight",
-                              isChecked && "line-through text-muted-foreground"
-                            )}
-                          >
-                            {task.title}
-                          </p>
-                          {completion?.note && (
-                            <p className="text-[10px] text-muted-foreground mt-0.5 italic truncate">
-                              📝 {completion.note}
-                            </p>
-                          )}
-                        </div>
-                        {isChecked && completion && (
-                          <Popover
-                            open={notePopover === taskKey}
-                            onOpenChange={(open) => {
-                              if (open) {
-                                setNotePopover(taskKey);
-                                setNoteText(completion.note || "");
-                              } else {
-                                setNotePopover(null);
-                              }
-                            }}
-                          >
-                            <PopoverTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0">
-                                <MessageSquare className="h-3 w-3" />
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-64 p-3" align="end">
-                              <div className="space-y-2">
-                                <p className="text-xs font-medium">Tilføj note</p>
-                                <Textarea
-                                  value={noteText}
-                                  onChange={(e) => setNoteText(e.target.value)}
-                                  placeholder="Skriv en note..."
-                                  className="text-xs min-h-[60px]"
-                                />
-                                <Button
-                                  size="sm"
-                                  className="w-full"
-                                  onClick={() => handleSaveNote(completion.id)}
-                                >
-                                  Gem
-                                </Button>
-                              </div>
-                            </PopoverContent>
-                          </Popover>
-                        )}
-                      </motion.div>
-                    );
-                  })}
-                </AnimatePresence>
-                {progress.pct === 100 && progress.total > 0 && (
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    className="flex items-center justify-center pt-1"
-                  >
-                    <CheckCircle2 className="h-5 w-5 text-green-500" />
-                  </motion.div>
+              {/* Tasks */}
+              <div className="flex-1 overflow-y-auto px-1.5 py-1 space-y-0.5">
+                {tasks.length === 0 && (
+                  <p className="text-[10px] text-muted-foreground italic p-1">Ingen opgaver</p>
                 )}
-              </CardContent>
-            </Card>
+                {tasks.map((task) => {
+                  const completion = getCompletion(task.id, dateStr);
+                  const isChecked = !!completion;
+                  const taskKey = `${task.id}-${dateStr}`;
+
+                  return (
+                    <div
+                      key={task.id}
+                      className={cn(
+                        "flex items-start gap-1 p-1 rounded transition-colors",
+                        isChecked
+                          ? "bg-green-100/60 dark:bg-green-900/20"
+                          : "hover:bg-muted/50"
+                      )}
+                    >
+                      <Checkbox
+                        checked={isChecked}
+                        onCheckedChange={() => handleToggle(task.id, dateStr)}
+                        className="mt-0.5 shrink-0 h-3.5 w-3.5"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p
+                          className={cn(
+                            "text-[10px] leading-tight",
+                            isChecked && "line-through text-muted-foreground"
+                          )}
+                        >
+                          {task.title}
+                        </p>
+                        {completion?.note && (
+                          <p className="text-[9px] text-muted-foreground mt-0.5 italic truncate">
+                            📝 {completion.note}
+                          </p>
+                        )}
+                      </div>
+                      {isChecked && completion && (
+                        <Popover
+                          open={notePopover === taskKey}
+                          onOpenChange={(open) => {
+                            if (open) {
+                              setNotePopover(taskKey);
+                              setNoteText(completion.note || "");
+                            } else {
+                              setNotePopover(null);
+                            }
+                          }}
+                        >
+                          <PopoverTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-4 w-4 shrink-0">
+                              <MessageSquare className="h-2.5 w-2.5" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-56 p-2" align="end">
+                            <div className="space-y-1.5">
+                              <p className="text-xs font-medium">Tilføj note</p>
+                              <Textarea
+                                value={noteText}
+                                onChange={(e) => setNoteText(e.target.value)}
+                                placeholder="Skriv en note..."
+                                className="text-xs min-h-[50px]"
+                              />
+                              <Button
+                                size="sm"
+                                className="w-full h-7 text-xs"
+                                onClick={() => handleSaveNote(completion.id)}
+                              >
+                                Gem
+                              </Button>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      )}
+                    </div>
+                  );
+                })}
+                {progress.pct === 100 && progress.total > 0 && (
+                  <div className="flex items-center justify-center py-0.5">
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  </div>
+                )}
+              </div>
+            </div>
           );
         })}
       </div>
 
+      {/* Admin section */}
       {showAdmin && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Administrer opgaver</CardTitle>
+        <Card className="mt-2 shrink-0">
+          <CardHeader className="pb-2 pt-3 px-4">
+            <CardTitle className="text-sm">Administrer opgaver</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="border rounded-lg p-4 space-y-3">
-              <h4 className="text-sm font-medium">Tilføj ny opgave</h4>
+          <CardContent className="space-y-3 px-4 pb-3">
+            <div className="border rounded-lg p-3 space-y-2">
+              <h4 className="text-xs font-medium">Tilføj ny opgave</h4>
               <Input
                 placeholder="Opgavetitel"
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
+                className="h-8 text-sm"
               />
               <Textarea
                 placeholder="Beskrivelse (valgfri)"
                 value={newDescription}
                 onChange={(e) => setNewDescription(e.target.value)}
-                className="min-h-[60px]"
+                className="min-h-[50px] text-sm"
               />
               <div>
-                <p className="text-xs text-muted-foreground mb-2">Vælg dage:</p>
+                <p className="text-[10px] text-muted-foreground mb-1">Vælg dage:</p>
                 <div className="flex gap-1">
                   {DAY_NAMES.map((name, idx) => (
                     <Button
                       key={idx}
                       size="sm"
                       variant={newWeekdays.includes(idx) ? "default" : "outline"}
-                      className="h-8 w-10 text-xs"
+                      className="h-6 w-9 text-[10px]"
                       onClick={() =>
                         setNewWeekdays((prev) =>
                           prev.includes(idx) ? prev.filter((d) => d !== idx) : [...prev, idx].sort()
@@ -336,24 +331,24 @@ export default function FmChecklistContent() {
                   ))}
                 </div>
               </div>
-              <Button onClick={handleAddTask} disabled={!newTitle.trim() || newWeekdays.length === 0}>
-                <Plus className="h-4 w-4 mr-1" />
+              <Button size="sm" className="h-7 text-xs" onClick={handleAddTask} disabled={!newTitle.trim() || newWeekdays.length === 0}>
+                <Plus className="h-3.5 w-3.5 mr-1" />
                 Tilføj
               </Button>
             </div>
 
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium">Eksisterende opgaver</h4>
+            <div className="space-y-1.5">
+              <h4 className="text-xs font-medium">Eksisterende opgaver</h4>
               {templates.map((t) => (
-                <div key={t.id} className="flex items-center justify-between p-3 border rounded-lg">
+                <div key={t.id} className="flex items-center justify-between p-2 border rounded-lg">
                   <div>
-                    <p className="text-sm font-medium">{t.title}</p>
-                    <div className="flex gap-1 mt-1">
+                    <p className="text-xs font-medium">{t.title}</p>
+                    <div className="flex gap-0.5 mt-0.5">
                       {DAY_NAMES.map((name, idx) => (
                         <Badge
                           key={idx}
                           variant={t.weekdays.includes(idx) ? "default" : "outline"}
-                          className="text-[10px] px-1 py-0"
+                          className="text-[9px] px-1 py-0 h-4"
                         >
                           {name}
                         </Badge>
@@ -363,10 +358,10 @@ export default function FmChecklistContent() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="text-destructive hover:text-destructive"
+                    className="h-6 w-6 text-destructive hover:text-destructive"
                     onClick={() => deactivateTemplate.mutate(t.id)}
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
               ))}
