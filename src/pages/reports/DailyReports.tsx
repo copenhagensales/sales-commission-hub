@@ -255,18 +255,23 @@ export default function DailyReports() {
   const { data: employees = [] } = useQuery({
     queryKey: ["daily-report-employees", employeeStatusFilter],
     queryFn: async () => {
-      const table = employeeStatusFilter === "active" ? "employee_basic_info" : "employee_master_data";
+      if (employeeStatusFilter === "active") {
+        const { data } = await supabase
+          .from("employee_basic_info")
+          .select("id, first_name, last_name, is_active")
+          .eq("is_active", true)
+          .order("first_name");
+        return data || [];
+      }
+      // For inactive or all, query employee_master_data directly
       let query = supabase
-        .from(table)
+        .from("employee_master_data")
         .select("id, first_name, last_name, is_active")
         .order("first_name");
       
-      if (employeeStatusFilter === "active") {
-        query = query.eq("is_active", true);
-      } else if (employeeStatusFilter === "inactive") {
+      if (employeeStatusFilter === "inactive") {
         query = query.eq("is_active", false);
       }
-      // "all" = no filter
       
       const { data } = await query;
       return data || [];
