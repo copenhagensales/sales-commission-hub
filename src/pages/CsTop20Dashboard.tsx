@@ -209,14 +209,14 @@ export default function CsTop20Dashboard() {
         ? 'bg-slate-800/95 border-slate-700/50 h-full' 
         : 'bg-card border-border/50'
     }`}>
-      <CardHeader className={`pb-3 flex-shrink-0 border-b ${
-        tvMode ? 'border-slate-700/50 bg-slate-800' : 'border-border/30 bg-muted/30'
+      <CardHeader className={`flex-shrink-0 border-b ${
+        tvMode ? 'border-slate-700/50 bg-slate-800 pb-4' : 'pb-3 border-border/30 bg-muted/30'
       }`}>
         <CardTitle className={`flex items-center justify-center gap-2.5 font-semibold tracking-wide ${
-          tvMode ? 'text-lg text-white' : 'text-base text-foreground'
+          tvMode ? 'text-xl text-white' : 'text-base text-foreground'
         }`}>
-          <div className={`p-1.5 rounded-lg ${accentClass}`}>
-            <Icon className="h-4 w-4 text-white" />
+          <div className={`rounded-lg ${tvMode ? 'p-2' : 'p-1.5'} ${accentClass}`}>
+            <Icon className={`text-white ${tvMode ? 'h-5 w-5' : 'h-4 w-4'}`} />
           </div>
           {title}
         </CardTitle>
