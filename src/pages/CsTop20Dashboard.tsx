@@ -258,13 +258,13 @@ export default function CsTop20Dashboard() {
                   }`}
                 >
                   {/* Rank */}
-                   <div className={`flex-shrink-0 text-center font-medium ${tvMode ? 'w-8' : 'w-6 sm:w-8'}`}>
+                   <div className={`flex-shrink-0 text-center font-medium ${tvMode ? 'w-5' : 'w-6 sm:w-8'}`}>
                     {rankBadge ? (
-                      <span className={tvMode ? "text-base" : "text-base sm:text-xl"}>{rankBadge}</span>
+                      <span className={tvMode ? "text-xs" : "text-base sm:text-xl"}>{rankBadge}</span>
                     ) : (
                       <span className={`tabular-nums ${
                         tvMode 
-                          ? 'text-sm text-slate-500' 
+                          ? 'text-[10px] text-slate-500' 
                           : 'text-xs sm:text-sm text-muted-foreground/70'
                       }`}>
                         {index + 1}
