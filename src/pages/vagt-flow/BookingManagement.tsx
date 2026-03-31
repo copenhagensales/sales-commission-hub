@@ -190,6 +190,14 @@ export default function BookingManagement() {
             </TabsContent>
           )}
 
+          {visibleTabs.some(t => t.value === "checklist") && (
+            <TabsContent value="checklist" className="mt-6">
+              <Suspense fallback={<div className="flex items-center justify-center py-12">Indlæser...</div>}>
+                <FmChecklistContent />
+              </Suspense>
+            </TabsContent>
+          )}
+
         </Tabs>
       </div>
     </MainLayout>
