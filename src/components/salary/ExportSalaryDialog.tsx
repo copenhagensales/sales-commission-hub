@@ -82,17 +82,20 @@ export function ExportSalaryDialog({ currentPeriodStart }: ExportSalaryDialogPro
   const { sellerData: rawSellerData, isLoading } = useSellerSalariesCached("all", activePeriod?.start, activePeriod?.end);
 
   const sellerData = useMemo(() => {
-    return rawSellerData?.filter(seller =>
-      seller.commission !== 0 ||
-      seller.cancellations !== 0 ||
-      seller.vacationPay !== 0 ||
-      seller.diet !== 0 ||
-      seller.sickDays !== 0 ||
-      seller.dailyBonus !== 0 ||
-      seller.startupBonus !== 0 ||
-      seller.referralBonus !== 0
-    );
-  }, [rawSellerData]);
+    return rawSellerData?.filter(seller => {
+      if (!includeConsultants && seller.isFreelanceConsultant) return false;
+      return (
+        seller.commission !== 0 ||
+        seller.cancellations !== 0 ||
+        seller.vacationPay !== 0 ||
+        seller.diet !== 0 ||
+        seller.sickDays !== 0 ||
+        seller.dailyBonus !== 0 ||
+        seller.startupBonus !== 0 ||
+        seller.referralBonus !== 0
+      );
+    });
+  }, [rawSellerData, includeConsultants]);
 
   const toggleCol = (key: ColKey) => {
     setSelectedCols((prev) => {
