@@ -1,61 +1,21 @@
 
 
-## FM Tjekliste-system
+## Vis kun til og med 3. Division på TV-boardet
 
-Et ugentligt tjeklistesystem for fieldmarketing-assistenten med dagspecifikke opgaver, afkrydsning, noter og motiverende UI.
+Filtrer divisions-data i `TvLeagueDashboard.tsx` så kun division 1–4 vises (Superligaen, 1. Division, 2. Division, 3. Division).
 
-### Database (2 tabeller)
+### Ændringer i `src/pages/tv-board/TvLeagueDashboard.tsx`
 
-**`fm_checklist_templates`** — de faste opgaver (admin kan tilføje/fjerne):
-- `id`, `title` (text), `description` (text, nullable), `weekdays` (integer[] — 0=mandag..6=søndag), `sort_order` (int), `is_active` (boolean default true), `created_at`, `created_by` (uuid)
+1. **Filtrér divisions** efter data er hentet — tilføj en konstant `MAX_DIVISION = 4` og filtrér `data.divisions` overalt hvor det bruges:
+   - `SceneDivisions` — kun divisioner ≤ 4
+   - `SceneLeagueOverview` — kun divisioner ≤ 4
+   - Opdatér `totalDivisions`-visningen til at reflektere det filtrerede antal
 
-**`fm_checklist_completions`** — afkrydsninger pr. uge:
-- `id`, `template_id` (FK → fm_checklist_templates), `completed_date` (date), `completed_by` (uuid FK → employee_master_data), `note` (text, nullable), `created_at`
-- Unique constraint: `(template_id, completed_date)` — kun én afkrydsning pr. opgave pr. dag
+2. **Steder der skal opdateres** (ca. 6 linjer):
+   - Linje ~888: `<SceneDivisions divisions={data.divisions.filter(d => d.division <= 4)}` />
+   - Linje ~952: Samme filter på `SceneLeagueOverview`
+   - Linje ~1091: Samme filter på desktop `SceneLeagueOverview`
+   - Tilsvarende `totalDivisions` props opdateres til filtreret antal
 
-RLS: Samme adgang som FM booking (`menu_fm_booking`-brugere kan læse/skrive).
-
-### Predefinerede opgaver (seedes)
-
-| Opgave | Dage |
-|--------|------|
-| Sørg for alle er informeret om standere | Man |
-| Tjek dubletter igennem | Dagligt |
-| Tjek difference fra PB til IM | Dagligt |
-| Pak alle biler til sælgerne | Man |
-| Pak standere til sælgere m. offentlig transport | Man |
-| Alle biler afleveret + kvittering m. billede. Ring ud hvis mangler | Søn |
-| Tag billeder af dashboards i biler (lamper) | Man |
-| Ryd biler op | Man |
-| Tjek standere ved sygdom (især ved 3 stk.) | Dagligt |
-| Tjek om sælgere er kørt tidligere dagen før | Dagligt (morgen) |
-| Send kannibalisering + Arpu ud (flag >40% / <110) | Dagligt |
-
-### Ny side: `src/pages/vagt-flow/FmChecklistContent.tsx`
-
-- Viser ugens opgaver i en ugekalender-visning (man-søn kolonner)
-- Hver opgave viser: titel, checkbox, tidspunkt for afkrydsning, hvem der afkrydsede, note-felt
-- **Motiverende UI**: Progressbar pr. dag ("5/8 udført"), grønt fyld-animation ved afkrydsning, konfetti/check-animation ved 100%, streak-counter ("3 dage i træk fuldført")
-- Ugenavigation (frem/tilbage)
-- Historisk overblik: kan se tidligere uger
-
-### Admin-sektion (på samme side)
-
-- Tilføj ny opgave: titel, beskrivelse, vælg dage
-- Fjern/deaktiver opgave
-- Rækkefølge (drag eller pile)
-
-### Integration i eksisterende system
-
-1. **Ny tab i BookingManagement**: Tilføj "Tjekliste" tab med `permissionKey: "tab_fm_checklist"`
-2. **Permission key**: Tilføj `tab_fm_checklist` i `permissionKeys.ts` under `menu_fm_booking`
-3. **Permission group**: Tilføj til `permissionGroups.ts` under `menu_fm_booking` children
-4. **Sidebar**: Tilføj i `PreviewSidebar.tsx` VAGT_FLOW_ITEMS
-
-### Teknisk opsummering
-
-- 1 database-migration (2 tabeller + RLS + seed-data)
-- 1 ny lazy-loaded tab-komponent
-- Hooks: `useFmChecklist` (hent templates), `useFmChecklistCompletions` (hent/mutér afkrydsninger)
-- Opdater: `BookingManagement.tsx` (ny tab), `permissionKeys.ts`, `permissionGroups.ts`, `PreviewSidebar.tsx`
+3. **Ingen backend-ændringer** — edge function leverer stadig alle divisioner, men frontend viser kun de øverste 4.
 
