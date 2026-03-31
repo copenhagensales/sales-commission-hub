@@ -319,7 +319,7 @@ export default function CsTop20Dashboard() {
                   {/* Commission */}
                   <div className={`flex-shrink-0 rounded-full font-semibold tabular-nums ${
                     tvMode 
-                      ? 'bg-slate-700/80 text-white px-2 py-1 text-sm' 
+                      ? 'bg-slate-700/80 text-white px-1.5 py-0.5 text-xs' 
                       : 'bg-primary/10 text-primary px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm'
                   }`}>
                     {formatCurrency(commission)}
