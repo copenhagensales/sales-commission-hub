@@ -1107,7 +1107,7 @@ export default function TvLeagueDashboard() {
         </div>
 
         {/* ─── RIGHT ZONE (60%) – always divisions ─── */}
-        <div className="w-[60%] p-3 2xl:p-6">
+        <div className={`w-[60%] ${tvMode ? "p-8" : "p-3 2xl:p-6"}`}>
           <SceneDivisions divisions={data.divisions} />
         </div>
       </div>
