@@ -428,21 +428,12 @@ export function useSellerSalariesCached(
         // Use commission difference from product_change_log
         deduction = basketDiffMap[cq.id] || 0;
       } else {
-        // Cancellation — deduct only the targeted product's commission
-        const targetName = (cq as any).target_product_name;
-        if (targetName) {
-          // Find sale_item matching the target product
-          const matchingItem = (sale.sale_items || []).find((si: any) => {
-            const itemProductName = productIdToName[si.product_id] || "";
-            return itemProductName === targetName;
-          });
-          deduction = matchingItem ? (matchingItem.mapped_commission || 0) : 0;
-        } else {
-          // Fallback for older records without target: deduct full sale commission
-          deduction = (sale.sale_items || []).reduce(
-            (sum: number, si: any) => sum + (si.mapped_commission || 0), 0
-          );
-        }
+        // Standard cancellation — deduct 100% of the sale's commission
+        // Each cancellation_queue row represents one cancelled sale (or product).
+        // Per business rule: standard cancellations deduct full provision.
+        deduction = (sale.sale_items || []).reduce(
+          (sum: number, si: any) => sum + (si.mapped_commission || 0), 0
+        );
       }
       if (deduction > 0) {
         cancellationMap[employeeId] = (cancellationMap[employeeId] || 0) + deduction;
