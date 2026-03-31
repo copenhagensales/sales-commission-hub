@@ -6,6 +6,7 @@ import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { isTvMode } from "@/utils/tvMode";
+import { useTvScreenAdapter, getTvScaleStyles, getTvCenteringStyles } from "@/hooks/useTvScreenAdapter";
 
 // ─── Types ────────────────────────────────────────────────────
 interface PlayerEntry {
@@ -804,6 +805,7 @@ export default function TvLeagueDashboard() {
   const [mobileTab, setMobileTab] = useState<MobileTab>("divisions");
   const tvMode = isTvMode();
   const isMobile = useIsMobile();
+  const screenInfo = useTvScreenAdapter();
 
   // Left scene rotation (only on desktop/TV)
   useEffect(() => {
@@ -972,8 +974,8 @@ export default function TvLeagueDashboard() {
   }
 
   // ─── DESKTOP / TV LAYOUT ───
-  return (
-    <DashboardShell>
+  const desktopContent = (
+    <>
       {!tvMode && (
         <DashboardHeader
           title="⚽ Superliga Live"
@@ -1111,6 +1113,28 @@ export default function TvLeagueDashboard() {
           <SceneDivisions divisions={data.divisions} />
         </div>
       </div>
+    </>
+  );
+
+  // In TV mode, wrap with scale adapter for large screens (4K etc.)
+  if (tvMode) {
+    const scaleStyles = getTvScaleStyles(screenInfo);
+    const centeringStyles = getTvCenteringStyles(screenInfo);
+
+    return (
+      <DashboardShell>
+        <div style={centeringStyles}>
+          <div style={scaleStyles}>
+            {desktopContent}
+          </div>
+        </div>
+      </DashboardShell>
+    );
+  }
+
+  return (
+    <DashboardShell>
+      {desktopContent}
     </DashboardShell>
   );
 }
