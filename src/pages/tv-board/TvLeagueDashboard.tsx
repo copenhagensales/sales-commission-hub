@@ -982,9 +982,9 @@ export default function TvLeagueDashboard() {
       )}
       <div className={`bg-slate-900 text-white overflow-hidden flex ${tvMode ? "w-screen h-screen" : "h-[calc(100vh-120px)] rounded-xl"}`}>
         {/* ─── LEFT ZONE (40%) – rotates overview / movements / records / league overview ─── */}
-        <div className={`w-[40%] border-r border-slate-800 flex flex-col ${tvMode ? "p-8" : "p-3 2xl:p-6"}`}>
+        <div className={`w-[40%] border-r border-slate-800 flex flex-col ${tvMode ? "p-4 pt-3" : "p-3 2xl:p-6"}`}>
           {tvMode && (
-            <div className="mb-6">
+            <div className="mb-3">
               <h1 className="text-3xl font-black tracking-tight">
                 <span className="text-yellow-400">⚽</span> Superliga Live
               </h1>
