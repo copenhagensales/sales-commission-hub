@@ -273,7 +273,7 @@ export default function CsTop20Dashboard() {
                   </div>
                   
                   {/* Avatar */}
-                  <Avatar className={`flex-shrink-0 ${tvMode ? 'h-10 w-10' : 'h-8 w-8 sm:h-10 sm:w-10'} ${
+                  <Avatar className={`flex-shrink-0 ${tvMode ? 'h-7 w-7' : 'h-8 w-8 sm:h-10 sm:w-10'} ${
                     index === 0 
                       ? 'ring-2 ring-amber-400/80 ring-offset-1 ring-offset-background' 
                       : index < 3 
