@@ -296,7 +296,7 @@ function SceneDivisions({ divisions }: { divisions: DivisionData[] }) {
             {div.players.map((p, i) => (
               <div
                 key={i}
-                className={`flex items-center gap-2 2xl:gap-3 px-2 2xl:px-3 className={`flex items-center gap-2 2xl:gap-3 px-2 2xl:px-3 py-0.5 2xl:py-1 rounded-lg bg-slate-800/50 border border-slate-700/50 ${ bg-slate-800/50 border border-slate-700/50 ${
+                className={`flex items-center gap-2 2xl:gap-3 px-2 2xl:px-3 py-0.5 2xl:py-1 rounded-lg bg-slate-800/50 border border-slate-700/50 ${
                   p.rank === 1 ? "border-l-2 border-l-yellow-400" :
                   p.rank === 2 ? "border-l-2 border-l-slate-300" :
                   p.rank === 3 ? "border-l-2 border-l-orange-400" :
