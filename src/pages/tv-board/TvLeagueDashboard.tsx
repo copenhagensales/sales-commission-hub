@@ -885,7 +885,7 @@ export default function TvLeagueDashboard() {
                 transition={{ duration: 0.3 }}
               >
                 {mobileTab === "divisions" && (
-                  <SceneDivisions divisions={data.divisions} />
+                  <SceneDivisions divisions={data.divisions.filter(d => d.division <= 4)} />
                 )}
                 {mobileTab === "overview" && (
                   <div className="space-y-4">
