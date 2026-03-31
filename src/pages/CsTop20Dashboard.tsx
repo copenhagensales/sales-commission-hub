@@ -6,7 +6,7 @@ import { formatNumber } from "@/lib/calculations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useCachedLeaderboard, getInitials as getInitialsFromHook, type LeaderboardEntry, type LeaderboardPeriod } from "@/hooks/useCachedLeaderboard";
+import { useCachedLeaderboard, useCachedLeaderboards, getInitials as getInitialsFromHook, type LeaderboardEntry, type LeaderboardPeriod } from "@/hooks/useCachedLeaderboard";
 import { Trophy, Calendar, Clock } from "lucide-react";
 import { DashboardPeriodSelector, getDefaultPeriod, type PeriodSelection, type PeriodType, mapPeriodTypeToCache } from "@/components/dashboard/DashboardPeriodSelector";
 import { supabase } from "@/integrations/supabase/client";
@@ -127,17 +127,23 @@ export default function CsTop20Dashboard() {
   const cachePeriod = mapPeriodTypeToCache(selectedPeriod.type) as LeaderboardPeriod | null;
   const canUseCache = cachePeriod !== null;
 
-  // Cached leaderboard for standard periods
+  // Cached leaderboard for standard periods (single period - used in normal mode)
   const { data: cachedLeaderboard, isLoading: cachedLoading } = useCachedLeaderboard(
     cachePeriod || "payroll_period",
     { type: "global" },
-    { enabled: canUseCache, limit: 20 }
+    { enabled: canUseCache && !tvMode, limit: 20 }
+  );
+
+  // TV mode: fetch all 3 periods at once
+  const { sellersToday, sellersWeek, sellersPayroll, isLoading: tvCachedLoading } = useCachedLeaderboards(
+    { type: "global" },
+    { enabled: tvMode, limit: 20 }
   );
 
   // Custom period leaderboard for non-standard periods
   const { data: customLeaderboard, isLoading: customLoading } = useCustomPeriodLeaderboard(
     selectedPeriod,
-    { enabled: !canUseCache, limit: 20 }
+    { enabled: !canUseCache && !tvMode, limit: 20 }
   );
 
   // For TV mode, also fetch from edge function as fallback (will be phased out)
@@ -157,11 +163,16 @@ export default function CsTop20Dashboard() {
       }
       return response.json();
     },
-    enabled: tvMode && !cachedLeaderboard?.length && !customLeaderboard?.length,
+    enabled: tvMode && !sellersToday.length && !sellersWeek.length && !sellersPayroll.length,
     ...REFRESH_PROFILES.dashboard,
   });
 
-  // Get the active leaderboard data
+  // TV mode: merge cached + fallback data for all 3 periods
+  const tvSellersToday = sellersToday.length ? sellersToday : (tvData?.sellersToday || []);
+  const tvSellersWeek = sellersWeek.length ? sellersWeek : (tvData?.sellersWeek || []);
+  const tvSellersPayroll = sellersPayroll.length ? sellersPayroll : (tvData?.sellersPayroll || []);
+
+  // Get the active leaderboard data (normal mode only)
   const leaderboardData = useMemo(() => {
     if (canUseCache && cachedLeaderboard?.length) {
       return cachedLeaderboard;
@@ -169,14 +180,8 @@ export default function CsTop20Dashboard() {
     if (!canUseCache && customLeaderboard?.length) {
       return customLeaderboard;
     }
-    // TV mode fallback - map to selected period
-    if (tvMode && tvData) {
-      if (selectedPeriod.type === "today") return tvData.sellersToday;
-      if (selectedPeriod.type === "this_week") return tvData.sellersWeek;
-      return tvData.sellersPayroll;
-    }
     return [];
-  }, [canUseCache, cachedLeaderboard, customLeaderboard, tvMode, tvData, selectedPeriod.type]);
+  }, [canUseCache, cachedLeaderboard, customLeaderboard]);
 
   const isLoading = canUseCache ? cachedLoading : customLoading;
 
@@ -204,14 +209,14 @@ export default function CsTop20Dashboard() {
         ? 'bg-slate-800/95 border-slate-700/50 h-full' 
         : 'bg-card border-border/50'
     }`}>
-      <CardHeader className={`pb-3 flex-shrink-0 border-b ${
-        tvMode ? 'border-slate-700/50 bg-slate-800' : 'border-border/30 bg-muted/30'
+      <CardHeader className={`flex-shrink-0 border-b ${
+        tvMode ? 'border-slate-700/50 bg-slate-800 pb-4' : 'pb-3 border-border/30 bg-muted/30'
       }`}>
         <CardTitle className={`flex items-center justify-center gap-2.5 font-semibold tracking-wide ${
-          tvMode ? 'text-lg text-white' : 'text-base text-foreground'
+          tvMode ? 'text-xl text-white' : 'text-base text-foreground'
         }`}>
-          <div className={`p-1.5 rounded-lg ${accentClass}`}>
-            <Icon className="h-4 w-4 text-white" />
+          <div className={`rounded-lg ${tvMode ? 'p-2' : 'p-1.5'} ${accentClass}`}>
+            <Icon className={`text-white ${tvMode ? 'h-5 w-5' : 'h-4 w-4'}`} />
           </div>
           {title}
         </CardTitle>
@@ -242,20 +247,20 @@ export default function CsTop20Dashboard() {
               const isTopThree = index < 3;
               
               return (
-                <div 
-                  key={seller.employeeId || name} 
-                  className={`flex items-center gap-2 sm:gap-3 transition-all duration-150 ${
-                    tvMode ? 'px-3 py-2.5' : 'px-3 sm:px-4 py-2.5 sm:py-3 hover:bg-muted/40'
-                  } ${
+                  <div 
+                    key={seller.employeeId || name} 
+                    className={`flex items-center gap-2 sm:gap-3 transition-all duration-150 ${
+                      tvMode ? 'px-4 py-3' : 'px-3 sm:px-4 py-2.5 sm:py-3 hover:bg-muted/40'
+                    } ${
                     isTopThree 
                       ? (tvMode ? 'bg-slate-700/20' : 'bg-primary/[0.03]') 
                       : ''
                   }`}
                 >
                   {/* Rank */}
-                  <div className={`flex-shrink-0 text-center font-medium ${tvMode ? 'w-7' : 'w-6 sm:w-8'}`}>
+                   <div className={`flex-shrink-0 text-center font-medium ${tvMode ? 'w-8' : 'w-6 sm:w-8'}`}>
                     {rankBadge ? (
-                      <span className={tvMode ? "text-lg" : "text-base sm:text-xl"}>{rankBadge}</span>
+                      <span className={tvMode ? "text-xl" : "text-base sm:text-xl"}>{rankBadge}</span>
                     ) : (
                       <span className={`tabular-nums ${
                         tvMode 
@@ -268,7 +273,7 @@ export default function CsTop20Dashboard() {
                   </div>
                   
                   {/* Avatar */}
-                  <Avatar className={`flex-shrink-0 ${tvMode ? 'h-9 w-9' : 'h-8 w-8 sm:h-10 sm:w-10'} ${
+                  <Avatar className={`flex-shrink-0 ${tvMode ? 'h-10 w-10' : 'h-8 w-8 sm:h-10 sm:w-10'} ${
                     index === 0 
                       ? 'ring-2 ring-amber-400/80 ring-offset-1 ring-offset-background' 
                       : index < 3 
@@ -276,7 +281,7 @@ export default function CsTop20Dashboard() {
                         : ''
                   }`}>
                     <AvatarImage src={avatarUrl || undefined} alt={name} />
-                    <AvatarFallback className={`font-medium text-xs ${
+                    <AvatarFallback className={`font-medium ${tvMode ? 'text-sm' : 'text-xs'} ${
                       tvMode 
                         ? 'bg-slate-700 text-slate-300' 
                         : 'bg-muted text-muted-foreground'
@@ -288,31 +293,33 @@ export default function CsTop20Dashboard() {
                   {/* Name & Sales & Team */}
                   <div className="flex-1 min-w-0 overflow-hidden">
                     <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
-                      <span className={`font-medium truncate max-w-[80px] sm:max-w-none ${
-                        tvMode ? 'text-sm text-white' : 'text-xs sm:text-sm text-foreground'
+                      <span className={`font-medium truncate ${
+                        tvMode ? 'text-base text-white max-w-none' : 'text-xs sm:text-sm text-foreground max-w-[80px] sm:max-w-none'
                       }`}>
                         {displayName}
                       </span>
                       {(() => {
                         const shortTeam = getShortTeamName(seller.teamName);
                         return shortTeam ? (
-                          <span className={`flex-shrink-0 rounded px-1 sm:px-1.5 py-0.5 text-[9px] sm:text-[10px] font-medium ${getTeamBadgeStyle(seller.teamName)}`}>
+                          <span className={`flex-shrink-0 rounded font-medium ${
+                            tvMode ? 'px-1.5 py-0.5 text-[11px]' : 'px-1 sm:px-1.5 py-0.5 text-[9px] sm:text-[10px]'
+                          } ${getTeamBadgeStyle(seller.teamName)}`}>
                             {shortTeam}
                           </span>
                         ) : null;
                       })()}
                     </div>
-                    <div className={`text-[10px] sm:text-xs ${
-                      tvMode ? 'text-slate-500' : 'text-muted-foreground/80'
+                    <div className={`${
+                      tvMode ? 'text-xs text-slate-500' : 'text-[10px] sm:text-xs text-muted-foreground/80'
                     }`}>
                       {sales} salg
                     </div>
                   </div>
                   
-                  {/* Commission - Clean, neutral styling */}
+                  {/* Commission */}
                   <div className={`flex-shrink-0 rounded-full font-semibold tabular-nums ${
                     tvMode 
-                      ? 'bg-slate-700/80 text-white px-3 py-1.5 text-sm' 
+                      ? 'bg-slate-700/80 text-white px-3 py-1.5 text-base' 
                       : 'bg-primary/10 text-primary px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm'
                   }`}>
                     {formatCurrency(commission)}
@@ -328,14 +335,14 @@ export default function CsTop20Dashboard() {
 
   return (
     <div className={tvMode 
-      ? 'w-[1920px] h-[1080px] bg-slate-900 p-6 flex flex-col overflow-hidden' 
+      ? 'w-screen h-screen bg-slate-900 p-8 flex flex-col overflow-hidden' 
       : 'min-h-screen bg-background p-6'
     }>
       {/* TV Mode Header */}
       {tvMode ? (
-        <div className="mb-5 text-center flex-shrink-0">
-          <h1 className="text-3xl font-bold text-white tracking-tight">CS Top 20</h1>
-          <p className="text-sm text-slate-400 mt-1.5">Top 20 på tværs af alle teams • {periodLabel}</p>
+        <div className="mb-6 text-center flex-shrink-0">
+          <h1 className="text-4xl font-bold text-white tracking-tight">CS Top 20</h1>
+          <p className="text-base text-slate-400 mt-2">Top 20 på tværs af alle teams</p>
         </div>
       ) : (
         <DashboardHeader 
@@ -350,17 +357,37 @@ export default function CsTop20Dashboard() {
         />
       )}
       
-      <div className={tvMode 
-        ? 'grid grid-cols-1 gap-5 flex-1 min-h-0' 
-        : 'grid grid-cols-1 gap-6 mt-6'
-      }>
-        <LeaderboardCard 
-          title={`Top 20 – ${periodLabel}`}
-          icon={Trophy}
-          sellers={leaderboardData}
-          accentClass="bg-amber-500"
-        />
-      </div>
+      {tvMode ? (
+        <div className="grid grid-cols-3 gap-6 flex-1 min-h-0">
+          <LeaderboardCard 
+            title="Top Dag"
+            icon={Clock}
+            sellers={tvSellersToday}
+            accentClass="bg-emerald-500"
+          />
+          <LeaderboardCard 
+            title="Top Uge"
+            icon={Calendar}
+            sellers={tvSellersWeek}
+            accentClass="bg-blue-500"
+          />
+          <LeaderboardCard 
+            title="Top Lønperiode"
+            icon={Trophy}
+            sellers={tvSellersPayroll}
+            accentClass="bg-amber-500"
+          />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-6 mt-6">
+          <LeaderboardCard 
+            title={`Top 20 – ${periodLabel}`}
+            icon={Trophy}
+            sellers={leaderboardData}
+            accentClass="bg-amber-500"
+          />
+        </div>
+      )}
     </div>
   );
 }
