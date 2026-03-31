@@ -64,6 +64,15 @@ export function SellerSalariesTab() {
   const filteredData = useMemo(() => {
     const filtered = sellerData?.filter(seller =>
       seller.name.toLowerCase().includes(searchQuery.toLowerCase())
+    ).filter(seller =>
+      seller.commission !== 0 ||
+      seller.cancellations !== 0 ||
+      seller.vacationPay !== 0 ||
+      seller.diet !== 0 ||
+      seller.sickDays !== 0 ||
+      seller.dailyBonus !== 0 ||
+      seller.startupBonus !== 0 ||
+      seller.referralBonus !== 0
     ) || [];
 
     return [...filtered].sort((a, b) => {
