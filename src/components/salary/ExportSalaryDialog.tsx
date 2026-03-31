@@ -43,7 +43,7 @@ function generatePeriods(ref: Date) {
   const periods: { start: Date; end: Date; label: string }[] = [];
   for (let offset = -3; offset <= 2; offset++) {
     const start = new Date(ref.getFullYear(), ref.getMonth() + offset, 15);
-    const end = new Date(ref.getFullYear(), ref.getMonth() + offset + 1, 14);
+    const end = new Date(ref.getFullYear(), ref.getMonth() + offset + 1, 14, 23, 59, 59, 999);
     periods.push({
       start,
       end,
