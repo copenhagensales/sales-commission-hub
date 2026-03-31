@@ -1088,9 +1088,9 @@ export default function TvLeagueDashboard() {
                 {currentLeftScene === "league-overview" && (
                   <SceneLeagueOverview
                     raceToTop={data.raceToTop || []}
-                    divisions={data.divisions}
+                    divisions={data.divisions.filter(d => d.division <= 4)}
                     totalPlayers={data.totalPlayers}
-                    totalDivisions={data.totalDivisions}
+                    totalDivisions={data.divisions.filter(d => d.division <= 4).length}
                     todayLeagueTotal={data.todayLeagueTotal || 0}
                     activeLast15Min={data.activeLast15Min || 0}
                   />
