@@ -127,17 +127,23 @@ export default function CsTop20Dashboard() {
   const cachePeriod = mapPeriodTypeToCache(selectedPeriod.type) as LeaderboardPeriod | null;
   const canUseCache = cachePeriod !== null;
 
-  // Cached leaderboard for standard periods
+  // Cached leaderboard for standard periods (single period - used in normal mode)
   const { data: cachedLeaderboard, isLoading: cachedLoading } = useCachedLeaderboard(
     cachePeriod || "payroll_period",
     { type: "global" },
-    { enabled: canUseCache, limit: 20 }
+    { enabled: canUseCache && !tvMode, limit: 20 }
+  );
+
+  // TV mode: fetch all 3 periods at once
+  const { sellersToday, sellersWeek, sellersPayroll, isLoading: tvCachedLoading } = useCachedLeaderboards(
+    { type: "global" },
+    { enabled: tvMode, limit: 20 }
   );
 
   // Custom period leaderboard for non-standard periods
   const { data: customLeaderboard, isLoading: customLoading } = useCustomPeriodLeaderboard(
     selectedPeriod,
-    { enabled: !canUseCache, limit: 20 }
+    { enabled: !canUseCache && !tvMode, limit: 20 }
   );
 
   // For TV mode, also fetch from edge function as fallback (will be phased out)
