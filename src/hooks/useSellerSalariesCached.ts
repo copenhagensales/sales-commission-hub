@@ -206,6 +206,19 @@ export function useSellerSalariesCached(
     staleTime: 60000,
   });
 
+  // Query 7a: Employee agent mappings (for resolving agent emails to employee IDs)
+  const { data: agentMappings } = useQuery({
+    queryKey: ["employee-agent-mappings"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_agent_mapping")
+        .select("employee_id, agents!inner(email)");
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 300000,
+  });
+
   // Query 7: Salary additions for the period
   const { data: salaryAdditionsData, isLoading: salaryAdditionsLoading } = useQuery({
     queryKey: ["salary-additions", periodStartISO, periodEndISO],
