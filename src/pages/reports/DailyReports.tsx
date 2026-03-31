@@ -250,22 +250,28 @@ export default function DailyReports() {
     }
   }, [scopeReportsDaily, teams, selectedTeam]);
 
-  // Fetch employees
+  // Fetch employees - use employee_master_data when we need inactive employees
+  // since employee_basic_info view filters to is_active = true only
   const { data: employees = [] } = useQuery({
     queryKey: ["daily-report-employees", employeeStatusFilter],
     queryFn: async () => {
-      // Use secure view that only exposes non-sensitive columns
+      if (employeeStatusFilter === "active") {
+        const { data } = await supabase
+          .from("employee_basic_info")
+          .select("id, first_name, last_name, is_active")
+          .eq("is_active", true)
+          .order("first_name");
+        return data || [];
+      }
+      // For inactive or all, query employee_master_data directly
       let query = supabase
-        .from("employee_basic_info")
+        .from("employee_master_data")
         .select("id, first_name, last_name, is_active")
         .order("first_name");
       
-      if (employeeStatusFilter === "active") {
-        query = query.eq("is_active", true);
-      } else if (employeeStatusFilter === "inactive") {
+      if (employeeStatusFilter === "inactive") {
         query = query.eq("is_active", false);
       }
-      // "all" = no filter
       
       const { data } = await query;
       return data || [];
