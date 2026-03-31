@@ -64,6 +64,7 @@ export function ExportSalaryDialog({ currentPeriodStart }: ExportSalaryDialogPro
   );
   const [selectedPeriodIdx, setSelectedPeriodIdx] = useState<string>("");
   const [exporting, setExporting] = useState(false);
+  const [includeConsultants, setIncludeConsultants] = useState(true);
 
   const periods = useMemo(() => generatePeriods(currentPeriodStart), [currentPeriodStart]);
 
@@ -81,17 +82,20 @@ export function ExportSalaryDialog({ currentPeriodStart }: ExportSalaryDialogPro
   const { sellerData: rawSellerData, isLoading } = useSellerSalariesCached("all", activePeriod?.start, activePeriod?.end);
 
   const sellerData = useMemo(() => {
-    return rawSellerData?.filter(seller =>
-      seller.commission !== 0 ||
-      seller.cancellations !== 0 ||
-      seller.vacationPay !== 0 ||
-      seller.diet !== 0 ||
-      seller.sickDays !== 0 ||
-      seller.dailyBonus !== 0 ||
-      seller.startupBonus !== 0 ||
-      seller.referralBonus !== 0
-    );
-  }, [rawSellerData]);
+    return rawSellerData?.filter(seller => {
+      if (!includeConsultants && seller.isFreelanceConsultant) return false;
+      return (
+        seller.commission !== 0 ||
+        seller.cancellations !== 0 ||
+        seller.vacationPay !== 0 ||
+        seller.diet !== 0 ||
+        seller.sickDays !== 0 ||
+        seller.dailyBonus !== 0 ||
+        seller.startupBonus !== 0 ||
+        seller.referralBonus !== 0
+      );
+    });
+  }, [rawSellerData, includeConsultants]);
 
   const toggleCol = (key: ColKey) => {
     setSelectedCols((prev) => {
@@ -242,6 +246,14 @@ export function ExportSalaryDialog({ currentPeriodStart }: ExportSalaryDialogPro
               ))}
             </div>
           </div>
+
+          <label className="flex items-center gap-2 cursor-pointer text-sm">
+            <Checkbox
+              checked={includeConsultants}
+              onCheckedChange={(checked) => setIncludeConsultants(!!checked)}
+            />
+            Inkluder konsulenter
+          </label>
 
           <Button
             onClick={handleExport}
