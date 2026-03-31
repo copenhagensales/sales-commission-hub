@@ -260,7 +260,7 @@ export default function CsTop20Dashboard() {
                   {/* Rank */}
                    <div className={`flex-shrink-0 text-center font-medium ${tvMode ? 'w-8' : 'w-6 sm:w-8'}`}>
                     {rankBadge ? (
-                      <span className={tvMode ? "text-xl" : "text-base sm:text-xl"}>{rankBadge}</span>
+                      <span className={tvMode ? "text-base" : "text-base sm:text-xl"}>{rankBadge}</span>
                     ) : (
                       <span className={`tabular-nums ${
                         tvMode 
