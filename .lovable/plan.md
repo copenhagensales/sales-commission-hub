@@ -1,21 +1,16 @@
 
 
-## Vis kun til og med 3. Division på TV-boardet
+## Fix CS Top 20 TV-board — tredje kolonne afskåret
 
-Filtrer divisions-data i `TvLeagueDashboard.tsx` så kun division 1–4 vises (Superligaen, 1. Division, 2. Division, 3. Division).
+Billedet viser at "Top Lønperiode"-kolonnen er delvist afskåret på højre side. Layoutet skal strammes op så alle 3 kolonner passer på skærmen.
 
-### Ændringer i `src/pages/tv-board/TvLeagueDashboard.tsx`
+### Ændringer i `src/pages/CsTop20Dashboard.tsx`
 
-1. **Filtrér divisions** efter data er hentet — tilføj en konstant `MAX_DIVISION = 4` og filtrér `data.divisions` overalt hvor det bruges:
-   - `SceneDivisions` — kun divisioner ≤ 4
-   - `SceneLeagueOverview` — kun divisioner ≤ 4
-   - Opdatér `totalDivisions`-visningen til at reflektere det filtrerede antal
+1. **Reducer padding** på TV-mode wrapper: `p-2` → `p-1.5` og `gap-2` → `gap-1.5`
+2. **Reducer commission-badge bredde**: Formater tal mere kompakt (fjern decimaler eller brug kortere format)
+3. **Stram rækker op**: Reducer `px-2` → `px-1.5`, `gap-1.5` → `gap-1` i seller-rows
+4. **Reducer navn-bredde**: Sørg for at `displayName` truncates korrekt med `max-w` constraint
+5. **Reducer header-størrelse**: Gør card-header mere kompakt i TV-mode
 
-2. **Steder der skal opdateres** (ca. 6 linjer):
-   - Linje ~888: `<SceneDivisions divisions={data.divisions.filter(d => d.division <= 4)}` />
-   - Linje ~952: Samme filter på `SceneLeagueOverview`
-   - Linje ~1091: Samme filter på desktop `SceneLeagueOverview`
-   - Tilsvarende `totalDivisions` props opdateres til filtreret antal
-
-3. **Ingen backend-ændringer** — edge function leverer stadig alle divisioner, men frontend viser kun de øverste 4.
+Ingen backend-ændringer — kun CSS/layout justeringer i TV-mode branching.
 
