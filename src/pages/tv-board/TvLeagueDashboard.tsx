@@ -804,7 +804,6 @@ export default function TvLeagueDashboard() {
   const [mobileTab, setMobileTab] = useState<MobileTab>("divisions");
   const tvMode = isTvMode();
   const isMobile = useIsMobile();
-  const screenInfo = useTvScreenAdapter();
 
   // Left scene rotation (only on desktop/TV)
   useEffect(() => {
