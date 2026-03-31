@@ -266,7 +266,7 @@ function SceneDivisions({ divisions }: { divisions: DivisionData[] }) {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between mb-1 2xl:mb-2">
+      <div className="flex items-center justify-between mb-0.5 2xl:mb-1">
         <div>
           <h2 className="text-xl 2xl:text-3xl font-black text-white flex items-center gap-2">
             {div.division === 1 && <Trophy className="h-5 w-5 2xl:h-7 2xl:w-7 text-yellow-400" />}
@@ -291,12 +291,12 @@ function SceneDivisions({ divisions }: { divisions: DivisionData[] }) {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -40 }}
             transition={{ duration: 0.4 }}
-            className="space-y-0.5 2xl:space-y-1 h-full overflow-y-auto pr-1"
+            className="space-y-px 2xl:space-y-0.5 h-full overflow-y-auto pr-1"
           >
             {div.players.map((p, i) => (
               <div
                 key={i}
-                className={`flex items-center gap-2 2xl:gap-3 px-2 2xl:px-3 py-1 2xl:py-1.5 rounded-lg bg-slate-800/50 border border-slate-700/50 ${
+                className={`flex items-center gap-2 2xl:gap-3 px-2 2xl:px-3 py-0.5 2xl:py-1 rounded-lg bg-slate-800/50 border border-slate-700/50 ${
                   p.rank === 1 ? "border-l-2 border-l-yellow-400" :
                   p.rank === 2 ? "border-l-2 border-l-slate-300" :
                   p.rank === 3 ? "border-l-2 border-l-orange-400" :
@@ -355,7 +355,7 @@ function SceneDivisions({ divisions }: { divisions: DivisionData[] }) {
           </motion.div>
         </AnimatePresence>
       </div>
-      <div className="mt-1 2xl:mt-2 flex flex-wrap gap-x-3 2xl:gap-x-4 gap-y-1 text-[10px] 2xl:text-xs text-slate-500">
+      <div className="mt-0.5 2xl:mt-1 flex flex-wrap gap-x-3 2xl:gap-x-4 gap-y-1 text-[10px] 2xl:text-xs text-slate-500">
         <span className="flex items-center gap-1">
           <span className="w-2 h-2 rounded-full bg-yellow-500" /> Top 3 samlet
         </span>
