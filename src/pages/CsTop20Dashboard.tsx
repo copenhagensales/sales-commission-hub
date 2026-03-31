@@ -294,7 +294,7 @@ export default function CsTop20Dashboard() {
                   <div className="flex-1 min-w-0 overflow-hidden">
                     <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
                       <span className={`font-medium truncate ${
-                        tvMode ? 'text-base text-white max-w-none' : 'text-xs sm:text-sm text-foreground max-w-[80px] sm:max-w-none'
+                        tvMode ? 'text-sm text-white max-w-none' : 'text-xs sm:text-sm text-foreground max-w-[80px] sm:max-w-none'
                       }`}>
                         {displayName}
                       </span>
