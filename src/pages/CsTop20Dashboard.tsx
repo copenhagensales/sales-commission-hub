@@ -357,7 +357,7 @@ export default function CsTop20Dashboard() {
       )}
       
       {tvMode ? (
-        <div className="grid grid-cols-3 gap-2 flex-1 min-h-0">
+        <div className="grid grid-cols-3 gap-1.5 flex-1 min-h-0">
           <LeaderboardCard 
             title="Top Dag"
             icon={Clock}
