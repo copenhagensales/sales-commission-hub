@@ -2,31 +2,30 @@
 
 ## Problem
 
-CS Top 20 dashboardet viser kun én enkelt liste (lønperiode) i TV-mode, og bruger faste `1920×1080` dimensioner der ikke fylder skærmen ud på TCL TV'et (samme problem som liga-dashboardet).
+Billedet viser at 3-kolonne layoutet virker, men kun ca. 3-4 sælgere er synlige per kolonne. Resten er skjult under kanten. Rækkerne har for meget padding/spacing til at 20 entries kan passe i den tilgængelige højde.
 
 ## Løsning
 
-Ombyg TV-mode layoutet til 3 kolonner side om side — **Top Dag**, **Top Uge**, **Top Lønperiode** — og brug viewport-relative units (`w-screen h-screen`) så det fylder hele skærmen.
+Gør rækkerne mere kompakte i TV-mode, så flere entries er synlige uden scroll. Reducer padding, avatar-størrelse og font-sizes per række. Gør også header og top-margin mindre for at frigøre plads.
 
 ## Ændringer i `src/pages/CsTop20Dashboard.tsx`
 
-1. **Hent alle 3 perioder i TV-mode** via den eksisterende `useCachedLeaderboards` hook (today, this_week, payroll_period) — den findes allerede i `useCachedLeaderboard.ts`.
+1. **Reducer top-header**: `mb-6` → `mb-3`, `text-4xl` → `text-2xl`, fjern subtitle-teksten i TV-mode for at spare plads.
 
-2. **Skift TV-container** fra `w-[1920px] h-[1080px]` til `w-screen h-screen`.
+2. **Reducer grid gap**: `gap-6` → `gap-4`.
 
-3. **3-kolonne grid i TV-mode**: `grid grid-cols-3 gap-6 flex-1 min-h-0` med tre `LeaderboardCard` instanser:
-   - 🏆 Top Dag (today)
-   - 📅 Top Uge (this_week)  
-   - 💰 Top Lønperiode (payroll_period)
+3. **Reducer padding i container**: `p-8` → `p-4`.
 
-4. **Forstør tekst i TV-mode**: Titel `text-4xl`, leaderboard-navne `text-base`, provision `text-base`, padding `px-4 py-3` — så det er læsbart på afstand.
+4. **Kompakte rækker i TV-mode**:
+   - Row padding: `px-4 py-3` → `px-3 py-1.5`
+   - Avatar: `h-10 w-10` → `h-7 w-7`
+   - Navn: `text-base` → `text-sm`
+   - Commission badge: `text-base px-3 py-1.5` → `text-sm px-2 py-1`
+   - Rank emoji: `text-xl` → `text-base`
+   - Salg-tekst: `text-xs` → `text-[10px]`
+   - Team badge: `text-[11px]` → `text-[9px]`
 
-5. **Normal mode uændret** — den eksisterende enkelt-kolonne med period selector bevares.
+5. **Card header kompakt**: `pb-4` → `pb-2`, titel `text-xl` → `text-base`.
 
-## Tekniske detaljer
-
-- Importér `useCachedLeaderboards` fra `@/hooks/useCachedLeaderboard` (allerede eksisterende)
-- TV-mode henter parallelt `today`, `this_week` og `payroll_period` fra cached leaderboard
-- Beholder fallback til edge function for TV-mode hvis cache er tom
-- Ingen databaseændringer
+Dette skulle give plads til ca. 15-20 entries per kolonne i stedet for 3-4.
 
