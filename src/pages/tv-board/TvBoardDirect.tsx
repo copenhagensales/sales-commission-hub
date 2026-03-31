@@ -328,6 +328,8 @@ export default function TvBoardDirect() {
 
   const scaleStyles = getTvScaleStyles(screenInfo);
   const centeringStyles = getTvCenteringStyles(screenInfo);
+  const responsiveTvDashboards = new Set(["commission-league", "cs-top-20"]);
+  const useLegacyScaleWrapper = !responsiveTvDashboards.has(currentSlug);
 
   return (
     <div className="tv-board-wrapper min-h-screen h-screen max-h-screen overflow-hidden relative bg-slate-900">
@@ -352,14 +354,22 @@ export default function TvBoardDirect() {
         }
       `}</style>
       
-      {/* Scaled dashboard container */}
-      <div style={centeringStyles}>
-        <div data-tv-dashboard style={scaleStyles}>
+      {/* Responsive dashboards render full viewport directly. Legacy dashboards keep scale wrapper. */}
+      {useLegacyScaleWrapper ? (
+        <div style={centeringStyles}>
+          <div data-tv-dashboard style={scaleStyles}>
+            <TvBoardProvider slug={currentSlug}>
+              <DashboardComponent />
+            </TvBoardProvider>
+          </div>
+        </div>
+      ) : (
+        <div className="w-screen h-screen" data-tv-dashboard>
           <TvBoardProvider slug={currentSlug}>
             <DashboardComponent />
           </TvBoardProvider>
         </div>
-      </div>
+      )}
       
       {/* Debug overlay - toggle with 'd' key */}
       {showDebug && (
