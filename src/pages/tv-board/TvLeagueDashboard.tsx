@@ -106,8 +106,8 @@ function formatPt(value: number): string {
   return `${Math.round(value)} pt`;
 }
 
-const DIVISION_DISPLAY_DURATION = 15_000;
-const LEFT_SCENE_DURATIONS = [15_000, 20_000, 20_000, 20_000]; // overview, movements, records, league overview
+const DIVISION_DISPLAY_DURATION = 45_000;
+const LEFT_SCENE_DURATIONS = [45_000, 60_000, 60_000, 60_000]; // overview, movements, records, league overview
 const REFRESH_INTERVAL = 30_000;
 
 // ─── Fetch Hook ───────────────────────────────────────────────
