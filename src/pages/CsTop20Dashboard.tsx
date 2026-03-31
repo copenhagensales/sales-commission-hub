@@ -210,13 +210,13 @@ export default function CsTop20Dashboard() {
         : 'bg-card border-border/50'
     }`}>
       <CardHeader className={`flex-shrink-0 border-b ${
-        tvMode ? 'border-slate-700/50 bg-slate-800 pb-4' : 'pb-3 border-border/30 bg-muted/30'
+        tvMode ? 'border-slate-700/50 bg-slate-800 pb-2 pt-3' : 'pb-3 border-border/30 bg-muted/30'
       }`}>
-        <CardTitle className={`flex items-center justify-center gap-2.5 font-semibold tracking-wide ${
-          tvMode ? 'text-xl text-white' : 'text-base text-foreground'
+        <CardTitle className={`flex items-center justify-center gap-2 font-semibold tracking-wide ${
+          tvMode ? 'text-base text-white' : 'text-base text-foreground'
         }`}>
-          <div className={`rounded-lg ${tvMode ? 'p-2' : 'p-1.5'} ${accentClass}`}>
-            <Icon className={`text-white ${tvMode ? 'h-5 w-5' : 'h-4 w-4'}`} />
+          <div className={`rounded-lg ${tvMode ? 'p-1.5' : 'p-1.5'} ${accentClass}`}>
+            <Icon className={`text-white ${tvMode ? 'h-4 w-4' : 'h-4 w-4'}`} />
           </div>
           {title}
         </CardTitle>
@@ -250,7 +250,7 @@ export default function CsTop20Dashboard() {
                   <div 
                     key={seller.employeeId || name} 
                     className={`flex items-center gap-2 sm:gap-3 transition-all duration-150 ${
-                      tvMode ? 'px-4 py-3' : 'px-3 sm:px-4 py-2.5 sm:py-3 hover:bg-muted/40'
+                      tvMode ? 'px-3 py-1.5' : 'px-3 sm:px-4 py-2.5 sm:py-3 hover:bg-muted/40'
                     } ${
                     isTopThree 
                       ? (tvMode ? 'bg-slate-700/20' : 'bg-primary/[0.03]') 
@@ -260,7 +260,7 @@ export default function CsTop20Dashboard() {
                   {/* Rank */}
                    <div className={`flex-shrink-0 text-center font-medium ${tvMode ? 'w-8' : 'w-6 sm:w-8'}`}>
                     {rankBadge ? (
-                      <span className={tvMode ? "text-xl" : "text-base sm:text-xl"}>{rankBadge}</span>
+                      <span className={tvMode ? "text-base" : "text-base sm:text-xl"}>{rankBadge}</span>
                     ) : (
                       <span className={`tabular-nums ${
                         tvMode 
@@ -273,7 +273,7 @@ export default function CsTop20Dashboard() {
                   </div>
                   
                   {/* Avatar */}
-                  <Avatar className={`flex-shrink-0 ${tvMode ? 'h-10 w-10' : 'h-8 w-8 sm:h-10 sm:w-10'} ${
+                  <Avatar className={`flex-shrink-0 ${tvMode ? 'h-7 w-7' : 'h-8 w-8 sm:h-10 sm:w-10'} ${
                     index === 0 
                       ? 'ring-2 ring-amber-400/80 ring-offset-1 ring-offset-background' 
                       : index < 3 
@@ -294,7 +294,7 @@ export default function CsTop20Dashboard() {
                   <div className="flex-1 min-w-0 overflow-hidden">
                     <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
                       <span className={`font-medium truncate ${
-                        tvMode ? 'text-base text-white max-w-none' : 'text-xs sm:text-sm text-foreground max-w-[80px] sm:max-w-none'
+                        tvMode ? 'text-sm text-white max-w-none' : 'text-xs sm:text-sm text-foreground max-w-[80px] sm:max-w-none'
                       }`}>
                         {displayName}
                       </span>
@@ -302,7 +302,7 @@ export default function CsTop20Dashboard() {
                         const shortTeam = getShortTeamName(seller.teamName);
                         return shortTeam ? (
                           <span className={`flex-shrink-0 rounded font-medium ${
-                            tvMode ? 'px-1.5 py-0.5 text-[11px]' : 'px-1 sm:px-1.5 py-0.5 text-[9px] sm:text-[10px]'
+                            tvMode ? 'px-1 py-0.5 text-[9px]' : 'px-1 sm:px-1.5 py-0.5 text-[9px] sm:text-[10px]'
                           } ${getTeamBadgeStyle(seller.teamName)}`}>
                             {shortTeam}
                           </span>
@@ -310,7 +310,7 @@ export default function CsTop20Dashboard() {
                       })()}
                     </div>
                     <div className={`${
-                      tvMode ? 'text-xs text-slate-500' : 'text-[10px] sm:text-xs text-muted-foreground/80'
+                      tvMode ? 'text-[10px] text-slate-500' : 'text-[10px] sm:text-xs text-muted-foreground/80'
                     }`}>
                       {sales} salg
                     </div>
@@ -319,7 +319,7 @@ export default function CsTop20Dashboard() {
                   {/* Commission */}
                   <div className={`flex-shrink-0 rounded-full font-semibold tabular-nums ${
                     tvMode 
-                      ? 'bg-slate-700/80 text-white px-3 py-1.5 text-base' 
+                      ? 'bg-slate-700/80 text-white px-2 py-1 text-sm' 
                       : 'bg-primary/10 text-primary px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm'
                   }`}>
                     {formatCurrency(commission)}
@@ -335,14 +335,13 @@ export default function CsTop20Dashboard() {
 
   return (
     <div className={tvMode 
-      ? 'w-screen h-screen bg-slate-900 p-8 flex flex-col overflow-hidden' 
+      ? 'w-screen h-screen bg-slate-900 p-4 flex flex-col overflow-hidden' 
       : 'min-h-screen bg-background p-6'
     }>
       {/* TV Mode Header */}
       {tvMode ? (
-        <div className="mb-6 text-center flex-shrink-0">
-          <h1 className="text-4xl font-bold text-white tracking-tight">CS Top 20</h1>
-          <p className="text-base text-slate-400 mt-2">Top 20 på tværs af alle teams</p>
+        <div className="mb-3 text-center flex-shrink-0">
+          <h1 className="text-2xl font-bold text-white tracking-tight">CS Top 20</h1>
         </div>
       ) : (
         <DashboardHeader 
@@ -358,7 +357,7 @@ export default function CsTop20Dashboard() {
       )}
       
       {tvMode ? (
-        <div className="grid grid-cols-3 gap-6 flex-1 min-h-0">
+        <div className="grid grid-cols-3 gap-4 flex-1 min-h-0">
           <LeaderboardCard 
             title="Top Dag"
             icon={Clock}
