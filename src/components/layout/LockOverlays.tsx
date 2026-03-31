@@ -5,6 +5,7 @@ import { CarQuizLockOverlay } from "./CarQuizLockOverlay";
 import { MfaLockOverlay } from "./MfaLockOverlay";
 import { GoalLockOverlay } from "./GoalLockOverlay";
 import { RejectedContractLockOverlay } from "./RejectedContractLockOverlay";
+import { PulseSurveyLockOverlay } from "./PulseSurveyLockOverlay";
 import { usePendingContractLock } from "@/hooks/usePendingContractLock";
 import { useCarQuizLock } from "@/hooks/useCarQuiz";
 import { useMfa } from "@/hooks/useMfa";
