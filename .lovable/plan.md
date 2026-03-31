@@ -1,31 +1,61 @@
 
 
-## Problem
+## FM Tjekliste-system
 
-Billedet viser at CS Top 20 kun viser ca. 8 entries per kolonne — rækkerne er stadig for store til at 20 entries kan passe. Avatars, padding og tekst skal yderligere reduceres.
+Et ugentligt tjeklistesystem for fieldmarketing-assistenten med dagspecifikke opgaver, afkrydsning, noter og motiverende UI.
 
-## Ændringer i `src/pages/CsTop20Dashboard.tsx`
+### Database (2 tabeller)
 
-1. **Endnu mere kompakte rækker i TV-mode**:
-   - Row padding: `px-3 py-1.5` → `px-2 py-[3px]`
-   - Avatar: `h-7 w-7` → `h-5 w-5`
-   - Navn: `text-sm` → `text-xs`
-   - Commission badge: `text-sm px-2 py-1` → `text-xs px-1.5 py-0.5`
-   - Rank width: `w-8` → `w-5`
-   - Rank emoji: `text-base` → `text-xs`
-   - Rank number: `text-sm` → `text-[10px]`
-   - Salg-tekst: `text-[10px]` → `text-[8px]`
-   - Team badge: `text-[9px]` → `text-[7px]`, padding `px-1` → `px-0.5`
-   - Avatar fallback: `text-sm` → `text-[8px]`
-   - Gap mellem elementer: `gap-2` → `gap-1.5`
+**`fm_checklist_templates`** — de faste opgaver (admin kan tilføje/fjerne):
+- `id`, `title` (text), `description` (text, nullable), `weekdays` (integer[] — 0=mandag..6=søndag), `sort_order` (int), `is_active` (boolean default true), `created_at`, `created_by` (uuid)
 
-2. **Reducer header**: Card header padding `pb-2 pt-3` → `pb-1 pt-2`, titel `text-base` → `text-sm`, ikon `h-4 w-4` → `h-3 w-3`
+**`fm_checklist_completions`** — afkrydsninger pr. uge:
+- `id`, `template_id` (FK → fm_checklist_templates), `completed_date` (date), `completed_by` (uuid FK → employee_master_data), `note` (text, nullable), `created_at`
+- Unique constraint: `(template_id, completed_date)` — kun én afkrydsning pr. opgave pr. dag
 
-3. **Reducer top-header**: `text-2xl` → `text-lg`, `mb-3` → `mb-1`
+RLS: Samme adgang som FM booking (`menu_fm_booking`-brugere kan læse/skrive).
 
-4. **Reducer grid gap**: `gap-4` → `gap-2`
+### Predefinerede opgaver (seedes)
 
-5. **Reducer container padding**: `p-4` → `p-2`
+| Opgave | Dage |
+|--------|------|
+| Sørg for alle er informeret om standere | Man |
+| Tjek dubletter igennem | Dagligt |
+| Tjek difference fra PB til IM | Dagligt |
+| Pak alle biler til sælgerne | Man |
+| Pak standere til sælgere m. offentlig transport | Man |
+| Alle biler afleveret + kvittering m. billede. Ring ud hvis mangler | Søn |
+| Tag billeder af dashboards i biler (lamper) | Man |
+| Ryd biler op | Man |
+| Tjek standere ved sygdom (især ved 3 stk.) | Dagligt |
+| Tjek om sælgere er kørt tidligere dagen før | Dagligt (morgen) |
+| Send kannibalisering + Arpu ud (flag >40% / <110) | Dagligt |
 
-Dette burde give plads til ca. 18-20 entries per kolonne.
+### Ny side: `src/pages/vagt-flow/FmChecklistContent.tsx`
+
+- Viser ugens opgaver i en ugekalender-visning (man-søn kolonner)
+- Hver opgave viser: titel, checkbox, tidspunkt for afkrydsning, hvem der afkrydsede, note-felt
+- **Motiverende UI**: Progressbar pr. dag ("5/8 udført"), grønt fyld-animation ved afkrydsning, konfetti/check-animation ved 100%, streak-counter ("3 dage i træk fuldført")
+- Ugenavigation (frem/tilbage)
+- Historisk overblik: kan se tidligere uger
+
+### Admin-sektion (på samme side)
+
+- Tilføj ny opgave: titel, beskrivelse, vælg dage
+- Fjern/deaktiver opgave
+- Rækkefølge (drag eller pile)
+
+### Integration i eksisterende system
+
+1. **Ny tab i BookingManagement**: Tilføj "Tjekliste" tab med `permissionKey: "tab_fm_checklist"`
+2. **Permission key**: Tilføj `tab_fm_checklist` i `permissionKeys.ts` under `menu_fm_booking`
+3. **Permission group**: Tilføj til `permissionGroups.ts` under `menu_fm_booking` children
+4. **Sidebar**: Tilføj i `PreviewSidebar.tsx` VAGT_FLOW_ITEMS
+
+### Teknisk opsummering
+
+- 1 database-migration (2 tabeller + RLS + seed-data)
+- 1 ny lazy-loaded tab-komponent
+- Hooks: `useFmChecklist` (hent templates), `useFmChecklistCompletions` (hent/mutér afkrydsninger)
+- Opdater: `BookingManagement.tsx` (ny tab), `permissionKeys.ts`, `permissionGroups.ts`, `PreviewSidebar.tsx`
 
