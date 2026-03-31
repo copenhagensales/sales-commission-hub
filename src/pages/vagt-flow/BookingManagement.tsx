@@ -1,6 +1,6 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, MapPin, ListChecks, CalendarDays, Loader2, Tent, Hotel, BarChart3, AlertTriangle } from "lucide-react";
+import { Calendar, MapPin, ListChecks, CalendarDays, Loader2, Tent, Hotel, BarChart3, AlertTriangle, ClipboardCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 import { lazy, Suspense, useMemo } from "react";
@@ -18,6 +18,7 @@ const MarketsContent = lazy(() => import("./MarketsContent"));
 const VagtplanFMContent = lazy(() => import("./VagtplanFMContent"));
 const HotelsContent = lazy(() => import("./HotelsContent"));
 const LocationProfitabilityContent = lazy(() => import("./LocationProfitabilityContent"));
+const FmChecklistContent = lazy(() => import("./FmChecklistContent"));
 
 
 // Tab configuration with permission keys
