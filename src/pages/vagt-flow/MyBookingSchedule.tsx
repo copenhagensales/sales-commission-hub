@@ -299,10 +299,13 @@ export default function MyBookingSchedule() {
           return allDatesWithHotel[allDatesWithHotel.length - 1] === a.date;
         })() : false;
 
-        // Stands/roll-ups: use booking's start_date/end_date
-        const booking = a.booking;
-        const isFirstBookingDay = booking?.start_date ? a.date === booking.start_date : false;
-        const isLastBookingDay = booking?.end_date ? a.date === booking.end_date : false;
+        // Stands/roll-ups: use employee's own first/last assignment dates for this booking
+        const myAssignmentsForBooking = assignments
+          ?.filter((ass: any) => ass.booking_id === a.booking_id)
+          .map((ass: any) => ass.date)
+          .sort() ?? [];
+        const isFirstBookingDay = myAssignmentsForBooking[0] === a.date;
+        const isLastBookingDay = myAssignmentsForBooking[myAssignmentsForBooking.length - 1] === a.date;
 
         // Vehicle last day: check if this is the last date this vehicle is booked for this booking
         const isLastVehicleDay = vehicleForDay ? (() => {
