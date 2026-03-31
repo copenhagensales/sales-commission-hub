@@ -843,7 +843,7 @@ export default function TvLeagueDashboard() {
   if (isMobile) {
     return (
       <DashboardShell>
-        <div className="bg-slate-900 text-white min-h-screen flex flex-col">
+        <div className="bg-slate-900 text-white h-screen flex flex-col overflow-hidden">
           {/* Mobile header */}
           <div className="px-4 pt-4 pb-2">
             <h1 className="text-lg font-black tracking-tight">
