@@ -247,6 +247,14 @@ export function ExportSalaryDialog({ currentPeriodStart }: ExportSalaryDialogPro
             </div>
           </div>
 
+          <label className="flex items-center gap-2 cursor-pointer text-sm">
+            <Checkbox
+              checked={includeConsultants}
+              onCheckedChange={(checked) => setIncludeConsultants(!!checked)}
+            />
+            Inkluder konsulenter
+          </label>
+
           <Button
             onClick={handleExport}
             disabled={exporting || isLoading || !sellerData?.length}
