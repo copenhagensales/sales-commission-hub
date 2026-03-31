@@ -210,7 +210,7 @@ export default function CsTop20Dashboard() {
         : 'bg-card border-border/50'
     }`}>
       <CardHeader className={`flex-shrink-0 border-b ${
-        tvMode ? 'border-slate-700/50 bg-slate-800 pb-4' : 'pb-3 border-border/30 bg-muted/30'
+        tvMode ? 'border-slate-700/50 bg-slate-800 pb-2 pt-3' : 'pb-3 border-border/30 bg-muted/30'
       }`}>
         <CardTitle className={`flex items-center justify-center gap-2.5 font-semibold tracking-wide ${
           tvMode ? 'text-xl text-white' : 'text-base text-foreground'
