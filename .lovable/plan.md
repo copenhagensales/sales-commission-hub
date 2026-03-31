@@ -2,30 +2,26 @@
 
 ## Problem
 
-Billedet viser at 3-kolonne layoutet virker, men kun ca. 3-4 sælgere er synlige per kolonne. Resten er skjult under kanten. Rækkerne har for meget padding/spacing til at 20 entries kan passe i den tilgængelige højde.
+Divisions-visningen på TV'et viser kun ca. 10 ud af 14 spillere — de sidste rækker er afskåret i bunden. Rækkerne har for meget padding og spacing til at alle 14 spillere kan passe i den tilgængelige højde.
 
 ## Løsning
 
-Gør rækkerne mere kompakte i TV-mode, så flere entries er synlige uden scroll. Reducer padding, avatar-størrelse og font-sizes per række. Gør også header og top-margin mindre for at frigøre plads.
+Gør divisions-rækkerne mere kompakte i `SceneDivisions`-komponenten og reducer padding i TV-mode, så alle 14 spillere er synlige uden scroll.
 
-## Ændringer i `src/pages/CsTop20Dashboard.tsx`
+## Ændringer i `src/pages/tv-board/TvLeagueDashboard.tsx`
 
-1. **Reducer top-header**: `mb-6` → `mb-3`, `text-4xl` → `text-2xl`, fjern subtitle-teksten i TV-mode for at spare plads.
+1. **Reducer højre-zone padding** i TV-mode: `p-8` → `p-4 pt-3` (linje 1110)
 
-2. **Reducer grid gap**: `gap-6` → `gap-4`.
+2. **Kompakte rækker i `SceneDivisions`** (linje 294-354):
+   - Row spacing: `space-y-1 2xl:space-y-1.5` → `space-y-0.5 2xl:space-y-1`
+   - Row padding: `py-1.5 2xl:py-2` → `py-1 2xl:py-1.5`
+   - Row rounding: `rounded-xl` → `rounded-lg`
 
-3. **Reducer padding i container**: `p-8` → `p-4`.
+3. **Reducer header margin** i divisions: `mb-2 2xl:mb-4` → `mb-1 2xl:mb-2` (linje 269)
 
-4. **Kompakte rækker i TV-mode**:
-   - Row padding: `px-4 py-3` → `px-3 py-1.5`
-   - Avatar: `h-10 w-10` → `h-7 w-7`
-   - Navn: `text-base` → `text-sm`
-   - Commission badge: `text-base px-3 py-1.5` → `text-sm px-2 py-1`
-   - Rank emoji: `text-xl` → `text-base`
-   - Salg-tekst: `text-xs` → `text-[10px]`
-   - Team badge: `text-[11px]` → `text-[9px]`
+4. **Reducer legend margin**: `mt-2 2xl:mt-3` → `mt-1 2xl:mt-2` (linje 358)
 
-5. **Card header kompakt**: `pb-4` → `pb-2`, titel `text-xl` → `text-base`.
+5. **Reducer venstre-zone padding** i TV-mode: `p-8` → `p-4 pt-3` (linje 985), og header `mb-6` → `mb-3` (linje 987)
 
-Dette skulle give plads til ca. 15-20 entries per kolonne i stedet for 3-4.
+Disse ændringer sparer ca. 80-100px vertikal plads, nok til at vise alle 14 spillere.
 
