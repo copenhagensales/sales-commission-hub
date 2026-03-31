@@ -5,11 +5,13 @@ import { CarQuizLockOverlay } from "./CarQuizLockOverlay";
 import { MfaLockOverlay } from "./MfaLockOverlay";
 import { GoalLockOverlay } from "./GoalLockOverlay";
 import { RejectedContractLockOverlay } from "./RejectedContractLockOverlay";
+import { PulseSurveyLockOverlay } from "./PulseSurveyLockOverlay";
 import { usePendingContractLock } from "@/hooks/usePendingContractLock";
 import { useCarQuizLock } from "@/hooks/useCarQuiz";
 import { useMfa } from "@/hooks/useMfa";
 import { useGoalLock } from "@/hooks/useGoalLock";
 import { useRejectedContractLock } from "@/hooks/useRejectedContractLock";
+import { usePulseSurveyLock } from "@/hooks/usePulseSurveyLock";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
 
 interface LockOverlaysProps {
@@ -22,6 +24,7 @@ export function LockOverlays({ children }: LockOverlaysProps) {
   const { isLocked: isQuizLocked, isLoading: quizLoading } = useCarQuizLock();
   const { isRequired: isMfaRequired, isVerified: isMfaVerified, isLoading: mfaLoading } = useMfa();
   const { isLocked: isGoalLocked, employeeId, payrollPeriod, isLoading: goalLoading, refetch: refetchGoalLock } = useGoalLock();
+  const { isLocked: isPulseSurveyLocked, isLoading: pulseSurveyLoading } = usePulseSurveyLock();
   const { isPreviewMode } = useRolePreview();
   const location = useLocation();
   const [mfaVerified, setMfaVerified] = useState(false);
@@ -37,15 +40,16 @@ export function LockOverlays({ children }: LockOverlaysProps) {
   const showCarQuizLock = showQuizLock && !isContractLocked && !isPreviewMode && !showRejectedContractLock;
   
   // Priority 3: Show MFA lock if required but not verified (and not in preview mode)
-  // Only show after other locks are resolved
   const showMfaLock = isMfaRequired && !isMfaVerified && !mfaVerified && !isPreviewMode && !showContractLock && !showCarQuizLock && !showRejectedContractLock;
   
   // Priority 4: Show goal lock for commission employees without a goal for current period
-  // Only show after contract, quiz, and MFA locks are resolved
   const showGoalLock = isGoalLocked && !isPreviewMode && !showContractLock && !showCarQuizLock && !showMfaLock && !showRejectedContractLock;
 
+  // Priority 5: Pulse survey lock - after all other locks, skip on /pulse-survey route
+  const showPulseSurveyLock = isPulseSurveyLocked && !isPreviewMode && !showContractLock && !showCarQuizLock && !showMfaLock && !showGoalLock && !showRejectedContractLock && location.pathname !== "/pulse-survey";
+
   // Show loading state while checking locks (skip in preview mode)
-  if ((rejectedContractLoading || contractLoading || quizLoading || mfaLoading || goalLoading) && !isPreviewMode) {
+  if ((rejectedContractLoading || contractLoading || quizLoading || mfaLoading || goalLoading || pulseSurveyLoading) && !isPreviewMode) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-pulse text-muted-foreground">Indlæser...</div>
@@ -53,12 +57,10 @@ export function LockOverlays({ children }: LockOverlaysProps) {
     );
   }
 
-  // Priority 1: Rejected contract lock - highest priority
   if (showRejectedContractLock) {
     return <RejectedContractLockOverlay />;
   }
 
-  // Return ONLY the lock overlay when locked - don't render children at all
   if (showContractLock && contract) {
     return (
       <ContractLockOverlay 
@@ -84,6 +86,10 @@ export function LockOverlays({ children }: LockOverlaysProps) {
         onComplete={() => refetchGoalLock()}
       />
     );
+  }
+
+  if (showPulseSurveyLock) {
+    return <PulseSurveyLockOverlay />;
   }
 
   return <>{children}</>;

@@ -9904,6 +9904,7 @@ export type Database = {
       pulse_survey_dismissals: {
         Row: {
           created_at: string | null
+          dismissal_count: number
           dismissed_until: string
           employee_id: string
           id: string
@@ -9911,6 +9912,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          dismissal_count?: number
           dismissed_until: string
           employee_id: string
           id?: string
@@ -9918,6 +9920,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          dismissal_count?: number
           dismissed_until?: string
           employee_id?: string
           id?: string

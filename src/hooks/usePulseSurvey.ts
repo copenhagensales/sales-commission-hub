@@ -221,17 +221,19 @@ export function usePulseSurveyDismissal(surveyId?: string) {
 
       const { data } = await supabase
         .from('pulse_survey_dismissals')
-        .select('dismissed_until')
+        .select('dismissed_until, dismissal_count')
         .eq('survey_id', surveyId)
         .eq('employee_id', employee.id)
         .maybeSingle();
 
       const isDismissed = data ? new Date(data.dismissed_until) > new Date() : false;
+      const dismissalCount = (data as any)?.dismissal_count ?? 0;
 
       return {
         isDismissed,
         isStaff: employee.is_staff_employee === true,
         employeeId: employee.id,
+        dismissalCount,
       };
     },
     enabled: !!surveyId && !!user,
@@ -246,10 +248,20 @@ export function useDismissPulseSurvey() {
     mutationFn: async ({ surveyId, employeeId }: { surveyId: string; employeeId: string }) => {
       const dismissedUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
+      // First get current count
+      const { data: existing } = await supabase
+        .from('pulse_survey_dismissals')
+        .select('dismissal_count')
+        .eq('survey_id', surveyId)
+        .eq('employee_id', employeeId)
+        .maybeSingle();
+
+      const newCount = ((existing as any)?.dismissal_count ?? 0) + 1;
+
       const { error } = await supabase
         .from('pulse_survey_dismissals')
         .upsert(
-          { survey_id: surveyId, employee_id: employeeId, dismissed_until: dismissedUntil },
+          { survey_id: surveyId, employee_id: employeeId, dismissed_until: dismissedUntil, dismissal_count: newCount } as any,
           { onConflict: 'survey_id,employee_id' }
         );
 

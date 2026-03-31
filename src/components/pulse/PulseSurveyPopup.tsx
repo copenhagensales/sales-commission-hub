@@ -108,10 +108,12 @@ export function PulseSurveyPopup() {
         </DialogHeader>
 
         <DialogFooter className="flex flex-col sm:flex-row gap-2 pt-2">
-          <Button variant="outline" onClick={handleRemindLater} disabled={dismissMutation.isPending} className="gap-2">
-            <Clock className="h-4 w-4" />
-            Påmind mig i morgen
-          </Button>
+          {(!dismissalData || dismissalData.dismissalCount < 1) && (
+            <Button variant="outline" onClick={handleRemindLater} disabled={dismissMutation.isPending} className="gap-2">
+              <Clock className="h-4 w-4" />
+              Påmind mig i morgen
+            </Button>
+          )}
           <Button onClick={handleAnswerNow} className="gap-2">
             <ActionIcon className="h-4 w-4" />
             {actionLabel}
