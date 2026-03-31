@@ -415,7 +415,10 @@ export function useSellerSalariesCached(
     }
 
     // Build cancellation map (agent_email → employee_id → total lost commission)
+    // For standard cancellations: deduct full sale commission, deduplicated by sale_id
+    // For basket_difference: deduct commission difference per queue entry
     const cancellationMap: Record<string, number> = {};
+    const deductedSaleIds = new Set<string>();
     for (const cq of cancellationData || []) {
       const sale = cq.sales;
       if (!sale?.agent_email) continue;
@@ -425,24 +428,17 @@ export function useSellerSalariesCached(
 
       let deduction = 0;
       if (cq.upload_type === "basket_difference") {
-        // Use commission difference from product_change_log
+        // Use commission difference from product_change_log (always per-entry)
         deduction = basketDiffMap[cq.id] || 0;
       } else {
-        // Cancellation — deduct only the targeted product's commission
-        const targetName = (cq as any).target_product_name;
-        if (targetName) {
-          // Find sale_item matching the target product
-          const matchingItem = (sale.sale_items || []).find((si: any) => {
-            const itemProductName = productIdToName[si.product_id] || "";
-            return itemProductName === targetName;
-          });
-          deduction = matchingItem ? (matchingItem.mapped_commission || 0) : 0;
-        } else {
-          // Fallback for older records without target: deduct full sale commission
-          deduction = (sale.sale_items || []).reduce(
-            (sum: number, si: any) => sum + (si.mapped_commission || 0), 0
-          );
-        }
+        // Standard cancellation — deduct 100% of the sale's commission
+        // Deduplicate by sale_id to avoid double-counting when multiple
+        // queue rows exist for the same sale (one per product)
+        if (deductedSaleIds.has(cq.sale_id)) continue;
+        deductedSaleIds.add(cq.sale_id);
+        deduction = (sale.sale_items || []).reduce(
+          (sum: number, si: any) => sum + (si.mapped_commission || 0), 0
+        );
       }
       if (deduction > 0) {
         cancellationMap[employeeId] = (cancellationMap[employeeId] || 0) + deduction;
