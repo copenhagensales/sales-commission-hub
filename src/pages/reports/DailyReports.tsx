@@ -284,13 +284,38 @@ export default function DailyReports() {
     enabled: selectedClient !== "all",
   });
 
-  // Filter employees based on selected client activity
+  // Fetch team memberships for employee dropdown filtering
+  const { data: employeeTeamMemberships = [] } = useQuery({
+    queryKey: ["daily-report-employee-teams"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("team_members")
+        .select("employee_id, team_id");
+      return data || [];
+    },
+  });
+
+  // Filter employees based on selected team and client activity
   const filteredEmployees = useMemo(() => {
-    if (selectedClient === "all") {
-      return employees;
+    let result = employees;
+    
+    // Filter by team if selected
+    if (selectedTeam !== "all") {
+      const teamEmployeeIds = new Set(
+        employeeTeamMemberships
+          .filter(tm => tm.team_id === selectedTeam)
+          .map(tm => tm.employee_id)
+      );
+      result = result.filter(emp => teamEmployeeIds.has(emp.id));
     }
-    return employees.filter(emp => employeesWithClientActivity.includes(emp.id));
-  }, [employees, selectedClient, employeesWithClientActivity]);
+    
+    // Filter by client activity if selected
+    if (selectedClient !== "all") {
+      result = result.filter(emp => employeesWithClientActivity.includes(emp.id));
+    }
+    
+    return result;
+  }, [employees, selectedTeam, selectedClient, employeesWithClientActivity, employeeTeamMemberships]);
 
   // Fetch clients
   const { data: clients = [] } = useQuery({
@@ -1203,7 +1228,7 @@ export default function DailyReports() {
                   {/* Teams */}
                   <div className="space-y-1.5">
                     <label className="text-xs text-white/70 font-medium">Teams</label>
-                    <Select value={selectedTeam} onValueChange={setSelectedTeam}>
+                    <Select value={selectedTeam} onValueChange={(v) => { setSelectedTeam(v); setSelectedEmployee("all"); }}>
                       <SelectTrigger className="bg-white/10 border-white/20 text-white hover:bg-white/20">
                         <div className="flex items-center justify-between w-full">
                           <SelectValue placeholder="Alle" />
