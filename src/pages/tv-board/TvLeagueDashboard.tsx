@@ -1114,22 +1114,6 @@ export default function TvLeagueDashboard() {
     </>
   );
 
-  // In TV mode, wrap with scale adapter for large screens (4K etc.)
-  if (tvMode) {
-    const scaleStyles = getTvScaleStyles(screenInfo);
-    const centeringStyles = getTvCenteringStyles(screenInfo);
-
-    return (
-      <DashboardShell>
-        <div style={centeringStyles}>
-          <div style={scaleStyles}>
-            {desktopContent}
-          </div>
-        </div>
-      </DashboardShell>
-    );
-  }
-
   return (
     <DashboardShell>
       {desktopContent}
