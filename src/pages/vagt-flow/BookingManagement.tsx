@@ -30,7 +30,7 @@ const allTabs = [
   { value: "vagtplan-fm", label: "Vagtplan", icon: CalendarDays, permissionKey: "tab_fm_vagtplan" },
   { value: "hotels", label: "Hoteller", icon: Hotel, permissionKey: "tab_fm_hotels" },
   { value: "okonomi", label: "Økonomi", icon: BarChart3, permissionKey: "tab_fm_locations" },
-  
+  { value: "checklist", label: "Tjekliste", icon: ClipboardCheck, permissionKey: "tab_fm_checklist" },
 ];
 
 export default function BookingManagement() {
