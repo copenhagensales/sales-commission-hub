@@ -10,6 +10,7 @@ import { useCarQuizLock } from "@/hooks/useCarQuiz";
 import { useMfa } from "@/hooks/useMfa";
 import { useGoalLock } from "@/hooks/useGoalLock";
 import { useRejectedContractLock } from "@/hooks/useRejectedContractLock";
+import { usePulseSurveyLock } from "@/hooks/usePulseSurveyLock";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
 
 interface LockOverlaysProps {
