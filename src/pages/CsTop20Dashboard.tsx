@@ -163,11 +163,16 @@ export default function CsTop20Dashboard() {
       }
       return response.json();
     },
-    enabled: tvMode && !cachedLeaderboard?.length && !customLeaderboard?.length,
+    enabled: tvMode && !sellersToday.length && !sellersWeek.length && !sellersPayroll.length,
     ...REFRESH_PROFILES.dashboard,
   });
 
-  // Get the active leaderboard data
+  // TV mode: merge cached + fallback data for all 3 periods
+  const tvSellersToday = sellersToday.length ? sellersToday : (tvData?.sellersToday || []);
+  const tvSellersWeek = sellersWeek.length ? sellersWeek : (tvData?.sellersWeek || []);
+  const tvSellersPayroll = sellersPayroll.length ? sellersPayroll : (tvData?.sellersPayroll || []);
+
+  // Get the active leaderboard data (normal mode only)
   const leaderboardData = useMemo(() => {
     if (canUseCache && cachedLeaderboard?.length) {
       return cachedLeaderboard;
@@ -175,14 +180,8 @@ export default function CsTop20Dashboard() {
     if (!canUseCache && customLeaderboard?.length) {
       return customLeaderboard;
     }
-    // TV mode fallback - map to selected period
-    if (tvMode && tvData) {
-      if (selectedPeriod.type === "today") return tvData.sellersToday;
-      if (selectedPeriod.type === "this_week") return tvData.sellersWeek;
-      return tvData.sellersPayroll;
-    }
     return [];
-  }, [canUseCache, cachedLeaderboard, customLeaderboard, tvMode, tvData, selectedPeriod.type]);
+  }, [canUseCache, cachedLeaderboard, customLeaderboard]);
 
   const isLoading = canUseCache ? cachedLoading : customLoading;
 
