@@ -355,7 +355,7 @@ function SceneDivisions({ divisions }: { divisions: DivisionData[] }) {
           </motion.div>
         </AnimatePresence>
       </div>
-      <div className="<div className="mt-0.5 2xl:mt-1 flex flex-wrap gap-x-3 2xl:gap-x-4 gap-y-1 text-[10px] 2xl:text-xs text-slate-500"> gap-x-3 2xl:gap-x-4 gap-y-1 text-[10px] 2xl:text-xs text-slate-500">
+      <div className="mt-0.5 2xl:mt-1 flex flex-wrap gap-x-3 2xl:gap-x-4 gap-y-1 text-[10px] 2xl:text-xs text-slate-500">
         <span className="flex items-center gap-1">
           <span className="w-2 h-2 rounded-full bg-yellow-500" /> Top 3 samlet
         </span>
