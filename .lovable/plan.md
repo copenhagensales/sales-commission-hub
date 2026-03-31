@@ -1,16 +1,22 @@
 
 
-## Tredobl rotationstider på Superliga Live
+## Fix: Tilføj divisionsfilter til TV-mode højre zone
 
-### Ændringer i `src/pages/tv-board/TvLeagueDashboard.tsx`
+### Problem
+I `src/pages/tv-board/TvLeagueDashboard.tsx` linje 1111 sendes `data.divisions` ufiltreret til `SceneDivisions` i TV-mode. Filteret `d.division <= 4` er kun sat på mobil-visningen (linje 888), men ikke på den faktiske TV-visning.
 
-**Linje ~109-111** — opdater alle tre timing-konstanter:
+### Ændring
 
-| Konstant | Nu | Nyt (×3) |
-|---|---|---|
-| `DIVISION_DISPLAY_DURATION` | 15s | 45s |
-| `LEFT_SCENE_DURATIONS` | [15s, 20s, 20s, 20s] | [45s, 60s, 60s, 60s] |
-| `REFRESH_INTERVAL` | 30s | 30s (uændret — data-fetch) |
+**Fil:** `src/pages/tv-board/TvLeagueDashboard.tsx`
 
-Data-refresh holdes på 30s da det kun henter data i baggrunden og ikke påvirker visningen.
+**Linje 1111** — tilføj filter:
+```tsx
+// Fra:
+<SceneDivisions divisions={data.divisions} />
+
+// Til:
+<SceneDivisions divisions={data.divisions.filter(d => d.division <= 4)} />
+```
+
+En enkelt linje-ændring. Alle andre steder er allerede korrekt filtreret.
 
