@@ -1,6 +1,6 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, MapPin, ListChecks, CalendarDays, Loader2, Tent, Hotel, BarChart3, AlertTriangle } from "lucide-react";
+import { Calendar, MapPin, ListChecks, CalendarDays, Loader2, Tent, Hotel, BarChart3, AlertTriangle, ClipboardCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 import { lazy, Suspense, useMemo } from "react";
@@ -18,6 +18,7 @@ const MarketsContent = lazy(() => import("./MarketsContent"));
 const VagtplanFMContent = lazy(() => import("./VagtplanFMContent"));
 const HotelsContent = lazy(() => import("./HotelsContent"));
 const LocationProfitabilityContent = lazy(() => import("./LocationProfitabilityContent"));
+const FmChecklistContent = lazy(() => import("./FmChecklistContent"));
 
 
 // Tab configuration with permission keys
@@ -29,7 +30,7 @@ const allTabs = [
   { value: "vagtplan-fm", label: "Vagtplan", icon: CalendarDays, permissionKey: "tab_fm_vagtplan" },
   { value: "hotels", label: "Hoteller", icon: Hotel, permissionKey: "tab_fm_hotels" },
   { value: "okonomi", label: "Økonomi", icon: BarChart3, permissionKey: "tab_fm_locations" },
-  
+  { value: "checklist", label: "Tjekliste", icon: ClipboardCheck, permissionKey: "tab_fm_checklist" },
 ];
 
 export default function BookingManagement() {
@@ -185,6 +186,14 @@ export default function BookingManagement() {
             <TabsContent value="okonomi" className="mt-6">
               <Suspense fallback={<div className="flex items-center justify-center py-12">Indlæser...</div>}>
                 <LocationProfitabilityContent />
+              </Suspense>
+            </TabsContent>
+          )}
+
+          {visibleTabs.some(t => t.value === "checklist") && (
+            <TabsContent value="checklist" className="mt-6">
+              <Suspense fallback={<div className="flex items-center justify-center py-12">Indlæser...</div>}>
+                <FmChecklistContent />
               </Suspense>
             </TabsContent>
           )}

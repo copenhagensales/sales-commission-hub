@@ -6705,6 +6705,117 @@ export type Database = {
         }
         Relationships: []
       }
+      fm_checklist_completions: {
+        Row: {
+          completed_by: string
+          completed_date: string
+          created_at: string
+          id: string
+          note: string | null
+          template_id: string
+        }
+        Insert: {
+          completed_by: string
+          completed_date: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          template_id: string
+        }
+        Update: {
+          completed_by?: string
+          completed_date?: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fm_checklist_completions_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fm_checklist_completions_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fm_checklist_completions_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fm_checklist_completions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "fm_checklist_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fm_checklist_templates: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          sort_order: number
+          title: string
+          weekdays: number[]
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          sort_order?: number
+          title: string
+          weekdays?: number[]
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          sort_order?: number
+          title?: string
+          weekdays?: number[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fm_checklist_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fm_checklist_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fm_checklist_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       forecast_settings: {
         Row: {
           churn_established_pct: number
