@@ -206,6 +206,19 @@ export function useSellerSalariesCached(
     staleTime: 60000,
   });
 
+  // Query 7a: Employee agent mappings (for resolving agent emails to employee IDs)
+  const { data: agentMappings } = useQuery({
+    queryKey: ["employee-agent-mappings"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_agent_mapping")
+        .select("employee_id, agents!inner(email)");
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 300000,
+  });
+
   // Query 7: Salary additions for the period
   const { data: salaryAdditionsData, isLoading: salaryAdditionsLoading } = useQuery({
     queryKey: ["salary-additions", periodStartISO, periodEndISO],
@@ -337,11 +350,18 @@ export function useSellerSalariesCached(
       return { sellerData: [], lastUpdated: null };
     }
 
-    // Build work_email -> employee_id lookup for FM fallback
+    // Build work_email -> employee_id lookup (includes agent mappings)
     const emailToEmployeeId: Record<string, string> = {};
     for (const emp of employees) {
       if (emp.work_email) {
         emailToEmployeeId[emp.work_email.toLowerCase()] = emp.id;
+      }
+    }
+    // Add agent emails from employee_agent_mapping
+    for (const mapping of agentMappings || []) {
+      const agentEmail = (mapping as any).agents?.email;
+      if (agentEmail && mapping.employee_id) {
+        emailToEmployeeId[agentEmail.toLowerCase()] = mapping.employee_id;
       }
     }
 
@@ -492,7 +512,7 @@ export function useSellerSalariesCached(
     sellers.sort((a, b) => b.commission - a.commission);
 
     return { sellerData: sellers, lastUpdated: new Date() };
-  }, [employees, salesAggregates, selectedTeam, salaryTypes, dietData, sickData, dailyBonusData, startupBonusData, cancellationData, productChangeLogData, productsLookup, salaryAdditionsData]);
+  }, [employees, salesAggregates, selectedTeam, salaryTypes, dietData, sickData, dailyBonusData, startupBonusData, cancellationData, productChangeLogData, productsLookup, salaryAdditionsData, agentMappings]);
 
   return {
     sellerData,
