@@ -78,7 +78,20 @@ export function ExportSalaryDialog({ currentPeriodStart }: ExportSalaryDialogPro
   const activeIdx = selectedPeriodIdx || currentIdx;
   const activePeriod = periods[parseInt(activeIdx)];
 
-  const { sellerData, isLoading } = useSellerSalariesCached("all", activePeriod?.start, activePeriod?.end);
+  const { sellerData: rawSellerData, isLoading } = useSellerSalariesCached("all", activePeriod?.start, activePeriod?.end);
+
+  const sellerData = useMemo(() => {
+    return rawSellerData?.filter(seller =>
+      seller.commission !== 0 ||
+      seller.cancellations !== 0 ||
+      seller.vacationPay !== 0 ||
+      seller.diet !== 0 ||
+      seller.sickDays !== 0 ||
+      seller.dailyBonus !== 0 ||
+      seller.startupBonus !== 0 ||
+      seller.referralBonus !== 0
+    );
+  }, [rawSellerData]);
 
   const toggleCol = (key: ColKey) => {
     setSelectedCols((prev) => {
