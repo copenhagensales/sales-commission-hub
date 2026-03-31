@@ -335,14 +335,13 @@ export default function CsTop20Dashboard() {
 
   return (
     <div className={tvMode 
-      ? 'w-screen h-screen bg-slate-900 p-8 flex flex-col overflow-hidden' 
+      ? 'w-screen h-screen bg-slate-900 p-4 flex flex-col overflow-hidden' 
       : 'min-h-screen bg-background p-6'
     }>
       {/* TV Mode Header */}
       {tvMode ? (
-        <div className="mb-6 text-center flex-shrink-0">
-          <h1 className="text-4xl font-bold text-white tracking-tight">CS Top 20</h1>
-          <p className="text-base text-slate-400 mt-2">Top 20 på tværs af alle teams</p>
+        <div className="mb-3 text-center flex-shrink-0">
+          <h1 className="text-2xl font-bold text-white tracking-tight">CS Top 20</h1>
         </div>
       ) : (
         <DashboardHeader 
