@@ -51,17 +51,27 @@ function rowKey(row: FlatUnmatchedRow): string {
 function parseFlexibleDate(value: unknown): string | null {
   if (!value) return null;
   const str = String(value).trim();
-  const isoDate = new Date(str);
-  if (!isNaN(isoDate.getTime())) {
-    return isoDate.toISOString().split("T")[0];
-  }
+
+  // Try splitting by common separators first (DD-MM-YYYY or DD/MM/YYYY — Danish convention)
   const parts = str.split(/[-/.]/);
   if (parts.length === 3) {
     const [a, b, c] = parts;
     if (c.length === 4) {
+      // DD-MM-YYYY or DD/MM/YYYY → YYYY-MM-DD
       const d = new Date(`${c}-${b.padStart(2, "0")}-${a.padStart(2, "0")}`);
       if (!isNaN(d.getTime())) return d.toISOString().split("T")[0];
     }
+    if (a.length === 4) {
+      // YYYY-MM-DD already
+      const d = new Date(`${a}-${b.padStart(2, "0")}-${c.padStart(2, "0")}`);
+      if (!isNaN(d.getTime())) return d.toISOString().split("T")[0];
+    }
+  }
+
+  // Fallback: try native parsing (ISO formats)
+  const isoDate = new Date(str);
+  if (!isNaN(isoDate.getTime())) {
+    return isoDate.toISOString().split("T")[0];
   }
   return null;
 }
