@@ -1228,7 +1228,7 @@ export default function DailyReports() {
                   {/* Teams */}
                   <div className="space-y-1.5">
                     <label className="text-xs text-white/70 font-medium">Teams</label>
-                    <Select value={selectedTeam} onValueChange={setSelectedTeam}>
+                    <Select value={selectedTeam} onValueChange={(v) => { setSelectedTeam(v); setSelectedEmployee("all"); }}>
                       <SelectTrigger className="bg-white/10 border-white/20 text-white hover:bg-white/20">
                         <div className="flex items-center justify-between w-full">
                           <SelectValue placeholder="Alle" />
