@@ -974,8 +974,8 @@ export default function TvLeagueDashboard() {
   }
 
   // ─── DESKTOP / TV LAYOUT ───
-  return (
-    <DashboardShell>
+  const desktopContent = (
+    <>
       {!tvMode && (
         <DashboardHeader
           title="⚽ Superliga Live"
@@ -1113,6 +1113,28 @@ export default function TvLeagueDashboard() {
           <SceneDivisions divisions={data.divisions} />
         </div>
       </div>
+    </>
+  );
+
+  // In TV mode, wrap with scale adapter for large screens (4K etc.)
+  if (tvMode) {
+    const scaleStyles = getTvScaleStyles(screenInfo);
+    const centeringStyles = getTvCenteringStyles(screenInfo);
+
+    return (
+      <DashboardShell>
+        <div style={centeringStyles}>
+          <div style={scaleStyles}>
+            {desktopContent}
+          </div>
+        </div>
+      </DashboardShell>
+    );
+  }
+
+  return (
+    <DashboardShell>
+      {desktopContent}
     </DashboardShell>
   );
 }
