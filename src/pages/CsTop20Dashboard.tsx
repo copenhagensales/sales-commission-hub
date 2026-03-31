@@ -302,7 +302,7 @@ export default function CsTop20Dashboard() {
                         const shortTeam = getShortTeamName(seller.teamName);
                         return shortTeam ? (
                           <span className={`flex-shrink-0 rounded font-medium ${
-                            tvMode ? 'px-1.5 py-0.5 text-[11px]' : 'px-1 sm:px-1.5 py-0.5 text-[9px] sm:text-[10px]'
+                            tvMode ? 'px-1 py-0.5 text-[9px]' : 'px-1 sm:px-1.5 py-0.5 text-[9px] sm:text-[10px]'
                           } ${getTeamBadgeStyle(seller.teamName)}`}>
                             {shortTeam}
                           </span>
