@@ -273,7 +273,7 @@ export default function CsTop20Dashboard() {
                   </div>
                   
                   {/* Avatar */}
-                  <Avatar className={`flex-shrink-0 ${tvMode ? 'h-9 w-9' : 'h-8 w-8 sm:h-10 sm:w-10'} ${
+                  <Avatar className={`flex-shrink-0 ${tvMode ? 'h-10 w-10' : 'h-8 w-8 sm:h-10 sm:w-10'} ${
                     index === 0 
                       ? 'ring-2 ring-amber-400/80 ring-offset-1 ring-offset-background' 
                       : index < 3 
@@ -281,7 +281,7 @@ export default function CsTop20Dashboard() {
                         : ''
                   }`}>
                     <AvatarImage src={avatarUrl || undefined} alt={name} />
-                    <AvatarFallback className={`font-medium text-xs ${
+                    <AvatarFallback className={`font-medium ${tvMode ? 'text-sm' : 'text-xs'} ${
                       tvMode 
                         ? 'bg-slate-700 text-slate-300' 
                         : 'bg-muted text-muted-foreground'
@@ -293,31 +293,33 @@ export default function CsTop20Dashboard() {
                   {/* Name & Sales & Team */}
                   <div className="flex-1 min-w-0 overflow-hidden">
                     <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
-                      <span className={`font-medium truncate max-w-[80px] sm:max-w-none ${
-                        tvMode ? 'text-sm text-white' : 'text-xs sm:text-sm text-foreground'
+                      <span className={`font-medium truncate ${
+                        tvMode ? 'text-base text-white max-w-none' : 'text-xs sm:text-sm text-foreground max-w-[80px] sm:max-w-none'
                       }`}>
                         {displayName}
                       </span>
                       {(() => {
                         const shortTeam = getShortTeamName(seller.teamName);
                         return shortTeam ? (
-                          <span className={`flex-shrink-0 rounded px-1 sm:px-1.5 py-0.5 text-[9px] sm:text-[10px] font-medium ${getTeamBadgeStyle(seller.teamName)}`}>
+                          <span className={`flex-shrink-0 rounded font-medium ${
+                            tvMode ? 'px-1.5 py-0.5 text-[11px]' : 'px-1 sm:px-1.5 py-0.5 text-[9px] sm:text-[10px]'
+                          } ${getTeamBadgeStyle(seller.teamName)}`}>
                             {shortTeam}
                           </span>
                         ) : null;
                       })()}
                     </div>
-                    <div className={`text-[10px] sm:text-xs ${
-                      tvMode ? 'text-slate-500' : 'text-muted-foreground/80'
+                    <div className={`${
+                      tvMode ? 'text-xs text-slate-500' : 'text-[10px] sm:text-xs text-muted-foreground/80'
                     }`}>
                       {sales} salg
                     </div>
                   </div>
                   
-                  {/* Commission - Clean, neutral styling */}
+                  {/* Commission */}
                   <div className={`flex-shrink-0 rounded-full font-semibold tabular-nums ${
                     tvMode 
-                      ? 'bg-slate-700/80 text-white px-3 py-1.5 text-sm' 
+                      ? 'bg-slate-700/80 text-white px-3 py-1.5 text-base' 
                       : 'bg-primary/10 text-primary px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm'
                   }`}>
                     {formatCurrency(commission)}
