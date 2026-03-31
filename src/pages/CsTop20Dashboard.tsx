@@ -333,14 +333,14 @@ export default function CsTop20Dashboard() {
 
   return (
     <div className={tvMode 
-      ? 'w-[1920px] h-[1080px] bg-slate-900 p-6 flex flex-col overflow-hidden' 
+      ? 'w-screen h-screen bg-slate-900 p-8 flex flex-col overflow-hidden' 
       : 'min-h-screen bg-background p-6'
     }>
       {/* TV Mode Header */}
       {tvMode ? (
-        <div className="mb-5 text-center flex-shrink-0">
-          <h1 className="text-3xl font-bold text-white tracking-tight">CS Top 20</h1>
-          <p className="text-sm text-slate-400 mt-1.5">Top 20 på tværs af alle teams • {periodLabel}</p>
+        <div className="mb-6 text-center flex-shrink-0">
+          <h1 className="text-4xl font-bold text-white tracking-tight">CS Top 20</h1>
+          <p className="text-base text-slate-400 mt-2">Top 20 på tværs af alle teams</p>
         </div>
       ) : (
         <DashboardHeader 
@@ -355,17 +355,37 @@ export default function CsTop20Dashboard() {
         />
       )}
       
-      <div className={tvMode 
-        ? 'grid grid-cols-1 gap-5 flex-1 min-h-0' 
-        : 'grid grid-cols-1 gap-6 mt-6'
-      }>
-        <LeaderboardCard 
-          title={`Top 20 – ${periodLabel}`}
-          icon={Trophy}
-          sellers={leaderboardData}
-          accentClass="bg-amber-500"
-        />
-      </div>
+      {tvMode ? (
+        <div className="grid grid-cols-3 gap-6 flex-1 min-h-0">
+          <LeaderboardCard 
+            title="Top Dag"
+            icon={Clock}
+            sellers={tvSellersToday}
+            accentClass="bg-emerald-500"
+          />
+          <LeaderboardCard 
+            title="Top Uge"
+            icon={Calendar}
+            sellers={tvSellersWeek}
+            accentClass="bg-blue-500"
+          />
+          <LeaderboardCard 
+            title="Top Lønperiode"
+            icon={Trophy}
+            sellers={tvSellersPayroll}
+            accentClass="bg-amber-500"
+          />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-6 mt-6">
+          <LeaderboardCard 
+            title={`Top 20 – ${periodLabel}`}
+            icon={Trophy}
+            sellers={leaderboardData}
+            accentClass="bg-amber-500"
+          />
+        </div>
+      )}
     </div>
   );
 }
