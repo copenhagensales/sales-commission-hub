@@ -250,7 +250,7 @@ export default function CsTop20Dashboard() {
                   <div 
                     key={seller.employeeId || name} 
                     className={`flex items-center gap-2 sm:gap-3 transition-all duration-150 ${
-                      tvMode ? 'px-4 py-3' : 'px-3 sm:px-4 py-2.5 sm:py-3 hover:bg-muted/40'
+                      tvMode ? 'px-3 py-1.5' : 'px-3 sm:px-4 py-2.5 sm:py-3 hover:bg-muted/40'
                     } ${
                     isTopThree 
                       ? (tvMode ? 'bg-slate-700/20' : 'bg-primary/[0.03]') 
