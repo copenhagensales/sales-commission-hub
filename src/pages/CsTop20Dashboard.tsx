@@ -210,7 +210,7 @@ export default function CsTop20Dashboard() {
         : 'bg-card border-border/50'
     }`}>
       <CardHeader className={`flex-shrink-0 border-b ${
-        tvMode ? 'border-slate-700/50 bg-slate-800 pb-1 pt-2' : 'pb-3 border-border/30 bg-muted/30'
+        tvMode ? 'border-slate-700/50 bg-slate-800 pb-0.5 pt-1.5' : 'pb-3 border-border/30 bg-muted/30'
       }`}>
         <CardTitle className={`flex items-center justify-center gap-2 font-semibold tracking-wide ${
           tvMode ? 'text-sm text-white' : 'text-base text-foreground'
@@ -250,7 +250,7 @@ export default function CsTop20Dashboard() {
                   <div 
                     key={seller.employeeId || name} 
                     className={`flex items-center transition-all duration-150 ${
-                      tvMode ? 'gap-1.5 px-2 py-[3px]' : 'gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 hover:bg-muted/40'
+                      tvMode ? 'gap-1 px-1.5 py-[3px]' : 'gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 hover:bg-muted/40'
                     } ${
                     isTopThree 
                       ? (tvMode ? 'bg-slate-700/20' : 'bg-primary/[0.03]') 
@@ -294,7 +294,7 @@ export default function CsTop20Dashboard() {
                   <div className="flex-1 min-w-0 overflow-hidden">
                     <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
                       <span className={`font-medium truncate ${
-                        tvMode ? 'text-xs text-white max-w-none' : 'text-xs sm:text-sm text-foreground max-w-[80px] sm:max-w-none'
+                        tvMode ? 'text-xs text-white max-w-[90px]' : 'text-xs sm:text-sm text-foreground max-w-[80px] sm:max-w-none'
                       }`}>
                         {displayName}
                       </span>
@@ -319,7 +319,7 @@ export default function CsTop20Dashboard() {
                   {/* Commission */}
                   <div className={`flex-shrink-0 rounded-full font-semibold tabular-nums ${
                     tvMode 
-                      ? 'bg-slate-700/80 text-white px-1.5 py-0.5 text-xs' 
+                      ? 'bg-slate-700/80 text-white px-1 py-0.5 text-[10px]' 
                       : 'bg-primary/10 text-primary px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm'
                   }`}>
                     {formatCurrency(commission)}
@@ -335,7 +335,7 @@ export default function CsTop20Dashboard() {
 
   return (
     <div className={tvMode 
-      ? 'w-screen h-screen bg-slate-900 p-2 flex flex-col overflow-hidden' 
+      ? 'w-screen h-screen bg-slate-900 p-1.5 flex flex-col overflow-hidden' 
       : 'min-h-screen bg-background p-6'
     }>
       {/* TV Mode Header */}
@@ -357,7 +357,7 @@ export default function CsTop20Dashboard() {
       )}
       
       {tvMode ? (
-        <div className="grid grid-cols-3 gap-2 flex-1 min-h-0">
+        <div className="grid grid-cols-3 gap-1.5 flex-1 min-h-0">
           <LeaderboardCard 
             title="Top Dag"
             icon={Clock}
