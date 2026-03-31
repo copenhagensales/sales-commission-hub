@@ -281,7 +281,7 @@ export default function CsTop20Dashboard() {
                         : ''
                   }`}>
                     <AvatarImage src={avatarUrl || undefined} alt={name} />
-                    <AvatarFallback className={`font-medium ${tvMode ? 'text-sm' : 'text-xs'} ${
+                    <AvatarFallback className={`font-medium ${tvMode ? 'text-[8px]' : 'text-xs'} ${
                       tvMode 
                         ? 'bg-slate-700 text-slate-300' 
                         : 'bg-muted text-muted-foreground'
