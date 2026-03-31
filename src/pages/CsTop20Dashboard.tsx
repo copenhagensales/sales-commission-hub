@@ -249,8 +249,8 @@ export default function CsTop20Dashboard() {
               return (
                   <div 
                     key={seller.employeeId || name} 
-                    className={`flex items-center gap-2 sm:gap-3 transition-all duration-150 ${
-                      tvMode ? 'px-3 py-1.5' : 'px-3 sm:px-4 py-2.5 sm:py-3 hover:bg-muted/40'
+                    className={`flex items-center transition-all duration-150 ${
+                      tvMode ? 'gap-1.5 px-2 py-[3px]' : 'gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 hover:bg-muted/40'
                     } ${
                     isTopThree 
                       ? (tvMode ? 'bg-slate-700/20' : 'bg-primary/[0.03]') 
