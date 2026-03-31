@@ -310,7 +310,7 @@ export default function CsTop20Dashboard() {
                       })()}
                     </div>
                     <div className={`${
-                      tvMode ? 'text-xs text-slate-500' : 'text-[10px] sm:text-xs text-muted-foreground/80'
+                      tvMode ? 'text-[10px] text-slate-500' : 'text-[10px] sm:text-xs text-muted-foreground/80'
                     }`}>
                       {sales} salg
                     </div>
