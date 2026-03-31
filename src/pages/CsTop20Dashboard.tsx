@@ -6,7 +6,7 @@ import { formatNumber } from "@/lib/calculations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useCachedLeaderboard, getInitials as getInitialsFromHook, type LeaderboardEntry, type LeaderboardPeriod } from "@/hooks/useCachedLeaderboard";
+import { useCachedLeaderboard, useCachedLeaderboards, getInitials as getInitialsFromHook, type LeaderboardEntry, type LeaderboardPeriod } from "@/hooks/useCachedLeaderboard";
 import { Trophy, Calendar, Clock } from "lucide-react";
 import { DashboardPeriodSelector, getDefaultPeriod, type PeriodSelection, type PeriodType, mapPeriodTypeToCache } from "@/components/dashboard/DashboardPeriodSelector";
 import { supabase } from "@/integrations/supabase/client";
