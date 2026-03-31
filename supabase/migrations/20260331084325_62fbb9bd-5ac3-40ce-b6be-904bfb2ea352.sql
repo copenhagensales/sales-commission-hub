@@ -1,0 +1,1 @@
+ALTER TABLE public.pulse_survey_dismissals ADD COLUMN IF NOT EXISTS dismissal_count integer NOT NULL DEFAULT 0;
