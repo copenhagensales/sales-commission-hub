@@ -982,7 +982,7 @@ export default function TvLeagueDashboard() {
           subtitle={`${data.totalPlayers} spillere · ${data.totalDivisions} divisioner`}
         />
       )}
-      <div className={`bg-slate-900 text-white overflow-hidden flex ${tvMode ? "min-h-screen h-screen" : "h-[calc(100vh-120px)] rounded-xl"}`}>
+      <div className={`bg-slate-900 text-white overflow-hidden flex ${tvMode ? "w-[1920px] h-[1080px]" : "h-[calc(100vh-120px)] rounded-xl"}`}>
         {/* ─── LEFT ZONE (40%) – rotates overview / movements / records / league overview ─── */}
         <div className="w-[40%] border-r border-slate-800 p-3 2xl:p-6 flex flex-col">
           {tvMode && (
