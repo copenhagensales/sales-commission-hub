@@ -6,7 +6,6 @@ import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { isTvMode } from "@/utils/tvMode";
-import { useTvScreenAdapter, getTvScaleStyles, getTvCenteringStyles } from "@/hooks/useTvScreenAdapter";
 
 // ─── Types ────────────────────────────────────────────────────
 interface PlayerEntry {
@@ -805,7 +804,6 @@ export default function TvLeagueDashboard() {
   const [mobileTab, setMobileTab] = useState<MobileTab>("divisions");
   const tvMode = isTvMode();
   const isMobile = useIsMobile();
-  const screenInfo = useTvScreenAdapter();
 
   // Left scene rotation (only on desktop/TV)
   useEffect(() => {
@@ -982,15 +980,15 @@ export default function TvLeagueDashboard() {
           subtitle={`${data.totalPlayers} spillere · ${data.totalDivisions} divisioner`}
         />
       )}
-      <div className={`bg-slate-900 text-white overflow-hidden flex ${tvMode ? "w-[1920px] h-[1080px]" : "h-[calc(100vh-120px)] rounded-xl"}`}>
+      <div className={`bg-slate-900 text-white overflow-hidden flex ${tvMode ? "w-screen h-screen" : "h-[calc(100vh-120px)] rounded-xl"}`}>
         {/* ─── LEFT ZONE (40%) – rotates overview / movements / records / league overview ─── */}
-        <div className="w-[40%] border-r border-slate-800 p-3 2xl:p-6 flex flex-col">
+        <div className={`w-[40%] border-r border-slate-800 flex flex-col ${tvMode ? "p-8" : "p-3 2xl:p-6"}`}>
           {tvMode && (
-            <div className="mb-2 2xl:mb-4">
-              <h1 className="text-lg 2xl:text-2xl font-black tracking-tight">
+            <div className="mb-6">
+              <h1 className="text-3xl font-black tracking-tight">
                 <span className="text-yellow-400">⚽</span> Superliga Live
               </h1>
-              <p className="text-[10px] 2xl:text-xs text-slate-500 mt-1">
+              <p className="text-sm text-slate-500 mt-1">
                 {data.totalPlayers} spillere · {data.totalDivisions} divisioner
               </p>
             </div>
@@ -1109,28 +1107,12 @@ export default function TvLeagueDashboard() {
         </div>
 
         {/* ─── RIGHT ZONE (60%) – always divisions ─── */}
-        <div className="w-[60%] p-3 2xl:p-6">
+        <div className={`w-[60%] ${tvMode ? "p-8" : "p-3 2xl:p-6"}`}>
           <SceneDivisions divisions={data.divisions} />
         </div>
       </div>
     </>
   );
-
-  // In TV mode, wrap with scale adapter for large screens (4K etc.)
-  if (tvMode) {
-    const scaleStyles = getTvScaleStyles(screenInfo);
-    const centeringStyles = getTvCenteringStyles(screenInfo);
-
-    return (
-      <DashboardShell>
-        <div style={centeringStyles}>
-          <div style={scaleStyles}>
-            {desktopContent}
-          </div>
-        </div>
-      </DashboardShell>
-    );
-  }
 
   return (
     <DashboardShell>
