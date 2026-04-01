@@ -30,8 +30,7 @@ import {
   Clock,
   Edit2,
   Save,
-  X,
-  SendHorizonal as _SendHorizonal
+  X
 } from "lucide-react";
 import { ScheduledEmailsList } from "./ScheduledEmailsList";
 import { format } from "date-fns";
