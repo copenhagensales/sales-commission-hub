@@ -21,9 +21,10 @@ interface MergePreview {
 }
 
 interface ProductRow {
-  id: string;
-  name: string;
-  internalName: string | null;
+  key: string; // unique display key matching main table: clientId::externalId::title
+  id: string | null; // product_id (null for unmapped)
+  name: string; // display name (adversus_product_title)
+  internalName: string | null; // product_name
   client_campaign_id: string | null;
   is_active: boolean;
 }
