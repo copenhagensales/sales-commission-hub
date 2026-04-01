@@ -1,32 +1,30 @@
 
 
-## Tilføj oversigt over planlagte emails med mulighed for annullering
+## Send notifikation til indrapportør når status ændres
 
-### Baggrund
-Brugeren har indrapporteret at der mangler en funktion til at se og annullere planlagte emails. Når man planlægger en email til afsendelse på en bestemt dato, er der ingen måde at se eller annullere den efterfølgende.
+### Problem
+Når en admin markerer en system-indrapportering som "løst" eller ændrer status, får den medarbejder der oprettede den ingen besked. De skal selv tjekke siden manuelt.
 
 ### Løsning
-Tilføj en ny sektion i rekrutteringsområdet (eller i CandidateDetailDialog) der viser alle ventende planlagte emails med mulighed for at annullere dem.
+Opret en ny edge function `notify-feedback-status-change` der sender en email til indrapportørens email, når status opdateres. Kald den fra `updateMutation.onSuccess` i `SystemFeedback.tsx`.
 
 ### Ændringer
 
-**1. Ny komponent: `src/components/recruitment/ScheduledEmailsList.tsx`**
-- Henter alle `scheduled_emails` med `status = 'pending'` fra databasen
-- Viser en liste med: modtager, emne, planlagt tidspunkt, og en "Annuller"-knap
-- Annullering opdaterer `status` til `'cancelled'` i databasen
-- Sorteret efter planlagt dato (nærmeste først)
-- Viser tom-tilstand hvis ingen ventende emails
+**1. Ny edge function: `supabase/functions/notify-feedback-status-change/index.ts`**
+- Modtager: `feedbackTitle`, `newStatus`, `adminNotes`, `employeeEmail`, `employeeName`
+- Sender en formateret HTML-email via M365 (samme mønster som `notify-system-feedback`)
+- Modtager er den medarbejder der oprettede indrapporteringen (via `work_email` eller `private_email` fra `employee_master_data`)
+- Emailen indeholder: titel på indrapporteringen, ny status (oversat til dansk), eventuelle admin-noter
 
-**2. Opdater `src/components/recruitment/CandidateDetailDialog.tsx`**
-- Tilføj en sektion eller fane der viser planlagte emails for den specifikke kandidat
-- Filtrer på `candidate_id` så kun relevante emails vises
-- Inkluder annulleringsknap per email
+**2. Opdater `src/pages/SystemFeedback.tsx`**
+- I `updateMutation`: hent indrapportørens email fra feedback-data + employee_master_data
+- I `onSuccess`: kald `supabase.functions.invoke("notify-feedback-status-change", { body: { ... } })` fire-and-forget
+- Oversæt statusværdier til dansk i emailen (open → Åben, in_progress → Under behandling, resolved → Løst, closed → Lukket)
 
-**3. Tilføj også en global oversigt**
-- Tilføj `ScheduledEmailsList` et sted i rekrutterings-flowet (f.eks. som en fane eller sektion på rekrutteringssiden) så man kan se ALLE ventende planlagte emails på tværs af kandidater
+**3. Opdater `supabase/config.toml`**
+- Tilføj `[functions.notify-feedback-status-change]` med `verify_jwt = false`
 
-### Tekniske detaljer
-- `scheduled_emails`-tabellen har allerede `status`-kolonne — annullering sætter den til `'cancelled'`
-- RLS-policies tillader allerede teamledere og rekruttering at administrere planlagte emails
-- Ingen databaseændringer nødvendige
+### Email-indhold (eksempel)
+- **Emne:** "Din indrapportering er blevet opdateret"
+- **Indhold:** "Status på '{titel}' er ændret til: Løst" + eventuelle admin-noter
 
