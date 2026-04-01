@@ -9788,6 +9788,50 @@ export type Database = {
           },
         ]
       }
+      product_merge_history: {
+        Row: {
+          adversus_mappings_moved: number | null
+          id: string
+          merged_at: string
+          merged_by: string | null
+          pricing_rules_moved: number | null
+          sale_items_moved: number | null
+          source_product_id: string
+          source_product_name: string | null
+          target_product_id: string
+        }
+        Insert: {
+          adversus_mappings_moved?: number | null
+          id?: string
+          merged_at?: string
+          merged_by?: string | null
+          pricing_rules_moved?: number | null
+          sale_items_moved?: number | null
+          source_product_id: string
+          source_product_name?: string | null
+          target_product_id: string
+        }
+        Update: {
+          adversus_mappings_moved?: number | null
+          id?: string
+          merged_at?: string
+          merged_by?: string | null
+          pricing_rules_moved?: number | null
+          sale_items_moved?: number | null
+          source_product_id?: string
+          source_product_name?: string | null
+          target_product_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_merge_history_target_product_id_fkey"
+            columns: ["target_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_price_history: {
         Row: {
           applied_at: string | null
@@ -9917,6 +9961,7 @@ export type Database = {
           id: string
           is_active: boolean
           is_hidden: boolean | null
+          merged_into_product_id: string | null
           name: string
           priority: number | null
           revenue_dkk: number | null
@@ -9932,6 +9977,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           is_hidden?: boolean | null
+          merged_into_product_id?: string | null
           name: string
           priority?: number | null
           revenue_dkk?: number | null
@@ -9947,6 +9993,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           is_hidden?: boolean | null
+          merged_into_product_id?: string | null
           name?: string
           priority?: number | null
           revenue_dkk?: number | null
@@ -9958,6 +10005,13 @@ export type Database = {
             columns: ["client_campaign_id"]
             isOneToOne: false
             referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_merged_into_product_id_fkey"
+            columns: ["merged_into_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]
