@@ -23,6 +23,7 @@ interface MergePreview {
 interface ProductRow {
   id: string;
   name: string;
+  internalName: string | null;
   client_campaign_id: string | null;
   is_active: boolean;
 }
@@ -109,7 +110,8 @@ export function ProductMergeDialog({
         if (r.client_id === clientId && r.product_id && !seen.has(r.product_id)) {
           seen.set(r.product_id, {
             id: r.product_id,
-            name: r.product_name ?? r.adversus_product_title ?? "Ukendt",
+            name: r.adversus_product_title ?? r.product_name ?? "Ukendt",
+            internalName: r.product_name ?? null,
             client_campaign_id: r.product_client_campaign_id,
             is_active: true,
           });
@@ -132,6 +134,7 @@ export function ProductMergeDialog({
             seen.set(p.id, {
               id: p.id,
               name: p.name,
+              internalName: p.name,
               client_campaign_id: p.client_campaign_id,
               is_active: p.is_active ?? true,
             });
@@ -369,7 +372,12 @@ export function ProductMergeDialog({
                           });
                         }}
                       />
-                      <span className="flex-1 truncate font-medium">{p.name}</span>
+                      <div className="flex-1 min-w-0">
+                        <span className="block truncate font-medium">{p.name}</span>
+                        {p.internalName && p.internalName !== p.name && (
+                          <span className="block truncate text-xs text-muted-foreground">Internt: {p.internalName}</span>
+                        )}
+                      </div>
                       {!p.is_active && <Badge variant="secondary" className="text-[10px]">Inaktiv</Badge>}
                       {isSelected && (
                         <Button
