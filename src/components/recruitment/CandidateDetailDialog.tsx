@@ -32,6 +32,7 @@ import {
   Save,
   X
 } from "lucide-react";
+import { ScheduledEmailsList } from "./ScheduledEmailsList";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
@@ -164,6 +165,9 @@ export function CandidateDetailDialog({
             </TabsTrigger>
             <TabsTrigger value="history" className="data-[state=active]:bg-background">
               Historik
+            </TabsTrigger>
+            <TabsTrigger value="scheduled" className="data-[state=active]:bg-background">
+              Planlagte emails
             </TabsTrigger>
           </TabsList>
 
@@ -362,6 +366,9 @@ export function CandidateDetailDialog({
                 </div>
               )}
             </ScrollArea>
+          </TabsContent>
+          <TabsContent value="scheduled" className="mt-4">
+            <ScheduledEmailsList candidateId={candidate.id} maxHeight="400px" />
           </TabsContent>
         </Tabs>
       </DialogContent>

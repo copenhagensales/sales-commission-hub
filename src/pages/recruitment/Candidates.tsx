@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { Search, Plus, SlidersHorizontal, Phone, MessageSquare, PhoneIncoming, PhoneOutgoing, Trash2, Users, Calendar } from "lucide-react";
+import { Search, Plus, SlidersHorizontal, Phone, MessageSquare, PhoneIncoming, PhoneOutgoing, Trash2, Users, Calendar, Mail } from "lucide-react";
+import { ScheduledEmailsList } from "@/components/recruitment/ScheduledEmailsList";
 import { CandidateCard } from "@/components/recruitment/CandidateCard";
 import { NewCandidateDialog } from "@/components/recruitment/NewCandidateDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -499,6 +500,18 @@ export default function Candidates() {
                     </div>
                   )}
                 </ScrollArea>
+              </CardContent>
+            </Card>
+            {/* Scheduled Emails */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Mail className="h-4 w-4" />
+                  Planlagte emails
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <ScheduledEmailsList maxHeight="250px" />
               </CardContent>
             </Card>
           </div>
