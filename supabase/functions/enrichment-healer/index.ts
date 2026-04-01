@@ -111,7 +111,16 @@ async function healAdversus(
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const leadData = await response.json();
+      const rawLeadResponse = await response.json();
+      // Adversus API may return {leads: [...]} or the lead object directly
+      let leadData = rawLeadResponse;
+      if (rawLeadResponse.leads && Array.isArray(rawLeadResponse.leads)) {
+        if (rawLeadResponse.leads.length === 0) {
+          throw new Error("API returned empty leads array");
+        }
+        leadData = rawLeadResponse.leads[0];
+      }
+      
       const leadResultData = leadData.resultData || leadData.leadResultData || [];
 
       const leadResultFields: Record<string, any> = {};
@@ -124,20 +133,49 @@ async function healAdversus(
         }
       }
 
-      if (leadResultData.length === 0 && Object.keys(leadResultFields).length === 0) {
-        throw new Error("API returned empty lead data");
+      // Also extract masterData fields (used by some Adversus accounts like Eesy TM)
+      const masterDataFields: Record<string, any> = {};
+      if (Array.isArray(leadData.masterData)) {
+        for (const field of leadData.masterData) {
+          const fieldName = field?.label || field?.name;
+          if (field && fieldName !== undefined) {
+            masterDataFields[fieldName] = field.value;
+          }
+        }
       }
 
+      // Extract phone from multiple possible locations
       let phone = leadData.phone || leadData.contactPhone || leadData.mobile || null;
       if (!phone && leadData.contactData) {
         const cd = leadData.contactData;
         phone = cd.Telefonnummer1 || cd['Kontakt nummer'] || cd.phone || cd.mobile || cd.Mobil || cd.Telefon || null;
+      }
+      // Try masterData fields for phone
+      if (!phone && Object.keys(masterDataFields).length > 0) {
+        phone = masterDataFields.Telefonnummer1 || masterDataFields['Kontakt nummer'] || masterDataFields.phone || masterDataFields.Telefon || masterDataFields.Mobil || masterDataFields.mobile || null;
+      }
+
+      // Check if we got ANY useful data from the API
+      const hasResultData = (Array.isArray(leadResultData) && leadResultData.length > 0) || Object.keys(leadResultFields).length > 0;
+      const hasMasterData = Object.keys(masterDataFields).length > 0;
+      const hasContactData = leadData.contactData && Object.keys(leadData.contactData).length > 0;
+      const hasPhone = !!phone;
+      const hasAnyData = hasResultData || hasMasterData || hasContactData || hasPhone || leadData.campaignId || leadData.status;
+
+      if (!hasAnyData) {
+        throw new Error("API returned empty lead data");
       }
 
       const updatedPayload = {
         ...rawPayload,
         leadResultFields,
         leadResultData,
+        ...(Object.keys(masterDataFields).length > 0 ? { masterDataFields } : {}),
+        ...(Array.isArray(leadData.masterData) ? { masterData: leadData.masterData } : {}),
+        ...(leadData.contactData ? { contactData: leadData.contactData } : {}),
+        ...(leadData.status ? { leadStatus: leadData.status } : {}),
+        ...(leadData.campaignId ? { leadCampaignId: leadData.campaignId } : {}),
+        ...(leadData.contactId ? { contactId: leadData.contactId } : {}),
       };
 
       await supabase.from("sales").update({
