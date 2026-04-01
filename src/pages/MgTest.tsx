@@ -1691,7 +1691,68 @@ export default function MgTest() {
     }
   };
 
-  const autoAssignCampaigns = useMutation({
+  const handleGenerateSuggestions = async () => {
+    if (!campaignMappings || !clientCampaigns || !clients) return;
+    setSuggestionsLoading(true);
+    try {
+      const result = await generateClientSuggestions(
+        campaignMappings,
+        clientCampaigns,
+        clients,
+        parseClientFromTitle,
+      );
+      setSuggestions(result);
+      setSuggestionsDialog(true);
+    } catch (err: any) {
+      toast.error(err?.message || "Kunne ikke generere forslag");
+    } finally {
+      setSuggestionsLoading(false);
+    }
+  };
+
+  const handleApproveSuggestions = async (approved: CampaignSuggestion[]) => {
+    setApprovingLoading(true);
+    try {
+      for (const s of approved) {
+        // Find or create client_campaign for the client
+        let clientCampaignId: string | null = null;
+        const { data: campaigns } = await supabase
+          .from("client_campaigns")
+          .select("id")
+          .eq("client_id", s.suggestedClientId);
+
+        if (campaigns && campaigns.length > 0) {
+          clientCampaignId = campaigns[0].id;
+        } else {
+          const { data: newCampaign, error: insertError } = await supabase
+            .from("client_campaigns")
+            .insert({ client_id: s.suggestedClientId, name: "Standard" })
+            .select("id")
+            .single();
+          if (insertError) throw insertError;
+          clientCampaignId = newCampaign.id;
+        }
+
+        const { error } = await supabase
+          .from("adversus_campaign_mappings")
+          .update({ client_campaign_id: clientCampaignId })
+          .eq("id", s.mappingId);
+        if (error) throw error;
+      }
+
+      toast.success(`${approved.length} kampagner tildelt kunder`);
+      setSuggestionsDialog(false);
+      setSuggestions([]);
+      queryClient.invalidateQueries({ queryKey: ["mg-campaign-mappings"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-client-campaigns"] });
+    } catch (err: any) {
+      toast.error(err?.message || "Kunne ikke godkende forslag");
+    } finally {
+      setApprovingLoading(false);
+    }
+  };
+
+
     mutationFn: async () => {
       if (!campaignMappings || !clients) return { updated: 0, byName: 0, byDefault: 0 };
 
