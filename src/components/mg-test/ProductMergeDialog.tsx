@@ -24,6 +24,7 @@ interface ProductRow {
   id: string;
   name: string;
   client_campaign_id: string | null;
+  is_active: boolean;
 }
 
 interface ClientOption {
