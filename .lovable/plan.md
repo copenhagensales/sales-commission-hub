@@ -1,52 +1,36 @@
 
 
-## Opret ny Adversus-integration: Eesy TM
+## Kør enrichment-healer for Eesy TM salg
 
-### Overblik
-Opretter en ny `dialer_integrations`-row for "Eesy TM" med provider `adversus` og de angivne API-credentials, krypteret med `DB_ENCRYPTION_KEY`. Derefter verificeres API-forbindelsen, kampagner synkroniseres, og cron-jobs oprettes.
+### Problem
+De 19 Eesy TM salg mangler kontaktdata (`customer_phone` er NULL). Enrichment-healeren skal køres for at hente lead-data fra Adversus API'en via de nye CPHSalesAPI-credentials.
 
-### Eksisterende kontekst
-- **Client**: "Eesy TM" (`81993a7b-ff24-46b8-8ffb-37a83138ddba`)
-- **Client Campaign**: "Eesy TM Products" (`d031126c-aec0-4b80-bbe2-bbc31c4f04ba`)
-- **Eksisterende Adversus-integrationer**: Lovablecph (`26fac751`), Relatel_CPHSALES (`657c2050`)
-- Der findes allerede ~20+ Eesy TM kampagnemappings i `adversus_campaign_mappings` (fra Lovablecph-kontoen)
+### Forudsætninger (allerede opfyldt)
+- Integrationen "Eesy TM" eksisterer med korrekte credentials (ID: `fe87f6eb-dc6a-4209-9a47-d84054381452`)
+- Enrichment-healeren matcher salg via `source`-feltet (= integrationsnavn "Eesy TM") og henter credentials via `getCredentialsByName("Eesy TM")`
+- Healeren bruger `leadId` fra `raw_payload` til at hente lead-data fra `https://api.adversus.io/v1/leads/{leadId}`
 
 ### Trin
 
-**1. Opret integrationen i databasen**
-- Kald `create_dialer_integration` RPC med:
-  - `p_name`: `"Eesy TM"`
-  - `p_provider`: `"adversus"`
-  - `p_credentials`: `'{"username":"CPHSalesAPI","password":"e36iv65wzk008w44c8ksowgok"}'`
-  - `p_encryption_key`: fra `DB_ENCRYPTION_KEY` secret
-- Dette indsætter en ny aktiv row med krypterede credentials
+**1. Sæt enrichment_status til "pending" for Eesy TM salg**
+- Kør UPDATE via insert-tool: sæt `enrichment_status = 'pending'` og `enrichment_attempts = 0` for alle salg med `source = 'Eesy TM'` der har `customer_phone IS NULL`
+- Dette sikrer at healeren finder dem
 
-**2. Verificer API-forbindelsen**
-- Kald `integration-engine` med `action: "fetch-sample-fields"` for den nye integration-ID
-- Bekræft at vi får kampagner og sample-data retur fra Adversus API
+**2. Kør enrichment-healer**
+- Kald `supabase.functions.invoke("enrichment-healer", { body: { provider: "adversus", turboMode: true, maxBatch: 50 } })`
+- Healeren vil:
+  - Finde salg med `enrichment_status = 'pending'`
+  - Gruppere dem under source "Eesy TM"
+  - Hente credentials for "Eesy TM" integrationen
+  - For hvert salg: hente lead-data fra Adversus API → opdatere `raw_payload` med `leadResultFields` + `leadResultData` + `customer_phone`
 
-**3. Synk kampagner + brugere**
-- Kald `integration-engine` med `actions: ["campaigns", "users"]` for den nye integration
-- Verificer at kampagnerne matcher de eksisterende Eesy TM-mappings
-- Map nye kampagner til "Eesy TM Products" client campaign
+**3. Verificer resultater**
+- Tjek at `customer_phone`, `raw_payload.leadResultFields` og `raw_payload.leadResultData` er udfyldt på de behandlede salg
 
-**4. Test salgssynkronisering**
-- Kald `integration-engine` med `actions: ["sales"]` og `days: 1` 
-- Verificer at salg hentes og gemmes korrekt med produkter og agent-data
-
-**5. Opret cron-jobs (via migration)**
-- **Sales sync**: Hvert 15. minut (forskudt fra eksisterende jobs) — f.eks. `13,28,43,58 * * * *`
-- **Meta sync**: Hver 30. minut (forskudt) — f.eks. `15,45 * * * *`
-- Payload-format matcher eksisterende Adversus-jobs men med det nye integration-ID
-
-### Vigtige overvejelser
-- Kampagnemappings er globale (ingen `integration_id` kolonne) — de eksisterende Eesy TM-mappings vil automatisk blive brugt af den nye integration
-- `adversus_campaign_mappings` tabellen har `reference_extraction_config` for OPP-udlæsning som allerede er sat op
-- Credentials gemmes krypteret med `pgp_sym_encrypt` via `DB_ENCRYPTION_KEY`
-- Den nye integration bruger separate API-credentials (CPHSalesAPI) — dette kan betyde at den ser andre/færre kampagner end Lovablecph-kontoen. Vi verificerer dette i trin 2-3
-
-### Tekniske detaljer
-- Integration-engine henter credentials via `get_dialer_credentials` RPC og instantierer `AdversusAdapter` med `{username, password}`
-- Cron-jobs kalder `integration-engine` edge function med `integration_id` parameter
-- Alle eksisterende stabilitetskontroller (rate limiting, circuit breaker, run locking, working hours) gælder automatisk
+### Hvad vi får med
+Enrichment-healeren henter alt tilgængeligt fra Adversus `/leads/{id}` endpoint:
+- Telefonnummer (→ `customer_phone`)
+- Lead result data (alle felter fra lead-formularen inkl. OPP-nummer)
+- Lead result fields (normaliseret key-value format)
+- Kontaktdata (firma, telefon, email osv.)
 
