@@ -641,11 +641,14 @@ export default function BookingsContent() {
     mutationFn: async ({ bookingId, date }: {
       bookingId: string; date: string;
     }) => {
+      const dietSalaryType = salaryTypes?.find(st => st.code === "diaet");
+      if (!dietSalaryType) throw new Error("Diæt lønart ikke fundet");
       const { error } = await supabase
         .from("booking_diet")
         .delete()
         .eq("booking_id", bookingId)
-        .eq("date", date);
+        .eq("date", date)
+        .eq("salary_type_id", dietSalaryType.id);
       if (error) throw error;
     },
     onSuccess: () => {
