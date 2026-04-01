@@ -490,7 +490,7 @@ export function ProductMergeDialog({
                 onClick={handleNext}
                 disabled={
                   (step === 1 && !selectedClientId) ||
-                  (step === 2 && (selectedProductIds.size < 2 || !targetProductId))
+                  (step === 2 && (selectedKeys.size < 2 || !targetKey))
                 }
               >
                 Næste <ChevronRight className="h-4 w-4 ml-1" />
