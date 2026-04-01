@@ -291,7 +291,7 @@ export default function SystemFeedback() {
           <TabsTrigger value="submit">Indsend</TabsTrigger>
           <TabsTrigger value="list">
             Alle indrapporteringer
-            {feedbackList.length > 0 && <Badge variant="secondary" className="ml-2">{feedbackList.length}</Badge>}
+            {activeFeedback.length > 0 && <Badge variant="secondary" className="ml-2">{activeFeedback.length}</Badge>}
           </TabsTrigger>
           {isOwner && <TabsTrigger value="recipients"><Bell className="h-4 w-4 mr-1" />Modtagere</TabsTrigger>}
           {isOwner && <TabsTrigger value="access"><Shield className="h-4 w-4 mr-1" />Adgang</TabsTrigger>}
