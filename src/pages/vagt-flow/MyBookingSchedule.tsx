@@ -507,19 +507,6 @@ export default function MyBookingSchedule() {
                               )}
                             </div>
 
-                            {/* Stands/roll-ups reminders */}
-                            {a.isFirstBookingDay && (
-                              <div className="mt-1 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-green-600/10 border border-green-500/20 dark:bg-green-500/10 dark:border-green-400/20">
-                                <Package className="w-3.5 h-3.5 text-green-700 dark:text-green-300 shrink-0" />
-                                <span className="text-[11px] font-medium text-green-700 dark:text-green-300">Husk at medbringe stande og roll-ups</span>
-                              </div>
-                            )}
-                            {a.isLastBookingDay && !a.isFirstBookingDay && (
-                              <div className="mt-1 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-orange-600/10 border border-orange-500/20 dark:bg-orange-500/10 dark:border-orange-400/20">
-                                <Package className="w-3.5 h-3.5 text-orange-700 dark:text-orange-300 shrink-0" />
-                                <span className="text-[11px] font-medium text-orange-700 dark:text-orange-300">Husk at tage stande og roll-ups med hjem</span>
-                              </div>
-                            )}
 
                             {/* Vehicle return callout */}
                             {a.isLastVehicleDay && (
