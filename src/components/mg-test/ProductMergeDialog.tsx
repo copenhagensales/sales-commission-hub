@@ -110,13 +110,23 @@ export function ProductMergeDialog({
         return;
       }
 
-      const { data, error } = await supabase
-        .from("products")
-        .select("id, name, client_campaign_id, is_active")
-        .in("client_campaign_id", campaignIds)
-        .order("name");
-      if (error) throw error;
-      setProducts((data ?? []).map((p) => ({ id: p.id, name: p.name, client_campaign_id: p.client_campaign_id, is_active: p.is_active ?? true })));
+      // Fetch campaign-assigned products AND unassigned products in parallel
+      const [campaignRes, unassignedRes] = await Promise.all([
+        supabase
+          .from("products")
+          .select("id, name, client_campaign_id, is_active")
+          .in("client_campaign_id", campaignIds)
+          .order("name"),
+        supabase
+          .from("products")
+          .select("id, name, client_campaign_id, is_active")
+          .is("client_campaign_id", null)
+          .order("name"),
+      ]);
+      if (campaignRes.error) throw campaignRes.error;
+      if (unassignedRes.error) throw unassignedRes.error;
+      const all = [...(campaignRes.data ?? []), ...(unassignedRes.data ?? [])];
+      setProducts(all.map((p) => ({ id: p.id, name: p.name, client_campaign_id: p.client_campaign_id, is_active: p.is_active ?? true })));
     } catch (e) {
       console.error("Load products error:", e);
     } finally {
