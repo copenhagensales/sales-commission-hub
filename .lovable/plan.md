@@ -1,30 +1,32 @@
 
 
-## Send email-notifikation ved nye system-indrapporteringer
+## Tilføj oversigt over planlagte emails med mulighed for annullering
 
-### Problem
-Når en bruger indsender en ny indrapportering på `/system-feedback`, gemmes den i `system_feedback`-tabellen, men der sendes ingen email-notifikation. Administratorer opdager derfor ikke nye indrapporteringer medmindre de selv tjekker siden.
+### Baggrund
+Brugeren har indrapporteret at der mangler en funktion til at se og annullere planlagte emails. Når man planlægger en email til afsendelse på en bestemt dato, er der ingen måde at se eller annullere den efterfølgende.
 
 ### Løsning
-Opret en ny edge function `notify-system-feedback` der sender en notifikationsmail via M365 (samme mønster som `customer-inquiry-webhook` og `check-compliance-reviews` bruger). Kald funktionen fra `SystemFeedback.tsx` efter succesfuld insert.
+Tilføj en ny sektion i rekrutteringsområdet (eller i CandidateDetailDialog) der viser alle ventende planlagte emails med mulighed for at annullere dem.
 
 ### Ændringer
 
-**1. Ny edge function: `supabase/functions/notify-system-feedback/index.ts`**
-- Modtager feedback-data (titel, kategori, prioritet, beskrivelse, berørt medarbejder, system-område, indsendt af)
-- Henter M365 access token via client credentials (genbruger eksisterende M365-env vars)
-- Sender en formateret HTML-email til en fast modtagergruppe (f.eks. mg@copenhagensales.dk og km@copenhagensales.dk — samme som customer-inquiry)
-- Email indeholder alle relevante felter i en tabel-layout
+**1. Ny komponent: `src/components/recruitment/ScheduledEmailsList.tsx`**
+- Henter alle `scheduled_emails` med `status = 'pending'` fra databasen
+- Viser en liste med: modtager, emne, planlagt tidspunkt, og en "Annuller"-knap
+- Annullering opdaterer `status` til `'cancelled'` i databasen
+- Sorteret efter planlagt dato (nærmeste først)
+- Viser tom-tilstand hvis ingen ventende emails
 
-**2. Tilføj til `supabase/config.toml`**
-```
-[functions.notify-system-feedback]
-verify_jwt = false
-```
+**2. Opdater `src/components/recruitment/CandidateDetailDialog.tsx`**
+- Tilføj en sektion eller fane der viser planlagte emails for den specifikke kandidat
+- Filtrer på `candidate_id` så kun relevante emails vises
+- Inkluder annulleringsknap per email
 
-**3. Opdater `src/pages/SystemFeedback.tsx`**
-- I `submitMutation.onSuccess`: kald `supabase.functions.invoke("notify-system-feedback", { body: { title, category, priority, description, affectedEmployee, systemArea } })` (fire-and-forget, fejl blokerer ikke brugeren)
+**3. Tilføj også en global oversigt**
+- Tilføj `ScheduledEmailsList` et sted i rekrutterings-flowet (f.eks. som en fane eller sektion på rekrutteringssiden) så man kan se ALLE ventende planlagte emails på tværs af kandidater
 
-### Modtagere
-Samme modtagere som kundehenvendelser: mg@copenhagensales.dk og km@copenhagensales.dk. Vil du have andre/flere modtagere?
+### Tekniske detaljer
+- `scheduled_emails`-tabellen har allerede `status`-kolonne — annullering sætter den til `'cancelled'`
+- RLS-policies tillader allerede teamledere og rekruttering at administrere planlagte emails
+- Ingen databaseændringer nødvendige
 
