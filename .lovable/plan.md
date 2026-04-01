@@ -1,28 +1,40 @@
 
 
-## Fix: Email-notifikationer for indrapporteringer og statusændringer
+## Smart kampagne-gætning med godkendelsesflow
 
-### Problem
-Ingen emails sendes, hverken når nye indrapporteringer oprettes eller når status ændres. Edge function logs er tomme for begge funktioner, hvilket tyder på at de ikke er korrekt deployed.
+### Hvad bygges
+En ny "Foreslå kunder"-knap der analyserer umappede kampagner og foreslår den mest sandsynlige kunde baseret på flere signaler. Forslagene vises i en godkendelsesdialog hvor du kan acceptere/afvise hvert forslag inden tildeling.
 
-### Årsager fundet
-1. **`notify-feedback-status-change` mangler i `config.toml`** — den er ikke registreret, så den kan ikke invokes
-2. **Begge funktioner har nul logs** — de skal gendeployes
-3. **`submittedBy` sendes ikke med** i notify-system-feedback kaldet (kosmetisk, men bør fixes)
+### Signaler (prioriteret)
 
-### Ændringer
+1. **Produktmatch** (stærkest): Slå kampagnens solgte produkter op i `sale_items` → match mod `adversus_product_mappings` → `products.client_campaign_id` → klient. Tæl antal hits per klient, vinderen med flest hits foreslås.
+2. **Navnematch**: Eksisterende `parseClientFromTitle`-logik (kampagnenavn indeholder kundenavn efter separator).
+3. **Agentoverlap**: Find hvilke agenter der sælger i kampagnen → se hvilke kunder de primært sælger for i allerede mappede kampagner.
 
-**Fil: `supabase/config.toml`**
-- Tilføj `notify-feedback-status-change` med `verify_jwt = false`
+Hvert signal giver en score, og den klient med højest samlet score vælges. Konfidensen vises som "Høj/Medium/Lav".
 
-**Fil: `src/pages/SystemFeedback.tsx`**
-- Tilføj `submittedBy` (medarbejderens navn) til notify-system-feedback body, så admin-mailen viser hvem der indsendte
+### UI-flow
 
-**Deploy**
-- Gendeployér begge edge functions: `notify-system-feedback` og `notify-feedback-status-change`
+1. Ny knap **"Foreslå kunder"** ved siden af "Auto-fordel"
+2. Klik starter analyse af alle umappede kampagner
+3. Åbner en **dialog** med en tabel:
+   - Kampagnenavn | Foreslået kunde | Konfidens | Begrundelse | ✓/✗
+   - F.eks.: "Admill Internettjek" → Eesy TM (Høj) — "12 produkter matcher Eesy TM"
+   - Checkbox per række + "Vælg alle" for batch-godkendelse
+4. "Godkend valgte" knap tildeler kun afkrydsede forslag
 
 ### Tekniske detaljer
-- Edge functions bruger M365 Graph API med client credentials — kræver at `M365_TENANT_ID`, `M365_CLIENT_ID`, `M365_CLIENT_SECRET`, `M365_SENDER_EMAIL` secrets er sat op (disse bruges allerede af andre funktioner, så de burde være på plads)
-- `notify-system-feedback` sender til hardcodede modtagere (mg@ og km@copenhagensales.dk)
-- `notify-feedback-status-change` sender til den medarbejder der oprettede indrapporteringen
+
+**Fil: `src/pages/MgTest.tsx`**
+
+- Ny state: `suggestionsDialog` (open/close), `suggestions[]` array, `selectedSuggestions` set
+- Ny async funktion `generateClientSuggestions()`:
+  1. Hent umappede kampagner (hvor `client_campaign_id IS NULL`)
+  2. For hver: hent `sale_items` via `sales.dialer_campaign_id` → match produkttitler mod `adversus_product_mappings` → opslå produkt → `client_campaign_id` → tæl klient-hits
+  3. Supplement med `parseClientFromTitle`
+  4. Returnér array af `{ campaignId, campaignName, suggestedClientId, clientName, confidence, reason, saleCount }`
+- Godkendelsesfunktion genbruger eksisterende `saveCampaignMapping`-logik
+- For at undgå N+1 queries: batch-hent alle sale_items for umappede kampagner i ét query, og brug in-memory maps til opslag
+
+**Performanceoptimering**: Én samlet query henter alle `sale_items` + `adversus_product_title` for umappede kampagner, og én query henter alle `products` med `client_campaign_id`. Alt matching sker client-side i memory.
 
