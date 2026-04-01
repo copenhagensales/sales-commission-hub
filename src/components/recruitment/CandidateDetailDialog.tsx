@@ -31,7 +31,7 @@ import {
   Edit2,
   Save,
   X,
-  SendHorizonal
+  SendHorizonal as _SendHorizonal
 } from "lucide-react";
 import { ScheduledEmailsList } from "./ScheduledEmailsList";
 import { format } from "date-fns";
