@@ -249,3 +249,6 @@ verify_jwt = false
 
 [functions.notify-system-feedback]
 verify_jwt = false
+
+[functions.notify-feedback-status-change]
+verify_jwt = false
