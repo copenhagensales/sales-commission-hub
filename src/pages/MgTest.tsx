@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Loader2, ChevronDown, Search, Plus, Trash2, Upload, ImageIcon, Users, Pencil, Settings, Eye, EyeOff, Check } from "lucide-react";
+import { Loader2, ChevronDown, Search, Plus, Trash2, Upload, ImageIcon, Users, Pencil, Settings, Eye, EyeOff, Check, Lightbulb } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -27,6 +27,7 @@ import ClientSalesOverviewContent from "@/pages/ClientSalesOverview";
 // ProductCampaignOverrides removed - functionality merged into pricing rules
 import { ProductPriceEditDialog } from "@/components/mg-test/ProductPriceEditDialog";
 import { DataMappingTab } from "@/components/mg-test/DataMappingTab";
+import { CampaignSuggestionDialog, generateClientSuggestions, type CampaignSuggestion } from "@/components/mg-test/CampaignSuggestionDialog";
 import { ProductPricingRulesDialog } from "@/components/mg-test/ProductPricingRulesDialog";
 
 interface InspectorField {
@@ -211,6 +212,12 @@ export default function MgTest() {
   
   // Hide products state
   const [showHiddenProducts, setShowHiddenProducts] = useState(false);
+
+  // Campaign suggestion state
+  const [suggestionsDialog, setSuggestionsDialog] = useState(false);
+  const [suggestions, setSuggestions] = useState<CampaignSuggestion[]>([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [approvingLoading, setApprovingLoading] = useState(false);
 
   // Field Inspector state
   const [inspectingCampaign, setInspectingCampaign] = useState<CampaignMapping | null>(null);
@@ -1684,6 +1691,67 @@ export default function MgTest() {
     }
   };
 
+  const handleGenerateSuggestions = async () => {
+    if (!campaignMappings || !clientCampaigns || !clients) return;
+    setSuggestionsLoading(true);
+    try {
+      const result = await generateClientSuggestions(
+        campaignMappings,
+        clientCampaigns,
+        clients,
+        parseClientFromTitle,
+      );
+      setSuggestions(result);
+      setSuggestionsDialog(true);
+    } catch (err: any) {
+      toast.error(err?.message || "Kunne ikke generere forslag");
+    } finally {
+      setSuggestionsLoading(false);
+    }
+  };
+
+  const handleApproveSuggestions = async (approved: CampaignSuggestion[]) => {
+    setApprovingLoading(true);
+    try {
+      for (const s of approved) {
+        // Find or create client_campaign for the client
+        let clientCampaignId: string | null = null;
+        const { data: campaigns } = await supabase
+          .from("client_campaigns")
+          .select("id")
+          .eq("client_id", s.suggestedClientId);
+
+        if (campaigns && campaigns.length > 0) {
+          clientCampaignId = campaigns[0].id;
+        } else {
+          const { data: newCampaign, error: insertError } = await supabase
+            .from("client_campaigns")
+            .insert({ client_id: s.suggestedClientId, name: "Standard" })
+            .select("id")
+            .single();
+          if (insertError) throw insertError;
+          clientCampaignId = newCampaign.id;
+        }
+
+        const { error } = await supabase
+          .from("adversus_campaign_mappings")
+          .update({ client_campaign_id: clientCampaignId })
+          .eq("id", s.mappingId);
+        if (error) throw error;
+      }
+
+      toast.success(`${approved.length} kampagner tildelt kunder`);
+      setSuggestionsDialog(false);
+      setSuggestions([]);
+      queryClient.invalidateQueries({ queryKey: ["mg-campaign-mappings"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-client-campaigns"] });
+    } catch (err: any) {
+      toast.error(err?.message || "Kunne ikke godkende forslag");
+    } finally {
+      setApprovingLoading(false);
+    }
+  };
+
   const autoAssignCampaigns = useMutation({
     mutationFn: async () => {
       if (!campaignMappings || !clients) return { updated: 0, byName: 0, byDefault: 0 };
@@ -2497,6 +2565,19 @@ export default function MgTest() {
                       {t("mgTest.autoAssignCampaigns")}
                     </Button>
                   </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="hover-scale"
+                    onClick={handleGenerateSuggestions}
+                    disabled={suggestionsLoading || !campaignMappings || campaignMappings.length === 0}
+                  >
+                    {suggestionsLoading && (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    )}
+                    <Lightbulb className="h-4 w-4 mr-1" />
+                    Foreslå kunder
+                  </Button>
                   <Button
                     size="sm"
                     variant="outline"
@@ -3656,6 +3737,14 @@ export default function MgTest() {
           }}
         />
       )}
+
+      <CampaignSuggestionDialog
+        open={suggestionsDialog}
+        onOpenChange={setSuggestionsDialog}
+        suggestions={suggestions}
+        onApprove={handleApproveSuggestions}
+        isApproving={approvingLoading}
+      />
     </MainLayout>
   );
 }
