@@ -214,7 +214,7 @@ export function ProductMergeDialog({
     if (step === 1 && selectedClientId) {
       loadProducts(selectedClientId);
       setStep(2);
-    } else if (step === 2 && selectedProductIds.size >= 2 && targetProductId) {
+    } else if (step === 2 && selectedKeys.size >= 2 && targetKey) {
       loadPreview();
       setStep(3);
     }
