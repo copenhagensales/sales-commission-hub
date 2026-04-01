@@ -21,9 +21,10 @@ interface MergePreview {
 }
 
 interface ProductRow {
-  id: string;
-  name: string;
-  internalName: string | null;
+  key: string; // unique display key matching main table: clientId::externalId::title
+  id: string | null; // product_id (null for unmapped)
+  name: string; // display name (adversus_product_title)
+  internalName: string | null; // product_name
   client_campaign_id: string | null;
   is_active: boolean;
 }
@@ -48,8 +49,8 @@ export function ProductMergeDialog({
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [selectedClientId, setSelectedClientId] = useState("");
   const [products, setProducts] = useState<ProductRow[]>([]);
-  const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
-  const [targetProductId, setTargetProductId] = useState("");
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const [targetKey, setTargetKey] = useState("");
   const [preview, setPreview] = useState<Record<string, MergePreview>>({});
   const [loadingClients, setLoadingClients] = useState(false);
   const [loadingProducts, setLoadingProducts] = useState(false);
@@ -62,8 +63,8 @@ export function ProductMergeDialog({
       setStep(1);
       setSelectedClientId("");
       setProducts([]);
-      setSelectedProductIds(new Set());
-      setTargetProductId("");
+      setSelectedKeys(new Set());
+      setTargetKey("");
       setPreview({});
       loadClients();
     }
@@ -100,25 +101,32 @@ export function ProductMergeDialog({
   async function loadProducts(clientId: string) {
     setLoadingProducts(true);
     try {
-      // Use the same RPC as the main table to find all products for this client
+      // Use the same RPC as the main table
       const { data: rpcData, error: rpcError } = await supabase.rpc("get_aggregated_product_types");
       if (rpcError) throw rpcError;
 
-      // Filter by selected client, deduplicate by product_id
-      const seen = new Map<string, ProductRow>();
+      // Match main table keying: clientId::adversus_external_id::adversus_product_title
+      const seenKeys = new Set<string>();
+      const result: ProductRow[] = [];
+
       for (const r of (rpcData ?? []) as any[]) {
-        if (r.client_id === clientId && r.product_id && !seen.has(r.product_id)) {
-          seen.set(r.product_id, {
-            id: r.product_id,
-            name: r.adversus_product_title ?? r.product_name ?? "Ukendt",
-            internalName: r.product_name ?? null,
-            client_campaign_id: r.product_client_campaign_id,
-            is_active: true,
-          });
-        }
+        if (r.client_id !== clientId) continue;
+
+        const productKey = `${r.adversus_external_id ?? ""}::${r.adversus_product_title ?? ""}`;
+        if (seenKeys.has(productKey)) continue;
+        seenKeys.add(productKey);
+
+        result.push({
+          key: productKey,
+          id: r.product_id ?? null,
+          name: r.adversus_product_title ?? r.product_name ?? "Ukendt",
+          internalName: r.product_name ?? null,
+          client_campaign_id: r.product_client_campaign_id,
+          is_active: true,
+        });
       }
 
-      // Also include directly campaign-assigned products (including inactive ones)
+      // Also include manually created products assigned to this client's campaigns
       const { data: campaigns } = await supabase
         .from("client_campaigns")
         .select("id")
@@ -130,19 +138,26 @@ export function ProductMergeDialog({
           .select("id, name, client_campaign_id, is_active")
           .in("client_campaign_id", campaignIds);
         for (const p of directProducts ?? []) {
-          if (!seen.has(p.id)) {
-            seen.set(p.id, {
-              id: p.id,
-              name: p.name,
-              internalName: p.name,
-              client_campaign_id: p.client_campaign_id,
-              is_active: p.is_active ?? true,
-            });
+          const manualKey = `manual::${p.id}`;
+          if (!seenKeys.has(manualKey)) {
+            // Check it's not already covered by an RPC row with same product_id
+            const alreadyCovered = result.some((r) => r.id === p.id);
+            if (!alreadyCovered) {
+              seenKeys.add(manualKey);
+              result.push({
+                key: manualKey,
+                id: p.id,
+                name: p.name,
+                internalName: p.name,
+                client_campaign_id: p.client_campaign_id,
+                is_active: p.is_active ?? true,
+              });
+            }
           }
         }
       }
 
-      setProducts(Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name, "da")));
+      setProducts(result.sort((a, b) => a.name.localeCompare(b.name, "da")));
     } catch (e) {
       console.error("Load products error:", e);
     } finally {
@@ -151,7 +166,8 @@ export function ProductMergeDialog({
   }
 
   async function loadPreview() {
-    const ids = Array.from(selectedProductIds);
+    const selected = products.filter((p) => selectedKeys.has(p.key) && p.id);
+    const ids = [...new Set(selected.map((p) => p.id!))];
     if (ids.length === 0) return;
     setLoadingPreview(true);
     try {
@@ -176,12 +192,14 @@ export function ProductMergeDialog({
     }
   }
 
-  const selectedProducts = products.filter((p) => selectedProductIds.has(p.id));
-  const sourceProducts = selectedProducts.filter((p) => p.id !== targetProductId);
+  const targetProduct = products.find((p) => p.key === targetKey);
+  const targetProductId = targetProduct?.id ?? "";
+  const selectedProducts = products.filter((p) => selectedKeys.has(p.key) && p.id);
+  const sourceProducts = selectedProducts.filter((p) => p.key !== targetKey);
 
   const totalMoved = sourceProducts.reduce(
     (acc, p) => {
-      const c = preview[p.id];
+      const c = preview[p.id!];
       if (!c) return acc;
       return {
         mappings: acc.mappings + c.adversusMappings,
@@ -196,7 +214,7 @@ export function ProductMergeDialog({
     if (step === 1 && selectedClientId) {
       loadProducts(selectedClientId);
       setStep(2);
-    } else if (step === 2 && selectedProductIds.size >= 2 && targetProductId) {
+    } else if (step === 2 && selectedKeys.size >= 2 && targetKey) {
       loadPreview();
       setStep(3);
     }
@@ -206,7 +224,7 @@ export function ProductMergeDialog({
     if (!targetProductId || sourceProducts.length === 0) return;
     setMerging(true);
     try {
-      const sourceIds = sourceProducts.map((p) => p.id);
+      const sourceIds = sourceProducts.map((p) => p.id!).filter(Boolean);
 
       const { error: e1 } = await supabase
         .from("adversus_product_mappings")
@@ -246,13 +264,13 @@ export function ProductMergeDialog({
 
       const { data: userData } = await supabase.auth.getUser();
       const historyRows = sourceProducts.map((p) => ({
-        source_product_id: p.id,
+        source_product_id: p.id!,
         target_product_id: targetProductId,
         merged_by: userData?.user?.id ?? null,
         source_product_name: p.name,
-        adversus_mappings_moved: preview[p.id]?.adversusMappings ?? 0,
-        sale_items_moved: preview[p.id]?.saleItems ?? 0,
-        pricing_rules_moved: preview[p.id]?.pricingRules ?? 0,
+        adversus_mappings_moved: preview[p.id!]?.adversusMappings ?? 0,
+        sale_items_moved: preview[p.id!]?.saleItems ?? 0,
+        pricing_rules_moved: preview[p.id!]?.pricingRules ?? 0,
       }));
 
       const { error: e7 } = await supabase
@@ -260,7 +278,7 @@ export function ProductMergeDialog({
         .insert(historyRows);
       if (e7) throw e7;
 
-      const targetName = products.find((p) => p.id === targetProductId)?.name;
+      const targetName = targetProduct?.name;
       toast.success(`${sourceProducts.length} produkter merget ind i "${targetName}"`);
       onOpenChange(false);
       onMergeComplete();
@@ -349,24 +367,26 @@ export function ProductMergeDialog({
             ) : (
               <div className="max-h-[300px] overflow-y-auto space-y-1 border rounded p-2">
                 {products.map((p) => {
-                  const isSelected = selectedProductIds.has(p.id);
-                  const isTarget = targetProductId === p.id;
+                  const isSelected = selectedKeys.has(p.key);
+                  const isTarget = targetKey === p.key;
+                  const isUnmapped = !p.id;
                   return (
                     <div
-                      key={p.id}
+                      key={p.key}
                       className={`flex items-center gap-3 px-3 py-2 rounded text-sm ${
                         isTarget ? "bg-primary/10 border border-primary/30" : isSelected ? "bg-muted/50" : ""
-                      }`}
+                      } ${isUnmapped ? "opacity-50" : ""}`}
                     >
                       <Checkbox
                         checked={isSelected}
+                        disabled={isUnmapped}
                         onCheckedChange={(checked) => {
-                          setSelectedProductIds((prev) => {
+                          setSelectedKeys((prev) => {
                             const next = new Set(prev);
-                            if (checked) next.add(p.id);
+                            if (checked) next.add(p.key);
                             else {
-                              next.delete(p.id);
-                              if (targetProductId === p.id) setTargetProductId("");
+                              next.delete(p.key);
+                              if (targetKey === p.key) setTargetKey("");
                             }
                             return next;
                           });
@@ -378,13 +398,14 @@ export function ProductMergeDialog({
                           <span className="block truncate text-xs text-muted-foreground">Internt: {p.internalName}</span>
                         )}
                       </div>
-                      {!p.is_active && <Badge variant="secondary" className="text-[10px]">Inaktiv</Badge>}
+                      {isUnmapped && <Badge variant="secondary" className="text-[10px]">Ikke mappet</Badge>}
+                      {!p.is_active && !isUnmapped && <Badge variant="secondary" className="text-[10px]">Inaktiv</Badge>}
                       {isSelected && (
                         <Button
                           variant={isTarget ? "default" : "outline"}
                           size="sm"
                           className="text-xs h-6 px-2"
-                          onClick={() => setTargetProductId(p.id)}
+                          onClick={() => setTargetKey(p.key)}
                         >
                           {isTarget ? "Target ✓" : "Vælg som target"}
                         </Button>
@@ -394,7 +415,7 @@ export function ProductMergeDialog({
                 })}
               </div>
             )}
-            {selectedProductIds.size >= 2 && !targetProductId && (
+            {selectedKeys.size >= 2 && !targetKey && (
               <p className="text-xs text-destructive">Vælg et target-produkt der skal beholdes.</p>
             )}
           </div>
@@ -405,7 +426,7 @@ export function ProductMergeDialog({
           <div className="space-y-3">
             <div>
               <p className="text-sm font-medium mb-1">
-                Target: <span className="text-primary">{products.find((p) => p.id === targetProductId)?.name}</span>
+                Target: <span className="text-primary">{targetProduct?.name}</span>
               </p>
             </div>
 
@@ -418,9 +439,9 @@ export function ProductMergeDialog({
               ) : (
                 <div className="space-y-1">
                   {sourceProducts.map((p) => {
-                    const c = preview[p.id];
+                    const c = p.id ? preview[p.id] : undefined;
                     return (
-                      <div key={p.id} className="flex items-center justify-between text-sm border rounded px-3 py-2">
+                      <div key={p.key} className="flex items-center justify-between text-sm border rounded px-3 py-2">
                         <span className="font-medium truncate max-w-[200px]">{p.name}</span>
                         <div className="flex gap-1">
                           {c && (
@@ -469,7 +490,7 @@ export function ProductMergeDialog({
                 onClick={handleNext}
                 disabled={
                   (step === 1 && !selectedClientId) ||
-                  (step === 2 && (selectedProductIds.size < 2 || !targetProductId))
+                  (step === 2 && (selectedKeys.size < 2 || !targetKey))
                 }
               >
                 Næste <ChevronRight className="h-4 w-4 ml-1" />
