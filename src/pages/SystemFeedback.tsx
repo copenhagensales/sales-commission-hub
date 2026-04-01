@@ -192,17 +192,39 @@ export default function SystemFeedback() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, status, notes }: { id: string; status: string; notes: string }) => {
+    mutationFn: async ({ id, status, notes, feedbackTitle, submittedById }: { id: string; status: string; notes: string; feedbackTitle: string; submittedById: string | null }) => {
       const { error } = await supabase
         .from("system_feedback")
         .update({ status, admin_notes: notes || null, updated_at: new Date().toISOString() })
         .eq("id", id);
       if (error) throw error;
+
+      // Fetch submitter's email to send notification
+      if (submittedById) {
+        const { data: empData } = await supabase
+          .from("employee_master_data")
+          .select("first_name, last_name, work_email, private_email")
+          .eq("id", submittedById)
+          .maybeSingle();
+
+        const email = empData?.work_email || empData?.private_email;
+        if (email) {
+          return { employeeEmail: email, employeeName: `${empData.first_name || ""} ${empData.last_name || ""}`.trim(), feedbackTitle, newStatus: status, adminNotes: notes };
+        }
+      }
+      return null;
     },
-    onSuccess: () => {
+    onSuccess: (notificationData) => {
       toast({ title: "Opdateret" });
       setSelectedFeedback(null);
       queryClient.invalidateQueries({ queryKey: ["system-feedback"] });
+
+      // Fire-and-forget notification to submitter
+      if (notificationData) {
+        supabase.functions.invoke("notify-feedback-status-change", {
+          body: notificationData,
+        }).catch((err) => console.error("Status change notification error:", err));
+      }
     },
   });
 
