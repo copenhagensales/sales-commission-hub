@@ -167,6 +167,9 @@ export function CandidateDetailDialog({
             <TabsTrigger value="history" className="data-[state=active]:bg-background">
               Historik
             </TabsTrigger>
+            <TabsTrigger value="scheduled" className="data-[state=active]:bg-background">
+              Planlagte emails
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="info" className="mt-4">
