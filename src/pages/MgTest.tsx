@@ -1671,11 +1671,24 @@ export default function MgTest() {
     }
   };
 
+  const [defaultClientId, setDefaultClientId] = useState<string>(() => {
+    return localStorage.getItem("mg-auto-assign-default-client") || "";
+  });
+
+  const handleDefaultClientChange = (value: string) => {
+    setDefaultClientId(value);
+    if (value) {
+      localStorage.setItem("mg-auto-assign-default-client", value);
+    } else {
+      localStorage.removeItem("mg-auto-assign-default-client");
+    }
+  };
+
   const autoAssignCampaigns = useMutation({
     mutationFn: async () => {
-      if (!campaignMappings || !clients) return { updated: 0 };
+      if (!campaignMappings || !clients) return { updated: 0, byName: 0, byDefault: 0 };
 
-      const updates: { mappingId: string; clientId: string }[] = [];
+      const updates: { mappingId: string; clientId: string; source: "name" | "default" }[] = [];
 
       for (const mapping of campaignMappings) {
         const existingClientId =
@@ -1685,7 +1698,9 @@ export default function MgTest() {
 
         const parsedClient = parseClientFromTitle(mapping.adversus_campaign_name, clients);
         if (parsedClient) {
-          updates.push({ mappingId: mapping.id, clientId: parsedClient.id });
+          updates.push({ mappingId: mapping.id, clientId: parsedClient.id, source: "name" });
+        } else if (defaultClientId) {
+          updates.push({ mappingId: mapping.id, clientId: defaultClientId, source: "default" });
         }
       }
 
@@ -1720,13 +1735,21 @@ export default function MgTest() {
         if (error) throw error;
       }
 
-      return { updated: updates.length };
+      const byName = updates.filter(u => u.source === "name").length;
+      const byDefault = updates.filter(u => u.source === "default").length;
+      return { updated: updates.length, byName, byDefault };
     },
-    onSuccess: ({ updated }) => {
+    onSuccess: ({ updated, byName, byDefault }) => {
       if (updated === 0) {
-        toast.success("Ingen kampagner kunne fordeles automatisk ud fra kundenavn.");
+        toast.success("Ingen kampagner kunne fordeles automatisk.");
       } else {
-        toast.success(`Fordelte ${updated} kampagner automatisk ud fra kundenavn.`);
+        const parts: string[] = [];
+        if (byName > 0) parts.push(`${byName} via navnematch`);
+        if (byDefault > 0) {
+          const clientName = clients?.find(c => c.id === defaultClientId)?.name || "standard";
+          parts.push(`${byDefault} til ${clientName}`);
+        }
+        toast.success(`Fordelte ${updated} kampagner: ${parts.join(", ")}.`);
       }
       queryClient.invalidateQueries({ queryKey: ["mg-campaign-mappings"] });
       queryClient.invalidateQueries({ queryKey: ["mg-client-campaigns"] });
