@@ -213,6 +213,12 @@ export default function MgTest() {
   // Hide products state
   const [showHiddenProducts, setShowHiddenProducts] = useState(false);
 
+  // Campaign suggestion state
+  const [suggestionsDialog, setSuggestionsDialog] = useState(false);
+  const [suggestions, setSuggestions] = useState<CampaignSuggestion[]>([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [approvingLoading, setApprovingLoading] = useState(false);
+
   // Field Inspector state
   const [inspectingCampaign, setInspectingCampaign] = useState<CampaignMapping | null>(null);
   const [inspectorFields, setInspectorFields] = useState<InspectorField[]>([]);
