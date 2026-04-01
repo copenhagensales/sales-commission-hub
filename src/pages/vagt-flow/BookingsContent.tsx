@@ -641,7 +641,6 @@ export default function BookingsContent() {
     mutationFn: async ({ bookingId, date }: {
       bookingId: string; date: string;
     }) => {
-      const dietSalaryType = salaryTypes?.find(st => st.code === "diaet");
       if (!dietSalaryType) throw new Error("Diæt lønart ikke fundet");
       const { error } = await supabase
         .from("booking_diet")
