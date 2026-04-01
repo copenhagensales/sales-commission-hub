@@ -54,10 +54,10 @@ function useCurrentEmployeeId() {
       if (!user?.id) return null;
       const { data } = await supabase
         .from("employee_master_data")
-        .select("id")
+        .select("id, first_name, last_name")
         .eq("auth_user_id", user.id)
         .maybeSingle();
-      return data?.id || null;
+      return data ? { id: data.id, name: `${data.first_name || ""} ${data.last_name || ""}`.trim() } : null;
     },
     enabled: !!user?.id,
   });
@@ -79,7 +79,9 @@ function useIsOwner() {
 export default function SystemFeedback() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { data: employeeId } = useCurrentEmployeeId();
+  const { data: currentEmployee } = useCurrentEmployeeId();
+  const employeeId = currentEmployee?.id || null;
+  const employeeName = currentEmployee?.name || "";
   const { data: isOwner } = useIsOwner();
 
   // Form state
@@ -180,7 +182,7 @@ export default function SystemFeedback() {
       toast({ title: "Tak for din indrapportering!", description: "Vi kigger på det hurtigst muligt." });
       // Fire-and-forget email notification
       supabase.functions.invoke("notify-system-feedback", {
-        body: { title, category, priority, description, affectedEmployee, systemArea },
+        body: { title, category, priority, description, affectedEmployee, systemArea, submittedBy: employeeName },
       }).catch((err) => console.error("Email notification error:", err));
       setTitle(""); setCategory("bug"); setPriority("medium");
       setAffectedEmployee(""); setSystemArea(""); setDescription("");
