@@ -54,10 +54,10 @@ function useCurrentEmployeeId() {
       if (!user?.id) return null;
       const { data } = await supabase
         .from("employee_master_data")
-        .select("id")
+        .select("id, first_name, last_name")
         .eq("auth_user_id", user.id)
         .maybeSingle();
-      return data?.id || null;
+      return data ? { id: data.id, name: `${data.first_name || ""} ${data.last_name || ""}`.trim() } : null;
     },
     enabled: !!user?.id,
   });
