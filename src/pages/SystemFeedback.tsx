@@ -537,7 +537,7 @@ export default function SystemFeedback() {
                     <div className="flex gap-2">
                       <Button
                         size="sm"
-                        onClick={() => updateMutation.mutate({ id: selectedFeedback.id, status: newStatus, notes: adminNotes })}
+                        onClick={() => updateMutation.mutate({ id: selectedFeedback.id, status: newStatus, notes: adminNotes, feedbackTitle: selectedFeedback.title, submittedById: selectedFeedback.submitted_by })}
                         disabled={updateMutation.isPending}
                       >
                         <CheckCircle2 className="h-4 w-4 mr-1" />
