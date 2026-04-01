@@ -14,7 +14,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Bug, Lightbulb, Sparkles, Upload, Image, AlertTriangle, ArrowUp, Minus, ArrowDown, Eye, Copy, CheckCircle2, UserPlus, X, Bell, Shield } from "lucide-react";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
+import { Bug, Lightbulb, Sparkles, Upload, Image, AlertTriangle, ArrowUp, Minus, ArrowDown, Eye, Copy, CheckCircle2, UserPlus, X, Bell, Shield, ChevronDown } from "lucide-react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 
