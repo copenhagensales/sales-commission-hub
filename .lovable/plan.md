@@ -1,36 +1,32 @@
 
 
-## Kør enrichment-healer for Eesy TM salg
+## Fix: Oplæringsbonus forsvinder efter tilføjelse
 
-### Problem
-De 19 Eesy TM salg mangler kontaktdata (`customer_phone` er NULL). Enrichment-healeren skal køres for at hente lead-data fra Adversus API'en via de nye CPHSalesAPI-credentials.
+### Problem identificeret
+Der er **to bugs** i `BookingsContent.tsx` relateret til `booking_diet`-tabellen:
 
-### Forudsætninger (allerede opfyldt)
-- Integrationen "Eesy TM" eksisterer med korrekte credentials (ID: `fe87f6eb-dc6a-4209-9a47-d84054381452`)
-- Enrichment-healeren matcher salg via `source`-feltet (= integrationsnavn "Eesy TM") og henter credentials via `getCredentialsByName("Eesy TM")`
-- Healeren bruger `leadId` fra `raw_payload` til at hente lead-data fra `https://api.adversus.io/v1/leads/{leadId}`
+**Bug 1 (hovedårsag):** `removeDietFromDayMutation` (linje 644-648) sletter ALLE `booking_diet`-rækker for en given booking+dato **uden at filtrere på `salary_type_id`**. Når nogen fjerner en diæt fra en dag, slettes oplæringsbonussen for samme dag også.
 
-### Trin
+```text
+// Nuværende kode (sletter ALT for booking+dato):
+.delete()
+.eq("booking_id", bookingId)
+.eq("date", date)
 
-**1. Sæt enrichment_status til "pending" for Eesy TM salg**
-- Kør UPDATE via insert-tool: sæt `enrichment_status = 'pending'` og `enrichment_attempts = 0` for alle salg med `source = 'Eesy TM'` der har `customer_phone IS NULL`
-- Dette sikrer at healeren finder dem
+// Mangler:
+.eq("salary_type_id", dietSalaryType.id)
+```
 
-**2. Kør enrichment-healer**
-- Kald `supabase.functions.invoke("enrichment-healer", { body: { provider: "adversus", turboMode: true, maxBatch: 50 } })`
-- Healeren vil:
-  - Finde salg med `enrichment_status = 'pending'`
-  - Gruppere dem under source "Eesy TM"
-  - Hente credentials for "Eesy TM" integrationen
-  - For hvert salg: hente lead-data fra Adversus API → opdatere `raw_payload` med `leadResultFields` + `leadResultData` + `customer_phone`
+**Bug 2:** `addDietToDayMutation` (linje 626) bruger `onConflict: "booking_id,employee_id,date"` (3 kolonner), men den faktiske unique constraint er på 4 kolonner: `(booking_id, employee_id, date, salary_type_id)`. Dette kan forårsage uventet opførsel ved upsert.
 
-**3. Verificer resultater**
-- Tjek at `customer_phone`, `raw_payload.leadResultFields` og `raw_payload.leadResultData` er udfyldt på de behandlede salg
+### Løsning
 
-### Hvad vi får med
-Enrichment-healeren henter alt tilgængeligt fra Adversus `/leads/{id}` endpoint:
-- Telefonnummer (→ `customer_phone`)
-- Lead result data (alle felter fra lead-formularen inkl. OPP-nummer)
-- Lead result fields (normaliseret key-value format)
-- Kontaktdata (firma, telefon, email osv.)
+**1. Fix `removeDietFromDayMutation` i `BookingsContent.tsx`**
+- Tilføj `.eq("salary_type_id", dietSalaryType.id)` til delete-kaldet, så kun diæt-rækker slettes — ikke oplæringsbonusser
+
+**2. Fix `addDietToDayMutation` i `BookingsContent.tsx`**
+- Ret `onConflict` fra `"booking_id,employee_id,date"` til `"booking_id,employee_id,date,salary_type_id"` så den matcher den faktiske unique constraint
+
+### Berørte filer
+- `src/pages/vagt-flow/BookingsContent.tsx` — 2 rettelser (linje 626 og 644-648)
 
