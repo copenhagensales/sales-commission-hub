@@ -79,7 +79,9 @@ function useIsOwner() {
 export default function SystemFeedback() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { data: employeeId } = useCurrentEmployeeId();
+  const { data: currentEmployee } = useCurrentEmployeeId();
+  const employeeId = currentEmployee?.id || null;
+  const employeeName = currentEmployee?.name || "";
   const { data: isOwner } = useIsOwner();
 
   // Form state
