@@ -193,7 +193,7 @@ export function ProductMergeDialog({
     try {
       const { data, error } = await supabase
         .from("product_pricing_rules")
-        .select("id, product_id, commission_dkk, revenue_dkk, effective_from, effective_to, is_active, priority, rule_name")
+        .select("id, product_id, commission_dkk, revenue_dkk, effective_from, effective_to, is_active, priority")
         .in("product_id", ids)
         .order("priority", { ascending: false });
       if (error) throw error;
