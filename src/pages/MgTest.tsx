@@ -221,7 +221,6 @@ export default function MgTest() {
   const [approvingLoading, setApprovingLoading] = useState(false);
 
   // Product merge state
-  const [mergeSelectedProducts, setMergeSelectedProducts] = useState<Set<string>>(new Set());
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
 
   // Field Inspector state
@@ -2115,15 +2114,13 @@ export default function MgTest() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {mergeSelectedProducts.size >= 2 && (
-                  <Button
-                    variant="outline"
-                    onClick={() => setMergeDialogOpen(true)}
-                  >
-                    <Merge className="h-4 w-4 mr-2" />
-                    Merge {mergeSelectedProducts.size} produkter
-                  </Button>
-                )}
+                <Button
+                  variant="outline"
+                  onClick={() => setMergeDialogOpen(true)}
+                >
+                  <Merge className="h-4 w-4 mr-2" />
+                  Merge produkter
+                </Button>
                 <Button onClick={() => setCreateProductDialog(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   Opret produkt
@@ -2208,26 +2205,6 @@ export default function MgTest() {
                           <Table>
                             <TableHeader>
                               <TableRow>
-                                <TableHead className="w-[3%] text-center">
-                                  <Checkbox
-                                    checked={
-                                      group.rows.filter(r => r.product?.id).length > 0 &&
-                                      group.rows.filter(r => r.product?.id).every(r => mergeSelectedProducts.has(r.product!.id))
-                                    }
-                                    onCheckedChange={(checked) => {
-                                      setMergeSelectedProducts(prev => {
-                                        const next = new Set(prev);
-                                        group.rows.forEach(r => {
-                                          if (r.product?.id) {
-                                            if (checked) next.add(r.product.id);
-                                            else next.delete(r.product.id);
-                                          }
-                                        });
-                                        return next;
-                                      });
-                                    }}
-                                  />
-                                </TableHead>
                                 <TableHead className="w-[30%]">{t("mgTest.adversusProductName")}</TableHead>
                                 <TableHead className="w-[15%]">{t("mgTest.externalId")}</TableHead>
                                 <TableHead className="w-[20%]">{t("mgTest.customer")}</TableHead>
@@ -2260,21 +2237,6 @@ export default function MgTest() {
                                 return (
                                   <>
                                     <TableRow key={row.key} className={row.product?.is_hidden ? 'opacity-50' : ''}>
-                                      <TableCell className="text-center">
-                                        {productId && (
-                                          <Checkbox
-                                            checked={mergeSelectedProducts.has(productId)}
-                                            onCheckedChange={(checked) => {
-                                              setMergeSelectedProducts(prev => {
-                                                const next = new Set(prev);
-                                                if (checked) next.add(productId);
-                                                else next.delete(productId);
-                                                return next;
-                                              });
-                                            }}
-                                          />
-                                        )}
-                                      </TableCell>
                                       <TableCell>
                                         <div className="flex flex-col">
                                           <span className="font-medium">
@@ -3688,18 +3650,7 @@ export default function MgTest() {
       <ProductMergeDialog
         open={mergeDialogOpen}
         onOpenChange={setMergeDialogOpen}
-        selectedProducts={
-          Array.from(mergeSelectedProducts).map(id => {
-            const found = aggregatedProducts.find(p => p.product?.id === id);
-            return {
-              id,
-              name: found?.product?.name || found?.adversus_product_title || "Ukendt",
-              clientCampaignId: found?.product?.client_campaign_id || null,
-            };
-          })
-        }
         onMergeComplete={() => {
-          setMergeSelectedProducts(new Set());
           queryClient.invalidateQueries({ queryKey: ["mg-aggregated-products"] });
           queryClient.invalidateQueries({ queryKey: ["mg-manual-products"] });
         }}
