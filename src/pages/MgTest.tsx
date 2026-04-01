@@ -220,6 +220,10 @@ export default function MgTest() {
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [approvingLoading, setApprovingLoading] = useState(false);
 
+  // Product merge state
+  const [mergeSelectedProducts, setMergeSelectedProducts] = useState<Set<string>>(new Set());
+  const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
+
   // Field Inspector state
   const [inspectingCampaign, setInspectingCampaign] = useState<CampaignMapping | null>(null);
   const [inspectorFields, setInspectorFields] = useState<InspectorField[]>([]);
