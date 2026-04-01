@@ -502,6 +502,18 @@ export default function Candidates() {
                 </ScrollArea>
               </CardContent>
             </Card>
+            {/* Scheduled Emails */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Mail className="h-4 w-4" />
+                  Planlagte emails
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <ScheduledEmailsList maxHeight="250px" />
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>

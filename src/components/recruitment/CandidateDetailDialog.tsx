@@ -368,6 +368,9 @@ export function CandidateDetailDialog({
               )}
             </ScrollArea>
           </TabsContent>
+          <TabsContent value="scheduled" className="mt-4">
+            <ScheduledEmailsList candidateId={candidate.id} maxHeight="400px" />
+          </TabsContent>
         </Tabs>
       </DialogContent>
     </Dialog>
