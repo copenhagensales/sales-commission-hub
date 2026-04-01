@@ -6,7 +6,7 @@ import { VagtFlowLayout } from "@/components/vagt-flow/VagtFlowLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight, MapPin, Clock, Users, Car, Utensils, CalendarDays, MessageSquare, Hotel, Package, CheckCircle2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, MapPin, Clock, Users, Car, Utensils, CalendarDays, MessageSquare, Hotel, CheckCircle2 } from "lucide-react";
 import { startOfWeek, addDays, addWeeks, format, isToday, isBefore, parseISO, getISOWeek } from "date-fns";
 import { da } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -299,13 +299,6 @@ export default function MyBookingSchedule() {
           return allDatesWithHotel[allDatesWithHotel.length - 1] === a.date;
         })() : false;
 
-        // Stands/roll-ups: use employee's own first/last assignment dates for this booking
-        const myAssignmentsForBooking = assignments
-          ?.filter((ass: any) => ass.booking_id === a.booking_id)
-          .map((ass: any) => ass.date)
-          .sort() ?? [];
-        const isFirstBookingDay = myAssignmentsForBooking[0] === a.date;
-        const isLastBookingDay = myAssignmentsForBooking[myAssignmentsForBooking.length - 1] === a.date;
 
         // Vehicle last day: check if this is the last date this vehicle is booked for this booking
         const isLastVehicleDay = vehicleForDay ? (() => {
@@ -331,8 +324,6 @@ export default function MyBookingSchedule() {
           vehicleBookingId: vehicleForDay?.id,
           diet: dietForDay,
           partners: partnersForDay.map((p: any) => p.employee?.first_name).filter(Boolean),
-          isFirstBookingDay,
-          isLastBookingDay,
           isLastVehicleDay,
           vehicleReturnConfirmed,
           hotel: hotelForBooking ? {
@@ -516,19 +507,6 @@ export default function MyBookingSchedule() {
                               )}
                             </div>
 
-                            {/* Stands/roll-ups reminders */}
-                            {a.isFirstBookingDay && (
-                              <div className="mt-1 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-green-600/10 border border-green-500/20 dark:bg-green-500/10 dark:border-green-400/20">
-                                <Package className="w-3.5 h-3.5 text-green-700 dark:text-green-300 shrink-0" />
-                                <span className="text-[11px] font-medium text-green-700 dark:text-green-300">Husk at medbringe stande og roll-ups</span>
-                              </div>
-                            )}
-                            {a.isLastBookingDay && !a.isFirstBookingDay && (
-                              <div className="mt-1 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-orange-600/10 border border-orange-500/20 dark:bg-orange-500/10 dark:border-orange-400/20">
-                                <Package className="w-3.5 h-3.5 text-orange-700 dark:text-orange-300 shrink-0" />
-                                <span className="text-[11px] font-medium text-orange-700 dark:text-orange-300">Husk at tage stande og roll-ups med hjem</span>
-                              </div>
-                            )}
 
                             {/* Vehicle return callout */}
                             {a.isLastVehicleDay && (
