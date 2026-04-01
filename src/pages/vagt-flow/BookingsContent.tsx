@@ -623,7 +623,7 @@ export default function BookingsContent() {
         created_by: user?.id || null,
       }));
       if (inserts.length === 0) throw new Error("Ingen medarbejdere tildelt denne dag");
-      const { error } = await supabase.from("booking_diet").upsert(inserts, { onConflict: "booking_id,employee_id,date" });
+      const { error } = await supabase.from("booking_diet").upsert(inserts, { onConflict: "booking_id,employee_id,date,salary_type_id" });
       if (error) throw error;
     },
     onSuccess: () => {
