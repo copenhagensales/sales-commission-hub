@@ -110,7 +110,8 @@ export function ProductMergeDialog({
         if (r.client_id === clientId && r.product_id && !seen.has(r.product_id)) {
           seen.set(r.product_id, {
             id: r.product_id,
-            name: r.product_name ?? r.adversus_product_title ?? "Ukendt",
+            name: r.adversus_product_title ?? r.product_name ?? "Ukendt",
+            internalName: r.product_name ?? null,
             client_campaign_id: r.product_client_campaign_id,
             is_active: true,
           });
