@@ -49,8 +49,8 @@ export function ProductMergeDialog({
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [selectedClientId, setSelectedClientId] = useState("");
   const [products, setProducts] = useState<ProductRow[]>([]);
-  const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
-  const [targetProductId, setTargetProductId] = useState("");
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const [targetKey, setTargetKey] = useState("");
   const [preview, setPreview] = useState<Record<string, MergePreview>>({});
   const [loadingClients, setLoadingClients] = useState(false);
   const [loadingProducts, setLoadingProducts] = useState(false);
