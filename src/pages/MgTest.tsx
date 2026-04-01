@@ -3737,6 +3737,14 @@ export default function MgTest() {
           }}
         />
       )}
+
+      <CampaignSuggestionDialog
+        open={suggestionsDialog}
+        onOpenChange={setSuggestionsDialog}
+        suggestions={suggestions}
+        onApprove={handleApproveSuggestions}
+        isApproving={approvingLoading}
+      />
     </MainLayout>
   );
 }
