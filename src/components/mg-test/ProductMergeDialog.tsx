@@ -347,6 +347,7 @@ export function ProductMergeDialog({
                         }}
                       />
                       <span className="flex-1 truncate font-medium">{p.name}</span>
+                      {!p.is_active && <Badge variant="secondary" className="text-[10px]">Inaktiv</Badge>}
                       {isSelected && (
                         <Button
                           variant={isTarget ? "default" : "outline"}
