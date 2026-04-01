@@ -1,40 +1,58 @@
 
 
-## Smart kampagne-gætning med godkendelsesflow
+## Produktmerge-funktion
 
-### Hvad bygges
-En ny "Foreslå kunder"-knap der analyserer umappede kampagner og foreslår den mest sandsynlige kunde baseret på flere signaler. Forslagene vises i en godkendelsesdialog hvor du kan acceptere/afvise hvert forslag inden tildeling.
+### Koncept
+En merge-funktion der samler flere produktvarianter (f.eks. 5 versioner af "Fri tale + 100 GB data (5G)") til ét primært produkt. Det primære produkt beholder sine priser og regler, mens de sekundære produkter peger hen til det.
 
-### Signaler (prioriteret)
+### Datamodel (ny tabel + kolonne)
 
-1. **Produktmatch** (stærkest): Slå kampagnens solgte produkter op i `sale_items` → match mod `adversus_product_mappings` → `products.client_campaign_id` → klient. Tæl antal hits per klient, vinderen med flest hits foreslås.
-2. **Navnematch**: Eksisterende `parseClientFromTitle`-logik (kampagnenavn indeholder kundenavn efter separator).
-3. **Agentoverlap**: Find hvilke agenter der sælger i kampagnen → se hvilke kunder de primært sælger for i allerede mappede kampagner.
+**Ny kolonne på `products`:**
+- `merged_into_product_id UUID REFERENCES products(id)` — NULL = selvstændigt produkt, sat = dette produkt er merget ind i et andet
 
-Hvert signal giver en score, og den klient med højest samlet score vælges. Konfidensen vises som "Høj/Medium/Lav".
+**Ny tabel `product_merge_history`** (audit log):
+- `id`, `source_product_id`, `target_product_id`, `merged_by`, `merged_at`, `adversus_mappings_moved INT`, `sale_items_moved INT`, `pricing_rules_moved INT`
+
+### Merge-logik (hvad sker ved merge)
+
+Når produkt A, B, C merges ind i produkt T (target):
+
+1. **`adversus_product_mappings`**: Alle mappings fra A/B/C peger nu på T (`UPDATE SET product_id = T`)
+2. **`sale_items`**: Alle sale_items med `product_id` = A/B/C opdateres til T
+3. **`product_pricing_rules`**: Regler fra A/B/C flyttes til T (eller slettes hvis T allerede har dem)
+4. **`cancellation_product_mappings`**: Opdater `product_id` fra A/B/C til T
+5. **`product_campaign_overrides`**: Opdater `product_id` fra A/B/C til T
+6. **Source-produkter**: Markér A/B/C med `merged_into_product_id = T` og `is_active = false`
+7. **Audit**: Indsæt rækker i `product_merge_history`
 
 ### UI-flow
 
-1. Ny knap **"Foreslå kunder"** ved siden af "Auto-fordel"
-2. Klik starter analyse af alle umappede kampagner
-3. Åbner en **dialog** med en tabel:
-   - Kampagnenavn | Foreslået kunde | Konfidens | Begrundelse | ✓/✗
-   - F.eks.: "Admill Internettjek" → Eesy TM (Høj) — "12 produkter matcher Eesy TM"
-   - Checkbox per række + "Vælg alle" for batch-godkendelse
-4. "Godkend valgte" knap tildeler kun afkrydsede forslag
+**Placering**: Produktfanen i MgTest, filtreret per kunde (som nu).
 
-### Tekniske detaljer
+1. Brugeren vælger flere produkter via checkboxes
+2. Ny knap **"Merge produkter"** aktiveres når 2+ produkter er valgt
+3. Åbner en **merge-dialog** der viser:
+   - Liste over valgte produkter med navn og antal tilknyttede sales
+   - Dropdown til at vælge **target-produkt** (hvilket produkt de andre merges ind i)
+   - Forhåndsvisning: "X adversus-mappings, Y sale_items, Z prisregler vil blive opdateret"
+4. Bekræftelsesknap udfører merge
+5. Mergede produkter forsvinder fra listen (da `is_active = false`) men kan ses via et "Vis mergede" toggle
 
-**Fil: `src/pages/MgTest.tsx`**
+### Filer der ændres
 
-- Ny state: `suggestionsDialog` (open/close), `suggestions[]` array, `selectedSuggestions` set
-- Ny async funktion `generateClientSuggestions()`:
-  1. Hent umappede kampagner (hvor `client_campaign_id IS NULL`)
-  2. For hver: hent `sale_items` via `sales.dialer_campaign_id` → match produkttitler mod `adversus_product_mappings` → opslå produkt → `client_campaign_id` → tæl klient-hits
-  3. Supplement med `parseClientFromTitle`
-  4. Returnér array af `{ campaignId, campaignName, suggestedClientId, clientName, confidence, reason, saleCount }`
-- Godkendelsesfunktion genbruger eksisterende `saveCampaignMapping`-logik
-- For at undgå N+1 queries: batch-hent alle sale_items for umappede kampagner i ét query, og brug in-memory maps til opslag
+| Fil | Ændring |
+|-----|---------|
+| **Migration SQL** | Ny kolonne `merged_into_product_id` på `products`, ny tabel `product_merge_history` |
+| **`src/components/mg-test/ProductMergeDialog.tsx`** | Ny komponent: merge-dialog med target-valg, preview og bekræftelse |
+| **`src/pages/MgTest.tsx`** | Tilføj checkbox-selection state, "Merge"-knap, og dialog-integration i produkttabellen |
 
-**Performanceoptimering**: Én samlet query henter alle `sale_items` + `adversus_product_title` for umappede kampagner, og én query henter alle `products` med `client_campaign_id`. Alt matching sker client-side i memory.
+### Sikkerhed
+- Merge kører som multiple updates i rækkefølge (ikke en DB-funktion, da vi bruger client-side Supabase)
+- Mergede produkter kan **ikke** slettes (de har historik-reference)
+- Merge er **irreversibel** i UI, men data bevares via audit-tabellen
+
+### Vigtige edge cases
+- Et produkt der allerede er merget kan ikke merges igen
+- Target-produktet skal tilhøre samme `client_campaign_id`
+- Eksisterende prisregler på source-produkter: brugeren vælger om de skal flyttes eller slettes
 
