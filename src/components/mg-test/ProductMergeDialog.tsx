@@ -264,13 +264,13 @@ export function ProductMergeDialog({
 
       const { data: userData } = await supabase.auth.getUser();
       const historyRows = sourceProducts.map((p) => ({
-        source_product_id: p.id,
+        source_product_id: p.id!,
         target_product_id: targetProductId,
         merged_by: userData?.user?.id ?? null,
         source_product_name: p.name,
-        adversus_mappings_moved: preview[p.id]?.adversusMappings ?? 0,
-        sale_items_moved: preview[p.id]?.saleItems ?? 0,
-        pricing_rules_moved: preview[p.id]?.pricingRules ?? 0,
+        adversus_mappings_moved: preview[p.id!]?.adversusMappings ?? 0,
+        sale_items_moved: preview[p.id!]?.saleItems ?? 0,
+        pricing_rules_moved: preview[p.id!]?.pricingRules ?? 0,
       }));
 
       const { error: e7 } = await supabase
