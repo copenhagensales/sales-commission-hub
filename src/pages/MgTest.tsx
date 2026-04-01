@@ -2504,32 +2504,6 @@ export default function MgTest() {
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex items-center gap-2">
-                    <Select value={defaultClientId} onValueChange={handleDefaultClientChange}>
-                      <SelectTrigger className="w-[180px] h-9 text-xs">
-                        <SelectValue placeholder="Standard kunde..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {clients?.map((client) => (
-                          <SelectItem key={client.id} value={client.id}>
-                            {client.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="hover-scale"
-                      onClick={() => autoAssignCampaigns.mutate()}
-                      disabled={autoAssignCampaigns.isPending || !campaignMappings || campaignMappings.length === 0}
-                    >
-                      {autoAssignCampaigns.isPending && (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      )}
-                      {t("mgTest.autoAssignCampaigns")}
-                    </Button>
-                  </div>
                   <Button
                     size="sm"
                     variant="outline"
