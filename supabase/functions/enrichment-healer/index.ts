@@ -111,8 +111,16 @@ async function healAdversus(
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const leadData = await response.json();
-      log(`DEBUG lead ${leadId} keys: ${JSON.stringify(Object.keys(leadData))}, status=${leadData.status}, campaignId=${leadData.campaignId}, contactData keys=${leadData.contactData ? JSON.stringify(Object.keys(leadData.contactData)) : 'none'}, resultData length=${Array.isArray(leadData.resultData) ? leadData.resultData.length : 'N/A'}, leadResultData length=${Array.isArray(leadData.leadResultData) ? leadData.leadResultData.length : 'N/A'}`);
+      const rawLeadResponse = await response.json();
+      // Adversus API may return {leads: [...]} or the lead object directly
+      let leadData = rawLeadResponse;
+      if (rawLeadResponse.leads && Array.isArray(rawLeadResponse.leads)) {
+        if (rawLeadResponse.leads.length === 0) {
+          throw new Error("API returned empty leads array");
+        }
+        leadData = rawLeadResponse.leads[0];
+      }
+      log(`Lead ${leadId} keys: ${JSON.stringify(Object.keys(leadData)).substring(0, 200)}`);
       const leadResultData = leadData.resultData || leadData.leadResultData || [];
 
       const leadResultFields: Record<string, any> = {};
