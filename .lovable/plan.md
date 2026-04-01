@@ -1,39 +1,34 @@
 
 
-## Problem: Produkter uden kampagne-tildeling mangler i merge-dialogen
+## Fix: Merge-dialog viser nu korrekte produkter for Eesy TM
 
-**220 af 454 aktive produkter** har `client_campaign_id = NULL` (inkl. 4 Eesy-produkter). Merge-dialogen filtrerer på `client_campaign_id IN (kampagne-ids)`, så disse produkter vises aldrig.
+Koden er allerede opdateret til at bruge `get_aggregated_product_types` RPC'en — samme datakilde som hovedtabellen. Problemet er at den nuværende kode stadig kan have subtile forskelle i forhold til hovedtabellen:
 
-### Fix
+1. **RPC returnerer duplikerede `product_id`'er** (f.eks. "Fri tale + fri data" og "Venta General" optræder flere gange). Den nuværende `seen`-Map deduplikerer korrekt.
+2. **RPC returnerer rækker med `product_id = NULL`** (4 rækker for Eesy TM). Disse filtreres korrekt fra med `r.product_id &&`.
+3. **Hovedtabellen viser "adversus_product_title" som primært navn**, men merge-dialogen viser `product_name` (internt navn). For bedre genkendelse bør merge-dialogen også vise `adversus_product_title` når det er tilgængeligt.
 
-**Fil: `src/components/mg-test/ProductMergeDialog.tsx`** — `loadProducts()`
+### Ændringer
 
-Ændre forespørgslen til at hente produkter i **to trin**:
-1. Produkter med `client_campaign_id` i kundens kampagner (som nu)
-2. Produkter med `client_campaign_id IS NULL` der har tilknytning til kunden via `sale_items` → `sales` → `integration` → `client_campaign`
+**Fil: `src/components/mg-test/ProductMergeDialog.tsx`**
 
-Alternativt (simplere): Hent **alle produkter** (inkl. dem uden kampagne) og vis dem i en separat sektion "Ikke-tildelte produkter" i step 2, så brugeren kan inkludere dem i merge.
+1. **Tilføj `adversus_product_title` til `ProductRow`-interfacet** så brugeren kan genkende produkterne ud fra det navn de ser i hovedtabellen.
+2. **Vis `adversus_product_title` som undertekst** i produktlisten (step 2), ligesom hovedtabellen viser "Internt produkt: ..." under adversus-titlen.
+3. **Brug `adversus_product_title` som primært visningsnavn** når det er tilgængeligt, med `product_name` som fallback — dette matcher hovedtabellens visning.
+4. **Behold den nuværende RPC + kampagne-baserede hentning** da den allerede matcher hovedtabellen korrekt for Eesy TM (alle 40 unikke produkter).
 
-**Anbefalet tilgang**: Udvid queryen til også at hente produkter uden `client_campaign_id`, og vis dem samlet i listen med en badge "Ingen kampagne". Dette matcher hovedtabellens adfærd der bruger RPC-aggregering.
+### Teknisk detalje
 
-```typescript
-// Hent kampagne-tildelte produkter
-const { data: campaignProducts } = await supabase
-  .from("products")
-  .select("id, name, client_campaign_id, is_active")
-  .in("client_campaign_id", campaignIds)
-  .order("name");
+```text
+ProductRow interface:
++ adversusTitle: string | null   // fra RPC'ens adversus_product_title
 
-// Hent produkter uden kampagne-tildeling
-const { data: unassignedProducts } = await supabase
-  .from("products")
-  .select("id, name, client_campaign_id, is_active")
-  .is("client_campaign_id", null)
-  .order("name");
+loadProducts():
+  name: r.adversus_product_title ?? r.product_name ?? "Ukendt"
+  adversusTitle: r.adversus_product_title
 
-// Kombiner begge lister
-setProducts([...(campaignProducts ?? []), ...(unassignedProducts ?? [])]);
+Step 2 UI:
+  Primært: p.name (adversus title)
+  Sekundært: "Internt: {product_name}" i lille tekst
 ```
-
-UI i step 2 viser en separator eller badge for "Ikke-tildelte" produkter så brugeren kan skelne.
 
