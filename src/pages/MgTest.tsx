@@ -2114,15 +2114,13 @@ export default function MgTest() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {mergeSelectedProducts.size >= 2 && (
-                  <Button
-                    variant="outline"
-                    onClick={() => setMergeDialogOpen(true)}
-                  >
-                    <Merge className="h-4 w-4 mr-2" />
-                    Merge {mergeSelectedProducts.size} produkter
-                  </Button>
-                )}
+                <Button
+                  variant="outline"
+                  onClick={() => setMergeDialogOpen(true)}
+                >
+                  <Merge className="h-4 w-4 mr-2" />
+                  Merge produkter
+                </Button>
                 <Button onClick={() => setCreateProductDialog(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   Opret produkt
