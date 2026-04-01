@@ -99,34 +99,47 @@ export function ProductMergeDialog({
   async function loadProducts(clientId: string) {
     setLoadingProducts(true);
     try {
-      // Get campaign IDs for this client
+      // Use the same RPC as the main table to find all products for this client
+      const { data: rpcData, error: rpcError } = await supabase.rpc("get_aggregated_product_types");
+      if (rpcError) throw rpcError;
+
+      // Filter by selected client, deduplicate by product_id
+      const seen = new Map<string, ProductRow>();
+      for (const r of (rpcData ?? []) as any[]) {
+        if (r.client_id === clientId && r.product_id && !seen.has(r.product_id)) {
+          seen.set(r.product_id, {
+            id: r.product_id,
+            name: r.product_name ?? r.adversus_product_title ?? "Ukendt",
+            client_campaign_id: r.product_client_campaign_id,
+            is_active: true,
+          });
+        }
+      }
+
+      // Also include directly campaign-assigned products (including inactive ones)
       const { data: campaigns } = await supabase
         .from("client_campaigns")
         .select("id")
         .eq("client_id", clientId);
       const campaignIds = (campaigns ?? []).map((c) => c.id);
-      if (campaignIds.length === 0) {
-        setProducts([]);
-        return;
+      if (campaignIds.length > 0) {
+        const { data: directProducts } = await supabase
+          .from("products")
+          .select("id, name, client_campaign_id, is_active")
+          .in("client_campaign_id", campaignIds);
+        for (const p of directProducts ?? []) {
+          if (!seen.has(p.id)) {
+            seen.set(p.id, {
+              id: p.id,
+              name: p.name,
+              client_campaign_id: p.client_campaign_id,
+              is_active: p.is_active ?? true,
+            });
+          }
+        }
       }
 
-      // Fetch campaign-assigned products AND unassigned products in parallel
-      const [campaignRes, unassignedRes] = await Promise.all([
-        supabase
-          .from("products")
-          .select("id, name, client_campaign_id, is_active")
-          .in("client_campaign_id", campaignIds)
-          .order("name"),
-        supabase
-          .from("products")
-          .select("id, name, client_campaign_id, is_active")
-          .is("client_campaign_id", null)
-          .order("name"),
-      ]);
-      if (campaignRes.error) throw campaignRes.error;
-      if (unassignedRes.error) throw unassignedRes.error;
-      const all = [...(campaignRes.data ?? []), ...(unassignedRes.data ?? [])];
-      setProducts(all.map((p) => ({ id: p.id, name: p.name, client_campaign_id: p.client_campaign_id, is_active: p.is_active ?? true })));
+      setProducts(Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name, "da")));
     } catch (e) {
       console.error("Load products error:", e);
     } finally {
