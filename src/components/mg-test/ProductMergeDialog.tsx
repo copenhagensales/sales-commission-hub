@@ -113,10 +113,9 @@ export function ProductMergeDialog({
         .from("products")
         .select("id, name, client_campaign_id, is_active")
         .in("client_campaign_id", campaignIds)
-        .eq("is_active", true)
         .order("name");
       if (error) throw error;
-      setProducts((data ?? []).map((p) => ({ id: p.id, name: p.name, client_campaign_id: p.client_campaign_id })));
+      setProducts((data ?? []).map((p) => ({ id: p.id, name: p.name, client_campaign_id: p.client_campaign_id, is_active: p.is_active ?? true })));
     } catch (e) {
       console.error("Load products error:", e);
     } finally {
