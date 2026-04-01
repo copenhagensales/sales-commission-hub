@@ -6,7 +6,7 @@ import { VagtFlowLayout } from "@/components/vagt-flow/VagtFlowLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight, MapPin, Clock, Users, Car, Utensils, CalendarDays, MessageSquare, Hotel, Package, CheckCircle2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, MapPin, Clock, Users, Car, Utensils, CalendarDays, MessageSquare, Hotel, CheckCircle2 } from "lucide-react";
 import { startOfWeek, addDays, addWeeks, format, isToday, isBefore, parseISO, getISOWeek } from "date-fns";
 import { da } from "date-fns/locale";
 import { cn } from "@/lib/utils";
