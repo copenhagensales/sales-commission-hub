@@ -439,9 +439,9 @@ export function ProductMergeDialog({
               ) : (
                 <div className="space-y-1">
                   {sourceProducts.map((p) => {
-                    const c = preview[p.id];
+                    const c = p.id ? preview[p.id] : undefined;
                     return (
-                      <div key={p.id} className="flex items-center justify-between text-sm border rounded px-3 py-2">
+                      <div key={p.key} className="flex items-center justify-between text-sm border rounded px-3 py-2">
                         <span className="font-medium truncate max-w-[200px]">{p.name}</span>
                         <div className="flex gap-1">
                           {c && (
