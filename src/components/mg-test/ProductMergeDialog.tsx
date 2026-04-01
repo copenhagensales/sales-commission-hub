@@ -278,7 +278,7 @@ export function ProductMergeDialog({
         .insert(historyRows);
       if (e7) throw e7;
 
-      const targetName = products.find((p) => p.id === targetProductId)?.name;
+      const targetName = targetProduct?.name;
       toast.success(`${sourceProducts.length} produkter merget ind i "${targetName}"`);
       onOpenChange(false);
       onMergeComplete();
