@@ -120,7 +120,7 @@ async function healAdversus(
         }
         leadData = rawLeadResponse.leads[0];
       }
-      log(`Lead ${leadId} keys: ${JSON.stringify(Object.keys(leadData)).substring(0, 200)}`);
+      
       const leadResultData = leadData.resultData || leadData.leadResultData || [];
 
       const leadResultFields: Record<string, any> = {};
