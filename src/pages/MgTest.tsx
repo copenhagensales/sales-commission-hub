@@ -1752,7 +1752,7 @@ export default function MgTest() {
     }
   };
 
-
+  const autoAssignCampaigns = useMutation({
     mutationFn: async () => {
       if (!campaignMappings || !clients) return { updated: 0, byName: 0, byDefault: 0 };
 
