@@ -166,7 +166,8 @@ export function ProductMergeDialog({
   }
 
   async function loadPreview() {
-    const ids = Array.from(selectedProductIds);
+    const selected = products.filter((p) => selectedKeys.has(p.key) && p.id);
+    const ids = [...new Set(selected.map((p) => p.id!))];
     if (ids.length === 0) return;
     setLoadingPreview(true);
     try {
@@ -191,12 +192,14 @@ export function ProductMergeDialog({
     }
   }
 
-  const selectedProducts = products.filter((p) => selectedProductIds.has(p.id));
-  const sourceProducts = selectedProducts.filter((p) => p.id !== targetProductId);
+  const targetProduct = products.find((p) => p.key === targetKey);
+  const targetProductId = targetProduct?.id ?? "";
+  const selectedProducts = products.filter((p) => selectedKeys.has(p.key) && p.id);
+  const sourceProducts = selectedProducts.filter((p) => p.key !== targetKey);
 
   const totalMoved = sourceProducts.reduce(
     (acc, p) => {
-      const c = preview[p.id];
+      const c = preview[p.id!];
       if (!c) return acc;
       return {
         mappings: acc.mappings + c.adversusMappings,
