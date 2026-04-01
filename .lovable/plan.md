@@ -1,56 +1,62 @@
 
+## Konsolideret plan: Merge Wizard + Post-Merge Visning + Systemdækkende Filter
 
-## Redesign af Merge Wizard: Prisregler og produktnavn
+Planen dækker **tre dele** — del 1 (wizard redesign) er allerede implementeret. Del 2 og 3 skal bygges nu.
 
-### Ny wizard-flow (4 trin)
+---
 
-```text
-Trin 1: Vælg kunde          (uændret)
-Trin 2: Vælg produkter      (fjern target-valg, kun checkboxes)
-Trin 3: Administrer regler   (NYT - vis alle pricing rules)
-Trin 4: Navngiv produkt      (NYT - skriv/vælg produktnavn + bekræft)
-```
+### Del 1: Merge Wizard (DONE)
+4-trins wizard med prisregeladministration og produktnavngivning — allerede implementeret i `ProductMergeDialog.tsx`.
 
-### Trin 3 — Administrer prisregler
+---
 
-Henter alle `product_pricing_rules` for de valgte produkter og viser dem grupperet per produkt:
+### Del 2: Post-Merge Produktvisning — Sammensatte produkter med til/frakobling
 
-| Produkt | Regel | Provision | Revenue | Handling |
-|---------|-------|-----------|---------|----------|
-| Fri tale + 100GB | (regel 1) | 275 kr | 750 kr | Behold / Sæt slutdato / Slet |
+#### `src/pages/MgTest.tsx`
+- Tilføj query for merged children: `products WHERE merged_into_product_id IS NOT NULL`, grupperet i `Map<targetId, children[]>`
+- Filtrer child-produkter væk fra `aggregatedProducts` (skip hvis product.id findes i children-sættet)
+- Vis `GitMerge`-ikon + badge med child-count på parent-produkter
+- Klik toggler expanderbar `MergedProductChildren`-komponent under rækken
+- State: `expandedMergeProducts: Set<string>`
 
-Hver regel får tre valgmuligheder:
-- **Behold** — reglen overføres til det nye produkt uændret
-- **Sæt slutdato** — reglen beholdes men får en `effective_to`-dato (datepicker vises)
-- **Slet** — reglen fjernes ved merge
+#### `src/components/mg-test/MergedProductChildren.tsx` (ny)
+- Props: `targetProductId`, `clientCampaignId`
+- Query: `products WHERE merged_into_product_id = targetId`
+- Per child: navn, external_product_code, "Frakobl"-knap
+- **Frakobl**: `update products SET merged_into_product_id = null, is_active = true WHERE id = childId`
+- **Tilkobl**: dropdown med produkter fra samme kunde (`.is("merged_into_product_id", null).eq("is_active", true)`) → sæt `merged_into_product_id = targetId, is_active = false`, flyt `adversus_product_mappings` og `sale_items` til target
+- Invalidér relevante queries efter mutation
 
-Regler der allerede har `effective_to` vises med datoen og kan ændres.
+---
 
-### Trin 4 — Navngiv produkt
+### Del 3: Systemdækkende filter — Merged children skjules overalt
 
-- Et tekstfelt til at skrive nyt produktnavn
-- En dropdown med de valgte produkters navne som hurtigvalg
-- Opsummering: antal regler der beholdes/afsluttes/slettes, antal sales og mappings der flyttes
+Tilføj `.is("merged_into_product_id", null)` til produkt-queries i:
 
-### Merge-logik (ændringer)
+| Fil | Kontekst |
+|-----|----------|
+| `src/pages/vagt-flow/SalesRegistration.tsx` | Produktvalg ved salgsregistrering |
+| `src/pages/vagt-flow/EditSalesRegistrations.tsx` | Produktliste ved redigering |
+| `src/components/cancellations/AddProductSection.tsx` | Tilføj produkt til opsigelse |
+| `src/components/cancellations/SellerMappingTab.tsx` | Produktliste til sælger-mapping |
+| `src/components/cancellations/ApprovalQueueTab.tsx` | Produktliste i approval queue |
+| `src/pages/MgTest.tsx` manualProducts query | Skjul children i manuelt tilføjede produkter |
+| `supabase/functions/sync-adversus/index.ts` | Product-matching ved sync, så nye salg mappes til target |
 
-Nuværende flow sletter kilde-regler og beholder targets. Ny flow:
-1. Opret nyt produkt (eller genbrug et eksisterende ID) med det valgte navn
-2. Flyt alle `adversus_product_mappings`, `sale_items`, `cancellation_product_mappings`, `product_campaign_overrides` til det nye produkt
-3. For regler markeret "Behold": opdater `product_id` til nyt produkt
-4. For regler markeret "Slutdato": opdater `product_id` + sæt `effective_to`
-5. For regler markeret "Slet": slet reglen
-6. Deaktiver alle kilde-produkter med `merged_into_product_id`
+#### Ingen ændring nødvendig i:
+- `pricing-service.ts` — henter per product_id, sale_items peger allerede på target
+- `rematch-pricing-rules` — opererer på eksisterende product_ids
+- Dashboards/rapporter — aggregerer på `sale_items.product_id` som allerede er flyttet
 
-### Tekniske detaljer
+---
 
-**Fil: `src/components/mg-test/ProductMergeDialog.tsx`**
-
-- Ny interface `RuleAction = { ruleId: string; action: 'keep' | 'end' | 'delete'; endDate?: string }`
-- Ny state: `ruleActions: Map<string, RuleAction>`, `mergedProductName: string`
-- Fjern `targetKey`/`targetProduct` state og logik
-- Step 2: Fjern "Vælg som target"-knap, kræv kun min. 2 valgte
-- Step 3: Fetch og vis pricing rules med action-valg per regel
-- Step 4: Produktnavn-input + opsummering
-- `handleMerge()`: Opret/genbrug produkt, håndter regler efter brugerens valg
-
+### Filer der ændres (del 2+3)
+1. `src/pages/MgTest.tsx` — children query, filtrering, merge-ikon, expanderbar sektion
+2. `src/components/mg-test/MergedProductChildren.tsx` (ny) — child-liste med frakobl/tilkobl
+3. `src/pages/vagt-flow/SalesRegistration.tsx` — merged-filter
+4. `src/pages/vagt-flow/EditSalesRegistrations.tsx` — merged-filter
+5. `src/components/cancellations/AddProductSection.tsx` — merged-filter
+6. `src/components/cancellations/SellerMappingTab.tsx` — merged-filter
+7. `src/components/cancellations/ApprovalQueueTab.tsx` — merged-filter
+8. `supabase/functions/sync-adversus/index.ts` — merged-filter ved product-matching
+9. `.lovable/plan.md` — opdatér med konsolideret plan
