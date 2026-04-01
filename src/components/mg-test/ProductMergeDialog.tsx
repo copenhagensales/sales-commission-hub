@@ -134,6 +134,7 @@ export function ProductMergeDialog({
             seen.set(p.id, {
               id: p.id,
               name: p.name,
+              internalName: p.name,
               client_campaign_id: p.client_campaign_id,
               is_active: p.is_active ?? true,
             });
