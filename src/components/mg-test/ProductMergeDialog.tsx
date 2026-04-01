@@ -23,6 +23,7 @@ interface MergePreview {
 interface ProductRow {
   id: string;
   name: string;
+  internalName: string | null;
   client_campaign_id: string | null;
   is_active: boolean;
 }
