@@ -112,6 +112,7 @@ async function healAdversus(
       }
 
       const leadData = await response.json();
+      log(`DEBUG lead ${leadId} keys: ${JSON.stringify(Object.keys(leadData))}, status=${leadData.status}, campaignId=${leadData.campaignId}, contactData keys=${leadData.contactData ? JSON.stringify(Object.keys(leadData.contactData)) : 'none'}, resultData length=${Array.isArray(leadData.resultData) ? leadData.resultData.length : 'N/A'}, leadResultData length=${Array.isArray(leadData.leadResultData) ? leadData.leadResultData.length : 'N/A'}`);
       const leadResultData = leadData.resultData || leadData.leadResultData || [];
 
       const leadResultFields: Record<string, any> = {};
