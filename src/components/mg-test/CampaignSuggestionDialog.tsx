@@ -307,35 +307,35 @@ export async function generateClientSuggestions(
   }
 
   // Signal 3: Agent overlap — which agents sell in this campaign and which clients do they usually sell for?
-  // Get agent_id -> campaign pairs from sales for mapped campaigns
+  // Use agent_external_id as agent identifier
   const { data: agentSalesData } = await supabase
     .from("sales")
-    .select("agent_id, client_campaign_id")
+    .select("agent_external_id, client_campaign_id")
     .not("client_campaign_id", "is", null)
-    .not("agent_id", "is", null);
+    .not("agent_external_id", "is", null);
 
-  const agentClientCounts = new Map<string, Map<string, number>>(); // agent_id -> { clientId -> count }
-  agentSalesData?.forEach((s) => {
-    if (!s.agent_id || !s.client_campaign_id) return;
+  const agentClientCounts = new Map<string, Map<string, number>>();
+  agentSalesData?.forEach((s: any) => {
+    if (!s.agent_external_id || !s.client_campaign_id) return;
     const clientId = clientCampaignToClient.get(s.client_campaign_id);
     if (!clientId) return;
-    if (!agentClientCounts.has(s.agent_id)) agentClientCounts.set(s.agent_id, new Map());
-    const m = agentClientCounts.get(s.agent_id)!;
+    if (!agentClientCounts.has(s.agent_external_id)) agentClientCounts.set(s.agent_external_id, new Map());
+    const m = agentClientCounts.get(s.agent_external_id)!;
     m.set(clientId, (m.get(clientId) || 0) + 1);
   });
 
   // Get agents per unmapped campaign
   const { data: unmappedAgentSales } = await supabase
     .from("sales")
-    .select("agent_id, dialer_campaign_id")
+    .select("agent_external_id, dialer_campaign_id")
     .in("dialer_campaign_id", unmappedCampaignIds)
-    .not("agent_id", "is", null);
+    .not("agent_external_id", "is", null);
 
   const agentsByCampaign = new Map<string, Set<string>>();
-  unmappedAgentSales?.forEach((s) => {
-    if (!s.dialer_campaign_id || !s.agent_id) return;
+  (unmappedAgentSales as any[])?.forEach((s) => {
+    if (!s.dialer_campaign_id || !s.agent_external_id) return;
     if (!agentsByCampaign.has(s.dialer_campaign_id)) agentsByCampaign.set(s.dialer_campaign_id, new Set());
-    agentsByCampaign.get(s.dialer_campaign_id)!.add(s.agent_id);
+    agentsByCampaign.get(s.dialer_campaign_id)!.add(s.agent_external_id);
   });
 
   // Now score each unmapped campaign
