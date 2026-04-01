@@ -422,55 +422,119 @@ export default function SystemFeedback() {
             <CardContent>
               {isLoading ? (
                 <p className="text-muted-foreground text-center py-8">Indlæser...</p>
-              ) : feedbackList.length === 0 ? (
+              ) : activeFeedback.length === 0 && resolvedFeedback.length === 0 ? (
                 <p className="text-muted-foreground text-center py-8">Ingen indrapporteringer endnu</p>
               ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Titel</TableHead>
-                        <TableHead>Kategori</TableHead>
-                        <TableHead>Prioritet</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Indsendt af</TableHead>
-                        <TableHead>Dato</TableHead>
-                        <TableHead></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {feedbackList.map((fb: any) => (
-                        <TableRow key={fb.id} className="cursor-pointer hover:bg-muted/30" onClick={() => {
-                          setSelectedFeedback(fb);
-                          setAdminNotes(fb.admin_notes || "");
-                          setNewStatus(fb.status);
-                        }}>
-                          <TableCell className="font-medium max-w-[200px] truncate">{fb.title}</TableCell>
-                          <TableCell>{getCategoryLabel(fb.category)}</TableCell>
-                          <TableCell>{getPriorityBadge(fb.priority)}</TableCell>
-                          <TableCell>{getStatusBadge(fb.status)}</TableCell>
-                          <TableCell className="text-sm">
-                            {fb.submitted_by_employee
-                              ? `${fb.submitted_by_employee.first_name} ${fb.submitted_by_employee.last_name}`
-                              : "Ukendt"}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {format(new Date(fb.created_at), "d. MMM yyyy", { locale: da })}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-1">
-                              {fb.screenshot_url && <Image className="h-4 w-4 text-muted-foreground" />}
-                              {isOwner && (
-                                <button onClick={e => { e.stopPropagation(); copyForLovable(fb); }} title="Kopiér til Lovable">
-                                  <Copy className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-                                </button>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                <div className="space-y-6">
+                  {activeFeedback.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-4">Ingen aktive opgaver</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Titel</TableHead>
+                            <TableHead>Kategori</TableHead>
+                            <TableHead>Prioritet</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Indsendt af</TableHead>
+                            <TableHead>Dato</TableHead>
+                            <TableHead></TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {activeFeedback.map((fb: any) => (
+                            <TableRow key={fb.id} className="cursor-pointer hover:bg-muted/30" onClick={() => {
+                              setSelectedFeedback(fb);
+                              setAdminNotes(fb.admin_notes || "");
+                              setNewStatus(fb.status);
+                            }}>
+                              <TableCell className="font-medium max-w-[200px] truncate">{fb.title}</TableCell>
+                              <TableCell>{getCategoryLabel(fb.category)}</TableCell>
+                              <TableCell>{getPriorityBadge(fb.priority)}</TableCell>
+                              <TableCell>{getStatusBadge(fb.status)}</TableCell>
+                              <TableCell className="text-sm">
+                                {fb.submitted_by_employee
+                                  ? `${fb.submitted_by_employee.first_name} ${fb.submitted_by_employee.last_name}`
+                                  : "Ukendt"}
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {format(new Date(fb.created_at), "d. MMM yyyy", { locale: da })}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex gap-1">
+                                  {fb.screenshot_url && <Image className="h-4 w-4 text-muted-foreground" />}
+                                  {isOwner && (
+                                    <button onClick={e => { e.stopPropagation(); copyForLovable(fb); }} title="Kopiér til Lovable">
+                                      <Copy className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                                    </button>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+
+                  {resolvedFeedback.length > 0 && (
+                    <Collapsible>
+                      <CollapsibleTrigger className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors group w-full">
+                        <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180" />
+                        Vis løste opgaver ({resolvedFeedback.length})
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="mt-3">
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Titel</TableHead>
+                                <TableHead>Kategori</TableHead>
+                                <TableHead>Prioritet</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Indsendt af</TableHead>
+                                <TableHead>Dato</TableHead>
+                                <TableHead></TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {resolvedFeedback.map((fb: any) => (
+                                <TableRow key={fb.id} className="cursor-pointer hover:bg-muted/30 opacity-60" onClick={() => {
+                                  setSelectedFeedback(fb);
+                                  setAdminNotes(fb.admin_notes || "");
+                                  setNewStatus(fb.status);
+                                }}>
+                                  <TableCell className="font-medium max-w-[200px] truncate">{fb.title}</TableCell>
+                                  <TableCell>{getCategoryLabel(fb.category)}</TableCell>
+                                  <TableCell>{getPriorityBadge(fb.priority)}</TableCell>
+                                  <TableCell>{getStatusBadge(fb.status)}</TableCell>
+                                  <TableCell className="text-sm">
+                                    {fb.submitted_by_employee
+                                      ? `${fb.submitted_by_employee.first_name} ${fb.submitted_by_employee.last_name}`
+                                      : "Ukendt"}
+                                  </TableCell>
+                                  <TableCell className="text-sm text-muted-foreground">
+                                    {format(new Date(fb.created_at), "d. MMM yyyy", { locale: da })}
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex gap-1">
+                                      {fb.screenshot_url && <Image className="h-4 w-4 text-muted-foreground" />}
+                                      {isOwner && (
+                                        <button onClick={e => { e.stopPropagation(); copyForLovable(fb); }} title="Kopiér til Lovable">
+                                          <Copy className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                                        </button>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  )}
                 </div>
               )}
             </CardContent>
