@@ -1,17 +1,21 @@
 
 
-## Fjern stande/roll-ups påmindelser fra "Min kalender"
+## Skjul løste opgaver fra hovedlisten — vis i fold-ud sektion
 
 ### Problem
-Sælgerne får vist påmindelser om at medbringe og tage stande/roll-ups med hjem i deres kalender. Denne funktion skal fjernes helt.
+Opgaver med status "resolved" og "wont_fix" vises stadig i hovedlisten, selvom de er færdige.
 
-### Ændring
+### Løsning
+**Fil: `src/pages/SystemFeedback.tsx`**
 
-**Fil: `src/pages/vagt-flow/MyBookingSchedule.tsx`**
+1. **Split feedbackList** i to: `activeFeedback` (status != resolved/wont_fix) og `resolvedFeedback` (status == resolved/wont_fix)
+2. **Vis kun `activeFeedback`** i hovedtabellen
+3. **Tilføj en `Collapsible`-sektion** under tabellen med tekst "Vis løste opgaver (X)" der folder `resolvedFeedback` ud i en tilsvarende tabel
+4. **Filtre respekteres stadig** — hvis brugeren vælger status "resolved" i filteret, vises de i hovedlisten som normalt (filteret overrider)
 
-1. **Fjern render-blokken** (linje 519-531) — de to conditional divs der viser "Husk at medbringe stande og roll-ups" og "Husk at tage stande og roll-ups med hjem"
-
-2. **Fjern beregningen** af `isFirstBookingDay` og `isLastBookingDay` (linje 305-308, 334-335) samt fjern dem fra det mappede objekt, da de ikke bruges andre steder
-
-3. **Fjern `Package`-ikonet** fra imports hvis det ikke bruges andetsteds i filen
+### Tekniske detaljer
+- Import `Collapsible`, `CollapsibleTrigger`, `CollapsibleContent` fra `@/components/ui/collapsible`
+- Import `ChevronDown` ikon til fold-ud knappen
+- `useMemo` til at splitte listen: resolved/wont_fix vs. resten
+- Når `filterStatus` er sat til "resolved" eller "wont_fix", vises alt i hovedtabellen (ingen split)
 
