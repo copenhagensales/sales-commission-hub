@@ -63,8 +63,8 @@ export function ProductMergeDialog({
       setStep(1);
       setSelectedClientId("");
       setProducts([]);
-      setSelectedProductIds(new Set());
-      setTargetProductId("");
+      setSelectedKeys(new Set());
+      setTargetKey("");
       setPreview({});
       loadClients();
     }
