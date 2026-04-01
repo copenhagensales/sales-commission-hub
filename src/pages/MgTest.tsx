@@ -221,7 +221,6 @@ export default function MgTest() {
   const [approvingLoading, setApprovingLoading] = useState(false);
 
   // Product merge state
-  const [mergeSelectedProducts, setMergeSelectedProducts] = useState<Set<string>>(new Set());
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
 
   // Field Inspector state
