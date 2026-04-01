@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
@@ -64,6 +65,7 @@ export function ProductMergeDialog({
   onOpenChange,
   onMergeComplete,
 }: ProductMergeDialogProps) {
+  const queryClient = useQueryClient();
   const [step, setStep] = useState(1);
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [selectedClientId, setSelectedClientId] = useState("");
@@ -378,6 +380,35 @@ export function ProductMergeDialog({
           .insert(historyRows);
         if (e7) throw e7;
       }
+
+      // Trigger rematch to recalculate mapped_commission/mapped_revenue for all affected sale_items
+      toast.info("Genberegner provisioner for mergede salg...");
+      try {
+        const rematchResponse = await supabase.functions.invoke("rematch-pricing-rules", {
+          body: { product_id: targetId, dry_run: false },
+        });
+        if (rematchResponse.error) {
+          console.error("Rematch error:", rematchResponse.error);
+          toast.warning("Merge gennemført, men prisgenberegning fejlede. Kør rematch manuelt.");
+        } else {
+          const stats = rematchResponse.data?.stats;
+          if (stats?.updated > 0) {
+            toast.success(`${stats.updated} salg genberegnet med nye priser`);
+          }
+        }
+      } catch (rematchErr) {
+        console.error("Rematch call error:", rematchErr);
+        toast.warning("Merge gennemført, men prisgenberegning fejlede.");
+      }
+
+      // Invalidate all relevant caches so dashboards/reports refresh
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["sales"] });
+      queryClient.invalidateQueries({ queryKey: ["sale_items"] });
+      queryClient.invalidateQueries({ queryKey: ["pricing-rules"] });
+      queryClient.invalidateQueries({ queryKey: ["sales-aggregates"] });
+      queryClient.invalidateQueries({ queryKey: ["kpi"] });
+      queryClient.invalidateQueries({ queryKey: ["aggregated-product-types"] });
 
       toast.success(`${selectedProducts.length} produkter merget til "${mergedProductName.trim()}"`);
       onOpenChange(false);
