@@ -229,6 +229,24 @@ export default function SystemFeedback() {
     },
   });
 
+  const isFilteringResolved = filterStatus === "resolved" || filterStatus === "wont_fix";
+
+  const { activeFeedback, resolvedFeedback } = useMemo(() => {
+    if (isFilteringResolved) {
+      return { activeFeedback: feedbackList, resolvedFeedback: [] };
+    }
+    const active: any[] = [];
+    const resolved: any[] = [];
+    for (const fb of feedbackList) {
+      if (fb.status === "resolved" || fb.status === "wont_fix") {
+        resolved.push(fb);
+      } else {
+        active.push(fb);
+      }
+    }
+    return { activeFeedback: active, resolvedFeedback: resolved };
+  }, [feedbackList, isFilteringResolved]);
+
   const copyForLovable = (fb: any) => {
     const text = [
       `## ${fb.title}`,
