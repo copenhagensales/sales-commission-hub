@@ -367,24 +367,26 @@ export function ProductMergeDialog({
             ) : (
               <div className="max-h-[300px] overflow-y-auto space-y-1 border rounded p-2">
                 {products.map((p) => {
-                  const isSelected = selectedProductIds.has(p.id);
-                  const isTarget = targetProductId === p.id;
+                  const isSelected = selectedKeys.has(p.key);
+                  const isTarget = targetKey === p.key;
+                  const isUnmapped = !p.id;
                   return (
                     <div
-                      key={p.id}
+                      key={p.key}
                       className={`flex items-center gap-3 px-3 py-2 rounded text-sm ${
                         isTarget ? "bg-primary/10 border border-primary/30" : isSelected ? "bg-muted/50" : ""
-                      }`}
+                      } ${isUnmapped ? "opacity-50" : ""}`}
                     >
                       <Checkbox
                         checked={isSelected}
+                        disabled={isUnmapped}
                         onCheckedChange={(checked) => {
-                          setSelectedProductIds((prev) => {
+                          setSelectedKeys((prev) => {
                             const next = new Set(prev);
-                            if (checked) next.add(p.id);
+                            if (checked) next.add(p.key);
                             else {
-                              next.delete(p.id);
-                              if (targetProductId === p.id) setTargetProductId("");
+                              next.delete(p.key);
+                              if (targetKey === p.key) setTargetKey("");
                             }
                             return next;
                           });
@@ -396,13 +398,14 @@ export function ProductMergeDialog({
                           <span className="block truncate text-xs text-muted-foreground">Internt: {p.internalName}</span>
                         )}
                       </div>
-                      {!p.is_active && <Badge variant="secondary" className="text-[10px]">Inaktiv</Badge>}
+                      {isUnmapped && <Badge variant="secondary" className="text-[10px]">Ikke mappet</Badge>}
+                      {!p.is_active && !isUnmapped && <Badge variant="secondary" className="text-[10px]">Inaktiv</Badge>}
                       {isSelected && (
                         <Button
                           variant={isTarget ? "default" : "outline"}
                           size="sm"
                           className="text-xs h-6 px-2"
-                          onClick={() => setTargetProductId(p.id)}
+                          onClick={() => setTargetKey(p.key)}
                         >
                           {isTarget ? "Target ✓" : "Vælg som target"}
                         </Button>
@@ -412,7 +415,7 @@ export function ProductMergeDialog({
                 })}
               </div>
             )}
-            {selectedProductIds.size >= 2 && !targetProductId && (
+            {selectedKeys.size >= 2 && !targetKey && (
               <p className="text-xs text-destructive">Vælg et target-produkt der skal beholdes.</p>
             )}
           </div>
