@@ -182,7 +182,7 @@ export default function SystemFeedback() {
       toast({ title: "Tak for din indrapportering!", description: "Vi kigger på det hurtigst muligt." });
       // Fire-and-forget email notification
       supabase.functions.invoke("notify-system-feedback", {
-        body: { title, category, priority, description, affectedEmployee, systemArea },
+        body: { title, category, priority, description, affectedEmployee, systemArea, submittedBy: employeeName },
       }).catch((err) => console.error("Email notification error:", err));
       setTitle(""); setCategory("bug"); setPriority("medium");
       setAffectedEmployee(""); setSystemArea(""); setDescription("");
