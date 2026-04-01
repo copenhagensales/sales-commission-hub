@@ -27,6 +27,7 @@ import ClientSalesOverviewContent from "@/pages/ClientSalesOverview";
 // ProductCampaignOverrides removed - functionality merged into pricing rules
 import { ProductPriceEditDialog } from "@/components/mg-test/ProductPriceEditDialog";
 import { DataMappingTab } from "@/components/mg-test/DataMappingTab";
+import { CampaignSuggestionDialog, generateClientSuggestions, type CampaignSuggestion } from "@/components/mg-test/CampaignSuggestionDialog";
 import { ProductPricingRulesDialog } from "@/components/mg-test/ProductPricingRulesDialog";
 
 interface InspectorField {
