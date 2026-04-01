@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
@@ -8,23 +9,41 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Merge, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Loader2, Merge, AlertTriangle, ChevronLeft, ChevronRight, CalendarIcon } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
-interface MergePreview {
-  adversusMappings: number;
-  saleItems: number;
-  pricingRules: number;
+interface PricingRule {
+  id: string;
+  product_id: string;
+  productName: string;
+  commission_dkk: number | null;
+  revenue_dkk: number | null;
+  effective_from: string | null;
+  effective_to: string | null;
+  is_active: boolean;
+  priority: number | null;
+  rule_name: string | null;
+}
+
+type RuleActionType = "keep" | "end" | "delete";
+
+interface RuleAction {
+  action: RuleActionType;
+  endDate?: string;
 }
 
 interface ProductRow {
-  key: string; // unique display key matching main table: clientId::externalId::title
-  id: string | null; // product_id (null for unmapped)
-  name: string; // display name (adversus_product_title)
-  internalName: string | null; // product_name
+  key: string;
+  id: string | null;
+  name: string;
+  internalName: string | null;
   client_campaign_id: string | null;
   is_active: boolean;
 }
@@ -50,12 +69,17 @@ export function ProductMergeDialog({
   const [selectedClientId, setSelectedClientId] = useState("");
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
-  const [targetKey, setTargetKey] = useState("");
-  const [preview, setPreview] = useState<Record<string, MergePreview>>({});
   const [loadingClients, setLoadingClients] = useState(false);
   const [loadingProducts, setLoadingProducts] = useState(false);
-  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [loadingRules, setLoadingRules] = useState(false);
   const [merging, setMerging] = useState(false);
+
+  // Step 3: Pricing rules
+  const [pricingRules, setPricingRules] = useState<PricingRule[]>([]);
+  const [ruleActions, setRuleActions] = useState<Map<string, RuleAction>>(new Map());
+
+  // Step 4: Product name
+  const [mergedProductName, setMergedProductName] = useState("");
 
   // Reset on open
   useEffect(() => {
@@ -64,8 +88,9 @@ export function ProductMergeDialog({
       setSelectedClientId("");
       setProducts([]);
       setSelectedKeys(new Set());
-      setTargetKey("");
-      setPreview({});
+      setPricingRules([]);
+      setRuleActions(new Map());
+      setMergedProductName("");
       loadClients();
     }
   }, [open]);
@@ -101,17 +126,14 @@ export function ProductMergeDialog({
   async function loadProducts(clientId: string) {
     setLoadingProducts(true);
     try {
-      // Use the same RPC as the main table
       const { data: rpcData, error: rpcError } = await supabase.rpc("get_aggregated_product_types");
       if (rpcError) throw rpcError;
 
-      // Match main table keying: clientId::adversus_external_id::adversus_product_title
       const seenKeys = new Set<string>();
       const result: ProductRow[] = [];
 
       for (const r of (rpcData ?? []) as any[]) {
         if (r.client_id !== clientId) continue;
-
         const productKey = `${r.adversus_external_id ?? ""}::${r.adversus_product_title ?? ""}`;
         if (seenKeys.has(productKey)) continue;
         seenKeys.add(productKey);
@@ -126,7 +148,6 @@ export function ProductMergeDialog({
         });
       }
 
-      // Also include manually created products assigned to this client's campaigns
       const { data: campaigns } = await supabase
         .from("client_campaigns")
         .select("id")
@@ -140,7 +161,6 @@ export function ProductMergeDialog({
         for (const p of directProducts ?? []) {
           const manualKey = `manual::${p.id}`;
           if (!seenKeys.has(manualKey)) {
-            // Check it's not already covered by an RPC row with same product_id
             const alreadyCovered = result.some((r) => r.id === p.id);
             if (!alreadyCovered) {
               seenKeys.add(manualKey);
@@ -165,121 +185,201 @@ export function ProductMergeDialog({
     }
   }
 
-  async function loadPreview() {
+  async function loadPricingRules() {
     const selected = products.filter((p) => selectedKeys.has(p.key) && p.id);
     const ids = [...new Set(selected.map((p) => p.id!))];
     if (ids.length === 0) return;
-    setLoadingPreview(true);
+    setLoadingRules(true);
     try {
-      const [mappingsRes, saleItemsRes, rulesRes] = await Promise.all([
-        supabase.from("adversus_product_mappings").select("id, product_id").in("product_id", ids),
-        supabase.from("sale_items").select("id, product_id").in("product_id", ids),
-        supabase.from("product_pricing_rules").select("id, product_id").in("product_id", ids),
-      ]);
-      const counts: Record<string, MergePreview> = {};
-      for (const id of ids) {
-        counts[id] = {
-          adversusMappings: (mappingsRes.data ?? []).filter((r) => r.product_id === id).length,
-          saleItems: (saleItemsRes.data ?? []).filter((r) => r.product_id === id).length,
-          pricingRules: (rulesRes.data ?? []).filter((r) => r.product_id === id).length,
-        };
-      }
-      setPreview(counts);
+      const { data, error } = await supabase
+        .from("product_pricing_rules")
+        .select("id, product_id, commission_dkk, revenue_dkk, effective_from, effective_to, is_active, priority")
+        .in("product_id", ids)
+        .order("priority", { ascending: false });
+      if (error) throw error;
+
+      const productNameMap = new Map<string, string>();
+      selected.forEach((p) => {
+        if (p.id) productNameMap.set(p.id, p.name);
+      });
+
+      const rules: PricingRule[] = (data ?? []).map((r: any) => ({
+        id: r.id,
+        product_id: r.product_id,
+        productName: productNameMap.get(r.product_id) ?? "Ukendt",
+        commission_dkk: r.commission_dkk,
+        revenue_dkk: r.revenue_dkk,
+        effective_from: r.effective_from,
+        effective_to: r.effective_to,
+        is_active: r.is_active,
+        priority: r.priority,
+        rule_name: null,
+      }));
+
+      setPricingRules(rules);
+
+      // Default all rules to "keep"
+      const defaultActions = new Map<string, RuleAction>();
+      rules.forEach((r) => {
+        defaultActions.set(r.id, { action: "keep" });
+      });
+      setRuleActions(defaultActions);
     } catch (e) {
-      console.error("Preview error:", e);
+      console.error("Load pricing rules error:", e);
     } finally {
-      setLoadingPreview(false);
+      setLoadingRules(false);
     }
   }
 
-  const targetProduct = products.find((p) => p.key === targetKey);
-  const targetProductId = targetProduct?.id ?? "";
   const selectedProducts = products.filter((p) => selectedKeys.has(p.key) && p.id);
-  const sourceProducts = selectedProducts.filter((p) => p.key !== targetKey);
 
-  const totalMoved = sourceProducts.reduce(
-    (acc, p) => {
-      const c = preview[p.id!];
-      if (!c) return acc;
-      return {
-        mappings: acc.mappings + c.adversusMappings,
-        sales: acc.sales + c.saleItems,
-        rules: acc.rules + c.pricingRules,
-      };
-    },
-    { mappings: 0, sales: 0, rules: 0 }
-  );
+  function setRuleAction(ruleId: string, action: RuleActionType) {
+    setRuleActions((prev) => {
+      const next = new Map(prev);
+      next.set(ruleId, { action, endDate: prev.get(ruleId)?.endDate });
+      return next;
+    });
+  }
+
+  function setRuleEndDate(ruleId: string, date: string) {
+    setRuleActions((prev) => {
+      const next = new Map(prev);
+      next.set(ruleId, { action: "end", endDate: date });
+      return next;
+    });
+  }
+
+  // Group rules by product
+  const rulesByProduct = new Map<string, PricingRule[]>();
+  pricingRules.forEach((r) => {
+    const list = rulesByProduct.get(r.product_id) || [];
+    list.push(r);
+    rulesByProduct.set(r.product_id, list);
+  });
+
+  // Stats for step 4
+  const rulesKept = [...ruleActions.values()].filter((a) => a.action === "keep").length;
+  const rulesEnded = [...ruleActions.values()].filter((a) => a.action === "end").length;
+  const rulesDeleted = [...ruleActions.values()].filter((a) => a.action === "delete").length;
 
   function handleNext() {
     if (step === 1 && selectedClientId) {
       loadProducts(selectedClientId);
       setStep(2);
-    } else if (step === 2 && selectedKeys.size >= 2 && targetKey) {
-      loadPreview();
+    } else if (step === 2 && selectedKeys.size >= 2) {
+      loadPricingRules();
       setStep(3);
+    } else if (step === 3) {
+      // Default name to first selected product's name
+      if (!mergedProductName) {
+        setMergedProductName(selectedProducts[0]?.name ?? "");
+      }
+      setStep(4);
     }
   }
 
   async function handleMerge() {
-    if (!targetProductId || sourceProducts.length === 0) return;
+    if (!mergedProductName.trim() || selectedProducts.length < 2) return;
     setMerging(true);
     try {
-      const sourceIds = sourceProducts.map((p) => p.id!).filter(Boolean);
+      const allIds = selectedProducts.map((p) => p.id!).filter(Boolean);
 
-      const { error: e1 } = await supabase
-        .from("adversus_product_mappings")
-        .update({ product_id: targetProductId })
-        .in("product_id", sourceIds);
-      if (e1) throw e1;
+      // Decide which product ID to use as the "target" — pick the first selected one
+      // and rename it, or create a new product
+      const targetId = allIds[0];
+      const sourceIds = allIds.slice(1);
 
-      const { error: e2 } = await supabase
-        .from("sale_items")
-        .update({ product_id: targetProductId })
-        .in("product_id", sourceIds);
-      if (e2) throw e2;
-
-      const { error: e3 } = await supabase
-        .from("product_pricing_rules")
-        .delete()
-        .in("product_id", sourceIds);
-      if (e3) throw e3;
-
-      const { error: e4 } = await supabase
-        .from("cancellation_product_mappings")
-        .update({ product_id: targetProductId })
-        .in("product_id", sourceIds);
-      if (e4) throw e4;
-
-      const { error: e5 } = await supabase
-        .from("product_campaign_overrides")
-        .update({ product_id: targetProductId })
-        .in("product_id", sourceIds);
-      if (e5) throw e5;
-
-      const { error: e6 } = await supabase
+      // Rename target product
+      const { error: renameErr } = await supabase
         .from("products")
-        .update({ merged_into_product_id: targetProductId, is_active: false } as any)
-        .in("id", sourceIds);
-      if (e6) throw e6;
+        .update({ name: mergedProductName.trim() })
+        .eq("id", targetId);
+      if (renameErr) throw renameErr;
 
+      // Move adversus_product_mappings
+      if (sourceIds.length > 0) {
+        const { error: e1 } = await supabase
+          .from("adversus_product_mappings")
+          .update({ product_id: targetId })
+          .in("product_id", sourceIds);
+        if (e1) throw e1;
+
+        // Move sale_items
+        const { error: e2 } = await supabase
+          .from("sale_items")
+          .update({ product_id: targetId })
+          .in("product_id", sourceIds);
+        if (e2) throw e2;
+
+        // Move cancellation_product_mappings
+        const { error: e4 } = await supabase
+          .from("cancellation_product_mappings")
+          .update({ product_id: targetId })
+          .in("product_id", sourceIds);
+        if (e4) throw e4;
+
+        // Move product_campaign_overrides
+        const { error: e5 } = await supabase
+          .from("product_campaign_overrides")
+          .update({ product_id: targetId })
+          .in("product_id", sourceIds);
+        if (e5) throw e5;
+      }
+
+      // Handle pricing rules according to user choices
+      for (const [ruleId, action] of ruleActions.entries()) {
+        if (action.action === "keep") {
+          // Update product_id to target
+          await supabase
+            .from("product_pricing_rules")
+            .update({ product_id: targetId })
+            .eq("id", ruleId);
+        } else if (action.action === "end") {
+          // Update product_id + set effective_to
+          await supabase
+            .from("product_pricing_rules")
+            .update({
+              product_id: targetId,
+              effective_to: action.endDate || null,
+            })
+            .eq("id", ruleId);
+        } else if (action.action === "delete") {
+          await supabase
+            .from("product_pricing_rules")
+            .delete()
+            .eq("id", ruleId);
+        }
+      }
+
+      // Deactivate source products
+      if (sourceIds.length > 0) {
+        const { error: e6 } = await supabase
+          .from("products")
+          .update({ merged_into_product_id: targetId, is_active: false } as any)
+          .in("id", sourceIds);
+        if (e6) throw e6;
+      }
+
+      // Log merge history
       const { data: userData } = await supabase.auth.getUser();
-      const historyRows = sourceProducts.map((p) => ({
+      const historyRows = selectedProducts.slice(1).map((p) => ({
         source_product_id: p.id!,
-        target_product_id: targetProductId,
+        target_product_id: targetId,
         merged_by: userData?.user?.id ?? null,
         source_product_name: p.name,
-        adversus_mappings_moved: preview[p.id!]?.adversusMappings ?? 0,
-        sale_items_moved: preview[p.id!]?.saleItems ?? 0,
-        pricing_rules_moved: preview[p.id!]?.pricingRules ?? 0,
+        adversus_mappings_moved: 0,
+        sale_items_moved: 0,
+        pricing_rules_moved: 0,
       }));
 
-      const { error: e7 } = await supabase
-        .from("product_merge_history" as any)
-        .insert(historyRows);
-      if (e7) throw e7;
+      if (historyRows.length > 0) {
+        const { error: e7 } = await supabase
+          .from("product_merge_history" as any)
+          .insert(historyRows);
+        if (e7) throw e7;
+      }
 
-      const targetName = targetProduct?.name;
-      toast.success(`${sourceProducts.length} produkter merget ind i "${targetName}"`);
+      toast.success(`${selectedProducts.length} produkter merget til "${mergedProductName.trim()}"`);
       onOpenChange(false);
       onMergeComplete();
     } catch (err: any) {
@@ -290,18 +390,26 @@ export function ProductMergeDialog({
     }
   }
 
-  const stepLabels = ["Vælg kunde", "Vælg produkter", "Bekræft"];
+  const stepLabels = ["Vælg kunde", "Vælg produkter", "Prisregler", "Navngiv & bekræft"];
+  const totalSteps = 4;
+
+  const canAdvance = () => {
+    if (step === 1) return !!selectedClientId;
+    if (step === 2) return selectedKeys.size >= 2;
+    if (step === 3) return true;
+    return false;
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Merge className="h-5 w-5" />
             Merge produkter
           </DialogTitle>
           <DialogDescription>
-            {stepLabels[step - 1]} (trin {step} af 3)
+            {stepLabels[step - 1]} (trin {step} af {totalSteps})
           </DialogDescription>
         </DialogHeader>
 
@@ -321,7 +429,7 @@ export function ProductMergeDialog({
                 {i + 1}
               </div>
               {i < stepLabels.length - 1 && (
-                <div className={`w-8 h-0.5 ${i + 1 < step ? "bg-primary/40" : "bg-muted"}`} />
+                <div className={`w-6 h-0.5 ${i + 1 < step ? "bg-primary/40" : "bg-muted"}`} />
               )}
             </div>
           ))}
@@ -352,11 +460,11 @@ export function ProductMergeDialog({
           </div>
         )}
 
-        {/* Step 2: Select products + target */}
+        {/* Step 2: Select products (no target selection) */}
         {step === 2 && (
           <div className="space-y-3">
             <label className="text-sm font-medium block">
-              Vælg produkter at merge (min. 2) og marker target
+              Vælg produkter at merge (min. 2)
             </label>
             {loadingProducts ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -368,13 +476,12 @@ export function ProductMergeDialog({
               <div className="max-h-[300px] overflow-y-auto space-y-1 border rounded p-2">
                 {products.map((p) => {
                   const isSelected = selectedKeys.has(p.key);
-                  const isTarget = targetKey === p.key;
                   const isUnmapped = !p.id;
                   return (
                     <div
                       key={p.key}
                       className={`flex items-center gap-3 px-3 py-2 rounded text-sm ${
-                        isTarget ? "bg-primary/10 border border-primary/30" : isSelected ? "bg-muted/50" : ""
+                        isSelected ? "bg-muted/50" : ""
                       } ${isUnmapped ? "opacity-50" : ""}`}
                     >
                       <Checkbox
@@ -384,10 +491,7 @@ export function ProductMergeDialog({
                           setSelectedKeys((prev) => {
                             const next = new Set(prev);
                             if (checked) next.add(p.key);
-                            else {
-                              next.delete(p.key);
-                              if (targetKey === p.key) setTargetKey("");
-                            }
+                            else next.delete(p.key);
                             return next;
                           });
                         }}
@@ -400,63 +504,130 @@ export function ProductMergeDialog({
                       </div>
                       {isUnmapped && <Badge variant="secondary" className="text-[10px]">Ikke mappet</Badge>}
                       {!p.is_active && !isUnmapped && <Badge variant="secondary" className="text-[10px]">Inaktiv</Badge>}
-                      {isSelected && (
-                        <Button
-                          variant={isTarget ? "default" : "outline"}
-                          size="sm"
-                          className="text-xs h-6 px-2"
-                          onClick={() => setTargetKey(p.key)}
-                        >
-                          {isTarget ? "Target ✓" : "Vælg som target"}
-                        </Button>
-                      )}
                     </div>
                   );
                 })}
               </div>
             )}
-            {selectedKeys.size >= 2 && !targetKey && (
-              <p className="text-xs text-destructive">Vælg et target-produkt der skal beholdes.</p>
+          </div>
+        )}
+
+        {/* Step 3: Pricing rules management */}
+        {step === 3 && (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Vælg hvad der skal ske med prisreglerne for de valgte produkter.
+            </p>
+            {loadingRules ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Henter prisregler...
+              </div>
+            ) : pricingRules.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic">Ingen prisregler fundet for de valgte produkter.</p>
+            ) : (
+              <div className="space-y-4 max-h-[350px] overflow-y-auto">
+                {[...rulesByProduct.entries()].map(([productId, rules]) => {
+                  const productName = rules[0]?.productName ?? "Ukendt";
+                  return (
+                    <div key={productId} className="border rounded-lg p-3 space-y-2">
+                      <p className="text-sm font-semibold">{productName}</p>
+                      {rules.map((rule) => {
+                        const action = ruleActions.get(rule.id);
+                        return (
+                          <div key={rule.id} className="bg-muted/30 rounded p-2 space-y-2">
+                            <div className="flex items-center justify-between gap-2 text-sm">
+                              <div className="flex-1 min-w-0">
+                                <span className="font-medium">{rule.rule_name || `Regel #${rule.priority ?? "?"}`}</span>
+                                <div className="flex gap-2 text-xs text-muted-foreground mt-0.5">
+                                  <span>Provision: {rule.commission_dkk ?? 0} kr</span>
+                                  <span>Revenue: {rule.revenue_dkk ?? 0} kr</span>
+                                  {rule.effective_from && <span>Fra: {rule.effective_from}</span>}
+                                  {rule.effective_to && <span>Til: {rule.effective_to}</span>}
+                                  {!rule.is_active && <Badge variant="secondary" className="text-[10px]">Inaktiv</Badge>}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 flex-wrap">
+                              <Button
+                                variant={action?.action === "keep" ? "default" : "outline"}
+                                size="sm"
+                                className="text-xs h-7 px-2"
+                                onClick={() => setRuleAction(rule.id, "keep")}
+                              >
+                                Behold
+                              </Button>
+                              <Button
+                                variant={action?.action === "end" ? "default" : "outline"}
+                                size="sm"
+                                className="text-xs h-7 px-2"
+                                onClick={() => setRuleAction(rule.id, "end")}
+                              >
+                                Sæt slutdato
+                              </Button>
+                              <Button
+                                variant={action?.action === "delete" ? "destructive" : "outline"}
+                                size="sm"
+                                className="text-xs h-7 px-2"
+                                onClick={() => setRuleAction(rule.id, "delete")}
+                              >
+                                Slet
+                              </Button>
+                              {action?.action === "end" && (
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <Button variant="outline" size="sm" className="text-xs h-7 px-2 ml-1 gap-1">
+                                      <CalendarIcon className="h-3 w-3" />
+                                      {action.endDate ? format(new Date(action.endDate), "dd/MM/yyyy") : "Vælg dato"}
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar
+                                      mode="single"
+                                      selected={action.endDate ? new Date(action.endDate) : undefined}
+                                      onSelect={(date) => {
+                                        if (date) setRuleEndDate(rule.id, format(date, "yyyy-MM-dd"));
+                                      }}
+                                      className="pointer-events-auto"
+                                    />
+                                  </PopoverContent>
+                                </Popover>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
         )}
 
-        {/* Step 3: Preview + confirm */}
-        {step === 3 && (
-          <div className="space-y-3">
-            <div>
-              <p className="text-sm font-medium mb-1">
-                Target: <span className="text-primary">{targetProduct?.name}</span>
-              </p>
-            </div>
-
+        {/* Step 4: Name product + confirm */}
+        {step === 4 && (
+          <div className="space-y-4">
             <div className="space-y-2">
-              <p className="text-sm font-medium">Produkter der merges ind:</p>
-              {loadingPreview ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" /> Henter data...
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  {sourceProducts.map((p) => {
-                    const c = p.id ? preview[p.id] : undefined;
-                    return (
-                      <div key={p.key} className="flex items-center justify-between text-sm border rounded px-3 py-2">
-                        <span className="font-medium truncate max-w-[200px]">{p.name}</span>
-                        <div className="flex gap-1">
-                          {c && (
-                            <>
-                              <Badge variant="outline" className="text-[10px]">{c.adversusMappings} mappings</Badge>
-                              <Badge variant="outline" className="text-[10px]">{c.saleItems} sales</Badge>
-                              <Badge variant="outline" className="text-[10px]">{c.pricingRules} regler</Badge>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+              <label className="text-sm font-medium block">Produktnavn for det samlede produkt</label>
+              <Input
+                value={mergedProductName}
+                onChange={(e) => setMergedProductName(e.target.value)}
+                placeholder="Skriv produktnavn..."
+              />
+              <div className="flex flex-wrap gap-1 mt-1">
+                <span className="text-xs text-muted-foreground mr-1">Hurtigvalg:</span>
+                {selectedProducts.map((p) => (
+                  <Button
+                    key={p.key}
+                    variant={mergedProductName === p.name ? "default" : "outline"}
+                    size="sm"
+                    className="text-xs h-6 px-2"
+                    onClick={() => setMergedProductName(p.name)}
+                  >
+                    {p.name.length > 30 ? p.name.slice(0, 30) + "…" : p.name}
+                  </Button>
+                ))}
+              </div>
             </div>
 
             <div className="bg-muted/50 rounded p-3 text-sm space-y-1">
@@ -464,9 +635,14 @@ export function ProductMergeDialog({
                 <AlertTriangle className="h-4 w-4 text-amber-500" />
                 Opsummering
               </p>
-              <p>{totalMoved.mappings} adversus-mappings flyttes</p>
-              <p>{totalMoved.sales} sale_items flyttes</p>
-              <p>{totalMoved.rules} prisregler slettes (target beholder sine)</p>
+              <p>{selectedProducts.length} produkter merges til "{mergedProductName || "..."}"</p>
+              {pricingRules.length > 0 && (
+                <>
+                  <p>{rulesKept} prisregler beholdes</p>
+                  <p>{rulesEnded} prisregler får slutdato</p>
+                  <p>{rulesDeleted} prisregler slettes</p>
+                </>
+              )}
               <p className="text-destructive text-xs mt-2">Denne handling kan ikke fortrydes.</p>
             </div>
           </div>
@@ -485,24 +661,18 @@ export function ProductMergeDialog({
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={merging}>
               Annuller
             </Button>
-            {step < 3 ? (
-              <Button
-                onClick={handleNext}
-                disabled={
-                  (step === 1 && !selectedClientId) ||
-                  (step === 2 && (selectedKeys.size < 2 || !targetKey))
-                }
-              >
+            {step < totalSteps ? (
+              <Button onClick={handleNext} disabled={!canAdvance()}>
                 Næste <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             ) : (
               <Button
                 onClick={handleMerge}
-                disabled={merging || sourceProducts.length === 0}
+                disabled={merging || !mergedProductName.trim()}
                 className="gap-2"
               >
                 {merging && <Loader2 className="h-4 w-4 animate-spin" />}
-                Merge {sourceProducts.length} produkt{sourceProducts.length !== 1 ? "er" : ""}
+                Merge {selectedProducts.length} produkter
               </Button>
             )}
           </div>
