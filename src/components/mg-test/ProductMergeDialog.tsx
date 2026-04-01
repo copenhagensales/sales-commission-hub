@@ -203,7 +203,7 @@ export function ProductMergeDialog({
         if (p.id) productNameMap.set(p.id, p.name);
       });
 
-      const rules: PricingRule[] = (data ?? []).map((r) => ({
+      const rules: PricingRule[] = (data ?? []).map((r: any) => ({
         id: r.id,
         product_id: r.product_id,
         productName: productNameMap.get(r.product_id) ?? "Ukendt",
@@ -213,7 +213,7 @@ export function ProductMergeDialog({
         effective_to: r.effective_to,
         is_active: r.is_active,
         priority: r.priority,
-        rule_name: r.rule_name,
+        rule_name: null,
       }));
 
       setPricingRules(rules);
