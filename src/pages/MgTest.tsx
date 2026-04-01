@@ -2569,6 +2569,19 @@ export default function MgTest() {
                     size="sm"
                     variant="outline"
                     className="hover-scale"
+                    onClick={handleGenerateSuggestions}
+                    disabled={suggestionsLoading || !campaignMappings || campaignMappings.length === 0}
+                  >
+                    {suggestionsLoading && (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    )}
+                    <Lightbulb className="h-4 w-4 mr-1" />
+                    Foreslå kunder
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="hover-scale"
                     onClick={() => backfillSalesCampaigns.mutate()}
                     disabled={backfillSalesCampaigns.isPending}
                   >
