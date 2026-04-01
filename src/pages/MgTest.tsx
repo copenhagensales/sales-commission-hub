@@ -2346,6 +2346,21 @@ export default function MgTest() {
                                 return (
                                   <>
                                     <TableRow key={row.key} className={row.product?.is_hidden ? 'opacity-50' : ''}>
+                                      <TableCell className="text-center">
+                                        {productId && (
+                                          <Checkbox
+                                            checked={mergeSelectedProducts.has(productId)}
+                                            onCheckedChange={(checked) => {
+                                              setMergeSelectedProducts(prev => {
+                                                const next = new Set(prev);
+                                                if (checked) next.add(productId);
+                                                else next.delete(productId);
+                                                return next;
+                                              });
+                                            }}
+                                          />
+                                        )}
+                                      </TableCell>
                                       <TableCell>
                                         <div className="flex flex-col">
                                           <span className="font-medium">
