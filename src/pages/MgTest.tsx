@@ -3796,6 +3796,26 @@ export default function MgTest() {
         onApprove={handleApproveSuggestions}
         isApproving={approvingLoading}
       />
+
+      <ProductMergeDialog
+        open={mergeDialogOpen}
+        onOpenChange={setMergeDialogOpen}
+        selectedProducts={
+          Array.from(mergeSelectedProducts).map(id => {
+            const found = aggregatedProducts.find(p => p.product?.id === id);
+            return {
+              id,
+              name: found?.product?.name || found?.adversus_product_title || "Ukendt",
+              clientCampaignId: found?.product?.client_campaign_id || null,
+            };
+          })
+        }
+        onMergeComplete={() => {
+          setMergeSelectedProducts(new Set());
+          queryClient.invalidateQueries({ queryKey: ["mg-aggregated-products"] });
+          queryClient.invalidateQueries({ queryKey: ["mg-manual-products"] });
+        }}
+      />
     </MainLayout>
   );
 }
