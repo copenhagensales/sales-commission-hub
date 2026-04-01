@@ -224,7 +224,7 @@ export function ProductMergeDialog({
     if (!targetProductId || sourceProducts.length === 0) return;
     setMerging(true);
     try {
-      const sourceIds = sourceProducts.map((p) => p.id);
+      const sourceIds = sourceProducts.map((p) => p.id!).filter(Boolean);
 
       const { error: e1 } = await supabase
         .from("adversus_product_mappings")
