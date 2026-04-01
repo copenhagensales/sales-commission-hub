@@ -372,7 +372,12 @@ export function ProductMergeDialog({
                           });
                         }}
                       />
-                      <span className="flex-1 truncate font-medium">{p.name}</span>
+                      <div className="flex-1 min-w-0">
+                        <span className="block truncate font-medium">{p.name}</span>
+                        {p.internalName && p.internalName !== p.name && (
+                          <span className="block truncate text-xs text-muted-foreground">Internt: {p.internalName}</span>
+                        )}
+                      </div>
                       {!p.is_active && <Badge variant="secondary" className="text-[10px]">Inaktiv</Badge>}
                       {isSelected && (
                         <Button
