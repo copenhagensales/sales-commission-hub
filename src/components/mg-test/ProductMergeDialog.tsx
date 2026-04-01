@@ -101,25 +101,32 @@ export function ProductMergeDialog({
   async function loadProducts(clientId: string) {
     setLoadingProducts(true);
     try {
-      // Use the same RPC as the main table to find all products for this client
+      // Use the same RPC as the main table
       const { data: rpcData, error: rpcError } = await supabase.rpc("get_aggregated_product_types");
       if (rpcError) throw rpcError;
 
-      // Filter by selected client, deduplicate by product_id
-      const seen = new Map<string, ProductRow>();
+      // Match main table keying: clientId::adversus_external_id::adversus_product_title
+      const seenKeys = new Set<string>();
+      const result: ProductRow[] = [];
+
       for (const r of (rpcData ?? []) as any[]) {
-        if (r.client_id === clientId && r.product_id && !seen.has(r.product_id)) {
-          seen.set(r.product_id, {
-            id: r.product_id,
-            name: r.adversus_product_title ?? r.product_name ?? "Ukendt",
-            internalName: r.product_name ?? null,
-            client_campaign_id: r.product_client_campaign_id,
-            is_active: true,
-          });
-        }
+        if (r.client_id !== clientId) continue;
+
+        const productKey = `${r.adversus_external_id ?? ""}::${r.adversus_product_title ?? ""}`;
+        if (seenKeys.has(productKey)) continue;
+        seenKeys.add(productKey);
+
+        result.push({
+          key: productKey,
+          id: r.product_id ?? null,
+          name: r.adversus_product_title ?? r.product_name ?? "Ukendt",
+          internalName: r.product_name ?? null,
+          client_campaign_id: r.product_client_campaign_id,
+          is_active: true,
+        });
       }
 
-      // Also include directly campaign-assigned products (including inactive ones)
+      // Also include manually created products assigned to this client's campaigns
       const { data: campaigns } = await supabase
         .from("client_campaigns")
         .select("id")
@@ -131,19 +138,26 @@ export function ProductMergeDialog({
           .select("id, name, client_campaign_id, is_active")
           .in("client_campaign_id", campaignIds);
         for (const p of directProducts ?? []) {
-          if (!seen.has(p.id)) {
-            seen.set(p.id, {
-              id: p.id,
-              name: p.name,
-              internalName: p.name,
-              client_campaign_id: p.client_campaign_id,
-              is_active: p.is_active ?? true,
-            });
+          const manualKey = `manual::${p.id}`;
+          if (!seenKeys.has(manualKey)) {
+            // Check it's not already covered by an RPC row with same product_id
+            const alreadyCovered = result.some((r) => r.id === p.id);
+            if (!alreadyCovered) {
+              seenKeys.add(manualKey);
+              result.push({
+                key: manualKey,
+                id: p.id,
+                name: p.name,
+                internalName: p.name,
+                client_campaign_id: p.client_campaign_id,
+                is_active: p.is_active ?? true,
+              });
+            }
           }
         }
       }
 
-      setProducts(Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name, "da")));
+      setProducts(result.sort((a, b) => a.name.localeCompare(b.name, "da")));
     } catch (e) {
       console.error("Load products error:", e);
     } finally {
