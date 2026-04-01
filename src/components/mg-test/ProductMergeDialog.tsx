@@ -24,6 +24,7 @@ interface ProductRow {
   id: string;
   name: string;
   client_campaign_id: string | null;
+  is_active: boolean;
 }
 
 interface ClientOption {
@@ -113,10 +114,9 @@ export function ProductMergeDialog({
         .from("products")
         .select("id, name, client_campaign_id, is_active")
         .in("client_campaign_id", campaignIds)
-        .eq("is_active", true)
         .order("name");
       if (error) throw error;
-      setProducts((data ?? []).map((p) => ({ id: p.id, name: p.name, client_campaign_id: p.client_campaign_id })));
+      setProducts((data ?? []).map((p) => ({ id: p.id, name: p.name, client_campaign_id: p.client_campaign_id, is_active: p.is_active ?? true })));
     } catch (e) {
       console.error("Load products error:", e);
     } finally {
@@ -347,6 +347,7 @@ export function ProductMergeDialog({
                         }}
                       />
                       <span className="flex-1 truncate font-medium">{p.name}</span>
+                      {!p.is_active && <Badge variant="secondary" className="text-[10px]">Inaktiv</Badge>}
                       {isSelected && (
                         <Button
                           variant={isTarget ? "default" : "outline"}
