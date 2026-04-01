@@ -1683,18 +1683,6 @@ export default function MgTest() {
     }
   };
 
-  const [defaultClientId, setDefaultClientId] = useState<string>(() => {
-    return localStorage.getItem("mg-auto-assign-default-client") || "";
-  });
-
-  const handleDefaultClientChange = (value: string) => {
-    setDefaultClientId(value);
-    if (value) {
-      localStorage.setItem("mg-auto-assign-default-client", value);
-    } else {
-      localStorage.removeItem("mg-auto-assign-default-client");
-    }
-  };
 
   const handleGenerateSuggestions = async () => {
     if (!campaignMappings || !clientCampaigns || !clients) return;
