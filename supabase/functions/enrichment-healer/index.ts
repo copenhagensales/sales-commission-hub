@@ -124,20 +124,29 @@ async function healAdversus(
         }
       }
 
-      if (leadResultData.length === 0 && Object.keys(leadResultFields).length === 0) {
-        throw new Error("API returned empty lead data");
-      }
-
       let phone = leadData.phone || leadData.contactPhone || leadData.mobile || null;
       if (!phone && leadData.contactData) {
         const cd = leadData.contactData;
         phone = cd.Telefonnummer1 || cd['Kontakt nummer'] || cd.phone || cd.mobile || cd.Mobil || cd.Telefon || null;
       }
 
+      // Check if we got ANY useful data from the API (not just resultData)
+      const hasResultData = (Array.isArray(leadResultData) && leadResultData.length > 0) || Object.keys(leadResultFields).length > 0;
+      const hasContactData = leadData.contactData && Object.keys(leadData.contactData).length > 0;
+      const hasPhone = !!phone;
+      const hasAnyData = hasResultData || hasContactData || hasPhone || leadData.campaignId || leadData.status;
+
+      if (!hasAnyData) {
+        throw new Error("API returned empty lead data");
+      }
+
       const updatedPayload = {
         ...rawPayload,
         leadResultFields,
         leadResultData,
+        ...(leadData.contactData ? { contactData: leadData.contactData } : {}),
+        ...(leadData.status ? { leadStatus: leadData.status } : {}),
+        ...(leadData.campaignId ? { campaignId: leadData.campaignId } : {}),
       };
 
       await supabase.from("sales").update({
