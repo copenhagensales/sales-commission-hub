@@ -426,7 +426,7 @@ export function ProductMergeDialog({
           <div className="space-y-3">
             <div>
               <p className="text-sm font-medium mb-1">
-                Target: <span className="text-primary">{products.find((p) => p.id === targetProductId)?.name}</span>
+                Target: <span className="text-primary">{targetProduct?.name}</span>
               </p>
             </div>
 
