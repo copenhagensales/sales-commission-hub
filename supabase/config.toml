@@ -246,3 +246,6 @@ verify_jwt = false
 
 [functions.gdpr-data-cleanup]
 verify_jwt = false
+
+[functions.notify-system-feedback]
+verify_jwt = false
