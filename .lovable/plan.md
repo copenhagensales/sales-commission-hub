@@ -1,35 +1,25 @@
 
 
-## Ombyg Produktmerge til step-baseret wizard
+## Problem: Merge-dialogen viser ikke alle produkter
 
-### Nuværende problem
-Merge-funktionen kræver at man først vælger produkter via checkboxes i tabellen og derefter åbner en dialog. Det er uoverskueligt og der er ingen kundefiltrering i selve merge-flowet.
+Merge-dialogen henter produkter med `is_active = true` og filtrerer via `client_campaign_id`. Men hovedtabellen viser produkter fra to kilder:
+1. **RPC `get_aggregated_product_types`** (baseret på sale_items)
+2. **`products`-tabellen** (manuelt oprettede)
 
-### Ny tilgang: Step-wizard i dialog
-En **"Merge produkter"**-knap (altid synlig) åbner en dialog med 3 steps:
+Merge-dialogen bruger kun kilde 2, og filtrerer derudover inaktive produkter fra. Produkter uden `client_campaign_id` eller fra RPC-aggregeringen vises slet ikke.
 
-**Step 1 — Vælg kunde**
-- Dropdown med alle kunder (fra `clientCampaigns` grupperet på `client_id`)
-- Når kunde er valgt, hentes produkter for den kunde
+### Fix
 
-**Step 2 — Vælg produkter**
-- Liste af kundens produkter med checkboxes
-- Vælg 2+ produkter + vælg target-produkt (radio button)
+**Fil: `src/components/mg-test/ProductMergeDialog.tsx`**
 
-**Step 3 — Bekræft merge**
-- Preview af hvad der flyttes (mappings, sales, regler)
-- Opsummering + bekræftelsesknap (som nu)
+I `loadProducts()`:
+- Fjern `eq("is_active", true)` filteret, så alle produkter (inkl. potentielt inaktive varianter) vises
+- Tilføj en visuel indikation (badge) på inaktive produkter, så brugeren kan se forskel
+- Sikre at produkter uden `client_campaign_id` også kan indgå (vis dem under en "Ikke-tildelte" sektion eller inkluder dem altid)
 
-### Ændringer
+Alternativt, hvis kun aktive produkter skal merges, behold `is_active = true` men sørg for at alle kampagne-IDs for kunden bliver hentet korrekt og at der ikke rammes en Supabase 1000-rækkers grænse.
 
-| Fil | Ændring |
-|-----|---------|
-| `ProductMergeDialog.tsx` | Omskrives til step-wizard: step 1 (kunde), step 2 (vælg produkter + target), step 3 (preview + bekræft). Henter selv produkter baseret på valgt kunde. |
-| `MgTest.tsx` | Fjern `mergeSelectedProducts` state, checkboxes i produkttabellen, og den betingede merge-knap. Erstat med en permanent "Merge produkter"-knap der åbner dialogen. |
+### Anbefaling
 
-### UI-detaljer
-- Step-indikator i toppen (1/2/3)
-- "Næste"/"Tilbage"-knapper i bunden
-- Step 3 beholder den eksisterende merge-logik og preview
-- Dialogen henter selv produkter via Supabase baseret på valgt kunde
+Fjern `is_active`-filteret og vis alle produkter for kunden, med badge der viser status. Dette matcher hvad brugeren ser i hovedtabellen.
 
