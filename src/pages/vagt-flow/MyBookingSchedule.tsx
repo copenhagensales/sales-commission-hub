@@ -324,8 +324,6 @@ export default function MyBookingSchedule() {
           vehicleBookingId: vehicleForDay?.id,
           diet: dietForDay,
           partners: partnersForDay.map((p: any) => p.employee?.first_name).filter(Boolean),
-          isFirstBookingDay,
-          isLastBookingDay,
           isLastVehicleDay,
           vehicleReturnConfirmed,
           hotel: hotelForBooking ? {
