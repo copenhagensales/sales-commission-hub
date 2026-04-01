@@ -2294,6 +2294,26 @@ export default function MgTest() {
                           <Table>
                             <TableHeader>
                               <TableRow>
+                                <TableHead className="w-[3%] text-center">
+                                  <Checkbox
+                                    checked={
+                                      group.rows.filter(r => r.product?.id).length > 0 &&
+                                      group.rows.filter(r => r.product?.id).every(r => mergeSelectedProducts.has(r.product!.id))
+                                    }
+                                    onCheckedChange={(checked) => {
+                                      setMergeSelectedProducts(prev => {
+                                        const next = new Set(prev);
+                                        group.rows.forEach(r => {
+                                          if (r.product?.id) {
+                                            if (checked) next.add(r.product.id);
+                                            else next.delete(r.product.id);
+                                          }
+                                        });
+                                        return next;
+                                      });
+                                    }}
+                                  />
+                                </TableHead>
                                 <TableHead className="w-[30%]">{t("mgTest.adversusProductName")}</TableHead>
                                 <TableHead className="w-[15%]">{t("mgTest.externalId")}</TableHead>
                                 <TableHead className="w-[20%]">{t("mgTest.customer")}</TableHead>
