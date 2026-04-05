@@ -103,7 +103,10 @@ const handler = async (req: Request): Promise<Response> => {
 
       // Check if it's Friday
       const now = new Date();
-      const jsDay = now.getDay();
+      const jsDay = new Date(
+        now.toLocaleString('en-US', { timeZone: 'Europe/Copenhagen' })
+      ).getDay();
+      console.log(`Danish weekday (jsDay): ${jsDay} (UTC day: ${now.getUTCDay()})`);
       
       if (body.auto && jsDay !== 5) {
         console.log("Not Friday - skipping weekend cleanup email");
