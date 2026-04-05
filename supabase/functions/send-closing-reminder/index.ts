@@ -108,10 +108,12 @@ const handler = async (req: Request): Promise<Response> => {
       // Get current weekday (1 = Monday, 5 = Friday in our system)
       // JavaScript getDay() returns 0 = Sunday, 1 = Monday, etc.
       const now = new Date();
-      const jsDay = now.getDay(); // 0-6, Sunday-Saturday
-      const weekday = jsDay === 0 ? 7 : jsDay; // Convert to 1-7, Monday-Sunday
+      const dkDayOfWeek = new Date(
+        now.toLocaleString('en-US', { timeZone: 'Europe/Copenhagen' })
+      ).getDay();
+      const weekday = dkDayOfWeek === 0 ? 7 : dkDayOfWeek;
 
-      console.log(`Current weekday: ${weekday} (JS day: ${jsDay})`);
+      console.log(`Danish weekday: ${weekday} (UTC day: ${now.getUTCDay()})`);
 
       // Only send on weekdays (1-5)
       if (weekday > 5) {
