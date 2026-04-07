@@ -1,40 +1,49 @@
 
 
-## Opret ALKA API integration (Enreach)
+## Konfigurer ALKA API med produktregler, datafiltre og org codes
 
-### Overblik
-Opretter en ny Enreach-integration kaldet "ALKA API" der bruger samme HeroBase API URL som Tryg, men med egne credentials og config. Kunden ALKA eksisterer allerede i systemet (id: `0a8048ac-ac28-4999-b1a7-5d1238d7fc2c`).
+### Analyse af sample-data
+Test-kaldet viser at ALKA API'et har **nøjagtig samme datastruktur** som Tryg:
+- `data.Resultat` — bruges til at matche succesfulde leads
+- `campaign.code` — bruges i produktnavnet (f.eks. "Meeting -- MB_Agentur Villa alle områder")
+- `lastModifiedByUser.orgCode` — bruges til org code filtrering
+- `firstProcessedByUser.orgCode` — fallback for agent-attribution
 
-### Trin
+### Ændringer
 
-#### 1. Indsæt ny integration i `dialer_integrations`
-- **name**: `alka`
-- **provider**: `enreach`
-- **api_url**: `https://wshero01.herobase.com/api`
-- **is_active**: `true`
-- **config**: Baseret på Tryg-strukturen men med tilpassede filtre (skal konfigureres — f.eks. org code filter, produktregler)
-- **Credentials**: Krypteres via `update_dialer_credentials` RPC med brugernavn `api_alka_performance@tryg.dk` og kode `g_2f1z0H!t`
+#### 1. Opdater `dialer_integrations.config` for ALKA (database UPDATE)
+Sæt config identisk med Tryg:
+```json
+{
+  "productExtraction": {
+    "strategy": "conditional",
+    "conditionalRules": [{
+      "conditionKey": "Resultat",
+      "conditionValue": "",
+      "extractionType": "composite",
+      "productNameTemplate": "Meeting -- {{campaign.code}}"
+    }],
+    "dataFilters": [{
+      "field": "lastModifiedByUser.orgCode",
+      "operator": "contains",
+      "value": "@copenhagensales.dk"
+    }]
+  },
+  "sync_frequency_minutes": 15,
+  "sync_schedule": "4,19,34,49 * * * *"
+}
+```
 
-#### 2. Opret cron jobs til automatisk sync
-Følger Tryg-mønsteret med to jobs:
-- **`enreach-alka-sales`** — henter salg hvert 15 min (staggered schedule, f.eks. `4,19,34,49 * * * *`)
-- **`enreach-alka-meta`** — henter users/campaigns/sessions én gang i timen
+#### 2. Sæt `calls_org_codes` for ALKA
+Sæt til `["Copenhagen sales"]` ligesom Tryg, så sessions/calls filtreres korrekt.
 
-Begge kalder `integration-engine` med den nye integration_id.
+#### 3. Tilføj ALKA til `tv-dashboard-data` mappings
+Map `alka` → ALKA client ID `0a8048ac-ac28-4999-b1a7-5d1238d7fc2c` i TV dashboard-funktionen.
 
-#### 3. Tilføj til cron-schedule config
-Opdater `update-cron-schedule` edge function med `alka` entry.
-
-#### 4. Tilføj til TV dashboard mappings
-Opdater `tv-dashboard-data` med `alka` → ALKA client_id mapping.
-
-### Tekniske detaljer
-- Credentials gemmes krypteret via eksisterende `update_dialer_credentials` DB-funktion med `DB_ENCRYPTION_KEY`
-- Config starter med en minimal opsætning — kan tilpasses efterfølgende med produktregler og datafiltre
-- Ingen kodeændringer i integration-engine — den håndterer allerede Enreach-adaptere generisk
+### Ingen kodeændringer i adapteren
+Enreach-adapteren håndterer allerede denne konfiguration generisk — det er kun database-config og én edge function der skal opdateres.
 
 ### Filer der ændres
-1. `supabase/functions/update-cron-schedule/index.ts` — tilføj `alka` schedule
-2. `supabase/functions/tv-dashboard-data/index.ts` — tilføj `alka` client mapping
-3. Database: INSERT i `dialer_integrations` + cron jobs via migration
+1. **Database**: UPDATE `dialer_integrations` config og calls_org_codes for ALKA (ID: `48d8bd23-df14-41fe-b000-abb8a4d6cd1d`)
+2. **`supabase/functions/tv-dashboard-data/index.ts`** — tilføj `alka` mapping
 
