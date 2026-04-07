@@ -1,68 +1,40 @@
 
 
-## Ret tidszone til dansk tid (Europe/Copenhagen) i reminder edge functions
+## Opret ALKA API integration (Enreach)
 
-### Problem
-`send-closing-reminder` og `send-weekend-cleanup` bruger `new Date().getDay()` som returnerer UTC-ugedag. Omkring midnat kan dette give forkert dag — f.eks. fredag aften kl. 23:30 dansk tid er lørdag 00:30 UTC, og weekend-cleanup ville ikke blive sendt.
+### Overblik
+Opretter en ny Enreach-integration kaldet "ALKA API" der bruger samme HeroBase API URL som Tryg, men med egne credentials og config. Kunden ALKA eksisterer allerede i systemet (id: `0a8048ac-ac28-4999-b1a7-5d1238d7fc2c`).
 
-### Ændringer
+### Trin
 
-#### 1. `supabase/functions/send-closing-reminder/index.ts` (linje ~110-112)
-Erstat:
-```typescript
-const now = new Date();
-const jsDay = now.getDay();
-const weekday = jsDay === 0 ? 7 : jsDay;
-```
-Med:
-```typescript
-const now = new Date();
-const dkDay = parseInt(
-  new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Copenhagen', weekday: 'narrow' })
-    .formatToParts(now).find(p => p.type === 'weekday')?.value || '0'
-);
-// Brug Intl til at hente den korrekte ugedag i dansk tid
-const dkDayOfWeek = new Date(
-  now.toLocaleString('en-US', { timeZone: 'Europe/Copenhagen' })
-).getDay();
-const weekday = dkDayOfWeek === 0 ? 7 : dkDayOfWeek;
-```
+#### 1. Indsæt ny integration i `dialer_integrations`
+- **name**: `alka`
+- **provider**: `enreach`
+- **api_url**: `https://wshero01.herobase.com/api`
+- **is_active**: `true`
+- **config**: Baseret på Tryg-strukturen men med tilpassede filtre (skal konfigureres — f.eks. org code filter, produktregler)
+- **Credentials**: Krypteres via `update_dialer_credentials` RPC med brugernavn `api_alka_performance@tryg.dk` og kode `g_2f1z0H!t`
 
-Simplificeret til ét kald:
-```typescript
-const now = new Date();
-const dkDayOfWeek = new Date(
-  now.toLocaleString('en-US', { timeZone: 'Europe/Copenhagen' })
-).getDay();
-const weekday = dkDayOfWeek === 0 ? 7 : dkDayOfWeek;
-```
+#### 2. Opret cron jobs til automatisk sync
+Følger Tryg-mønsteret med to jobs:
+- **`enreach-alka-sales`** — henter salg hvert 15 min (staggered schedule, f.eks. `4,19,34,49 * * * *`)
+- **`enreach-alka-meta`** — henter users/campaigns/sessions én gang i timen
 
-#### 2. `supabase/functions/send-weekend-cleanup/index.ts` (linje ~105-106)
-Erstat:
-```typescript
-const now = new Date();
-const jsDay = now.getDay();
-```
-Med:
-```typescript
-const now = new Date();
-const jsDay = new Date(
-  now.toLocaleString('en-US', { timeZone: 'Europe/Copenhagen' })
-).getDay();
-```
+Begge kalder `integration-engine` med den nye integration_id.
 
-#### 3. Tilføj logging i begge funktioner
-Log den beregnede danske dag for debugging:
-```typescript
-console.log(`Danish weekday: ${weekday} (UTC day: ${now.getUTCDay()})`);
-```
+#### 3. Tilføj til cron-schedule config
+Opdater `update-cron-schedule` edge function med `alka` entry.
+
+#### 4. Tilføj til TV dashboard mappings
+Opdater `tv-dashboard-data` med `alka` → ALKA client_id mapping.
+
+### Tekniske detaljer
+- Credentials gemmes krypteret via eksisterende `update_dialer_credentials` DB-funktion med `DB_ENCRYPTION_KEY`
+- Config starter med en minimal opsætning — kan tilpasses efterfølgende med produktregler og datafiltre
+- Ingen kodeændringer i integration-engine — den håndterer allerede Enreach-adaptere generisk
 
 ### Filer der ændres
-1. `supabase/functions/send-closing-reminder/index.ts` — brug dansk tid til ugedag
-2. `supabase/functions/send-weekend-cleanup/index.ts` — brug dansk tid til ugedag
-
-### Ikke berørt
-- `activate-pulse-survey` — bruger allerede `Intl.DateTimeFormat` med `Europe/Copenhagen`
-- `calculate-kpi-values` / `tv-dashboard-data` — opererer på datostrenge, ikke live ugedag-check
-- `_shared/date-helpers.ts` — bruges til periodeberegning, ikke live dag-detection
+1. `supabase/functions/update-cron-schedule/index.ts` — tilføj `alka` schedule
+2. `supabase/functions/tv-dashboard-data/index.ts` — tilføj `alka` client mapping
+3. Database: INSERT i `dialer_integrations` + cron jobs via migration
 
