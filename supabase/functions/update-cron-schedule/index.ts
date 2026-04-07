@@ -24,6 +24,7 @@ const staggeredFiveMinuteSchedules: Record<string, string> = {
   eesy: "0,5,10,15,20,25,30,35,40,45,50,55 * * * *",
   tryg: "2,7,12,17,22,27,32,37,42,47,52,57 * * * *",
   ase: "4,9,14,19,24,29,34,39,44,49,54,59 * * * *",
+  alka: "4,19,34,49 * * * *",
 };
 
 const LOVABLE_ALLOWED_ACTIONS = ["campaigns", "users", "sales", "calls"] as const;
