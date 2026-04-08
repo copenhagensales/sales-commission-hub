@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Loader2, Merge, AlertTriangle, ChevronLeft, ChevronRight, CalendarIcon } from "lucide-react";
+import { Loader2, Merge, AlertTriangle, ChevronLeft, ChevronRight, CalendarIcon, GitMerge, Unlink } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
