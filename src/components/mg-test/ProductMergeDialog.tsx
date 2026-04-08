@@ -324,17 +324,24 @@ export function ProductMergeDialog({
 
   function handleNext() {
     if (step === 1 && selectedClientId) {
-      loadProducts(selectedClientId);
       setStep(2);
-    } else if (step === 2 && selectedKeys.size >= 2) {
-      loadPricingRules();
+    } else if (step === 2) {
+      // Mode selected, load products and go to step 3
+      loadProducts(selectedClientId);
       setStep(3);
     } else if (step === 3) {
+      if (mode === "merge" && selectedKeys.size >= 2) {
+        loadPricingRules();
+        setStep(4);
+      } else if (mode === "unmerge" && selectedKeys.size >= 1) {
+        setStep(4); // confirm step for unmerge
+      }
+    } else if (step === 4 && mode === "merge") {
       // Default name: use expand target name if expanding, otherwise first selected
       if (!mergedProductName) {
         setMergedProductName(expandTarget?.name ?? selectedProducts[0]?.name ?? "");
       }
-      setStep(4);
+      setStep(5);
     }
   }
 
