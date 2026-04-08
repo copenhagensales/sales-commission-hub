@@ -557,6 +557,12 @@ export function ProductMergeDialog({
             <label className="text-sm font-medium block">
               Vælg produkter at merge (min. 2)
             </label>
+            {isExpandMode && expandTarget && (
+              <div className="bg-primary/10 border border-primary/20 rounded p-2 text-sm flex items-center gap-2">
+                <Merge className="h-4 w-4 text-primary" />
+                <span>Tilføjer til eksisterende merge: <strong>{expandTarget.name}</strong></span>
+              </div>
+            )}
             {loadingProducts ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" /> Henter produkter...
@@ -568,16 +574,18 @@ export function ProductMergeDialog({
                 {products.map((p) => {
                   const isSelected = selectedKeys.has(p.key);
                   const isUnmapped = !p.id;
+                  const isMergedChild = !!p.merged_into_product_id && p.merged_into_product_id !== p.id;
+                  const isDisabled = isUnmapped || isMergedChild;
                   return (
                     <div
                       key={p.key}
                       className={`flex items-center gap-3 px-3 py-2 rounded text-sm ${
                         isSelected ? "bg-muted/50" : ""
-                      } ${isUnmapped ? "opacity-50" : ""}`}
+                      } ${isDisabled ? "opacity-50" : ""}`}
                     >
                       <Checkbox
                         checked={isSelected}
-                        disabled={isUnmapped}
+                        disabled={isDisabled}
                         onCheckedChange={(checked) => {
                           setSelectedKeys((prev) => {
                             const next = new Set(prev);
@@ -593,8 +601,12 @@ export function ProductMergeDialog({
                           <span className="block truncate text-xs text-muted-foreground">Internt: {p.internalName}</span>
                         )}
                       </div>
-                      {isUnmapped && <Badge variant="secondary" className="text-[10px]">Ikke mappet</Badge>}
-                      {!p.is_active && !isUnmapped && <Badge variant="secondary" className="text-[10px]">Inaktiv</Badge>}
+                      <div className="flex gap-1 flex-shrink-0">
+                        {isMergedChild && <Badge variant="secondary" className="text-[10px]">Allerede merget</Badge>}
+                        {p.isMergeParent && <Badge variant="outline" className="text-[10px] border-primary/40 text-primary">Merge-parent</Badge>}
+                        {isUnmapped && <Badge variant="secondary" className="text-[10px]">Ikke mappet</Badge>}
+                        {!p.is_active && !isUnmapped && !isMergedChild && <Badge variant="secondary" className="text-[10px]">Inaktiv</Badge>}
+                      </div>
                     </div>
                   );
                 })}
