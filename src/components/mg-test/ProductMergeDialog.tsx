@@ -173,6 +173,20 @@ export function ProductMergeDialog({
         }
       }
 
+      // Also fetch merged children that lost their campaign_id during merge
+      const parentIds = allDbProducts.filter(p => !p.merged_into_product_id).map(p => p.id);
+      if (parentIds.length > 0) {
+        const existingIds = new Set(allDbProducts.map(p => p.id));
+        const { data: mergedChildren } = await supabase
+          .from("products")
+          .select("id, name, client_campaign_id, is_active, merged_into_product_id")
+          .in("merged_into_product_id", parentIds)
+          .not("id", "in", `(${Array.from(existingIds).join(",")})`);
+        if (mergedChildren && mergedChildren.length > 0) {
+          allDbProducts = [...allDbProducts, ...mergedChildren];
+        }
+      }
+
       // Build lookup maps
       const mergedIntoMap = new Map<string, string | null>();
       const mergeParentIds = new Set<string>();
