@@ -149,6 +149,27 @@ export function ProductMergeDialog({
         allDbProducts = dbProds ?? [];
       }
 
+      // Collect product IDs from RPC that might not have a campaign_id
+      const rpcProductIds = new Set<string>();
+      const dbProductIds = new Set(allDbProducts.map((p) => p.id));
+      for (const r of (rpcData ?? []) as any[]) {
+        if (r.client_id !== clientId) continue;
+        if (r.product_id && !dbProductIds.has(r.product_id)) {
+          rpcProductIds.add(r.product_id);
+        }
+      }
+
+      // Fetch merge status for products without campaign_id
+      if (rpcProductIds.size > 0) {
+        const { data: extraProds } = await supabase
+          .from("products")
+          .select("id, name, client_campaign_id, is_active, merged_into_product_id")
+          .in("id", Array.from(rpcProductIds));
+        if (extraProds) {
+          allDbProducts = [...allDbProducts, ...extraProds];
+        }
+      }
+
       // Build lookup maps
       const mergedIntoMap = new Map<string, string | null>();
       const mergeParentIds = new Set<string>();
@@ -180,7 +201,7 @@ export function ProductMergeDialog({
           name: r.adversus_product_title ?? r.product_name ?? "Ukendt",
           internalName: r.product_name ?? null,
           client_campaign_id: r.product_client_campaign_id,
-          is_active: true,
+          is_active: pid ? (allDbProducts.find((p) => p.id === pid)?.is_active ?? true) : true,
           merged_into_product_id: pid ? (mergedIntoMap.get(pid) ?? null) : null,
           isMergeParent: pid ? mergeParentIds.has(pid) : false,
         });
