@@ -258,7 +258,12 @@ export function ProductMergeDialog({
   }
 
   const selectedProducts = products.filter((p) => selectedKeys.has(p.key) && p.id);
-
+  
+  // Detect "expand existing merge" mode: if exactly one selected product is a merge parent
+  const selectedParents = selectedProducts.filter((p) => p.isMergeParent);
+  const isExpandMode = selectedParents.length === 1;
+  const expandTarget = isExpandMode ? selectedParents[0] : null;
+  const minProducts = isExpandMode ? 2 : 2; // always need at least 2 selected, but in expand mode 1 is the parent
   function setRuleAction(ruleId: string, action: RuleActionType) {
     setRuleActions((prev) => {
       const next = new Map(prev);
