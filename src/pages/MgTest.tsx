@@ -445,6 +445,19 @@ export default function MgTest() {
     },
   });
 
+  // Hent produkter der er merget ind i andre (skal filtreres fra hovedlisten)
+  const { data: mergedChildProductIds } = useQuery({
+    queryKey: ["mg-merged-child-ids"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("id")
+        .not("merged_into_product_id", "is", null);
+      if (error) throw error;
+      return new Set((data ?? []).map((row) => row.id));
+    },
+  });
+
   // Note: Campaign overrides are now managed via product_pricing_rules
 
   // Hent antal aktive regler per produkt
