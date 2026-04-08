@@ -724,8 +724,8 @@ export function ProductMergeDialog({
           </div>
         )}
 
-        {/* Step 3: Pricing rules management */}
-        {step === 3 && (
+        {/* Step 4: Pricing rules management (merge only) */}
+        {step === 4 && mode === "merge" && (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
               Vælg hvad der skal ske med prisreglerne for de valgte produkter.
@@ -816,8 +816,29 @@ export function ProductMergeDialog({
           </div>
         )}
 
-        {/* Step 4: Name product + confirm */}
-        {step === 4 && (
+        {/* Step 4: Unmerge confirm */}
+        {step === 4 && mode === "unmerge" && (
+          <div className="space-y-4">
+            <div className="bg-muted/50 rounded p-3 text-sm space-y-1">
+              <p className="font-medium flex items-center gap-1">
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                Bekræft unmerge
+              </p>
+              <p>{selectedProducts.length} produkt(er) vil blive frigjort fra deres merge-parent:</p>
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                {selectedProducts.map((p) => (
+                  <li key={p.key} className="text-sm">{p.name}</li>
+                ))}
+              </ul>
+              <p className="text-xs text-muted-foreground mt-3">
+                Produkterne bliver aktiveret igen som selvstændige produkter. Deres salgsdata og mappings forbliver uændrede.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Step 5: Name product + confirm (merge only) */}
+        {step === 5 && mode === "merge" && (
           <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium block">Produktnavn for det samlede produkt</label>
@@ -877,7 +898,7 @@ export function ProductMergeDialog({
               <Button onClick={handleNext} disabled={!canAdvance()}>
                 Næste <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
-            ) : (
+            ) : mode === "merge" ? (
               <Button
                 onClick={handleMerge}
                 disabled={merging || !mergedProductName.trim()}
@@ -885,6 +906,15 @@ export function ProductMergeDialog({
               >
                 {merging && <Loader2 className="h-4 w-4 animate-spin" />}
                 Merge {selectedProducts.length} produkter
+              </Button>
+            ) : (
+              <Button
+                onClick={handleUnmerge}
+                disabled={merging || selectedProducts.length === 0}
+                className="gap-2"
+              >
+                {merging && <Loader2 className="h-4 w-4 animate-spin" />}
+                Unmerge {selectedProducts.length} produkter
               </Button>
             )}
           </div>
