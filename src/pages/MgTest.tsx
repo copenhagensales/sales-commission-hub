@@ -563,7 +563,12 @@ export default function MgTest() {
           }
         }
 
-        if (item.product_id) {
+        // Skip merged child products
+        if (item.product_id && mergedChildProductIds?.has(item.product_id)) {
+          return;
+        }
+
+
           const groupedKey = `${clientId ?? "no-client"}::product::${item.product_id}`;
           const existing = groupedByProductId.get(groupedKey);
 
