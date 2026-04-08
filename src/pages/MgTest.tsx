@@ -678,7 +678,7 @@ export default function MgTest() {
       const titleB = b.product?.name || b.adversus_product_title || "";
       return titleA.localeCompare(titleB, "da");
     });
-  }, [aggregatedProductsRpc, manualProducts, clients, linkedProductIds]);
+  }, [aggregatedProductsRpc, manualProducts, clients, linkedProductIds, mergedChildProductIds]);
 
   // Filter products based on showHiddenProducts toggle
   const filteredAggregatedProducts = useMemo(() => {
