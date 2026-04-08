@@ -568,7 +568,7 @@ export default function MgTest() {
           return;
         }
 
-
+        if (item.product_id) {
           const groupedKey = `${clientId ?? "no-client"}::product::${item.product_id}`;
           const existing = groupedByProductId.get(groupedKey);
 
