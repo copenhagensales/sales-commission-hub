@@ -91,6 +91,7 @@ export function ProductMergeDialog({
   useEffect(() => {
     if (open) {
       setStep(1);
+      setMode("merge");
       setSelectedClientId("");
       setProducts([]);
       setSelectedKeys(new Set());
