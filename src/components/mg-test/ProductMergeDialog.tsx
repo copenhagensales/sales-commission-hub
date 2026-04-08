@@ -318,9 +318,8 @@ export function ProductMergeDialog({
       // Deduplicate IDs — multiple RPC rows can reference the same product_id
       const uniqueIds = [...new Set(allIds)];
 
-      // Decide which product ID to use as the "target" — pick the first selected one
-      // and rename it, or create a new product
-      const targetId = uniqueIds[0];
+      // In expand mode, use the existing merge parent as target
+      const targetId = expandTarget?.id ?? uniqueIds[0];
       const sourceIds = uniqueIds.filter(id => id !== targetId);
 
       // Rename target product
