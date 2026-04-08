@@ -320,12 +320,41 @@ export function ProductMergeDialog({
           .in("product_id", sourceIds);
         if (e4) throw e4;
 
-        // Move product_campaign_overrides
-        const { error: e5 } = await supabase
+        // Move product_campaign_overrides (handle unique constraint on product_id + campaign_mapping_id)
+        // First, get existing overrides on the target product
+        const { data: targetOverrides } = await supabase
           .from("product_campaign_overrides")
-          .update({ product_id: targetId })
+          .select("campaign_mapping_id")
+          .eq("product_id", targetId);
+        const existingCampaignIds = new Set((targetOverrides || []).map((o: any) => o.campaign_mapping_id));
+
+        // Get source overrides
+        const { data: sourceOverrides } = await supabase
+          .from("product_campaign_overrides")
+          .select("id, campaign_mapping_id")
           .in("product_id", sourceIds);
-        if (e5) throw e5;
+
+        if (sourceOverrides && sourceOverrides.length > 0) {
+          // Delete source overrides that would conflict with existing target overrides
+          const conflictIds = sourceOverrides
+            .filter((o: any) => existingCampaignIds.has(o.campaign_mapping_id))
+            .map((o: any) => o.id);
+          if (conflictIds.length > 0) {
+            await supabase.from("product_campaign_overrides").delete().in("id", conflictIds);
+          }
+
+          // Move remaining non-conflicting overrides to target
+          const moveIds = sourceOverrides
+            .filter((o: any) => !existingCampaignIds.has(o.campaign_mapping_id))
+            .map((o: any) => o.id);
+          if (moveIds.length > 0) {
+            const { error: e5 } = await supabase
+              .from("product_campaign_overrides")
+              .update({ product_id: targetId })
+              .in("id", moveIds);
+            if (e5) throw e5;
+          }
+        }
       }
 
       // Handle pricing rules according to user choices
