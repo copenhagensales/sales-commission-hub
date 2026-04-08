@@ -445,6 +445,19 @@ export default function MgTest() {
     },
   });
 
+  // Hent produkter der er merget ind i andre (skal filtreres fra hovedlisten)
+  const { data: mergedChildProductIds } = useQuery({
+    queryKey: ["mg-merged-child-ids"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("id")
+        .not("merged_into_product_id", "is", null);
+      if (error) throw error;
+      return new Set((data ?? []).map((row) => row.id));
+    },
+  });
+
   // Note: Campaign overrides are now managed via product_pricing_rules
 
   // Hent antal aktive regler per produkt
@@ -548,6 +561,11 @@ export default function MgTest() {
             clientId = parsedClient.id;
             clientName = parsedClient.name ?? "Ukendt kunde";
           }
+        }
+
+        // Skip merged child products
+        if (item.product_id && mergedChildProductIds?.has(item.product_id)) {
+          return;
         }
 
         if (item.product_id) {
@@ -660,7 +678,7 @@ export default function MgTest() {
       const titleB = b.product?.name || b.adversus_product_title || "";
       return titleA.localeCompare(titleB, "da");
     });
-  }, [aggregatedProductsRpc, manualProducts, clients, linkedProductIds]);
+  }, [aggregatedProductsRpc, manualProducts, clients, linkedProductIds, mergedChildProductIds]);
 
   // Filter products based on showHiddenProducts toggle
   const filteredAggregatedProducts = useMemo(() => {
