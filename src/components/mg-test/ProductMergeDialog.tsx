@@ -286,10 +286,13 @@ export function ProductMergeDialog({
     try {
       const allIds = selectedProducts.map((p) => p.id!).filter(Boolean);
 
+      // Deduplicate IDs — multiple RPC rows can reference the same product_id
+      const uniqueIds = [...new Set(allIds)];
+
       // Decide which product ID to use as the "target" — pick the first selected one
       // and rename it, or create a new product
-      const targetId = allIds[0];
-      const sourceIds = allIds.slice(1);
+      const targetId = uniqueIds[0];
+      const sourceIds = uniqueIds.filter(id => id !== targetId);
 
       // Rename target product
       const { error: renameErr } = await supabase
