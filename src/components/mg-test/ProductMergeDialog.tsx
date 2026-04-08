@@ -301,9 +301,9 @@ export function ProductMergeDialog({
       loadPricingRules();
       setStep(3);
     } else if (step === 3) {
-      // Default name to first selected product's name
+      // Default name: use expand target name if expanding, otherwise first selected
       if (!mergedProductName) {
-        setMergedProductName(selectedProducts[0]?.name ?? "");
+        setMergedProductName(expandTarget?.name ?? selectedProducts[0]?.name ?? "");
       }
       setStep(4);
     }
