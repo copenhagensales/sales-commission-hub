@@ -425,6 +425,7 @@ export default function MgTest() {
             clients(id, name)
           )
         `)
+        .is("merged_into_product_id", null)
         .order("name");
       if (error) throw error;
       return data;
