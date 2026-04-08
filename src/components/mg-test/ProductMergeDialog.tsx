@@ -559,7 +559,7 @@ export function ProductMergeDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Merge className="h-5 w-5" />
-            Merge produkter
+            {mode === "merge" ? "Merge produkter" : "Unmerge produkter"}
           </DialogTitle>
           <DialogDescription>
             {stepLabels[step - 1]} (trin {step} af {totalSteps})
