@@ -613,13 +613,52 @@ export function ProductMergeDialog({
           </div>
         )}
 
-        {/* Step 2: Select products (no target selection) */}
+        {/* Step 2: Select mode (merge or unmerge) */}
         {step === 2 && (
           <div className="space-y-3">
+            <label className="text-sm font-medium block">Hvad vil du gøre?</label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setMode("merge")}
+                className={cn(
+                  "flex flex-col items-center gap-3 rounded-lg border-2 p-6 transition-all text-left",
+                  mode === "merge"
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:border-muted-foreground/40"
+                )}
+              >
+                <GitMerge className={cn("h-8 w-8", mode === "merge" ? "text-primary" : "text-muted-foreground")} />
+                <div className="text-center">
+                  <p className="font-medium text-sm">Merge</p>
+                  <p className="text-xs text-muted-foreground mt-1">Saml flere produkter til ét</p>
+                </div>
+              </button>
+              <button
+                onClick={() => setMode("unmerge")}
+                className={cn(
+                  "flex flex-col items-center gap-3 rounded-lg border-2 p-6 transition-all text-left",
+                  mode === "unmerge"
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:border-muted-foreground/40"
+                )}
+              >
+                <Unlink className={cn("h-8 w-8", mode === "unmerge" ? "text-primary" : "text-muted-foreground")} />
+                <div className="text-center">
+                  <p className="font-medium text-sm">Unmerge</p>
+                  <p className="text-xs text-muted-foreground mt-1">Frigør et produkt fra en merge</p>
+                </div>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Select products */}
+        {step === 3 && (
+          <div className="space-y-3">
             <label className="text-sm font-medium block">
-              Vælg produkter at merge (min. 2)
+              {mode === "merge" ? "Vælg produkter at merge (min. 2)" : "Vælg produkter at unmerge"}
             </label>
-            {isExpandMode && expandTarget && (
+            {mode === "merge" && isExpandMode && expandTarget && (
               <div className="bg-primary/10 border border-primary/20 rounded p-2 text-sm flex items-center gap-2">
                 <Merge className="h-4 w-4 text-primary" />
                 <span>Tilføjer til eksisterende merge: <strong>{expandTarget.name}</strong></span>
