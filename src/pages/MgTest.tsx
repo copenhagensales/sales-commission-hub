@@ -58,6 +58,9 @@ interface AggregatedProduct {
   key: string;
   adversus_external_id: string | null;
   adversus_product_title: string | null;
+  mappingTitles?: string[];
+  mappingExternalIds?: string[];
+  mappingCount?: number;
   product: {
     id: string;
     name: string;
