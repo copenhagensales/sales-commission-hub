@@ -160,6 +160,7 @@ export function ProductMergeDialog({
       }
 
       const seenKeys = new Set<string>();
+      const seenProductIds = new Set<string>();
       const result: ProductRow[] = [];
 
       for (const r of (rpcData ?? []) as any[]) {
@@ -169,6 +170,10 @@ export function ProductMergeDialog({
         seenKeys.add(productKey);
 
         const pid = r.product_id ?? null;
+        // Skip if we already have a row for this product_id (dedup by internal ID too)
+        if (pid && seenProductIds.has(pid)) continue;
+        if (pid) seenProductIds.add(pid);
+
         result.push({
           key: productKey,
           id: pid,
