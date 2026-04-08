@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Loader2, Merge, AlertTriangle, ChevronLeft, ChevronRight, CalendarIcon } from "lucide-react";
+import { Loader2, Merge, AlertTriangle, ChevronLeft, ChevronRight, CalendarIcon, GitMerge, Unlink } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +33,7 @@ interface PricingRule {
   rule_name: string | null;
 }
 
+type MergeMode = "merge" | "unmerge";
 type RuleActionType = "keep" | "end" | "delete";
 
 interface RuleAction {
@@ -69,6 +70,7 @@ export function ProductMergeDialog({
 }: ProductMergeDialogProps) {
   const queryClient = useQueryClient();
   const [step, setStep] = useState(1);
+  const [mode, setMode] = useState<MergeMode>("merge");
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [selectedClientId, setSelectedClientId] = useState("");
   const [products, setProducts] = useState<ProductRow[]>([]);
@@ -89,6 +91,7 @@ export function ProductMergeDialog({
   useEffect(() => {
     if (open) {
       setStep(1);
+      setMode("merge");
       setSelectedClientId("");
       setProducts([]);
       setSelectedKeys(new Set());
@@ -321,17 +324,24 @@ export function ProductMergeDialog({
 
   function handleNext() {
     if (step === 1 && selectedClientId) {
-      loadProducts(selectedClientId);
       setStep(2);
-    } else if (step === 2 && selectedKeys.size >= 2) {
-      loadPricingRules();
+    } else if (step === 2) {
+      // Mode selected, load products and go to step 3
+      loadProducts(selectedClientId);
       setStep(3);
     } else if (step === 3) {
+      if (mode === "merge" && selectedKeys.size >= 2) {
+        loadPricingRules();
+        setStep(4);
+      } else if (mode === "unmerge" && selectedKeys.size >= 1) {
+        setStep(4); // confirm step for unmerge
+      }
+    } else if (step === 4 && mode === "merge") {
       // Default name: use expand target name if expanding, otherwise first selected
       if (!mergedProductName) {
         setMergedProductName(expandTarget?.name ?? selectedProducts[0]?.name ?? "");
       }
-      setStep(4);
+      setStep(5);
     }
   }
 
@@ -527,13 +537,48 @@ export function ProductMergeDialog({
     }
   }
 
-  const stepLabels = ["Vælg kunde", "Vælg produkter", "Prisregler", "Navngiv & bekræft"];
-  const totalSteps = 4;
+  async function handleUnmerge() {
+    const toUnmerge = selectedProducts.filter((p) => p.id && p.merged_into_product_id);
+    if (toUnmerge.length === 0) return;
+    setMerging(true);
+    try {
+      for (const product of toUnmerge) {
+        const { error } = await supabase
+          .from("products")
+          .update({ merged_into_product_id: null, is_active: true } as any)
+          .eq("id", product.id!);
+        if (error) throw error;
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["aggregated-product-types"] });
+      queryClient.invalidateQueries({ queryKey: ["sales"] });
+      queryClient.invalidateQueries({ queryKey: ["sale_items"] });
+
+      toast.success(`${toUnmerge.length} produkt(er) frigjort fra merge`);
+      onOpenChange(false);
+      onMergeComplete();
+    } catch (err: any) {
+      console.error("Unmerge error:", err);
+      toast.error(`Unmerge fejlede: ${err.message || "Ukendt fejl"}`);
+    } finally {
+      setMerging(false);
+    }
+  }
+
+  const stepLabels = mode === "merge"
+    ? ["Vælg kunde", "Vælg handling", "Vælg produkter", "Prisregler", "Navngiv & bekræft"]
+    : ["Vælg kunde", "Vælg handling", "Vælg produkter", "Bekræft"];
+  const totalSteps = stepLabels.length;
 
   const canAdvance = () => {
     if (step === 1) return !!selectedClientId;
-    if (step === 2) return selectedKeys.size >= 2;
-    if (step === 3) return true;
+    if (step === 2) return true; // mode is always selected
+    if (step === 3) {
+      if (mode === "merge") return selectedKeys.size >= 2;
+      if (mode === "unmerge") return selectedKeys.size >= 1;
+    }
+    if (step === 4 && mode === "merge") return true; // pricing rules
     return false;
   };
 
@@ -543,7 +588,7 @@ export function ProductMergeDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Merge className="h-5 w-5" />
-            Merge produkter
+            {mode === "merge" ? "Merge produkter" : "Unmerge produkter"}
           </DialogTitle>
           <DialogDescription>
             {stepLabels[step - 1]} (trin {step} af {totalSteps})
@@ -597,13 +642,52 @@ export function ProductMergeDialog({
           </div>
         )}
 
-        {/* Step 2: Select products (no target selection) */}
+        {/* Step 2: Select mode (merge or unmerge) */}
         {step === 2 && (
           <div className="space-y-3">
+            <label className="text-sm font-medium block">Hvad vil du gøre?</label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setMode("merge")}
+                className={cn(
+                  "flex flex-col items-center gap-3 rounded-lg border-2 p-6 transition-all text-left",
+                  mode === "merge"
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:border-muted-foreground/40"
+                )}
+              >
+                <GitMerge className={cn("h-8 w-8", mode === "merge" ? "text-primary" : "text-muted-foreground")} />
+                <div className="text-center">
+                  <p className="font-medium text-sm">Merge</p>
+                  <p className="text-xs text-muted-foreground mt-1">Saml flere produkter til ét</p>
+                </div>
+              </button>
+              <button
+                onClick={() => setMode("unmerge")}
+                className={cn(
+                  "flex flex-col items-center gap-3 rounded-lg border-2 p-6 transition-all text-left",
+                  mode === "unmerge"
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:border-muted-foreground/40"
+                )}
+              >
+                <Unlink className={cn("h-8 w-8", mode === "unmerge" ? "text-primary" : "text-muted-foreground")} />
+                <div className="text-center">
+                  <p className="font-medium text-sm">Unmerge</p>
+                  <p className="text-xs text-muted-foreground mt-1">Frigør et produkt fra en merge</p>
+                </div>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Select products */}
+        {step === 3 && (
+          <div className="space-y-3">
             <label className="text-sm font-medium block">
-              Vælg produkter at merge (min. 2)
+              {mode === "merge" ? "Vælg produkter at merge (min. 2)" : "Vælg produkter at unmerge"}
             </label>
-            {isExpandMode && expandTarget && (
+            {mode === "merge" && isExpandMode && expandTarget && (
               <div className="bg-primary/10 border border-primary/20 rounded p-2 text-sm flex items-center gap-2">
                 <Merge className="h-4 w-4 text-primary" />
                 <span>Tilføjer til eksisterende merge: <strong>{expandTarget.name}</strong></span>
@@ -617,11 +701,19 @@ export function ProductMergeDialog({
               <p className="text-sm text-muted-foreground">Ingen aktive produkter fundet for denne kunde.</p>
             ) : (
               <div className="max-h-[300px] overflow-y-auto space-y-1 border rounded p-2">
-                {products.map((p) => {
+                {products
+                  .filter((p) => {
+                    if (mode === "unmerge") {
+                      // Only show merged children
+                      return !!p.merged_into_product_id && p.merged_into_product_id !== p.id;
+                    }
+                    return true;
+                  })
+                  .map((p) => {
                   const isSelected = selectedKeys.has(p.key);
                   const isUnmapped = !p.id;
                   const isMergedChild = !!p.merged_into_product_id && p.merged_into_product_id !== p.id;
-                  const isDisabled = isUnmapped || isMergedChild;
+                  const isDisabled = mode === "merge" ? (isUnmapped || isMergedChild) : false;
                   return (
                     <div
                       key={p.key}
@@ -661,8 +753,8 @@ export function ProductMergeDialog({
           </div>
         )}
 
-        {/* Step 3: Pricing rules management */}
-        {step === 3 && (
+        {/* Step 4: Pricing rules management (merge only) */}
+        {step === 4 && mode === "merge" && (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
               Vælg hvad der skal ske med prisreglerne for de valgte produkter.
@@ -753,8 +845,29 @@ export function ProductMergeDialog({
           </div>
         )}
 
-        {/* Step 4: Name product + confirm */}
-        {step === 4 && (
+        {/* Step 4: Unmerge confirm */}
+        {step === 4 && mode === "unmerge" && (
+          <div className="space-y-4">
+            <div className="bg-muted/50 rounded p-3 text-sm space-y-1">
+              <p className="font-medium flex items-center gap-1">
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                Bekræft unmerge
+              </p>
+              <p>{selectedProducts.length} produkt(er) vil blive frigjort fra deres merge-parent:</p>
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                {selectedProducts.map((p) => (
+                  <li key={p.key} className="text-sm">{p.name}</li>
+                ))}
+              </ul>
+              <p className="text-xs text-muted-foreground mt-3">
+                Produkterne bliver aktiveret igen som selvstændige produkter. Deres salgsdata og mappings forbliver uændrede.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Step 5: Name product + confirm (merge only) */}
+        {step === 5 && mode === "merge" && (
           <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium block">Produktnavn for det samlede produkt</label>
@@ -814,7 +927,7 @@ export function ProductMergeDialog({
               <Button onClick={handleNext} disabled={!canAdvance()}>
                 Næste <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
-            ) : (
+            ) : mode === "merge" ? (
               <Button
                 onClick={handleMerge}
                 disabled={merging || !mergedProductName.trim()}
@@ -822,6 +935,15 @@ export function ProductMergeDialog({
               >
                 {merging && <Loader2 className="h-4 w-4 animate-spin" />}
                 Merge {selectedProducts.length} produkter
+              </Button>
+            ) : (
+              <Button
+                onClick={handleUnmerge}
+                disabled={merging || selectedProducts.length === 0}
+                className="gap-2"
+              >
+                {merging && <Loader2 className="h-4 w-4 animate-spin" />}
+                Unmerge {selectedProducts.length} produkter
               </Button>
             )}
           </div>
