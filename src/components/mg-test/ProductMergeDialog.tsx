@@ -530,13 +530,19 @@ export function ProductMergeDialog({
     }
   }
 
-  const stepLabels = ["Vælg kunde", "Vælg produkter", "Prisregler", "Navngiv & bekræft"];
-  const totalSteps = 4;
+  const stepLabels = mode === "merge"
+    ? ["Vælg kunde", "Vælg handling", "Vælg produkter", "Prisregler", "Navngiv & bekræft"]
+    : ["Vælg kunde", "Vælg handling", "Vælg produkter", "Bekræft"];
+  const totalSteps = stepLabels.length;
 
   const canAdvance = () => {
     if (step === 1) return !!selectedClientId;
-    if (step === 2) return selectedKeys.size >= 2;
-    if (step === 3) return true;
+    if (step === 2) return true; // mode is always selected
+    if (step === 3) {
+      if (mode === "merge") return selectedKeys.size >= 2;
+      if (mode === "unmerge") return selectedKeys.size >= 1;
+    }
+    if (step === 4 && mode === "merge") return true; // pricing rules
     return false;
   };
 
