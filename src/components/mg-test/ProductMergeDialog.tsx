@@ -564,6 +564,7 @@ export function ProductMergeDialog({
     } finally {
       setMerging(false);
     }
+  }
 
   const stepLabels = mode === "merge"
     ? ["Vælg kunde", "Vælg handling", "Vælg produkter", "Prisregler", "Navngiv & bekræft"]
