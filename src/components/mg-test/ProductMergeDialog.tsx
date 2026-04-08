@@ -33,6 +33,7 @@ interface PricingRule {
   rule_name: string | null;
 }
 
+type MergeMode = "merge" | "unmerge";
 type RuleActionType = "keep" | "end" | "delete";
 
 interface RuleAction {
