@@ -537,6 +537,34 @@ export function ProductMergeDialog({
     }
   }
 
+  async function handleUnmerge() {
+    const toUnmerge = selectedProducts.filter((p) => p.id && p.merged_into_product_id);
+    if (toUnmerge.length === 0) return;
+    setMerging(true);
+    try {
+      for (const product of toUnmerge) {
+        const { error } = await supabase
+          .from("products")
+          .update({ merged_into_product_id: null, is_active: true } as any)
+          .eq("id", product.id!);
+        if (error) throw error;
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["aggregated-product-types"] });
+      queryClient.invalidateQueries({ queryKey: ["sales"] });
+      queryClient.invalidateQueries({ queryKey: ["sale_items"] });
+
+      toast.success(`${toUnmerge.length} produkt(er) frigjort fra merge`);
+      onOpenChange(false);
+      onMergeComplete();
+    } catch (err: any) {
+      console.error("Unmerge error:", err);
+      toast.error(`Unmerge fejlede: ${err.message || "Ukendt fejl"}`);
+    } finally {
+      setMerging(false);
+    }
+
   const stepLabels = mode === "merge"
     ? ["Vælg kunde", "Vælg handling", "Vælg produkter", "Prisregler", "Navngiv & bekræft"]
     : ["Vælg kunde", "Vælg handling", "Vælg produkter", "Bekræft"];
