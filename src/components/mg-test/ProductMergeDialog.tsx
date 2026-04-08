@@ -133,6 +133,32 @@ export function ProductMergeDialog({
       const { data: rpcData, error: rpcError } = await supabase.rpc("get_aggregated_product_types");
       if (rpcError) throw rpcError;
 
+      // Fetch all products for this client to get merge status
+      const { data: campaigns } = await supabase
+        .from("client_campaigns")
+        .select("id")
+        .eq("client_id", clientId);
+      const campaignIds = (campaigns ?? []).map((c) => c.id);
+
+      let allDbProducts: any[] = [];
+      if (campaignIds.length > 0) {
+        const { data: dbProds } = await supabase
+          .from("products")
+          .select("id, name, client_campaign_id, is_active, merged_into_product_id")
+          .in("client_campaign_id", campaignIds);
+        allDbProducts = dbProds ?? [];
+      }
+
+      // Build lookup maps
+      const mergedIntoMap = new Map<string, string | null>();
+      const mergeParentIds = new Set<string>();
+      for (const p of allDbProducts) {
+        mergedIntoMap.set(p.id, p.merged_into_product_id);
+        if (p.merged_into_product_id && p.merged_into_product_id !== p.id) {
+          mergeParentIds.add(p.merged_into_product_id);
+        }
+      }
+
       const seenKeys = new Set<string>();
       const result: ProductRow[] = [];
 
@@ -142,27 +168,21 @@ export function ProductMergeDialog({
         if (seenKeys.has(productKey)) continue;
         seenKeys.add(productKey);
 
+        const pid = r.product_id ?? null;
         result.push({
           key: productKey,
-          id: r.product_id ?? null,
+          id: pid,
           name: r.adversus_product_title ?? r.product_name ?? "Ukendt",
           internalName: r.product_name ?? null,
           client_campaign_id: r.product_client_campaign_id,
           is_active: true,
+          merged_into_product_id: pid ? (mergedIntoMap.get(pid) ?? null) : null,
+          isMergeParent: pid ? mergeParentIds.has(pid) : false,
         });
       }
 
-      const { data: campaigns } = await supabase
-        .from("client_campaigns")
-        .select("id")
-        .eq("client_id", clientId);
-      const campaignIds = (campaigns ?? []).map((c) => c.id);
       if (campaignIds.length > 0) {
-        const { data: directProducts } = await supabase
-          .from("products")
-          .select("id, name, client_campaign_id, is_active")
-          .in("client_campaign_id", campaignIds);
-        for (const p of directProducts ?? []) {
+        for (const p of allDbProducts) {
           const manualKey = `manual::${p.id}`;
           if (!seenKeys.has(manualKey)) {
             const alreadyCovered = result.some((r) => r.id === p.id);
@@ -175,6 +195,8 @@ export function ProductMergeDialog({
                 internalName: p.name,
                 client_campaign_id: p.client_campaign_id,
                 is_active: p.is_active ?? true,
+                merged_into_product_id: p.merged_into_product_id ?? null,
+                isMergeParent: mergeParentIds.has(p.id),
               });
             }
           }
