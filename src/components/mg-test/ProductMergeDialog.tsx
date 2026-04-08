@@ -672,11 +672,19 @@ export function ProductMergeDialog({
               <p className="text-sm text-muted-foreground">Ingen aktive produkter fundet for denne kunde.</p>
             ) : (
               <div className="max-h-[300px] overflow-y-auto space-y-1 border rounded p-2">
-                {products.map((p) => {
+                {products
+                  .filter((p) => {
+                    if (mode === "unmerge") {
+                      // Only show merged children
+                      return !!p.merged_into_product_id && p.merged_into_product_id !== p.id;
+                    }
+                    return true;
+                  })
+                  .map((p) => {
                   const isSelected = selectedKeys.has(p.key);
                   const isUnmapped = !p.id;
                   const isMergedChild = !!p.merged_into_product_id && p.merged_into_product_id !== p.id;
-                  const isDisabled = isUnmapped || isMergedChild;
+                  const isDisabled = mode === "merge" ? (isUnmapped || isMergedChild) : false;
                   return (
                     <div
                       key={p.key}
