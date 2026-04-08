@@ -335,19 +335,25 @@ export function ProductMergeDialog({
       if (renameErr) throw renameErr;
 
       // Move adversus_product_mappings
+      let adversusMappingsMoved = 0;
+      let saleItemsMoved = 0;
+      let pricingRulesMoved = 0;
+
       if (sourceIds.length > 0) {
-        const { error: e1 } = await supabase
+        const { error: e1, count: c1 } = await supabase
           .from("adversus_product_mappings")
           .update({ product_id: targetId })
           .in("product_id", sourceIds);
         if (e1) throw e1;
+        adversusMappingsMoved = c1 ?? 0;
 
         // Move sale_items
-        const { error: e2 } = await supabase
+        const { error: e2, count: c2 } = await supabase
           .from("sale_items")
           .update({ product_id: targetId })
           .in("product_id", sourceIds);
         if (e2) throw e2;
+        saleItemsMoved = c2 ?? 0;
 
         // Move cancellation_product_mappings
         const { error: e4 } = await supabase
@@ -355,6 +361,20 @@ export function ProductMergeDialog({
           .update({ product_id: targetId })
           .in("product_id", sourceIds);
         if (e4) throw e4;
+
+        // Move cancellation_product_conditions
+        const { error: eCpc } = await supabase
+          .from("cancellation_product_conditions")
+          .update({ product_id: targetId })
+          .in("product_id", sourceIds);
+        if (eCpc) throw eCpc;
+
+        // Move product_price_history
+        const { error: ePph } = await supabase
+          .from("product_price_history" as any)
+          .update({ product_id: targetId })
+          .in("product_id", sourceIds);
+        if (ePph) throw ePph;
 
         // Move product_campaign_overrides (handle unique constraint on product_id + campaign_mapping_id)
         // First, get existing overrides on the target product
@@ -396,13 +416,12 @@ export function ProductMergeDialog({
       // Handle pricing rules according to user choices
       for (const [ruleId, action] of ruleActions.entries()) {
         if (action.action === "keep") {
-          // Update product_id to target
           await supabase
             .from("product_pricing_rules")
             .update({ product_id: targetId })
             .eq("id", ruleId);
+          pricingRulesMoved++;
         } else if (action.action === "end") {
-          // Update product_id + set effective_to
           await supabase
             .from("product_pricing_rules")
             .update({
@@ -410,6 +429,7 @@ export function ProductMergeDialog({
               effective_to: action.endDate || null,
             })
             .eq("id", ruleId);
+          pricingRulesMoved++;
         } else if (action.action === "delete") {
           await supabase
             .from("product_pricing_rules")
@@ -427,16 +447,16 @@ export function ProductMergeDialog({
         if (e6) throw e6;
       }
 
-      // Log merge history
+      // Log merge history with actual counts
       const { data: userData } = await supabase.auth.getUser();
-      const historyRows = selectedProducts.slice(1).map((p) => ({
-        source_product_id: p.id!,
+      const historyRows = sourceIds.map((srcId) => ({
+        source_product_id: srcId,
         target_product_id: targetId,
         merged_by: userData?.user?.id ?? null,
-        source_product_name: p.name,
-        adversus_mappings_moved: 0,
-        sale_items_moved: 0,
-        pricing_rules_moved: 0,
+        source_product_name: selectedProducts.find((p) => p.id === srcId)?.name ?? "Ukendt",
+        adversus_mappings_moved: adversusMappingsMoved,
+        sale_items_moved: saleItemsMoved,
+        pricing_rules_moved: pricingRulesMoved,
       }));
 
       if (historyRows.length > 0) {
