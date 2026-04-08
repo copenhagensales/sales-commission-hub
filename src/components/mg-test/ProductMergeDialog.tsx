@@ -70,6 +70,7 @@ export function ProductMergeDialog({
 }: ProductMergeDialogProps) {
   const queryClient = useQueryClient();
   const [step, setStep] = useState(1);
+  const [mode, setMode] = useState<MergeMode>("merge");
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [selectedClientId, setSelectedClientId] = useState("");
   const [products, setProducts] = useState<ProductRow[]>([]);
