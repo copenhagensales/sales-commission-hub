@@ -715,53 +715,100 @@ export function ProductMergeDialog({
               <p className="text-sm text-muted-foreground">Ingen aktive produkter fundet for denne kunde.</p>
             ) : (
               <div className="max-h-[300px] overflow-y-auto space-y-1 border rounded p-2">
-                {products
-                  .filter((p) => {
-                    if (mode === "unmerge") {
-                      // Only show merged children
-                      return !!p.merged_into_product_id && p.merged_into_product_id !== p.id;
+                {mode === "unmerge" ? (
+                  // Group children by parent for unmerge mode
+                  (() => {
+                    const children = products.filter(
+                      (p) => !!p.merged_into_product_id && p.merged_into_product_id !== p.id
+                    );
+                    const parentLookup = new Map<string, string>();
+                    for (const p of products) {
+                      if (p.id) parentLookup.set(p.id, p.internalName || p.name);
                     }
-                    return true;
+                    // Group by parent id
+                    const groups = new Map<string, typeof children>();
+                    for (const c of children) {
+                      const pid = c.merged_into_product_id!;
+                      if (!groups.has(pid)) groups.set(pid, []);
+                      groups.get(pid)!.push(c);
+                    }
+                    return Array.from(groups.entries()).map(([parentId, groupChildren]) => (
+                      <div key={parentId} className="mb-2 last:mb-0">
+                        <div className="flex items-center gap-2 px-2 py-1.5 text-xs font-semibold text-muted-foreground border-b border-border/50 mb-1">
+                          <Merge className="h-3 w-3" />
+                          <span>Parent: {parentLookup.get(parentId) || "Ukendt"}</span>
+                          <Badge variant="outline" className="text-[10px] ml-auto">{groupChildren.length} child(s)</Badge>
+                        </div>
+                        {groupChildren.map((p) => {
+                          const isSelected = selectedKeys.has(p.key);
+                          return (
+                            <div
+                              key={p.key}
+                              className={`flex items-center gap-3 px-3 py-2 rounded text-sm ml-3 ${
+                                isSelected ? "bg-muted/50" : ""
+                              }`}
+                            >
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={(checked) => {
+                                  setSelectedKeys((prev) => {
+                                    const next = new Set(prev);
+                                    if (checked) next.add(p.key);
+                                    else next.delete(p.key);
+                                    return next;
+                                  });
+                                }}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <span className="block truncate font-medium">{p.name}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ));
+                  })()
+                ) : (
+                  products.map((p) => {
+                    const isSelected = selectedKeys.has(p.key);
+                    const isUnmapped = !p.id;
+                    const isMergedChild = !!p.merged_into_product_id && p.merged_into_product_id !== p.id;
+                    const isDisabled = isUnmapped || isMergedChild;
+                    return (
+                      <div
+                        key={p.key}
+                        className={`flex items-center gap-3 px-3 py-2 rounded text-sm ${
+                          isSelected ? "bg-muted/50" : ""
+                        } ${isDisabled ? "opacity-50" : ""}`}
+                      >
+                        <Checkbox
+                          checked={isSelected}
+                          disabled={isDisabled}
+                          onCheckedChange={(checked) => {
+                            setSelectedKeys((prev) => {
+                              const next = new Set(prev);
+                              if (checked) next.add(p.key);
+                              else next.delete(p.key);
+                              return next;
+                            });
+                          }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <span className="block truncate font-medium">{p.name}</span>
+                          {p.internalName && p.internalName !== p.name && (
+                            <span className="block truncate text-xs text-muted-foreground">Internt: {p.internalName}</span>
+                          )}
+                        </div>
+                        <div className="flex gap-1 flex-shrink-0">
+                          {isMergedChild && <Badge variant="secondary" className="text-[10px]">Allerede merget</Badge>}
+                          {p.isMergeParent && <Badge variant="outline" className="text-[10px] border-primary/40 text-primary">Merge-parent</Badge>}
+                          {isUnmapped && <Badge variant="secondary" className="text-[10px]">Ikke mappet</Badge>}
+                          {!p.is_active && !isUnmapped && !isMergedChild && <Badge variant="secondary" className="text-[10px]">Inaktiv</Badge>}
+                        </div>
+                      </div>
+                    );
                   })
-                  .map((p) => {
-                  const isSelected = selectedKeys.has(p.key);
-                  const isUnmapped = !p.id;
-                  const isMergedChild = !!p.merged_into_product_id && p.merged_into_product_id !== p.id;
-                  const isDisabled = mode === "merge" ? (isUnmapped || isMergedChild) : false;
-                  return (
-                    <div
-                      key={p.key}
-                      className={`flex items-center gap-3 px-3 py-2 rounded text-sm ${
-                        isSelected ? "bg-muted/50" : ""
-                      } ${isDisabled ? "opacity-50" : ""}`}
-                    >
-                      <Checkbox
-                        checked={isSelected}
-                        disabled={isDisabled}
-                        onCheckedChange={(checked) => {
-                          setSelectedKeys((prev) => {
-                            const next = new Set(prev);
-                            if (checked) next.add(p.key);
-                            else next.delete(p.key);
-                            return next;
-                          });
-                        }}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <span className="block truncate font-medium">{p.name}</span>
-                        {p.internalName && p.internalName !== p.name && (
-                          <span className="block truncate text-xs text-muted-foreground">Internt: {p.internalName}</span>
-                        )}
-                      </div>
-                      <div className="flex gap-1 flex-shrink-0">
-                        {isMergedChild && <Badge variant="secondary" className="text-[10px]">Allerede merget</Badge>}
-                        {p.isMergeParent && <Badge variant="outline" className="text-[10px] border-primary/40 text-primary">Merge-parent</Badge>}
-                        {isUnmapped && <Badge variant="secondary" className="text-[10px]">Ikke mappet</Badge>}
-                        {!p.is_active && !isUnmapped && !isMergedChild && <Badge variant="secondary" className="text-[10px]">Inaktiv</Badge>}
-                      </div>
-                    </div>
-                  );
-                })}
+                )}
               </div>
             )}
           </div>
