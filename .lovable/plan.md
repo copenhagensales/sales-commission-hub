@@ -1,49 +1,42 @@
 
 
-## Konfigurer ALKA API med produktregler, datafiltre og org codes
+## Komplet plan: Fix merge-logik + konsolider duplikerede produkter
 
-### Analyse af sample-data
-Test-kaldet viser at ALKA API'et har **nøjagtig samme datastruktur** som Tryg:
-- `data.Resultat` — bruges til at matche succesfulde leads
-- `campaign.code` — bruges i produktnavnet (f.eks. "Meeting -- MB_Agentur Villa alle områder")
-- `lastModifiedByUser.orgCode` — bruges til org code filtrering
-- `firstProcessedByUser.orgCode` — fallback for agent-attribution
+### Problem
+1. Merge-wizarden mangler opdatering af `cancellation_product_conditions` og `product_price_history` — data forbliver på deaktiverede produkter
+2. Merge-historik logges med hardcoded `0`-værdier
+3. To identiske "Fri tale + 150 GB data (5G) (6 mdr. binding)" produkter (`95cf33d1` og `d1bc3454`) er begge aktive og skal konsolideres
 
-### Ændringer
+---
 
-#### 1. Opdater `dialer_integrations.config` for ALKA (database UPDATE)
-Sæt config identisk med Tryg:
-```json
-{
-  "productExtraction": {
-    "strategy": "conditional",
-    "conditionalRules": [{
-      "conditionKey": "Resultat",
-      "conditionValue": "",
-      "extractionType": "composite",
-      "productNameTemplate": "Meeting -- {{campaign.code}}"
-    }],
-    "dataFilters": [{
-      "field": "lastModifiedByUser.orgCode",
-      "operator": "contains",
-      "value": "@copenhagensales.dk"
-    }]
-  },
-  "sync_frequency_minutes": 15,
-  "sync_schedule": "4,19,34,49 * * * *"
-}
-```
+### Trin 1: Opdater `src/components/mg-test/ProductMergeDialog.tsx`
 
-#### 2. Sæt `calls_org_codes` for ALKA
-Sæt til `["Copenhagen sales"]` ligesom Tryg, så sessions/calls filtreres korrekt.
+Tilføj i `handleMerge()` efter de eksisterende moves:
 
-#### 3. Tilføj ALKA til `tv-dashboard-data` mappings
-Map `alka` → ALKA client ID `0a8048ac-ac28-4999-b1a7-5d1238d7fc2c` i TV dashboard-funktionen.
+- **`cancellation_product_conditions`**: Flyt alle rækker fra kildeprodukter til target
+- **`product_price_history`**: Flyt alle rækker fra kildeprodukter til target
+- **Ret merge-historik**: Beregn faktiske counts for `adversus_mappings_moved`, `sale_items_moved`, `pricing_rules_moved` i stedet for hardcoded `0`
 
-### Ingen kodeændringer i adapteren
-Enreach-adapteren håndterer allerede denne konfiguration generisk — det er kun database-config og én edge function der skal opdateres.
+### Trin 2: Data-fix for duplikerede produkter
+
+Via database insert-tool, konsolider `95cf33d1` → `d1bc3454`:
+
+1. Flyt `adversus_product_mappings`
+2. Flyt `sale_items`
+3. Flyt `cancellation_product_mappings`
+4. Flyt `cancellation_product_conditions`
+5. Flyt `product_price_history`
+6. Slet `product_pricing_rules` fra kilde (behold targets 275/750 regler)
+7. Slet `product_campaign_overrides` fra kilde
+8. Deaktiver kilde: `merged_into_product_id = d1bc3454`, `is_active = false`
+
+### Trin 3: Kør rematch-pricing-rules
+
+Invoke edge function for `d1bc3454` for at genberegne provision/omsætning på alle berørte sale_items.
+
+---
 
 ### Filer der ændres
-1. **Database**: UPDATE `dialer_integrations` config og calls_org_codes for ALKA (ID: `48d8bd23-df14-41fe-b000-abb8a4d6cd1d`)
-2. **`supabase/functions/tv-dashboard-data/index.ts`** — tilføj `alka` mapping
+- `src/components/mg-test/ProductMergeDialog.tsx` — tilføj 2 manglende tabeller + ret historik-logging
+- Database — data-fix via insert tool for de to duplikerede produkter
 
