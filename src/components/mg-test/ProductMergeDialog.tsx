@@ -47,6 +47,8 @@ interface ProductRow {
   internalName: string | null;
   client_campaign_id: string | null;
   is_active: boolean;
+  merged_into_product_id: string | null;
+  isMergeParent: boolean;
 }
 
 interface ClientOption {
