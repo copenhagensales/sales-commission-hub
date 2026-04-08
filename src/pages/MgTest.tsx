@@ -58,6 +58,9 @@ interface AggregatedProduct {
   key: string;
   adversus_external_id: string | null;
   adversus_product_title: string | null;
+  mappingTitles?: string[];
+  mappingExternalIds?: string[];
+  mappingCount?: number;
   product: {
     id: string;
     name: string;
@@ -522,13 +525,14 @@ export default function MgTest() {
   const aggregatedProducts: AggregatedProduct[] = useMemo(() => {
     const products: AggregatedProduct[] = [];
     const seenKeys = new Set<string>();
+    const groupedByProductId = new Map<string, AggregatedProduct>();
 
     // 1. Add products from RPC (sale_items based)
     if (aggregatedProductsRpc) {
       aggregatedProductsRpc.forEach((item) => {
         let clientId = item.client_id;
         let clientName = item.client_name;
-        
+
         if (!clientId && item.adversus_product_title) {
           const parsedClient = parseClientFromTitle(item.adversus_product_title, clients);
           if (parsedClient) {
@@ -536,13 +540,55 @@ export default function MgTest() {
             clientName = parsedClient.name ?? "Ukendt kunde";
           }
         }
-        
+
         if (!clientId && item.sale_source) {
           const parsedClient = parseClientFromSource(item.sale_source, clients);
           if (parsedClient) {
             clientId = parsedClient.id;
             clientName = parsedClient.name ?? "Ukendt kunde";
           }
+        }
+
+        if (item.product_id) {
+          const groupedKey = `${clientId ?? "no-client"}::product::${item.product_id}`;
+          const existing = groupedByProductId.get(groupedKey);
+
+          if (existing) {
+            if (item.adversus_product_title && !existing.mappingTitles?.includes(item.adversus_product_title)) {
+              existing.mappingTitles = [...(existing.mappingTitles ?? []), item.adversus_product_title];
+            }
+            if (item.adversus_external_id && !existing.mappingExternalIds?.includes(item.adversus_external_id)) {
+              existing.mappingExternalIds = [...(existing.mappingExternalIds ?? []), item.adversus_external_id];
+            }
+            existing.mappingCount = existing.mappingTitles?.length ?? 1;
+            return;
+          }
+
+          const nextProduct: AggregatedProduct = {
+            key: groupedKey,
+            adversus_external_id: item.adversus_external_id,
+            adversus_product_title: item.adversus_product_title,
+            mappingTitles: item.adversus_product_title ? [item.adversus_product_title] : [],
+            mappingExternalIds: item.adversus_external_id ? [item.adversus_external_id] : [],
+            mappingCount: item.adversus_product_title ? 1 : 0,
+            product: {
+              id: item.product_id,
+              name: item.product_name ?? "",
+              commission_dkk: item.commission_dkk,
+              revenue_dkk: item.revenue_dkk,
+              client_campaign_id: item.product_client_campaign_id,
+              counts_as_sale: item.counts_as_sale ?? true,
+              counts_as_cross_sale: item.counts_as_cross_sale ?? false,
+              is_hidden: item.is_hidden ?? false,
+            },
+            campaignId: clientId,
+            campaignLabel: clientName ?? "Ingen kunde valgt",
+            sale_source: item.sale_source,
+          };
+
+          groupedByProductId.set(groupedKey, nextProduct);
+          products.push(nextProduct);
+          return;
         }
 
         const productKey = `${item.adversus_external_id ?? ""}::${item.adversus_product_title ?? ""}`;
@@ -554,18 +600,10 @@ export default function MgTest() {
             key: fullKey,
             adversus_external_id: item.adversus_external_id,
             adversus_product_title: item.adversus_product_title,
-            product: item.product_id
-              ? {
-                  id: item.product_id,
-                  name: item.product_name ?? "",
-                  commission_dkk: item.commission_dkk,
-                  revenue_dkk: item.revenue_dkk,
-                  client_campaign_id: item.product_client_campaign_id,
-                  counts_as_sale: item.counts_as_sale ?? true,
-                  counts_as_cross_sale: item.counts_as_cross_sale ?? false,
-                  is_hidden: item.is_hidden ?? false,
-                }
-              : null,
+            mappingTitles: item.adversus_product_title ? [item.adversus_product_title] : [],
+            mappingExternalIds: item.adversus_external_id ? [item.adversus_external_id] : [],
+            mappingCount: item.adversus_product_title ? 1 : 0,
+            product: null,
             campaignId: clientId,
             campaignLabel: clientName ?? "Ingen kunde valgt",
             sale_source: item.sale_source,
@@ -578,24 +616,20 @@ export default function MgTest() {
     // Only mark as deletable (isManual) if the product is NOT linked to any sales
     if (manualProducts) {
       manualProducts.forEach((p) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const campaign = p.client_campaigns as any;
         const clientId = campaign?.client_id ?? null;
         const clientName = campaign?.clients?.name ?? "Ingen kunde valgt";
+        const productKey = `${clientId ?? "no-client"}::product::${p.id}`;
 
-        // Use product name as the key identifier for manual products
-        const productKey = `manual::${p.id}`;
-        const fullKey = `${clientId ?? "no-client"}::${productKey}`;
-
-        // Only add if not already in the list
-        if (!seenKeys.has(fullKey)) {
-          seenKeys.add(fullKey);
-          // Only mark as manual (deletable) if NOT linked to any sales
+        if (!groupedByProductId.has(productKey)) {
           const isLinkedToSales = linkedProductIds.has(p.id);
-          products.push({
-            key: fullKey,
+          const nextProduct: AggregatedProduct = {
+            key: productKey,
             adversus_external_id: p.external_product_code,
             adversus_product_title: p.name,
+            mappingTitles: [p.name],
+            mappingExternalIds: p.external_product_code ? [p.external_product_code] : [],
+            mappingCount: 1,
             product: {
               id: p.id,
               name: p.name,
@@ -608,8 +642,11 @@ export default function MgTest() {
             },
             campaignId: clientId,
             campaignLabel: clientName,
-            isManual: !isLinkedToSales, // Only deletable if NOT linked to sales
-          });
+            isManual: !isLinkedToSales,
+          };
+
+          groupedByProductId.set(productKey, nextProduct);
+          products.push(nextProduct);
         }
       });
     }
@@ -618,8 +655,8 @@ export default function MgTest() {
       const campA = a.campaignLabel;
       const campB = b.campaignLabel;
       if (campA !== campB) return campA.localeCompare(campB, "da");
-      const titleA = a.adversus_product_title || "";
-      const titleB = b.adversus_product_title || "";
+      const titleA = a.product?.name || a.adversus_product_title || "";
+      const titleB = b.product?.name || b.adversus_product_title || "";
       return titleA.localeCompare(titleB, "da");
     });
   }, [aggregatedProductsRpc, manualProducts, clients, linkedProductIds]);
@@ -2238,20 +2275,27 @@ export default function MgTest() {
                                   <>
                                     <TableRow key={row.key} className={row.product?.is_hidden ? 'opacity-50' : ''}>
                                       <TableCell>
-                                        <div className="flex flex-col">
+                                        <div className="flex flex-col gap-1">
                                           <span className="font-medium">
-                                            {row.adversus_product_title || t("mgTest.noTitle")}
+                                            {row.product?.name || row.adversus_product_title || t("mgTest.noTitle")}
                                           </span>
-                                          {row.product && (
+                                          {row.mappingCount && row.mappingCount > 1 && (
                                             <span className="text-xs text-muted-foreground">
-                                              {t("mgTest.internalProduct")}: {row.product.name}
+                                              {row.mappingCount} mappings samlet
+                                            </span>
+                                          )}
+                                          {row.product && row.mappingTitles && row.mappingTitles.length > 0 && (
+                                            <span className="text-xs text-muted-foreground">
+                                              Internt produkt: {row.product.name}
                                             </span>
                                           )}
                                         </div>
                                       </TableCell>
                                       <TableCell>
                                         <span className="text-xs font-mono text-muted-foreground">
-                                          {row.adversus_external_id || t("mgTest.missing")}
+                                          {row.mappingExternalIds && row.mappingExternalIds.length > 1
+                                            ? `${row.mappingExternalIds[0]} +${row.mappingExternalIds.length - 1}`
+                                            : row.adversus_external_id || t("mgTest.missing")}
                                         </span>
                                       </TableCell>
                                       <TableCell>
