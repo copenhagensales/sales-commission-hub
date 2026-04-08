@@ -2293,7 +2293,9 @@ export default function MgTest() {
                                       </TableCell>
                                       <TableCell>
                                         <span className="text-xs font-mono text-muted-foreground">
-                                          {row.adversus_external_id || t("mgTest.missing")}
+                                          {row.mappingExternalIds && row.mappingExternalIds.length > 1
+                                            ? `${row.mappingExternalIds[0]} +${row.mappingExternalIds.length - 1}`
+                                            : row.adversus_external_id || t("mgTest.missing")}
                                         </span>
                                       </TableCell>
                                       <TableCell>
