@@ -278,15 +278,16 @@ export function useTeamGoalForecast(
         const prevSales = emails.reduce((sum, email) => sum + (salesByEmail[email] || 0), 0);
         const prevShifts = countNormalShifts(emp.id, prevStart, prevEnd);
 
-        // For target month: check if employee has ANY individual shifts or booking assignments
-        // If not, don't fall back to team/employee standard (no bookings = 0 forecast)
-        const hasIndividualShifts = (individualShiftMap.get(emp.id) || new Set());
-        const hasBookingAssignments = (bookingAssignmentMap.get(emp.id) || new Set());
-        const targetStartStr = format(targetStart, "yyyy-MM-dd");
-        const targetEndDate = format(targetEnd, "yyyy-MM-dd");
-        const hasAnyTargetShifts = Array.from(hasIndividualShifts).some(d => d >= targetStartStr && d <= targetEndDate);
-        const hasAnyTargetBookings = Array.from(hasBookingAssignments).some(d => d >= targetStartStr && d <= targetEndDate);
-        const useBookingOnly = !hasAnyTargetShifts && !hasAnyTargetBookings;
+        // For target month: only use bookingOnly mode if the employee is a booking-based (FM) worker
+        // Detected by having booking assignments in the PREVIOUS month but no standard/individual shifts
+        const bookingDates = bookingAssignmentMap.get(emp.id) || new Set();
+        const prevStartStr2 = format(prevStart, "yyyy-MM-dd");
+        const prevEndStr2 = format(prevEnd, "yyyy-MM-dd");
+        const hadPrevBookings = Array.from(bookingDates).some(d => d >= prevStartStr2 && d <= prevEndStr2);
+        const empShiftId = empShiftIdMap.get(emp.id);
+        const hasStandardShifts = empShiftId !== undefined || (teamDays && teamDays.length > 0);
+        // Only restrict to booking-only if employee actually works via bookings and has no standard shift setup
+        const useBookingOnly = hadPrevBookings && !hasStandardShifts;
 
         const targetShifts = countNormalShifts(emp.id, targetStart, targetEnd, useBookingOnly);
 
