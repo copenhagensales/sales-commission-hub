@@ -2275,13 +2275,18 @@ export default function MgTest() {
                                   <>
                                     <TableRow key={row.key} className={row.product?.is_hidden ? 'opacity-50' : ''}>
                                       <TableCell>
-                                        <div className="flex flex-col">
+                                        <div className="flex flex-col gap-1">
                                           <span className="font-medium">
-                                            {row.adversus_product_title || t("mgTest.noTitle")}
+                                            {row.product?.name || row.adversus_product_title || t("mgTest.noTitle")}
                                           </span>
-                                          {row.product && (
+                                          {row.mappingCount && row.mappingCount > 1 && (
                                             <span className="text-xs text-muted-foreground">
-                                              {t("mgTest.internalProduct")}: {row.product.name}
+                                              {row.mappingCount} mappings samlet
+                                            </span>
+                                          )}
+                                          {row.product && row.mappingTitles && row.mappingTitles.length > 0 && (
+                                            <span className="text-xs text-muted-foreground">
+                                              Internt produkt: {row.product.name}
                                             </span>
                                           )}
                                         </div>
