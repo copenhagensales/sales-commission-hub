@@ -124,29 +124,47 @@ export default function Candidates() {
     },
   });
 
-  // Fetch last contacted per candidate
+  // Fetch last contacted data for candidates
   const { data: lastContactedData = [] } = useQuery({
     queryKey: ["candidate-last-contacted"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("communication_logs")
-        .select("candidate_id, created_at")
+        .select("phone_number, created_at")
         .eq("context_type", "candidate")
-        .not("candidate_id", "is", null)
+        .not("phone_number", "is", null)
         .order("created_at", { ascending: false });
       
       if (error) throw error;
-      return data as { candidate_id: string; created_at: string }[];
+      return data as { phone_number: string; created_at: string }[];
     },
   });
 
-  // Build lookup map: candidateId → latest contact date
-  const lastContactMap: Record<string, string> = {};
-  for (const row of lastContactedData) {
-    if (row.candidate_id && !lastContactMap[row.candidate_id]) {
-      lastContactMap[row.candidate_id] = row.created_at;
+  // Build lookup map: candidateId → latest contact date (matched by phone)
+  const lastContactMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    // Build phone→latest contact map first
+    const phoneMap: Record<string, string> = {};
+    for (const row of lastContactedData) {
+      const cleaned = row.phone_number?.replace(/[\s\-\+\(\)]/g, '') || '';
+      if (cleaned && !phoneMap[cleaned]) {
+        phoneMap[cleaned] = row.created_at;
+      }
     }
-  }
+    // Match to candidates
+    for (const c of candidatesWithApps) {
+      const cPhone = c.phone?.replace(/[\s\-\+\(\)]/g, '') || '';
+      if (cPhone) {
+        for (const [phone, date] of Object.entries(phoneMap)) {
+          if (phone.includes(cPhone) || cPhone.includes(phone)) {
+            map[c.id] = date;
+            break;
+          }
+        }
+      }
+    }
+    return map;
+  }, [lastContactedData, candidatesWithApps]);
 
   // Define finished statuses that should be hidden in "active" view
   const finishedStatuses = ['hired', 'rejected', 'ghostet', 'takket_nej', 'ansat', 'ikke_ansat', 'ikke_kvalificeret', 'udskudt_samtale'];
