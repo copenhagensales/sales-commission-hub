@@ -333,6 +333,40 @@ serve(async (req) => {
         }
       }
 
+      // Fallback: check adversus_product_mappings by title
+      if (!mappedProductId && product.title) {
+        const { data: mappingByTitle } = await supabase
+          .from('adversus_product_mappings')
+          .select('product_id, id')
+          .eq('adversus_product_title', product.title)
+          .not('product_id', 'is', null)
+          .maybeSingle();
+
+        if (mappingByTitle?.product_id) {
+          mappedProductId = mappingByTitle.product_id;
+          needsMapping = false;
+
+          const { data: productDetails } = await supabase
+            .from('products')
+            .select('commission_dkk, revenue_dkk')
+            .eq('id', mappedProductId)
+            .single();
+
+          if (productDetails) {
+            commission = productDetails.commission_dkk || 0;
+            revenue = productDetails.revenue_dkk || 0;
+          }
+
+          // Update the mapping with the new external ID for future fast lookups
+          if (product.externalId) {
+            await supabase.from('adversus_product_mappings')
+              .update({ adversus_external_id: product.externalId })
+              .eq('id', mappingByTitle.id);
+          }
+          console.log(`Product mapped via title fallback: "${product.title}" → ${mappedProductId}`);
+        }
+      }
+
       // Fallback: match by title in products table
       if (!mappedProductId) {
         const { data: productByTitle } = await supabase
