@@ -1,36 +1,38 @@
 
-## Plan: Ekstra sorterings- og filtreringsmuligheder på kandidatsiden
 
-### Hvad ændres
+## Plan: Tilføj title-baseret fallback-opslag i webhook produktmapping
 
-**Fil: `src/pages/recruitment/Candidates.tsx`**
+### Problem
+Webhook'en slår kun op i `adversus_product_mappings` via `adversus_external_id`. Når Adversus sender et nyt numerisk ID (f.eks. `9515`) for et produkt der allerede er mappet via titel (f.eks. `"Fri tale + 170 GB data (5G) (6 mdr. binding)"`), finder den ingen mapping og markerer salget som `needs_mapping = true`.
 
-### 1. Tilføj positionsfilter (Fieldmarketing / Salgskonsulent)
+### Løsning
+Tilføj et ekstra opslag i **begge webhook-filer** så de også tjekker `adversus_product_title` i `adversus_product_mappings` inden de opgiver:
 
-Tilføj en ny Select-dropdown ved siden af status-filteret:
-- State: `positionFilter` (default `"all"`)
-- Valgmuligheder: "Alle positioner", "Fieldmarketing", "Salgskonsulent" (evt. flere baseret på `applied_position`-værdier i databasen)
-- Filtrer `filteredCandidates` med `candidate.applied_position?.toLowerCase()` match
+**Filer der ændres:**
+1. `supabase/functions/dialer-webhook/index.ts`
+2. `supabase/functions/adversus-webhook/index.ts`
 
-### 2. Hent "sidst kontaktet" tidspunkt per kandidat
+### Ændring (identisk i begge filer)
 
-Udvid candidate-queryen eller tilføj en separat query der henter seneste `communication_logs`-entry per kandidat:
-- Query `communication_logs` grupperet på `candidate_id` med `MAX(created_at)` — eller hent alle med `context_type = 'candidate'` og byg et lookup-map `candidateId → seneste kontaktdato`
-- Gem som `lastContactMap: Record<string, string>`
+Efter det eksisterende `adversus_external_id`-opslag (linje ~222-244 i dialer-webhook), og **før** det direkte `products`-navneopslag, tilføj:
 
-### 3. Udvid sorteringsmuligheder
+```text
+Eksisterende flow:
+  1. Slå op via adversus_external_id → fundet? → brug product_id
+  2. [NY] Slå op via adversus_product_title → fundet? → brug product_id + opdater mapping med nyt external_id
+  3. Slå op direkte i products via titel → fundet? → opret mapping
+  4. Ellers → needs_mapping = true
+```
 
-Tilføj nye valgmuligheder i sort-dropdown:
-- **"Sidst kontaktet"** — sorterer efter seneste SMS/opkald (nyeste først), kandidater uden kontakt sidst
-- **"Navn (A-Å)"** — alfabetisk sortering
+Trin 2 (nyt) gør følgende:
+- Query `adversus_product_mappings` med `.eq('adversus_product_title', product.title)` og `.not('product_id', 'is', null)`
+- Hvis fundet: sæt `mappedProductId`, hent provision/omsætning fra `products`, sæt `needsMapping = false`
+- Opdater den fundne mapping-row med det nye `adversus_external_id` så fremtidige opslag er hurtigere
 
-Opdater sort-logikken i `.sort()` til at håndtere de nye muligheder ved opslag i `lastContactMap`.
+### Eksisterende items
 
-### 4. Layout-justering
-
-Udvid filter-grid fra `grid-cols-2` til `grid-cols-3` på desktop for at rumme det ekstra positions-filter.
-
----
+For de nuværende `needs_mapping`-items (9515, 9457, 7755): Kør `rematch-pricing-rules` efter deploy — den resolver allerede via titel og vil automatisk sætte `product_id` og `needs_mapping = false`.
 
 ### Ingen database-ændringer
-Alt data findes allerede (`applied_position` på candidates, `communication_logs` med `candidate_id`). Kun UI-ændringer i én fil.
+Alt bruger eksisterende tabeller og kolonner. Kun edge function-kodeændringer + redeploy.
+
