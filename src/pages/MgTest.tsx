@@ -432,22 +432,25 @@ export default function MgTest() {
     },
   });
 
-  // Count sale_items with needs_mapping=true in last 30 days
-  const { data: needsMappingCount } = useQuery({
-    queryKey: ["mg-needs-mapping-count"],
+  // Fetch sale_items with needs_mapping=true in last 30 days (full rows for dialog)
+  const { data: needsMappingItems } = useQuery({
+    queryKey: ["mg-needs-mapping-items"],
     queryFn: async () => {
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      const { count, error } = await supabase
+      const { data, error } = await supabase
         .from("sale_items")
-        .select("id", { count: "exact", head: true })
+        .select("id, adversus_product_title, created_at, quantity, sale_id, sales(agent_name)")
         .eq("needs_mapping", true)
         .is("product_id", null)
-        .gte("created_at", thirtyDaysAgo.toISOString());
+        .gte("created_at", thirtyDaysAgo.toISOString())
+        .order("created_at", { ascending: false });
       if (error) throw error;
-      return count ?? 0;
+      return data ?? [];
     },
   });
+  const needsMappingCount = needsMappingItems?.length ?? 0;
+  const [showNeedsMappingDialog, setShowNeedsMappingDialog] = useState(false);
 
   const { data: mappedProductIds } = useQuery({
     queryKey: ["mg-mapped-product-ids"],
@@ -2177,14 +2180,59 @@ export default function MgTest() {
           </p>
         </header>
 
-        {needsMappingCount != null && needsMappingCount > 0 && (
-          <div className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-4 py-2 text-sm">
+        {needsMappingCount > 0 && (
+          <div
+            className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-4 py-2 text-sm cursor-pointer hover:bg-destructive/20 transition-colors"
+            onClick={() => setShowNeedsMappingDialog(true)}
+          >
             <AlertTriangle className="h-4 w-4 text-destructive" />
-            <span className="text-destructive font-medium">
-              {needsMappingCount} salg mangler produktmapping (seneste 30 dage)
+            <span className="text-destructive font-medium underline">
+              {needsMappingCount} salg mangler produktmapping (seneste 30 dage) — klik for detaljer
             </span>
           </div>
         )}
+
+        <Dialog open={showNeedsMappingDialog} onOpenChange={setShowNeedsMappingDialog}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>Salg der mangler produktmapping</DialogTitle>
+              <DialogDescription>
+                Disse sale_items har needs_mapping=true og intet product_id (seneste 30 dage)
+              </DialogDescription>
+            </DialogHeader>
+            <div className="overflow-auto max-h-[60vh]">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Produktnavn</TableHead>
+                    <TableHead>Sælger</TableHead>
+                    <TableHead>Dato</TableHead>
+                    <TableHead>Antal</TableHead>
+                    <TableHead>Sale Item ID</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(needsMappingItems ?? []).map((item: any) => (
+                    <TableRow key={item.id}>
+                      <TableCell className="font-medium">{item.adversus_product_title ?? "—"}</TableCell>
+                      <TableCell>{item.sales?.agent_name ?? "—"}</TableCell>
+                      <TableCell>{item.created_at ? new Date(item.created_at).toLocaleDateString("da-DK") : "—"}</TableCell>
+                      <TableCell>{item.quantity ?? 1}</TableCell>
+                      <TableCell className="font-mono text-xs">{item.id.slice(0, 8)}</TableCell>
+                    </TableRow>
+                  ))}
+                  {(needsMappingItems ?? []).length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                        Ingen umappede salg fundet
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <Tabs defaultValue="product" className="space-y-4">
           <TabsList>
