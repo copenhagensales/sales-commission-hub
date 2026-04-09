@@ -1128,6 +1128,14 @@ export default function MgTest() {
       queryClient.invalidateQueries({ queryKey: ["mg-aggregated-products"] });
       queryClient.invalidateQueries({ queryKey: ["adversus-product-mappings"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-needs-mapping-count"] });
+      // Auto-rematch for newly mapped items
+      supabase.functions.invoke("rematch-pricing-rules", { body: {} }).then((res) => {
+        if (res.data?.stats?.updated > 0) {
+          toast.success(`Auto-rematch: ${res.data.stats.updated} salg opdateret med priser`);
+          queryClient.invalidateQueries({ queryKey: ["mg-needs-mapping-count"] });
+        }
+      }).catch(() => { /* silent */ });
     },
     onError: (error: any) => {
       toast.error(error?.message || "Kunne ikke opdatere");
