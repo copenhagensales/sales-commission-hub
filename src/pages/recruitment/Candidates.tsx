@@ -184,19 +184,32 @@ export default function Candidates() {
       if (!matchesSearch) return false;
 
       // Status filter
-      if (statusFilter === "all") return true;
-      if (statusFilter === "active") return !finishedStatuses.includes(candidate.status);
-      return candidate.status === statusFilter;
+      if (statusFilter === "active" && finishedStatuses.includes(candidate.status)) return false;
+      if (statusFilter !== "all" && statusFilter !== "active" && candidate.status !== statusFilter) return false;
+
+      // Position filter
+      if (positionFilter !== "all") {
+        const pos = candidate.applied_position?.toLowerCase() || '';
+        if (pos !== positionFilter.toLowerCase()) return false;
+      }
+
+      return true;
     })
     .sort((a, b) => {
-      const aDate = new Date(a.created_at).getTime();
-      const bDate = new Date(b.created_at).getTime();
-
       if (sortBy === "newest") {
-        return bDate - aDate;
-      } else {
-        return aDate - bDate;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      } else if (sortBy === "oldest") {
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      } else if (sortBy === "last_contacted") {
+        const aContact = lastContactMap[a.id] ? new Date(lastContactMap[a.id]).getTime() : 0;
+        const bContact = lastContactMap[b.id] ? new Date(lastContactMap[b.id]).getTime() : 0;
+        return bContact - aContact;
+      } else if (sortBy === "name_asc") {
+        const aName = `${a.first_name} ${a.last_name}`.toLowerCase();
+        const bName = `${b.first_name} ${b.last_name}`.toLowerCase();
+        return aName.localeCompare(bName, 'da');
       }
+      return 0;
     });
 
   const totalApplications = candidatesWithApps.reduce(
