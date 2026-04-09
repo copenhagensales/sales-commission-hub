@@ -78,6 +78,7 @@ export default function Candidates() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showNewCandidateDialog, setShowNewCandidateDialog] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("active");
+  const [positionFilter, setPositionFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("newest");
 
   const { data: candidatesWithApps = [], isLoading, refetch } = useQuery({
