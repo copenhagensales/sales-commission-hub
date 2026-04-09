@@ -2161,6 +2161,15 @@ export default function MgTest() {
           </p>
         </header>
 
+        {needsMappingCount != null && needsMappingCount > 0 && (
+          <div className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-4 py-2 text-sm">
+            <AlertTriangle className="h-4 w-4 text-destructive" />
+            <span className="text-destructive font-medium">
+              {needsMappingCount} salg mangler produktmapping (seneste 30 dage)
+            </span>
+          </div>
+        )}
+
         <Tabs defaultValue="product" className="space-y-4">
           <TabsList>
             <TabsTrigger value="product">{t("mgTest.tabProduct")}</TabsTrigger>
