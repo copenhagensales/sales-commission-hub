@@ -1,45 +1,36 @@
 
-
-## Plan: Split DB-oversigt per klient + team-badge på lokationer
+## Plan: Ekstra sorterings- og filtreringsmuligheder på kandidatsiden
 
 ### Hvad ændres
 
-**Fil: `src/pages/vagt-flow/LocationProfitabilityContent.tsx`**
+**Fil: `src/pages/recruitment/Candidates.tsx`**
 
-### 1. Hent `client_id` og klientnavn fra bookings
+### 1. Tilføj positionsfilter (Fieldmarketing / Salgskonsulent)
 
-Udvid booking-queryen (linje 84-91) til også at selecte `client_id` og joine klientnavnet:
+Tilføj en ny Select-dropdown ved siden af status-filteret:
+- State: `positionFilter` (default `"all"`)
+- Valgmuligheder: "Alle positioner", "Fieldmarketing", "Salgskonsulent" (evt. flere baseret på `applied_position`-værdier i databasen)
+- Filtrer `filteredCandidates` med `candidate.applied_position?.toLowerCase()` match
 
-```
-.select("id, location_id, booked_days, daily_rate_override, placement_id, start_date, end_date, client_id, client:clients!client_id(name), location!inner(id, name, daily_rate)")
-```
+### 2. Hent "sidst kontaktet" tidspunkt per kandidat
 
-### 2. Tilføj klientnavn til `LocationSalesData` interface
+Udvid candidate-queryen eller tilføj en separat query der henter seneste `communication_logs`-entry per kandidat:
+- Query `communication_logs` grupperet på `candidate_id` med `MAX(created_at)` — eller hent alle med `context_type = 'candidate'` og byg et lookup-map `candidateId → seneste kontaktdato`
+- Gem som `lastContactMap: Record<string, string>`
 
-Tilføj `clientName: string` til interfacet, og sæt det fra booking-data i `locationMap`-opbygningen.
+### 3. Udvid sorteringsmuligheder
 
-### 3. Vis team-badge på hver lokationsrække
+Tilføj nye valgmuligheder i sort-dropdown:
+- **"Sidst kontaktet"** — sorterer efter seneste SMS/opkald (nyeste først), kandidater uden kontakt sidst
+- **"Navn (A-Å)"** — alfabetisk sortering
 
-I tabellen (linje 502-506) tilføj en farvekodet badge ved siden af lokationsnavnet:
-- **Eesy FM** → grøn/teal badge
-- **Yousee** → blå badge
+Opdater sort-logikken i `.sort()` til at håndtere de nye muligheder ved opslag i `lastContactMap`.
 
-### 4. Split KPI-kort per klient
+### 4. Layout-justering
 
-Over den samlede KPI-sektion (eller som erstatning), tilføj to sektioner med per-klient totaler:
-- Beregn `eesyLocations` og `youseeLocations` ved at filtrere `locationData` på `clientName`
-- Vis separate KPI-kort (Omsætning, Sælgerløn, Lokation, Hotel, Diæt, DB, DB%) for hver klient
-- Behold den samlede total som et samlet overblik
-
-### 5. Gruppér lokationstabellen per klient
-
-Tilføj en visuel separator/header-række i tabellen der grupperer lokationer under "Eesy FM" og "Yousee", med subtotaler for hver gruppe.
+Udvid filter-grid fra `grid-cols-2` til `grid-cols-3` på desktop for at rumme det ekstra positions-filter.
 
 ---
 
-### Hvad ændres IKKE
-- Ingen ændring i beregningslogik (DB, provision, omsætning)
-- Ingen ændring i data — kun visuel gruppering
-- Ingen ændring i placement/diet/hotel logik
-- Kun én fil ændres: `LocationProfitabilityContent.tsx`
-
+### Ingen database-ændringer
+Alt data findes allerede (`applied_position` på candidates, `communication_logs` med `candidate_id`). Kun UI-ændringer i én fil.
