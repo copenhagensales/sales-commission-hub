@@ -344,7 +344,7 @@ export default function Candidates() {
               <span className="text-sm font-medium">Filtre:</span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 w-full">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 flex-1 w-full">
               <div className="space-y-2">
                 <Label htmlFor="status-filter" className="text-sm">Status</Label>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -369,14 +369,30 @@ export default function Candidates() {
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="position-filter" className="text-sm">Position</Label>
+                <Select value={positionFilter} onValueChange={setPositionFilter}>
+                  <SelectTrigger id="position-filter" className="bg-background border-border">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover border-border">
+                    <SelectItem value="all">Alle positioner</SelectItem>
+                    <SelectItem value="fieldmarketing">Fieldmarketing</SelectItem>
+                    <SelectItem value="salgskonsulent">Salgskonsulent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="sort-by" className="text-sm">Sortering</Label>
                 <Select value={sortBy} onValueChange={setSortBy}>
                   <SelectTrigger id="sort-by" className="bg-background border-border">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-popover border-border">
-                    <SelectItem value="newest">Nyeste ansøgninger først</SelectItem>
-                    <SelectItem value="oldest">Ældste ansøgninger først</SelectItem>
+                    <SelectItem value="newest">Nyeste først</SelectItem>
+                    <SelectItem value="oldest">Ældste først</SelectItem>
+                    <SelectItem value="last_contacted">Sidst kontaktet</SelectItem>
+                    <SelectItem value="name_asc">Navn (A-Å)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
