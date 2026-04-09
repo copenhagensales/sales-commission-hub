@@ -432,7 +432,23 @@ export default function MgTest() {
     },
   });
 
-  // Hent produkt-IDs der er mappet via adversus_product_mappings (disse må IKKE slettes)
+  // Count sale_items with needs_mapping=true in last 30 days
+  const { data: needsMappingCount } = useQuery({
+    queryKey: ["mg-needs-mapping-count"],
+    queryFn: async () => {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const { count, error } = await supabase
+        .from("sale_items")
+        .select("id", { count: "exact", head: true })
+        .eq("needs_mapping", true)
+        .is("product_id", null)
+        .gte("created_at", thirtyDaysAgo.toISOString());
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+
   const { data: mappedProductIds } = useQuery({
     queryKey: ["mg-mapped-product-ids"],
     queryFn: async () => {
