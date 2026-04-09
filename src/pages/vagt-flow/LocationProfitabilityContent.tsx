@@ -17,7 +17,7 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
   TrendingUp, TrendingDown, MapPin,
 } from "lucide-react";
-import { format, addDays, differenceInCalendarDays } from "date-fns";
+import { format, addDays } from "date-fns";
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
 
@@ -37,6 +37,7 @@ interface BookingInfo {
 interface LocationSalesData {
   locationId: string;
   locationName: string;
+  clientName: string;
   dailyRate: number;
   bookedDays: number[];
   dailyBreakdown: Record<string, { sales: number; commission: number; revenue: number }>;
@@ -52,6 +53,86 @@ function formatKr(amount: number) {
 function formatPct(value: number) {
   if (!isFinite(value)) return "–";
   return new Intl.NumberFormat("da-DK", { style: "decimal", maximumFractionDigits: 1 }).format(value) + "%";
+}
+
+function TeamBadge({ clientName }: { clientName: string }) {
+  const lower = clientName.toLowerCase();
+  if (lower.includes("eesy")) {
+    return <Badge className="bg-orange-500 text-white hover:bg-orange-600 text-[10px] px-1.5 py-0">Eesy</Badge>;
+  }
+  if (lower.includes("yousee")) {
+    return <Badge className="bg-blue-700 text-white hover:bg-blue-800 text-[10px] px-1.5 py-0">YouSee</Badge>;
+  }
+  return <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{clientName}</Badge>;
+}
+
+interface KpiSectionProps {
+  label: string;
+  totals: {
+    totalRevenue: number;
+    totalSellerCost: number;
+    totalLocationCost: number;
+    totalHotelCost: number;
+    totalDietCost: number;
+    totalDB: number;
+    dbPct: number;
+  };
+}
+
+function KpiCards({ label, totals }: KpiSectionProps) {
+  return (
+    <div>
+      <p className="text-sm font-semibold text-muted-foreground mb-2">{label}</p>
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+        <Card><CardContent className="pt-3 pb-2 px-3">
+          <p className="text-xs text-muted-foreground">Omsætning</p>
+          <p className="text-lg font-bold">{formatKr(totals.totalRevenue)}</p>
+        </CardContent></Card>
+        <Card><CardContent className="pt-3 pb-2 px-3">
+          <p className="text-xs text-muted-foreground">Sælgerløn</p>
+          <p className="text-lg font-bold">{formatKr(totals.totalSellerCost)}</p>
+        </CardContent></Card>
+        <Card><CardContent className="pt-3 pb-2 px-3">
+          <p className="text-xs text-muted-foreground">Lokation</p>
+          <p className="text-lg font-bold">{formatKr(totals.totalLocationCost)}</p>
+        </CardContent></Card>
+        <Card><CardContent className="pt-3 pb-2 px-3">
+          <p className="text-xs text-muted-foreground">Hotel</p>
+          <p className="text-lg font-bold">{formatKr(totals.totalHotelCost)}</p>
+        </CardContent></Card>
+        <Card><CardContent className="pt-3 pb-2 px-3">
+          <p className="text-xs text-muted-foreground">Diæt</p>
+          <p className="text-lg font-bold">{formatKr(totals.totalDietCost)}</p>
+        </CardContent></Card>
+        <Card><CardContent className="pt-3 pb-2 px-3">
+          <p className="text-xs text-muted-foreground">DB</p>
+          <p className={`text-lg font-bold ${totals.totalDB >= 0 ? "text-emerald-600" : "text-destructive"}`}>
+            {formatKr(totals.totalDB)}
+          </p>
+        </CardContent></Card>
+        <Card><CardContent className="pt-3 pb-2 px-3">
+          <p className="text-xs text-muted-foreground">DB%</p>
+          <div className="flex items-center gap-1">
+            <p className={`text-lg font-bold ${totals.dbPct >= 0 ? "text-emerald-600" : "text-destructive"}`}>
+              {formatPct(totals.dbPct)}
+            </p>
+            {totals.dbPct >= 0 ? <TrendingUp className="h-3 w-3 text-emerald-600" /> : <TrendingDown className="h-3 w-3 text-destructive" />}
+          </div>
+        </CardContent></Card>
+      </div>
+    </div>
+  );
+}
+
+function computeTotals(locations: Array<{ totalRevenue: number; sellerCost: number; locationCost: number; hotelCost: number; dietCost: number; db: number }>) {
+  const totalRevenue = locations.reduce((s, l) => s + l.totalRevenue, 0);
+  const totalSellerCost = locations.reduce((s, l) => s + l.sellerCost, 0);
+  const totalLocationCost = locations.reduce((s, l) => s + l.locationCost, 0);
+  const totalHotelCost = locations.reduce((s, l) => s + l.hotelCost, 0);
+  const totalDietCost = locations.reduce((s, l) => s + l.dietCost, 0);
+  const totalDB = totalRevenue - totalSellerCost - totalLocationCost - totalHotelCost - totalDietCost;
+  const dbPct = totalRevenue > 0 ? (totalDB / totalRevenue) * 100 : 0;
+  return { totalRevenue, totalSellerCost, totalLocationCost, totalHotelCost, totalDietCost, totalDB, dbPct };
 }
 
 export default function LocationProfitabilityContent() {
@@ -77,13 +158,13 @@ export default function LocationProfitabilityContent() {
     setSearchParams({ tab: "okonomi", week: String(newWeek), year: String(newYear) });
   };
 
-  // Fetch bookings with location + placement data
+  // Fetch bookings with location + client data
   const { data: bookings, isLoading: loadingBookings } = useQuery({
     queryKey: ["location-profitability-bookings", week, year],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("booking")
-        .select("id, location_id, booked_days, daily_rate_override, placement_id, start_date, end_date, location!inner(id, name, daily_rate)")
+        .select("id, location_id, booked_days, daily_rate_override, placement_id, start_date, end_date, client_id, client:clients!client_id(name), location!inner(id, name, daily_rate)")
         .eq("week_number", week)
         .eq("year", year);
       if (error) throw error;
@@ -190,7 +271,6 @@ export default function LocationProfitabilityContent() {
     return map;
   }, [hotelData]);
 
-  // Hotel booked_days per booking for daily distribution
   const hotelBookedDaysByBooking = useMemo(() => {
     const map = new Map<string, number[]>();
     for (const h of hotelData || []) {
@@ -207,7 +287,6 @@ export default function LocationProfitabilityContent() {
     return map;
   }, [dietData]);
 
-  // Map booking_id -> location_id for cost attribution
   const bookingToLocation = useMemo(() => {
     const map = new Map<string, string>();
     for (const b of bookings || []) {
@@ -216,7 +295,6 @@ export default function LocationProfitabilityContent() {
     return map;
   }, [bookings]);
 
-  // Aggregate hotel & diet per location
   const hotelCostByLocation = useMemo(() => {
     const map = new Map<string, number>();
     for (const [bid, cost] of hotelCostByBooking) {
@@ -226,7 +304,6 @@ export default function LocationProfitabilityContent() {
     return map;
   }, [hotelCostByBooking, bookingToLocation]);
 
-  // Aggregate hotel booked_days per location
   const hotelBookedDaysByLocation = useMemo(() => {
     const map = new Map<string, number[]>();
     for (const [bid, days] of hotelBookedDaysByBooking) {
@@ -263,6 +340,8 @@ export default function LocationProfitabilityContent() {
 
     for (const booking of bookings) {
       const loc = booking.location as any;
+      const client = (booking as any).client as any;
+      const clientName = client?.name || "Ukendt";
       const locId = booking.location_id;
       const locPlacements = placementsByLocation.get(locId) || [];
       const selectedPlacement = locPlacements.find(p => p.id === booking.placement_id);
@@ -272,6 +351,7 @@ export default function LocationProfitabilityContent() {
         locationMap.set(locId, {
           locationId: locId,
           locationName: loc?.name || "Ukendt",
+          clientName,
           dailyRate: effectiveRate,
           bookedDays: booking.booked_days || [],
           dailyBreakdown: {},
@@ -286,6 +366,7 @@ export default function LocationProfitabilityContent() {
         existing.bookings.push({ id: booking.id, placementId: booking.placement_id, dailyRateOverride: booking.daily_rate_override });
         if (booking.daily_rate_override) existing.dailyRate = booking.daily_rate_override;
         if (booking.placement_id) existing.selectedPlacementId = booking.placement_id;
+        // Keep the client name from the first booking
       }
     }
 
@@ -308,7 +389,7 @@ export default function LocationProfitabilityContent() {
 
       if (!locationMap.has(locId)) {
         locationMap.set(locId, {
-          locationId: locId, locationName: "Ukendt lokation", dailyRate: 0,
+          locationId: locId, locationName: "Ukendt lokation", clientName: "Ukendt", dailyRate: 0,
           bookedDays: [], dailyBreakdown: {}, placements: [], selectedPlacementId: null, bookings: [],
         });
       }
@@ -336,16 +417,23 @@ export default function LocationProfitabilityContent() {
       .sort((a, b) => b.db - a.db);
   }, [bookings, salesData, placements, hotelCostByLocation, dietCostByLocation]);
 
-  const totals = useMemo(() => {
-    const totalRevenue = locationData.reduce((s, l) => s + l.totalRevenue, 0);
-    const totalSellerCost = locationData.reduce((s, l) => s + l.sellerCost, 0);
-    const totalLocationCost = locationData.reduce((s, l) => s + l.locationCost, 0);
-    const totalHotelCost = locationData.reduce((s, l) => s + l.hotelCost, 0);
-    const totalDietCost = locationData.reduce((s, l) => s + l.dietCost, 0);
-    const totalDB = totalRevenue - totalSellerCost - totalLocationCost - totalHotelCost - totalDietCost;
-    const dbPct = totalRevenue > 0 ? (totalDB / totalRevenue) * 100 : 0;
-    return { totalRevenue, totalSellerCost, totalLocationCost, totalHotelCost, totalDietCost, totalDB, dbPct, locationCount: locationData.length };
+  // Split by client group
+  const { eesyLocations, youseeLocations, otherLocations } = useMemo(() => {
+    const eesy: typeof locationData = [];
+    const yousee: typeof locationData = [];
+    const other: typeof locationData = [];
+    for (const loc of locationData) {
+      const lower = loc.clientName.toLowerCase();
+      if (lower.includes("eesy")) eesy.push(loc);
+      else if (lower.includes("yousee")) yousee.push(loc);
+      else other.push(loc);
+    }
+    return { eesyLocations: eesy, youseeLocations: yousee, otherLocations: other };
   }, [locationData]);
+
+  const totalAll = useMemo(() => computeTotals(locationData), [locationData]);
+  const totalEesy = useMemo(() => computeTotals(eesyLocations), [eesyLocations]);
+  const totalYousee = useMemo(() => computeTotals(youseeLocations), [youseeLocations]);
 
   const toggleExpand = (locId: string) => {
     setExpandedLocations((prev) => {
@@ -369,7 +457,6 @@ export default function LocationProfitabilityContent() {
 
   const weekDates = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
 
-  // Diet per location per date
   const dietByLocationDate = useMemo(() => {
     const map = new Map<string, number>();
     for (const d of dietData || []) {
@@ -381,6 +468,125 @@ export default function LocationProfitabilityContent() {
     }
     return map;
   }, [dietData, bookingToLocation]);
+
+  // Render location rows (reusable for grouped sections)
+  const renderLocationRows = (locations: typeof locationData) =>
+    locations.map((loc) => {
+      const isExpanded = expandedLocations.has(loc.locationId);
+      const hasPlacements = loc.placements.length > 0;
+      const selectedPlacement = loc.placements.find(p => p.id === loc.selectedPlacementId);
+
+      return (
+        <>
+          <TableRow
+            key={loc.locationId}
+            className="cursor-pointer hover:bg-muted/50"
+            onClick={() => toggleExpand(loc.locationId)}
+          >
+            <TableCell className="pl-6 font-medium">
+              <div className="flex items-center gap-2">
+                {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                {loc.locationName}
+                <TeamBadge clientName={loc.clientName} />
+              </div>
+            </TableCell>
+            <TableCell onClick={(e) => e.stopPropagation()}>
+              {hasPlacements ? (
+                <Select
+                  value={loc.selectedPlacementId || ""}
+                  onValueChange={(val) => handlePlacementChange(loc, val)}
+                >
+                  <SelectTrigger className="h-8 w-[140px] text-xs">
+                    <SelectValue placeholder="Vælg placering" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {loc.placements.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name} ({formatKr(p.daily_rate)}/dag)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <span className="text-xs text-muted-foreground">–</span>
+              )}
+            </TableCell>
+            <TableCell className="text-right">{loc.bookedDays.length}</TableCell>
+            <TableCell className="text-right">{loc.totalSales}</TableCell>
+            <TableCell className="text-right">{formatKr(loc.totalRevenue)}</TableCell>
+            <TableCell className="text-right">{formatKr(loc.sellerCost)}</TableCell>
+            <TableCell className="text-right">{formatKr(loc.locationCost)}</TableCell>
+            <TableCell className="text-right">{formatKr(loc.hotelCost)}</TableCell>
+            <TableCell className="text-right">{formatKr(loc.dietCost)}</TableCell>
+            <TableCell className={`text-right font-semibold ${loc.db >= 0 ? "text-emerald-600" : "text-destructive"}`}>
+              {formatKr(loc.db)}
+            </TableCell>
+            <TableCell className={`text-right pr-6 ${loc.dbPct >= 0 ? "text-emerald-600" : "text-destructive"}`}>
+              {formatPct(loc.dbPct)}
+            </TableCell>
+          </TableRow>
+          {isExpanded && weekDates.map((date) => {
+            const dateStr = format(date, "yyyy-MM-dd");
+            const jsDay = date.getDay();
+            const dayNum = jsDay === 0 ? 6 : jsDay - 1;
+            const isBooked = loc.bookedDays.includes(dayNum);
+            const day = loc.dailyBreakdown[dateStr];
+            const dayRevenue = day?.revenue || 0;
+            const dayCommission = day?.commission || 0;
+            const daySellerCost = dayCommission * (1 + VACATION_PAY_RATES.SELLER);
+            const dayLocCost = isBooked ? loc.dailyRate : 0;
+            const dayDietCost = dietByLocationDate.get(`${loc.locationId}|${dateStr}`) || 0;
+            const hotelDays = hotelBookedDaysByLocation.get(loc.locationId) || [];
+            const isHotelDay = hotelDays.includes(dayNum);
+            const dayHotelCost = isHotelDay && hotelDays.length > 0 ? (loc.hotelCost / hotelDays.length) : 0;
+            const dayDB = dayRevenue - daySellerCost - dayLocCost - dayHotelCost - dayDietCost;
+
+            return (
+              <TableRow key={`${loc.locationId}-${dateStr}`} className="bg-muted/30">
+                <TableCell className="pl-12 text-muted-foreground text-sm">
+                  {format(date, "EEEE d/M", { locale: da })}
+                  {!isBooked && <span className="ml-2 text-xs opacity-50">(ikke booket)</span>}
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {selectedPlacement?.name || "–"}
+                </TableCell>
+                <TableCell className="text-right text-sm">{isBooked ? "1" : "–"}</TableCell>
+                <TableCell className="text-right text-sm">{day?.sales || 0}</TableCell>
+                <TableCell className="text-right text-sm">{formatKr(dayRevenue)}</TableCell>
+                <TableCell className="text-right text-sm">{formatKr(daySellerCost)}</TableCell>
+                <TableCell className="text-right text-sm">{formatKr(dayLocCost)}</TableCell>
+                <TableCell className="text-right text-sm">{formatKr(dayHotelCost)}</TableCell>
+                <TableCell className="text-right text-sm">{formatKr(dayDietCost)}</TableCell>
+                <TableCell className={`text-right text-sm font-medium ${dayDB >= 0 ? "text-emerald-600" : "text-destructive"}`}>
+                  {formatKr(dayDB)}
+                </TableCell>
+                <TableCell className="text-right pr-6 text-sm">
+                  {dayRevenue > 0 ? formatPct((dayDB / dayRevenue) * 100) : "–"}
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </>
+      );
+    });
+
+  const renderGroupSubtotal = (label: string, locations: typeof locationData) => {
+    const t = computeTotals(locations);
+    return (
+      <TableRow className="bg-muted/60 font-semibold border-t">
+        <TableCell className="pl-6" colSpan={2}>{label} — subtotal</TableCell>
+        <TableCell className="text-right">{locations.reduce((s, l) => s + l.bookedDays.length, 0)}</TableCell>
+        <TableCell className="text-right">{locations.reduce((s, l) => s + l.totalSales, 0)}</TableCell>
+        <TableCell className="text-right">{formatKr(t.totalRevenue)}</TableCell>
+        <TableCell className="text-right">{formatKr(t.totalSellerCost)}</TableCell>
+        <TableCell className="text-right">{formatKr(t.totalLocationCost)}</TableCell>
+        <TableCell className="text-right">{formatKr(t.totalHotelCost)}</TableCell>
+        <TableCell className="text-right">{formatKr(t.totalDietCost)}</TableCell>
+        <TableCell className={`text-right ${t.totalDB >= 0 ? "text-emerald-600" : "text-destructive"}`}>{formatKr(t.totalDB)}</TableCell>
+        <TableCell className={`text-right pr-6 ${t.dbPct >= 0 ? "text-emerald-600" : "text-destructive"}`}>{formatPct(t.dbPct)}</TableCell>
+      </TableRow>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -402,57 +608,11 @@ export default function LocationProfitabilityContent() {
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-        <Card>
-          <CardContent className="pt-4 pb-3 px-4">
-            <p className="text-xs text-muted-foreground">Omsætning</p>
-            <p className="text-xl font-bold">{formatKr(totals.totalRevenue)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 pb-3 px-4">
-            <p className="text-xs text-muted-foreground">Sælgerløn</p>
-            <p className="text-xl font-bold">{formatKr(totals.totalSellerCost)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 pb-3 px-4">
-            <p className="text-xs text-muted-foreground">Lokation</p>
-            <p className="text-xl font-bold">{formatKr(totals.totalLocationCost)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 pb-3 px-4">
-            <p className="text-xs text-muted-foreground">Hotel</p>
-            <p className="text-xl font-bold">{formatKr(totals.totalHotelCost)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 pb-3 px-4">
-            <p className="text-xs text-muted-foreground">Diæt</p>
-            <p className="text-xl font-bold">{formatKr(totals.totalDietCost)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 pb-3 px-4">
-            <p className="text-xs text-muted-foreground">DB</p>
-            <p className={`text-xl font-bold ${totals.totalDB >= 0 ? "text-emerald-600" : "text-destructive"}`}>
-              {formatKr(totals.totalDB)}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 pb-3 px-4">
-            <p className="text-xs text-muted-foreground">DB%</p>
-            <div className="flex items-center gap-2">
-              <p className={`text-xl font-bold ${totals.dbPct >= 0 ? "text-emerald-600" : "text-destructive"}`}>
-                {formatPct(totals.dbPct)}
-              </p>
-              {totals.dbPct >= 0 ? <TrendingUp className="h-4 w-4 text-emerald-600" /> : <TrendingDown className="h-4 w-4 text-destructive" />}
-            </div>
-          </CardContent>
-        </Card>
+      {/* KPI Cards split by client */}
+      <div className="space-y-4">
+        {eesyLocations.length > 0 && <KpiCards label="Eesy FM" totals={totalEesy} />}
+        {youseeLocations.length > 0 && <KpiCards label="YouSee" totals={totalYousee} />}
+        <KpiCards label="Samlet" totals={totalAll} />
       </div>
 
       {/* Location table */}
@@ -461,7 +621,7 @@ export default function LocationProfitabilityContent() {
           <CardTitle className="flex items-center gap-2 text-base">
             <MapPin className="h-4 w-4" />
             Lokationer i uge {week}
-            <Badge variant="secondary" className="ml-2">{totals.locationCount}</Badge>
+            <Badge variant="secondary" className="ml-2">{locationData.length}</Badge>
           </CardTitle>
         </CardHeader>
         <CardContent className="px-0 pb-0">
@@ -487,103 +647,53 @@ export default function LocationProfitabilityContent() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {locationData.map((loc) => {
-                  const isExpanded = expandedLocations.has(loc.locationId);
-                  const hasPlacements = loc.placements.length > 0;
-                  const selectedPlacement = loc.placements.find(p => p.id === loc.selectedPlacementId);
+                {/* Eesy FM group */}
+                {eesyLocations.length > 0 && (
+                  <>
+                    <TableRow className="bg-orange-50 dark:bg-orange-950/20">
+                      <TableCell colSpan={11} className="pl-6 py-2 font-semibold text-sm">
+                        <div className="flex items-center gap-2">
+                          <Badge className="bg-orange-500 text-white hover:bg-orange-600">Eesy FM</Badge>
+                          <span className="text-muted-foreground">({eesyLocations.length} lokationer)</span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                    {renderLocationRows(eesyLocations)}
+                    {renderGroupSubtotal("Eesy FM", eesyLocations)}
+                  </>
+                )}
 
-                  return (
-                    <>
-                      <TableRow
-                        key={loc.locationId}
-                        className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => toggleExpand(loc.locationId)}
-                      >
-                        <TableCell className="pl-6 font-medium">
-                          <div className="flex items-center gap-2">
-                            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                            {loc.locationName}
-                          </div>
-                        </TableCell>
-                        <TableCell onClick={(e) => e.stopPropagation()}>
-                          {hasPlacements ? (
-                            <Select
-                              value={loc.selectedPlacementId || ""}
-                              onValueChange={(val) => handlePlacementChange(loc, val)}
-                            >
-                              <SelectTrigger className="h-8 w-[140px] text-xs">
-                                <SelectValue placeholder="Vælg placering" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {loc.placements.map((p) => (
-                                  <SelectItem key={p.id} value={p.id}>
-                                    {p.name} ({formatKr(p.daily_rate)}/dag)
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">–</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">{loc.bookedDays.length}</TableCell>
-                        <TableCell className="text-right">{loc.totalSales}</TableCell>
-                        <TableCell className="text-right">{formatKr(loc.totalRevenue)}</TableCell>
-                        <TableCell className="text-right">{formatKr(loc.sellerCost)}</TableCell>
-                        <TableCell className="text-right">{formatKr(loc.locationCost)}</TableCell>
-                        <TableCell className="text-right">{formatKr(loc.hotelCost)}</TableCell>
-                        <TableCell className="text-right">{formatKr(loc.dietCost)}</TableCell>
-                        <TableCell className={`text-right font-semibold ${loc.db >= 0 ? "text-emerald-600" : "text-destructive"}`}>
-                          {formatKr(loc.db)}
-                        </TableCell>
-                        <TableCell className={`text-right pr-6 ${loc.dbPct >= 0 ? "text-emerald-600" : "text-destructive"}`}>
-                          {formatPct(loc.dbPct)}
-                        </TableCell>
-                      </TableRow>
-                      {isExpanded && weekDates.map((date) => {
-                        const dateStr = format(date, "yyyy-MM-dd");
-                        const jsDay = date.getDay();
-                        const dayNum = jsDay === 0 ? 6 : jsDay - 1;
-                        const isBooked = loc.bookedDays.includes(dayNum);
-                        const day = loc.dailyBreakdown[dateStr];
-                        const dayRevenue = day?.revenue || 0;
-                        const dayCommission = day?.commission || 0;
-                        const daySellerCost = dayCommission * (1 + VACATION_PAY_RATES.SELLER);
-                        const dayLocCost = isBooked ? loc.dailyRate : 0;
-                        const dayDietCost = dietByLocationDate.get(`${loc.locationId}|${dateStr}`) || 0;
-                        const hotelDays = hotelBookedDaysByLocation.get(loc.locationId) || [];
-                        const isHotelDay = hotelDays.includes(dayNum);
-                        const dayHotelCost = isHotelDay && hotelDays.length > 0 ? (loc.hotelCost / hotelDays.length) : 0;
-                        const dayDB = dayRevenue - daySellerCost - dayLocCost - dayHotelCost - dayDietCost;
+                {/* YouSee group */}
+                {youseeLocations.length > 0 && (
+                  <>
+                    <TableRow className="bg-blue-50 dark:bg-blue-950/20">
+                      <TableCell colSpan={11} className="pl-6 py-2 font-semibold text-sm">
+                        <div className="flex items-center gap-2">
+                          <Badge className="bg-blue-700 text-white hover:bg-blue-800">YouSee</Badge>
+                          <span className="text-muted-foreground">({youseeLocations.length} lokationer)</span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                    {renderLocationRows(youseeLocations)}
+                    {renderGroupSubtotal("YouSee", youseeLocations)}
+                  </>
+                )}
 
-                        return (
-                          <TableRow key={`${loc.locationId}-${dateStr}`} className="bg-muted/30">
-                            <TableCell className="pl-12 text-muted-foreground text-sm">
-                              {format(date, "EEEE d/M", { locale: da })}
-                              {!isBooked && <span className="ml-2 text-xs opacity-50">(ikke booket)</span>}
-                            </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              {selectedPlacement?.name || "–"}
-                            </TableCell>
-                            <TableCell className="text-right text-sm">{isBooked ? "1" : "–"}</TableCell>
-                            <TableCell className="text-right text-sm">{day?.sales || 0}</TableCell>
-                            <TableCell className="text-right text-sm">{formatKr(dayRevenue)}</TableCell>
-                            <TableCell className="text-right text-sm">{formatKr(daySellerCost)}</TableCell>
-                            <TableCell className="text-right text-sm">{formatKr(dayLocCost)}</TableCell>
-                            <TableCell className="text-right text-sm">{formatKr(dayHotelCost)}</TableCell>
-                            <TableCell className="text-right text-sm">{formatKr(dayDietCost)}</TableCell>
-                            <TableCell className={`text-right text-sm font-medium ${dayDB >= 0 ? "text-emerald-600" : "text-destructive"}`}>
-                              {formatKr(dayDB)}
-                            </TableCell>
-                            <TableCell className="text-right pr-6 text-sm">
-                              {dayRevenue > 0 ? formatPct((dayDB / dayRevenue) * 100) : "–"}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </>
-                  );
-                })}
+                {/* Other group */}
+                {otherLocations.length > 0 && (
+                  <>
+                    <TableRow className="bg-muted/30">
+                      <TableCell colSpan={11} className="pl-6 py-2 font-semibold text-sm">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary">Øvrige</Badge>
+                          <span className="text-muted-foreground">({otherLocations.length} lokationer)</span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                    {renderLocationRows(otherLocations)}
+                    {renderGroupSubtotal("Øvrige", otherLocations)}
+                  </>
+                )}
               </TableBody>
             </Table>
           )}
