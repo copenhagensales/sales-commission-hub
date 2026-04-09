@@ -316,6 +316,62 @@ serve(async (req) => {
 
     console.log(`[rematch-pricing-rules] Starting with source=${source || "all"}, product_id=${productId || "all"}, sale_ids=${saleIds?.length || 0}, sale_item_ids=${saleItemIds?.length || 0}, limit=${limit || "none"}, dry_run=${dryRun}`);
 
+    // Phase 0: Resolve needs_mapping items by looking up adversus_product_mappings
+    const resolvedItemIds: string[] = [];
+    {
+      const { data: needsMappingItems, error: nmError } = await supabase
+        .from("sale_items")
+        .select("id, adversus_product_title")
+        .eq("needs_mapping", true)
+        .is("product_id", null)
+        .not("adversus_product_title", "is", null)
+        .limit(1000);
+
+      if (nmError) {
+        console.error("[rematch-pricing-rules] Error fetching needs_mapping items:", nmError);
+      } else if (needsMappingItems && needsMappingItems.length > 0) {
+        console.log(`[rematch-pricing-rules] Found ${needsMappingItems.length} items with needs_mapping=true`);
+
+        // Get all adversus_product_mappings
+        const titles = [...new Set(needsMappingItems.map((i: any) => i.adversus_product_title))];
+        const { data: mappings } = await supabase
+          .from("adversus_product_mappings")
+          .select("adversus_product_title, product_id")
+          .in("adversus_product_title", titles)
+          .not("product_id", "is", null);
+
+        if (mappings && mappings.length > 0) {
+          const titleToProductId = new Map<string, string>();
+          for (const m of mappings) {
+            titleToProductId.set(m.adversus_product_title!, m.product_id!);
+          }
+
+          for (const item of needsMappingItems) {
+            const resolvedProductId = titleToProductId.get(item.adversus_product_title!);
+            if (resolvedProductId) {
+              if (!dryRun) {
+                const { error: updateErr } = await supabase
+                  .from("sale_items")
+                  .update({ product_id: resolvedProductId, needs_mapping: false })
+                  .eq("id", item.id);
+
+                if (updateErr) {
+                  console.error(`[rematch-pricing-rules] Failed to resolve item ${item.id}:`, updateErr);
+                } else {
+                  resolvedItemIds.push(item.id);
+                  console.log(`[rematch-pricing-rules] Resolved item ${item.id} → product ${resolvedProductId}`);
+                }
+              } else {
+                resolvedItemIds.push(item.id);
+                console.log(`[rematch-pricing-rules] [DRY RUN] Would resolve item ${item.id} → product ${resolvedProductId}`);
+              }
+            }
+          }
+          console.log(`[rematch-pricing-rules] Resolved ${resolvedItemIds.length} needs_mapping items`);
+        }
+      }
+    }
+
     // Fetch sale_items - either all for specific product, or unmatched items
     let query = supabase
       .from("sale_items")
@@ -350,9 +406,17 @@ serve(async (req) => {
       query = query.eq("product_id", productId);
     } else {
       // Otherwise, only process items without matched rule
-      query = query
-        .is("matched_pricing_rule_id", null)
-        .not("product_id", "is", null);
+      // Include recently resolved needs_mapping items
+      if (resolvedItemIds.length > 0) {
+        // Fetch both: unmatched items AND recently resolved items
+        query = query.or(
+          `and(matched_pricing_rule_id.is.null,product_id.not.is.null),id.in.(${resolvedItemIds.join(",")})`
+        );
+      } else {
+        query = query
+          .is("matched_pricing_rule_id", null)
+          .not("product_id", "is", null);
+      }
     }
 
     if (source) {
