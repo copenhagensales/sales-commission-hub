@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -78,6 +78,7 @@ export default function Candidates() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showNewCandidateDialog, setShowNewCandidateDialog] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("active");
+  const [positionFilter, setPositionFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("newest");
 
   const { data: candidatesWithApps = [], isLoading, refetch } = useQuery({
@@ -123,6 +124,48 @@ export default function Candidates() {
     },
   });
 
+  // Fetch last contacted data for candidates
+  const { data: lastContactedData = [] } = useQuery({
+    queryKey: ["candidate-last-contacted"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("communication_logs")
+        .select("phone_number, created_at")
+        .eq("context_type", "candidate")
+        .not("phone_number", "is", null)
+        .order("created_at", { ascending: false });
+      
+      if (error) throw error;
+      return data as { phone_number: string; created_at: string }[];
+    },
+  });
+
+  // Build lookup map: candidateId → latest contact date (matched by phone)
+  const lastContactMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    // Build phone→latest contact map first
+    const phoneMap: Record<string, string> = {};
+    for (const row of lastContactedData) {
+      const cleaned = row.phone_number?.replace(/[\s\-\+\(\)]/g, '') || '';
+      if (cleaned && !phoneMap[cleaned]) {
+        phoneMap[cleaned] = row.created_at;
+      }
+    }
+    // Match to candidates
+    for (const c of candidatesWithApps) {
+      const cPhone = c.phone?.replace(/[\s\-\+\(\)]/g, '') || '';
+      if (cPhone) {
+        for (const [phone, date] of Object.entries(phoneMap)) {
+          if (phone.includes(cPhone) || cPhone.includes(phone)) {
+            map[c.id] = date;
+            break;
+          }
+        }
+      }
+    }
+    return map;
+  }, [lastContactedData, candidatesWithApps]);
+
   // Define finished statuses that should be hidden in "active" view
   const finishedStatuses = ['hired', 'rejected', 'ghostet', 'takket_nej', 'ansat', 'ikke_ansat', 'ikke_kvalificeret', 'udskudt_samtale'];
 
@@ -141,19 +184,32 @@ export default function Candidates() {
       if (!matchesSearch) return false;
 
       // Status filter
-      if (statusFilter === "all") return true;
-      if (statusFilter === "active") return !finishedStatuses.includes(candidate.status);
-      return candidate.status === statusFilter;
+      if (statusFilter === "active" && finishedStatuses.includes(candidate.status)) return false;
+      if (statusFilter !== "all" && statusFilter !== "active" && candidate.status !== statusFilter) return false;
+
+      // Position filter
+      if (positionFilter !== "all") {
+        const pos = candidate.applied_position?.toLowerCase() || '';
+        if (pos !== positionFilter.toLowerCase()) return false;
+      }
+
+      return true;
     })
     .sort((a, b) => {
-      const aDate = new Date(a.created_at).getTime();
-      const bDate = new Date(b.created_at).getTime();
-
       if (sortBy === "newest") {
-        return bDate - aDate;
-      } else {
-        return aDate - bDate;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      } else if (sortBy === "oldest") {
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      } else if (sortBy === "last_contacted") {
+        const aContact = lastContactMap[a.id] ? new Date(lastContactMap[a.id]).getTime() : 0;
+        const bContact = lastContactMap[b.id] ? new Date(lastContactMap[b.id]).getTime() : 0;
+        return bContact - aContact;
+      } else if (sortBy === "name_asc") {
+        const aName = `${a.first_name} ${a.last_name}`.toLowerCase();
+        const bName = `${b.first_name} ${b.last_name}`.toLowerCase();
+        return aName.localeCompare(bName, 'da');
       }
+      return 0;
     });
 
   const totalApplications = candidatesWithApps.reduce(
@@ -288,7 +344,7 @@ export default function Candidates() {
               <span className="text-sm font-medium">Filtre:</span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 w-full">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 flex-1 w-full">
               <div className="space-y-2">
                 <Label htmlFor="status-filter" className="text-sm">Status</Label>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -313,14 +369,30 @@ export default function Candidates() {
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="position-filter" className="text-sm">Position</Label>
+                <Select value={positionFilter} onValueChange={setPositionFilter}>
+                  <SelectTrigger id="position-filter" className="bg-background border-border">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover border-border">
+                    <SelectItem value="all">Alle positioner</SelectItem>
+                    <SelectItem value="fieldmarketing">Fieldmarketing</SelectItem>
+                    <SelectItem value="salgskonsulent">Salgskonsulent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="sort-by" className="text-sm">Sortering</Label>
                 <Select value={sortBy} onValueChange={setSortBy}>
                   <SelectTrigger id="sort-by" className="bg-background border-border">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-popover border-border">
-                    <SelectItem value="newest">Nyeste ansøgninger først</SelectItem>
-                    <SelectItem value="oldest">Ældste ansøgninger først</SelectItem>
+                    <SelectItem value="newest">Nyeste først</SelectItem>
+                    <SelectItem value="oldest">Ældste først</SelectItem>
+                    <SelectItem value="last_contacted">Sidst kontaktet</SelectItem>
+                    <SelectItem value="name_asc">Navn (A-Å)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
