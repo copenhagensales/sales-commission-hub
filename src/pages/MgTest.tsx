@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Loader2, ChevronDown, Search, Plus, Trash2, Upload, ImageIcon, Users, Pencil, Settings, Eye, EyeOff, Check, Lightbulb, Merge } from "lucide-react";
+import { Loader2, ChevronDown, Search, Plus, Trash2, Upload, ImageIcon, Users, Pencil, Settings, Eye, EyeOff, Check, Lightbulb, Merge, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -432,7 +432,23 @@ export default function MgTest() {
     },
   });
 
-  // Hent produkt-IDs der er mappet via adversus_product_mappings (disse må IKKE slettes)
+  // Count sale_items with needs_mapping=true in last 30 days
+  const { data: needsMappingCount } = useQuery({
+    queryKey: ["mg-needs-mapping-count"],
+    queryFn: async () => {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const { count, error } = await supabase
+        .from("sale_items")
+        .select("id", { count: "exact", head: true })
+        .eq("needs_mapping", true)
+        .is("product_id", null)
+        .gte("created_at", thirtyDaysAgo.toISOString());
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+
   const { data: mappedProductIds } = useQuery({
     queryKey: ["mg-mapped-product-ids"],
     queryFn: async () => {
@@ -1013,6 +1029,14 @@ export default function MgTest() {
       queryClient.invalidateQueries({ queryKey: ["adversus-product-mappings"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["mg-client-campaigns"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-needs-mapping-count"] });
+      // Auto-rematch: trigger pricing rule matching for newly mapped items
+      supabase.functions.invoke("rematch-pricing-rules", { body: {} }).then((res) => {
+        if (res.data?.stats?.updated > 0) {
+          toast.success(`Auto-rematch: ${res.data.stats.updated} salg opdateret med priser`);
+          queryClient.invalidateQueries({ queryKey: ["mg-needs-mapping-count"] });
+        }
+      }).catch(() => { /* silent */ });
     },
     onError: (error: any) => {
       toast.error(error?.message || "Kunne ikke gemme værdier");
@@ -1104,6 +1128,14 @@ export default function MgTest() {
       queryClient.invalidateQueries({ queryKey: ["mg-aggregated-products"] });
       queryClient.invalidateQueries({ queryKey: ["adversus-product-mappings"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-needs-mapping-count"] });
+      // Auto-rematch for newly mapped items
+      supabase.functions.invoke("rematch-pricing-rules", { body: {} }).then((res) => {
+        if (res.data?.stats?.updated > 0) {
+          toast.success(`Auto-rematch: ${res.data.stats.updated} salg opdateret med priser`);
+          queryClient.invalidateQueries({ queryKey: ["mg-needs-mapping-count"] });
+        }
+      }).catch(() => { /* silent */ });
     },
     onError: (error: any) => {
       toast.error(error?.message || "Kunne ikke opdatere");
@@ -2144,6 +2176,15 @@ export default function MgTest() {
             {t("mgTest.description")}
           </p>
         </header>
+
+        {needsMappingCount != null && needsMappingCount > 0 && (
+          <div className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-4 py-2 text-sm">
+            <AlertTriangle className="h-4 w-4 text-destructive" />
+            <span className="text-destructive font-medium">
+              {needsMappingCount} salg mangler produktmapping (seneste 30 dage)
+            </span>
+          </div>
+        )}
 
         <Tabs defaultValue="product" className="space-y-4">
           <TabsList>
