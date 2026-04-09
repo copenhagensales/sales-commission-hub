@@ -124,6 +124,30 @@ export default function Candidates() {
     },
   });
 
+  // Fetch last contacted per candidate
+  const { data: lastContactedData = [] } = useQuery({
+    queryKey: ["candidate-last-contacted"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("communication_logs")
+        .select("candidate_id, created_at")
+        .eq("context_type", "candidate")
+        .not("candidate_id", "is", null)
+        .order("created_at", { ascending: false });
+      
+      if (error) throw error;
+      return data as { candidate_id: string; created_at: string }[];
+    },
+  });
+
+  // Build lookup map: candidateId → latest contact date
+  const lastContactMap: Record<string, string> = {};
+  for (const row of lastContactedData) {
+    if (row.candidate_id && !lastContactMap[row.candidate_id]) {
+      lastContactMap[row.candidate_id] = row.created_at;
+    }
+  }
+
   // Define finished statuses that should be hidden in "active" view
   const finishedStatuses = ['hired', 'rejected', 'ghostet', 'takket_nej', 'ansat', 'ikke_ansat', 'ikke_kvalificeret', 'udskudt_samtale'];
 
