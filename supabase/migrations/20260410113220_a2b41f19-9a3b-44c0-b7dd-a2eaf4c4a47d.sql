@@ -1,0 +1,1 @@
+ALTER TABLE public.fm_checklist_templates ADD COLUMN one_time_date date NULL;

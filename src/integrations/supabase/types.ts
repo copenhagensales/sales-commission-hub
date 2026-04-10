@@ -6810,6 +6810,7 @@ export type Database = {
           description: string | null
           id: string
           is_active: boolean
+          one_time_date: string | null
           sort_order: number
           title: string
           weekdays: number[]
@@ -6820,6 +6821,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          one_time_date?: string | null
           sort_order?: number
           title: string
           weekdays?: number[]
@@ -6830,6 +6832,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          one_time_date?: string | null
           sort_order?: number
           title?: string
           weekdays?: number[]
