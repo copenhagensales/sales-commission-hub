@@ -1318,6 +1318,33 @@ export default function BookingsContent() {
                                   </div>
                                 );
                               })()}
+                              {(() => {
+                                const dateStr = format(dayDate, "yyyy-MM-dd");
+                                const trainingInfo = trainingByBookingDate.get(`${booking.id}_${dateStr}`);
+                                if (!trainingInfo) return null;
+                                const creatorName = trainingInfo.created_by && dietCreatorNames?.[trainingInfo.created_by];
+                                const createdTime = trainingInfo.created_at ? format(new Date(trainingInfo.created_at), "HH:mm 'd.' dd/MM", { locale: da }) : null;
+                                const tooltipText = creatorName
+                                  ? `Tilføjet af ${creatorName} kl. ${createdTime}`
+                                  : createdTime ? `Tilføjet kl. ${createdTime}` : "Oplæringsbonus";
+                                return (
+                                  <div className="mt-1 flex flex-col items-center">
+                                    <TooltipProvider delayDuration={200}>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Badge variant="secondary" className="text-[9px] px-1 py-0 gap-0.5 bg-indigo-100 text-indigo-800 border border-indigo-300 cursor-default">
+                                            <GraduationCap className="h-2 w-2" />
+                                            Oplæring
+                                          </Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top" className="text-xs">
+                                          {tooltipText}
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  </div>
+                                );
+                              })()}
                               {canEditFmBookings && isBooked && (
                                 <DayQuickAddButtons
                                   booking={booking}
@@ -1595,6 +1622,33 @@ export default function BookingsContent() {
                                             <X className="h-2 w-2" />
                                           </button>
                                         )}
+                                      </Badge>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" className="text-xs">
+                                      {tooltipText}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+                            );
+                          })()}
+                          {(() => {
+                            const dateStr = format(dayDate, "yyyy-MM-dd");
+                            const trainingInfo = trainingByBookingDate.get(`${booking.id}_${dateStr}`);
+                            if (!trainingInfo) return null;
+                            const creatorName = trainingInfo.created_by && dietCreatorNames?.[trainingInfo.created_by];
+                            const createdTime = trainingInfo.created_at ? format(new Date(trainingInfo.created_at), "HH:mm 'd.' dd/MM", { locale: da }) : null;
+                            const tooltipText = creatorName
+                              ? `Tilføjet af ${creatorName} kl. ${createdTime}`
+                              : createdTime ? `Tilføjet kl. ${createdTime}` : "Oplæringsbonus";
+                            return (
+                              <div className="mt-1 flex flex-col items-center">
+                                <TooltipProvider delayDuration={200}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Badge variant="secondary" className="text-[9px] px-1 py-0 gap-0.5 bg-indigo-100 text-indigo-800 border border-indigo-300 cursor-default">
+                                        <GraduationCap className="h-2 w-2" />
+                                        Oplæring
                                       </Badge>
                                     </TooltipTrigger>
                                     <TooltipContent side="top" className="text-xs">
