@@ -14,7 +14,8 @@ import {
   Phone,
   MessageSquare,
   Mail,
-  ArrowRight
+  ArrowRight,
+  Percent
 } from "lucide-react";
 import { format, subDays, eachDayOfInterval, startOfDay } from "date-fns";
 import { da } from "date-fns/locale";
@@ -23,7 +24,7 @@ import {
   ChartTooltip, 
   ChartTooltipContent 
 } from "@/components/ui/chart";
-import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, BarChart, Bar, Cell, Tooltip } from "recharts";
 import { Link } from "react-router-dom";
 
 const chartConfig = {
@@ -109,10 +110,57 @@ export default function RecruitmentDashboard() {
     [candidates]
   );
 
-  const statusCounts = recentCandidates.reduce((acc, candidate) => {
-    acc[candidate.status] = (acc[candidate.status] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  // Conversion stats by position type
+  const conversionStats = useMemo(() => {
+    const categorize = (pos: string | null) => {
+      if (!pos) return "other";
+      const lower = pos.toLowerCase();
+      if (lower.includes("salgskonsulent") || lower.includes("salg")) return "sales";
+      if (lower.includes("field") || lower.includes("marketing")) return "field";
+      return "other";
+    };
+
+    const statusLabels: Record<string, string> = {
+      new: "Ny",
+      contacted: "Kontaktet",
+      interview_scheduled: "Samtale",
+      hired: "Ansat",
+      rejected: "Afvist",
+      not_qualified: "Ikke-kval.",
+      ghosted: "Ghostet",
+      declined: "Takket nej",
+    };
+
+    const calcForCategory = (cat: string) => {
+      const filtered = candidates.filter(c => categorize(c.applied_position) === cat);
+      const total = filtered.length;
+      const hired = filtered.filter(c => c.status === "hired").length;
+      const rate = total > 0 ? Math.round((hired / total) * 1000) / 10 : 0;
+
+      // Status breakdown for funnel
+      const statusBreakdown: Record<string, number> = {};
+      filtered.forEach(c => {
+        statusBreakdown[c.status] = (statusBreakdown[c.status] || 0) + 1;
+      });
+
+      // Build funnel data in logical order
+      const funnelOrder = ["new", "contacted", "interview_scheduled", "hired", "rejected", "not_qualified", "ghosted", "declined"];
+      const funnelData = funnelOrder
+        .filter(s => statusBreakdown[s])
+        .map(s => ({
+          status: statusLabels[s] || s,
+          count: statusBreakdown[s],
+          key: s,
+        }));
+
+      return { total, hired, rate, funnelData };
+    };
+
+    return {
+      sales: calcForCategory("sales"),
+      field: calcForCategory("field"),
+    };
+  }, [candidates]);
 
   // KPI calculations with trends
   const kpiStats = useMemo(() => {
@@ -250,6 +298,110 @@ export default function RecruitmentDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Conversion Rate Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card className="bg-card border-border">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Salgskonsulent konvertering</CardTitle>
+            <Percent className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-foreground">{conversionStats.sales.rate}%</div>
+            <p className="text-xs text-muted-foreground">
+              {conversionStats.sales.hired} af {conversionStats.sales.total} ansat
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card border-border">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Fieldmarketing konvertering</CardTitle>
+            <Percent className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-foreground">{conversionStats.field.rate}%</div>
+            <p className="text-xs text-muted-foreground">
+              {conversionStats.field.hired} af {conversionStats.field.total} ansat
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Funnel Visualization */}
+      <Card className="bg-card border-border">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg font-semibold text-foreground">
+            Kandidat-funnel per stillingskategori
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {[
+            { label: "Salgskonsulent", data: conversionStats.sales },
+            { label: "Fieldmarketing", data: conversionStats.field },
+          ].map(({ label, data }) => (
+            <div key={label}>
+              <p className="text-sm font-medium text-foreground mb-2">{label} <span className="text-muted-foreground font-normal">({data.total} total)</span></p>
+              {data.funnelData.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Ingen data</p>
+              ) : (
+                <div className="flex gap-1 items-end h-8">
+                  {data.funnelData.map((item) => {
+                    const widthPct = Math.max((item.count / data.total) * 100, 2);
+                    const isHired = item.key === "hired";
+                    const isNegative = ["rejected", "not_qualified", "ghosted", "declined"].includes(item.key);
+                    return (
+                      <div
+                        key={item.key}
+                        className="group relative h-full rounded-sm flex items-center justify-center cursor-default"
+                        style={{
+                          width: `${widthPct}%`,
+                          minWidth: "24px",
+                          backgroundColor: isHired
+                            ? "hsl(var(--primary))"
+                            : isNegative
+                            ? "hsl(var(--destructive) / 0.3)"
+                            : "hsl(var(--muted-foreground) / 0.2)",
+                        }}
+                      >
+                        {widthPct > 8 && (
+                          <span className={`text-[10px] font-medium ${isHired ? "text-primary-foreground" : "text-foreground"}`}>
+                            {item.count}
+                          </span>
+                        )}
+                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-popover text-popover-foreground text-xs px-2 py-1 rounded shadow-md border border-border hidden group-hover:block whitespace-nowrap z-10">
+                          {item.status}: {item.count}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <div className="flex gap-3 mt-1.5 flex-wrap">
+                {data.funnelData.map((item) => {
+                  const isHired = item.key === "hired";
+                  const isNegative = ["rejected", "not_qualified", "ghosted", "declined"].includes(item.key);
+                  return (
+                    <div key={item.key} className="flex items-center gap-1">
+                      <div
+                        className="w-2 h-2 rounded-full"
+                        style={{
+                          backgroundColor: isHired
+                            ? "hsl(var(--primary))"
+                            : isNegative
+                            ? "hsl(var(--destructive) / 0.5)"
+                            : "hsl(var(--muted-foreground) / 0.3)",
+                        }}
+                      />
+                      <span className="text-[10px] text-muted-foreground">{item.status}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
 
       {/* Recent Applications - compact inline list */}
       <Card className="bg-card border-border">
