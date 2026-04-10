@@ -1,25 +1,25 @@
 
 
-## Konverteringsrate opdelt på Salgskonsulent og Fieldmarketing
+## Gør Kandidat-funnel mere visuel
 
-### Data (aktuelt)
-- **Salgskonsulent**: 33 ansat af 270 ansøgere = **12,2%**
-- **Fieldmarketing**: 5 ansat af 58 ansøgere = **8,6%**
+### Problem
+Den nuværende funnel er en flad horisontal bar med små farvesegmenter — svær at aflæse, især når segmenter er meget små.
 
-### Visualisering
+### Løsning: Vertikal funnel med recharts BarChart
 
-**1. To side-by-side KPI-kort** — placeres under de eksisterende 4 KPI-kort:
-- **Salgskonsulent konvertering**: Stort procenttal (12,2%), undertekst "33 af 270 ansat", trend vs. forrige periode
-- **Fieldmarketing konvertering**: Stort procenttal (8,6%), undertekst "5 af 58 ansat", trend vs. forrige periode
+Erstat den nuværende inline-bar med en **vertikal stacked bar chart** (recharts `BarChart`) for hver kategori — klarere farver, labels direkte på søjlerne, og en ægte funnel-følelse.
 
-**2. Funnel-bars under KPI-kort** — to horisontale stacked bars der viser fordelingen per type:
-- Ny → Kontaktet → Samtale → **Ansat** vs. Afvist/Ghostet/Ikke-kvalificeret
-- Én bar for Salgskonsulent, én for Fieldmarketing
-- Giver overblik over hvor i processen kandidater falder fra, for hver stillingskategori
+**Design:**
+- To side-by-side vertikale bar charts (én per kategori)
+- Hver status er en separat søjle (ikke stacked), sorteret i funnel-rækkefølge: Ny → Kontaktet → Samtale → **Ansat** | Afvist, Ghostet, etc.
+- Grønne toner for positive trin (Ny, Kontaktet, Samtale, Ansat med stigende intensitet), røde/grå for negative (Afvist, Ghostet, etc.)
+- Antal og procent vises som label over hver søjle
+- Konverteringsrate vises som stort tal i hjørnet af hver chart
+- Responsivt: stacker vertikalt på smalle skærme
 
 ### Teknisk
 - Kun ændringer i `RecruitmentDashboard.tsx`
-- Grupperer `candidates` arrayet på `applied_position` (case-insensitive match på "salgskonsulent" / "fieldmarketing")
-- Bruger recharts `BarChart` (stacked, horizontal) til funnel
-- Periodefilter (30d/90d/alle) genbruges fra eksisterende chart
+- Bruger `BarChart`, `Bar`, `XAxis`, `YAxis`, `Cell`, `LabelList` fra recharts (allerede importeret i projektet)
+- Erstatter den eksisterende funnel-sektion (linje 298-371)
+- Data-logikken (`conversionStats`, `funnelData`) genbruges uændret
 
