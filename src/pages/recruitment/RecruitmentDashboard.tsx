@@ -104,6 +104,14 @@ export default function RecruitmentDashboard() {
       const hired = filtered.filter(c => c.status === "hired").length;
       const rate = total > 0 ? Math.round((hired / total) * 1000) / 10 : 0;
 
+      // 30-day stats
+      const now = new Date();
+      const thirtyDaysAgo = subDays(now, 30);
+      const recent = filtered.filter(c => new Date(c.created_at) >= thirtyDaysAgo);
+      const recentTotal = recent.length;
+      const recentHired = recent.filter(c => c.status === "hired").length;
+      const recentRate = recentTotal > 0 ? Math.round((recentHired / recentTotal) * 1000) / 10 : 0;
+
       // Status breakdown for funnel
       const statusBreakdown: Record<string, number> = {};
       filtered.forEach(c => {
@@ -120,7 +128,7 @@ export default function RecruitmentDashboard() {
           key: s,
         }));
 
-      return { total, hired, rate, funnelData };
+      return { total, hired, rate, recentTotal, recentHired, recentRate, funnelData };
     };
 
     return {
