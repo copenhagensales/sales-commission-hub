@@ -50,39 +50,6 @@ export default function RecruitmentDashboard() {
     },
   });
 
-  const { data: recentHiresByTeam = [] } = useQuery({
-    queryKey: ["recent-hires-by-team"],
-    queryFn: async () => {
-      const thirtyDaysAgo = subDays(new Date(), 30).toISOString();
-      
-      // Get hired candidates from applications with team info
-      const { data: applications, error } = await supabase
-        .from("applications")
-        .select(`
-          id,
-          team_id,
-          candidates!inner(id, status, created_at, first_name, last_name),
-          teams(id, name)
-        `)
-        .eq("candidates.status", "hired")
-        .gte("candidates.created_at", thirtyDaysAgo);
-      
-      if (error) throw error;
-      
-      // Group by team
-      const teamCounts: Record<string, { name: string; count: number }> = {};
-      
-      applications?.forEach((app: any) => {
-        const teamName = app.teams?.name || "Ikke tildelt";
-        if (!teamCounts[teamName]) {
-          teamCounts[teamName] = { name: teamName, count: 0 };
-        }
-        teamCounts[teamName].count += 1;
-      });
-      
-      return Object.values(teamCounts).sort((a, b) => b.count - a.count);
-    },
-  });
 
   const { data: communicationStats } = useQuery({
     queryKey: ["communication-stats"],
