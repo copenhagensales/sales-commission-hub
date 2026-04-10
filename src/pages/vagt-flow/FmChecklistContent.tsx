@@ -202,6 +202,8 @@ export default function FmChecklistContent() {
   const [newWeekdays, setNewWeekdays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
   const [notePopover, setNotePopover] = useState<string | null>(null);
   const [noteText, setNoteText] = useState("");
+  const [quickAddDay, setQuickAddDay] = useState<number | null>(null);
+  const [quickAddTitle, setQuickAddTitle] = useState("");
 
   const employeeId = useEmployeeId();
 
@@ -212,21 +214,24 @@ export default function FmChecklistContent() {
   const weekStartStr = format(weekStart, "yyyy-MM-dd");
   const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
 
-  const { data: templates = [], isLoading: templatesLoading } = useFmChecklistTemplates();
+  const { data: templates = [], isLoading: templatesLoading } = useFmChecklistTemplates(weekStartStr, weekEndStr);
   const { data: completions = [], isLoading: completionsLoading } = useFmChecklistCompletions(weekStartStr, weekEndStr);
   const toggleCompletion = useToggleChecklistCompletion();
   const updateNote = useUpdateCompletionNote();
   const addTemplate = useAddChecklistTemplate();
   const deactivateTemplate = useDeactivateChecklistTemplate();
 
-  const getTasksForDay = (dayIndex: number) =>
-    templates.filter((t) => t.weekdays.includes(dayIndex));
+  const getTasksForDay = (dayIndex: number, dateStr: string) =>
+    templates.filter((t) => {
+      if (t.one_time_date) return t.one_time_date === dateStr;
+      return t.weekdays.includes(dayIndex);
+    });
 
   const getCompletion = (templateId: string, date: string): FmChecklistCompletion | undefined =>
     completions.find((c) => c.template_id === templateId && c.completed_date === date);
 
   const getDayProgress = (dayIndex: number, date: string) => {
-    const tasks = getTasksForDay(dayIndex);
+    const tasks = getTasksForDay(dayIndex, date);
     if (tasks.length === 0) return { done: 0, total: 0, pct: 0 };
     const done = tasks.filter((t) => getCompletion(t.id, date)).length;
     return { done, total: tasks.length, pct: Math.round((done / tasks.length) * 100) };
@@ -238,7 +243,10 @@ export default function FmChecklistContent() {
       const d = addDays(today, -i);
       const dayIndex = (d.getDay() + 6) % 7; 
       const dateStr = format(d, "yyyy-MM-dd");
-      const tasks = templates.filter((t) => t.weekdays.includes(dayIndex));
+      const tasks = templates.filter((t) => {
+        if (t.one_time_date) return t.one_time_date === dateStr;
+        return t.weekdays.includes(dayIndex);
+      });
       if (tasks.length === 0) continue;
       const allDone = tasks.every((t) => completions.some((c) => c.template_id === t.id && c.completed_date === dateStr));
       if (allDone) count++;
@@ -268,6 +276,19 @@ export default function FmChecklistContent() {
           setNewTitle("");
           setNewDescription("");
           setNewWeekdays([0, 1, 2, 3, 4, 5, 6]);
+        },
+      }
+    );
+  };
+
+  const handleQuickAdd = (dateStr: string) => {
+    if (!quickAddTitle.trim()) return;
+    addTemplate.mutate(
+      { title: quickAddTitle.trim(), weekdays: [], one_time_date: dateStr },
+      {
+        onSuccess: () => {
+          setQuickAddTitle("");
+          setQuickAddDay(null);
         },
       }
     );
@@ -317,7 +338,7 @@ export default function FmChecklistContent() {
       <div className="grid grid-cols-7 gap-1.5 flex-1 min-h-0">
         {weekDates.map((date, dayIdx) => {
           const dateStr = format(date, "yyyy-MM-dd");
-          const tasks = getTasksForDay(dayIdx);
+          const tasks = getTasksForDay(dayIdx, dateStr);
           const progress = getDayProgress(dayIdx, dateStr);
           const isToday = isSameDay(date, today);
 
@@ -372,14 +393,21 @@ export default function FmChecklistContent() {
                         className="mt-0.5 shrink-0 h-3.5 w-3.5"
                       />
                       <div className="flex-1 min-w-0">
-                        <p
-                          className={cn(
-                            "text-[10px] leading-tight",
-                            isChecked && "line-through text-muted-foreground"
+                        <div className="flex items-center gap-1">
+                          <p
+                            className={cn(
+                              "text-[10px] leading-tight",
+                              isChecked && "line-through text-muted-foreground"
+                            )}
+                          >
+                            {task.title}
+                          </p>
+                          {task.one_time_date && (
+                            <Badge variant="outline" className="text-[8px] px-0.5 py-0 h-3 shrink-0 border-blue-300 text-blue-600">
+                              1x
+                            </Badge>
                           )}
-                        >
-                          {task.title}
-                        </p>
+                        </div>
                         {completion?.note && (
                           <p className="text-[9px] text-muted-foreground mt-0.5 italic truncate">
                             📝 {completion.note}
@@ -430,6 +458,43 @@ export default function FmChecklistContent() {
                   <div className="flex items-center justify-center py-0.5">
                     <CheckCircle2 className="h-4 w-4 text-green-500" />
                   </div>
+                )}
+              </div>
+
+              {/* Quick add button */}
+              <div className="px-1.5 pb-1 shrink-0">
+                {quickAddDay === dayIdx ? (
+                  <div className="flex gap-1">
+                    <Input
+                      autoFocus
+                      value={quickAddTitle}
+                      onChange={(e) => setQuickAddTitle(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleQuickAdd(dateStr);
+                        if (e.key === "Escape") { setQuickAddDay(null); setQuickAddTitle(""); }
+                      }}
+                      placeholder="Opgavetitel..."
+                      className="h-6 text-[10px] flex-1"
+                    />
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-6 w-6 shrink-0"
+                      onClick={() => { setQuickAddDay(null); setQuickAddTitle(""); }}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full h-5 text-[10px] text-muted-foreground hover:text-foreground"
+                    onClick={() => { setQuickAddDay(dayIdx); setQuickAddTitle(""); }}
+                  >
+                    <Plus className="h-3 w-3 mr-0.5" />
+                    Tilføj
+                  </Button>
                 )}
               </div>
             </div>
@@ -486,7 +551,7 @@ export default function FmChecklistContent() {
 
             <div className="space-y-1.5">
               <h4 className="text-xs font-medium">Eksisterende opgaver</h4>
-              {templates.map((t) => (
+              {templates.filter(t => !t.one_time_date).map((t) => (
                 <div key={t.id} className="flex items-center justify-between p-2 border rounded-lg">
                   <div>
                     <p className="text-xs font-medium">{t.title}</p>
