@@ -281,6 +281,19 @@ export default function FmChecklistContent() {
     );
   };
 
+  const handleQuickAdd = (dateStr: string) => {
+    if (!quickAddTitle.trim()) return;
+    addTemplate.mutate(
+      { title: quickAddTitle.trim(), weekdays: [], one_time_date: dateStr },
+      {
+        onSuccess: () => {
+          setQuickAddTitle("");
+          setQuickAddDay(null);
+        },
+      }
+    );
+  };
+
   const handleSaveNote = (completionId: string) => {
     updateNote.mutate({ completionId, note: noteText });
     setNotePopover(null);
@@ -325,7 +338,7 @@ export default function FmChecklistContent() {
       <div className="grid grid-cols-7 gap-1.5 flex-1 min-h-0">
         {weekDates.map((date, dayIdx) => {
           const dateStr = format(date, "yyyy-MM-dd");
-          const tasks = getTasksForDay(dayIdx);
+          const tasks = getTasksForDay(dayIdx, dateStr);
           const progress = getDayProgress(dayIdx, dateStr);
           const isToday = isSameDay(date, today);
 
