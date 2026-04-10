@@ -1,35 +1,25 @@
 
 
-## Lettere opgavetilføjelse: Engangs- og tilbagevendende opgaver
+## Konverteringsrate opdelt på Salgskonsulent og Fieldmarketing
 
-### Problem
-I dag kræver det at åbne "Administrer"-panelet for at tilføje en opgave, og der er ingen skelnen mellem engangs- og tilbagevendende opgaver.
+### Data (aktuelt)
+- **Salgskonsulent**: 33 ansat af 270 ansøgere = **12,2%**
+- **Fieldmarketing**: 5 ansat af 58 ansøgere = **8,6%**
 
-### Løsning
+### Visualisering
 
-**1. Database: Tilføj `one_time_date` kolonne**
-- Tilføj `one_time_date DATE NULL` til `fm_checklist_templates`
-- Hvis sat: opgaven vises kun på den specifikke dato (engangopgave)
-- Hvis NULL: opgaven fungerer som i dag med `weekdays`-arrayet (tilbagevendende)
+**1. To side-by-side KPI-kort** — placeres under de eksisterende 4 KPI-kort:
+- **Salgskonsulent konvertering**: Stort procenttal (12,2%), undertekst "33 af 270 ansat", trend vs. forrige periode
+- **Fieldmarketing konvertering**: Stort procenttal (8,6%), undertekst "5 af 58 ansat", trend vs. forrige periode
 
-**2. "+" knap under hver dag**
-- Tilføj en lille `+`-knap i bunden af hver dags kolonne
-- Klik åbner en inline popover/input direkte på dagen
-- Bruger skriver blot en titel og trykker Enter eller "Tilføj"
-- Opretter en template med `one_time_date = den pågældende dato` og `weekdays = []`
-- Hurtig, minimal friktion
+**2. Funnel-bars under KPI-kort** — to horisontale stacked bars der viser fordelingen per type:
+- Ny → Kontaktet → Samtale → **Ansat** vs. Afvist/Ghostet/Ikke-kvalificeret
+- Én bar for Salgskonsulent, én for Fieldmarketing
+- Giver overblik over hvor i processen kandidater falder fra, for hver stillingskategori
 
-**3. Opdater visningslogik**
-- `getTasksForDay()` viser nu også one-time tasks der matcher datoen (udover tilbagevendende via weekdays)
-- One-time tasks vises med et lille engangsbadge så man kan skelne dem
-
-**4. Admin-panelet: Tilbagevendende markering**
-- Den eksisterende "Tilføj ny opgave" i admin forbliver for tilbagevendende opgaver
-- Tydeliggør at admin-flowet er til tilbagevendende (ugedage-vælgeren er allerede der)
-
-### Teknisk opsummering
-- 1 migration: `ALTER TABLE fm_checklist_templates ADD COLUMN one_time_date date NULL`
-- Opdater `useFmChecklistTemplates` query til også at hente one-time tasks for den aktuelle uge
-- Opdater `FmChecklistContent.tsx`: tilføj `+`-knap per dag, popover med titel-input, og opdater `getTasksForDay()`
-- Tilføj `useAddOneTimeTask` hook der kalder `addTemplate` med `one_time_date` og `weekdays: []`
+### Teknisk
+- Kun ændringer i `RecruitmentDashboard.tsx`
+- Grupperer `candidates` arrayet på `applied_position` (case-insensitive match på "salgskonsulent" / "fieldmarketing")
+- Bruger recharts `BarChart` (stacked, horizontal) til funnel
+- Periodefilter (30d/90d/alle) genbruges fra eksisterende chart
 
