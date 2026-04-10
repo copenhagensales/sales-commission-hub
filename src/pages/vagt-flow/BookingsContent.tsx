@@ -387,8 +387,9 @@ export default function BookingsContent() {
   const dietCreatorUserIds = useMemo(() => {
     const ids = new Set<string>();
     dietByBookingDate.forEach(v => { if (v.created_by) ids.add(v.created_by); });
+    trainingByBookingDate.forEach(v => { if (v.created_by) ids.add(v.created_by); });
     return Array.from(ids);
-  }, [dietByBookingDate]);
+  }, [dietByBookingDate, trainingByBookingDate]);
 
   const { data: dietCreatorNames } = useQuery({
     queryKey: ["diet-creator-names", dietCreatorUserIds],
