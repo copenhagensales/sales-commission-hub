@@ -174,3 +174,110 @@ export function useDeactivateChecklistTemplate() {
     },
   });
 }
+
+// ── Email config hooks ──
+
+export interface FmChecklistEmailConfig {
+  id: string;
+  send_time: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export function useFmChecklistEmailConfig() {
+  return useQuery({
+    queryKey: ["fm-checklist-email-config"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("fm_checklist_email_config")
+        .select("*")
+        .limit(1)
+        .single();
+      if (error) throw error;
+      return data as FmChecklistEmailConfig;
+    },
+  });
+}
+
+export function useUpdateEmailConfig() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (updates: { send_time?: string; is_active?: boolean }) => {
+      const { data: existing } = await supabase
+        .from("fm_checklist_email_config")
+        .select("id")
+        .limit(1)
+        .single();
+      if (!existing) throw new Error("No config row");
+      const { error } = await supabase
+        .from("fm_checklist_email_config")
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq("id", existing.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["fm-checklist-email-config"] });
+      toast.success("Email-indstillinger opdateret");
+    },
+    onError: (error) => {
+      toast.error("Kunne ikke opdatere: " + error.message);
+    },
+  });
+}
+
+export interface FmChecklistEmailRecipient {
+  id: string;
+  employee_id: string;
+  created_at: string;
+}
+
+export function useFmChecklistEmailRecipients() {
+  return useQuery({
+    queryKey: ["fm-checklist-email-recipients"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("fm_checklist_email_recipients")
+        .select("*");
+      if (error) throw error;
+      return data as FmChecklistEmailRecipient[];
+    },
+  });
+}
+
+export function useAddEmailRecipient() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (employeeId: string) => {
+      const { error } = await supabase
+        .from("fm_checklist_email_recipients")
+        .insert({ employee_id: employeeId });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["fm-checklist-email-recipients"] });
+    },
+    onError: (error) => {
+      toast.error("Kunne ikke tilføje modtager: " + error.message);
+    },
+  });
+}
+
+export function useRemoveEmailRecipient() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (recipientId: string) => {
+      const { error } = await supabase
+        .from("fm_checklist_email_recipients")
+        .delete()
+        .eq("id", recipientId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["fm-checklist-email-recipients"] });
+    },
+  });
+}

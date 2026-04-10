@@ -7,11 +7,17 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ChevronLeft, ChevronRight, Plus, Trash2, CheckCircle2, MessageSquare, Flame, Settings } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { TimeSelect } from "@/components/ui/time-select";
+import { ChevronLeft, ChevronRight, Plus, Trash2, CheckCircle2, MessageSquare, Flame, Settings, Mail, Send, X, Loader2 } from "lucide-react";
 import { format, addDays, startOfWeek, isSameDay } from "date-fns";
 import { da } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import {
   useFmChecklistTemplates,
   useFmChecklistCompletions,
@@ -19,6 +25,11 @@ import {
   useUpdateCompletionNote,
   useAddChecklistTemplate,
   useDeactivateChecklistTemplate,
+  useFmChecklistEmailConfig,
+  useUpdateEmailConfig,
+  useFmChecklistEmailRecipients,
+  useAddEmailRecipient,
+  useRemoveEmailRecipient,
   type FmChecklistCompletion,
 } from "@/hooks/useFmChecklist";
 import { motion, AnimatePresence } from "framer-motion";
@@ -45,6 +56,156 @@ function useEmployeeId() {
   }, [user?.id]);
 
   return employeeId;
+}
+
+function EmailSummaryConfig() {
+  const { data: config, isLoading: configLoading } = useFmChecklistEmailConfig();
+  const { data: recipients = [], isLoading: recipientsLoading } = useFmChecklistEmailRecipients();
+  const updateConfig = useUpdateEmailConfig();
+  const addRecipient = useAddEmailRecipient();
+  const removeRecipient = useRemoveEmailRecipient();
+  const [selectedEmployee, setSelectedEmployee] = useState<string>("");
+  const [isSending, setIsSending] = useState(false);
+
+  const { data: activeEmployees = [] } = useQuery({
+    queryKey: ["active-employees-for-email"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("agents")
+        .select("id, name, email")
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const recipientEmployeeIds = recipients.map((r) => r.employee_id);
+  const availableEmployees = activeEmployees.filter(
+    (e) => !recipientEmployeeIds.includes(e.id)
+  );
+
+  const handleAddRecipient = () => {
+    if (!selectedEmployee) return;
+    addRecipient.mutate(selectedEmployee);
+    setSelectedEmployee("");
+  };
+
+  const handleSendNow = async () => {
+    setIsSending(true);
+    try {
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const url = `https://${projectId}.supabase.co/functions/v1/send-checklist-daily-summary?force=true`;
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session?.access_token}`,
+          "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+      });
+      const result = await response.json();
+      if (response.ok) {
+        toast.success(`Email sendt til ${result.recipients} modtager(e)`);
+      } else {
+        toast.error(result.error || "Kunne ikke sende email");
+      }
+    } catch (err: any) {
+      toast.error("Fejl: " + err.message);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  if (configLoading) return null;
+
+  return (
+    <div className="border rounded-lg p-3 space-y-3">
+      <div className="flex items-center gap-2">
+        <Mail className="h-4 w-4 text-muted-foreground" />
+        <h4 className="text-xs font-medium">Daglig email-opsummering</h4>
+      </div>
+
+      {/* Active toggle */}
+      <div className="flex items-center justify-between">
+        <label className="text-xs text-muted-foreground">Aktiv</label>
+        <Switch
+          checked={config?.is_active ?? false}
+          onCheckedChange={(checked) => updateConfig.mutate({ is_active: checked })}
+        />
+      </div>
+
+      {/* Send time */}
+      <div className="space-y-1">
+        <label className="text-xs text-muted-foreground">Afsendelsestidspunkt</label>
+        <TimeSelect
+          value={config?.send_time ?? "20:00"}
+          onChange={(time) => updateConfig.mutate({ send_time: time })}
+        />
+      </div>
+
+      {/* Recipients */}
+      <div className="space-y-1.5">
+        <label className="text-xs text-muted-foreground">Modtagere</label>
+        <div className="flex flex-wrap gap-1">
+          {recipients.map((r) => {
+            const emp = activeEmployees.find((e) => e.id === r.employee_id);
+            return (
+              <Badge key={r.id} variant="secondary" className="gap-1 text-xs">
+                {emp?.name ?? "Ukendt"}
+                <button
+                  onClick={() => removeRecipient.mutate(r.id)}
+                  className="ml-0.5 hover:text-destructive"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            );
+          })}
+        </div>
+        <div className="flex gap-1.5">
+          <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+            <SelectTrigger className="h-8 text-xs flex-1">
+              <SelectValue placeholder="Vælg medarbejder..." />
+            </SelectTrigger>
+            <SelectContent>
+              {availableEmployees.map((e) => (
+                <SelectItem key={e.id} value={e.id} className="text-xs">
+                  {e.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 text-xs"
+            onClick={handleAddRecipient}
+            disabled={!selectedEmployee}
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Send now button */}
+      <Button
+        size="sm"
+        variant="outline"
+        className="w-full h-8 text-xs"
+        onClick={handleSendNow}
+        disabled={isSending || recipients.length === 0}
+      >
+        {isSending ? (
+          <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+        ) : (
+          <Send className="h-3.5 w-3.5 mr-1" />
+        )}
+        Send opsummering nu
+      </Button>
+    </div>
+  );
 }
 
 export default function FmChecklistContent() {
@@ -366,6 +527,9 @@ export default function FmChecklistContent() {
                 </div>
               ))}
             </div>
+
+            {/* Email summary config */}
+            <EmailSummaryConfig />
           </CardContent>
         </Card>
       )}

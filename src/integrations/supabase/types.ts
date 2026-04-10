@@ -6761,6 +6761,56 @@ export type Database = {
           },
         ]
       }
+      fm_checklist_email_config: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean
+          send_time: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean
+          send_time?: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean
+          send_time?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      fm_checklist_email_recipients: {
+        Row: {
+          created_at: string | null
+          employee_id: string
+          id: string
+        }
+        Insert: {
+          created_at?: string | null
+          employee_id: string
+          id?: string
+        }
+        Update: {
+          created_at?: string | null
+          employee_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fm_checklist_email_recipients_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fm_checklist_templates: {
         Row: {
           created_at: string
