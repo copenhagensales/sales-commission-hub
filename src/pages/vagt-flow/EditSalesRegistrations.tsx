@@ -363,7 +363,12 @@ export default function EditSalesRegistrations() {
       }
       
       // Update existing items (product, phone, comment) + group fields via raw_payload
+      const saleIdsNeedingRematch: string[] = [];
+      
       for (const item of toUpdate) {
+        // Find the original sale to compare core fields
+        const originalSale = originalGroup.sales.find(s => s.id === item.id);
+        
         // Get existing raw_payload
         const { data: existing } = await supabase
           .from("sales")
@@ -372,6 +377,12 @@ export default function EditSalesRegistrations() {
           .maybeSingle();
         
         const existingPayload = (existing?.raw_payload as any) || {};
+        
+        // Determine if core data (product, client, location) has changed
+        const productChanged = item.product_name !== (existingPayload.fm_product_name || originalSale?.product_name);
+        const clientChanged = updates.client_id && updates.client_id !== (existingPayload.fm_client_id || originalSale?.client_id);
+        const locationChanged = updates.location_id && updates.location_id !== (existingPayload.fm_location_id || originalSale?.location_id);
+        const coreDataChanged = productChanged || clientChanged || locationChanged;
         
         const { error } = await supabase
           .from("sales")
@@ -389,10 +400,17 @@ export default function EditSalesRegistrations() {
           .eq("id", item.id!);
         if (error) throw error;
 
-        // Delete and rematch sale_items for correct campaign-aware pricing
-        await supabase.from("sale_items").delete().eq("sale_id", item.id!);
+        // Only delete and rematch sale_items when core pricing data changed
+        if (coreDataChanged) {
+          await supabase.from("sale_items").delete().eq("sale_id", item.id!);
+          saleIdsNeedingRematch.push(item.id!);
+        }
+      }
+      
+      // Batch rematch all sales that had core data changes
+      if (saleIdsNeedingRematch.length > 0) {
         await supabase.functions.invoke("rematch-pricing-rules", {
-          body: { sale_ids: [item.id!] },
+          body: { sale_ids: saleIdsNeedingRematch },
         });
       }
       
