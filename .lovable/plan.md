@@ -1,21 +1,31 @@
 
 
-## Fix: Tilføj Inboxgame-kampagne til prisregel og rematch
+## Fjern Inboxgame fra prisregel og rematch berørte salg
 
-### Årsag
-- **Dashboard**: Beregner priser live fra `product_pricing_rules` → viser korrekt
-- **Dagsrapporter**: Læser `sale_items.mapped_commission` / `mapped_revenue` direkte → viser 0 kr fordi rematchen ikke har applied reglen
+### Status
+Regel `29323acd` har aktuelt 8 kampagner i `campaign_mapping_ids` (inkl. Inboxgame `60da0076`). Den sætter 190 kr commission. Basisproduktet har 250 kr commission / 550 kr revenue.
+
+3 berørte salg fundet:
+- `7b0a7db8-ed65-4903-a98d-085baef71352`
+- `bebae7c0-7274-4254-8f95-06c2bc2e4064`
+- `d4b6e5c9-d4b3-423f-a499-d67a89821426`
 
 ### Trin
 
-1. **Opdater prisreglen** i `product_pricing_rules`: Tilføj kampagne-mapping `60da0076-85a5-4bf3-94d7-3f29fdbb1cde` (Inboxgame - Konkurrence leads) til `campaign_mapping_ids` arrayet for reglen med `product_id = f18da6d2` og priority 1 (regel ID `29323acd`).
+1. **Opdater regel via migration** — Fjern `60da0076-85a5-4bf3-94d7-3f29fdbb1cde` fra `campaign_mapping_ids` arrayet på regel `29323acd`. De resterende 7 kampagner beholder 190 kr.
 
-2. **Kør rematch** på Thomas' salg (`d4b6e5c9-d4b3-423f-a499-d67a89821426`) for at opdatere `sale_items` med korrekte værdier (forventet: 190 kr commission, 550 kr revenue).
+```sql
+UPDATE product_pricing_rules
+SET campaign_mapping_ids = array_remove(campaign_mapping_ids, '60da0076-85a5-4bf3-94d7-3f29fdbb1cde'::uuid)
+WHERE id = '29323acd-21c1-4d43-93cf-8e8e9c6245f5';
+```
 
-3. **Verificér** at `sale_items` nu har korrekte `mapped_commission` og `mapped_revenue`.
+2. **Kør rematch** på de 3 berørte salg via `rematch-pricing-rules` edge function med `sale_ids` for at opdatere `mapped_commission` til 250 kr (basisproduktets pris).
+
+3. **Verificér** at `sale_items` nu viser 250 kr commission og 550 kr revenue for de berørte salg.
 
 ### Teknisk detalje
-- Én SQL UPDATE (append til `campaign_mapping_ids` array via insert-tool)
-- Ét kald til `rematch-pricing-rules` edge function
-- Ingen kodeændringer — dagsrapporter og dashboard vil begge vise korrekte tal efter rematch
+- Ingen kodeændringer
+- Én database-migration (UPDATE på eksisterende data)
+- Ét kald til rematch edge function
 
