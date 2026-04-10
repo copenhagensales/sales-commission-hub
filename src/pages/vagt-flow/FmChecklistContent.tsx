@@ -551,7 +551,7 @@ export default function FmChecklistContent() {
 
             <div className="space-y-1.5">
               <h4 className="text-xs font-medium">Eksisterende opgaver</h4>
-              {templates.map((t) => (
+              {templates.filter(t => !t.one_time_date).map((t) => (
                 <div key={t.id} className="flex items-center justify-between p-2 border rounded-lg">
                   <div>
                     <p className="text-xs font-medium">{t.title}</p>
