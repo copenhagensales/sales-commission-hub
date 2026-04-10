@@ -202,6 +202,8 @@ export default function FmChecklistContent() {
   const [newWeekdays, setNewWeekdays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
   const [notePopover, setNotePopover] = useState<string | null>(null);
   const [noteText, setNoteText] = useState("");
+  const [quickAddDay, setQuickAddDay] = useState<number | null>(null);
+  const [quickAddTitle, setQuickAddTitle] = useState("");
 
   const employeeId = useEmployeeId();
 
@@ -212,15 +214,18 @@ export default function FmChecklistContent() {
   const weekStartStr = format(weekStart, "yyyy-MM-dd");
   const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
 
-  const { data: templates = [], isLoading: templatesLoading } = useFmChecklistTemplates();
+  const { data: templates = [], isLoading: templatesLoading } = useFmChecklistTemplates(weekStartStr, weekEndStr);
   const { data: completions = [], isLoading: completionsLoading } = useFmChecklistCompletions(weekStartStr, weekEndStr);
   const toggleCompletion = useToggleChecklistCompletion();
   const updateNote = useUpdateCompletionNote();
   const addTemplate = useAddChecklistTemplate();
   const deactivateTemplate = useDeactivateChecklistTemplate();
 
-  const getTasksForDay = (dayIndex: number) =>
-    templates.filter((t) => t.weekdays.includes(dayIndex));
+  const getTasksForDay = (dayIndex: number, dateStr: string) =>
+    templates.filter((t) => {
+      if (t.one_time_date) return t.one_time_date === dateStr;
+      return t.weekdays.includes(dayIndex);
+    });
 
   const getCompletion = (templateId: string, date: string): FmChecklistCompletion | undefined =>
     completions.find((c) => c.template_id === templateId && c.completed_date === date);
