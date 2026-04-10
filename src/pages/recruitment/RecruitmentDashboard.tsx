@@ -50,39 +50,6 @@ export default function RecruitmentDashboard() {
     },
   });
 
-  const { data: recentHiresByTeam = [] } = useQuery({
-    queryKey: ["recent-hires-by-team"],
-    queryFn: async () => {
-      const thirtyDaysAgo = subDays(new Date(), 30).toISOString();
-      
-      // Get hired candidates from applications with team info
-      const { data: applications, error } = await supabase
-        .from("applications")
-        .select(`
-          id,
-          team_id,
-          candidates!inner(id, status, created_at, first_name, last_name),
-          teams(id, name)
-        `)
-        .eq("candidates.status", "hired")
-        .gte("candidates.created_at", thirtyDaysAgo);
-      
-      if (error) throw error;
-      
-      // Group by team
-      const teamCounts: Record<string, { name: string; count: number }> = {};
-      
-      applications?.forEach((app: any) => {
-        const teamName = app.teams?.name || "Ikke tildelt";
-        if (!teamCounts[teamName]) {
-          teamCounts[teamName] = { name: teamName, count: 0 };
-        }
-        teamCounts[teamName].count += 1;
-      });
-      
-      return Object.values(teamCounts).sort((a, b) => b.count - a.count);
-    },
-  });
 
   const { data: communicationStats } = useQuery({
     queryKey: ["communication-stats"],
@@ -403,44 +370,6 @@ export default function RecruitmentDashboard() {
         </CardContent>
       </Card>
 
-      {/* Recent Applications - compact inline list */}
-      <Card className="bg-card border-border">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg font-semibold text-foreground flex items-center justify-between">
-            Seneste ansøgninger
-            <Link to="/recruitment/candidates">
-              <Button variant="ghost" size="sm">
-                Se alle <ArrowRight className="ml-1 h-4 w-4" />
-              </Button>
-            </Link>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0">
-          {candidates.length === 0 ? (
-            <p className="text-muted-foreground text-center py-4">Ingen ansøgninger endnu</p>
-          ) : (
-            <div className="flex flex-wrap gap-x-4 gap-y-1">
-              {candidates.slice(0, 10).map((candidate, index) => (
-                <Link 
-                  key={candidate.id} 
-                  to={`/recruitment/candidates/${candidate.id}`}
-                  className="inline-flex items-center gap-1.5 py-1 hover:text-primary transition-colors group text-sm"
-                >
-                  <span className="font-medium text-foreground group-hover:text-primary transition-colors">
-                    {candidate.first_name}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {format(new Date(candidate.created_at), "d/M", { locale: da })}
-                  </span>
-                  {index < Math.min(candidates.length - 1, 9) && (
-                    <span className="text-muted-foreground/50 ml-1">•</span>
-                  )}
-                </Link>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
 
 
       {/* Applicants Over Time Chart */}
@@ -512,31 +441,8 @@ export default function RecruitmentDashboard() {
         </CardContent>
       </Card>
 
-      {/* New Hires by Team */}
-      <Card className="bg-card border-border">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg font-semibold text-foreground">
-            Nye ansættelser (30 dage)
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0">
-          {recentHiresByTeam.length === 0 ? (
-            <p className="text-muted-foreground text-center py-4">Ingen ansættelser de sidste 30 dage</p>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
-              {recentHiresByTeam.map((team) => (
-                <div 
-                  key={team.name} 
-                  className="flex items-center justify-between p-2.5 sm:p-3 rounded-lg bg-muted/30 border border-border"
-                >
-                  <span className="text-sm font-medium text-foreground truncate">{team.name}</span>
-                  <span className="text-lg font-bold text-foreground ml-2 shrink-0">{team.count}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+
+
       </div>
     </MainLayout>
   );
