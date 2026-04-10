@@ -328,9 +328,9 @@ export default function RecruitmentDashboard() {
             declined: "hsl(220 10% 45%)",
           };
 
-          const chartData = data.funnelData.map((item) => ({
+          const chartData = data.recentFunnelData.map((item) => ({
             ...item,
-            pct: data.total > 0 ? Math.round((item.count / data.total) * 100) : 0,
+            pct: data.recentTotal > 0 ? Math.round((item.count / data.recentTotal) * 100) : 0,
             fill: COLORS[item.key] || "hsl(var(--muted-foreground) / 0.3)",
           }));
 
@@ -338,10 +338,10 @@ export default function RecruitmentDashboard() {
             <Card key={label} className="bg-card border-border">
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-medium text-foreground">{label}</CardTitle>
-                  <span className="text-2xl font-bold text-foreground">{data.rate}%</span>
+                  <CardTitle className="text-sm font-medium text-foreground">{label} (30 dage)</CardTitle>
+                  <span className="text-2xl font-bold text-foreground">{data.recentTotal} ansøgere</span>
                 </div>
-                <p className="text-xs text-muted-foreground">{data.hired} af {data.total} ansat</p>
+                <p className="text-xs text-muted-foreground">{data.recentHired} af {data.recentTotal} ansat ({data.recentRate}%)</p>
               </CardHeader>
               <CardContent>
                 {chartData.length === 0 ? (
