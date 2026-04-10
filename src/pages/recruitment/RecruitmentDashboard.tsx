@@ -112,23 +112,25 @@ export default function RecruitmentDashboard() {
       const recentHired = recent.filter(c => c.status === "hired").length;
       const recentRate = recentTotal > 0 ? Math.round((recentHired / recentTotal) * 1000) / 10 : 0;
 
-      // Status breakdown for funnel
-      const statusBreakdown: Record<string, number> = {};
-      filtered.forEach(c => {
-        statusBreakdown[c.status] = (statusBreakdown[c.status] || 0) + 1;
-      });
+      const buildFunnel = (list: typeof filtered) => {
+        const statusBreakdown: Record<string, number> = {};
+        list.forEach(c => {
+          statusBreakdown[c.status] = (statusBreakdown[c.status] || 0) + 1;
+        });
+        const funnelOrder = ["new", "contacted", "interview_scheduled", "hired", "rejected", "not_qualified", "ghosted", "declined"];
+        return funnelOrder
+          .filter(s => statusBreakdown[s])
+          .map(s => ({
+            status: statusLabels[s] || s,
+            count: statusBreakdown[s],
+            key: s,
+          }));
+      };
 
-      // Build funnel data in logical order
-      const funnelOrder = ["new", "contacted", "interview_scheduled", "hired", "rejected", "not_qualified", "ghosted", "declined"];
-      const funnelData = funnelOrder
-        .filter(s => statusBreakdown[s])
-        .map(s => ({
-          status: statusLabels[s] || s,
-          count: statusBreakdown[s],
-          key: s,
-        }));
+      const funnelData = buildFunnel(filtered);
+      const recentFunnelData = buildFunnel(recent);
 
-      return { total, hired, rate, recentTotal, recentHired, recentRate, funnelData };
+      return { total, hired, rate, recentTotal, recentHired, recentRate, funnelData, recentFunnelData };
     };
 
     return {
