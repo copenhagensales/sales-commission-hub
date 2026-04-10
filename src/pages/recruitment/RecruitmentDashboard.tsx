@@ -104,6 +104,14 @@ export default function RecruitmentDashboard() {
       const hired = filtered.filter(c => c.status === "hired").length;
       const rate = total > 0 ? Math.round((hired / total) * 1000) / 10 : 0;
 
+      // 30-day stats
+      const now = new Date();
+      const thirtyDaysAgo = subDays(now, 30);
+      const recent = filtered.filter(c => new Date(c.created_at) >= thirtyDaysAgo);
+      const recentTotal = recent.length;
+      const recentHired = recent.filter(c => c.status === "hired").length;
+      const recentRate = recentTotal > 0 ? Math.round((recentHired / recentTotal) * 1000) / 10 : 0;
+
       // Status breakdown for funnel
       const statusBreakdown: Record<string, number> = {};
       filtered.forEach(c => {
@@ -120,7 +128,7 @@ export default function RecruitmentDashboard() {
           key: s,
         }));
 
-      return { total, hired, rate, funnelData };
+      return { total, hired, rate, recentTotal, recentHired, recentRate, funnelData };
     };
 
     return {
@@ -270,26 +278,32 @@ export default function RecruitmentDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card className="bg-card border-border">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Salgskonsulent konvertering</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Salgskonsulent konvertering (30 dage)</CardTitle>
             <Percent className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{conversionStats.sales.rate}%</div>
+            <div className="text-2xl font-bold text-foreground">{conversionStats.sales.recentRate}%</div>
             <p className="text-xs text-muted-foreground">
-              {conversionStats.sales.hired} af {conversionStats.sales.total} ansat
+              {conversionStats.sales.recentHired} af {conversionStats.sales.recentTotal} ansat (30d)
+            </p>
+            <p className="text-xs text-muted-foreground/60 mt-1">
+              Historisk: {conversionStats.sales.rate}% ({conversionStats.sales.hired}/{conversionStats.sales.total})
             </p>
           </CardContent>
         </Card>
 
         <Card className="bg-card border-border">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Fieldmarketing konvertering</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Fieldmarketing konvertering (30 dage)</CardTitle>
             <Percent className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{conversionStats.field.rate}%</div>
+            <div className="text-2xl font-bold text-foreground">{conversionStats.field.recentRate}%</div>
             <p className="text-xs text-muted-foreground">
-              {conversionStats.field.hired} af {conversionStats.field.total} ansat
+              {conversionStats.field.recentHired} af {conversionStats.field.recentTotal} ansat (30d)
+            </p>
+            <p className="text-xs text-muted-foreground/60 mt-1">
+              Historisk: {conversionStats.field.rate}% ({conversionStats.field.hired}/{conversionStats.field.total})
             </p>
           </CardContent>
         </Card>
