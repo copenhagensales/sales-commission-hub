@@ -1,26 +1,35 @@
 
 
-## Fix: Oplæringsbonus vises fejlagtigt som "Diæt"-tag
+## Lettere opgavetilføjelse: Engangs- og tilbagevendende opgaver
 
 ### Problem
-`booking_diet`-tabellen bruges til **både** diæter og oplæringsbonusser (differentieret via `salary_type_id`). Men queryen i booking-oversigten henter alle rækker uden filter — så oplæringsbonusser vises som orange "Diæt"-tags.
+I dag kræver det at åbne "Administrer"-panelet for at tilføje en opgave, og der er ingen skelnen mellem engangs- og tilbagevendende opgaver.
 
 ### Løsning
 
-**Fil: `src/pages/vagt-flow/BookingsContent.tsx`**
+**1. Database: Tilføj `one_time_date` kolonne**
+- Tilføj `one_time_date DATE NULL` til `fm_checklist_templates`
+- Hvis sat: opgaven vises kun på den specifikke dato (engangopgave)
+- Hvis NULL: opgaven fungerer som i dag med `weekdays`-arrayet (tilbagevendende)
 
-1. **Filtrer diet-query** (linje ~302): Tilføj `.eq("salary_type_id", dietSalaryType.id)` så kun ægte diæter hentes. Gør queryen afhængig af at `dietSalaryType` er loaded.
+**2. "+" knap under hver dag**
+- Tilføj en lille `+`-knap i bunden af hver dags kolonne
+- Klik åbner en inline popover/input direkte på dagen
+- Bruger skriver blot en titel og trykker Enter eller "Tilføj"
+- Opretter en template med `one_time_date = den pågældende dato` og `weekdays = []`
+- Hurtig, minimal friktion
 
-2. **Tilføj separat query for oplæringsbonus**: Hent `booking_diet`-rækker filtreret på `salary_type_id = trainingBonusSalaryType.id` (kræver at training salary type også fetches — den hentes muligvis allerede i EditBookingDialog men ikke i BookingsContent).
+**3. Opdater visningslogik**
+- `getTasksForDay()` viser nu også one-time tasks der matcher datoen (udover tilbagevendende via weekdays)
+- One-time tasks vises med et lille engangsbadge så man kan skelne dem
 
-3. **Tilføj training salary type query** i BookingsContent (ligesom diet salary type allerede hentes på linje 313-326).
+**4. Admin-panelet: Tilbagevendende markering**
+- Den eksisterende "Tilføj ny opgave" i admin forbliver for tilbagevendende opgaver
+- Tydeliggør at admin-flowet er til tilbagevendende (ugedage-vælgeren er allerede der)
 
-4. **Byg separat lookup-map** for oplæringsbonusser (`trainingByBookingDate`).
-
-5. **Render separat tag** for oplæringsbonus — indigo/lilla badge med `GraduationCap`-ikon og teksten "Oplæring" i stedet for orange "Diæt", på begge steder hvor diet-tagget renderes (linje ~1234 og ~1521).
-
-### Resultat
-- Diæt-tags vises kun for ægte diæter (orange, gaffel-ikon)
-- Oplæringsbonusser vises med eget tag (indigo, graduation-ikon)
-- Ingen data ændres — kun visningslogik
+### Teknisk opsummering
+- 1 migration: `ALTER TABLE fm_checklist_templates ADD COLUMN one_time_date date NULL`
+- Opdater `useFmChecklistTemplates` query til også at hente one-time tasks for den aktuelle uge
+- Opdater `FmChecklistContent.tsx`: tilføj `+`-knap per dag, popover med titel-input, og opdater `getTasksForDay()`
+- Tilføj `useAddOneTimeTask` hook der kalder `addTemplate` med `one_time_date` og `weekdays: []`
 
