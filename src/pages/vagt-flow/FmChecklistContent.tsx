@@ -117,23 +117,6 @@ function EmailSummaryConfig() {
       setIsSending(false);
     }
   };
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${session?.access_token}`,
-          "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-        },
-      });
-      const result = await response.json();
-      if (response.ok) {
-        toast.success(`Email sendt til ${result.recipients} modtager(e)`);
-      } else {
-        toast.error(result.error || "Kunne ikke sende email");
-      }
-    } catch (err: any) {
-      toast.error("Fejl: " + err.message);
-    } finally {
-      setIsSending(false);
-    }
-  };
 
   if (configLoading) return null;
 
