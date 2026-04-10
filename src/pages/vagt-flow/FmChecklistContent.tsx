@@ -60,35 +60,29 @@ function useEmployeeId() {
 
 function EmailSummaryConfig() {
   const { data: config, isLoading: configLoading } = useFmChecklistEmailConfig();
-  const { data: recipients = [], isLoading: recipientsLoading } = useFmChecklistEmailRecipients();
+  const { data: recipients = [] } = useFmChecklistEmailRecipients();
   const updateConfig = useUpdateEmailConfig();
   const addRecipient = useAddEmailRecipient();
   const removeRecipient = useRemoveEmailRecipient();
-  const [selectedEmployee, setSelectedEmployee] = useState<string>("");
+  const [newEmail, setNewEmail] = useState("");
   const [isSending, setIsSending] = useState(false);
 
-  const { data: activeEmployees = [] } = useQuery({
-    queryKey: ["active-employees-for-email"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("agents")
-        .select("id, name, email")
-        .eq("is_active", true)
-        .order("name");
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const recipientEmployeeIds = recipients.map((r) => r.employee_id);
-  const availableEmployees = activeEmployees.filter(
-    (e) => !recipientEmployeeIds.includes(e.id)
-  );
-
   const handleAddRecipient = () => {
-    if (!selectedEmployee) return;
-    addRecipient.mutate(selectedEmployee);
-    setSelectedEmployee("");
+    const trimmed = newEmail.trim().toLowerCase();
+    if (!trimmed || !trimmed.includes("@")) return;
+    if (recipients.some((r) => r.email === trimmed)) {
+      toast.error("Email er allerede tilføjet");
+      return;
+    }
+    addRecipient.mutate(trimmed);
+    setNewEmail("");
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleAddRecipient();
+    }
   };
 
   const handleSendNow = async () => {
@@ -149,40 +143,33 @@ function EmailSummaryConfig() {
       <div className="space-y-1.5">
         <label className="text-xs text-muted-foreground">Modtagere</label>
         <div className="flex flex-wrap gap-1">
-          {recipients.map((r) => {
-            const emp = activeEmployees.find((e) => e.id === r.employee_id);
-            return (
-              <Badge key={r.id} variant="secondary" className="gap-1 text-xs">
-                {emp?.name ?? "Ukendt"}
-                <button
-                  onClick={() => removeRecipient.mutate(r.id)}
-                  className="ml-0.5 hover:text-destructive"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </Badge>
-            );
-          })}
+          {recipients.map((r) => (
+            <Badge key={r.id} variant="secondary" className="gap-1 text-xs">
+              {r.email}
+              <button
+                onClick={() => removeRecipient.mutate(r.id)}
+                className="ml-0.5 hover:text-destructive"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          ))}
         </div>
         <div className="flex gap-1.5">
-          <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
-            <SelectTrigger className="h-8 text-xs flex-1">
-              <SelectValue placeholder="Vælg medarbejder..." />
-            </SelectTrigger>
-            <SelectContent>
-              {availableEmployees.map((e) => (
-                <SelectItem key={e.id} value={e.id} className="text-xs">
-                  {e.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Input
+            type="email"
+            placeholder="Indtast email-adresse..."
+            value={newEmail}
+            onChange={(e) => setNewEmail(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="h-8 text-xs flex-1"
+          />
           <Button
             size="sm"
             variant="outline"
             className="h-8 text-xs"
             onClick={handleAddRecipient}
-            disabled={!selectedEmployee}
+            disabled={!newEmail.trim() || !newEmail.includes("@")}
           >
             <Plus className="h-3.5 w-3.5" />
           </Button>

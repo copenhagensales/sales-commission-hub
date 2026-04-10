@@ -229,7 +229,7 @@ export function useUpdateEmailConfig() {
 
 export interface FmChecklistEmailRecipient {
   id: string;
-  employee_id: string;
+  email: string;
   created_at: string;
 }
 
@@ -250,10 +250,10 @@ export function useAddEmailRecipient() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (employeeId: string) => {
+    mutationFn: async (email: string) => {
       const { error } = await supabase
         .from("fm_checklist_email_recipients")
-        .insert({ employee_id: employeeId });
+        .insert({ email });
       if (error) throw error;
     },
     onSuccess: () => {
