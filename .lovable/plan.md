@@ -1,38 +1,24 @@
 
 
-## Plan: Map 5 Eesy TM-kampagner og backfill umappede salg
+## Plan: Remap Pricebook DNB og Venta General til konsolideret Eesy-produkt
 
-### Hvad der sker
+### Problem
+Salg fra kampagnerne Pricebook DNB og Venta General mapper til selvstændige produkter med 0 kr provision, selvom de reelt sælger Eesy-mobilabonnementer (Fri tale + 70 GB, 100 GB osv.).
 
-5 kampagner i `adversus_campaign_mappings` har `client_campaign_id = NULL` men hører til Eesy TM. De opdateres på præcis samme måde som de 20+ eksisterende Eesy TM-kampagner.
+### Løsning
+Følg den eksisterende Eesy TM-konsolideringsstrategi: map til det fælles 5G-produkt `bd58176b` ("Fri tale + fri data (5G) (6 mdr. binding) 109 kr"), som alle andre 5G-varianter allerede peger på. Derefter rematch for korrekt provision.
 
-### Trin 1: Opdater kampagne-mappings
+### Trin
 
-Sæt `client_campaign_id = 'd031126c-aec0-4b80-bbe2-bbc31c4f04ba'` (Eesy TM Products) på:
+1. **Opdater adversus_product_mappings** — sæt `product_id = bd58176b` for "Pricebook DNB" og "Venta General" så fremtidige salg mappes korrekt.
 
-| Kampagne | Navn |
-|----------|------|
-| CAMP8252C81 | Pricebook DNB |
-| CAMP8291C81 | Mobilpriser |
-| CAMP8438C81 | Admill - Valino |
-| CAMP7371C81 | (ukendt) |
-| CAMP7526C81 | (ukendt) |
+2. **Opdater sale_items** — ændr `product_id` på eksisterende sale_items fra de to 0 kr-produkter til `bd58176b`.
 
-### Trin 2: Backfill salg
-
-Opdater `sales.client_campaign_id` via join mod `adversus_campaign_mappings` for alle salg hvor:
-- `dialer_campaign_id` matcher en af de 5 kampagner
-- `client_campaign_id IS NULL`
-
-Også backfill de 8 salg fra kategori 2 (kampagner 108547, 108541, 108543, 108545) der allerede har korrekt mapping men mangler det på salget.
-
-### Trin 3: Rematch prisregler
-
-Kald `rematch-pricing-rules` for de berørte salg så provision/omsætning beregnes.
+3. **Rematch prisregler** — kald `rematch-pricing-rules` for de berørte salg, så de får de kampagne-specifikke Eesy TM-priser (250-375 kr provision).
 
 ### Teknisk
-
 - Data-opdateringer via insert-tool (UPDATE statements)
-- Ingen kodeændringer — bruger eksisterende infrastruktur
-- Samme mønster som alle andre Eesy TM-kampagner
+- Ingen kodeændringer
+- Følger præcis samme konsolideringsmønster som alle andre Eesy TM 5G-varianter
+- ~8 salg påvirkes
 
