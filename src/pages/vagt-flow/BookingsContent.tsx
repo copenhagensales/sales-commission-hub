@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useMemo } from "react";
-import { ChevronUp, ChevronDown, Trash2, Plus, Calendar as CalendarIcon, AlertTriangle, X, Pencil, Car, Tent, Utensils, Hotel, CheckCircle2, UserPlus, Undo2 } from "lucide-react";
+import { ChevronUp, ChevronDown, Trash2, Plus, Calendar as CalendarIcon, AlertTriangle, X, Pencil, Car, Tent, Utensils, Hotel, CheckCircle2, UserPlus, Undo2, GraduationCap } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { useBookingHotels } from "@/hooks/useBookingHotels";
 import { usePermissions } from "@/hooks/usePositionPermissions";
@@ -293,22 +293,6 @@ export default function BookingsContent() {
     enabled: allBookingIds.length > 0,
   });
 
-  // Fetch booking_diet data for diet tags
-
-  const { data: bookingDiets = [] } = useQuery({
-    queryKey: ["vagt-booking-diets", selectedWeek, selectedYear],
-    queryFn: async () => {
-      if (allBookingIds.length === 0) return [];
-      const { data, error } = await supabase
-        .from("booking_diet")
-        .select("id, booking_id, date, created_at, created_by")
-        .in("booking_id", allBookingIds);
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: allBookingIds.length > 0,
-  });
-
   // Fetch diet salary type for quick-add
   const { data: dietSalaryType } = useQuery({
     queryKey: ["diet-salary-type"],
@@ -325,6 +309,54 @@ export default function BookingsContent() {
     },
   });
 
+  // Fetch training bonus salary type
+  const { data: trainingBonusSalaryType } = useQuery({
+    queryKey: ["training-bonus-salary-type"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("salary_types")
+        .select("id, name, amount")
+        .ilike("name", "%oplæring%")
+        .eq("is_active", true)
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Fetch booking_diet data for diet tags (filtered to diet salary type only)
+  const { data: bookingDiets = [] } = useQuery({
+    queryKey: ["vagt-booking-diets", selectedWeek, selectedYear, dietSalaryType?.id],
+    queryFn: async () => {
+      if (allBookingIds.length === 0 || !dietSalaryType) return [];
+      const { data, error } = await supabase
+        .from("booking_diet")
+        .select("id, booking_id, date, created_at, created_by")
+        .in("booking_id", allBookingIds)
+        .eq("salary_type_id", dietSalaryType.id);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: allBookingIds.length > 0 && !!dietSalaryType,
+  });
+
+  // Fetch booking_diet data for training bonus tags
+  const { data: bookingTrainingBonuses = [] } = useQuery({
+    queryKey: ["vagt-booking-training-bonuses", selectedWeek, selectedYear, trainingBonusSalaryType?.id],
+    queryFn: async () => {
+      if (allBookingIds.length === 0 || !trainingBonusSalaryType) return [];
+      const { data, error } = await supabase
+        .from("booking_diet")
+        .select("id, booking_id, date, created_at, created_by")
+        .in("booking_id", allBookingIds)
+        .eq("salary_type_id", trainingBonusSalaryType.id);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: allBookingIds.length > 0 && !!trainingBonusSalaryType,
+  });
+
   // Build lookup: booking_id + date -> diet info (created_at, created_by)
   const dietByBookingDate = useMemo(() => {
     const map = new Map<string, { created_at: string | null; created_by: string | null }>();
@@ -338,12 +370,26 @@ export default function BookingsContent() {
     return map;
   }, [bookingDiets]);
 
+  // Build lookup: booking_id + date -> training bonus info
+  const trainingByBookingDate = useMemo(() => {
+    const map = new Map<string, { created_at: string | null; created_by: string | null }>();
+    for (const d of bookingTrainingBonuses as any[]) {
+      if (!d.date) continue;
+      const key = `${d.booking_id}_${d.date}`;
+      if (!map.has(key)) {
+        map.set(key, { created_at: d.created_at, created_by: d.created_by });
+      }
+    }
+    return map;
+  }, [bookingTrainingBonuses]);
+
   // Fetch employee names for diet created_by user ids
   const dietCreatorUserIds = useMemo(() => {
     const ids = new Set<string>();
     dietByBookingDate.forEach(v => { if (v.created_by) ids.add(v.created_by); });
+    trainingByBookingDate.forEach(v => { if (v.created_by) ids.add(v.created_by); });
     return Array.from(ids);
-  }, [dietByBookingDate]);
+  }, [dietByBookingDate, trainingByBookingDate]);
 
   const { data: dietCreatorNames } = useQuery({
     queryKey: ["diet-creator-names", dietCreatorUserIds],
@@ -1273,6 +1319,33 @@ export default function BookingsContent() {
                                   </div>
                                 );
                               })()}
+                              {(() => {
+                                const dateStr = format(dayDate, "yyyy-MM-dd");
+                                const trainingInfo = trainingByBookingDate.get(`${booking.id}_${dateStr}`);
+                                if (!trainingInfo) return null;
+                                const creatorName = trainingInfo.created_by && dietCreatorNames?.[trainingInfo.created_by];
+                                const createdTime = trainingInfo.created_at ? format(new Date(trainingInfo.created_at), "HH:mm 'd.' dd/MM", { locale: da }) : null;
+                                const tooltipText = creatorName
+                                  ? `Tilføjet af ${creatorName} kl. ${createdTime}`
+                                  : createdTime ? `Tilføjet kl. ${createdTime}` : "Oplæringsbonus";
+                                return (
+                                  <div className="mt-1 flex flex-col items-center">
+                                    <TooltipProvider delayDuration={200}>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Badge variant="secondary" className="text-[9px] px-1 py-0 gap-0.5 bg-indigo-100 text-indigo-800 border border-indigo-300 cursor-default">
+                                            <GraduationCap className="h-2 w-2" />
+                                            Oplæring
+                                          </Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top" className="text-xs">
+                                          {tooltipText}
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  </div>
+                                );
+                              })()}
                               {canEditFmBookings && isBooked && (
                                 <DayQuickAddButtons
                                   booking={booking}
@@ -1550,6 +1623,33 @@ export default function BookingsContent() {
                                             <X className="h-2 w-2" />
                                           </button>
                                         )}
+                                      </Badge>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" className="text-xs">
+                                      {tooltipText}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+                            );
+                          })()}
+                          {(() => {
+                            const dateStr = format(dayDate, "yyyy-MM-dd");
+                            const trainingInfo = trainingByBookingDate.get(`${booking.id}_${dateStr}`);
+                            if (!trainingInfo) return null;
+                            const creatorName = trainingInfo.created_by && dietCreatorNames?.[trainingInfo.created_by];
+                            const createdTime = trainingInfo.created_at ? format(new Date(trainingInfo.created_at), "HH:mm 'd.' dd/MM", { locale: da }) : null;
+                            const tooltipText = creatorName
+                              ? `Tilføjet af ${creatorName} kl. ${createdTime}`
+                              : createdTime ? `Tilføjet kl. ${createdTime}` : "Oplæringsbonus";
+                            return (
+                              <div className="mt-1 flex flex-col items-center">
+                                <TooltipProvider delayDuration={200}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Badge variant="secondary" className="text-[9px] px-1 py-0 gap-0.5 bg-indigo-100 text-indigo-800 border border-indigo-300 cursor-default">
+                                        <GraduationCap className="h-2 w-2" />
+                                        Oplæring
                                       </Badge>
                                     </TooltipTrigger>
                                     <TooltipContent side="top" className="text-xs">
