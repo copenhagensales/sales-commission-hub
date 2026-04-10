@@ -1,0 +1,1 @@
+SELECT cron.alter_job(53, '0 14 * * 5');
