@@ -1,24 +1,38 @@
 
 
-## Plan: Map kampagne CAMP8324C81 til Eesy TM og backfill umappede salg
+## Plan: Map 5 Eesy TM-kampagner og backfill umappede salg
 
-### Baggrund
-Kampagnen "Pricebook Internet Tjek" (`CAMP8324C81`) eksisterer allerede i `adversus_campaign_mappings` men har `client_campaign_id = NULL`. 59 af 65 salg har allerede korrekt `client_campaign_id` (sat via webhook), men 6 nyere salg mangler den.
+### Hvad der sker
 
-### Trin 1: Database-migration
-En enkelt SQL-migration der:
-1. Sætter `client_campaign_id = 'd031126c-aec0-4b80-bbe2-bbc31c4f04ba'` (Eesy TM Products) på `adversus_campaign_mappings` for `CAMP8324C81`
-2. Backfiller de 6 salg der mangler `client_campaign_id` — opdaterer `sales` hvor `dialer_campaign_id = 'CAMP8324C81' AND client_campaign_id IS NULL`
+5 kampagner i `adversus_campaign_mappings` har `client_campaign_id = NULL` men hører til Eesy TM. De opdateres på præcis samme måde som de 20+ eksisterende Eesy TM-kampagner.
 
-### Trin 2: Trigger rematch
-Kalder `rematch-pricing-rules` edge function for de 6 berørte salg, så `sale_items` får korrekt provision/omsætning baseret på den nu-korrekte kampagne-mapping.
+### Trin 1: Opdater kampagne-mappings
 
-### Resultat
-- Fremtidige salg fra denne kampagne bliver automatisk mappet via webhook (ligesom alle andre)
-- De 6 historiske salg tæller nu med under Eesy TM i leaderboard
-- Ingen hardcoding — det følger det eksisterende mapping-mønster
+Sæt `client_campaign_id = 'd031126c-aec0-4b80-bbe2-bbc31c4f04ba'` (Eesy TM Products) på:
 
-### Filer der ændres
-- **Database:** 1 migration (update campaign mapping + backfill sales)
-- **Ingen kodeændringer** — alt bruger eksisterende infrastruktur
+| Kampagne | Navn |
+|----------|------|
+| CAMP8252C81 | Pricebook DNB |
+| CAMP8291C81 | Mobilpriser |
+| CAMP8438C81 | Admill - Valino |
+| CAMP7371C81 | (ukendt) |
+| CAMP7526C81 | (ukendt) |
+
+### Trin 2: Backfill salg
+
+Opdater `sales.client_campaign_id` via join mod `adversus_campaign_mappings` for alle salg hvor:
+- `dialer_campaign_id` matcher en af de 5 kampagner
+- `client_campaign_id IS NULL`
+
+Også backfill de 8 salg fra kategori 2 (kampagner 108547, 108541, 108543, 108545) der allerede har korrekt mapping men mangler det på salget.
+
+### Trin 3: Rematch prisregler
+
+Kald `rematch-pricing-rules` for de berørte salg så provision/omsætning beregnes.
+
+### Teknisk
+
+- Data-opdateringer via insert-tool (UPDATE statements)
+- Ingen kodeændringer — bruger eksisterende infrastruktur
+- Samme mønster som alle andre Eesy TM-kampagner
 
