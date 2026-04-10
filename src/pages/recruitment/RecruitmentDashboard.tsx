@@ -24,7 +24,7 @@ import {
   ChartTooltip, 
   ChartTooltipContent 
 } from "@/components/ui/chart";
-import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, BarChart, Bar, Cell, Tooltip } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, BarChart, Bar, Cell, Tooltip, LabelList } from "recharts";
 import { Link } from "react-router-dom";
 
 const chartConfig = {
@@ -295,80 +295,86 @@ export default function RecruitmentDashboard() {
         </Card>
       </div>
 
-      {/* Funnel Visualization */}
-      <Card className="bg-card border-border">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg font-semibold text-foreground">
-            Kandidat-funnel per stillingskategori
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {[
-            { label: "Salgskonsulent", data: conversionStats.sales },
-            { label: "Fieldmarketing", data: conversionStats.field },
-          ].map(({ label, data }) => (
-            <div key={label}>
-              <p className="text-sm font-medium text-foreground mb-2">{label} <span className="text-muted-foreground font-normal">({data.total} total)</span></p>
-              {data.funnelData.length === 0 ? (
-                <p className="text-xs text-muted-foreground">Ingen data</p>
-              ) : (
-                <div className="flex gap-1 items-end h-8">
-                  {data.funnelData.map((item) => {
-                    const widthPct = Math.max((item.count / data.total) * 100, 2);
-                    const isHired = item.key === "hired";
-                    const isNegative = ["rejected", "not_qualified", "ghosted", "declined"].includes(item.key);
-                    return (
-                      <div
-                        key={item.key}
-                        className="group relative h-full rounded-sm flex items-center justify-center cursor-default"
-                        style={{
-                          width: `${widthPct}%`,
-                          minWidth: "24px",
-                          backgroundColor: isHired
-                            ? "hsl(var(--primary))"
-                            : isNegative
-                            ? "hsl(var(--destructive) / 0.3)"
-                            : "hsl(var(--muted-foreground) / 0.2)",
-                        }}
-                      >
-                        {widthPct > 8 && (
-                          <span className={`text-[10px] font-medium ${isHired ? "text-primary-foreground" : "text-foreground"}`}>
-                            {item.count}
-                          </span>
-                        )}
-                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-popover text-popover-foreground text-xs px-2 py-1 rounded shadow-md border border-border hidden group-hover:block whitespace-nowrap z-10">
-                          {item.status}: {item.count}
-                        </div>
-                      </div>
-                    );
-                  })}
+      {/* Funnel Visualization - Recharts */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {[
+          { label: "Salgskonsulent", data: conversionStats.sales },
+          { label: "Fieldmarketing", data: conversionStats.field },
+        ].map(({ label, data }) => {
+          const COLORS: Record<string, string> = {
+            new: "hsl(142 60% 75%)",
+            contacted: "hsl(142 55% 60%)",
+            interview_scheduled: "hsl(142 50% 45%)",
+            hired: "hsl(142 70% 35%)",
+            rejected: "hsl(0 55% 55%)",
+            not_qualified: "hsl(0 40% 65%)",
+            ghosted: "hsl(220 10% 60%)",
+            declined: "hsl(220 10% 45%)",
+          };
+
+          const chartData = data.funnelData.map((item) => ({
+            ...item,
+            pct: data.total > 0 ? Math.round((item.count / data.total) * 100) : 0,
+            fill: COLORS[item.key] || "hsl(var(--muted-foreground) / 0.3)",
+          }));
+
+          return (
+            <Card key={label} className="bg-card border-border">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-medium text-foreground">{label}</CardTitle>
+                  <span className="text-2xl font-bold text-foreground">{data.rate}%</span>
                 </div>
-              )}
-              <div className="flex gap-3 mt-1.5 flex-wrap">
-                {data.funnelData.map((item) => {
-                  const isHired = item.key === "hired";
-                  const isNegative = ["rejected", "not_qualified", "ghosted", "declined"].includes(item.key);
-                  return (
-                    <div key={item.key} className="flex items-center gap-1">
-                      <div
-                        className="w-2 h-2 rounded-full"
-                        style={{
-                          backgroundColor: isHired
-                            ? "hsl(var(--primary))"
-                            : isNegative
-                            ? "hsl(var(--destructive) / 0.5)"
-                            : "hsl(var(--muted-foreground) / 0.3)",
+                <p className="text-xs text-muted-foreground">{data.hired} af {data.total} ansat</p>
+              </CardHeader>
+              <CardContent>
+                {chartData.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Ingen data</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={chartData} margin={{ top: 20, right: 5, left: -10, bottom: 5 }}>
+                      <XAxis
+                        dataKey="status"
+                        tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                        axisLine={false}
+                        tickLine={false}
+                        interval={0}
+                        angle={-25}
+                        textAnchor="end"
+                        height={50}
+                      />
+                      <YAxis hide />
+                      <Tooltip
+                        cursor={{ fill: "hsl(var(--muted) / 0.5)" }}
+                        content={({ active, payload }) => {
+                          if (!active || !payload?.length) return null;
+                          const d = payload[0].payload;
+                          return (
+                            <div className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs shadow-xl">
+                              <p className="font-medium text-foreground">{d.status}</p>
+                              <p className="text-muted-foreground">{d.count} ({d.pct}%)</p>
+                            </div>
+                          );
                         }}
                       />
-                      <span className="text-[10px] text-muted-foreground">{item.status}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+                      <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={36}>
+                        {chartData.map((entry) => (
+                          <Cell key={entry.key} fill={entry.fill} />
+                        ))}
+                        <LabelList
+                          dataKey="count"
+                          position="top"
+                          style={{ fontSize: 11, fontWeight: 600, fill: "hsl(var(--foreground))" }}
+                        />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
 
 
 
