@@ -1,24 +1,23 @@
 
 
-## Plan: Remap Pricebook DNB og Venta General til konsolideret Eesy-produkt
+## Plan: Behold team_members ved deaktivering
 
 ### Problem
-Salg fra kampagnerne Pricebook DNB og Venta General mapper til selvstændige produkter med 0 kr provision, selvom de reelt sælger Eesy-mobilabonnementer (Fri tale + 70 GB, 100 GB osv.).
+Når en medarbejder deaktiveres, sletter triggeren `remove_deactivated_employee_from_teams` deres `team_members`-række. Selvom `last_team_id` sættes som fallback, er det ikke altid tilstrækkeligt — fx hvis medarbejderen aldrig havde en team_members-post, eller hvis andre dele af systemet kun kigger på `team_members`.
 
 ### Løsning
-Følg den eksisterende Eesy TM-konsolideringsstrategi: map til det fælles 5G-produkt `bd58176b` ("Fri tale + fri data (5G) (6 mdr. binding) 109 kr"), som alle andre 5G-varianter allerede peger på. Derefter rematch for korrekt provision.
+Fjern `DELETE FROM team_members` fra triggeren, så inaktive medarbejdere beholder deres team-tilknytning. Da alle relevante queries allerede filtrerer på `is_active` fra `employee_master_data`, vil inaktive medarbejdere ikke "forurene" aktive teamoversigter, men de vil fortsat fremgå korrekt i dagsrapporter og lønrapporter.
 
 ### Trin
 
-1. **Opdater adversus_product_mappings** — sæt `product_id = bd58176b` for "Pricebook DNB" og "Venta General" så fremtidige salg mappes korrekt.
+1. **Opdater trigger-funktionen** via migration:
+   - Fjern linjen `DELETE FROM public.team_members WHERE employee_id = NEW.id;`
+   - Behold alt andet (historical_employment, league cleanup, contract cancel, referral reject)
 
-2. **Opdater sale_items** — ændr `product_id` på eksisterende sale_items fra de to 0 kr-produkter til `bd58176b`.
+2. **Verificér dagsrapporter**: Sikr at inaktive medarbejdere med team_members nu vises korrekt under deres team i dagsrapporter.
 
-3. **Rematch prisregler** — kald `rematch-pricing-rules` for de berørte salg, så de får de kampagne-specifikke Eesy TM-priser (250-375 kr provision).
-
-### Teknisk
-- Data-opdateringer via insert-tool (UPDATE statements)
-- Ingen kodeændringer
-- Følger præcis samme konsolideringsmønster som alle andre Eesy TM 5G-varianter
-- ~8 salg påvirkes
+### Teknisk detalje
+- Én SQL-migration der erstatter trigger-funktionen
+- Ingen kodeændringer i frontend — dagsrapporter bruger allerede `team_members` + `last_team_id` fallback
+- `last_team_id` sættes stadig som backup
 
