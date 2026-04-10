@@ -231,7 +231,7 @@ export default function FmChecklistContent() {
     completions.find((c) => c.template_id === templateId && c.completed_date === date);
 
   const getDayProgress = (dayIndex: number, date: string) => {
-    const tasks = getTasksForDay(dayIndex);
+    const tasks = getTasksForDay(dayIndex, date);
     if (tasks.length === 0) return { done: 0, total: 0, pct: 0 };
     const done = tasks.filter((t) => getCompletion(t.id, date)).length;
     return { done, total: tasks.length, pct: Math.round((done / tasks.length) * 100) };
@@ -243,7 +243,10 @@ export default function FmChecklistContent() {
       const d = addDays(today, -i);
       const dayIndex = (d.getDay() + 6) % 7; 
       const dateStr = format(d, "yyyy-MM-dd");
-      const tasks = templates.filter((t) => t.weekdays.includes(dayIndex));
+      const tasks = templates.filter((t) => {
+        if (t.one_time_date) return t.one_time_date === dateStr;
+        return t.weekdays.includes(dayIndex);
+      });
       if (tasks.length === 0) continue;
       const allDone = tasks.every((t) => completions.some((c) => c.template_id === t.id && c.completed_date === dateStr));
       if (allDone) count++;
