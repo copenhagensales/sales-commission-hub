@@ -12,6 +12,7 @@ export interface FmChecklistTemplate {
   is_active: boolean;
   created_at: string;
   created_by: string | null;
+  one_time_date: string | null;
 }
 
 export interface FmChecklistCompletion {
@@ -23,17 +24,35 @@ export interface FmChecklistCompletion {
   created_at: string;
 }
 
-export function useFmChecklistTemplates() {
+export function useFmChecklistTemplates(weekStart?: string, weekEnd?: string) {
   return useQuery({
-    queryKey: ["fm-checklist-templates"],
+    queryKey: ["fm-checklist-templates", weekStart, weekEnd],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Fetch recurring templates
+      const { data: recurring, error: err1 } = await supabase
         .from("fm_checklist_templates")
         .select("*")
         .eq("is_active", true)
+        .is("one_time_date", null)
         .order("sort_order", { ascending: true });
-      if (error) throw error;
-      return data as FmChecklistTemplate[];
+      if (err1) throw err1;
+
+      // Fetch one-time tasks for this week range
+      let oneTime: any[] = [];
+      if (weekStart && weekEnd) {
+        const { data, error: err2 } = await supabase
+          .from("fm_checklist_templates")
+          .select("*")
+          .eq("is_active", true)
+          .not("one_time_date", "is", null)
+          .gte("one_time_date", weekStart)
+          .lte("one_time_date", weekEnd)
+          .order("sort_order", { ascending: true });
+        if (err2) throw err2;
+        oneTime = data || [];
+      }
+
+      return [...(recurring || []), ...oneTime] as FmChecklistTemplate[];
     },
   });
 }
@@ -126,10 +145,12 @@ export function useAddChecklistTemplate() {
       title,
       description,
       weekdays,
+      one_time_date,
     }: {
       title: string;
       description?: string;
       weekdays: number[];
+      one_time_date?: string;
     }) => {
       // Get max sort_order
       const { data: existing } = await supabase
@@ -144,6 +165,7 @@ export function useAddChecklistTemplate() {
         description: description || null,
         weekdays,
         sort_order: nextOrder,
+        one_time_date: one_time_date || null,
       });
       if (error) throw error;
     },
