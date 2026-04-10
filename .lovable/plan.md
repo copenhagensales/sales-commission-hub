@@ -1,19 +1,21 @@
 
 
-## Problem: Manglende prismatch på "Fri tale + 20 GB data"
+## Fix: Tilføj Inboxgame-kampagne til prisregel og rematch
 
 ### Årsag
-Sale item `3ea55971` har `mapped_commission = 0` og `mapped_revenue = 0` fordi `matched_pricing_rule_id` er NULL — prisreglerne blev aldrig applied på dette salg.
+- **Dashboard**: Beregner priser live fra `product_pricing_rules` → viser korrekt
+- **Dagsrapporter**: Læser `sale_items.mapped_commission` / `mapped_revenue` direkte → viser 0 kr fordi rematchen ikke har applied reglen
 
-Produktet er korrekt resolved (`product_id = f18da6d2`, `needs_mapping = false`), og der **findes** en aktiv prisregel (priority 1, ID `29323acd`) der dækker præcis dette produkt OG denne kampagne-mapping (`d811a2a8`), med commission 190 kr og revenue 550 kr.
+### Trin
 
-Sandsynlig forklaring: Salget blev synkroniseret efter seneste automatiske rematch, og der er ikke kørt en ny rematch siden.
+1. **Opdater prisreglen** i `product_pricing_rules`: Tilføj kampagne-mapping `60da0076-85a5-4bf3-94d7-3f29fdbb1cde` (Inboxgame - Konkurrence leads) til `campaign_mapping_ids` arrayet for reglen med `product_id = f18da6d2` og priority 1 (regel ID `29323acd`).
 
-### Løsning
+2. **Kør rematch** på Thomas' salg (`d4b6e5c9-d4b3-423f-a499-d67a89821426`) for at opdatere `sale_items` med korrekte værdier (forventet: 190 kr commission, 550 kr revenue).
 
-1. **Kør rematch-pricing-rules** for dette specifikke salg (sale ID `1052eb21-a094-4147-a583-6e77a48eff86`) for at matche prisreglen og udfylde commission/revenue.
+3. **Verificér** at `sale_items` nu har korrekte `mapped_commission` og `mapped_revenue`.
 
-2. **Verificér** at `mapped_commission` og `mapped_revenue` opdateres korrekt (forventet: 190 kr / 550 kr baseret på priority 1 reglen).
-
-Ingen kodeændringer nødvendige — dette er udelukkende en data-operation via den eksisterende rematch edge function.
+### Teknisk detalje
+- Én SQL UPDATE (append til `campaign_mapping_ids` array via insert-tool)
+- Ét kald til `rematch-pricing-rules` edge function
+- Ingen kodeændringer — dagsrapporter og dashboard vil begge vise korrekte tal efter rematch
 
