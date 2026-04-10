@@ -114,10 +114,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 2. Get recipients
+    // 2. Get recipients (emails stored directly)
     const { data: recipientRows } = await supabase
       .from("fm_checklist_email_recipients")
-      .select("employee_id");
+      .select("email");
 
     if (!recipientRows?.length) {
       return new Response(JSON.stringify({ message: "No recipients configured" }), {
@@ -125,14 +125,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const employeeIds = recipientRows.map((r) => r.employee_id);
-    const { data: employees } = await supabase
-      .from("agents")
-      .select("email")
-      .in("id", employeeIds)
-      .eq("is_active", true);
-
-    const recipientEmails = (employees ?? []).map((e) => e.email).filter(Boolean);
+    const recipientEmails = recipientRows.map((r: any) => r.email).filter(Boolean);
 
     if (!recipientEmails.length) {
       return new Response(JSON.stringify({ message: "No active recipient emails" }), {

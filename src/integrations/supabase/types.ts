@@ -6788,28 +6788,20 @@ export type Database = {
       fm_checklist_email_recipients: {
         Row: {
           created_at: string | null
-          employee_id: string
+          email: string
           id: string
         }
         Insert: {
           created_at?: string | null
-          employee_id: string
+          email: string
           id?: string
         }
         Update: {
           created_at?: string | null
-          employee_id?: string
+          email?: string
           id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "fm_checklist_email_recipients_employee_id_fkey"
-            columns: ["employee_id"]
-            isOneToOne: true
-            referencedRelation: "agents"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       fm_checklist_templates: {
         Row: {
