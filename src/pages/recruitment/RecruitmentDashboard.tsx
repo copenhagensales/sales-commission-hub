@@ -290,31 +290,6 @@ export default function RecruitmentDashboard() {
         </CardContent>
       </Card>
 
-      {/* Pipeline Overview */}
-      <Card className="bg-card border-border">
-        <CardHeader>
-          <CardTitle className="text-lg font-semibold text-foreground">Rekrutteringspipeline (30 dage)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between gap-2 overflow-x-auto pb-2">
-            {[
-              { status: "new", label: "Ny", color: "bg-blue-500" },
-              { status: "contacted", label: "Kontaktet", color: "bg-yellow-500" },
-              { status: "interview_scheduled", label: "Samtale", color: "bg-purple-500" },
-              { status: "interviewed", label: "Afholdt", color: "bg-cyan-500" },
-              { status: "hired", label: "Ansat", color: "bg-green-500" },
-            ].map((stage, idx) => (
-              <div key={stage.status} className="flex-1 min-w-[60px] text-center">
-                <div className={`h-2 ${stage.color} rounded-full mb-2`} />
-                <div className="text-xl sm:text-2xl font-bold text-foreground">
-                  {statusCounts[stage.status] || 0}
-                </div>
-                <p className="text-xs text-muted-foreground whitespace-nowrap">{stage.label}</p>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Applicants Over Time Chart */}
       <Card className="bg-card border-border">
