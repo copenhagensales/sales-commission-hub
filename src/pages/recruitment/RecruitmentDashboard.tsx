@@ -36,7 +36,85 @@ const chartConfig = {
   },
 };
 
-export default function RecruitmentDashboard() {
+function ReferralKpiSection() {
+  const { data: referrals = [] } = useQuery({
+    queryKey: ["referral-kpis"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_referrals")
+        .select("id, status, created_at, hired_date")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const stats = useMemo(() => {
+    const active = referrals.filter(r => ["pending", "contacted"].includes(r.status)).length;
+    const total = referrals.length;
+    const hired = referrals.filter(r => ["hired", "eligible_for_bonus", "bonus_paid"].includes(r.status)).length;
+    const rate = total > 0 ? Math.round((hired / total) * 1000) / 10 : 0;
+    const recentHired = referrals.filter(r =>
+      ["hired", "eligible_for_bonus", "bonus_paid"].includes(r.status) &&
+      r.hired_date && new Date(r.hired_date) >= subDays(new Date(), 30)
+    ).length;
+    const awaitingBonus = referrals.filter(r => r.status === "eligible_for_bonus").length;
+    return { active, total, hired, rate, recentHired, awaitingBonus };
+  }, [referrals]);
+
+  return (
+    <div className="space-y-2">
+      <h2 className="text-lg font-semibold text-foreground">Anbefalinger</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="bg-card border-border">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Aktive anbefalinger</CardTitle>
+            <Handshake className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-foreground">{stats.active}</div>
+            <p className="text-xs text-muted-foreground">af {stats.total} i alt</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card border-border">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Ansat via anbefaling (30d)</CardTitle>
+            <Handshake className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-foreground">{stats.recentHired}</div>
+            <p className="text-xs text-muted-foreground">{stats.hired} ansat i alt</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card border-border">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Konvertering</CardTitle>
+            <Percent className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-foreground">{stats.rate}%</div>
+            <p className="text-xs text-muted-foreground">{stats.hired} af {stats.total} anbefalinger</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card border-border">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Afventende bonus</CardTitle>
+            <Handshake className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-foreground">{stats.awaitingBonus}</div>
+            <p className="text-xs text-muted-foreground">Klar til udbetaling</p>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+
   const [chartPeriod, setChartPeriod] = useState(30);
 
   const { data: candidates = [] } = useQuery({
