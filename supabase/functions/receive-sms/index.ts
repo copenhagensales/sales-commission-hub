@@ -143,6 +143,48 @@ serve(async (req) => {
       bodyLength: body?.length
     });
 
+    // Auto-stop booking flow: if candidate has active enrollment, pause it
+    const normalizedPhoneForFlow = from?.replace(/\D/g, '').slice(-8);
+    if (normalizedPhoneForFlow) {
+      const { data: candidateForFlow } = await supabase
+        .from('candidates')
+        .select('id')
+        .or(`phone.ilike.%${normalizedPhoneForFlow}`)
+        .maybeSingle();
+
+      if (candidateForFlow) {
+        const { data: activeEnrollments } = await supabase
+          .from('booking_flow_enrollments')
+          .select('id')
+          .eq('candidate_id', candidateForFlow.id)
+          .eq('status', 'active');
+
+        if (activeEnrollments && activeEnrollments.length > 0) {
+          for (const enrollment of activeEnrollments) {
+            await supabase
+              .from('booking_flow_touchpoints')
+              .update({ status: 'cancelled' })
+              .eq('enrollment_id', enrollment.id)
+              .eq('status', 'pending');
+
+            await supabase
+              .from('booking_flow_enrollments')
+              .update({
+                status: 'cancelled',
+                cancelled_at: new Date().toISOString(),
+                cancelled_reason: 'Kandidat svarede på SMS',
+              })
+              .eq('id', enrollment.id);
+          }
+
+          console.log('[receive-sms] Auto-stopped booking flow for candidate:', {
+            candidateId: candidateForFlow.id,
+            enrollmentsCancelled: activeEnrollments.length,
+          });
+        }
+      }
+    }
+
     // Return empty TwiML (no auto-reply)
     return new Response(
       `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`,

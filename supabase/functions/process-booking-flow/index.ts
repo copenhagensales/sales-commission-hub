@@ -194,9 +194,11 @@ Deno.serve(async (req) => {
       const role = app?.role || 'Salgskonsulent';
 
       // Replace merge tags
+      const unsubscribeUrl = `${supabaseUrl}/functions/v1/unsubscribe-candidate?id=${enrollment.candidate_id}`;
       const mergedContent = content
         .replace(/\{\{fornavn\}\}/g, candidate.first_name || '')
-        .replace(/\{\{rolle\}\}/g, role);
+        .replace(/\{\{rolle\}\}/g, role)
+        .replace(/\{\{afmeld_link\}\}/g, unsubscribeUrl);
       const mergedSubject = subject
         .replace(/\{\{fornavn\}\}/g, candidate.first_name || '')
         .replace(/\{\{rolle\}\}/g, role);

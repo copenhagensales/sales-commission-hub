@@ -7,12 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Users, Zap, Clock, CheckCircle, XCircle, Plus, Mail, MessageSquare, Phone, Loader2, ShieldCheck, AlertTriangle } from "lucide-react";
+import { Users, Zap, Clock, CheckCircle, XCircle, Plus, Mail, MessageSquare, Phone, Loader2, ShieldCheck, AlertTriangle, FileText } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { da } from "date-fns/locale";
 import { SegmentationModal } from "@/components/recruitment/SegmentationModal";
 import { BookingFlowTimeline } from "@/components/recruitment/BookingFlowTimeline";
+import { FlowTemplatesTab } from "@/components/recruitment/FlowTemplatesTab";
 import { addDays, setHours, setMinutes } from "date-fns";
 
 const tierConfig = {
@@ -269,6 +271,20 @@ export default function BookingFlow() {
           </Button>
         </div>
 
+        <Tabs defaultValue="dashboard" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="dashboard" className="gap-2">
+              <Users className="h-4 w-4" />
+              Dashboard
+            </TabsTrigger>
+            <TabsTrigger value="templates" className="gap-2">
+              <FileText className="h-4 w-4" />
+              Flow-skabeloner
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="dashboard" className="space-y-6">
+
         {/* Stats */}
         <div className="grid grid-cols-5 gap-4">
           <Card>
@@ -513,15 +529,21 @@ export default function BookingFlow() {
           </CardContent>
         </Card>
 
-        {/* Touchpoint timeline dialog */}
-        <Dialog open={!!selectedEnrollment} onOpenChange={(open) => !open && setSelectedEnrollment(null)}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Flow-tidslinje</DialogTitle>
-            </DialogHeader>
-            <BookingFlowTimeline touchpoints={touchpoints || []} />
-          </DialogContent>
-        </Dialog>
+          {/* Touchpoint timeline dialog */}
+          <Dialog open={!!selectedEnrollment} onOpenChange={(open) => !open && setSelectedEnrollment(null)}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Flow-tidslinje</DialogTitle>
+              </DialogHeader>
+              <BookingFlowTimeline touchpoints={touchpoints || []} />
+            </DialogContent>
+          </Dialog>
+          </TabsContent>
+
+          <TabsContent value="templates">
+            <FlowTemplatesTab />
+          </TabsContent>
+        </Tabs>
 
         {/* Add candidate dialog */}
         <Dialog open={addCandidateOpen} onOpenChange={setAddCandidateOpen}>
