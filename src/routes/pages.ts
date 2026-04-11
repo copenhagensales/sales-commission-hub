@@ -73,6 +73,7 @@ export const Winback = lazyPage(() => import("@/pages/recruitment/Winback"));
 export const UpcomingInterviews = lazyPage(() => import("@/pages/recruitment/UpcomingInterviews"));
 export const UpcomingHires = lazyPage(() => import("@/pages/recruitment/UpcomingHires"));
 export const BookingFlow = lazyPage(() => import("@/pages/recruitment/BookingFlow"));
+export const PublicCandidateBooking = lazyPage(() => import("@/pages/recruitment/PublicCandidateBooking"));
 
 export const Some = lazyPage(() => import("@/pages/Some"));
 export const TimeStamp = lazyPage(() => import("@/pages/TimeStamp"));

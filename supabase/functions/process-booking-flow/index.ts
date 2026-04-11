@@ -10,12 +10,12 @@ const FLOW_TEMPLATES: Record<string, { subject: string; content: string; channel
   // Tier A
   flow_a_dag0_email: {
     subject: "Tak for din ansøgning — vi vil gerne tale med dig!",
-    content: "Hej {{fornavn}},\n\nTak for din ansøgning til stillingen som {{rolle}} hos Copenhagen Sales.\n\nVi var begejstrede for din profil og vil meget gerne invitere dig til en kort samtale. Kan du inden for de næste par dage?\n\nSvar gerne på denne mail eller ring til os.\n\nMed venlig hilsen\nCopenhagen Sales",
+    content: "Hej {{fornavn}},\n\nTak for din ansøgning til stillingen som {{rolle}} hos Copenhagen Sales.\n\nVi var begejstrede for din profil og vil meget gerne invitere dig til en kort samtale.\n\nVi ringer dig {{ringetidspunkt}} fra {{telefonnummer}}.\n\nPasser det ikke? Book selv en tid der passer dig her:\n{{booking_link}}\n\nØnsker du ikke at blive kontaktet? Afmeld dig her:\n{{afmeld_link}}\n\nMed venlig hilsen\nCopenhagen Sales",
     channel: "email",
   },
   flow_a_dag0_sms: {
     subject: "",
-    content: "Hej {{fornavn}}! Tak for din ansøgning hos Copenhagen Sales. Vi vil gerne booke en samtale med dig – tjek din mail for detaljer 📩",
+    content: "Hej {{fornavn}}! Tak for din ansøgning til {{rolle}}. Vi ringer dig {{ringetidspunkt}} fra {{telefonnummer}}. Passer det ikke? Book selv en tid: {{booking_link}} — Afmeld: {{afmeld_link}}",
     channel: "sms",
   },
   flow_a_dag1_precall_sms: {
@@ -30,7 +30,7 @@ const FLOW_TEMPLATES: Record<string, { subject: string; content: string; channel
   },
   flow_a_dag1_followup_sms: {
     subject: "",
-    content: "Hej {{fornavn}}, vi prøvede at ringe dig i dag. Hvornår passer det dig at tale? Svar gerne her eller ring os på [nummer] 😊",
+    content: "Hej {{fornavn}}, vi prøvede at ringe dig i dag. Hvornår passer det dig at tale? Book selv en tid her: {{booking_link}} — eller ring os på {{telefonnummer}} 😊",
     channel: "sms",
   },
   flow_a_dag2_reminder_email: {
@@ -167,11 +167,32 @@ Deno.serve(async (req) => {
       const role = app?.role || 'Salgskonsulent';
 
       // Replace merge tags
+      const siteUrl = Deno.env.get('SITE_URL') || 'https://sales-sync-pay.lovable.app';
+      const recruitmentPhone = Deno.env.get('RECRUITMENT_PHONE_NUMBER') || '+45 XX XX XX XX';
       const unsubscribeUrl = `${supabaseUrl}/functions/v1/unsubscribe-candidate?id=${enrollment.candidate_id}`;
+      const bookingLink = `${siteUrl}/book/${enrollment.candidate_id}`;
+
+      // Calculate call time based on scheduled_at
+      const scheduledDate = new Date(tp.scheduled_at);
+      const hour = scheduledDate.getHours();
+      const dayOfWeek = scheduledDate.getDay();
+      let ringetidspunkt: string;
+      if (dayOfWeek === 5 || dayOfWeek === 6 || dayOfWeek === 0) {
+        // Friday after 14, Saturday, Sunday → Monday 11-12
+        ringetidspunkt = 'mandag mellem kl. 11:00 og 12:00';
+      } else if (hour < 14) {
+        ringetidspunkt = 'i dag mellem kl. 15:00 og 16:15';
+      } else {
+        ringetidspunkt = 'i morgen mellem kl. 11:00 og 12:00';
+      }
+
       const mergedContent = content
         .replace(/\{\{fornavn\}\}/g, candidate.first_name || '')
         .replace(/\{\{rolle\}\}/g, role)
-        .replace(/\{\{afmeld_link\}\}/g, unsubscribeUrl);
+        .replace(/\{\{afmeld_link\}\}/g, unsubscribeUrl)
+        .replace(/\{\{booking_link\}\}/g, bookingLink)
+        .replace(/\{\{ringetidspunkt\}\}/g, ringetidspunkt)
+        .replace(/\{\{telefonnummer\}\}/g, recruitmentPhone);
       const mergedSubject = subject
         .replace(/\{\{fornavn\}\}/g, candidate.first_name || '')
         .replace(/\{\{rolle\}\}/g, role);

@@ -15,12 +15,12 @@ import { Mail, MessageSquare, Phone, Pencil, Loader2 } from "lucide-react";
 const FLOW_TEMPLATES: Record<string, { subject: string; content: string; channel: string }> = {
   flow_a_dag0_email: {
     subject: "Tak for din ansøgning — vi vil gerne tale med dig!",
-    content: "Hej {{fornavn}},\n\nTak for din ansøgning til stillingen som {{rolle}} hos Copenhagen Sales.\n\nVi var begejstrede for din profil og vil meget gerne invitere dig til en kort samtale. Kan du inden for de næste par dage?\n\nSvar gerne på denne mail eller ring til os.\n\nMed venlig hilsen\nCopenhagen Sales",
+    content: "Hej {{fornavn}},\n\nTak for din ansøgning til stillingen som {{rolle}} hos Copenhagen Sales.\n\nVi var begejstrede for din profil og vil meget gerne invitere dig til en kort samtale.\n\nVi ringer dig {{ringetidspunkt}} fra {{telefonnummer}}.\n\nPasser det ikke? Book selv en tid der passer dig her:\n{{booking_link}}\n\nØnsker du ikke at blive kontaktet? Afmeld dig her:\n{{afmeld_link}}\n\nMed venlig hilsen\nCopenhagen Sales",
     channel: "email",
   },
   flow_a_dag0_sms: {
     subject: "",
-    content: "Hej {{fornavn}}! Tak for din ansøgning hos Copenhagen Sales. Vi vil gerne booke en samtale med dig – tjek din mail for detaljer 📩",
+    content: "Hej {{fornavn}}! Tak for din ansøgning til {{rolle}}. Vi ringer dig {{ringetidspunkt}} fra {{telefonnummer}}. Passer det ikke? Book selv en tid: {{booking_link}} — Afmeld: {{afmeld_link}}",
     channel: "sms",
   },
   flow_a_dag1_precall_sms: {
@@ -35,7 +35,7 @@ const FLOW_TEMPLATES: Record<string, { subject: string; content: string; channel
   },
   flow_a_dag1_followup_sms: {
     subject: "",
-    content: "Hej {{fornavn}}, vi prøvede at ringe dig i dag. Hvornår passer det dig at tale? Svar gerne her eller ring os på [nummer] 😊",
+    content: "Hej {{fornavn}}, vi prøvede at ringe dig i dag. Hvornår passer det dig at tale? Book selv en tid her: {{booking_link}} — eller ring os på {{telefonnummer}} 😊",
     channel: "sms",
   },
   flow_a_dag2_reminder_email: {
@@ -176,7 +176,7 @@ export function FlowTemplatesTab() {
   return (
     <div className="space-y-6">
       <p className="text-sm text-muted-foreground">
-        Rediger de beskeder der sendes i hvert trin af booking-flowet. Brug <Badge variant="secondary" className="text-[10px] px-1 py-0 font-mono">{"{{fornavn}}"}</Badge> og <Badge variant="secondary" className="text-[10px] px-1 py-0 font-mono">{"{{rolle}}"}</Badge> som merge-tags. Tilføj <Badge variant="secondary" className="text-[10px] px-1 py-0 font-mono">{"{{afmeld_link}}"}</Badge> for afmeldingslink.
+        Rediger de beskeder der sendes i hvert trin af booking-flowet. Brug <Badge variant="secondary" className="text-[10px] px-1 py-0 font-mono">{"{{fornavn}}"}</Badge>, <Badge variant="secondary" className="text-[10px] px-1 py-0 font-mono">{"{{rolle}}"}</Badge>, <Badge variant="secondary" className="text-[10px] px-1 py-0 font-mono">{"{{ringetidspunkt}}"}</Badge>, <Badge variant="secondary" className="text-[10px] px-1 py-0 font-mono">{"{{telefonnummer}}"}</Badge>, <Badge variant="secondary" className="text-[10px] px-1 py-0 font-mono">{"{{booking_link}}"}</Badge> og <Badge variant="secondary" className="text-[10px] px-1 py-0 font-mono">{"{{afmeld_link}}"}</Badge> som merge-tags.
       </p>
 
       {TIER_GROUPS.map(group => (
@@ -251,7 +251,7 @@ export function FlowTemplatesTab() {
                 className="font-mono text-sm"
               />
               <p className="text-[10px] text-muted-foreground mt-1">
-                Merge-tags: {"{{fornavn}}"}, {"{{rolle}}"}, {"{{afmeld_link}}"}
+                Merge-tags: {"{{fornavn}}"}, {"{{rolle}}"}, {"{{ringetidspunkt}}"}, {"{{telefonnummer}}"}, {"{{booking_link}}"}, {"{{afmeld_link}}"}
               </p>
             </div>
           </div>
