@@ -1,93 +1,88 @@
 
 
-## Booking Flow — Automatiseret outreach med A/B/C-segmentering
+## Intelligent auto-segmentering med NLP-baseret tier-tildeling
 
-### Koncept
-Et automatiseret multi-dag outreach-system der tager nye kandidater og kører dem igennem et struktureret flow af emails, SMS og opkaldspåmindelser — med det formål at booke en samtale. Kandidater segmenteres i A/B/C-tiers baseret på kvalifikationskriterier, og hver tier får sit eget flow med forskellig intensitet.
+### Hvad ændrer sig
+Den nuværende segmentering er manuel (5 toggles → tæl op → tier). Den erstattes med en **automatisk analyse** af kandidatens data og ansøgningstekst, som tildeler en tier baseret på de forretningsregler du beskriver.
 
-### Tilpasning til jeres nuværende setup
-I har allerede: M365-email (edge function), Twilio SMS (edge function), email-skabeloner, scheduled_emails-tabel og kandidat-statusser. Booking flow bygges oven på dette fundament:
+### Ny segmenteringslogik
 
-- **Eksisterende edge functions genbruges** — `send-recruitment-email` og `send-recruitment-sms` bruges som afsendere
-- **Eksisterende kandidat-statusser udvides** — ny status `i_flow` tilføjes
-- **Scheduled emails-tabellen udvides** — bruges til at planlægge alle touchpoints i flowet
+**Tier A — Auto-start flow + SMS:**
+- Alder 18–25 (parsed fra `candidates.notes` eller `applications.notes`)
+- 0–3 års erfaring
+- Ansøgningstekst er dansk (< 40% engelske ord)
+- Søger fuldtid (ikke deltid/fleksibel)
+- Høj motivation (keywords: motiveret, udvikle mig, resultater, bedste, salg, konkurrence, energisk, målrettet)
+- **Handling:** Send SMS straks via Twilio, start flow automatisk — ingen godkendelse krævet
 
-### Flows per tier
+**Tier B — Manuel godkendelse:**
+- Alder 30+ og/eller 5+ års erfaring
+- Tekst er dansk
+- **Handling:** Vis notifikation til recruiter, flow starter først efter godkendelse
 
-| Tier | Dag 0 | Dag 1 | Dag 2 | Dag 3 |
-|------|-------|-------|-------|-------|
-| **A** (4-5 kriterier) | Email + SMS inden 10 min | Pre-call SMS + opkaldspåmindelse + follow-up SMS | Reminder email + 2. opkaldspåmindelse | Sidste kontaktforsøg |
-| **B** (2-3 kriterier) | Email med booking-link | SMS hvis ingen booking | Opkaldspåmindelse | — |
-| **C** (0-1 kriterier) | Bekræftelsesmail | — | — | Venligt afslag dag 3-5 |
+**Tier C — Manuel godkendelse, lav prioritet:**
+- Ansøgningstekst > 40% engelske ord
+- Nævner deltid/fleksibel/part-time
+- **Handling:** Vis notifikation, visuelt nedprioriteret (grå), placeres sidst
+
+**Fallback:** Kan ikke bestemme alder/erfaring med sikkerhed → Tier B + flag for review
+
+### Edge function: `auto-segment-candidate`
+
+Ny edge function der:
+1. Modtager `candidate_id`
+2. Henter kandidat + seneste application med notes
+3. Kører NLP-analyse lokalt (ingen AI model — ren regex/heuristik):
+   - **Sprogdetektion:** Tæl engelske ord vs. danske ord → procent
+   - **Aldersudtræk:** Regex for "jeg er X år", "X-årig", "født i XXXX"
+   - **Erfaringsudtræk:** Regex for "X års erfaring", "arbejdet i X år"
+   - **Deltid-detektion:** Søg efter "deltid", "part-time", "fleksibel", "flexible"
+   - **Motivations-score:** Tæl forekomster af keywords
+4. Returnerer `{ tier, confidence, signals, requiresApproval }`
+5. Hvis Tier A: opretter enrollment + touchpoints + sender SMS automatisk
+6. Hvis Tier B/C: opretter enrollment med `status: "pending_approval"` og sender notifikation
 
 ### Database-ændringer
 
-1. **Ny tabel: `booking_flow_enrollments`**
-   - `candidate_id`, `tier` (A/B/C), `enrolled_at`, `current_day`, `status` (active/completed/cancelled)
-   - Knytter en kandidat til et aktivt flow
+1. **Ny kolonne på `booking_flow_enrollments`:** `approval_status` (text: `auto_approved`, `pending_approval`, `approved`, `rejected`)
+2. **Ny kolonne:** `segmentation_signals` (jsonb — gemmer parsed alder, erfaring, sprog%, motivation-score)
+3. **Opdater `booking_flow_criteria`-data:** Erstat de 5 generiske kriterier med de nye forretningsspecifikke
 
-2. **Ny tabel: `booking_flow_touchpoints`**
-   - `enrollment_id`, `day`, `channel` (email/sms/call_reminder), `scheduled_at`, `status` (pending/sent/skipped), `template_key`
-   - Alle planlagte touchpoints for en kandidat
+### UI-ændringer
 
-3. **Ny tabel: `booking_flow_criteria`**
-   - `id`, `name`, `description`, `active`
-   - De 5 konfigurerbare must-have kriterier brugt til segmentering
+**SegmentationModal:** Fjern de manuelle toggles. Erstat med:
+- Auto-analyse resultat: "Tier A — Ung profil, dansk, fuldtid, høj motivation"
+- Parsed signals vist som badges (alder, erfaring, sprog, keywords fundet)
+- Confidence-indikator
+- For Tier A: "Start flow automatisk"-knap (ingen godkendelse)
+- For Tier B/C: "Godkend og start flow" / "Afvis" knapper
 
-4. **Tilføj `tier` kolonne** på `candidates`-tabellen (A/B/C/null)
+**BookingFlow.tsx:** Tilføj nyt afsnit øverst:
+- "Afventer godkendelse" sektion med Tier B/C kandidater der venter på recruiter-review
+- Tier B vises med lilla badge, Tier C med grå badge og placeres sidst
+- Godkend-knap starter flow, afvis-knap arkiverer
 
-### Nye sider og UI
+### SMS ved Tier A auto-start
 
-1. **Booking Flow side** (`/recruitment/booking-flow`)
-   - Oversigt over aktive flows: hvor mange kandidater i hvert tier, status-distribution
-   - Liste med kandidater i flow — navn, tier-badge, dag i flow, sidste touchpoint, næste planlagte aktion
-   - Mulighed for manuelt at tilføje en kandidat til flow / fjerne fra flow
-
-2. **Segmenteringsmodal**
-   - Vises når en kandidat enrolles i flowet
-   - 5 ja/nej toggles for must-have kriterier
-   - Auto-beregning af tier (4-5 = A, 2-3 = B, 0-1 = C)
-   - Preview af hvilket flow der trigges
-
-3. **Flow-skabeloner side** (ny tab på EmailTemplates)
-   - Skabeloner organiseret per tier og dag
-   - Redigerbare med merge tags: `{{fornavn}}`, `{{rolle}}`, `{{booking_link}}`
-
-### Edge function: `process-booking-flow`
-
-- Cron-job der kører hver time i arbejdstiden (8-17)
-- Finder touchpoints der er forfaldne (`scheduled_at <= now()` og `status = pending`)
-- Sender via eksisterende `send-recruitment-email` / `send-recruitment-sms`
-- Opdaterer touchpoint-status
-- Tjekker om kandidaten allerede er booket (status ændret til `interview_scheduled`) → stopper flowet
-
-### Enrollment-flow
-
-Når en ny kandidat oprettes eller manuelt tilføjes:
-1. Segmenteringsmodal åbnes → tier beregnes
-2. Alle touchpoints for det relevante tier-flow oprettes i `booking_flow_touchpoints` med korrekte `scheduled_at`-tider
-3. Kandidatens status sættes til `i_flow`
-4. Første touchpoint (dag 0) sendes med det samme
-
-### Integration med eksisterende kandidat-flow
-
-- Hvis kandidaten manuelt flyttes til `interview_scheduled` eller `hired` → flowet annulleres automatisk
-- Hvis kandidaten markeres som `rejected` eller `ghostet` → flowet annulleres
-- Booking flow-historik vises i kandidat-detail som en timeline
+Bruger den eksisterende `send-recruitment-sms` edge function:
+```
+"Hej {first_name}, tak for din ansøgning til {role}! 
+Vi vil meget gerne tale med dig. Vi ringer dig op [dag] kl. [tid] 
+— eller book selv en tid her: {booking_link}. 
+Glæder os til at høre fra dig!"
+```
 
 ### Filer der oprettes/ændres
 
 | Fil | Ændring |
 |-----|---------|
-| `src/pages/recruitment/BookingFlow.tsx` | **Ny** — hovedside med oversigt |
-| `src/components/recruitment/SegmentationModal.tsx` | **Ny** — tier-beregning |
-| `src/components/recruitment/BookingFlowTimeline.tsx` | **Ny** — touchpoint-timeline |
-| `src/pages/recruitment/EmailTemplates.tsx` | Tilføj flow-skabeloner (dag 0-3 per tier) |
-| `src/pages/recruitment/CandidateDetail.tsx` | Vis flow-status + timeline-tab |
-| `src/routes/config.tsx` + `pages.ts` | Tilføj route |
-| `supabase/functions/process-booking-flow/index.ts` | **Ny** — cron-processor |
-| 4 migrationer | Tabeller + tier-kolonne + cron-job |
+| `supabase/functions/auto-segment-candidate/index.ts` | **Ny** — NLP-analyse + auto-tier |
+| `src/components/recruitment/SegmentationModal.tsx` | Omskriv til auto-analyse UI |
+| `src/pages/recruitment/BookingFlow.tsx` | Tilføj pending-approval sektion |
+| `supabase/functions/process-booking-flow/index.ts` | Respekter `pending_approval` status |
+| 1 migration | Tilføj kolonner til `booking_flow_enrollments` |
 
-### Design
-Clean, Premium SaaS-feel (Pipeline-stil): hvide overflader, subtle borders, generøs whitespace. Tier-badges: A = grøn (#1D9E75), B = lilla (#7F77DD), C = grå (#888780).
+### Teknisk detalje: Sprogdetektion
+
+En simpel ordliste-tilgang (top 200 engelske ord som stopord) sammenholdt med input-teksten. Ingen ekstern API — kører direkte i edge function.
 
