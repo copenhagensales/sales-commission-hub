@@ -120,9 +120,20 @@ Deno.serve(async (req) => {
       // Get template content from booking_flow_steps (primary) or email_templates (override)
       const { data: flowStep } = await supabase
         .from('booking_flow_steps')
-        .select('subject, content, channel')
+        .select('subject, content, channel, phase')
         .eq('template_key', tp.template_key)
         .maybeSingle();
+
+      // Guard: never send confirmation-phase templates from the outreach loop
+      if (flowStep?.phase === 'confirmation') {
+        console.log(`[process-booking-flow] Skipping confirmation template: ${tp.template_key}`);
+        await supabase
+          .from('booking_flow_touchpoints')
+          .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+          .eq('id', tp.id);
+        skipped++;
+        continue;
+      }
 
       const { data: customTemplate } = await supabase
         .from('email_templates')
