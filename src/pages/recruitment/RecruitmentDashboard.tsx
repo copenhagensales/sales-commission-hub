@@ -514,7 +514,7 @@ function ReferralKpiSection() {
         })}
       </div>
 
-
+export default function RecruitmentDashboard() {
 
       {/* Applicants Over Time Chart */}
       <Card className="bg-card border-border">
