@@ -301,29 +301,27 @@ Deno.serve(async (req) => {
     await supabase.from('candidates').update({ tier }).eq('id', candidate_id);
 
     // If Tier A (auto-approved): create touchpoints + send immediate SMS
-    if (!requiresApproval) {
-      // Create touchpoints (using same flow definitions as SegmentationModal)
-      const FLOW_A = [
-        { day: 0, channel: "email", template_key: "flow_a_dag0_email", offsetHours: 0 },
-        { day: 0, channel: "sms", template_key: "flow_a_dag0_sms", offsetHours: 0.15 },
-        { day: 1, channel: "sms", template_key: "flow_a_dag1_sms", offsetHours: 10 },
-        { day: 3, channel: "email", template_key: "flow_a_dag3_email", offsetHours: 9 },
-        { day: 6, channel: "sms", template_key: "flow_a_dag6_sms", offsetHours: 9 },
-        { day: 6, channel: "email", template_key: "flow_a_dag6_email", offsetHours: 9.5 },
-        { day: 10, channel: "email", template_key: "flow_a_dag10_email", offsetHours: 10 },
-        { day: 45, channel: "sms", template_key: "flow_a_dag45_sms", offsetHours: 10 },
-        { day: 120, channel: "email", template_key: "flow_a_dag120_email", offsetHours: 10 },
-      ];
+      // Fetch flow steps from DB
+      const { data: flowSteps, error: stepsErr } = await supabase
+        .from('booking_flow_steps')
+        .select('*')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true });
+      
+      if (stepsErr || !flowSteps?.length) {
+        console.error('[auto-segment] Failed to fetch flow steps:', stepsErr);
+        throw new Error('No flow steps found in database');
+      }
 
       const now = new Date();
-      const touchpoints = FLOW_A.map(step => {
+      const touchpoints = flowSteps.map((step: any) => {
         let scheduledAt: Date;
-        if (step.day === 0 && step.offsetHours < 1) {
-          scheduledAt = new Date(now.getTime() + step.offsetHours * 3600000);
+        if (step.day === 0 && step.offset_hours < 1) {
+          scheduledAt = new Date(now.getTime() + step.offset_hours * 3600000);
         } else {
           const dayDate = new Date(now);
           dayDate.setDate(dayDate.getDate() + step.day);
-          dayDate.setHours(Math.floor(step.offsetHours), (step.offsetHours % 1) * 60, 0, 0);
+          dayDate.setHours(Math.floor(step.offset_hours), (step.offset_hours % 1) * 60, 0, 0);
           scheduledAt = dayDate;
         }
         return {
