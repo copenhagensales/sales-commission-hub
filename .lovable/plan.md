@@ -1,35 +1,33 @@
 
 
-## Flyt hardkodet Dag 0 SMS ind i flow-skabeloner
+## Flyt booking-bekræftelses-SMS til flow-skabeloner
 
 ### Problem
-Dag 0 SMS-beskeden er hardkodet i `auto-segment-candidate` (linje 372) og kan ikke redigeres via Skabeloner-fanen. Indholdet i databasen mangler helt — der findes kun `flow_a_dag0_email`, ikke en tilsvarende SMS-post.
+Når en kandidat booker en tid via den offentlige bookingside, sendes en bekræftelses-SMS med hardkodet tekst i `public-book-candidate` edge function. Denne besked kan ikke redigeres via Skabeloner-fanen.
 
 ### Løsning
 
-**1. Tilføj Dag 0 SMS-skabelon i databasen**
+**1. Tilføj bekræftelsesskabelon i databasen**
 
-Indsæt en ny `booking_flow_steps`-post med den nuværende hardkodede besked som indhold, med merge-tags:
+Indsæt ny `booking_flow_steps`-post:
+- `template_key`: `booking_confirmation_sms`
+- `day`: 0, `channel`: sms, `phase`: confirmation
+- `subject`: `Booking bekræftelse`
+- `content`: `Hej {{fornavn}}! Din samtale er booket til {{dato}} kl. {{tidspunkt}}. Vi ringer dig op. Glæder os! 📞 — Copenhagen Sales`
 
-```
-Hej {{fornavn}}, tak for din ansøgning til {{rolle}}! Vi ringer dig {{ringetidspunkt}} fra {{telefonnummer}}. Passer det ikke? Book selv en tid: {{booking_link}} — Afmeld: {{afmeld_link}}
-```
+**2. Opdater `public-book-candidate` edge function**
 
-Template key: `flow_a_dag0_sms`, day: 0, channel: sms, offset_hours: 0, phase: active.
+Erstat hardkodet SMS (linje 170) med opslag i `booking_flow_steps` via `template_key = 'booking_confirmation_sms'`. Erstat merge-tags `{{fornavn}}`, `{{dato}}`, `{{tidspunkt}}`.
 
-**2. Opdater `auto-segment-candidate` edge function**
+**3. Tilføj `{{dato}}` og `{{tidspunkt}}` som merge-tags i UI**
 
-Erstat den hardkodede SMS-tekst (linje 340-391) med et opslag i `booking_flow_steps` via `template_key = 'flow_a_dag0_sms'`. Brug den eksisterende merge-tag-erstatning (`{{fornavn}}`, `{{rolle}}`, `{{booking_link}}`, `{{afmeld_link}}`, `{{ringetidspunkt}}`, `{{telefonnummer}}`).
-
-**3. Tilføj `{{telefonnummer}}` som dokumenteret merge-tag i UI**
-
-Opdater `FlowTemplatesTab.tsx` så `{{telefonnummer}}` og `{{ringetidspunkt}}` vises i listen af tilgængelige merge-tags.
+Opdater `FlowTemplatesTab.tsx` så de nye tags vises i dokumentationen.
 
 ### Filer der ændres
 
 | Fil | Ændring |
 |-----|---------|
-| **Database insert** | Tilføj `flow_a_dag0_sms` post til `booking_flow_steps` |
-| `supabase/functions/auto-segment-candidate/index.ts` | Læs dag 0 SMS fra DB, merge tags, send |
-| `src/components/recruitment/FlowTemplatesTab.tsx` | Tilføj `{{ringetidspunkt}}` og `{{telefonnummer}}` til merge-tag dokumentation |
+| **Database insert** | Tilføj `booking_confirmation_sms` til `booking_flow_steps` |
+| `supabase/functions/public-book-candidate/index.ts` | Læs bekræftelses-SMS fra DB, merge tags |
+| `src/components/recruitment/FlowTemplatesTab.tsx` | Tilføj `{{dato}}` og `{{tidspunkt}}` til merge-tag liste |
 
