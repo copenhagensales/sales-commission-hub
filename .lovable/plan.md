@@ -1,55 +1,28 @@
 
 
-## Gør booking flow-trin redigerbare (tilføj/slet)
+## Opdater afmeldingsside med venligere besked
 
-### Problem
-Flow-trinene er hardkodet 3 steder: frontend (`BookingFlow.tsx`), `auto-segment-candidate` og `process-booking-flow`. Man kan ikke tilføje eller fjerne trin uden at ændre kode.
+### Ændring
 
-### Løsning
-Flyt flow-definitionen til en databasetabel (`booking_flow_steps`) og lad frontend CRUD'e derfra. Edge functions læser trinene dynamisk fra DB i stedet for hardkodede arrays.
+**Fil:** `supabase/functions/unsubscribe-candidate/index.ts`
 
-### Database
+Opdater to ting:
 
-Ny tabel `booking_flow_steps`:
+1. **Succesbesked** (linje 84-89): Erstat den nuværende korte besked med en varmere, mere indbydende tekst der takker for interessen og inviterer til at søge igen.
 
-| Kolonne | Type | Beskrivelse |
-|---------|------|-------------|
-| id | uuid PK | |
-| day | integer | Dag i flowet (0, 1, 3, 6...) |
-| channel | text | "email" eller "sms" |
-| template_key | text | Reference til skabelon |
-| offset_hours | numeric | Tidspunkt på dagen |
-| sort_order | integer | Rækkefølge |
-| is_active | boolean | Slå til/fra |
-| phase | text | "active" eller "reengagement" |
+2. **HTML-styling** (linje 100-121): Gør siden pænere med bedre styling — større kort, et ikon/checkmark, farveaccenter, og mere luft. Tilføj et lille Copenhagen Sales-branding touch.
 
-Seed med de nuværende 9 trin. RLS: kun autentificerede med `is_teamleder_or_above`.
+**Ny beskedtekst:**
+> **Tak for din interesse, {fornavn}!**
+> 
+> Vi har modtaget din afmelding, og du vil ikke modtage flere beskeder fra os.
+> 
+> Vi sætter stor pris på, at du tog dig tid til at søge hos os – det betyder meget.
+> 
+> Du er altid velkommen til at søge igen en anden gang. Vi vil med glæde høre fra dig!
+> 
+> Venlig hilsen, Copenhagen Sales
 
-### Frontend-ændringer
-
-**`FlowTemplatesTab.tsx`**:
-- Hent trin fra `booking_flow_steps` i stedet for hardkodet `FLOW_TEMPLATES`
-- Tilføj "Tilføj trin" knap per fase-gruppe (åbner dialog med dag, kanal, emne, indhold)
-- Tilføj slet-knap (med bekræftelse) på hvert trin
-- Behold redigering af skabelonindhold som i dag
-
-**`BookingFlow.tsx`**:
-- Hent `FLOW_DEFINITIONS` dynamisk fra `booking_flow_steps` tabel i stedet for hardkodet objekt
-- Brug dynamiske trin ved oprettelse af touchpoints (approve-mutation)
-
-### Edge Functions
-
-**`auto-segment-candidate`**: Erstat hardkodet `FLOW_A` array med query til `booking_flow_steps` tabel.
-
-**`process-booking-flow`**: Allerede template-agnostisk (læser fra touchpoints), men opdater `FLOW_TEMPLATES` fallback til også at checke DB.
-
-### Filer der ændres
-
-| Fil | Ændring |
-|-----|---------|
-| **Migration** | Opret `booking_flow_steps` tabel + seed data |
-| `src/components/recruitment/FlowTemplatesTab.tsx` | Dynamisk hentning, tilføj/slet UI |
-| `src/pages/recruitment/BookingFlow.tsx` | Dynamisk flow-definitioner fra DB |
-| `supabase/functions/auto-segment-candidate/index.ts` | Læs trin fra DB |
-| `supabase/functions/process-booking-flow/index.ts` | Brug DB-templates som primær kilde |
+### Resultat
+Kandidater der afmelder sig ser en venlig, branded side der takker dem og inviterer dem til at søge igen.
 
