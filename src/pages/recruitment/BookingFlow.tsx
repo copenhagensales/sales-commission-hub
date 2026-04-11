@@ -33,49 +33,6 @@ const statusConfig: Record<string, { label: string; icon: typeof CheckCircle; co
   pending_approval: { label: "Afventer", icon: Clock, color: "bg-amber-500/10 text-amber-600 border-amber-500/30" },
 };
 
-const FLOW_DEFINITIONS: Record<string, Array<{ day: number; channel: string; template_key: string; offsetHours: number }>> = {
-  A: [
-    // Dag 0 — Første kontakt
-    { day: 0, channel: "email", template_key: "flow_a_dag0_email", offsetHours: 0 },
-    { day: 0, channel: "sms", template_key: "flow_a_dag0_sms", offsetHours: 0.15 },
-    // Dag 1 — Første rykker (SMS-fokus)
-    { day: 1, channel: "sms", template_key: "flow_a_dag1_sms", offsetHours: 10 },
-    // Dag 3 — Anden rykker (Email, mere kontekst)
-    { day: 3, channel: "email", template_key: "flow_a_dag3_email", offsetHours: 9 },
-    // Dag 6 — Tredje rykker (SMS + Email, deadline)
-    { day: 6, channel: "sms", template_key: "flow_a_dag6_sms", offsetHours: 9 },
-    { day: 6, channel: "email", template_key: "flow_a_dag6_email", offsetHours: 9.5 },
-    // Dag 10 — Afslutning af aktiv fase
-    { day: 10, channel: "email", template_key: "flow_a_dag10_email", offsetHours: 10 },
-    // Dag 45 — Re-engagement 1 (genaktivering)
-    { day: 45, channel: "sms", template_key: "flow_a_dag45_sms", offsetHours: 10 },
-    // Dag 120 — Re-engagement 2 (sidste chance)
-    { day: 120, channel: "email", template_key: "flow_a_dag120_email", offsetHours: 10 },
-  ],
-  B: [
-    { day: 0, channel: "email", template_key: "flow_a_dag0_email", offsetHours: 0 },
-    { day: 0, channel: "sms", template_key: "flow_a_dag0_sms", offsetHours: 0.15 },
-    { day: 1, channel: "sms", template_key: "flow_a_dag1_sms", offsetHours: 10 },
-    { day: 3, channel: "email", template_key: "flow_a_dag3_email", offsetHours: 9 },
-    { day: 6, channel: "sms", template_key: "flow_a_dag6_sms", offsetHours: 9 },
-    { day: 6, channel: "email", template_key: "flow_a_dag6_email", offsetHours: 9.5 },
-    { day: 10, channel: "email", template_key: "flow_a_dag10_email", offsetHours: 10 },
-    { day: 45, channel: "sms", template_key: "flow_a_dag45_sms", offsetHours: 10 },
-    { day: 120, channel: "email", template_key: "flow_a_dag120_email", offsetHours: 10 },
-  ],
-  C: [
-    { day: 0, channel: "email", template_key: "flow_a_dag0_email", offsetHours: 0 },
-    { day: 0, channel: "sms", template_key: "flow_a_dag0_sms", offsetHours: 0.15 },
-    { day: 1, channel: "sms", template_key: "flow_a_dag1_sms", offsetHours: 10 },
-    { day: 3, channel: "email", template_key: "flow_a_dag3_email", offsetHours: 9 },
-    { day: 6, channel: "sms", template_key: "flow_a_dag6_sms", offsetHours: 9 },
-    { day: 6, channel: "email", template_key: "flow_a_dag6_email", offsetHours: 9.5 },
-    { day: 10, channel: "email", template_key: "flow_a_dag10_email", offsetHours: 10 },
-    { day: 45, channel: "sms", template_key: "flow_a_dag45_sms", offsetHours: 10 },
-    { day: 120, channel: "email", template_key: "flow_a_dag120_email", offsetHours: 10 },
-  ],
-};
-
 export default function BookingFlow() {
   const queryClient = useQueryClient();
   const [segModalOpen, setSegModalOpen] = useState(false);
@@ -194,17 +151,23 @@ export default function BookingFlow() {
         .eq("id", enrollmentId);
       if (updateErr) throw updateErr;
 
-      // Create touchpoints for the tier
-      const tier = enrollment.tier as string;
-      const flowSteps = FLOW_DEFINITIONS[tier] || FLOW_DEFINITIONS.B;
+      // Fetch flow steps from DB
+      const { data: flowSteps, error: stepsErr } = await supabase
+        .from("booking_flow_steps")
+        .select("*")
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true });
+      if (stepsErr) throw stepsErr;
+      if (!flowSteps?.length) throw new Error("Ingen flow-trin fundet i databasen");
+
       const now = new Date();
       const touchpoints = flowSteps.map(step => {
         let scheduledAt: Date;
-        if (step.day === 0 && step.offsetHours < 1) {
-          scheduledAt = new Date(now.getTime() + step.offsetHours * 3600000);
+        if (step.day === 0 && step.offset_hours < 1) {
+          scheduledAt = new Date(now.getTime() + step.offset_hours * 3600000);
         } else {
           const dayDate = addDays(now, step.day);
-          scheduledAt = setMinutes(setHours(dayDate, Math.floor(step.offsetHours)), (step.offsetHours % 1) * 60);
+          scheduledAt = setMinutes(setHours(dayDate, Math.floor(step.offset_hours)), (step.offset_hours % 1) * 60);
         }
         return {
           enrollment_id: enrollmentId,
