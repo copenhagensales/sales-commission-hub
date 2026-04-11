@@ -151,9 +151,15 @@ export default function BookingFlow() {
         .eq("id", enrollmentId);
       if (updateErr) throw updateErr;
 
-      // Create touchpoints for the tier
-      const tier = enrollment.tier as string;
-      const flowSteps = FLOW_DEFINITIONS[tier] || FLOW_DEFINITIONS.B;
+      // Fetch flow steps from DB
+      const { data: flowSteps, error: stepsErr } = await supabase
+        .from("booking_flow_steps")
+        .select("*")
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true });
+      if (stepsErr) throw stepsErr;
+      if (!flowSteps?.length) throw new Error("Ingen flow-trin fundet i databasen");
+
       const now = new Date();
       const touchpoints = flowSteps.map(step => {
         let scheduledAt: Date;
