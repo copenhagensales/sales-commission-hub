@@ -63,7 +63,7 @@ export function BookingPreviewTab() {
         <div>
           <h3 className="text-sm font-medium">Kandidat-visning (preview)</h3>
           <p className="text-xs text-muted-foreground">
-            Sådan ser booking-siden ud for kandidaten — med live data fra dine indstillinger
+            Sådan ser booking-siden ud for kandidaten – med live data fra dine indstillinger
           </p>
         </div>
         <span
@@ -93,7 +93,7 @@ export function BookingPreviewTab() {
               </h1>
               <p className="text-sm leading-relaxed" style={{ color: "#666" }}>
                 Book en kort snak med <strong style={{ color: CS_DARK }}>Oscar</strong>, vores rekrutteringsansvarlige.
-                På 5–10 minutter tager I en uforpligtende snak om jobbet — og Oscar svarer gerne på spørgsmål om løn, arbejdstider og hverdagen i salg.
+                På 5–10 minutter tager I en uforpligtende snak om jobbet – og Oscar svarer gerne på spørgsmål om løn, arbejdstider og hverdagen i salg.
               </p>
               <span
                 className="inline-block rounded-full px-3 py-1 text-xs font-medium"
@@ -175,7 +175,7 @@ export function BookingPreviewTab() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-sm font-medium" style={{ color: "#888" }}>
                     <Clock className="h-4 w-4" />
-                    Vælg et tidspunkt — {format(selectedDate, "EEEE d. MMM", { locale: da })}
+                    Vælg et tidspunkt – {format(selectedDate, "EEEE d. MMM", { locale: da })}
                   </div>
                   <span
                     className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-medium"
@@ -229,7 +229,7 @@ export function BookingPreviewTab() {
             {/* Unsubscribe */}
             <div className="text-center">
               <span className="text-xs underline cursor-default" style={{ color: "#aaa" }}>
-                Ikke interesseret længere? Klik her — det er helt okay
+                Ikke interesseret længere? Klik her – det er helt okay
               </span>
             </div>
           </div>
