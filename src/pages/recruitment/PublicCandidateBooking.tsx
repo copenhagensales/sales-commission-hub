@@ -111,7 +111,7 @@ export default function PublicCandidateBooking() {
       <div className="min-h-screen bg-white flex items-center justify-center p-4" style={fontStyle}>
         <div className="max-w-md w-full text-center rounded-2xl border border-gray-100 shadow-sm p-8 space-y-5">
           <CheckCircle2 className="h-12 w-12 mx-auto" style={{ color: CS_GREEN }} />
-          <h2 className="text-xl font-semibold tracking-[-0.02em]" style={{ color: CS_DARK }}>Perfekt — du er booket! 🎉</h2>
+          <h2 className="text-xl font-semibold tracking-[-0.02em]" style={{ color: CS_DARK }}>Perfekt – du er booket! 🎉</h2>
           <p className="text-sm" style={{ color: "#666" }}>
             Oscar ringer dig {selectedDate && format(selectedDate, "EEEE 'd.' d. MMMM", { locale: da })} kl. {selectedSlot?.start}. Samtalen er helt uforpligtende.
           </p>
@@ -128,12 +128,12 @@ export default function PublicCandidateBooking() {
               </li>
               <li className="flex items-start gap-2">
                 <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" style={{ color: CS_GREEN }} />
-                Hav gerne et par spørgsmål klar — Oscar fortæller gerne om løn, arbejdstider og hverdagen
+                Hav gerne et par spørgsmål klar – Oscar fortæller gerne om løn, arbejdstider og hverdagen
               </li>
             </ul>
           </div>
           <p className="text-xs" style={{ color: "#999" }}>
-            Tip: Tænk over hvad der motiverer dig — det spørger Oscar nemlig om 😊
+            Tip: Tænk over hvad der motiverer dig – det spørger Oscar nemlig om 😊
           </p>
         </div>
       </div>
@@ -175,7 +175,7 @@ export default function PublicCandidateBooking() {
           </h1>
           <p className="text-sm leading-relaxed" style={{ color: "#666" }}>
             Book en kort snak med <strong style={{ color: CS_DARK }}>Oscar</strong>, vores rekrutteringsansvarlige.
-            På 5–10 minutter tager I en uforpligtende snak om jobbet — og Oscar svarer gerne på spørgsmål om løn, arbejdstider og hverdagen i salg.
+            På 5–10 minutter tager I en uforpligtende snak om jobbet – og Oscar svarer gerne på spørgsmål om løn, arbejdstider og hverdagen i salg.
           </p>
           {application?.role && (
             <span
@@ -255,7 +255,7 @@ export default function PublicCandidateBooking() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-sm font-medium" style={{ color: "#888" }}>
                 <Clock className="h-4 w-4" />
-                Vælg et tidspunkt — {format(selectedDate, "EEEE d. MMM", { locale: da })}
+                Vælg et tidspunkt – {format(selectedDate, "EEEE d. MMM", { locale: da })}
               </div>
               <span
                 className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-medium"
@@ -326,7 +326,7 @@ export default function PublicCandidateBooking() {
             style={{ color: "#aaa" }}
             disabled={unsubMutation.isPending}
           >
-            {unsubMutation.isPending ? "Trækker tilbage..." : "Ikke interesseret længere? Klik her — det er helt okay"}
+            {unsubMutation.isPending ? "Trækker tilbage..." : "Ikke interesseret længere? Klik her – det er helt okay"}
           </button>
         </div>
       </div>
