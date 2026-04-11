@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Users, Zap, Clock, CheckCircle, XCircle, Plus, Mail, MessageSquare, Phone, Loader2, ShieldCheck, AlertTriangle, FileText, CalendarDays, Eye, PhoneCall } from "lucide-react";
+import { Users, Zap, Clock, CheckCircle, XCircle, Plus, Mail, MessageSquare, Loader2, ShieldCheck, AlertTriangle, FileText, CalendarDays, Eye, PhoneCall } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { da } from "date-fns/locale";
 import { SegmentationModal } from "@/components/recruitment/SegmentationModal";
@@ -38,31 +38,24 @@ const FLOW_DEFINITIONS: Record<string, Array<{ day: number; channel: string; tem
     { day: 0, channel: "email", template_key: "flow_a_dag0_email", offsetHours: 0 },
     { day: 0, channel: "sms", template_key: "flow_a_dag0_sms", offsetHours: 0.15 },
     { day: 1, channel: "sms", template_key: "flow_a_dag1_precall_sms", offsetHours: 9 },
-    { day: 1, channel: "call_reminder", template_key: "flow_a_dag1_call", offsetHours: 10 },
     { day: 1, channel: "sms", template_key: "flow_a_dag1_followup_sms", offsetHours: 15 },
     { day: 2, channel: "email", template_key: "flow_a_dag2_reminder_email", offsetHours: 9 },
-    { day: 2, channel: "call_reminder", template_key: "flow_a_dag2_call", offsetHours: 11 },
     { day: 3, channel: "email", template_key: "flow_a_dag3_last_attempt", offsetHours: 10 },
   ],
-  // B and C now use the same flow as A
   B: [
     { day: 0, channel: "email", template_key: "flow_a_dag0_email", offsetHours: 0 },
     { day: 0, channel: "sms", template_key: "flow_a_dag0_sms", offsetHours: 0.15 },
     { day: 1, channel: "sms", template_key: "flow_a_dag1_precall_sms", offsetHours: 9 },
-    { day: 1, channel: "call_reminder", template_key: "flow_a_dag1_call", offsetHours: 10 },
     { day: 1, channel: "sms", template_key: "flow_a_dag1_followup_sms", offsetHours: 15 },
     { day: 2, channel: "email", template_key: "flow_a_dag2_reminder_email", offsetHours: 9 },
-    { day: 2, channel: "call_reminder", template_key: "flow_a_dag2_call", offsetHours: 11 },
     { day: 3, channel: "email", template_key: "flow_a_dag3_last_attempt", offsetHours: 10 },
   ],
   C: [
     { day: 0, channel: "email", template_key: "flow_a_dag0_email", offsetHours: 0 },
     { day: 0, channel: "sms", template_key: "flow_a_dag0_sms", offsetHours: 0.15 },
     { day: 1, channel: "sms", template_key: "flow_a_dag1_precall_sms", offsetHours: 9 },
-    { day: 1, channel: "call_reminder", template_key: "flow_a_dag1_call", offsetHours: 10 },
     { day: 1, channel: "sms", template_key: "flow_a_dag1_followup_sms", offsetHours: 15 },
     { day: 2, channel: "email", template_key: "flow_a_dag2_reminder_email", offsetHours: 9 },
-    { day: 2, channel: "call_reminder", template_key: "flow_a_dag2_call", offsetHours: 11 },
     { day: 3, channel: "email", template_key: "flow_a_dag3_last_attempt", offsetHours: 10 },
   ],
 };

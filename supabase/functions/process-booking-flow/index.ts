@@ -23,11 +23,6 @@ const FLOW_TEMPLATES: Record<string, { subject: string; content: string; channel
     content: "Hej {{fornavn}}, har du set vores besked? Book en tid her: {{booking_link}} – hvis du ikke lige når det, giver Oscar dig bare et kald fra {{telefonnummer}} 📞 Afmeld: {{afmeld_link}}",
     channel: "sms",
   },
-  flow_a_dag1_call: {
-    subject: "Opkald til kandidat",
-    content: "Ring til {{fornavn}} angående ansøgning til {{rolle}}. Dag 1 i booking flow.",
-    channel: "call_reminder",
-  },
   flow_a_dag1_followup_sms: {
     subject: "",
     content: "Hej {{fornavn}}, Oscar prøvede at ringe dig. Book selv en tid her: {{booking_link}} – ellers prøver vi igen 😊",
@@ -37,11 +32,6 @@ const FLOW_TEMPLATES: Record<string, { subject: string; content: string; channel
     subject: "Du har stadig ikke booket en tid",
     content: "Hej {{fornavn}},\n\nDu har stadig ikke booket en tid til en snak om din ansøgning til {{rolle}}.\n\nGør det nemt her:\n{{booking_link}}\n\nHvis du ikke booker, ringer Oscar dig i løbet af dagen.\n\nMed venlig hilsen\nCopenhagen Sales",
     channel: "email",
-  },
-  flow_a_dag2_call: {
-    subject: "2. opkaldsforsøg",
-    content: "Ring til {{fornavn}} igen – 2. forsøg. Ansøgning til {{rolle}}.",
-    channel: "call_reminder",
   },
   flow_a_dag3_last_attempt: {
     subject: "Sidste chance for at booke en tid",
@@ -271,9 +261,6 @@ Deno.serve(async (req) => {
             const errText = await smsResponse.text();
             throw new Error(`SMS send failed: ${errText}`);
           }
-        } else if (tp.channel === 'call_reminder') {
-          // Call reminders are just logged — no actual sending needed
-          console.log(`[process-booking-flow] Call reminder for ${candidate.first_name}: ${mergedContent}`);
         } else {
           // No contact info for channel
           await supabase
