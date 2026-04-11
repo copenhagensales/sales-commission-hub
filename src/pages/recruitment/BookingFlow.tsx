@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Users, Zap, Clock, CheckCircle, XCircle, Plus, Mail, MessageSquare, Phone, Loader2, ShieldCheck, AlertTriangle, FileText, CalendarDays, Eye } from "lucide-react";
+import { Users, Zap, Clock, CheckCircle, XCircle, Plus, Mail, MessageSquare, Phone, Loader2, ShieldCheck, AlertTriangle, FileText, CalendarDays, Eye, PhoneCall } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { da } from "date-fns/locale";
 import { SegmentationModal } from "@/components/recruitment/SegmentationModal";
@@ -17,6 +17,7 @@ import { BookingFlowTimeline } from "@/components/recruitment/BookingFlowTimelin
 import { FlowTemplatesTab } from "@/components/recruitment/FlowTemplatesTab";
 import { BookingSettingsTab } from "@/components/recruitment/BookingSettingsTab";
 import { BookingPreviewTab } from "@/components/recruitment/BookingPreviewTab";
+import { BookingCalendarTab } from "@/components/recruitment/BookingCalendarTab";
 import { addDays, setHours, setMinutes } from "date-fns";
 
 const tierConfig = {
@@ -303,6 +304,10 @@ export default function BookingFlow() {
               <Eye className="h-4 w-4" />
               Preview
             </TabsTrigger>
+            <TabsTrigger value="samtaler" className="gap-2">
+              <PhoneCall className="h-4 w-4" />
+              Samtaler
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="dashboard" className="space-y-6">
@@ -572,6 +577,10 @@ export default function BookingFlow() {
 
           <TabsContent value="booking-preview">
             <BookingPreviewTab />
+          </TabsContent>
+
+          <TabsContent value="samtaler">
+            <BookingCalendarTab />
           </TabsContent>
         </Tabs>
 
