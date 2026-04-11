@@ -15,12 +15,12 @@ import { Mail, MessageSquare, Phone, Pencil, Loader2 } from "lucide-react";
 const FLOW_TEMPLATES: Record<string, { subject: string; content: string; channel: string }> = {
   flow_a_dag0_email: {
     subject: "Book en tid til en snak om din ansøgning",
-    content: "Hej {{fornavn}},\n\nTak for din ansøgning til stillingen som {{rolle}} hos Copenhagen Sales.\n\nVi vil gerne invitere dig til en uforpligtende snak på 5–10 minutter med Oscar, som er ansvarlig for rekruttering. Han kan svare på alt fra løn og arbejdstider til hverdagen i salg.\n\nBook selv den tid der passer dig bedst her:\n{{booking_link}}\n\nHvis du ikke booker noget, ringer Oscar bare til dig {{ringetidspunkt}} fra {{telefonnummer}}.\n\nIkke interesseret længere? Klik her – det er helt okay:\n{{afmeld_link}}\n\nMed venlig hilsen\nCopenhagen Sales",
+    content: "Hej {{fornavn}},\n\nTak for din ansøgning til stillingen som {{rolle}} hos Copenhagen Sales.\n\nVi vil gerne invitere dig til en uforpligtende snak på 5–10 minutter over telefonen med Oscar, som er ansvarlig for rekruttering.\n\nBook selv den tid der passer dig bedst her:\n{{booking_link}}\n\nHvis du ikke booker noget, ringer Oscar bare til dig {{ringetidspunkt}} fra {{telefonnummer}}.\n\nIkke interesseret længere? Klik her – det er helt okay:\n{{afmeld_link}}\n\nMed venlig hilsen\nCopenhagen Sales",
     channel: "email",
   },
   flow_a_dag0_sms: {
     subject: "",
-    content: "Hej {{fornavn}}! Tak for din ansøgning til {{rolle}}. Book selv en tid til en uforpligtende snak med Oscar her: {{booking_link}} – booker du ikke, ringer han bare til dig 😊 Afmeld: {{afmeld_link}}",
+    content: "Hej {{fornavn}}! Tak for din ansøgning til {{rolle}}. Vi vil gerne tage en uforpligtende snak på 5–10 min over telefonen. Book selv en tid med Oscar her: {{booking_link}} – booker du ikke, ringer han bare til dig 😊 Afmeld: {{afmeld_link}}",
     channel: "sms",
   },
   flow_a_dag1_precall_sms: {
