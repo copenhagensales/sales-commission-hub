@@ -114,8 +114,7 @@ function ReferralKpiSection() {
   );
 }
 
-
-  const [chartPeriod, setChartPeriod] = useState(30);
+export default function RecruitmentDashboard() {
 
   const { data: candidates = [] } = useQuery({
     queryKey: ["candidates"],
@@ -514,7 +513,7 @@ function ReferralKpiSection() {
         })}
       </div>
 
-export default function RecruitmentDashboard() {
+
 
       {/* Applicants Over Time Chart */}
       <Card className="bg-card border-border">
