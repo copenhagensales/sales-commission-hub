@@ -1,9 +1,9 @@
 import { useState, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, Clock, Phone, ChevronLeft, ChevronRight, Info } from "lucide-react";
-import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay, isBefore, startOfDay, addDays, isWeekend } from "date-fns";
+import { Calendar, Clock, Phone } from "lucide-react";
+import { format, isSameDay, parseISO } from "date-fns";
 import { da } from "date-fns/locale";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,11 +12,9 @@ interface TimeSlot { start: string; end: string; }
 interface AvailabilityDay { date: string; slots: TimeSlot[]; }
 
 export function BookingPreviewTab() {
-  const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
 
-  // Fetch a real candidate for realistic preview
   const { data: sampleCandidate } = useQuery({
     queryKey: ["preview-sample-candidate"],
     queryFn: async () => {
@@ -30,7 +28,6 @@ export function BookingPreviewTab() {
     },
   });
 
-  // Fetch real availability using the edge function
   const { data: availability, isLoading } = useQuery({
     queryKey: ["preview-availability", sampleCandidate?.id],
     queryFn: async () => {
@@ -45,14 +42,9 @@ export function BookingPreviewTab() {
 
   const firstName = sampleCandidate?.first_name?.split(" ")[0] || "Kandidat";
 
-  const monthStart = startOfMonth(currentMonth);
-  const monthEnd = endOfMonth(currentMonth);
-  const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
-  const startPadding = (getDay(monthStart) + 6) % 7;
-
-  const availableDates = useMemo(() => {
-    if (!availability?.days) return new Set<string>();
-    return new Set(availability.days.filter(d => d.slots.length > 0).map(d => d.date));
+  const availableDays = useMemo(() => {
+    if (!availability?.days) return [];
+    return availability.days.filter(d => d.slots.length > 0).slice(0, 7);
   }, [availability]);
 
   const slotsForDate = useMemo(() => {
@@ -61,8 +53,6 @@ export function BookingPreviewTab() {
     const day = availability.days.find(d => d.date === dateStr);
     return day?.slots || [];
   }, [selectedDate, availability]);
-
-  const today = startOfDay(new Date());
 
   return (
     <div className="space-y-4">
@@ -83,7 +73,7 @@ export function BookingPreviewTab() {
       <Card className="overflow-hidden border-2 border-dashed">
         <CardContent className="p-0">
           <div className="bg-gradient-to-b from-muted/30 to-background">
-            <div className="max-w-2xl mx-auto p-4 py-8 space-y-6">
+            <div className="max-w-lg mx-auto p-4 py-8 space-y-6">
               {/* Header */}
               <div className="text-center space-y-2">
                 <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-4 py-1.5 text-sm font-medium">
@@ -99,121 +89,93 @@ export function BookingPreviewTab() {
                 <Badge variant="secondary" className="text-xs">Sælger</Badge>
               </div>
 
-              {/* Calendar + Slots */}
-              <div className="grid md:grid-cols-2 gap-4">
-                {/* Calendar */}
-                <Card>
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between">
-                      <Button variant="ghost" size="sm" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
-                        <ChevronLeft className="h-4 w-4" />
-                      </Button>
-                      <CardTitle className="text-sm font-medium capitalize">
-                        {format(currentMonth, "MMMM yyyy", { locale: da })}
-                      </CardTitle>
-                      <Button variant="ghost" size="sm" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-7 gap-1 text-center mb-2">
-                      {["Ma", "Ti", "On", "To", "Fr", "Lø", "Sø"].map(d => (
-                        <div key={d} className="text-[10px] font-medium text-muted-foreground py-1">{d}</div>
-                      ))}
-                    </div>
-                    <div className="grid grid-cols-7 gap-1">
-                      {Array.from({ length: startPadding }).map((_, i) => (
-                        <div key={`pad-${i}`} />
-                      ))}
-                      {daysInMonth.map(day => {
-                        const dateStr = format(day, "yyyy-MM-dd");
-                        const isAvail = availableDates.has(dateStr);
-                        const isPast = isBefore(day, today);
-                        const isWknd = isWeekend(day);
-                        const isSelected = selectedDate && isSameDay(day, selectedDate);
+              {/* Day selector */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                  <Calendar className="h-4 w-4" />
+                  Vælg en dag
+                </div>
+                {isLoading ? (
+                  <div className="flex justify-center py-3">
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  </div>
+                ) : availableDays.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    Ingen ledige dage lige nu.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                    {availableDays.map(day => {
+                      const date = parseISO(day.date);
+                      const isSelected = selectedDate && isSameDay(date, selectedDate);
+                      return (
+                        <button
+                          key={day.date}
+                          onClick={() => { setSelectedDate(date); setSelectedSlot(null); }}
+                          className={`
+                            flex flex-col items-center gap-0.5 rounded-lg border px-3 py-3 text-sm font-medium transition-all
+                            ${isSelected
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-card hover:bg-muted/50 border-border text-foreground"}
+                          `}
+                        >
+                          <span className="text-xs capitalize">
+                            {format(date, "EEE", { locale: da })}
+                          </span>
+                          <span className="text-base font-semibold">
+                            {format(date, "d")}
+                          </span>
+                          <span className="text-[10px] opacity-70">
+                            {format(date, "MMM", { locale: da })}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
 
+              {/* Time Slots */}
+              {selectedDate && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                    <Clock className="h-4 w-4" />
+                    Ledige tider — {format(selectedDate, "EEEE d. MMM", { locale: da })}
+                  </div>
+                  {slotsForDate.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      Ingen ledige tider denne dag.
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2">
+                      {slotsForDate.map(slot => {
+                        const isActive = selectedSlot?.start === slot.start;
                         return (
                           <button
-                            key={dateStr}
-                            disabled={!isAvail || isPast}
-                            onClick={() => {
-                              setSelectedDate(day);
-                              setSelectedSlot(null);
-                            }}
+                            key={slot.start}
+                            onClick={() => setSelectedSlot(slot)}
                             className={`
-                              h-9 w-full rounded-md text-sm transition-all
-                              ${isSelected ? "bg-primary text-primary-foreground font-semibold" : ""}
-                              ${isAvail && !isPast && !isSelected ? "bg-primary/10 text-primary hover:bg-primary/20 font-medium cursor-pointer" : ""}
-                              ${isPast || isWknd ? "text-muted-foreground/40" : ""}
-                              ${!isAvail && !isPast && !isWknd ? "text-muted-foreground" : ""}
-                              disabled:cursor-default
+                              px-3 py-2.5 rounded-lg border text-sm font-medium transition-all
+                              ${isActive
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "bg-card hover:bg-muted/50 border-border text-foreground"}
                             `}
                           >
-                            {format(day, "d")}
+                            {slot.start} – {slot.end}
                           </button>
                         );
                       })}
                     </div>
-                    {isLoading && (
-                      <div className="flex justify-center py-3">
-                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+                  )}
 
-                {/* Time Slots */}
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      {selectedDate
-                        ? `Ledige tider — ${format(selectedDate, "EEEE d. MMM", { locale: da })}`
-                        : "Vælg en dato"}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {!selectedDate ? (
-                      <p className="text-sm text-muted-foreground py-4 text-center">
-                        Vælg en dag i kalenderen for at se ledige tider.
-                      </p>
-                    ) : slotsForDate.length === 0 ? (
-                      <p className="text-sm text-muted-foreground py-4 text-center">
-                        Ingen ledige tider denne dag.
-                      </p>
-                    ) : (
-                      <div className="grid grid-cols-2 gap-2 max-h-[280px] overflow-y-auto">
-                        {slotsForDate.map(slot => {
-                          const isActive = selectedSlot?.start === slot.start;
-                          return (
-                            <button
-                              key={slot.start}
-                              onClick={() => setSelectedSlot(slot)}
-                              className={`
-                                px-3 py-2 rounded-lg border text-sm font-medium transition-all
-                                ${isActive
-                                  ? "bg-primary text-primary-foreground border-primary"
-                                  : "bg-card hover:bg-muted/50 border-border text-foreground"}
-                              `}
-                            >
-                              {slot.start} – {slot.end}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {selectedSlot && (
-                      <Button className="w-full mt-4" size="lg" disabled>
-                        <Calendar className="h-4 w-4 mr-2" />
-                        Book møde — {selectedSlot.start} (preview)
-                      </Button>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-
+                  {selectedSlot && (
+                    <Button className="w-full" size="lg" disabled>
+                      <Calendar className="h-4 w-4 mr-2" />
+                      Book møde — {selectedSlot.start} (preview)
+                    </Button>
+                  )}
+                </div>
+              )}
 
               {/* Unsubscribe */}
               <div className="text-center">
