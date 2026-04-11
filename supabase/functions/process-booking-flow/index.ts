@@ -117,9 +117,20 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Get template content
-      const template = FLOW_TEMPLATES[tp.template_key];
-      if (!template) {
+      // Get template content from booking_flow_steps (primary) or email_templates (override)
+      const { data: flowStep } = await supabase
+        .from('booking_flow_steps')
+        .select('subject, content, channel')
+        .eq('template_key', tp.template_key)
+        .maybeSingle();
+
+      const { data: customTemplate } = await supabase
+        .from('email_templates')
+        .select('subject, content')
+        .eq('template_key', tp.template_key)
+        .maybeSingle();
+
+      if (!flowStep && !customTemplate) {
         console.error(`[process-booking-flow] Unknown template: ${tp.template_key}`);
         await supabase
           .from('booking_flow_touchpoints')
@@ -129,15 +140,8 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Check for custom template in DB
-      const { data: customTemplate } = await supabase
-        .from('email_templates')
-        .select('subject, content')
-        .eq('template_key', tp.template_key)
-        .maybeSingle();
-
-      const subject = customTemplate?.subject || template.subject;
-      const content = customTemplate?.content || template.content;
+      const subject = customTemplate?.subject || flowStep?.subject || '';
+      const content = customTemplate?.content || flowStep?.content || '';
 
       // Get role from application
       const { data: app } = await supabase
