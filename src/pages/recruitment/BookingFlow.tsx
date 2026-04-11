@@ -163,11 +163,11 @@ export default function BookingFlow() {
       const now = new Date();
       const touchpoints = flowSteps.map(step => {
         let scheduledAt: Date;
-        if (step.day === 0 && step.offsetHours < 1) {
-          scheduledAt = new Date(now.getTime() + step.offsetHours * 3600000);
+        if (step.day === 0 && step.offset_hours < 1) {
+          scheduledAt = new Date(now.getTime() + step.offset_hours * 3600000);
         } else {
           const dayDate = addDays(now, step.day);
-          scheduledAt = setMinutes(setHours(dayDate, Math.floor(step.offsetHours)), (step.offsetHours % 1) * 60);
+          scheduledAt = setMinutes(setHours(dayDate, Math.floor(step.offset_hours)), (step.offset_hours % 1) * 60);
         }
         return {
           enrollment_id: enrollmentId,
