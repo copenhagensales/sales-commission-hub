@@ -1,37 +1,28 @@
 
 
-## Korte SMS-links via `job.cphsales.dk`
+## Tilføj "Ghost procent" KPI-kort til rekrutterings-dashboardet
 
-### Problem
-SMS-links er lange og uoverskuelige:
-- `https://sales-sync-pay.lovable.app/book/550e8400-e29b-41d4-a716-446655440000`
-- `https://jwlimmeijpfmaksvmuru.supabase.co/functions/v1/unsubscribe-candidate?id=...`
+### Hvad der bygges
+Et nyt KPI-kort under konverterings-kortene der viser ghost-procenten for de seneste 30 dage — beregnet som antal kandidater med status `ghosted` divideret med totalt antal kandidater i perioden.
 
-### Løsning
-Oprette en `short_links` tabel + redirect edge function, og bruge domænet `job.cphsales.dk`.
+### Beregning
+- **30-dages ghost%**: `(ghosted count / total candidates) * 100` — for både Salgskonsulent og Fieldmarketing
+- Vises med samme layout som konverteringskortene (procent som stort tal, "X af Y ghostet (30d)" som undertekst, historisk rate som sekundær linje)
 
-**Resultat:** `job.cphsales.dk/r/aB3kx9` (ca. 27 tegn vs. 80+ i dag)
-
-### Forudsætning
-Du skal pege domænet `job.cphsales.dk` til dette projekt (via Project Settings → Domains). Uden det vil links ikke virke.
-
-### Trin
-
-| # | Handling |
-|---|---------|
-| 1 | **Opret `short_links` tabel** – `code` (unik 6-tegn), `target_url`, `candidate_id`, `link_type`, `created_at`. Ingen RLS. |
-| 2 | **Opret `r` edge function** – slår `code` op, returnerer 302 redirect til `target_url` |
-| 3 | **Opdater `process-booking-flow`** – generér kort kode for booking + afmeld links, gem i `short_links`, brug `job.cphsales.dk/r/{code}` i SMS/email |
-| 4 | **Opdater `auto-segment-candidate`** – samme for dag-0 SMS |
-| 5 | **Tilføj `/r/:code` route i React** – client-side fallback der redirecter via opslag |
-
-### Filer
+### Ændringer
 
 | Fil | Ændring |
 |-----|---------|
-| Migration SQL | Ny `short_links` tabel + index |
-| `supabase/functions/r/index.ts` | Ny redirect function |
-| `supabase/functions/process-booking-flow/index.ts` | Generér korte links |
-| `supabase/functions/auto-segment-candidate/index.ts` | Generér korte links |
-| `src/routes/pages.ts` + `src/routes/config.tsx` | `/r/:code` redirect page |
+| `src/pages/recruitment/RecruitmentDashboard.tsx` | Udvid `calcForCategory` til at beregne `ghosted`, `recentGhosted`, `ghostRate`, `recentGhostRate`. Tilføj et nyt grid med 2 ghost%-kort under konverteringskortene. |
+
+### Teknisk detalje
+I `calcForCategory` tilføjes:
+```ts
+const ghosted = filtered.filter(c => c.status === "ghosted").length;
+const ghostRate = total > 0 ? Math.round((ghosted / total) * 1000) / 10 : 0;
+const recentGhosted = recent.filter(c => c.status === "ghosted").length;
+const recentGhostRate = recentTotal > 0 ? Math.round((recentGhosted / recentTotal) * 1000) / 10 : 0;
+```
+
+Kortet vises med `Ghost` ikon og samme `Percent`-ikon som konverteringskortene.
 
