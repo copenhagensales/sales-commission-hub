@@ -1,36 +1,17 @@
 
 
-## Problem: Tallene stemmer ikke overens
+## Fjern "Opkald" fra booking flow — behold kun SMS og Email
 
-**Database-fakta (30 dage):**
-- 18 hired kandidater: 7 med "Salgskonsulent", 0 med Fieldmarketing, **11 med `null`**
-- 5 hired anbefalinger
-- Total: 23
+### Ændringer
 
-**Hvad du ser:**
-- "Ansat (30 dage)": 23 (18 kandidater + 5 anbefalinger) — korrekt
-- "Salgskonsulent: 7 af 144 ansat (30d)" — kun de 7 med position sat
-- 11 hired kandidater har **ingen stilling** og tælles hverken under Salgskonsulent eller Fieldmarketing
+| Fil | Hvad |
+|-----|------|
+| `src/pages/recruitment/BookingFlow.tsx` | Fjern alle `call_reminder`-touchpoints fra tier A, B og C flow-definitionerne |
+| `src/components/recruitment/FlowTemplatesTab.tsx` | Fjern `flow_a_dag1_call` og `flow_a_dag2_call` fra default templates, fjern `call_reminder` case i ikon-funktionen |
+| `src/components/recruitment/BookingFlowTimeline.tsx` | Fjern `call_reminder` fra `channelConfig`, fjern `Phone` import |
+| `supabase/functions/process-booking-flow/index.ts` | Fjern `flow_a_dag1_call` og `flow_a_dag2_call` fra `FLOW_TEMPLATES`, fjern `call_reminder` handling i processing-logikken |
+| `supabase/functions/auto-segment-candidate/index.ts` | Fjern `call_reminder`-touchpoints fra flow-definitionen |
 
-**Årsag:** Kandidater fra anbefalinger (og evt. manuelt oprettede) får ikke sat `applied_position`. De falder i en "other"-kategori der aldrig vises.
-
-### Løsning
-Tæl kandidater uden `applied_position` med under **Salgskonsulent** som default, da det er den primære stilling. Ændre `categorize`-funktionen:
-
-```ts
-const categorize = (pos: string | null) => {
-  if (!pos) return "sales"; // default til salgskonsulent
-  const lower = pos.toLowerCase();
-  if (lower.includes("field") || lower.includes("marketing")) return "field";
-  return "sales"; // alt andet er også salg
-};
-```
-
-### Ændring
-
-| Fil | Ændring |
-|-----|---------|
-| `src/pages/recruitment/RecruitmentDashboard.tsx` | Opdater `categorize`-funktionen (linje 173-179) så `null` og ukendte positioner defaulter til "sales" i stedet for "other" |
-
-Herefter vil Salgskonsulent-kortet vise **18 af 178 ansat (30d)**, og det samlede tal (23 = 18 + 5 anbefalinger) giver mening.
+### Resultat
+Alle tre tiers vil kun indeholde SMS og email-touchpoints. Eksisterende call_reminder-touchpoints i databasen vil stadig kunne vises i timeline (med fallback), men nye flows opretter dem ikke.
 
