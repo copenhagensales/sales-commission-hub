@@ -1711,28 +1711,34 @@ export type Database = {
       }
       booking_settings: {
         Row: {
+          available_weekdays: number[] | null
           blocked_dates: string[] | null
           id: string
           lookahead_days: number
           slot_duration_minutes: number
+          time_windows: Json | null
           updated_at: string
           work_end_hour: number
           work_start_hour: number
         }
         Insert: {
+          available_weekdays?: number[] | null
           blocked_dates?: string[] | null
           id?: string
           lookahead_days?: number
           slot_duration_minutes?: number
+          time_windows?: Json | null
           updated_at?: string
           work_end_hour?: number
           work_start_hour?: number
         }
         Update: {
+          available_weekdays?: number[] | null
           blocked_dates?: string[] | null
           id?: string
           lookahead_days?: number
           slot_duration_minutes?: number
+          time_windows?: Json | null
           updated_at?: string
           work_end_hour?: number
           work_start_hour?: number
