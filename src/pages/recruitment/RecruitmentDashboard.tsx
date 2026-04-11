@@ -585,8 +585,7 @@ export default function RecruitmentDashboard() {
         </CardContent>
       </Card>
 
-
-
+export default function RecruitmentDashboard() {
       </div>
     </MainLayout>
   );
