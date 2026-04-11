@@ -171,7 +171,7 @@ export default function PublicCandidateBooking() {
             </p>
           ) : (
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-              {availableDays.map(day => {
+              {availableDays.map((day, index) => {
                 const date = parseISO(day.date);
                 const isSelected = selectedDate && isSameDay(date, selectedDate);
                 return (
@@ -185,6 +185,11 @@ export default function PublicCandidateBooking() {
                         : "bg-card hover:bg-muted/50 border-border text-foreground"}
                     `}
                   >
+                    {index === 0 && (
+                      <span className="text-[9px] font-semibold uppercase tracking-wide text-green-600 bg-green-100 rounded px-1.5 py-0.5">
+                        Anbefalet
+                      </span>
+                    )}
                     <span className="text-xs capitalize">
                       {format(date, "EEEE", { locale: da })}
                     </span>
