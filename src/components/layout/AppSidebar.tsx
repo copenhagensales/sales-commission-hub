@@ -413,7 +413,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   const showRecruitmentMenu = p.canView("menu_section_rekruttering") && 
     (p.canViewRecruitmentDashboard || p.canViewCandidates || p.canViewMessages ||
      p.canViewSmsTemplates || p.canViewEmailTemplates || p.canViewWinback ||
-     p.canViewUpcomingInterviews || p.canViewUpcomingHires);
+     p.canViewUpcomingInterviews || p.canViewUpcomingHires || p.canViewBookingFlow);
   
   // Check if any Onboarding items are visible (requires section permission) - only show for admin users
   const showOnboardingMenu = p.canView("menu_section_onboarding") && p.canViewOnboardingAdmin;
@@ -1445,6 +1445,15 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                   )}>
                     <CalendarClock className="h-4 w-4" />
                     {t("sidebar.upcomingInterviews")}
+                  </NavLink>
+                )}
+                {p.canViewBookingFlow && (
+                  <NavLink to="/recruitment/booking-flow" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/recruitment/booking-flow" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <CalendarClock className="h-4 w-4" />
+                    Booking Flow
                   </NavLink>
                 )}
                 {p.canViewWinback && (

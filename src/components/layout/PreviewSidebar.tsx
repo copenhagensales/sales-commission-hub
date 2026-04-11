@@ -96,6 +96,7 @@ const RECRUITMENT_ITEMS = {
   menu_messages: { name: "Beskeder", href: "/recruitment/messages", icon: FileText },
   menu_sms_templates: { name: "SMS skabeloner", href: "/recruitment/sms-templates", icon: FileText },
   menu_email_templates: { name: "Email skabeloner", href: "/recruitment/email-templates", icon: FileText },
+  menu_booking_flow: { name: "Booking Flow", href: "/recruitment/booking-flow", icon: Calendar },
 };
 
 const BOARDS_ITEMS = {
