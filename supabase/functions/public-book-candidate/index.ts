@@ -39,13 +39,28 @@ Deno.serve(async (req) => {
     }
 
     // Get application
-    const { data: application } = await supabase
+    let { data: application } = await supabase
       .from("applications")
       .select("id, role, status")
       .eq("candidate_id", candidateId)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
+
+    // If no application exists, create one
+    if (!application) {
+      const { data: newApp } = await supabase
+        .from("applications")
+        .insert({
+          candidate_id: candidateId,
+          role: "Salgskonsulent",
+          status: "interview_scheduled",
+        })
+        .select("id, role, status")
+        .single();
+      application = newApp;
+      console.log(`[public-book-candidate] Created new application for candidate ${candidateId}`);
+    }
 
     const role = application?.role || "Salgskonsulent";
 
