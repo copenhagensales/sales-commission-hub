@@ -1,28 +1,35 @@
 
 
-## Opdater afmeldingsside med venligere besked
+## Flyt hardkodet Dag 0 SMS ind i flow-skabeloner
 
-### Ændring
+### Problem
+Dag 0 SMS-beskeden er hardkodet i `auto-segment-candidate` (linje 372) og kan ikke redigeres via Skabeloner-fanen. Indholdet i databasen mangler helt — der findes kun `flow_a_dag0_email`, ikke en tilsvarende SMS-post.
 
-**Fil:** `supabase/functions/unsubscribe-candidate/index.ts`
+### Løsning
 
-Opdater to ting:
+**1. Tilføj Dag 0 SMS-skabelon i databasen**
 
-1. **Succesbesked** (linje 84-89): Erstat den nuværende korte besked med en varmere, mere indbydende tekst der takker for interessen og inviterer til at søge igen.
+Indsæt en ny `booking_flow_steps`-post med den nuværende hardkodede besked som indhold, med merge-tags:
 
-2. **HTML-styling** (linje 100-121): Gør siden pænere med bedre styling — større kort, et ikon/checkmark, farveaccenter, og mere luft. Tilføj et lille Copenhagen Sales-branding touch.
+```
+Hej {{fornavn}}, tak for din ansøgning til {{rolle}}! Vi ringer dig {{ringetidspunkt}} fra {{telefonnummer}}. Passer det ikke? Book selv en tid: {{booking_link}} — Afmeld: {{afmeld_link}}
+```
 
-**Ny beskedtekst:**
-> **Tak for din interesse, {fornavn}!**
-> 
-> Vi har modtaget din afmelding, og du vil ikke modtage flere beskeder fra os.
-> 
-> Vi sætter stor pris på, at du tog dig tid til at søge hos os – det betyder meget.
-> 
-> Du er altid velkommen til at søge igen en anden gang. Vi vil med glæde høre fra dig!
-> 
-> Venlig hilsen, Copenhagen Sales
+Template key: `flow_a_dag0_sms`, day: 0, channel: sms, offset_hours: 0, phase: active.
 
-### Resultat
-Kandidater der afmelder sig ser en venlig, branded side der takker dem og inviterer dem til at søge igen.
+**2. Opdater `auto-segment-candidate` edge function**
+
+Erstat den hardkodede SMS-tekst (linje 340-391) med et opslag i `booking_flow_steps` via `template_key = 'flow_a_dag0_sms'`. Brug den eksisterende merge-tag-erstatning (`{{fornavn}}`, `{{rolle}}`, `{{booking_link}}`, `{{afmeld_link}}`, `{{ringetidspunkt}}`, `{{telefonnummer}}`).
+
+**3. Tilføj `{{telefonnummer}}` som dokumenteret merge-tag i UI**
+
+Opdater `FlowTemplatesTab.tsx` så `{{telefonnummer}}` og `{{ringetidspunkt}}` vises i listen af tilgængelige merge-tags.
+
+### Filer der ændres
+
+| Fil | Ændring |
+|-----|---------|
+| **Database insert** | Tilføj `flow_a_dag0_sms` post til `booking_flow_steps` |
+| `supabase/functions/auto-segment-candidate/index.ts` | Læs dag 0 SMS fra DB, merge tags, send |
+| `src/components/recruitment/FlowTemplatesTab.tsx` | Tilføj `{{ringetidspunkt}}` og `{{telefonnummer}}` til merge-tag dokumentation |
 
