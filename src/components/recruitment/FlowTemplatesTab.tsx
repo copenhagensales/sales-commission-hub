@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Mail, MessageSquare, Phone, Pencil, Loader2 } from "lucide-react";
+import { Mail, MessageSquare, Pencil, Loader2 } from "lucide-react";
 
 // Mirrored from process-booking-flow defaults
 const FLOW_TEMPLATES: Record<string, { subject: string; content: string; channel: string }> = {
@@ -28,11 +28,6 @@ const FLOW_TEMPLATES: Record<string, { subject: string; content: string; channel
     content: "Hej {{fornavn}}, har du set vores besked? Book en tid her: {{booking_link}} – hvis du ikke lige når det, giver Oscar dig bare et kald fra {{telefonnummer}} 📞 Afmeld: {{afmeld_link}}",
     channel: "sms",
   },
-  flow_a_dag1_call: {
-    subject: "Opkald til kandidat",
-    content: "Ring til {{fornavn}} angående ansøgning til {{rolle}}. Dag 1 i booking flow.",
-    channel: "call_reminder",
-  },
   flow_a_dag1_followup_sms: {
     subject: "",
     content: "Hej {{fornavn}}, Oscar prøvede at ringe dig. Book selv en tid her: {{booking_link}} – ellers prøver vi igen 😊",
@@ -43,11 +38,6 @@ const FLOW_TEMPLATES: Record<string, { subject: string; content: string; channel
     content: "Hej {{fornavn}},\n\nDu har stadig ikke booket en tid til en snak om din ansøgning til {{rolle}}.\n\nGør det nemt her:\n{{booking_link}}\n\nHvis du ikke booker, ringer Oscar dig i løbet af dagen.\n\nMed venlig hilsen\nCopenhagen Sales",
     channel: "email",
   },
-  flow_a_dag2_call: {
-    subject: "2. opkaldsforsøg",
-    content: "Ring til {{fornavn}} igen – 2. forsøg. Ansøgning til {{rolle}}.",
-    channel: "call_reminder",
-  },
   flow_a_dag3_last_attempt: {
     subject: "Sidste chance for at booke en tid",
     content: "Hej {{fornavn}},\n\nDet er sidste chance for at booke en tid til en snak om din ansøgning til {{rolle}} hos Copenhagen Sales.\n\nBook her:\n{{booking_link}}\n\nHører vi ikke fra dig, lukker vi ansøgningen.\n\nMed venlig hilsen\nCopenhagen Sales",
@@ -56,7 +46,7 @@ const FLOW_TEMPLATES: Record<string, { subject: string; content: string; channel
 };
 
 const TIER_GROUPS = [
-  { tier: "A", label: "Booking Flow — 8 trin", keys: ["flow_a_dag0_email", "flow_a_dag0_sms", "flow_a_dag1_precall_sms", "flow_a_dag1_call", "flow_a_dag1_followup_sms", "flow_a_dag2_reminder_email", "flow_a_dag2_call", "flow_a_dag3_last_attempt"], color: "text-foreground" },
+  { tier: "A", label: "Booking Flow — 6 trin", keys: ["flow_a_dag0_email", "flow_a_dag0_sms", "flow_a_dag1_precall_sms", "flow_a_dag1_followup_sms", "flow_a_dag2_reminder_email", "flow_a_dag3_last_attempt"], color: "text-foreground" },
 ];
 
 function extractDay(key: string): string {
@@ -68,7 +58,6 @@ function channelIcon(channel: string) {
   switch (channel) {
     case "email": return <Mail className="h-4 w-4 text-blue-500" />;
     case "sms": return <MessageSquare className="h-4 w-4 text-green-500" />;
-    case "call_reminder": return <Phone className="h-4 w-4 text-orange-500" />;
     default: return null;
   }
 }

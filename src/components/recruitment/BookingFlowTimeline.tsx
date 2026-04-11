@@ -1,5 +1,5 @@
 import { Badge } from "@/components/ui/badge";
-import { Mail, MessageSquare, Phone, CheckCircle, Clock, XCircle, AlertTriangle } from "lucide-react";
+import { Mail, MessageSquare, CheckCircle, Clock, XCircle, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 
@@ -17,7 +17,6 @@ interface Touchpoint {
 const channelConfig: Record<string, { icon: typeof Mail; label: string }> = {
   email: { icon: Mail, label: "Email" },
   sms: { icon: MessageSquare, label: "SMS" },
-  call_reminder: { icon: Phone, label: "Opkald" },
 };
 
 const statusConfig: Record<string, { icon: typeof CheckCircle; color: string; label: string }> = {

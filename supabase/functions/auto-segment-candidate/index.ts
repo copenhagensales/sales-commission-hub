@@ -307,10 +307,8 @@ Deno.serve(async (req) => {
         { day: 0, channel: "email", template_key: "flow_a_dag0_email", offsetHours: 0 },
         { day: 0, channel: "sms", template_key: "flow_a_dag0_sms", offsetHours: 0.15 },
         { day: 1, channel: "sms", template_key: "flow_a_dag1_precall_sms", offsetHours: 9 },
-        { day: 1, channel: "call_reminder", template_key: "flow_a_dag1_call", offsetHours: 10 },
         { day: 1, channel: "sms", template_key: "flow_a_dag1_followup_sms", offsetHours: 15 },
         { day: 2, channel: "email", template_key: "flow_a_dag2_reminder_email", offsetHours: 9 },
-        { day: 2, channel: "call_reminder", template_key: "flow_a_dag2_call", offsetHours: 11 },
         { day: 3, channel: "email", template_key: "flow_a_dag3_last_attempt", offsetHours: 10 },
       ];
 
