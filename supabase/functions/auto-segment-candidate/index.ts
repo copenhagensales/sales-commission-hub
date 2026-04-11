@@ -301,6 +301,7 @@ Deno.serve(async (req) => {
     await supabase.from('candidates').update({ tier }).eq('id', candidate_id);
 
     // If Tier A (auto-approved): create touchpoints + send immediate SMS
+    if (!requiresApproval) {
       // Fetch flow steps from DB
       const { data: flowSteps, error: stepsErr } = await supabase
         .from('booking_flow_steps')
