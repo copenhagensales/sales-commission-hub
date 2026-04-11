@@ -39,13 +39,28 @@ Deno.serve(async (req) => {
     }
 
     // Get application
-    const { data: application } = await supabase
+    let { data: application } = await supabase
       .from("applications")
       .select("id, role, status")
       .eq("candidate_id", candidateId)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
+
+    // If no application exists, create one
+    if (!application) {
+      const { data: newApp } = await supabase
+        .from("applications")
+        .insert({
+          candidate_id: candidateId,
+          role: "Salgskonsulent",
+          status: "interview_scheduled",
+        })
+        .select("id, role, status")
+        .single();
+      application = newApp;
+      console.log(`[public-book-candidate] Created new application for candidate ${candidateId}`);
+    }
 
     const role = application?.role || "Salgskonsulent";
 
@@ -131,6 +146,17 @@ Deno.serve(async (req) => {
         .update({ status: "interview_scheduled", updated_at: new Date().toISOString() })
         .eq("id", application.id);
     }
+
+    // Update candidate status and interview_date
+    const interviewDatetime = `${date}T${startTime}:00+02:00`;
+    await supabase
+      .from("candidates")
+      .update({
+        status: "interview_scheduled",
+        interview_date: interviewDatetime,
+      })
+      .eq("id", candidateId);
+    console.log(`[public-book-candidate] Updated candidate ${candidateId} with interview_date ${interviewDatetime}`);
 
     // Cancel active booking flow enrollments
     const { data: enrollments } = await supabase
