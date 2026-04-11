@@ -329,10 +329,21 @@ Deno.serve(async (req) => {
       // Send immediate SMS for Tier A
       if (candidate.phone) {
         const role = application?.role || candidate.applied_position || 'Salgskonsulent';
+        const shortDomain = Deno.env.get('SHORT_LINK_DOMAIN') || 'https://job.cphsales.dk';
         const siteUrl = Deno.env.get('SITE_URL') || 'https://sales-sync-pay.lovable.app';
         const recruitmentPhone = Deno.env.get('RECRUITMENT_PHONE_NUMBER') || '+45 XX XX XX XX';
-        const bookingLink = `${siteUrl}/book/${candidate.id}`;
-        const unsubscribeUrl = `${supabaseUrl}/functions/v1/unsubscribe-candidate?id=${candidate.id}`;
+
+        // Generate short links
+        const fullBookingUrl = `${siteUrl}/book/${candidate.id}`;
+        const fullUnsubscribeUrl = `${supabaseUrl}/functions/v1/unsubscribe-candidate?id=${candidate.id}`;
+
+        const bookingCode = generateShortCode();
+        await supabase.from('short_links').insert({ code: bookingCode, target_url: fullBookingUrl, candidate_id: candidate.id, link_type: 'booking' });
+        const bookingLink = `${shortDomain}/r/${bookingCode}`;
+
+        const unsubCode = generateShortCode();
+        await supabase.from('short_links').insert({ code: unsubCode, target_url: fullUnsubscribeUrl, candidate_id: candidate.id, link_type: 'unsubscribe' });
+        const unsubscribeUrl = `${shortDomain}/r/${unsubCode}`;
 
         // Determine call time based on current hour (Danish time)
         const nowDk = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Copenhagen' }));
