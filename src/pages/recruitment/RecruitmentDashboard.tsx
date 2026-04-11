@@ -171,11 +171,10 @@ export default function RecruitmentDashboard() {
   // Conversion stats by position type
   const conversionStats = useMemo(() => {
     const categorize = (pos: string | null) => {
-      if (!pos) return "other";
+      if (!pos) return "sales";
       const lower = pos.toLowerCase();
-      if (lower.includes("salgskonsulent") || lower.includes("salg")) return "sales";
       if (lower.includes("field") || lower.includes("marketing")) return "field";
-      return "other";
+      return "sales";
     };
 
     const statusLabels: Record<string, string> = {
