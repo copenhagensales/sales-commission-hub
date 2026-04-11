@@ -84,7 +84,7 @@ export function BookingPreviewTab() {
                   Book en samtale, {firstName}
                 </h1>
                 <p className="text-muted-foreground text-sm">
-                  Vælg en dato og et tidspunkt der passer dig — vi ringer dig op.
+                  Samtalen tager kun 10 minutter — og så finder vi ud af om det er et match.
                 </p>
                 <Badge variant="secondary" className="text-xs">Sælger</Badge>
               </div>
@@ -143,9 +143,15 @@ export function BookingPreviewTab() {
               {/* Time Slots */}
               {selectedDate && (
                 <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                    <Clock className="h-4 w-4" />
-                    Ledige tider — {format(selectedDate, "EEEE d. MMM", { locale: da })}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                      <Clock className="h-4 w-4" />
+                      Ledige tider — {format(selectedDate, "EEEE d. MMM", { locale: da })}
+                    </div>
+                    <Badge variant="secondary" className="text-[10px] gap-1">
+                      <Clock className="h-3 w-3" />
+                      Ca. 10 min
+                    </Badge>
                   </div>
                   {slotsForDate.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-4">

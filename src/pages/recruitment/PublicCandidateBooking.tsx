@@ -102,13 +102,30 @@ export default function PublicCandidateBooking() {
     return (
       <div className="min-h-screen bg-gradient-to-b from-muted/30 to-background flex items-center justify-center p-4">
         <Card className="max-w-md w-full text-center">
-          <CardContent className="pt-8 pb-8 space-y-4">
+          <CardContent className="pt-8 pb-8 space-y-5">
             <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto" />
             <h2 className="text-xl font-semibold">Du er booket! 🎉</h2>
             <p className="text-muted-foreground text-sm">
               Vi har booket en samtale med dig {selectedDate && format(selectedDate, "EEEE 'd.' d. MMMM", { locale: da })} kl. {selectedSlot?.start}–{selectedSlot?.end}.
             </p>
-            <p className="text-muted-foreground text-sm">
+            <div className="bg-muted/50 rounded-lg p-4 text-left space-y-2">
+              <p className="text-sm font-medium">Hvad sker der nu?</p>
+              <ul className="text-sm text-muted-foreground space-y-1.5">
+                <li className="flex items-start gap-2">
+                  <Phone className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
+                  Vi ringer dig op på det aftalte tidspunkt
+                </li>
+                <li className="flex items-start gap-2">
+                  <Clock className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
+                  Samtalen tager ca. 10 minutter
+                </li>
+                <li className="flex items-start gap-2">
+                  <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
+                  Hav gerne dit CV klar — så får vi mest ud af tiden
+                </li>
+              </ul>
+            </div>
+            <p className="text-muted-foreground text-xs">
               Du modtager en bekræftelse på SMS. Vi glæder os til at tale med dig!
             </p>
           </CardContent>
@@ -150,7 +167,7 @@ export default function PublicCandidateBooking() {
             Book en samtale, {candidate.first_name}
           </h1>
           <p className="text-muted-foreground text-sm">
-            Vælg en dato og et tidspunkt der passer dig — vi ringer dig op.
+            Samtalen tager kun 10 minutter — og så finder vi ud af om det er et match.
           </p>
           {application?.role && (
             <Badge variant="secondary" className="text-xs">
@@ -209,9 +226,15 @@ export default function PublicCandidateBooking() {
         {/* Time Slots */}
         {selectedDate && (
           <div className="space-y-3">
-            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <Clock className="h-4 w-4" />
-              Ledige tider — {format(selectedDate, "EEEE d. MMM", { locale: da })}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <Clock className="h-4 w-4" />
+                Ledige tider — {format(selectedDate, "EEEE d. MMM", { locale: da })}
+              </div>
+              <Badge variant="secondary" className="text-[10px] gap-1">
+                <Clock className="h-3 w-3" />
+                Ca. 10 min
+              </Badge>
             </div>
             {slotsForDate.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">
