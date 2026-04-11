@@ -304,6 +304,10 @@ export default function BookingFlow() {
               <Eye className="h-4 w-4" />
               Preview
             </TabsTrigger>
+            <TabsTrigger value="samtaler" className="gap-2">
+              <PhoneCall className="h-4 w-4" />
+              Samtaler
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="dashboard" className="space-y-6">
@@ -573,6 +577,10 @@ export default function BookingFlow() {
 
           <TabsContent value="booking-preview">
             <BookingPreviewTab />
+          </TabsContent>
+
+          <TabsContent value="samtaler">
+            <BookingCalendarTab />
           </TabsContent>
         </Tabs>
 
