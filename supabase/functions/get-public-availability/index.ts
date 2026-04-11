@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
         dateTime: endDate.toISOString().split(".")[0],
         timeZone: "Europe/Copenhagen",
       },
-      availabilityViewInterval: 30,
+      availabilityViewInterval: 15,
     };
 
     const scheduleResponse = await fetch(
