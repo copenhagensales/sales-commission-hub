@@ -337,7 +337,7 @@ Deno.serve(async (req) => {
 
       await supabase.from('booking_flow_touchpoints').insert(touchpoints);
 
-      // Send immediate SMS for Tier A
+      // Send immediate SMS for Tier A – content from DB template
       if (candidate.phone) {
         const role = application?.role || candidate.applied_position || 'Salgskonsulent';
         const shortDomain = Deno.env.get('SHORT_LINK_DOMAIN') || 'https://job.cphsales.dk';
@@ -369,7 +369,24 @@ Deno.serve(async (req) => {
           ringetidspunkt = 'i morgen mellem kl. 11:00 og 12:00';
         }
 
-        const smsMessage = `Hej ${candidate.first_name}, tak for din ansøgning til ${role}! Vi ringer dig ${ringetidspunkt} fra ${recruitmentPhone}. Passer det ikke? Book selv en tid: ${bookingLink} — Afmeld: ${unsubscribeUrl}`;
+        // Fetch SMS template from DB
+        const { data: smsTemplate } = await supabase
+          .from('booking_flow_steps')
+          .select('content')
+          .eq('template_key', 'flow_a_dag0_sms')
+          .eq('is_active', true)
+          .single();
+
+        const templateContent = smsTemplate?.content
+          || 'Hej {{fornavn}}, tak for din ansøgning til {{rolle}}! Vi ringer dig {{ringetidspunkt}} fra {{telefonnummer}}. Passer det ikke? Book selv en tid: {{booking_link}} — Afmeld: {{afmeld_link}}';
+
+        const smsMessage = templateContent
+          .replace(/\{\{fornavn\}\}/g, candidate.first_name || '')
+          .replace(/\{\{rolle\}\}/g, role)
+          .replace(/\{\{ringetidspunkt\}\}/g, ringetidspunkt)
+          .replace(/\{\{telefonnummer\}\}/g, recruitmentPhone)
+          .replace(/\{\{booking_link\}\}/g, bookingLink)
+          .replace(/\{\{afmeld_link\}\}/g, unsubscribeUrl);
 
         try {
           await fetch(`${supabaseUrl}/functions/v1/send-recruitment-sms`, {
