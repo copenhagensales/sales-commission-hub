@@ -121,6 +121,19 @@ Vi glæder os til at høre fra dig!
 Med venlig hilsen
 Copenhagen Sales`;
 
+const DEFAULT_APPLICATION_CONFIRMATION = `Kære {{fornavn}},
+
+Tak for din ansøgning til stillingen som {{rolle}} hos Copenhagen Sales — vi sætter stor pris på din interesse.
+
+Vi har modtaget din ansøgning og vil nu gennemgå den grundigt. Du kan forvente at høre fra os inden for 5 hverdage.
+
+I mellemtiden er du velkommen til at kontakte os, hvis du har spørgsmål.
+
+Vi glæder os til at lære dig bedre at kende.
+
+Med venlig hilsen
+Copenhagen Sales`;
+
 interface EmailTemplate {
   id: string;
   name: string;
@@ -131,7 +144,7 @@ interface EmailTemplate {
   updated_at: string;
 }
 
-type TemplateKey = "invitation_samtale" | "afslag" | "jobtilbud";
+type TemplateKey = "invitation_samtale" | "afslag" | "jobtilbud" | "bekraeftelse_ansoegning";
 
 interface TemplateConfig {
   key: TemplateKey;
@@ -186,6 +199,20 @@ const TEMPLATE_CONFIGS: TemplateConfig[] = [
     },
     badge: "Jobtilbud",
     previewTitle: "Jobtilbud",
+  },
+  {
+    key: "bekraeftelse_ansoegning",
+    name: "Bekræftelse af ansøgning",
+    description: "Sendes som bekræftelse når en kandidat ansøger",
+    icon: Send,
+    defaultSubject: "Tak for din ansøgning hos Copenhagen Sales",
+    defaultContent: DEFAULT_APPLICATION_CONFIRMATION,
+    previewReplacements: {
+      "{{fornavn}}": "Maria",
+      "{{rolle}}": "Salgskonsulent",
+    },
+    badge: "Ansøgningsbekræftelse",
+    previewTitle: "Tak for din ansøgning",
   },
 ];
 
