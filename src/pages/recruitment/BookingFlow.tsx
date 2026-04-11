@@ -9,12 +9,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Users, Zap, Clock, CheckCircle, XCircle, Plus, Mail, MessageSquare, Phone, Loader2, ShieldCheck, AlertTriangle, FileText } from "lucide-react";
+import { Users, Zap, Clock, CheckCircle, XCircle, Plus, Mail, MessageSquare, Phone, Loader2, ShieldCheck, AlertTriangle, FileText, CalendarDays } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { da } from "date-fns/locale";
 import { SegmentationModal } from "@/components/recruitment/SegmentationModal";
 import { BookingFlowTimeline } from "@/components/recruitment/BookingFlowTimeline";
 import { FlowTemplatesTab } from "@/components/recruitment/FlowTemplatesTab";
+import { BookingSettingsTab } from "@/components/recruitment/BookingSettingsTab";
 import { addDays, setHours, setMinutes } from "date-fns";
 
 const tierConfig = {
@@ -293,6 +294,10 @@ export default function BookingFlow() {
               <FileText className="h-4 w-4" />
               Flow-skabeloner
             </TabsTrigger>
+            <TabsTrigger value="booking-settings" className="gap-2">
+              <CalendarDays className="h-4 w-4" />
+              Booking-side
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="dashboard" className="space-y-6">
@@ -554,6 +559,10 @@ export default function BookingFlow() {
 
           <TabsContent value="templates">
             <FlowTemplatesTab />
+          </TabsContent>
+
+          <TabsContent value="booking-settings">
+            <BookingSettingsTab />
           </TabsContent>
         </Tabs>
 
