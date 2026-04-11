@@ -195,10 +195,15 @@ Deno.serve(async (req) => {
       const role = app?.role || 'Salgskonsulent';
 
       // Replace merge tags
+      const shortDomain = Deno.env.get('SHORT_LINK_DOMAIN') || 'https://job.cphsales.dk';
       const siteUrl = Deno.env.get('SITE_URL') || 'https://sales-sync-pay.lovable.app';
       const recruitmentPhone = Deno.env.get('RECRUITMENT_PHONE_NUMBER') || '+45 XX XX XX XX';
-      const unsubscribeUrl = `${supabaseUrl}/functions/v1/unsubscribe-candidate?id=${enrollment.candidate_id}`;
-      const bookingLink = `${siteUrl}/book/${enrollment.candidate_id}`;
+
+      // Generate short links
+      const fullBookingUrl = `${siteUrl}/book/${enrollment.candidate_id}`;
+      const fullUnsubscribeUrl = `${supabaseUrl}/functions/v1/unsubscribe-candidate?id=${enrollment.candidate_id}`;
+      const bookingLink = await createShortLink(supabase, fullBookingUrl, enrollment.candidate_id, 'booking', shortDomain);
+      const unsubscribeUrl = await createShortLink(supabase, fullUnsubscribeUrl, enrollment.candidate_id, 'unsubscribe', shortDomain);
 
       // Calculate call time based on scheduled_at
       const scheduledDate = new Date(tp.scheduled_at);
