@@ -20,7 +20,7 @@ const FLOW_TEMPLATES: Record<string, { subject: string; content: string; channel
   },
   flow_a_dag1_precall_sms: {
     subject: "",
-    content: "Hej {{fornavn}}, har du booket en tid endnu? Gør det her: {{booking_link}} – ellers ringer Oscar dig i dag 📞",
+    content: "Hej {{fornavn}}, har du set vores besked? Book en tid her: {{booking_link}} – hvis du ikke lige når det, giver Oscar dig bare et kald fra {{telefonnummer}} 📞 Afmeld: {{afmeld_link}}",
     channel: "sms",
   },
   flow_a_dag1_call: {
