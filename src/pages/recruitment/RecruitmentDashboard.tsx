@@ -262,9 +262,15 @@ export default function RecruitmentDashboard() {
     }).length;
     const trend30d = prev30d > 0 ? Math.round(((last30d - prev30d) / prev30d) * 100) : last30d > 0 ? 100 : 0;
 
-    // Scheduled interviews
-    const scheduledInterviews = candidates.filter(c => c.status === 'interview_scheduled').length;
-    
+    // Hired last 30 days (candidates + referrals)
+    const candidatesHired30d = candidates.filter(c => 
+      c.status === 'hired' && new Date(c.created_at) >= subDays(now, 30)
+    ).length;
+    const referralsHired30d = referralsForKpi.filter(r =>
+      r.hired_date && new Date(r.hired_date) >= subDays(now, 30)
+    ).length;
+    const totalHired30d = candidatesHired30d + referralsHired30d;
+
     return {
       last24h,
       trend24h,
@@ -272,9 +278,11 @@ export default function RecruitmentDashboard() {
       trend7d,
       last30d,
       trend30d,
-      scheduledInterviews,
+      totalHired30d,
+      candidatesHired30d,
+      referralsHired30d,
     };
-  }, [candidates]);
+  }, [candidates, referralsForKpi]);
 
   const chartData = useMemo(() => {
     const endDate = startOfDay(new Date());
@@ -361,12 +369,14 @@ export default function RecruitmentDashboard() {
 
         <Card className="bg-card border-border">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Planlagte samtaler</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Ansat (30 dage)</CardTitle>
+            <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{kpiStats.scheduledInterviews}</div>
-            <p className="text-xs text-muted-foreground">Kommende interviews</p>
+            <div className="text-2xl font-bold text-foreground">{kpiStats.totalHired30d}</div>
+            <p className="text-xs text-muted-foreground">
+              {kpiStats.candidatesHired30d} kandidater · {kpiStats.referralsHired30d} anbefalinger
+            </p>
           </CardContent>
         </Card>
       </div>
