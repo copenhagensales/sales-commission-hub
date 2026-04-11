@@ -15,7 +15,8 @@ import {
   MessageSquare,
   Mail,
   ArrowRight,
-  Percent
+  Percent,
+  Ghost
 } from "lucide-react";
 import { format, subDays, eachDayOfInterval, startOfDay } from "date-fns";
 import { da } from "date-fns/locale";
@@ -103,6 +104,8 @@ export default function RecruitmentDashboard() {
       const total = filtered.length;
       const hired = filtered.filter(c => c.status === "hired").length;
       const rate = total > 0 ? Math.round((hired / total) * 1000) / 10 : 0;
+      const ghosted = filtered.filter(c => c.status === "ghosted").length;
+      const ghostRate = total > 0 ? Math.round((ghosted / total) * 1000) / 10 : 0;
 
       // 30-day stats
       const now = new Date();
@@ -111,6 +114,8 @@ export default function RecruitmentDashboard() {
       const recentTotal = recent.length;
       const recentHired = recent.filter(c => c.status === "hired").length;
       const recentRate = recentTotal > 0 ? Math.round((recentHired / recentTotal) * 1000) / 10 : 0;
+      const recentGhosted = recent.filter(c => c.status === "ghosted").length;
+      const recentGhostRate = recentTotal > 0 ? Math.round((recentGhosted / recentTotal) * 1000) / 10 : 0;
 
       const buildFunnel = (list: typeof filtered) => {
         const statusBreakdown: Record<string, number> = {};
@@ -130,7 +135,7 @@ export default function RecruitmentDashboard() {
       const funnelData = buildFunnel(filtered);
       const recentFunnelData = buildFunnel(recent);
 
-      return { total, hired, rate, recentTotal, recentHired, recentRate, funnelData, recentFunnelData };
+      return { total, hired, rate, recentTotal, recentHired, recentRate, ghosted, ghostRate, recentGhosted, recentGhostRate, funnelData, recentFunnelData };
     };
 
     return {
@@ -306,6 +311,41 @@ export default function RecruitmentDashboard() {
             </p>
             <p className="text-xs text-muted-foreground/60 mt-1">
               Historisk: {conversionStats.field.rate}% ({conversionStats.field.hired}/{conversionStats.field.total})
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Ghost Rate Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card className="bg-card border-border">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Salgskonsulent ghost % (30 dage)</CardTitle>
+            <Ghost className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-foreground">{conversionStats.sales.recentGhostRate}%</div>
+            <p className="text-xs text-muted-foreground">
+              {conversionStats.sales.recentGhosted} af {conversionStats.sales.recentTotal} ghostet (30d)
+            </p>
+            <p className="text-xs text-muted-foreground/60 mt-1">
+              Historisk: {conversionStats.sales.ghostRate}% ({conversionStats.sales.ghosted}/{conversionStats.sales.total})
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card border-border">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Fieldmarketing ghost % (30 dage)</CardTitle>
+            <Ghost className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-foreground">{conversionStats.field.recentGhostRate}%</div>
+            <p className="text-xs text-muted-foreground">
+              {conversionStats.field.recentGhosted} af {conversionStats.field.recentTotal} ghostet (30d)
+            </p>
+            <p className="text-xs text-muted-foreground/60 mt-1">
+              Historisk: {conversionStats.field.ghostRate}% ({conversionStats.field.ghosted}/{conversionStats.field.total})
             </p>
           </CardContent>
         </Card>
