@@ -200,6 +200,20 @@ const TEMPLATE_CONFIGS: TemplateConfig[] = [
     badge: "Jobtilbud",
     previewTitle: "Jobtilbud",
   },
+  {
+    key: "bekraeftelse_ansoegning",
+    name: "Bekræftelse af ansøgning",
+    description: "Sendes som bekræftelse når en kandidat ansøger",
+    icon: Send,
+    defaultSubject: "Tak for din ansøgning hos Copenhagen Sales",
+    defaultContent: DEFAULT_APPLICATION_CONFIRMATION,
+    previewReplacements: {
+      "{{fornavn}}": "Maria",
+      "{{rolle}}": "Salgskonsulent",
+    },
+    badge: "Ansøgningsbekræftelse",
+    previewTitle: "Tak for din ansøgning",
+  },
 ];
 
 export default function EmailTemplates() {
