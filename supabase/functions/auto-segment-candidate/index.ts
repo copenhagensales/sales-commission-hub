@@ -307,6 +307,7 @@ Deno.serve(async (req) => {
         .from('booking_flow_steps')
         .select('*')
         .eq('is_active', true)
+        .in('phase', ['active', 'reengagement'])
         .order('sort_order', { ascending: true });
       
       if (stepsErr || !flowSteps?.length) {
