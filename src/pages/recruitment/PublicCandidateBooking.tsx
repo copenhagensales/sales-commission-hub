@@ -186,7 +186,7 @@ export default function PublicCandidateBooking() {
                     `}
                   >
                     <span className="text-xs capitalize">
-                      {format(date, "EEE", { locale: da })}
+                      {format(date, "EEEE", { locale: da })}
                     </span>
                     <span className="text-base font-semibold">
                       {format(date, "d")}
