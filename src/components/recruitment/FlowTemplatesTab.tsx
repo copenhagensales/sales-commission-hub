@@ -53,37 +53,10 @@ const FLOW_TEMPLATES: Record<string, { subject: string; content: string; channel
     content: "Hej {{fornavn}},\n\nVi har forsøgt at kontakte dig et par gange vedrørende din ansøgning til {{rolle}} hos Copenhagen Sales.\n\nHvis du stadig er interesseret, vil vi meget gerne høre fra dig. Ellers lukker vi ansøgningen.\n\nMed venlig hilsen\nCopenhagen Sales",
     channel: "email",
   },
-  flow_b_dag0_email: {
-    subject: "Tak for din ansøgning hos Copenhagen Sales",
-    content: "Hej {{fornavn}},\n\nTak for din ansøgning til stillingen som {{rolle}} hos Copenhagen Sales.\n\nVi gennemgår din ansøgning og vender tilbage snarest. Hvis du gerne vil booke en samtale med det samme, er du velkommen til at svare på denne mail.\n\nMed venlig hilsen\nCopenhagen Sales",
-    channel: "email",
-  },
-  flow_b_dag1_sms: {
-    subject: "",
-    content: "Hej {{fornavn}}, har du set vores mail om din ansøgning hos Copenhagen Sales? Vi vil gerne tale med dig – svar gerne her 😊",
-    channel: "sms",
-  },
-  flow_b_dag2_call: {
-    subject: "Opkald til Tier B kandidat",
-    content: "Ring til {{fornavn}} angående ansøgning til {{rolle}}. Tier B follow-up.",
-    channel: "call_reminder",
-  },
-  flow_c_dag0_email: {
-    subject: "Tak for din ansøgning hos Copenhagen Sales",
-    content: "Hej {{fornavn}},\n\nTak for din ansøgning til stillingen som {{rolle}} hos Copenhagen Sales.\n\nVi har modtaget din ansøgning og vil gennemgå den. Du hører fra os.\n\nMed venlig hilsen\nCopenhagen Sales",
-    channel: "email",
-  },
-  flow_c_dag4_afslag: {
-    subject: "Vedrørende din ansøgning hos Copenhagen Sales",
-    content: "Hej {{fornavn}},\n\nTak for din interesse i Copenhagen Sales.\n\nEfter gennemgang af din ansøgning har vi desværre valgt at gå videre med andre kandidater til stillingen som {{rolle}}.\n\nVi ønsker dig held og lykke videre.\n\nMed venlig hilsen\nCopenhagen Sales",
-    channel: "email",
-  },
 };
 
 const TIER_GROUPS = [
-  { tier: "A", label: "Tier A — Høj prioritet", keys: ["flow_a_dag0_email", "flow_a_dag0_sms", "flow_a_dag1_precall_sms", "flow_a_dag1_call", "flow_a_dag1_followup_sms", "flow_a_dag2_reminder_email", "flow_a_dag2_call", "flow_a_dag3_last_attempt"], color: "text-emerald-700" },
-  { tier: "B", label: "Tier B — Medium", keys: ["flow_b_dag0_email", "flow_b_dag1_sms", "flow_b_dag2_call"], color: "text-violet-700" },
-  { tier: "C", label: "Tier C — Lav", keys: ["flow_c_dag0_email", "flow_c_dag4_afslag"], color: "text-muted-foreground" },
+  { tier: "A", label: "Booking Flow — 8 trin", keys: ["flow_a_dag0_email", "flow_a_dag0_sms", "flow_a_dag1_precall_sms", "flow_a_dag1_call", "flow_a_dag1_followup_sms", "flow_a_dag2_reminder_email", "flow_a_dag2_call", "flow_a_dag3_last_attempt"], color: "text-foreground" },
 ];
 
 function extractDay(key: string): string {
