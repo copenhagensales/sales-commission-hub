@@ -15,7 +15,8 @@ import {
   MessageSquare,
   Mail,
   ArrowRight,
-  Percent
+  Percent,
+  Ghost
 } from "lucide-react";
 import { format, subDays, eachDayOfInterval, startOfDay } from "date-fns";
 import { da } from "date-fns/locale";
@@ -310,6 +311,41 @@ export default function RecruitmentDashboard() {
             </p>
             <p className="text-xs text-muted-foreground/60 mt-1">
               Historisk: {conversionStats.field.rate}% ({conversionStats.field.hired}/{conversionStats.field.total})
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Ghost Rate Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card className="bg-card border-border">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Salgskonsulent ghost % (30 dage)</CardTitle>
+            <Ghost className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-foreground">{conversionStats.sales.recentGhostRate}%</div>
+            <p className="text-xs text-muted-foreground">
+              {conversionStats.sales.recentGhosted} af {conversionStats.sales.recentTotal} ghostet (30d)
+            </p>
+            <p className="text-xs text-muted-foreground/60 mt-1">
+              Historisk: {conversionStats.sales.ghostRate}% ({conversionStats.sales.ghosted}/{conversionStats.sales.total})
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card border-border">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Fieldmarketing ghost % (30 dage)</CardTitle>
+            <Ghost className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-foreground">{conversionStats.field.recentGhostRate}%</div>
+            <p className="text-xs text-muted-foreground">
+              {conversionStats.field.recentGhosted} af {conversionStats.field.recentTotal} ghostet (30d)
+            </p>
+            <p className="text-xs text-muted-foreground/60 mt-1">
+              Historisk: {conversionStats.field.ghostRate}% ({conversionStats.field.ghosted}/{conversionStats.field.total})
             </p>
           </CardContent>
         </Card>
