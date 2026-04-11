@@ -2,18 +2,18 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Users, Zap, Clock, CheckCircle, XCircle, Plus, RefreshCw, Mail, MessageSquare, Phone, Loader2 } from "lucide-react";
-import { format, formatDistanceToNow } from "date-fns";
+import { Users, Zap, Clock, CheckCircle, XCircle, Plus, Mail, MessageSquare, Phone, Loader2, ShieldCheck, AlertTriangle } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
 import { da } from "date-fns/locale";
 import { SegmentationModal } from "@/components/recruitment/SegmentationModal";
 import { BookingFlowTimeline } from "@/components/recruitment/BookingFlowTimeline";
+import { addDays, setHours, setMinutes } from "date-fns";
 
 const tierConfig = {
   A: { label: "Tier A", color: "bg-emerald-500/10 text-emerald-700 border-emerald-500/30", dot: "bg-emerald-500" },
@@ -25,12 +25,29 @@ const statusConfig: Record<string, { label: string; icon: typeof CheckCircle; co
   active: { label: "Aktiv", icon: Zap, color: "bg-blue-500/10 text-blue-600 border-blue-500/30" },
   completed: { label: "Fuldført", icon: CheckCircle, color: "bg-green-500/10 text-green-600 border-green-500/30" },
   cancelled: { label: "Annulleret", icon: XCircle, color: "bg-red-500/10 text-red-600 border-red-500/30" },
+  pending_approval: { label: "Afventer", icon: Clock, color: "bg-amber-500/10 text-amber-600 border-amber-500/30" },
 };
 
-const channelIcons: Record<string, typeof Mail> = {
-  email: Mail,
-  sms: MessageSquare,
-  call_reminder: Phone,
+const FLOW_DEFINITIONS: Record<string, Array<{ day: number; channel: string; template_key: string; offsetHours: number }>> = {
+  A: [
+    { day: 0, channel: "email", template_key: "flow_a_dag0_email", offsetHours: 0 },
+    { day: 0, channel: "sms", template_key: "flow_a_dag0_sms", offsetHours: 0.15 },
+    { day: 1, channel: "sms", template_key: "flow_a_dag1_precall_sms", offsetHours: 9 },
+    { day: 1, channel: "call_reminder", template_key: "flow_a_dag1_call", offsetHours: 10 },
+    { day: 1, channel: "sms", template_key: "flow_a_dag1_followup_sms", offsetHours: 15 },
+    { day: 2, channel: "email", template_key: "flow_a_dag2_reminder_email", offsetHours: 9 },
+    { day: 2, channel: "call_reminder", template_key: "flow_a_dag2_call", offsetHours: 11 },
+    { day: 3, channel: "email", template_key: "flow_a_dag3_last_attempt", offsetHours: 10 },
+  ],
+  B: [
+    { day: 0, channel: "email", template_key: "flow_b_dag0_email", offsetHours: 0 },
+    { day: 1, channel: "sms", template_key: "flow_b_dag1_sms", offsetHours: 10 },
+    { day: 2, channel: "call_reminder", template_key: "flow_b_dag2_call", offsetHours: 10 },
+  ],
+  C: [
+    { day: 0, channel: "email", template_key: "flow_c_dag0_email", offsetHours: 0 },
+    { day: 4, channel: "email", template_key: "flow_c_dag4_afslag", offsetHours: 10 },
+  ],
 };
 
 export default function BookingFlow() {
@@ -41,7 +58,7 @@ export default function BookingFlow() {
   const [filterStatus, setFilterStatus] = useState<string>("active");
   const [addCandidateOpen, setAddCandidateOpen] = useState(false);
 
-  // Fetch enrollments with candidate info
+  // Fetch all enrollments
   const { data: enrollments, isLoading } = useQuery({
     queryKey: ["booking-flow-enrollments", filterTier, filterStatus],
     queryFn: async () => {
@@ -67,6 +84,25 @@ export default function BookingFlow() {
     },
   });
 
+  // Fetch pending approval enrollments (always)
+  const { data: pendingApprovals } = useQuery({
+    queryKey: ["booking-flow-pending-approvals"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("booking_flow_enrollments")
+        .select(`
+          *,
+          candidates!inner(id, first_name, last_name, email, phone),
+          applications(id, role, status)
+        `)
+        .eq("status", "pending_approval")
+        .order("tier", { ascending: true })
+        .order("enrolled_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
   // Fetch touchpoints for selected enrollment
   const { data: touchpoints } = useQuery({
     queryKey: ["booking-flow-touchpoints", selectedEnrollment],
@@ -83,15 +119,14 @@ export default function BookingFlow() {
     enabled: !!selectedEnrollment,
   });
 
-  // Fetch unenrolled candidates for adding to flow
+  // Fetch unenrolled candidates
   const { data: unenrolledCandidates } = useQuery({
     queryKey: ["unenrolled-candidates"],
     queryFn: async () => {
-      // Get candidates with active applications that aren't in an active flow
       const { data: enrolled } = await supabase
         .from("booking_flow_enrollments")
         .select("candidate_id")
-        .eq("status", "active");
+        .in("status", ["active", "pending_approval"]);
 
       const enrolledIds = (enrolled || []).map(e => e.candidate_id);
 
@@ -112,17 +147,91 @@ export default function BookingFlow() {
     enabled: addCandidateOpen,
   });
 
+  // Approve enrollment mutation
+  const approveMutation = useMutation({
+    mutationFn: async (enrollmentId: string) => {
+      // Get enrollment details
+      const { data: enrollment, error: fetchErr } = await supabase
+        .from("booking_flow_enrollments")
+        .select("*")
+        .eq("id", enrollmentId)
+        .single();
+      if (fetchErr) throw fetchErr;
+
+      // Update status to active
+      const { error: updateErr } = await supabase
+        .from("booking_flow_enrollments")
+        .update({
+          status: "active",
+          approval_status: "approved",
+        })
+        .eq("id", enrollmentId);
+      if (updateErr) throw updateErr;
+
+      // Create touchpoints for the tier
+      const tier = enrollment.tier as string;
+      const flowSteps = FLOW_DEFINITIONS[tier] || FLOW_DEFINITIONS.B;
+      const now = new Date();
+      const touchpoints = flowSteps.map(step => {
+        let scheduledAt: Date;
+        if (step.day === 0 && step.offsetHours < 1) {
+          scheduledAt = new Date(now.getTime() + step.offsetHours * 3600000);
+        } else {
+          const dayDate = addDays(now, step.day);
+          scheduledAt = setMinutes(setHours(dayDate, Math.floor(step.offsetHours)), (step.offsetHours % 1) * 60);
+        }
+        return {
+          enrollment_id: enrollmentId,
+          day: step.day,
+          channel: step.channel,
+          template_key: step.template_key,
+          scheduled_at: scheduledAt.toISOString(),
+          status: "pending",
+        };
+      });
+
+      const { error: tpErr } = await supabase.from("booking_flow_touchpoints").insert(touchpoints);
+      if (tpErr) throw tpErr;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["booking-flow-enrollments"] });
+      queryClient.invalidateQueries({ queryKey: ["booking-flow-pending-approvals"] });
+      toast.success("Flow godkendt og startet");
+    },
+    onError: (err: any) => toast.error("Fejl: " + err.message),
+  });
+
+  // Reject enrollment mutation
+  const rejectMutation = useMutation({
+    mutationFn: async (enrollmentId: string) => {
+      const { error } = await supabase
+        .from("booking_flow_enrollments")
+        .update({
+          status: "cancelled",
+          approval_status: "rejected",
+          cancelled_at: new Date().toISOString(),
+          cancelled_reason: "Afvist af recruiter",
+        })
+        .eq("id", enrollmentId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["booking-flow-enrollments"] });
+      queryClient.invalidateQueries({ queryKey: ["booking-flow-pending-approvals"] });
+      toast.success("Kandidat afvist");
+    },
+    onError: (err: any) => toast.error("Fejl: " + err.message),
+  });
+
   // Cancel enrollment
   const cancelMutation = useMutation({
     mutationFn: async (enrollmentId: string) => {
-      // Cancel enrollment
       const { error: enrollError } = await supabase
         .from("booking_flow_enrollments")
         .update({ status: "cancelled", cancelled_at: new Date().toISOString(), cancelled_reason: "Manuelt annulleret" })
         .eq("id", enrollmentId);
       if (enrollError) throw enrollError;
 
-      // Cancel pending touchpoints
       const { error: tpError } = await supabase
         .from("booking_flow_touchpoints")
         .update({ status: "cancelled" })
@@ -137,11 +246,11 @@ export default function BookingFlow() {
     },
   });
 
-  // Stats
   const activeCount = enrollments?.filter(e => e.status === "active").length || 0;
   const tierACnt = enrollments?.filter(e => e.tier === "A" && e.status === "active").length || 0;
   const tierBCnt = enrollments?.filter(e => e.tier === "B" && e.status === "active").length || 0;
   const tierCCnt = enrollments?.filter(e => e.tier === "C" && e.status === "active").length || 0;
+  const pendingCount = pendingApprovals?.length || 0;
 
   return (
     <MainLayout>
@@ -151,7 +260,7 @@ export default function BookingFlow() {
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Booking Flow</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Automatiseret outreach med A/B/C-segmentering
+              Automatiseret outreach med intelligent A/B/C-segmentering
             </p>
           </div>
           <Button onClick={() => setAddCandidateOpen(true)} className="gap-2">
@@ -161,7 +270,7 @@ export default function BookingFlow() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-5 gap-4">
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
@@ -171,6 +280,19 @@ export default function BookingFlow() {
                 <div>
                   <p className="text-2xl font-semibold">{activeCount}</p>
                   <p className="text-xs text-muted-foreground">Aktive flows</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-amber-500/10">
+                  <AlertTriangle className="h-5 w-5 text-amber-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-semibold">{pendingCount}</p>
+                  <p className="text-xs text-muted-foreground">Afventer</p>
                 </div>
               </div>
             </CardContent>
@@ -195,6 +317,93 @@ export default function BookingFlow() {
             </Card>
           ))}
         </div>
+
+        {/* Pending Approval Section */}
+        {pendingCount > 0 && (
+          <Card className="border-amber-200 bg-amber-50/30">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                Afventer godkendelse ({pendingCount})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="divide-y">
+                {pendingApprovals?.map((enrollment: any) => {
+                  const candidate = enrollment.candidates;
+                  const tier = tierConfig[enrollment.tier as keyof typeof tierConfig];
+                  const signals = enrollment.segmentation_signals as any;
+
+                  return (
+                    <div key={enrollment.id} className="flex items-center justify-between py-3 px-1">
+                      <div className="flex items-center gap-4">
+                        <div className={`w-2 h-2 rounded-full ${tier?.dot}`} />
+                        <div>
+                          <p className="font-medium text-sm">
+                            {candidate?.first_name} {candidate?.last_name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {enrollment.tier === "B"
+                              ? "Erfaren kandidat — godkend for at starte flow"
+                              : "Muligt mismatch — gennemse inden flow"
+                            }
+                          </p>
+                          {signals && (
+                            <div className="flex gap-1.5 mt-1">
+                              {signals.detectedAge && (
+                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                                  {signals.detectedAge} år
+                                </Badge>
+                              )}
+                              {signals.detectedExperienceYears !== null && (
+                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                                  {signals.detectedExperienceYears} års erfaring
+                                </Badge>
+                              )}
+                              {!signals.isDanish && (
+                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-red-100 text-red-700">
+                                  Engelsk ({signals.englishWordPct}%)
+                                </Badge>
+                              )}
+                              {signals.isPartTime && (
+                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-red-100 text-red-700">
+                                  Deltid
+                                </Badge>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className={tier?.color}>
+                          {tier?.label}
+                        </Badge>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => rejectMutation.mutate(enrollment.id)}
+                          disabled={rejectMutation.isPending}
+                        >
+                          <XCircle className="h-3.5 w-3.5 mr-1" />
+                          Afvis
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => approveMutation.mutate(enrollment.id)}
+                          disabled={approveMutation.isPending}
+                        >
+                          <ShieldCheck className="h-3.5 w-3.5 mr-1" />
+                          Godkend
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Filters */}
         <div className="flex gap-3">
@@ -271,6 +480,11 @@ export default function BookingFlow() {
                           <StatusIcon className="h-3 w-3 mr-1" />
                           {status?.label}
                         </Badge>
+                        {enrollment.approval_status === "auto_approved" && (
+                          <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30 text-[10px]">
+                            Auto
+                          </Badge>
+                        )}
                         <span className="text-xs text-muted-foreground">
                           Dag {enrollment.current_day}
                         </span>
@@ -309,7 +523,7 @@ export default function BookingFlow() {
           </DialogContent>
         </Dialog>
 
-        {/* Add candidate dialog → opens segmentation modal */}
+        {/* Add candidate dialog */}
         <Dialog open={addCandidateOpen} onOpenChange={setAddCandidateOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader>
@@ -323,7 +537,6 @@ export default function BookingFlow() {
                   onClick={() => {
                     setAddCandidateOpen(false);
                     setSegModalOpen(true);
-                    // Store selected candidate temporarily
                     (window as any).__selectedCandidateForFlow = c;
                   }}
                 >
@@ -349,6 +562,7 @@ export default function BookingFlow() {
           onOpenChange={setSegModalOpen}
           onEnrolled={() => {
             queryClient.invalidateQueries({ queryKey: ["booking-flow-enrollments"] });
+            queryClient.invalidateQueries({ queryKey: ["booking-flow-pending-approvals"] });
             queryClient.invalidateQueries({ queryKey: ["unenrolled-candidates"] });
           }}
         />
