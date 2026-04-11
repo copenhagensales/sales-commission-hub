@@ -329,7 +329,25 @@ Deno.serve(async (req) => {
       // Send immediate SMS for Tier A
       if (candidate.phone) {
         const role = application?.role || candidate.applied_position || 'Salgskonsulent';
-        const smsMessage = `Hej ${candidate.first_name}, tak for din ansøgning til ${role}! Vi vil meget gerne tale med dig. Vi ringer dig op snarest — eller book selv en tid her. Glæder os til at høre fra dig!`;
+        const siteUrl = Deno.env.get('SITE_URL') || 'https://sales-sync-pay.lovable.app';
+        const recruitmentPhone = Deno.env.get('RECRUITMENT_PHONE_NUMBER') || '+45 XX XX XX XX';
+        const bookingLink = `${siteUrl}/book/${candidate.id}`;
+        const unsubscribeUrl = `${supabaseUrl}/functions/v1/unsubscribe-candidate?id=${candidate.id}`;
+
+        // Determine call time based on current hour (Danish time)
+        const nowDk = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Copenhagen' }));
+        const currentHour = nowDk.getHours();
+        const currentDay = nowDk.getDay();
+        let ringetidspunkt: string;
+        if (currentDay === 5 && currentHour >= 14 || currentDay === 6 || currentDay === 0) {
+          ringetidspunkt = 'mandag mellem kl. 11:00 og 12:00';
+        } else if (currentHour < 14) {
+          ringetidspunkt = 'i dag mellem kl. 15:00 og 16:15';
+        } else {
+          ringetidspunkt = 'i morgen mellem kl. 11:00 og 12:00';
+        }
+
+        const smsMessage = `Hej ${candidate.first_name}, tak for din ansøgning til ${role}! Vi ringer dig ${ringetidspunkt} fra ${recruitmentPhone}. Passer det ikke? Book selv en tid: ${bookingLink} — Afmeld: ${unsubscribeUrl}`;
 
         try {
           await fetch(`${supabaseUrl}/functions/v1/send-recruitment-sms`, {
