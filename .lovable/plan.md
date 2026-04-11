@@ -1,47 +1,36 @@
 
 
-## Tilføj "Anbefalinger" KPI-sektion til rekrutterings-dashboardet
+## Problem: Tallene stemmer ikke overens
 
-### Hvad der bygges
-En ny, adskilt KPI-sektion for medarbejderhenvisninger (referrals) med egne kort, så de ikke blandes sammen med de øvrige kandidat-KPI'er.
+**Database-fakta (30 dage):**
+- 18 hired kandidater: 7 med "Salgskonsulent", 0 med Fieldmarketing, **11 med `null`**
+- 5 hired anbefalinger
+- Total: 23
 
-### KPI-kort i sektionen
-1. **Aktive anbefalinger** — antal med status `pending` eller `contacted`
-2. **Ansat via anbefaling (30d)** — antal med status `hired` de seneste 30 dage
-3. **Konvertering** — procent af anbefalinger der er endt med `hired`
-4. **Afventende bonus** — antal med status `eligible_for_bonus`
+**Hvad du ser:**
+- "Ansat (30 dage)": 23 (18 kandidater + 5 anbefalinger) — korrekt
+- "Salgskonsulent: 7 af 144 ansat (30d)" — kun de 7 med position sat
+- 11 hired kandidater har **ingen stilling** og tælles hverken under Salgskonsulent eller Fieldmarketing
 
-### Ændringer
+**Årsag:** Kandidater fra anbefalinger (og evt. manuelt oprettede) får ikke sat `applied_position`. De falder i en "other"-kategori der aldrig vises.
+
+### Løsning
+Tæl kandidater uden `applied_position` med under **Salgskonsulent** som default, da det er den primære stilling. Ændre `categorize`-funktionen:
+
+```ts
+const categorize = (pos: string | null) => {
+  if (!pos) return "sales"; // default til salgskonsulent
+  const lower = pos.toLowerCase();
+  if (lower.includes("field") || lower.includes("marketing")) return "field";
+  return "sales"; // alt andet er også salg
+};
+```
+
+### Ændring
 
 | Fil | Ændring |
 |-----|---------|
-| `src/pages/recruitment/RecruitmentDashboard.tsx` | Tilføj `useQuery` for `employee_referrals`-tabellen. Beregn KPI'er (aktive, hired 30d, konverteringsrate, bonus-afventende). Render en ny sektion med overskrift "Anbefalinger" og 4 KPI-kort i et grid, placeret efter ghost%-kortene og før funnel-diagrammerne. Importér `Handshake`-ikon fra lucide. |
+| `src/pages/recruitment/RecruitmentDashboard.tsx` | Opdater `categorize`-funktionen (linje 173-179) så `null` og ukendte positioner defaulter til "sales" i stedet for "other" |
 
-### Teknisk detalje
-```ts
-const { data: referrals = [] } = useQuery({
-  queryKey: ["referral-kpis"],
-  queryFn: async () => {
-    const { data, error } = await supabase
-      .from("employee_referrals")
-      .select("id, status, created_at, hired_date")
-      .order("created_at", { ascending: false });
-    if (error) throw error;
-    return data;
-  },
-});
-
-const referralStats = useMemo(() => {
-  const active = referrals.filter(r => ["pending","contacted"].includes(r.status)).length;
-  const total = referrals.length;
-  const hired = referrals.filter(r => r.status === "hired" || r.status === "eligible_for_bonus" || r.status === "bonus_paid").length;
-  const rate = total > 0 ? Math.round((hired / total) * 1000) / 10 : 0;
-  const recentHired = referrals.filter(r => 
-    (r.status === "hired" || r.status === "eligible_for_bonus" || r.status === "bonus_paid") &&
-    r.hired_date && new Date(r.hired_date) >= subDays(new Date(), 30)
-  ).length;
-  const awaitingBonus = referrals.filter(r => r.status === "eligible_for_bonus").length;
-  return { active, total, hired, rate, recentHired, awaitingBonus };
-}, [referrals]);
-```
+Herefter vil Salgskonsulent-kortet vise **18 af 178 ansat (30d)**, og det samlede tal (23 = 18 + 5 anbefalinger) giver mening.
 
