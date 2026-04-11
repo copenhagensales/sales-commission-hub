@@ -285,7 +285,7 @@ export default function PublicCandidateBooking() {
                   Ingen ledige tider denne dag.
                 </p>
               ) : (
-                <div className="grid grid-cols-2 gap-2 max-h-[280px] overflow-y-auto">
+                <div className="grid grid-cols-3 gap-2 max-h-[280px] overflow-y-auto">
                   {slotsForDate.map(slot => {
                     const isActive = selectedSlot?.start === slot.start;
                     return (
