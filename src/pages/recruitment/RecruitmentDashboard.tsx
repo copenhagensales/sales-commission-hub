@@ -64,7 +64,7 @@ function ReferralKpiSection() {
 
   return (
     <div className="space-y-2">
-      <h2 className="text-lg font-semibold text-foreground">Anbefalinger</h2>
+      <h2 className="text-lg font-semibold text-foreground">Anbefalinger (30 dage)</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="bg-card border-border">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
