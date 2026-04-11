@@ -1,37 +1,52 @@
 
+Ja.
 
-## Fix dobbelt SMS + fejlagtig booking-bekræftelse
+Det jeg kan se i koden og live-data er:
 
-### Problemer identificeret
+### Hvad der sker lige nu
+1. `booking_confirmation_sms` sendes korrekt ved rigtig booking i `public-book-candidate`.
+2. Men der lå stadig gamle allerede-oprettede touchpoints i `booking_flow_touchpoints` med `template_key = 'booking_confirmation_sms'`.
+3. `process-booking-flow` sendte dem kl. `19:35`, selvom de aldrig burde have været oprettet som del af første outreach.
 
-1. **`booking_confirmation_sms`** har `phase = 'active'` i databasen, så den medtages i touchpoint-oprettelsen og sendes som outreach — selvom den kun bør sendes ved faktisk booking. Merge-tags `{{dato}}` og `{{tidspunkt}}` er tomme fordi der ingen booking er.
+### Bevis
+- I databasen står `booking_confirmation_sms` nu korrekt som:
+  - `phase = confirmation`
+- Men der findes stadig 2 udsendte touchpoints med:
+  - `template_key = booking_confirmation_sms`
+  - `status = sent`
+- `process-booking-flow` log viser:
+  - `Found 2 pending touchpoints`
+  - `Done. Processed: 2`
+- `public-book-candidate` log viser bagefter:
+  - `Confirmation SMS sent to Kasper`
 
-2. **`flow_a_dag0_sms`** sendes umiddelbart af `auto-segment-candidate` (linje 391) OG oprettes som touchpoint (linje 318-338), som `process-booking-flow` derefter også sender. Resultat: to identiske SMS'er.
+### Svar på dit spørgsmål
+- Ja, du fik ved en fejl en booking-bekræftelse sammen med første flow-SMS.
+- Ja, du får den igen “rigtigt”, når du faktisk booker tid, fordi den rigtige booking-logik stadig kører separat.
 
-### Løsning
+### Hvorfor det sker
+Fixet stoppede nye fejl fremadrettet i logikken for nye flow-oprettelser, men det fjernede ikke de gamle pending touchpoints, som allerede var blevet oprettet før rettelsen.
 
-**1. Database: Flyt `booking_confirmation_sms` til phase `confirmation`**
+### Hvad der bør gøres
+Hvis vi skal rydde det helt op, bør næste rettelse være:
 
-Opdater `booking_confirmation_sms` i `booking_flow_steps`: sæt `phase = 'confirmation'`. Denne phase bruges aldrig af outreach-flowet.
+1. Rydde eksisterende `booking_confirmation_sms`-touchpoints væk fra outreach-data
+   - enten slette dem
+   - eller markere dem som `cancelled`
 
-**2. Edge function: Filtrer touchpoints på phase**
+2. Gennemgå om der findes flere historiske fejl-touchpoints med samme mønster
 
-I `auto-segment-candidate/index.ts` (linje 306-310): tilføj `.in('phase', ['active', 'reengagement'])` til flowSteps-query, så `confirmation`-steps aldrig oprettes som touchpoints.
+3. Eventuelt lave en sikkerhedsregel i `process-booking-flow`, så den aldrig sender `confirmation`-templates fra touchpoints, hvis sådan nogle mod forventning findes igen
 
-**3. Edge function: Skip dag 0 SMS i touchpoints**
+### Konsekvens
+Når de gamle fejl-touchpoints er ryddet op:
+- første SMS bliver kun den rigtige dag-0-besked
+- booking-bekræftelsen sendes kun ved reel booking
+- kandidaten får ikke dobbelt “bekræftelse”
 
-I `auto-segment-candidate/index.ts`: filtrer `flow_a_dag0_sms` fra touchpoint-listen, da den allerede sendes umiddelbart. Dette forhindrer dobbelt-afsendelse.
-
-### Filer der ændres
-
-| Fil | Ændring |
-|-----|---------|
-| **Database** | `UPDATE booking_flow_steps SET phase = 'confirmation' WHERE template_key = 'booking_confirmation_sms'` |
-| `supabase/functions/auto-segment-candidate/index.ts` | Filtrer flowSteps query + skip dag 0 SMS fra touchpoints |
-
-### Resultat efter fix
-
-- Kandidaten modtager præcis 1 SMS på dag 0 (den umiddelbare)
-- Booking-bekræftelse sendes KUN når kandidaten faktisk booker en tid
-- Alle øvrige touchpoints (dag 1, 3, 6, 10, 45, 120) fungerer uændret
-
+### Konkret implementeringsplan
+- Lav en database-migration der finder `booking_flow_touchpoints` med `template_key = 'booking_confirmation_sms'` og som ikke stammer fra reel booking, og markerer dem som `cancelled`
+- Tilføj en ekstra guard i `process-booking-flow`, så system-trigger templates som `booking_confirmation_sms` aldrig udsendes fra det almindelige outreach-loop
+- Verificér bagefter i logs og databasen, at:
+  - der er 0 pending `booking_confirmation_sms` touchpoints
+  - kun `public-book-candidate` sender confirmation-SMS ved booking
