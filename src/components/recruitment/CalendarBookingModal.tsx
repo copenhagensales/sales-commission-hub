@@ -135,8 +135,8 @@ export function CalendarBookingModal({
 
         {showConfirmation && (
           <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8">
-            <div className="h-16 w-16 rounded-full bg-green-100 flex items-center justify-center">
-              <Check className="h-8 w-8 text-green-600" />
+            <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
+              <Check className="h-8 w-8 text-primary" />
             </div>
             <div className="text-center">
               <h3 className="text-lg font-semibold text-foreground">
@@ -296,7 +296,7 @@ export function CalendarBookingModal({
         {isConfigured && !showConfirmation && (
           <div className="border-t px-6 py-4 space-y-2">
             {!hasEmail && (
-              <div className="flex items-center gap-2 text-xs text-amber-600 mb-2">
+              <div className="flex items-center gap-2 text-xs text-destructive mb-2">
                 <AlertCircle className="h-3 w-3" />
                 Tilføj kandidatens email for at sende invitation
               </div>
