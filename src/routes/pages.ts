@@ -232,3 +232,5 @@ export const ComplianceGdprAwareness = lazyPage(() => import("@/pages/compliance
 export const ComplianceAiGovernance = lazyPage(() => import("@/pages/compliance/AiGovernance"));
 export const ComplianceSensitiveAccessLog = lazyPage(() => import("@/pages/compliance/SensitiveAccessLog"));
 export const ComplianceContractAccessLog = lazyPage(() => import("@/pages/compliance/ContractAccessLog"));
+
+export const ShortLinkRedirect = lazyPage(() => import("@/pages/ShortLinkRedirect"));

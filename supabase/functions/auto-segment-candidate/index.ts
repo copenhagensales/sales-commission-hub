@@ -195,6 +195,17 @@ function determineTier(signals: SegmentationSignals): { tier: "A" | "B" | "C"; r
   return { tier: "B", requiresApproval: true, reason: "Gennemsnitlig profil — kræver godkendelse" };
 }
 
+function generateShortCode(length = 6): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let code = '';
+  const arr = new Uint8Array(length);
+  crypto.getRandomValues(arr);
+  for (let i = 0; i < length; i++) {
+    code += chars[arr[i] % chars.length];
+  }
+  return code;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -329,10 +340,21 @@ Deno.serve(async (req) => {
       // Send immediate SMS for Tier A
       if (candidate.phone) {
         const role = application?.role || candidate.applied_position || 'Salgskonsulent';
+        const shortDomain = Deno.env.get('SHORT_LINK_DOMAIN') || 'https://job.cphsales.dk';
         const siteUrl = Deno.env.get('SITE_URL') || 'https://sales-sync-pay.lovable.app';
         const recruitmentPhone = Deno.env.get('RECRUITMENT_PHONE_NUMBER') || '+45 XX XX XX XX';
-        const bookingLink = `${siteUrl}/book/${candidate.id}`;
-        const unsubscribeUrl = `${supabaseUrl}/functions/v1/unsubscribe-candidate?id=${candidate.id}`;
+
+        // Generate short links
+        const fullBookingUrl = `${siteUrl}/book/${candidate.id}`;
+        const fullUnsubscribeUrl = `${supabaseUrl}/functions/v1/unsubscribe-candidate?id=${candidate.id}`;
+
+        const bookingCode = generateShortCode();
+        await supabase.from('short_links').insert({ code: bookingCode, target_url: fullBookingUrl, candidate_id: candidate.id, link_type: 'booking' });
+        const bookingLink = `${shortDomain}/r/${bookingCode}`;
+
+        const unsubCode = generateShortCode();
+        await supabase.from('short_links').insert({ code: unsubCode, target_url: fullUnsubscribeUrl, candidate_id: candidate.id, link_type: 'unsubscribe' });
+        const unsubscribeUrl = `${shortDomain}/r/${unsubCode}`;
 
         // Determine call time based on current hour (Danish time)
         const nowDk = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Copenhagen' }));
