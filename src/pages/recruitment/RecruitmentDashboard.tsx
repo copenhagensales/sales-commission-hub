@@ -130,6 +130,17 @@ export default function RecruitmentDashboard() {
     },
   });
 
+  const { data: referralsForKpi = [] } = useQuery({
+    queryKey: ["referral-hired-kpi"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_referrals")
+        .select("id, status, hired_date")
+        .in("status", ["hired", "eligible_for_bonus", "bonus_paid"]);
+      if (error) throw error;
+      return data;
+    },
+  });
 
   const { data: communicationStats } = useQuery({
     queryKey: ["communication-stats"],
