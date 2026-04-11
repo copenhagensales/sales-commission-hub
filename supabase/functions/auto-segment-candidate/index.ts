@@ -195,6 +195,17 @@ function determineTier(signals: SegmentationSignals): { tier: "A" | "B" | "C"; r
   return { tier: "B", requiresApproval: true, reason: "Gennemsnitlig profil — kræver godkendelse" };
 }
 
+function generateShortCode(length = 6): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let code = '';
+  const arr = new Uint8Array(length);
+  crypto.getRandomValues(arr);
+  for (let i = 0; i < length; i++) {
+    code += chars[arr[i] % chars.length];
+  }
+  return code;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
