@@ -16,7 +16,8 @@ import {
   Mail,
   ArrowRight,
   Percent,
-  Ghost
+  Ghost,
+  Handshake
 } from "lucide-react";
 import { format, subDays, eachDayOfInterval, startOfDay } from "date-fns";
 import { da } from "date-fns/locale";
@@ -350,6 +351,9 @@ export default function RecruitmentDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Anbefalinger KPI Section */}
+      <ReferralKpiSection />
 
       {/* Funnel Visualization - Recharts */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
