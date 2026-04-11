@@ -151,13 +151,21 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const { data: candidate } = await supabase
-      .from("candidates").select("id, first_name").eq("id", candidateId).maybeSingle();
+      .from("candidates").select("id, first_name, last_name, email, phone").eq("id", candidateId).maybeSingle();
 
     if (!candidate) {
       return new Response(JSON.stringify({ error: "Candidate not found" }), {
         status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    const { data: application } = await supabase
+      .from("applications")
+      .select("role, status")
+      .eq("candidate_id", candidateId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
     const settings = await fetchSettings(supabase);
     const now = new Date();
