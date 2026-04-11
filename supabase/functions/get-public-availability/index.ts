@@ -178,7 +178,7 @@ Deno.serve(async (req) => {
 
     if (!clientId || !clientSecret || !tenantId || !msUserEmail) {
       console.warn("[get-public-availability] M365 not configured, returning default slots");
-      return new Response(JSON.stringify({ days: generateDays(settings, now) }), {
+      return new Response(JSON.stringify({ days: generateDays(settings, now), candidate, application }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -197,7 +197,7 @@ Deno.serve(async (req) => {
 
     if (!tokenResponse.ok) {
       console.error("[get-public-availability] Token error:", await tokenResponse.text());
-      return new Response(JSON.stringify({ days: generateDays(settings, now) }), {
+      return new Response(JSON.stringify({ days: generateDays(settings, now), candidate, application }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -225,7 +225,7 @@ Deno.serve(async (req) => {
 
     if (!scheduleResponse.ok) {
       console.error("[get-public-availability] Schedule error:", await scheduleResponse.text());
-      return new Response(JSON.stringify({ days: generateDays(settings, now) }), {
+      return new Response(JSON.stringify({ days: generateDays(settings, now), candidate, application }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -234,7 +234,7 @@ Deno.serve(async (req) => {
     const schedule = scheduleData.value?.[0];
 
     if (!schedule) {
-      return new Response(JSON.stringify({ days: generateDays(settings, now) }), {
+      return new Response(JSON.stringify({ days: generateDays(settings, now), candidate, application }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -246,7 +246,7 @@ Deno.serve(async (req) => {
         end: new Date(item.end.dateTime + "Z"),
       }));
 
-    return new Response(JSON.stringify({ days: generateDays(settings, now, busyPeriods) }), {
+    return new Response(JSON.stringify({ days: generateDays(settings, now, busyPeriods), candidate, application }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: any) {
