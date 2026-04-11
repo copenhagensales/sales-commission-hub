@@ -1,30 +1,37 @@
 
-## Ny "Samtaler" kalender-fane i Booking Flow
 
-Tilføjer en ny fane i BookingFlow-siden der viser en kalendervisning over alle kandidater med booket interview, med mulighed for at markere om man har talt med dem.
+## Korte SMS-links via `job.cphsales.dk`
 
-### Hvad der bygges
+### Problem
+SMS-links er lange og uoverskuelige:
+- `https://sales-sync-pay.lovable.app/book/550e8400-e29b-41d4-a716-446655440000`
+- `https://jwlimmeijpfmaksvmuru.supabase.co/functions/v1/unsubscribe-candidate?id=...`
 
-1. **Ny fane "Samtaler"** i BookingFlow-sidens TabsList med et kalender-ikon
-2. **Kalendervisning** der viser dage med bookede samtaler som dots/badges
-3. **Dagsliste** ved klik på en dato — viser kandidater med navn, telefon, tidspunkt
-4. **Handlingsknapper** per kandidat:
-   - "Talt med" — opdaterer kandidatens status til `hired` eller `interview_completed` og stopper flowet
-   - "Ikke fået fat" — sætter kandidaten tilbage som `contacted` (flowet fortsætter med opfølgning)
-5. **Komponent**: Ny `BookingCalendarTab.tsx` under `src/components/recruitment/`
+### Løsning
+Oprette en `short_links` tabel + redirect edge function, og bruge domænet `job.cphsales.dk`.
 
-### Teknisk
+**Resultat:** `job.cphsales.dk/r/aB3kx9` (ca. 27 tegn vs. 80+ i dag)
 
-- Henter kandidater med `status = 'interview_scheduled'` og `interview_date IS NOT NULL`
-- Bruger den eksisterende `Calendar` komponent til månedsvisning
-- Dage med samtaler markeres visuelt (dot under datoen)
-- Ved klik på en dag vises liste over kandidater den dag
-- "Talt med" → `candidates.status = 'interview_completed'`, annullerer aktive enrollments
-- "Ikke fået fat" → `candidates.status = 'contacted'`, `interview_date = null`, flowet genoptages
+### Forudsætning
+Du skal pege domænet `job.cphsales.dk` til dette projekt (via Project Settings → Domains). Uden det vil links ikke virke.
+
+### Trin
+
+| # | Handling |
+|---|---------|
+| 1 | **Opret `short_links` tabel** – `code` (unik 6-tegn), `target_url`, `candidate_id`, `link_type`, `created_at`. Ingen RLS. |
+| 2 | **Opret `r` edge function** – slår `code` op, returnerer 302 redirect til `target_url` |
+| 3 | **Opdater `process-booking-flow`** – generér kort kode for booking + afmeld links, gem i `short_links`, brug `job.cphsales.dk/r/{code}` i SMS/email |
+| 4 | **Opdater `auto-segment-candidate`** – samme for dag-0 SMS |
+| 5 | **Tilføj `/r/:code` route i React** – client-side fallback der redirecter via opslag |
 
 ### Filer
 
 | Fil | Ændring |
 |-----|---------|
-| `src/components/recruitment/BookingCalendarTab.tsx` | Ny komponent med kalender + dagsliste + handlingsknapper |
-| `src/pages/recruitment/BookingFlow.tsx` | Tilføj ny TabsTrigger + TabsContent der renderer `BookingCalendarTab` |
+| Migration SQL | Ny `short_links` tabel + index |
+| `supabase/functions/r/index.ts` | Ny redirect function |
+| `supabase/functions/process-booking-flow/index.ts` | Generér korte links |
+| `supabase/functions/auto-segment-candidate/index.ts` | Generér korte links |
+| `src/routes/pages.ts` + `src/routes/config.tsx` | `/r/:code` redirect page |
+
