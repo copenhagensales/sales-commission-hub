@@ -307,6 +307,7 @@ Deno.serve(async (req) => {
         .from('booking_flow_steps')
         .select('*')
         .eq('is_active', true)
+        .in('phase', ['active', 'reengagement'])
         .order('sort_order', { ascending: true });
       
       if (stepsErr || !flowSteps?.length) {
@@ -315,25 +316,28 @@ Deno.serve(async (req) => {
       }
 
       const now = new Date();
-      const touchpoints = flowSteps.map((step: any) => {
-        let scheduledAt: Date;
-        if (step.day === 0 && step.offset_hours < 1) {
-          scheduledAt = new Date(now.getTime() + step.offset_hours * 3600000);
-        } else {
-          const dayDate = new Date(now);
-          dayDate.setDate(dayDate.getDate() + step.day);
-          dayDate.setHours(Math.floor(step.offset_hours), (step.offset_hours % 1) * 60, 0, 0);
-          scheduledAt = dayDate;
-        }
-        return {
-          enrollment_id: enrollment.id,
-          day: step.day,
-          channel: step.channel,
-          template_key: step.template_key,
-          scheduled_at: scheduledAt.toISOString(),
-          status: "pending",
-        };
-      });
+      // Skip flow_a_dag0_sms from touchpoints — it's already sent immediately below
+      const touchpoints = flowSteps
+        .filter((step: any) => step.template_key !== 'flow_a_dag0_sms')
+        .map((step: any) => {
+          let scheduledAt: Date;
+          if (step.day === 0 && step.offset_hours < 1) {
+            scheduledAt = new Date(now.getTime() + step.offset_hours * 3600000);
+          } else {
+            const dayDate = new Date(now);
+            dayDate.setDate(dayDate.getDate() + step.day);
+            dayDate.setHours(Math.floor(step.offset_hours), (step.offset_hours % 1) * 60, 0, 0);
+            scheduledAt = dayDate;
+          }
+          return {
+            enrollment_id: enrollment.id,
+            day: step.day,
+            channel: step.channel,
+            template_key: step.template_key,
+            scheduled_at: scheduledAt.toISOString(),
+            status: "pending",
+          };
+        });
 
       await supabase.from('booking_flow_touchpoints').insert(touchpoints);
 
