@@ -103,6 +103,8 @@ export default function RecruitmentDashboard() {
       const total = filtered.length;
       const hired = filtered.filter(c => c.status === "hired").length;
       const rate = total > 0 ? Math.round((hired / total) * 1000) / 10 : 0;
+      const ghosted = filtered.filter(c => c.status === "ghosted").length;
+      const ghostRate = total > 0 ? Math.round((ghosted / total) * 1000) / 10 : 0;
 
       // 30-day stats
       const now = new Date();
@@ -111,6 +113,8 @@ export default function RecruitmentDashboard() {
       const recentTotal = recent.length;
       const recentHired = recent.filter(c => c.status === "hired").length;
       const recentRate = recentTotal > 0 ? Math.round((recentHired / recentTotal) * 1000) / 10 : 0;
+      const recentGhosted = recent.filter(c => c.status === "ghosted").length;
+      const recentGhostRate = recentTotal > 0 ? Math.round((recentGhosted / recentTotal) * 1000) / 10 : 0;
 
       const buildFunnel = (list: typeof filtered) => {
         const statusBreakdown: Record<string, number> = {};
@@ -130,7 +134,7 @@ export default function RecruitmentDashboard() {
       const funnelData = buildFunnel(filtered);
       const recentFunnelData = buildFunnel(recent);
 
-      return { total, hired, rate, recentTotal, recentHired, recentRate, funnelData, recentFunnelData };
+      return { total, hired, rate, recentTotal, recentHired, recentRate, ghosted, ghostRate, recentGhosted, recentGhostRate, funnelData, recentFunnelData };
     };
 
     return {
