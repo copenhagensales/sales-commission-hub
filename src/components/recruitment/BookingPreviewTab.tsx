@@ -89,10 +89,11 @@ export function BookingPreviewTab() {
                 Copenhagen Sales
               </div>
               <h1 className="text-2xl font-semibold tracking-[-0.02em]" style={{ color: CS_DARK }}>
-                Book en samtale, {firstName}
+                Hej {firstName} 👋
               </h1>
-              <p className="text-sm" style={{ color: "#666" }}>
-                Samtalen tager kun 10 minutter — og så finder vi ud af om det er et match.
+              <p className="text-sm leading-relaxed" style={{ color: "#666" }}>
+                Book en kort snak med <strong style={{ color: CS_DARK }}>Oscar</strong>, vores rekrutteringsansvarlige.
+                På 5–10 minutter tager I en uforpligtende snak om jobbet — og Oscar svarer gerne på spørgsmål om løn, arbejdstider og hverdagen i salg.
               </p>
               <span
                 className="inline-block rounded-full px-3 py-1 text-xs font-medium"
@@ -102,11 +103,20 @@ export function BookingPreviewTab() {
               </span>
             </div>
 
+            {/* 3-step flow */}
+            <div className="flex items-center justify-center gap-2 text-xs" style={{ color: "#888" }}>
+              <span className="flex items-center gap-1"><span>📅</span> Vælg tid</span>
+              <span style={{ color: "#ddd" }}>→</span>
+              <span className="flex items-center gap-1"><span>📞</span> Oscar ringer dig</span>
+              <span style={{ color: "#ddd" }}>→</span>
+              <span className="flex items-center gap-1"><span>🚀</span> Start dit nye job</span>
+            </div>
+
             {/* Day selector */}
             <div className="space-y-4">
               <div className="flex items-center gap-2 text-sm font-medium" style={{ color: "#888" }}>
                 <Calendar className="h-4 w-4" />
-                Vælg en dag
+                Hvornår passer det dig?
               </div>
               {isLoading ? (
                 <div className="flex justify-center py-3">
@@ -165,14 +175,14 @@ export function BookingPreviewTab() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-sm font-medium" style={{ color: "#888" }}>
                     <Clock className="h-4 w-4" />
-                    Ledige tider — {format(selectedDate, "EEEE d. MMM", { locale: da })}
+                    Vælg et tidspunkt — {format(selectedDate, "EEEE d. MMM", { locale: da })}
                   </div>
                   <span
                     className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-medium"
                     style={{ backgroundColor: CS_GREEN_LIGHT, color: CS_GREEN }}
                   >
                     <Clock className="h-3 w-3" />
-                    Ca. 10 min
+                    5–10 min · uforpligtende
                   </span>
                 </div>
                 {slotsForDate.length === 0 ? (
@@ -209,7 +219,7 @@ export function BookingPreviewTab() {
                   >
                     <span className="inline-flex items-center gap-2">
                       <Calendar className="h-4 w-4" />
-                      Book møde — {selectedSlot.start} (preview)
+                      Book snak med Oscar kl. {selectedSlot.start} → (preview)
                     </span>
                   </button>
                 )}
@@ -219,7 +229,7 @@ export function BookingPreviewTab() {
             {/* Unsubscribe */}
             <div className="text-center">
               <span className="text-xs underline cursor-default" style={{ color: "#aaa" }}>
-                Jeg ønsker ikke at blive kontaktet — træk min ansøgning tilbage
+                Ikke interesseret længere? Det er helt okay
               </span>
             </div>
           </div>
