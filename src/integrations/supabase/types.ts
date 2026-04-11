@@ -1527,6 +1527,7 @@ export type Database = {
       booking_flow_enrollments: {
         Row: {
           application_id: string | null
+          approval_status: string
           cancelled_at: string | null
           cancelled_reason: string | null
           candidate_id: string
@@ -1536,12 +1537,14 @@ export type Database = {
           current_day: number
           enrolled_at: string
           id: string
+          segmentation_signals: Json | null
           status: string
           tier: string
           updated_at: string
         }
         Insert: {
           application_id?: string | null
+          approval_status?: string
           cancelled_at?: string | null
           cancelled_reason?: string | null
           candidate_id: string
@@ -1551,12 +1554,14 @@ export type Database = {
           current_day?: number
           enrolled_at?: string
           id?: string
+          segmentation_signals?: Json | null
           status?: string
           tier: string
           updated_at?: string
         }
         Update: {
           application_id?: string | null
+          approval_status?: string
           cancelled_at?: string | null
           cancelled_reason?: string | null
           candidate_id?: string
@@ -1566,6 +1571,7 @@ export type Database = {
           current_day?: number
           enrolled_at?: string
           id?: string
+          segmentation_signals?: Json | null
           status?: string
           tier?: string
           updated_at?: string
