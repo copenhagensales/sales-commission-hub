@@ -1709,6 +1709,36 @@ export type Database = {
           },
         ]
       }
+      booking_settings: {
+        Row: {
+          blocked_dates: string[] | null
+          id: string
+          lookahead_days: number
+          slot_duration_minutes: number
+          updated_at: string
+          work_end_hour: number
+          work_start_hour: number
+        }
+        Insert: {
+          blocked_dates?: string[] | null
+          id?: string
+          lookahead_days?: number
+          slot_duration_minutes?: number
+          updated_at?: string
+          work_end_hour?: number
+          work_start_hour?: number
+        }
+        Update: {
+          blocked_dates?: string[] | null
+          id?: string
+          lookahead_days?: number
+          slot_duration_minutes?: number
+          updated_at?: string
+          work_end_hour?: number
+          work_start_hour?: number
+        }
+        Relationships: []
+      }
       booking_startup_bonus: {
         Row: {
           amount: number
