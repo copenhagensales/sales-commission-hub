@@ -50,6 +50,34 @@ const FLOW_TEMPLATES: Record<string, { subject: string; content: string; channel
   },
 };
 
+function generateShortCode(length = 6): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let code = '';
+  const arr = new Uint8Array(length);
+  crypto.getRandomValues(arr);
+  for (let i = 0; i < length; i++) {
+    code += chars[arr[i] % chars.length];
+  }
+  return code;
+}
+
+async function createShortLink(
+  supabase: any,
+  targetUrl: string,
+  candidateId: string,
+  linkType: string,
+  shortDomain: string
+): Promise<string> {
+  const code = generateShortCode();
+  await supabase.from('short_links').insert({
+    code,
+    target_url: targetUrl,
+    candidate_id: candidateId,
+    link_type: linkType,
+  });
+  return `${shortDomain}/r/${code}`;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
