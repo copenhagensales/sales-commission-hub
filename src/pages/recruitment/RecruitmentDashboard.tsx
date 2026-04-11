@@ -95,7 +95,7 @@ export default function RecruitmentDashboard() {
       hired: "Ansat",
       rejected: "Afvist",
       not_qualified: "Ikke-kval.",
-      ghosted: "Ghostet",
+      ghostet: "Ghostet",
       declined: "Takket nej",
     };
 
@@ -364,7 +364,7 @@ export default function RecruitmentDashboard() {
             hired: "hsl(142 70% 35%)",
             rejected: "hsl(0 55% 55%)",
             not_qualified: "hsl(0 40% 65%)",
-            ghosted: "hsl(220 10% 60%)",
+            ghostet: "hsl(220 10% 60%)",
             declined: "hsl(220 10% 45%)",
           };
 
