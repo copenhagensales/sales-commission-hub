@@ -81,11 +81,9 @@ Deno.serve(async (req) => {
 
     console.log(`[unsubscribe-candidate] Candidate ${candidateId} unsubscribed. Cancelled ${activeEnrollments?.length || 0} enrollments.`);
 
+    const firstName = candidate.first_name || '';
     return new Response(
-      renderHtml(
-        "Du er afmeldt",
-        `Hej ${candidate.first_name || ''}, du er nu afmeldt og vil ikke modtage flere beskeder fra os vedrørende denne ansøgning. Tak for din interesse.`
-      ),
+      renderSuccessHtml(firstName),
       { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
     );
   } catch (error: any) {
@@ -97,6 +95,42 @@ Deno.serve(async (req) => {
   }
 });
 
+function renderSuccessHtml(firstName: string): string {
+  const greeting = firstName ? `Tak for din interesse, ${firstName}!` : 'Tak for din interesse!';
+  return `<!DOCTYPE html>
+<html lang="da">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Afmelding modtaget — Copenhagen Sales</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #f0f4f8; color: #1f2937; }
+    .card { background: white; border-radius: 16px; padding: 48px 40px; max-width: 520px; text-align: center; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
+    .icon { width: 64px; height: 64px; background: #ecfdf5; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px; }
+    .icon svg { width: 32px; height: 32px; color: #10b981; }
+    h1 { font-size: 22px; margin: 0 0 16px; color: #111827; }
+    p { color: #4b5563; line-height: 1.7; margin: 0 0 12px; font-size: 15px; }
+    .highlight { color: #111827; font-weight: 500; }
+    .divider { width: 48px; height: 2px; background: #e5e7eb; margin: 24px auto; }
+    .brand { font-size: 13px; color: #9ca3af; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+    </div>
+    <h1>${greeting}</h1>
+    <p>Vi har modtaget din afmelding, og du vil ikke modtage flere beskeder fra os.</p>
+    <p>Vi sætter stor pris på, at du tog dig tid til at søge hos os – <span class="highlight">det betyder meget</span>.</p>
+    <p>Du er altid velkommen til at søge igen en anden gang. Vi vil med glæde høre fra dig!</p>
+    <div class="divider"></div>
+    <p class="brand">Venlig hilsen, Copenhagen Sales</p>
+  </div>
+</body>
+</html>`;
+}
+
 function renderHtml(title: string, message: string): string {
   return `<!DOCTYPE html>
 <html lang="da">
@@ -105,10 +139,10 @@ function renderHtml(title: string, message: string): string {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${title} — Copenhagen Sales</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #f9fafb; color: #1f2937; }
-    .card { background: white; border-radius: 12px; padding: 48px; max-width: 480px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-    h1 { font-size: 24px; margin-bottom: 16px; }
-    p { color: #6b7280; line-height: 1.6; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #f0f4f8; color: #1f2937; }
+    .card { background: white; border-radius: 16px; padding: 48px 40px; max-width: 520px; text-align: center; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
+    h1 { font-size: 22px; margin-bottom: 16px; color: #111827; }
+    p { color: #4b5563; line-height: 1.7; font-size: 15px; }
   </style>
 </head>
 <body>
