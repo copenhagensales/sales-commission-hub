@@ -1,7 +1,4 @@
 import { useState, useMemo } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Calendar, Clock, Phone } from "lucide-react";
 import { format, isSameDay, parseISO } from "date-fns";
 import { da } from "date-fns/locale";
@@ -10,6 +7,10 @@ import { supabase } from "@/integrations/supabase/client";
 
 interface TimeSlot { start: string; end: string; }
 interface AvailabilityDay { date: string; slots: TimeSlot[]; }
+
+const CS_GREEN = "#52c68d";
+const CS_GREEN_LIGHT = "#e8f8f0";
+const CS_DARK = "#2e3136";
 
 export function BookingPreviewTab() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -54,6 +55,8 @@ export function BookingPreviewTab() {
     return day?.slots || [];
   }, [selectedDate, availability]);
 
+  const fontStyle = { fontFamily: "'Figtree', sans-serif" };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -63,141 +66,165 @@ export function BookingPreviewTab() {
             Sådan ser booking-siden ud for kandidaten — med live data fra dine indstillinger
           </p>
         </div>
-        <Badge variant="outline" className="text-xs gap-1">
+        <span
+          className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium"
+          style={{ backgroundColor: CS_DARK, color: "#e6f0f1" }}
+        >
           <Phone className="h-3 w-3" />
           Live preview
-        </Badge>
+        </span>
       </div>
 
       {/* Simulated booking page */}
-      <Card className="overflow-hidden border-2 border-dashed">
-        <CardContent className="p-0">
-          <div className="bg-gradient-to-b from-muted/30 to-background">
-            <div className="max-w-lg mx-auto p-4 py-8 space-y-6">
-              {/* Header */}
-              <div className="text-center space-y-2">
-                <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-4 py-1.5 text-sm font-medium">
-                  <Phone className="h-4 w-4" />
-                  Copenhagen Sales
-                </div>
-                <h1 className="text-2xl font-bold tracking-tight">
-                  Book en samtale, {firstName}
-                </h1>
-                <p className="text-muted-foreground text-sm">
-                  Samtalen tager kun 10 minutter — og så finder vi ud af om det er et match.
-                </p>
-                <Badge variant="secondary" className="text-xs">Sælger</Badge>
+      <div className="overflow-hidden border-2 border-dashed rounded-2xl">
+        <div className="bg-white" style={fontStyle}>
+          <div className="max-w-lg mx-auto p-4 py-8 space-y-6">
+            {/* Header */}
+            <div className="text-center space-y-3">
+              <div
+                className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium"
+                style={{ backgroundColor: CS_DARK, color: "#e6f0f1" }}
+              >
+                <Phone className="h-4 w-4" />
+                Copenhagen Sales
               </div>
+              <h1 className="text-2xl font-semibold tracking-[-0.02em]" style={{ color: CS_DARK }}>
+                Book en samtale, {firstName}
+              </h1>
+              <p className="text-sm" style={{ color: "#666" }}>
+                Samtalen tager kun 10 minutter — og så finder vi ud af om det er et match.
+              </p>
+              <span
+                className="inline-block rounded-full px-3 py-1 text-xs font-medium"
+                style={{ backgroundColor: CS_GREEN_LIGHT, color: CS_GREEN }}
+              >
+                Sælger
+              </span>
+            </div>
 
-              {/* Day selector */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                  <Calendar className="h-4 w-4" />
-                  Vælg en dag
+            {/* Day selector */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-sm font-medium" style={{ color: "#888" }}>
+                <Calendar className="h-4 w-4" />
+                Vælg en dag
+              </div>
+              {isLoading ? (
+                <div className="flex justify-center py-3">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: `${CS_GREEN} transparent ${CS_GREEN} ${CS_GREEN}` }} />
                 </div>
-                {isLoading ? (
-                  <div className="flex justify-center py-3">
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              ) : availableDays.length === 0 ? (
+                <p className="text-sm text-center py-4" style={{ color: "#999" }}>
+                  Ingen ledige dage lige nu.
+                </p>
+              ) : (
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                  {availableDays.map((day, index) => {
+                    const date = parseISO(day.date);
+                    const isSelected = selectedDate && isSameDay(date, selectedDate);
+                    return (
+                      <button
+                        key={day.date}
+                        onClick={() => { setSelectedDate(date); setSelectedSlot(null); }}
+                        className="flex flex-col items-center gap-0.5 rounded-xl border px-3 py-3 text-sm font-medium transition-all"
+                        style={{
+                          backgroundColor: isSelected ? CS_GREEN : "#fff",
+                          color: isSelected ? "#fff" : CS_DARK,
+                          borderColor: isSelected ? CS_GREEN : "#e5e7eb",
+                        }}
+                      >
+                        {index === 0 && (
+                          <span
+                            className="text-[9px] font-semibold uppercase tracking-wide rounded px-1.5 py-0.5"
+                            style={{
+                              backgroundColor: isSelected ? "rgba(255,255,255,0.25)" : CS_GREEN_LIGHT,
+                              color: isSelected ? "#fff" : CS_GREEN,
+                            }}
+                          >
+                            Anbefalet
+                          </span>
+                        )}
+                        <span className="text-xs capitalize">
+                          {format(date, "EEEE", { locale: da })}
+                        </span>
+                        <span className="text-base font-semibold">
+                          {format(date, "d")}
+                        </span>
+                        <span className="text-[10px]" style={{ opacity: 0.6 }}>
+                          {format(date, "MMM", { locale: da })}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Time Slots */}
+            {selectedDate && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm font-medium" style={{ color: "#888" }}>
+                    <Clock className="h-4 w-4" />
+                    Ledige tider — {format(selectedDate, "EEEE d. MMM", { locale: da })}
                   </div>
-                ) : availableDays.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">
-                    Ingen ledige dage lige nu.
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-medium"
+                    style={{ backgroundColor: CS_GREEN_LIGHT, color: CS_GREEN }}
+                  >
+                    <Clock className="h-3 w-3" />
+                    Ca. 10 min
+                  </span>
+                </div>
+                {slotsForDate.length === 0 ? (
+                  <p className="text-sm text-center py-4" style={{ color: "#999" }}>
+                    Ingen ledige tider denne dag.
                   </p>
                 ) : (
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                    {availableDays.map((day, index) => {
-                      const date = parseISO(day.date);
-                      const isSelected = selectedDate && isSameDay(date, selectedDate);
+                  <div className="grid grid-cols-2 gap-2">
+                    {slotsForDate.map(slot => {
+                      const isActive = selectedSlot?.start === slot.start;
                       return (
                         <button
-                          key={day.date}
-                          onClick={() => { setSelectedDate(date); setSelectedSlot(null); }}
-                          className={`
-                            flex flex-col items-center gap-0.5 rounded-lg border px-3 py-3 text-sm font-medium transition-all
-                            ${isSelected
-                              ? "bg-primary text-primary-foreground border-primary"
-                              : "bg-card hover:bg-muted/50 border-border text-foreground"}
-                          `}
+                          key={slot.start}
+                          onClick={() => setSelectedSlot(slot)}
+                          className="px-3 py-2.5 rounded-xl border text-sm font-medium transition-all"
+                          style={{
+                            backgroundColor: isActive ? CS_GREEN : "#fff",
+                            color: isActive ? "#fff" : CS_DARK,
+                            borderColor: isActive ? CS_GREEN : "#e5e7eb",
+                          }}
                         >
-                          {index === 0 && (
-                            <span className="text-[9px] font-semibold uppercase tracking-wide text-green-600 bg-green-100 rounded px-1.5 py-0.5">
-                              Anbefalet
-                            </span>
-                          )}
-                          <span className="text-xs capitalize">
-                            {format(date, "EEEE", { locale: da })}
-                          </span>
-                          <span className="text-base font-semibold">
-                            {format(date, "d")}
-                          </span>
-                          <span className="text-[10px] opacity-70">
-                            {format(date, "MMM", { locale: da })}
-                          </span>
+                          {slot.start} – {slot.end}
                         </button>
                       );
                     })}
                   </div>
                 )}
-              </div>
 
-              {/* Time Slots */}
-              {selectedDate && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                      <Clock className="h-4 w-4" />
-                      Ledige tider — {format(selectedDate, "EEEE d. MMM", { locale: da })}
-                    </div>
-                    <Badge variant="secondary" className="text-[10px] gap-1">
-                      <Clock className="h-3 w-3" />
-                      Ca. 10 min
-                    </Badge>
-                  </div>
-                  {slotsForDate.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">
-                      Ingen ledige tider denne dag.
-                    </p>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-2">
-                      {slotsForDate.map(slot => {
-                        const isActive = selectedSlot?.start === slot.start;
-                        return (
-                          <button
-                            key={slot.start}
-                            onClick={() => setSelectedSlot(slot)}
-                            className={`
-                              px-3 py-2.5 rounded-lg border text-sm font-medium transition-all
-                              ${isActive
-                                ? "bg-primary text-primary-foreground border-primary"
-                                : "bg-card hover:bg-muted/50 border-border text-foreground"}
-                            `}
-                          >
-                            {slot.start} – {slot.end}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {selectedSlot && (
-                    <Button className="w-full" size="lg" disabled>
-                      <Calendar className="h-4 w-4 mr-2" />
+                {selectedSlot && (
+                  <button
+                    className="w-full rounded-full py-3 text-sm font-semibold transition-all cursor-default opacity-80"
+                    style={{ backgroundColor: CS_GREEN, color: "#fff" }}
+                    disabled
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
                       Book møde — {selectedSlot.start} (preview)
-                    </Button>
-                  )}
-                </div>
-              )}
-
-              {/* Unsubscribe */}
-              <div className="text-center">
-                <span className="text-xs text-muted-foreground underline cursor-default">
-                  Jeg ønsker ikke at blive kontaktet — træk min ansøgning tilbage
-                </span>
+                    </span>
+                  </button>
+                )}
               </div>
+            )}
+
+            {/* Unsubscribe */}
+            <div className="text-center">
+              <span className="text-xs underline cursor-default" style={{ color: "#aaa" }}>
+                Jeg ønsker ikke at blive kontaktet — træk min ansøgning tilbage
+              </span>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,10 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Calendar, Clock, Phone, CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { format, isSameDay, parseISO } from "date-fns";
@@ -13,12 +10,24 @@ import { da } from "date-fns/locale";
 interface TimeSlot { start: string; end: string; }
 interface AvailabilityDay { date: string; slots: TimeSlot[]; }
 
+const CS_GREEN = "#52c68d";
+const CS_GREEN_LIGHT = "#e8f8f0";
+const CS_DARK = "#2e3136";
+
 export default function PublicCandidateBooking() {
   const { candidateId } = useParams<{ candidateId: string }>();
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
   const [booked, setBooked] = useState(false);
   const [unsubscribed, setUnsubscribed] = useState(false);
+
+  useEffect(() => {
+    const link = document.createElement("link");
+    link.href = "https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap";
+    link.rel = "stylesheet";
+    document.head.appendChild(link);
+    return () => { document.head.removeChild(link); };
+  }, []);
 
   const { data: availability, isLoading: availLoading } = useQuery({
     queryKey: ["public-availability", candidateId],
@@ -69,7 +78,6 @@ export default function PublicCandidateBooking() {
     onError: (err: any) => toast.error(err.message || "Afmelding fejlede"),
   });
 
-  // Only days with available slots
   const availableDays = useMemo(() => {
     if (!availability?.days) return [];
     return availability.days.filter(d => d.slots.length > 0).slice(0, 7);
@@ -82,108 +90,110 @@ export default function PublicCandidateBooking() {
     return day?.slots || [];
   }, [selectedDate, availability]);
 
+  const fontStyle = { fontFamily: "'Figtree', sans-serif" };
+
   if (unsubscribed) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-muted/30 to-background flex items-center justify-center p-4">
-        <Card className="max-w-md w-full text-center">
-          <CardContent className="pt-8 pb-8 space-y-4">
-            <XCircle className="h-12 w-12 text-muted-foreground mx-auto" />
-            <h2 className="text-xl font-semibold">Du er afmeldt</h2>
-            <p className="text-muted-foreground text-sm">
-              Din ansøgning er trukket tilbage, og du vil ikke modtage flere beskeder fra os.
-            </p>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-white flex items-center justify-center p-4" style={fontStyle}>
+        <div className="max-w-md w-full text-center rounded-2xl border border-gray-100 shadow-sm p-8 space-y-4">
+          <XCircle className="h-12 w-12 mx-auto" style={{ color: "#999" }} />
+          <h2 className="text-xl font-semibold tracking-[-0.02em]" style={{ color: CS_DARK }}>Du er afmeldt</h2>
+          <p className="text-sm" style={{ color: "#666" }}>
+            Din ansøgning er trukket tilbage, og du vil ikke modtage flere beskeder fra os.
+          </p>
+        </div>
       </div>
     );
   }
 
   if (booked) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-muted/30 to-background flex items-center justify-center p-4">
-        <Card className="max-w-md w-full text-center">
-          <CardContent className="pt-8 pb-8 space-y-5">
-            <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto" />
-            <h2 className="text-xl font-semibold">Du er booket! 🎉</h2>
-            <p className="text-muted-foreground text-sm">
-              Vi har booket en samtale med dig {selectedDate && format(selectedDate, "EEEE 'd.' d. MMMM", { locale: da })} kl. {selectedSlot?.start}–{selectedSlot?.end}.
-            </p>
-            <div className="bg-muted/50 rounded-lg p-4 text-left space-y-2">
-              <p className="text-sm font-medium">Hvad sker der nu?</p>
-              <ul className="text-sm text-muted-foreground space-y-1.5">
-                <li className="flex items-start gap-2">
-                  <Phone className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
-                  Vi ringer dig op på det aftalte tidspunkt
-                </li>
-                <li className="flex items-start gap-2">
-                  <Clock className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
-                  Samtalen tager ca. 10 minutter
-                </li>
-                <li className="flex items-start gap-2">
-                  <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
-                  Hav gerne dit CV klar — så får vi mest ud af tiden
-                </li>
-              </ul>
-            </div>
-            <p className="text-muted-foreground text-xs">
-              Du modtager en bekræftelse på SMS. Vi glæder os til at tale med dig!
-            </p>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-white flex items-center justify-center p-4" style={fontStyle}>
+        <div className="max-w-md w-full text-center rounded-2xl border border-gray-100 shadow-sm p-8 space-y-5">
+          <CheckCircle2 className="h-12 w-12 mx-auto" style={{ color: CS_GREEN }} />
+          <h2 className="text-xl font-semibold tracking-[-0.02em]" style={{ color: CS_DARK }}>Du er booket! 🎉</h2>
+          <p className="text-sm" style={{ color: "#666" }}>
+            Vi har booket en samtale med dig {selectedDate && format(selectedDate, "EEEE 'd.' d. MMMM", { locale: da })} kl. {selectedSlot?.start}–{selectedSlot?.end}.
+          </p>
+          <div className="rounded-xl p-4 text-left space-y-2" style={{ backgroundColor: CS_GREEN_LIGHT }}>
+            <p className="text-sm font-semibold" style={{ color: CS_DARK }}>Hvad sker der nu?</p>
+            <ul className="text-sm space-y-1.5" style={{ color: "#444" }}>
+              <li className="flex items-start gap-2">
+                <Phone className="h-4 w-4 mt-0.5 shrink-0" style={{ color: CS_GREEN }} />
+                Vi ringer dig op på det aftalte tidspunkt
+              </li>
+              <li className="flex items-start gap-2">
+                <Clock className="h-4 w-4 mt-0.5 shrink-0" style={{ color: CS_GREEN }} />
+                Samtalen tager ca. 10 minutter
+              </li>
+              <li className="flex items-start gap-2">
+                <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" style={{ color: CS_GREEN }} />
+                Hav gerne dit CV klar — så får vi mest ud af tiden
+              </li>
+            </ul>
+          </div>
+          <p className="text-xs" style={{ color: "#999" }}>
+            Du modtager en bekræftelse på SMS. Vi glæder os til at tale med dig!
+          </p>
+        </div>
       </div>
     );
   }
 
   if (availLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="min-h-screen bg-white flex items-center justify-center" style={fontStyle}>
+        <Loader2 className="h-8 w-8 animate-spin" style={{ color: CS_GREEN }} />
       </div>
     );
   }
 
   if (!candidate) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <Card className="max-w-md w-full text-center">
-          <CardContent className="pt-8 pb-8">
-            <p className="text-muted-foreground">Kandidat ikke fundet.</p>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-white flex items-center justify-center p-4" style={fontStyle}>
+        <div className="max-w-md w-full text-center rounded-2xl border border-gray-100 shadow-sm p-8">
+          <p style={{ color: "#666" }}>Kandidat ikke fundet.</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-muted/30 to-background">
+    <div className="min-h-screen bg-white" style={fontStyle}>
       <div className="max-w-lg mx-auto p-4 py-8 space-y-6">
         {/* Header */}
-        <div className="text-center space-y-2">
-          <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-4 py-1.5 text-sm font-medium">
+        <div className="text-center space-y-3">
+          <div
+            className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium"
+            style={{ backgroundColor: CS_DARK, color: "#e6f0f1" }}
+          >
             <Phone className="h-4 w-4" />
             Copenhagen Sales
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">
+          <h1 className="text-2xl font-semibold tracking-[-0.02em]" style={{ color: CS_DARK }}>
             Book en samtale, {candidate.first_name}
           </h1>
-          <p className="text-muted-foreground text-sm">
+          <p className="text-sm" style={{ color: "#666" }}>
             Samtalen tager kun 10 minutter — og så finder vi ud af om det er et match.
           </p>
           {application?.role && (
-            <Badge variant="secondary" className="text-xs">
+            <span
+              className="inline-block rounded-full px-3 py-1 text-xs font-medium"
+              style={{ backgroundColor: CS_GREEN_LIGHT, color: CS_GREEN }}
+            >
               {application.role}
-            </Badge>
+            </span>
           )}
         </div>
 
         {/* Day selector */}
         <div className="space-y-4">
-          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+          <div className="flex items-center gap-2 text-sm font-medium" style={{ color: "#888" }}>
             <Calendar className="h-4 w-4" />
             Vælg en dag
           </div>
           {availableDays.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">
+            <p className="text-sm text-center py-4" style={{ color: "#999" }}>
               Ingen ledige dage lige nu.
             </p>
           ) : (
@@ -195,15 +205,21 @@ export default function PublicCandidateBooking() {
                   <button
                     key={day.date}
                     onClick={() => { setSelectedDate(date); setSelectedSlot(null); }}
-                    className={`
-                      flex flex-col items-center gap-0.5 rounded-lg border px-3 py-3 text-sm font-medium transition-all
-                      ${isSelected
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-card hover:bg-muted/50 border-border text-foreground"}
-                    `}
+                    className="flex flex-col items-center gap-0.5 rounded-xl border px-3 py-3 text-sm font-medium transition-all"
+                    style={{
+                      backgroundColor: isSelected ? CS_GREEN : "#fff",
+                      color: isSelected ? "#fff" : CS_DARK,
+                      borderColor: isSelected ? CS_GREEN : "#e5e7eb",
+                    }}
                   >
                     {index === 0 && (
-                      <span className="text-[9px] font-semibold uppercase tracking-wide text-green-600 bg-green-100 rounded px-1.5 py-0.5">
+                      <span
+                        className="text-[9px] font-semibold uppercase tracking-wide rounded px-1.5 py-0.5"
+                        style={{
+                          backgroundColor: isSelected ? "rgba(255,255,255,0.25)" : CS_GREEN_LIGHT,
+                          color: isSelected ? "#fff" : CS_GREEN,
+                        }}
+                      >
                         Anbefalet
                       </span>
                     )}
@@ -213,7 +229,7 @@ export default function PublicCandidateBooking() {
                     <span className="text-base font-semibold">
                       {format(date, "d")}
                     </span>
-                    <span className="text-[10px] opacity-70">
+                    <span className="text-[10px]" style={{ opacity: 0.6 }}>
                       {format(date, "MMM", { locale: da })}
                     </span>
                   </button>
@@ -227,17 +243,20 @@ export default function PublicCandidateBooking() {
         {selectedDate && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+              <div className="flex items-center gap-2 text-sm font-medium" style={{ color: "#888" }}>
                 <Clock className="h-4 w-4" />
                 Ledige tider — {format(selectedDate, "EEEE d. MMM", { locale: da })}
               </div>
-              <Badge variant="secondary" className="text-[10px] gap-1">
+              <span
+                className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-medium"
+                style={{ backgroundColor: CS_GREEN_LIGHT, color: CS_GREEN }}
+              >
                 <Clock className="h-3 w-3" />
                 Ca. 10 min
-              </Badge>
+              </span>
             </div>
             {slotsForDate.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">
+              <p className="text-sm text-center py-4" style={{ color: "#999" }}>
                 Ingen ledige tider denne dag.
               </p>
             ) : (
@@ -248,12 +267,12 @@ export default function PublicCandidateBooking() {
                     <button
                       key={slot.start}
                       onClick={() => setSelectedSlot(slot)}
-                      className={`
-                        px-3 py-2.5 rounded-lg border text-sm font-medium transition-all
-                        ${isActive
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "bg-card hover:bg-muted/50 border-border text-foreground"}
-                      `}
+                      className="px-3 py-2.5 rounded-xl border text-sm font-medium transition-all"
+                      style={{
+                        backgroundColor: isActive ? CS_GREEN : "#fff",
+                        color: isActive ? "#fff" : CS_DARK,
+                        borderColor: isActive ? CS_GREEN : "#e5e7eb",
+                      }}
                     >
                       {slot.start} – {slot.end}
                     </button>
@@ -263,19 +282,24 @@ export default function PublicCandidateBooking() {
             )}
 
             {selectedSlot && (
-              <Button
-                className="w-full"
-                size="lg"
+              <button
+                className="w-full rounded-full py-3 text-sm font-semibold transition-all disabled:opacity-50"
+                style={{ backgroundColor: CS_GREEN, color: "#fff" }}
                 onClick={() => bookMutation.mutate()}
                 disabled={bookMutation.isPending}
               >
                 {bookMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  <span className="inline-flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Booker...
+                  </span>
                 ) : (
-                  <Calendar className="h-4 w-4 mr-2" />
+                  <span className="inline-flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    Book møde — {selectedSlot.start}
+                  </span>
                 )}
-                Book møde — {selectedSlot.start}
-              </Button>
+              </button>
             )}
           </div>
         )}
@@ -288,7 +312,8 @@ export default function PublicCandidateBooking() {
                 unsubMutation.mutate();
               }
             }}
-            className="text-xs text-muted-foreground underline hover:text-foreground transition-colors"
+            className="text-xs underline transition-colors"
+            style={{ color: "#aaa" }}
             disabled={unsubMutation.isPending}
           >
             {unsubMutation.isPending ? "Trækker tilbage..." : "Jeg ønsker ikke at blive kontaktet — træk min ansøgning tilbage"}
