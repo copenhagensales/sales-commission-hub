@@ -59,6 +59,7 @@ import {
   Winback,
   UpcomingInterviews,
   UpcomingHires,
+  BookingFlow,
   Some,
   TimeStamp,
   ClientSalesOverview,
@@ -327,6 +328,12 @@ export const routes: RouteConfig[] = [
     component: UpcomingHires,
     access: "role",
     positionPermission: "menu_upcoming_hires",
+  },
+  {
+    path: "/recruitment/booking-flow",
+    component: BookingFlow,
+    access: "role",
+    positionPermission: "menu_candidates",
   },
   {
     path: "/recruitment/referrals",
