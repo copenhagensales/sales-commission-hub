@@ -273,7 +273,7 @@ export function FlowTemplatesTab() {
                 className="font-mono text-sm"
               />
               <p className="text-[10px] text-muted-foreground mt-1">
-                Merge-tags: {"{{fornavn}}"}, {"{{rolle}}"}, {"{{booking_link}}"}, {"{{afmeld_link}}"}
+                Merge-tags: {"{{fornavn}}"}, {"{{rolle}}"}, {"{{booking_link}}"}, {"{{afmeld_link}}"}, {"{{ringetidspunkt}}"}, {"{{telefonnummer}}"}
               </p>
             </div>
           </div>
@@ -340,7 +340,7 @@ export function FlowTemplatesTab() {
                 placeholder="Skriv beskedens indhold her..."
               />
               <p className="text-[10px] text-muted-foreground mt-1">
-                Merge-tags: {"{{fornavn}}"}, {"{{rolle}}"}, {"{{booking_link}}"}, {"{{afmeld_link}}"}
+                Merge-tags: {"{{fornavn}}"}, {"{{rolle}}"}, {"{{booking_link}}"}, {"{{afmeld_link}}"}, {"{{ringetidspunkt}}"}, {"{{telefonnummer}}"}
               </p>
             </div>
           </div>
