@@ -1,47 +1,30 @@
 
 
-## Flere tidsvinduerne pr. dag + valgbare ugedage
+## Fix: Offentlig booking-side virker ikke (RLS-problem)
 
-### Hvad ændrer sig
+### Problem
 
-I dag har `booking_settings` ét enkelt tidsvindue (`work_start_hour`/`work_end_hour`) og hardcoded "kun hverdage". Det udvides med:
+Når en kandidat åbner booking-linket (`/book/:candidateId`), er de ikke logget ind. Siden forsøger at hente kandidat-data direkte fra `candidates`-tabellen via Supabase-klienten, men RLS-politikkerne kræver at man er autentificeret (rekrutterer/teamleder). Resultatet er at kandidaten ser "Kandidat ikke fundet".
 
-1. **Flere tidsvinduerne pr. dag** — fx 10:00–12:30 og 14:00–16:30
-2. **Valgbare ugedage** — fx kun man–fre, eller man+ons+fre
-3. De gamle `work_start_hour`/`work_end_hour` beholdes som fallback
+### Løsning
 
-### Database
+Flyt kandidat- og ansøgnings-data ind i `get-public-availability` edge function (som allerede bruger service role key og dermed omgår RLS). Fjern de direkte klient-queries fra `PublicCandidateBooking.tsx`.
 
-Tilføj to nye kolonner til `booking_settings`:
+### Ændringer
 
-- `time_windows jsonb DEFAULT '[{"start":"09:00","end":"17:00"}]'` — array af `{start, end}` objekter
-- `available_weekdays integer[] DEFAULT '{1,2,3,4,5}'` — 1=mandag ... 7=søndag, default = hverdage
+**`supabase/functions/get-public-availability/index.ts`**
+- Udvid response til også at returnere `candidate` (navn, email, phone) og `application` (rolle, status) sammen med `days`
+- Data hentes allerede med service role key, så det virker uden login
 
-### UI: BookingSettingsTab.tsx
-
-Erstat de to "Starttidspunkt"/"Sluttidspunkt" dropdowns med:
-
-**Tidsvinduerne-sektion:**
-- Viser hvert vindue som en række: `[HH:MM] – [HH:MM]` med slet-knap
-- "Tilføj tidsvindue" knap
-- Tidsvalg via Select med 15-min intervaller (06:00–20:00)
-
-**Ugedage-sektion:**
-- 7 toggle-knapper (Ma, Ti, On, To, Fr, Lø, Sø) — klik for at aktivere/deaktivere
-- Default: Ma–Fr aktive
-
-### Edge function: get-public-availability
-
-- Læs `time_windows` og `available_weekdays` fra settings
-- Fallback: hvis `time_windows` er null, brug gamle `work_start_hour`/`work_end_hour`
-- Loop over hvert tidsvindue pr. dag og generer slots inden for det
-- Filtrér dage baseret på `available_weekdays` i stedet for hardcoded weekend-check
+**`src/pages/recruitment/PublicCandidateBooking.tsx`**
+- Fjern de to separate `useQuery`-kald til `candidates` og `applications` tabeller
+- Brug i stedet data fra det eksisterende `availability`-query (som nu returnerer `{ days, candidate, application }`)
+- Fjern `candidateLoading` og brug kun `availLoading`
 
 ### Filer
 
 | Fil | Ændring |
 |-----|---------|
-| Migration | Tilføj `time_windows` + `available_weekdays` kolonner |
-| `src/components/recruitment/BookingSettingsTab.tsx` | Nyt UI for tidsvinduerne + ugedage |
-| `supabase/functions/get-public-availability/index.ts` | Brug `time_windows` + `available_weekdays` |
+| `supabase/functions/get-public-availability/index.ts` | Tilføj candidate + application data i response |
+| `src/pages/recruitment/PublicCandidateBooking.tsx` | Brug data fra edge function i stedet for direkte DB-queries |
 
