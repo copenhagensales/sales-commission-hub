@@ -1,52 +1,67 @@
 
-Ja.
 
-Det jeg kan se i koden og live-data er:
+## Fix: Bookinger vises ikke i Samtaler-fanen
 
-### Hvad der sker lige nu
-1. `booking_confirmation_sms` sendes korrekt ved rigtig booking i `public-book-candidate`.
-2. Men der lå stadig gamle allerede-oprettede touchpoints i `booking_flow_touchpoints` med `template_key = 'booking_confirmation_sms'`.
-3. `process-booking-flow` sendte dem kl. `19:35`, selvom de aldrig burde have været oprettet som del af første outreach.
+### Problemer fundet
 
-### Bevis
-- I databasen står `booking_confirmation_sms` nu korrekt som:
-  - `phase = confirmation`
-- Men der findes stadig 2 udsendte touchpoints med:
-  - `template_key = booking_confirmation_sms`
-  - `status = sent`
-- `process-booking-flow` log viser:
-  - `Found 2 pending touchpoints`
-  - `Done. Processed: 2`
-- `public-book-candidate` log viser bagefter:
-  - `Confirmation SMS sent to Kasper`
+**Problem 1: `candidates`-tabellen opdateres aldrig ved booking**
 
-### Svar på dit spørgsmål
-- Ja, du fik ved en fejl en booking-bekræftelse sammen med første flow-SMS.
-- Ja, du får den igen “rigtigt”, når du faktisk booker tid, fordi den rigtige booking-logik stadig kører separat.
+`public-book-candidate` opdaterer kun `applications.status` — men `BookingCalendarTab` filtrerer på `candidates.status = 'interview_scheduled'` og `candidates.interview_date IS NOT NULL`. Funktionen sætter aldrig disse felter på kandidaten.
 
-### Hvorfor det sker
-Fixet stoppede nye fejl fremadrettet i logikken for nye flow-oprettelser, men det fjernede ikke de gamle pending touchpoints, som allerede var blevet oprettet før rettelsen.
+**Problem 2: Kasper Mikkelsen har ingen `applications`-post**
 
-### Hvad der bør gøres
-Hvis vi skal rydde det helt op, bør næste rettelse være:
+`auto-segment-candidate` opretter ikke en application — den læser kun en eksisterende. Så `public-book-candidate` linje 128-133 gør intet, da `application` er `null`.
 
-1. Rydde eksisterende `booking_confirmation_sms`-touchpoints væk fra outreach-data
-   - enten slette dem
-   - eller markere dem som `cancelled`
+### Løsning
 
-2. Gennemgå om der findes flere historiske fejl-touchpoints med samme mønster
+Opdater `supabase/functions/public-book-candidate/index.ts` til at:
 
-3. Eventuelt lave en sikkerhedsregel i `process-booking-flow`, så den aldrig sender `confirmation`-templates fra touchpoints, hvis sådan nogle mod forventning findes igen
+1. **Opdatere `candidates`-tabellen direkte** med `status: 'interview_scheduled'` og `interview_date` (som timestamp fra dato+tidspunkt).
+2. **Oprette en application** hvis der ikke allerede findes en, så der er en post at opdatere og tracke.
 
-### Konsekvens
-Når de gamle fejl-touchpoints er ryddet op:
-- første SMS bliver kun den rigtige dag-0-besked
-- booking-bekræftelsen sendes kun ved reel booking
-- kandidaten får ikke dobbelt “bekræftelse”
+### Konkrete ændringer
 
-### Konkret implementeringsplan
-- Lav en database-migration der finder `booking_flow_touchpoints` med `template_key = 'booking_confirmation_sms'` og som ikke stammer fra reel booking, og markerer dem som `cancelled`
-- Tilføj en ekstra guard i `process-booking-flow`, så system-trigger templates som `booking_confirmation_sms` aldrig udsendes fra det almindelige outreach-loop
-- Verificér bagefter i logs og databasen, at:
-  - der er 0 pending `booking_confirmation_sms` touchpoints
-  - kun `public-book-candidate` sender confirmation-SMS ved booking
+**`supabase/functions/public-book-candidate/index.ts`**
+
+Efter linje 49 (application lookup), tilføj:
+```ts
+// If no application exists, create one
+if (!application) {
+  const { data: newApp } = await supabase
+    .from("applications")
+    .insert({
+      candidate_id: candidateId,
+      role: "Salgskonsulent",
+      status: "interview_scheduled",
+    })
+    .select("id, role, status")
+    .single();
+  application = newApp;
+}
+```
+
+Efter application-update blokken (linje 127-133), tilføj:
+```ts
+// Update candidate status and interview_date
+const interviewDatetime = `${date}T${startTime}:00+02:00`;
+await supabase
+  .from("candidates")
+  .update({
+    status: "interview_scheduled",
+    interview_date: interviewDatetime,
+  })
+  .eq("id", candidateId);
+```
+
+**Derudover**: Ret Kasper Mikkelsen manuelt via en migration der opdaterer hans `interview_date` og `status`.
+
+### Filer der ændres
+
+| Fil | Ændring |
+|-----|---------|
+| `supabase/functions/public-book-candidate/index.ts` | Opdater `candidates`-tabellen + opret application hvis manglende |
+| **Database** | Ret Kasper Mikkelsens data manuelt |
+
+### Resultat
+Alle kandidater der booker via den offentlige side vil fremgå i Samtaler-fanen med korrekt dato og tidspunkt.
+
