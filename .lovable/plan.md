@@ -1,33 +1,37 @@
 
 
-## Flyt booking-bekræftelses-SMS til flow-skabeloner
+## Fix dobbelt SMS + fejlagtig booking-bekræftelse
 
-### Problem
-Når en kandidat booker en tid via den offentlige bookingside, sendes en bekræftelses-SMS med hardkodet tekst i `public-book-candidate` edge function. Denne besked kan ikke redigeres via Skabeloner-fanen.
+### Problemer identificeret
+
+1. **`booking_confirmation_sms`** har `phase = 'active'` i databasen, så den medtages i touchpoint-oprettelsen og sendes som outreach — selvom den kun bør sendes ved faktisk booking. Merge-tags `{{dato}}` og `{{tidspunkt}}` er tomme fordi der ingen booking er.
+
+2. **`flow_a_dag0_sms`** sendes umiddelbart af `auto-segment-candidate` (linje 391) OG oprettes som touchpoint (linje 318-338), som `process-booking-flow` derefter også sender. Resultat: to identiske SMS'er.
 
 ### Løsning
 
-**1. Tilføj bekræftelsesskabelon i databasen**
+**1. Database: Flyt `booking_confirmation_sms` til phase `confirmation`**
 
-Indsæt ny `booking_flow_steps`-post:
-- `template_key`: `booking_confirmation_sms`
-- `day`: 0, `channel`: sms, `phase`: confirmation
-- `subject`: `Booking bekræftelse`
-- `content`: `Hej {{fornavn}}! Din samtale er booket til {{dato}} kl. {{tidspunkt}}. Vi ringer dig op. Glæder os! 📞 — Copenhagen Sales`
+Opdater `booking_confirmation_sms` i `booking_flow_steps`: sæt `phase = 'confirmation'`. Denne phase bruges aldrig af outreach-flowet.
 
-**2. Opdater `public-book-candidate` edge function**
+**2. Edge function: Filtrer touchpoints på phase**
 
-Erstat hardkodet SMS (linje 170) med opslag i `booking_flow_steps` via `template_key = 'booking_confirmation_sms'`. Erstat merge-tags `{{fornavn}}`, `{{dato}}`, `{{tidspunkt}}`.
+I `auto-segment-candidate/index.ts` (linje 306-310): tilføj `.in('phase', ['active', 'reengagement'])` til flowSteps-query, så `confirmation`-steps aldrig oprettes som touchpoints.
 
-**3. Tilføj `{{dato}}` og `{{tidspunkt}}` som merge-tags i UI**
+**3. Edge function: Skip dag 0 SMS i touchpoints**
 
-Opdater `FlowTemplatesTab.tsx` så de nye tags vises i dokumentationen.
+I `auto-segment-candidate/index.ts`: filtrer `flow_a_dag0_sms` fra touchpoint-listen, da den allerede sendes umiddelbart. Dette forhindrer dobbelt-afsendelse.
 
 ### Filer der ændres
 
 | Fil | Ændring |
 |-----|---------|
-| **Database insert** | Tilføj `booking_confirmation_sms` til `booking_flow_steps` |
-| `supabase/functions/public-book-candidate/index.ts` | Læs bekræftelses-SMS fra DB, merge tags |
-| `src/components/recruitment/FlowTemplatesTab.tsx` | Tilføj `{{dato}}` og `{{tidspunkt}}` til merge-tag liste |
+| **Database** | `UPDATE booking_flow_steps SET phase = 'confirmation' WHERE template_key = 'booking_confirmation_sms'` |
+| `supabase/functions/auto-segment-candidate/index.ts` | Filtrer flowSteps query + skip dag 0 SMS fra touchpoints |
+
+### Resultat efter fix
+
+- Kandidaten modtager præcis 1 SMS på dag 0 (den umiddelbare)
+- Booking-bekræftelse sendes KUN når kandidaten faktisk booker en tid
+- Alle øvrige touchpoints (dag 1, 3, 6, 10, 45, 120) fungerer uændret
 
