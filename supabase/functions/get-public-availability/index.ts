@@ -151,15 +151,15 @@ Deno.serve(async (req) => {
         const dateStr = current.toISOString().split("T")[0];
         const slots: TimeSlot[] = [];
 
-        // Generate 30-min slots from 9:00 to 16:30
+        // Generate 15-min slots from 9:00 to 16:45
         for (let hour = 9; hour < 17; hour++) {
-          for (let min = 0; min < 60; min += 30) {
-            if (hour === 16 && min > 0) break; // Last slot: 16:00-16:30
+          for (let min = 0; min < 60; min += 15) {
+            if (hour === 16 && min > 30) break; // Last slot: 16:30-16:45
 
             const slotStart = new Date(current);
             slotStart.setHours(hour, min, 0, 0);
             const slotEnd = new Date(slotStart);
-            slotEnd.setMinutes(slotEnd.getMinutes() + 30);
+            slotEnd.setMinutes(slotEnd.getMinutes() + 15);
 
             // Skip if slot is in the past
             if (slotStart <= now) continue;
@@ -214,16 +214,16 @@ function generateDefaultSlots(): AvailabilityDay[] {
       const dateStr = current.toISOString().split("T")[0];
       const slots: TimeSlot[] = [];
       for (let h = 9; h < 17; h++) {
-        for (let m = 0; m < 60; m += 30) {
-          if (h === 16 && m > 0) break;
+        for (let m = 0; m < 60; m += 15) {
+          if (h === 16 && m > 30) break;
           const slotStart = new Date(current);
           slotStart.setHours(h, m, 0, 0);
           if (slotStart > now) {
-            const endH = m === 30 ? h + 1 : h;
-            const endM = m === 30 ? 0 : 30;
+            const endDate = new Date(slotStart);
+            endDate.setMinutes(endDate.getMinutes() + 15);
             slots.push({
               start: `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`,
-              end: `${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`,
+              end: `${String(endDate.getHours()).padStart(2, "0")}:${String(endDate.getMinutes()).padStart(2, "0")}`,
             });
           }
         }
