@@ -214,19 +214,6 @@ export function BookingPreviewTab() {
                 </Card>
               </div>
 
-              {/* Info box */}
-              <Card className="bg-muted/30 border-dashed">
-                <CardContent className="pt-4 pb-4">
-                  <div className="flex gap-3">
-                    <Info className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                    <div className="space-y-1 text-xs text-muted-foreground">
-                      <p>Mødet oprettes direkte i vores kalender — ingen dobbeltbooking.</p>
-                      <p>Du modtager automatisk bekræftelse via SMS.</p>
-                      <p>Vi ringer dig op på det valgte tidspunkt.</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
 
               {/* Unsubscribe */}
               <div className="text-center">
