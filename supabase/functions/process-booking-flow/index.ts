@@ -48,33 +48,6 @@ const FLOW_TEMPLATES: Record<string, { subject: string; content: string; channel
     content: "Hej {{fornavn}},\n\nVi har forsøgt at kontakte dig et par gange vedrørende din ansøgning til {{rolle}} hos Copenhagen Sales.\n\nHvis du stadig er interesseret, vil vi meget gerne høre fra dig. Ellers lukker vi ansøgningen.\n\nMed venlig hilsen\nCopenhagen Sales",
     channel: "email",
   },
-  // Tier B
-  flow_b_dag0_email: {
-    subject: "Tak for din ansøgning hos Copenhagen Sales",
-    content: "Hej {{fornavn}},\n\nTak for din ansøgning til stillingen som {{rolle}} hos Copenhagen Sales.\n\nVi gennemgår din ansøgning og vender tilbage snarest. Hvis du gerne vil booke en samtale med det samme, er du velkommen til at svare på denne mail.\n\nMed venlig hilsen\nCopenhagen Sales",
-    channel: "email",
-  },
-  flow_b_dag1_sms: {
-    subject: "",
-    content: "Hej {{fornavn}}, har du set vores mail om din ansøgning hos Copenhagen Sales? Vi vil gerne tale med dig – svar gerne her 😊",
-    channel: "sms",
-  },
-  flow_b_dag2_call: {
-    subject: "Opkald til Tier B kandidat",
-    content: "Ring til {{fornavn}} angående ansøgning til {{rolle}}. Tier B follow-up.",
-    channel: "call_reminder",
-  },
-  // Tier C
-  flow_c_dag0_email: {
-    subject: "Tak for din ansøgning hos Copenhagen Sales",
-    content: "Hej {{fornavn}},\n\nTak for din ansøgning til stillingen som {{rolle}} hos Copenhagen Sales.\n\nVi har modtaget din ansøgning og vil gennemgå den. Du hører fra os.\n\nMed venlig hilsen\nCopenhagen Sales",
-    channel: "email",
-  },
-  flow_c_dag4_afslag: {
-    subject: "Vedrørende din ansøgning hos Copenhagen Sales",
-    content: "Hej {{fornavn}},\n\nTak for din interesse i Copenhagen Sales.\n\nEfter gennemgang af din ansøgning har vi desværre valgt at gå videre med andre kandidater til stillingen som {{rolle}}.\n\nVi ønsker dig held og lykke videre.\n\nMed venlig hilsen\nCopenhagen Sales",
-    channel: "email",
-  },
 };
 
 Deno.serve(async (req) => {
