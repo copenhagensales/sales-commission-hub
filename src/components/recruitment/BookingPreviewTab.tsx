@@ -218,7 +218,7 @@ export function BookingPreviewTab() {
               {/* Unsubscribe */}
               <div className="text-center">
                 <span className="text-xs text-muted-foreground underline cursor-default">
-                  Jeg ønsker ikke at blive kontaktet — afmeld min ansøgning
+                  Jeg ønsker ikke at blive kontaktet — træk min ansøgning tilbage
                 </span>
               </div>
             </div>
