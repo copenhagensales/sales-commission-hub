@@ -26,6 +26,8 @@ const MOTIVATION_KEYWORDS = [
   "motiveret", "udvikle mig", "resultater", "bedste", "salg", "konkurrence",
   "energisk", "målrettet", "ambitiøs", "drevet", "passioneret", "entusiastisk",
   "dedikeret", "engageret", "vindermentalitet", "præstere", "vækst", "udfordring",
+  "i gang", "gå på", "klar til", "vil gerne", "brænder for", "sulten",
+  "går efter", "lyst til", "give den gas", "topmotiveret", "kæmpe for",
 ];
 
 // Part-time keywords
@@ -67,6 +69,20 @@ function detectAge(text: string): { age: number | null; confidence: "high" | "me
     const year = parseInt(bornYear[1]);
     const age = new Date().getFullYear() - year;
     if (age >= 15 && age <= 70) return { age, confidence: "high" };
+  }
+
+  // "XX år gammel" or "XX år og"
+  const ageGammelOg = lower.match(/(\d{1,2})\s+år\s+(?:gammel|og)/);
+  if (ageGammelOg) {
+    const age = parseInt(ageGammelOg[1]);
+    if (age >= 15 && age <= 70) return { age, confidence: "medium" };
+  }
+
+  // Standalone "XX år" at start of text or after punctuation/comma
+  const standaloneAge = lower.match(/(^|[.,]\s*)(\d{1,2})\s+år/);
+  if (standaloneAge) {
+    const age = parseInt(standaloneAge[2]);
+    if (age >= 15 && age <= 70) return { age, confidence: "medium" };
   }
 
   // Graduation indicators suggesting young age
