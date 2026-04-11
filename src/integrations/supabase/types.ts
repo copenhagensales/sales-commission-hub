@@ -1593,6 +1593,51 @@ export type Database = {
           },
         ]
       }
+      booking_flow_steps: {
+        Row: {
+          channel: string
+          content: string
+          created_at: string
+          day: number
+          id: string
+          is_active: boolean
+          offset_hours: number | null
+          phase: string
+          sort_order: number
+          subject: string | null
+          template_key: string
+          updated_at: string
+        }
+        Insert: {
+          channel: string
+          content: string
+          created_at?: string
+          day: number
+          id?: string
+          is_active?: boolean
+          offset_hours?: number | null
+          phase?: string
+          sort_order?: number
+          subject?: string | null
+          template_key: string
+          updated_at?: string
+        }
+        Update: {
+          channel?: string
+          content?: string
+          created_at?: string
+          day?: number
+          id?: string
+          is_active?: boolean
+          offset_hours?: number | null
+          phase?: string
+          sort_order?: number
+          subject?: string | null
+          template_key?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       booking_flow_touchpoints: {
         Row: {
           channel: string
