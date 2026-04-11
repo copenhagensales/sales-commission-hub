@@ -103,7 +103,7 @@ export function BookingSettingsTab() {
           slot_duration_minutes: values.slot_duration_minutes,
           lookahead_days: values.lookahead_days,
           blocked_dates: values.blocked_dates,
-          time_windows: values.time_windows as unknown as Record<string, unknown>[],
+          time_windows: values.time_windows as any,
           available_weekdays: values.available_weekdays,
           work_start_hour: parseInt(values.time_windows[0]?.start?.split(":")[0] ?? "9"),
           work_end_hour: parseInt(values.time_windows[values.time_windows.length - 1]?.end?.split(":")[0] ?? "17"),
