@@ -621,6 +621,7 @@ export function usePermissions() {
     canViewMessages: canView("menu_messages"),
     canViewSmsTemplates: canView("menu_sms_templates"),
     canViewEmailTemplates: canView("menu_email_templates"),
+    canViewBookingFlow: canView("menu_booking_flow"),
     canViewReferrals: canView("menu_referrals"),
     canEditReferrals: canEdit("menu_referrals"),
     // Boards menu

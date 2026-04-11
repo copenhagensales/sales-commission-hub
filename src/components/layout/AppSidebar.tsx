@@ -413,7 +413,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   const showRecruitmentMenu = p.canView("menu_section_rekruttering") && 
     (p.canViewRecruitmentDashboard || p.canViewCandidates || p.canViewMessages ||
      p.canViewSmsTemplates || p.canViewEmailTemplates || p.canViewWinback ||
-     p.canViewUpcomingInterviews || p.canViewUpcomingHires);
+     p.canViewUpcomingInterviews || p.canViewUpcomingHires || p.canViewBookingFlow);
   
   // Check if any Onboarding items are visible (requires section permission) - only show for admin users
   const showOnboardingMenu = p.canView("menu_section_onboarding") && p.canViewOnboardingAdmin;
