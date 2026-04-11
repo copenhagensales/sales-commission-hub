@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Users, Zap, Clock, CheckCircle, XCircle, Plus, Mail, MessageSquare, Phone, Loader2, ShieldCheck, AlertTriangle, FileText, CalendarDays, Eye, PhoneCall } from "lucide-react";
+import { Users, Zap, Clock, CheckCircle, XCircle, Plus, Mail, MessageSquare, Loader2, ShieldCheck, AlertTriangle, FileText, CalendarDays, Eye, PhoneCall } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { da } from "date-fns/locale";
 import { SegmentationModal } from "@/components/recruitment/SegmentationModal";
