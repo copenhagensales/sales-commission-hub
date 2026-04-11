@@ -1,14 +1,25 @@
 
 
-## Tilføj "Anbefalet"-badge på første ledige dag
+## Forbedringer til booking-siden
 
-Tilføj et lille "Anbefalet"-badge på den første dag i listen for at nudge kandidaten til at booke hurtigst muligt.
+Baseret på din feedback implementerer vi tre ting:
 
-### Ændringer
+### 1. Kort pitch under overskriften
+Tilføj en uforpligtende, motiverende tekst under "Book en samtale":
+> "Samtalen tager kun 10 minutter — og så finder vi ud af om det er et match."
 
-**`src/pages/recruitment/PublicCandidateBooking.tsx`**
-- I dag-knap-loopet: hvis `index === 0`, vis en lille grøn badge med teksten "Anbefalet" over eller under ugedagen
+### 2. Varighed-indikator
+Tilføj et lille ikon+tekst ved tidsvælgeren: "⏱ Ca. 10 min" så kandidaten ved hvad de siger ja til.
 
-**`src/components/recruitment/BookingPreviewTab.tsx`**
-- Samme ændring så preview matcher den offentlige side
+### 3. Forbedret bekræftelsesside
+Udvid "Du er booket"-siden med:
+- "Hvad sker der nu?" — kort forklaring (vi ringer dig op, hav evt. CV klar)
+- Holder kandidaten engageret efter booking
+
+### Filer
+
+| Fil | Ændring |
+|-----|---------|
+| `src/pages/recruitment/PublicCandidateBooking.tsx` | Pitch-tekst, varighed-badge, forbedret bekræftelse |
+| `src/components/recruitment/BookingPreviewTab.tsx` | Samme ændringer i preview |
 
