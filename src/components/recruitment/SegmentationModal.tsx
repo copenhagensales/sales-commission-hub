@@ -1,15 +1,12 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Zap, Mail, MessageSquare, Phone, Loader2, CheckCircle } from "lucide-react";
-import { addHours, addDays, setHours, setMinutes } from "date-fns";
+import { Zap, Loader2, CheckCircle, Brain, Globe, Clock, Briefcase, User, Flame, AlertTriangle } from "lucide-react";
 
 interface SegmentationModalProps {
   open: boolean;
@@ -19,153 +16,100 @@ interface SegmentationModalProps {
   applicationId?: string;
 }
 
+interface SegmentationSignals {
+  detectedAge: number | null;
+  ageConfidence: string;
+  detectedExperienceYears: number | null;
+  experienceConfidence: string;
+  englishWordPct: number;
+  isDanish: boolean;
+  isPartTime: boolean;
+  motivationScore: number;
+  motivationKeywordsFound: string[];
+  fullTimeIndicators: boolean;
+}
+
+interface AnalysisResult {
+  tier: "A" | "B" | "C";
+  requiresApproval: boolean;
+  reason: string;
+  signals: SegmentationSignals;
+  enrollmentId?: string;
+  approvalStatus?: string;
+}
+
 const tierInfo = {
   A: {
     label: "Tier A — Høj prioritet",
     color: "bg-emerald-500/10 text-emerald-700 border-emerald-500/30",
-    description: "Intensivt outreach: Email + SMS dag 0, opkald dag 1-2, reminder dag 3",
+    description: "Automatisk flow: SMS sendes straks, fuldt outreach-flow starter",
+    icon: Zap,
   },
   B: {
-    label: "Tier B — Medium",
+    label: "Tier B — Kræver godkendelse",
     color: "bg-violet-500/10 text-violet-700 border-violet-500/30",
-    description: "Standard outreach: Email dag 0, SMS dag 1, opkald dag 2",
+    description: "Erfaren profil — gennemse og godkend før flow starter",
+    icon: AlertTriangle,
   },
   C: {
-    label: "Tier C — Lav",
+    label: "Tier C — Lav prioritet",
     color: "bg-gray-500/10 text-gray-600 border-gray-500/30",
-    description: "Let outreach: Bekræftelsesmail dag 0, venligt afslag dag 3-5",
+    description: "Muligt mismatch — gennemse inden flow",
+    icon: Clock,
   },
 };
 
-// Flow definitions per tier
-const FLOW_DEFINITIONS: Record<string, Array<{ day: number; channel: string; template_key: string; offsetHours: number }>> = {
-  A: [
-    { day: 0, channel: "email", template_key: "flow_a_dag0_email", offsetHours: 0 },
-    { day: 0, channel: "sms", template_key: "flow_a_dag0_sms", offsetHours: 0.15 },
-    { day: 1, channel: "sms", template_key: "flow_a_dag1_precall_sms", offsetHours: 9 },
-    { day: 1, channel: "call_reminder", template_key: "flow_a_dag1_call", offsetHours: 10 },
-    { day: 1, channel: "sms", template_key: "flow_a_dag1_followup_sms", offsetHours: 15 },
-    { day: 2, channel: "email", template_key: "flow_a_dag2_reminder_email", offsetHours: 9 },
-    { day: 2, channel: "call_reminder", template_key: "flow_a_dag2_call", offsetHours: 11 },
-    { day: 3, channel: "email", template_key: "flow_a_dag3_last_attempt", offsetHours: 10 },
-  ],
-  B: [
-    { day: 0, channel: "email", template_key: "flow_b_dag0_email", offsetHours: 0 },
-    { day: 1, channel: "sms", template_key: "flow_b_dag1_sms", offsetHours: 10 },
-    { day: 2, channel: "call_reminder", template_key: "flow_b_dag2_call", offsetHours: 10 },
-  ],
-  C: [
-    { day: 0, channel: "email", template_key: "flow_c_dag0_email", offsetHours: 0 },
-    { day: 4, channel: "email", template_key: "flow_c_dag4_afslag", offsetHours: 10 },
-  ],
-};
-
-function calculateTier(criteriaMet: number): "A" | "B" | "C" {
-  if (criteriaMet >= 4) return "A";
-  if (criteriaMet >= 2) return "B";
-  return "C";
-}
-
 export function SegmentationModal({ open, onOpenChange, onEnrolled, candidateId: propCandidateId, applicationId: propApplicationId }: SegmentationModalProps) {
-  const [criteriaChecks, setCriteriaChecks] = useState<Record<string, boolean>>({});
+  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
 
-  const { data: criteria, isLoading } = useQuery({
-    queryKey: ["booking-flow-criteria"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("booking_flow_criteria")
-        .select("*")
-        .eq("active", true)
-        .order("sort_order", { ascending: true });
+  const getCandidateId = () => {
+    const candidate = (window as any).__selectedCandidateForFlow;
+    return propCandidateId || candidate?.id;
+  };
+
+  // Run auto-analysis
+  const analyzeMutation = useMutation({
+    mutationFn: async () => {
+      const candidateId = getCandidateId();
+      if (!candidateId) throw new Error("Ingen kandidat valgt");
+
+      setAnalyzing(true);
+      const { data, error } = await supabase.functions.invoke("auto-segment-candidate", {
+        body: { candidate_id: candidateId, dry_run: true },
+      });
       if (error) throw error;
-      return data;
+      return data as AnalysisResult;
+    },
+    onSuccess: (data) => {
+      setAnalysis(data);
+      setAnalyzing(false);
+    },
+    onError: (err: any) => {
+      toast.error("Analyse fejlede: " + err.message);
+      setAnalyzing(false);
     },
   });
 
-  const criteriaMet = Object.values(criteriaChecks).filter(Boolean).length;
-  const tier = calculateTier(criteriaMet);
-  const info = tierInfo[tier];
-
+  // Enroll candidate (actual enrollment)
   const enrollMutation = useMutation({
     mutationFn: async () => {
-      // Get candidate from temp storage or props
-      const candidate = (window as any).__selectedCandidateForFlow;
-      const candidateId = propCandidateId || candidate?.id;
+      const candidateId = getCandidateId();
       if (!candidateId) throw new Error("Ingen kandidat valgt");
 
-      // Get latest application for candidate
-      let applicationId = propApplicationId;
-      if (!applicationId) {
-        const { data: app } = await supabase
-          .from("applications")
-          .select("id")
-          .eq("candidate_id", candidateId)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        applicationId = app?.id;
-      }
-
-      // Create enrollment
-      const metCriteria = criteria?.filter(c => criteriaChecks[c.id]).map(c => ({ id: c.id, name: c.name })) || [];
-      
-      const { data: enrollment, error: enrollError } = await supabase
-        .from("booking_flow_enrollments")
-        .insert({
-          candidate_id: candidateId,
-          application_id: applicationId || null,
-          tier,
-          criteria_met: metCriteria,
-          status: "active",
-        })
-        .select("id")
-        .single();
-
-      if (enrollError) throw enrollError;
-
-      // Create touchpoints based on tier flow
-      const flowSteps = FLOW_DEFINITIONS[tier];
-      const now = new Date();
-      const touchpoints = flowSteps.map(step => {
-        let scheduledAt: Date;
-        if (step.day === 0 && step.offsetHours < 1) {
-          // Immediate or near-immediate
-          scheduledAt = addHours(now, step.offsetHours);
-        } else {
-          // Future days: schedule at offsetHours (as hour of day, Danish business hours)
-          const dayDate = addDays(now, step.day);
-          scheduledAt = setMinutes(setHours(dayDate, Math.floor(step.offsetHours)), (step.offsetHours % 1) * 60);
-        }
-
-        return {
-          enrollment_id: enrollment.id,
-          day: step.day,
-          channel: step.channel,
-          template_key: step.template_key,
-          scheduled_at: scheduledAt.toISOString(),
-          status: "pending",
-        };
+      const { data, error } = await supabase.functions.invoke("auto-segment-candidate", {
+        body: { candidate_id: candidateId, dry_run: false },
       });
-
-      const { error: tpError } = await supabase
-        .from("booking_flow_touchpoints")
-        .insert(touchpoints);
-
-      if (tpError) throw tpError;
-
-      // Update candidate tier
-      await supabase
-        .from("candidates")
-        .update({ tier })
-        .eq("id", candidateId);
-
-      // Clean up temp storage
-      delete (window as any).__selectedCandidateForFlow;
+      if (error) throw error;
+      return data as AnalysisResult;
     },
-    onSuccess: () => {
-      toast.success(`Kandidat tilføjet til Tier ${tier} flow`);
-      setCriteriaChecks({});
-      onOpenChange(false);
+    onSuccess: (data) => {
+      if (data.requiresApproval) {
+        toast.success(`Kandidat tilføjet som Tier ${data.tier} — afventer godkendelse`);
+      } else {
+        toast.success(`Tier ${data.tier} flow startet automatisk — SMS sendt!`);
+      }
+      resetAndClose();
       onEnrolled();
     },
     onError: (err: any) => {
@@ -173,100 +117,172 @@ export function SegmentationModal({ open, onOpenChange, onEnrolled, candidateId:
     },
   });
 
-  return (
-    <Dialog open={open} onOpenChange={(o) => {
-      if (!o) {
-        setCriteriaChecks({});
-        delete (window as any).__selectedCandidateForFlow;
-      }
+  const resetAndClose = () => {
+    setAnalysis(null);
+    setAnalyzing(false);
+    delete (window as any).__selectedCandidateForFlow;
+    onOpenChange(false);
+  };
+
+  // Auto-analyze when modal opens
+  const handleOpenChange = (o: boolean) => {
+    if (o && !analysis && !analyzing) {
+      analyzeMutation.mutate();
+    }
+    if (!o) {
+      resetAndClose();
+    } else {
       onOpenChange(o);
-    }}>
+    }
+  };
+
+  // Trigger analysis on open
+  if (open && !analysis && !analyzing && !analyzeMutation.isPending) {
+    analyzeMutation.mutate();
+  }
+
+  const info = analysis ? tierInfo[analysis.tier] : null;
+  const TierIcon = info?.icon || Zap;
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Segmentering — Booking Flow</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <Brain className="h-5 w-5 text-muted-foreground" />
+            Auto-segmentering
+          </DialogTitle>
         </DialogHeader>
 
-        {isLoading ? (
-          <div className="flex justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        {(analyzing || analyzeMutation.isPending) && !analysis ? (
+          <div className="flex flex-col items-center justify-center py-12 gap-3">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">Analyserer kandidatprofil...</p>
           </div>
-        ) : (
-          <div className="space-y-6">
-            {/* Criteria checklist */}
-            <div className="space-y-3">
-              <p className="text-sm font-medium">Must-have kriterier</p>
-              {criteria?.map((c) => (
-                <div key={c.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <Label className="text-sm font-medium">{c.name}</Label>
-                    {c.description && (
-                      <p className="text-xs text-muted-foreground mt-0.5">{c.description}</p>
-                    )}
-                  </div>
-                  <Switch
-                    checked={criteriaChecks[c.id] || false}
-                    onCheckedChange={(checked) =>
-                      setCriteriaChecks(prev => ({ ...prev, [c.id]: checked }))
-                    }
-                  />
-                </div>
-              ))}
+        ) : analysis ? (
+          <div className="space-y-5">
+            {/* Tier result */}
+            <div className={`p-4 rounded-lg border ${info?.color}`}>
+              <div className="flex items-center gap-2 mb-2">
+                <TierIcon className="h-4 w-4" />
+                <span className="font-semibold text-sm">{info?.label}</span>
+              </div>
+              <p className="text-xs opacity-80">{info?.description}</p>
+              <p className="text-xs mt-2 font-medium">{analysis.reason}</p>
             </div>
 
             <Separator />
 
-            {/* Tier result */}
+            {/* Parsed signals */}
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium">Resultat</p>
-                <Badge variant="outline" className={info.color}>
-                  {criteriaMet} af {criteria?.length || 5} kriterier opfyldt
-                </Badge>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Analyserede signaler</p>
+              
+              <div className="grid grid-cols-2 gap-3">
+                {/* Age */}
+                <SignalCard
+                  icon={User}
+                  label="Alder"
+                  value={analysis.signals.detectedAge !== null ? `${analysis.signals.detectedAge} år` : "Ikke fundet"}
+                  confidence={analysis.signals.ageConfidence}
+                />
+
+                {/* Experience */}
+                <SignalCard
+                  icon={Briefcase}
+                  label="Erfaring"
+                  value={analysis.signals.detectedExperienceYears !== null ? `${analysis.signals.detectedExperienceYears} år` : "Ikke fundet"}
+                  confidence={analysis.signals.experienceConfidence}
+                />
+
+                {/* Language */}
+                <SignalCard
+                  icon={Globe}
+                  label="Sprog"
+                  value={analysis.signals.isDanish ? "Dansk" : `Engelsk (${analysis.signals.englishWordPct}%)`}
+                  confidence={analysis.signals.isDanish ? "high" : "low"}
+                />
+
+                {/* Job type */}
+                <SignalCard
+                  icon={Clock}
+                  label="Jobtype"
+                  value={analysis.signals.isPartTime ? "Deltid" : analysis.signals.fullTimeIndicators ? "Fuldtid" : "Ukendt"}
+                  confidence={analysis.signals.isPartTime ? "low" : analysis.signals.fullTimeIndicators ? "high" : "none"}
+                />
               </div>
 
-              <div className={`p-4 rounded-lg border ${info.color}`}>
+              {/* Motivation */}
+              <div className="p-3 border rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
-                  <Zap className="h-4 w-4" />
-                  <span className="font-semibold text-sm">{info.label}</span>
+                  <Flame className="h-4 w-4 text-orange-500" />
+                  <span className="text-sm font-medium">Motivation</span>
+                  <Badge variant="outline" className="text-xs ml-auto">
+                    Score: {analysis.signals.motivationScore}
+                  </Badge>
                 </div>
-                <p className="text-xs opacity-80">{info.description}</p>
-              </div>
-
-              {/* Flow preview */}
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Planlagte touchpoints</p>
-                {FLOW_DEFINITIONS[tier].map((step, i) => {
-                  const Icon = step.channel === "email" ? Mail : step.channel === "sms" ? MessageSquare : Phone;
-                  return (
-                    <div key={i} className="flex items-center gap-3 text-xs py-1">
-                      <span className="w-12 text-muted-foreground">Dag {step.day}</span>
-                      <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span className="capitalize">{step.channel === "call_reminder" ? "Opkaldspåmindelse" : step.channel.toUpperCase()}</span>
-                    </div>
-                  );
-                })}
+                {analysis.signals.motivationKeywordsFound.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {analysis.signals.motivationKeywordsFound.map((kw) => (
+                      <Badge key={kw} variant="secondary" className="text-xs">
+                        {kw}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Ingen motivations-keywords fundet</p>
+                )}
               </div>
             </div>
           </div>
-        )}
+        ) : null}
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => handleOpenChange(false)}>
             Annuller
           </Button>
-          <Button
-            onClick={() => enrollMutation.mutate()}
-            disabled={enrollMutation.isPending}
-          >
-            {enrollMutation.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            ) : (
-              <CheckCircle className="h-4 w-4 mr-2" />
-            )}
-            Start Tier {tier} flow
-          </Button>
+          {analysis && (
+            <Button
+              onClick={() => enrollMutation.mutate()}
+              disabled={enrollMutation.isPending}
+            >
+              {enrollMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <CheckCircle className="h-4 w-4 mr-2" />
+              )}
+              {analysis.requiresApproval
+                ? `Opret Tier ${analysis.tier} — afventer godkendelse`
+                : `Start Tier ${analysis.tier} flow automatisk`
+              }
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function SignalCard({ icon: Icon, label, value, confidence }: {
+  icon: typeof User;
+  label: string;
+  value: string;
+  confidence: string;
+}) {
+  const confidenceColor = {
+    high: "bg-emerald-500",
+    medium: "bg-amber-500",
+    low: "bg-red-500",
+    none: "bg-gray-300",
+  }[confidence] || "bg-gray-300";
+
+  return (
+    <div className="p-3 border rounded-lg">
+      <div className="flex items-center gap-2 mb-1">
+        <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+        <span className="text-xs text-muted-foreground">{label}</span>
+        <div className={`w-2 h-2 rounded-full ml-auto ${confidenceColor}`} />
+      </div>
+      <p className="text-sm font-medium">{value}</p>
+    </div>
   );
 }

@@ -119,7 +119,7 @@ Deno.serve(async (req) => {
       const enrollment = tp.booking_flow_enrollments;
       const candidate = enrollment.candidates;
 
-      // Check if enrollment is still active
+      // Check if enrollment is still active (skip pending_approval)
       if (enrollment.status !== 'active') {
         await supabase
           .from('booking_flow_touchpoints')
