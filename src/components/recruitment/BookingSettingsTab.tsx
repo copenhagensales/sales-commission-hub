@@ -10,13 +10,43 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/components/ui/slider";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Toggle } from "@/components/ui/toggle";
 import { toast } from "sonner";
-import { ExternalLink, Copy, Search, CalendarIcon, Save, X, Settings, Eye } from "lucide-react";
+import { ExternalLink, Copy, Search, CalendarIcon, Save, X, Settings, Eye, Plus, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
-const HOUR_OPTIONS = Array.from({ length: 13 }, (_, i) => i + 6); // 6-18
+interface TimeWindow {
+  start: string;
+  end: string;
+}
+
+const TIME_OPTIONS: string[] = [];
+for (let h = 6; h <= 20; h++) {
+  for (let m = 0; m < 60; m += 15) {
+    if (h === 20 && m > 0) break;
+    TIME_OPTIONS.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
+  }
+}
+
+const WEEKDAY_LABELS = [
+  { value: 1, label: "Ma" },
+  { value: 2, label: "Ti" },
+  { value: 3, label: "On" },
+  { value: 4, label: "To" },
+  { value: 5, label: "Fr" },
+  { value: 6, label: "Lø" },
+  { value: 7, label: "Sø" },
+];
+
+interface FormState {
+  slot_duration_minutes: number;
+  lookahead_days: number;
+  blocked_dates: string[];
+  time_windows: TimeWindow[];
+  available_weekdays: number[];
+}
 
 export function BookingSettingsTab() {
   const queryClient = useQueryClient();
@@ -24,7 +54,6 @@ export function BookingSettingsTab() {
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
   const [blockDate, setBlockDate] = useState<Date>();
 
-  // Fetch settings
   const { data: settings, isLoading: settingsLoading } = useQuery({
     queryKey: ["booking-settings"],
     queryFn: async () => {
@@ -38,38 +67,46 @@ export function BookingSettingsTab() {
     },
   });
 
-  // Local state for form
-  const [formState, setFormState] = useState<{
-    work_start_hour: number;
-    work_end_hour: number;
-    slot_duration_minutes: number;
-    lookahead_days: number;
-    blocked_dates: string[];
-  } | null>(null);
+  const [formState, setFormState] = useState<FormState | null>(null);
 
-  const form = formState ?? settings ?? {
-    work_start_hour: 9,
-    work_end_hour: 17,
+  const defaultForm: FormState = {
     slot_duration_minutes: 15,
     lookahead_days: 14,
     blocked_dates: [],
+    time_windows: [{ start: "09:00", end: "17:00" }],
+    available_weekdays: [1, 2, 3, 4, 5],
   };
 
-  const updateForm = (updates: Partial<typeof form>) => {
+  const settingsForm: FormState | null = settings
+    ? {
+        slot_duration_minutes: settings.slot_duration_minutes,
+        lookahead_days: settings.lookahead_days,
+        blocked_dates: (settings.blocked_dates as string[] | null) ?? [],
+        time_windows: (settings.time_windows as unknown as TimeWindow[] | null) ?? [
+          { start: `${String(settings.work_start_hour).padStart(2, "0")}:00`, end: `${String(settings.work_end_hour).padStart(2, "0")}:00` },
+        ],
+        available_weekdays: (settings.available_weekdays as number[] | null) ?? [1, 2, 3, 4, 5],
+      }
+    : null;
+
+  const form = formState ?? settingsForm ?? defaultForm;
+
+  const updateForm = (updates: Partial<FormState>) => {
     setFormState({ ...form, ...updates });
   };
 
-  // Save mutation
   const saveMutation = useMutation({
-    mutationFn: async (values: typeof form) => {
+    mutationFn: async (values: FormState) => {
       const { error } = await supabase
         .from("booking_settings")
         .update({
-          work_start_hour: values.work_start_hour,
-          work_end_hour: values.work_end_hour,
           slot_duration_minutes: values.slot_duration_minutes,
           lookahead_days: values.lookahead_days,
           blocked_dates: values.blocked_dates,
+          time_windows: values.time_windows as any,
+          available_weekdays: values.available_weekdays,
+          work_start_hour: parseInt(values.time_windows[0]?.start?.split(":")[0] ?? "9"),
+          work_end_hour: parseInt(values.time_windows[values.time_windows.length - 1]?.end?.split(":")[0] ?? "17"),
         })
         .eq("id", settings?.id);
       if (error) throw error;
@@ -82,7 +119,7 @@ export function BookingSettingsTab() {
     onError: (err: any) => toast.error("Fejl: " + err.message),
   });
 
-  // Fetch candidates for preview
+  // Candidates
   const { data: candidates } = useQuery({
     queryKey: ["booking-candidates-search", searchTerm],
     queryFn: async () => {
@@ -91,13 +128,11 @@ export function BookingSettingsTab() {
         .select("id, first_name, last_name, email, phone")
         .order("created_at", { ascending: false })
         .limit(20);
-
       if (searchTerm.length > 1) {
         query = query.or(
           `first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`
         );
       }
-
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -117,9 +152,7 @@ export function BookingSettingsTab() {
   };
 
   const openBookingPage = () => {
-    if (bookingUrl) {
-      window.open(bookingUrl, "_blank");
-    }
+    if (bookingUrl) window.open(bookingUrl, "_blank");
   };
 
   const addBlockedDate = (date: Date | undefined) => {
@@ -133,16 +166,39 @@ export function BookingSettingsTab() {
   };
 
   const removeBlockedDate = (dateStr: string) => {
-    updateForm({
-      blocked_dates: (form.blocked_dates || []).filter((d) => d !== dateStr),
-    });
+    updateForm({ blocked_dates: (form.blocked_dates || []).filter((d) => d !== dateStr) });
+  };
+
+  // Time window helpers
+  const addTimeWindow = () => {
+    updateForm({ time_windows: [...form.time_windows, { start: "09:00", end: "12:00" }] });
+  };
+
+  const removeTimeWindow = (index: number) => {
+    if (form.time_windows.length <= 1) return;
+    updateForm({ time_windows: form.time_windows.filter((_, i) => i !== index) });
+  };
+
+  const updateTimeWindow = (index: number, field: "start" | "end", value: string) => {
+    const updated = form.time_windows.map((w, i) => (i === index ? { ...w, [field]: value } : w));
+    updateForm({ time_windows: updated });
+  };
+
+  // Weekday toggle
+  const toggleWeekday = (day: number) => {
+    const current = form.available_weekdays;
+    const updated = current.includes(day)
+      ? current.filter((d) => d !== day)
+      : [...current, day].sort((a, b) => a - b);
+    if (updated.length === 0) return; // must have at least one
+    updateForm({ available_weekdays: updated });
   };
 
   const hasChanges = formState !== null;
 
   return (
     <div className="space-y-6">
-      {/* Section A: Preview booking page */}
+      {/* Section A: Preview */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
@@ -175,9 +231,7 @@ export function BookingSettingsTab() {
                     selectedCandidateId === c.id && "bg-accent"
                   )}
                 >
-                  <span className="font-medium">
-                    {c.first_name} {c.last_name}
-                  </span>
+                  <span className="font-medium">{c.first_name} {c.last_name}</span>
                   <span className="text-muted-foreground ml-2">{c.email}</span>
                 </button>
               ))}
@@ -188,12 +242,10 @@ export function BookingSettingsTab() {
             <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
               <span className="text-sm truncate flex-1 font-mono">{bookingUrl}</span>
               <Button variant="outline" size="sm" onClick={copyLink} className="gap-1.5">
-                <Copy className="h-3.5 w-3.5" />
-                Kopiér
+                <Copy className="h-3.5 w-3.5" /> Kopiér
               </Button>
               <Button size="sm" onClick={openBookingPage} className="gap-1.5">
-                <ExternalLink className="h-3.5 w-3.5" />
-                Åbn
+                <ExternalLink className="h-3.5 w-3.5" /> Åbn
               </Button>
             </div>
           )}
@@ -213,44 +265,68 @@ export function BookingSettingsTab() {
             <p className="text-sm text-muted-foreground">Indlæser...</p>
           ) : (
             <>
-              {/* Work hours */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Starttidspunkt</Label>
-                  <Select
-                    value={String(form.work_start_hour)}
-                    onValueChange={(v) => updateForm({ work_start_hour: Number(v) })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {HOUR_OPTIONS.map((h) => (
-                        <SelectItem key={h} value={String(h)}>
-                          {String(h).padStart(2, "0")}:00
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              {/* Weekdays */}
+              <div className="space-y-3">
+                <Label>Åbne ugedage</Label>
+                <div className="flex gap-2">
+                  {WEEKDAY_LABELS.map(({ value, label }) => (
+                    <Toggle
+                      key={value}
+                      pressed={form.available_weekdays.includes(value)}
+                      onPressedChange={() => toggleWeekday(value)}
+                      variant="outline"
+                      size="sm"
+                      className="w-10"
+                    >
+                      {label}
+                    </Toggle>
+                  ))}
                 </div>
+              </div>
+
+              {/* Time windows */}
+              <div className="space-y-3">
+                <Label>Tidsvinduerner</Label>
                 <div className="space-y-2">
-                  <Label>Sluttidspunkt</Label>
-                  <Select
-                    value={String(form.work_end_hour)}
-                    onValueChange={(v) => updateForm({ work_end_hour: Number(v) })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {HOUR_OPTIONS.map((h) => (
-                        <SelectItem key={h} value={String(h)}>
-                          {String(h).padStart(2, "0")}:00
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {form.time_windows.map((tw, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <Select value={tw.start} onValueChange={(v) => updateTimeWindow(idx, "start", v)}>
+                        <SelectTrigger className="w-28">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TIME_OPTIONS.map((t) => (
+                            <SelectItem key={t} value={t}>{t}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <span className="text-muted-foreground">–</span>
+                      <Select value={tw.end} onValueChange={(v) => updateTimeWindow(idx, "end", v)}>
+                        <SelectTrigger className="w-28">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TIME_OPTIONS.map((t) => (
+                            <SelectItem key={t} value={t}>{t}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeTimeWindow(idx)}
+                        disabled={form.time_windows.length <= 1}
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
                 </div>
+                <Button type="button" variant="outline" size="sm" onClick={addTimeWindow} className="gap-1.5">
+                  <Plus className="h-3.5 w-3.5" /> Tilføj tidsvindue
+                </Button>
               </div>
 
               {/* Slot duration */}
@@ -265,9 +341,7 @@ export function BookingSettingsTab() {
                   </SelectTrigger>
                   <SelectContent>
                     {[15, 30, 45, 60].map((m) => (
-                      <SelectItem key={m} value={String(m)}>
-                        {m} minutter
-                      </SelectItem>
+                      <SelectItem key={m} value={String(m)}>{m} minutter</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -293,8 +367,7 @@ export function BookingSettingsTab() {
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button variant="outline" size="sm" className="gap-1.5">
-                        <CalendarIcon className="h-3.5 w-3.5" />
-                        Tilføj dato
+                        <CalendarIcon className="h-3.5 w-3.5" /> Tilføj dato
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
@@ -313,10 +386,7 @@ export function BookingSettingsTab() {
                     {form.blocked_dates.map((dateStr) => (
                       <Badge key={dateStr} variant="secondary" className="gap-1 pr-1">
                         {dateStr}
-                        <button
-                          onClick={() => removeBlockedDate(dateStr)}
-                          className="ml-1 hover:bg-destructive/20 rounded-full p-0.5"
-                        >
+                        <button onClick={() => removeBlockedDate(dateStr)} className="ml-1 hover:bg-destructive/20 rounded-full p-0.5">
                           <X className="h-3 w-3" />
                         </button>
                       </Badge>
