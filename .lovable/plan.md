@@ -1,33 +1,27 @@
 
 
-## Omskriv booking flow-kommunikation: "Book selv først, ellers ringer vi"
+## Opsæt cron-job for process-booking-flow
 
-Ændrer budskabet i alle templates fra "vi ringer dig – book selv hvis det ikke passer" til "book selv den tid der passer dig – ellers ringer vi bare".
+Opretter et pg_cron job der kalder `process-booking-flow` edge-funktionen hvert 5. minut.
 
-### Ny kommunikationsstrategi
+### Trin
 
-**Primært budskab:** Opfordr kandidaten til selv at booke
-**Sekundært budskab:** "Hvis du ikke booker, ringer Oscar bare til dig"
+1. **Aktiver extensions** – Sørg for `pg_cron` og `pg_net` er aktive (sandsynligvis allerede aktive baseret på eksisterende cron-jobs i systemet).
 
-### Tekst-ændringer
+2. **Indsæt cron-job via insert-tool** – Kør SQL der scheduler jobbet:
+```sql
+SELECT cron.schedule(
+  'process-booking-flow-cron',
+  '*/5 * * * *',
+  $$
+  SELECT net.http_post(
+    url := 'https://jwlimmeijpfmaksvmuru.supabase.co/functions/v1/process-booking-flow',
+    headers := '{"Content-Type": "application/json", "Authorization": "Bearer <anon_key>"}'::jsonb
+  ) AS request_id;
+  $$
+);
+```
 
-Begge steder hvor templates er defineret (edge function + frontend preview):
-
-| Template | Nuværende kerneidé | Ny kerneidé |
-|----------|-------------------|-------------|
-| **Dag 0 Email** | "Vi ringer dig X – book selv hvis det ikke passer" | "Book selv en tid der passer dig – hvis du ikke booker, ringer Oscar bare til dig" |
-| **Dag 0 SMS** | "Vi ringer dig X. Passer det ikke? Book selv" | "Book en tid til en snak med Oscar: {link}. Booker du ikke, ringer vi bare til dig" |
-| **Dag 1 Pre-call SMS** | "Vi ringer dig i dag" | "Har du booket en tid endnu? Gør det her: {link}. Ellers ringer Oscar dig i dag" |
-| **Dag 1 Follow-up SMS** | "Vi prøvede at ringe. Book en tid" | "Oscar prøvede at ringe dig. Book selv en tid her: {link} – ellers prøver vi igen" |
-| **Dag 2 Reminder Email** | "Vi sendte en invitation – har du set den?" | "Du har stadig ikke booket en tid. Gør det nemt her: {link}. Ellers ringer Oscar dig" |
-| **Dag 3 Last Attempt** | "Vi har forsøgt at kontakte dig" | "Sidste chance for at booke en tid – ellers lukker vi din ansøgning" |
-
-Tonen forbliver personlig med Oscar som afsender, uforpligtende, og med en-dash.
-
-### Filer der ændres
-
-| Fil | Hvad |
-|-----|------|
-| `supabase/functions/process-booking-flow/index.ts` | Opdater alle FLOW_TEMPLATES tekster |
-| `src/components/recruitment/FlowTemplatesTab.tsx` | Samme tekst-opdateringer i preview-templates |
+### Resultat
+Pending touchpoints med `scheduled_at <= now()` vil automatisk blive behandlet inden for 5 minutter.
 
