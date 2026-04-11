@@ -1,25 +1,26 @@
 
 
-## Fix: Weekend-cleanup mail skal sendes kl. 16:00 dansk tid
+## Opret "Tak for ansøgning" email-skabelon
 
-### Problem
-Cron-jobbet kører `0 15 * * 5` (15:00 UTC). Det giver:
-- **Vintertid (CET):** 16:00 ✅
-- **Sommertid (CEST):** 17:00 ❌ ← vi er her nu
+### Hvad der sker
+Tilføjer en ny system-skabelon "Bekræftelse af ansøgning" til email-skabelonerne, som automatisk sender en bekræftelse til kandidater når de søger. Skabelonen oprettes som en ny system-template (ligesom invitation/afslag/jobtilbud) men aktiveres ikke — den er bare klar til brug.
 
-### Løsning
-Ændre cron-schedule til `0 14 * * 5` (14:00 UTC) så det rammer 16:00 i sommertid.
+### Indhold af skabelonen
+- **Emne:** "Tak for din ansøgning hos Copenhagen Sales"
+- **Tone:** Professionel, varm, Pipeline-inspireret (clean, premium SaaS-feel)
+- **Variabler:** `{{fornavn}}`, `{{rolle}}`
+- **Indhold:** Kort bekræftelse, hvad der sker nu (vi gennemgår ansøgningen), forventet responstid, Copenhagen Sales signatur
 
-**Bemærk:** I vintertid vil det så blive kl. 15:00 dansk tid. pg_cron kører i UTC og understøtter ikke automatisk DST-justering. Der er to muligheder:
+### Teknisk plan
+**Fil:** `src/pages/recruitment/EmailTemplates.tsx`
 
-1. **Simpel:** Sæt til `0 14 * * 5` — kl. 16:00 om sommeren, kl. 15:00 om vinteren. Tæt nok på.
-2. **Præcis:** Lade edge-funktionen selv tjekke dansk klokkeslæt og skippe hvis det ikke er tæt på kl. 16, og køre cron hvert kvarter fredag eftermiddag. Overkill for en påmindelse.
+1. Tilføj en ny default-tekst konstant `DEFAULT_APPLICATION_CONFIRMATION` med den Pipeline-inspirerede bekræftelsesmail
+2. Tilføj en ny entry i `TEMPLATE_CONFIGS` arrayet:
+   - `key: "bekraeftelse_ansoegning"`
+   - `name: "Bekræftelse af ansøgning"`
+   - `icon: Mail` (eller `Send`)
+   - Badge og preview-data
+3. Opdater `TemplateKey` typen til at inkludere den nye nøgle
 
-### Anbefaling: Mulighed 1
-Opdater cron-jobbet med SQL:
-```sql
-SELECT cron.alter_job(53, '0 14 * * 5');
-```
-
-Det er én SQL-kommando — ingen kodeændringer.
+Skabelonen vil dukke op som en ny tab i email-skabeloner, klar til redigering og test — men ikke koblet til nogen automatisk sending.
 
