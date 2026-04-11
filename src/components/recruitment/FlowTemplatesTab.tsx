@@ -161,7 +161,7 @@ export function FlowTemplatesTab() {
   return (
     <div className="space-y-6">
       <p className="text-sm text-muted-foreground">
-        Rediger de beskeder der sendes i hvert trin af booking-flowet. Brug <Badge variant="secondary" className="text-[10px] px-1 py-0 font-mono">{"{{fornavn}}"}</Badge>, <Badge variant="secondary" className="text-[10px] px-1 py-0 font-mono">{"{{rolle}}"}</Badge>, <Badge variant="secondary" className="text-[10px] px-1 py-0 font-mono">{"{{booking_link}}"}</Badge>, <Badge variant="secondary" className="text-[10px] px-1 py-0 font-mono">{"{{afmeld_link}}"}</Badge>, <Badge variant="secondary" className="text-[10px] px-1 py-0 font-mono">{"{{ringetidspunkt}}"}</Badge> og <Badge variant="secondary" className="text-[10px] px-1 py-0 font-mono">{"{{telefonnummer}}"}</Badge> som merge-tags.
+        Rediger de beskeder der sendes i hvert trin af booking-flowet. Brug <Badge variant="secondary" className="text-[10px] px-1 py-0 font-mono">{"{{fornavn}}"}</Badge>, <Badge variant="secondary" className="text-[10px] px-1 py-0 font-mono">{"{{rolle}}"}</Badge>, <Badge variant="secondary" className="text-[10px] px-1 py-0 font-mono">{"{{booking_link}}"}</Badge>, <Badge variant="secondary" className="text-[10px] px-1 py-0 font-mono">{"{{afmeld_link}}"}</Badge>, <Badge variant="secondary" className="text-[10px] px-1 py-0 font-mono">{"{{ringetidspunkt}}"}</Badge>, <Badge variant="secondary" className="text-[10px] px-1 py-0 font-mono">{"{{telefonnummer}}"}</Badge>, <Badge variant="secondary" className="text-[10px] px-1 py-0 font-mono">{"{{dato}}"}</Badge> og <Badge variant="secondary" className="text-[10px] px-1 py-0 font-mono">{"{{tidspunkt}}"}</Badge> som merge-tags.
       </p>
 
       {PHASE_GROUPS.map(group => {
@@ -273,7 +273,7 @@ export function FlowTemplatesTab() {
                 className="font-mono text-sm"
               />
               <p className="text-[10px] text-muted-foreground mt-1">
-                Merge-tags: {"{{fornavn}}"}, {"{{rolle}}"}, {"{{booking_link}}"}, {"{{afmeld_link}}"}, {"{{ringetidspunkt}}"}, {"{{telefonnummer}}"}
+                Merge-tags: {"{{fornavn}}"}, {"{{rolle}}"}, {"{{booking_link}}"}, {"{{afmeld_link}}"}, {"{{ringetidspunkt}}"}, {"{{telefonnummer}}"}, {"{{dato}}"}, {"{{tidspunkt}}"}
               </p>
             </div>
           </div>
@@ -340,7 +340,7 @@ export function FlowTemplatesTab() {
                 placeholder="Skriv beskedens indhold her..."
               />
               <p className="text-[10px] text-muted-foreground mt-1">
-                Merge-tags: {"{{fornavn}}"}, {"{{rolle}}"}, {"{{booking_link}}"}, {"{{afmeld_link}}"}, {"{{ringetidspunkt}}"}, {"{{telefonnummer}}"}
+                Merge-tags: {"{{fornavn}}"}, {"{{rolle}}"}, {"{{booking_link}}"}, {"{{afmeld_link}}"}, {"{{ringetidspunkt}}"}, {"{{telefonnummer}}"}, {"{{dato}}"}, {"{{tidspunkt}}"}
               </p>
             </div>
           </div>

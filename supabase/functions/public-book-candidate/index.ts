@@ -167,7 +167,19 @@ Deno.serve(async (req) => {
         const monthName = monthNames[dateObj.getMonth()];
         const dateFormatted = `${dayName} d. ${dateObj.getDate()}. ${monthName}`;
 
-        const smsMessage = `Hej ${candidate.first_name}! Din samtale er booket til ${dateFormatted} kl. ${startTime}. Vi ringer dig op. Glæder os! 📞 — Copenhagen Sales`;
+        // Fetch template from DB
+        const { data: smsTemplate } = await supabase
+          .from("booking_flow_steps")
+          .select("content")
+          .eq("template_key", "booking_confirmation_sms")
+          .eq("is_active", true)
+          .maybeSingle();
+
+        const fallback = `Hej {{fornavn}}! Din samtale er booket til {{dato}} kl. {{tidspunkt}}. Vi ringer dig op. Glæder os! 📞 — Copenhagen Sales`;
+        const smsMessage = (smsTemplate?.content || fallback)
+          .replace(/\{\{fornavn\}\}/g, candidate.first_name)
+          .replace(/\{\{dato\}\}/g, dateFormatted)
+          .replace(/\{\{tidspunkt\}\}/g, startTime);
 
         await fetch(`${supabaseUrl}/functions/v1/send-recruitment-sms`, {
           method: "POST",
