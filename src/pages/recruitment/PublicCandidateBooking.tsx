@@ -326,7 +326,7 @@ export default function PublicCandidateBooking() {
             style={{ color: "#aaa" }}
             disabled={unsubMutation.isPending}
           >
-            {unsubMutation.isPending ? "Trækker tilbage..." : "Ikke interesseret længere? Det er helt okay"}
+            {unsubMutation.isPending ? "Trækker tilbage..." : "Ikke interesseret længere? Klik her — det er helt okay"}
           </button>
         </div>
       </div>

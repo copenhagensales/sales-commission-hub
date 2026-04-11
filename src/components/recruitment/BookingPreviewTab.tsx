@@ -229,7 +229,7 @@ export function BookingPreviewTab() {
             {/* Unsubscribe */}
             <div className="text-center">
               <span className="text-xs underline cursor-default" style={{ color: "#aaa" }}>
-                Ikke interesseret længere? Det er helt okay
+                Ikke interesseret længere? Klik her — det er helt okay
               </span>
             </div>
           </div>
