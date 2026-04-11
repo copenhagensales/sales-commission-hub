@@ -147,6 +147,17 @@ Deno.serve(async (req) => {
         .eq("id", application.id);
     }
 
+    // Update candidate status and interview_date
+    const interviewDatetime = `${date}T${startTime}:00+02:00`;
+    await supabase
+      .from("candidates")
+      .update({
+        status: "interview_scheduled",
+        interview_date: interviewDatetime,
+      })
+      .eq("id", candidateId);
+    console.log(`[public-book-candidate] Updated candidate ${candidateId} with interview_date ${interviewDatetime}`);
+
     // Cancel active booking flow enrollments
     const { data: enrollments } = await supabase
       .from("booking_flow_enrollments")
