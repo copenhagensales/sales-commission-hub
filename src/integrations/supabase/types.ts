@@ -11452,6 +11452,41 @@ export type Database = {
         }
         Relationships: []
       }
+      short_links: {
+        Row: {
+          candidate_id: string | null
+          code: string
+          created_at: string
+          id: string
+          link_type: string | null
+          target_url: string
+        }
+        Insert: {
+          candidate_id?: string | null
+          code: string
+          created_at?: string
+          id?: string
+          link_type?: string | null
+          target_url: string
+        }
+        Update: {
+          candidate_id?: string | null
+          code?: string
+          created_at?: string
+          id?: string
+          link_type?: string | null
+          target_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "short_links_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "candidates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sms_notification_log: {
         Row: {
           booking_assignment_id: string | null
