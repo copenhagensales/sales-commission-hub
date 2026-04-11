@@ -11,7 +11,6 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Mail, MessageSquare, Pencil, Loader2 } from "lucide-react";
 
-// Mirrored from process-booking-flow defaults
 const FLOW_TEMPLATES: Record<string, { subject: string; content: string; channel: string }> = {
   flow_a_dag0_email: {
     subject: "Book en tid til en snak om din ansøgning",
@@ -23,30 +22,56 @@ const FLOW_TEMPLATES: Record<string, { subject: string; content: string; channel
     content: "Hej {{fornavn}}! Tak for din ansøgning til {{rolle}}. Vi vil gerne tage en uforpligtende snak på 5–10 min over telefonen. Book selv en tid med Oscar her: {{booking_link}} – Afmeld: {{afmeld_link}}",
     channel: "sms",
   },
-  flow_a_dag1_precall_sms: {
+  flow_a_dag1_sms: {
     subject: "",
-    content: "Hej {{fornavn}}, har du set vores besked? Book en tid her: {{booking_link}} – hvis du ikke lige når det, giver Oscar dig bare et kald fra {{telefonnummer}} 📞 Afmeld: {{afmeld_link}}",
+    content: "Hej {{fornavn}} 👋 Har du set vores besked? Vi vil stadig gerne snakke med dig om {{rolle}}. Book en tid her: {{booking_link}} – Afmeld: {{afmeld_link}}",
     channel: "sms",
   },
-  flow_a_dag1_followup_sms: {
-    subject: "",
-    content: "Hej {{fornavn}}, Oscar prøvede at ringe dig. Book selv en tid her: {{booking_link}} – ellers prøver vi igen 😊",
-    channel: "sms",
-  },
-  flow_a_dag2_reminder_email: {
-    subject: "Du har stadig ikke booket en tid",
-    content: "Hej {{fornavn}},\n\nDu har stadig ikke booket en tid til en snak om din ansøgning til {{rolle}}.\n\nGør det nemt her:\n{{booking_link}}\n\nHvis du ikke booker, ringer Oscar dig i løbet af dagen.\n\nMed venlig hilsen\nCopenhagen Sales",
+  flow_a_dag3_email: {
+    subject: "Lidt mere om stillingen som {{rolle}}",
+    content: "Hej {{fornavn}},\n\nVi ville lige følge op på din ansøgning til {{rolle}} hos Copenhagen Sales.\n\nHos os får du:\n• Grundig oplæring og sparring fra dag ét\n• Et ungt, ambitiøst team\n• Mulighed for at udvikle dig hurtigt\n\nBook en kort snak med Oscar her – det tager kun 5–10 min:\n{{booking_link}}\n\nIkke interesseret længere? Klik her – det er helt okay:\n{{afmeld_link}}\n\nMed venlig hilsen\nCopenhagen Sales",
     channel: "email",
   },
-  flow_a_dag3_last_attempt: {
-    subject: "Sidste chance for at booke en tid",
-    content: "Hej {{fornavn}},\n\nDet er sidste chance for at booke en tid til en snak om din ansøgning til {{rolle}} hos Copenhagen Sales.\n\nBook her:\n{{booking_link}}\n\nHører vi ikke fra dig, lukker vi ansøgningen.\n\nMed venlig hilsen\nCopenhagen Sales",
+  flow_a_dag6_sms: {
+    subject: "",
+    content: "Hej {{fornavn}}, vi har stadig en plads åben til {{rolle}} 🙌 Book en tid inden fredag: {{booking_link}} – Afmeld: {{afmeld_link}}",
+    channel: "sms",
+  },
+  flow_a_dag6_email: {
+    subject: "Pladsen er stadig åben – book inden fredag",
+    content: "Hej {{fornavn}},\n\nVi har stadig en plads åben til stillingen som {{rolle}}, og vi vil rigtig gerne høre fra dig.\n\nBook en tid til en kort snak her – det tager kun 5–10 min:\n{{booking_link}}\n\nVi holder pladsen åben til fredag.\n\nIkke interesseret længere? Klik her – det er helt okay:\n{{afmeld_link}}\n\nMed venlig hilsen\nCopenhagen Sales",
+    channel: "email",
+  },
+  flow_a_dag10_email: {
+    subject: "Vi lukker din ansøgning – men døren er åben",
+    content: "Hej {{fornavn}},\n\nVi har forsøgt at nå dig angående din ansøgning til {{rolle}} hos Copenhagen Sales, men har desværre ikke hørt fra dig.\n\nVi lukker derfor din ansøgning for nu – men døren er altid åben, hvis du får lyst til at tage en snak på et senere tidspunkt.\n\nDu er velkommen til at booke en tid her:\n{{booking_link}}\n\nVi ønsker dig alt det bedste!\n\nMed venlig hilsen\nCopenhagen Sales",
+    channel: "email",
+  },
+  flow_a_dag45_sms: {
+    subject: "",
+    content: "Hej {{fornavn}} 😊 Det er et stykke tid siden du søgte {{rolle}} hos Copenhagen Sales. Vi leder stadig – har du lyst til en uforpligtende snak? Book her: {{booking_link}} – Afmeld: {{afmeld_link}}",
+    channel: "sms",
+  },
+  flow_a_dag120_email: {
+    subject: "Vi har en ny mulighed til dig",
+    content: "Hej {{fornavn}},\n\nDet er et stykke tid siden, men vi tænkte på dig – vi søger lige nu en {{rolle}} hos Copenhagen Sales, og din profil passer godt.\n\nHar du lyst til en helt uforpligtende snak? Det tager kun 5–10 min:\n{{booking_link}}\n\nIngen pres – vi vil bare gerne høre, om det kunne have interesse.\n\nIkke interesseret? Klik her – det er helt okay:\n{{afmeld_link}}\n\nMed venlig hilsen\nCopenhagen Sales",
     channel: "email",
   },
 };
 
 const TIER_GROUPS = [
-  { tier: "A", label: "Booking Flow — 6 trin", keys: ["flow_a_dag0_email", "flow_a_dag0_sms", "flow_a_dag1_precall_sms", "flow_a_dag1_followup_sms", "flow_a_dag2_reminder_email", "flow_a_dag3_last_attempt"], color: "text-foreground" },
+  {
+    tier: "active",
+    label: "Aktiv booking — Dag 0–10",
+    keys: ["flow_a_dag0_email", "flow_a_dag0_sms", "flow_a_dag1_sms", "flow_a_dag3_email", "flow_a_dag6_sms", "flow_a_dag6_email", "flow_a_dag10_email"],
+    color: "text-foreground",
+  },
+  {
+    tier: "reengagement",
+    label: "Re-engagement — Dag 45 & 120",
+    keys: ["flow_a_dag45_sms", "flow_a_dag120_email"],
+    color: "text-foreground",
+  },
 ];
 
 function extractDay(key: string): string {
@@ -76,7 +101,6 @@ export function FlowTemplatesTab() {
   const [editSubject, setEditSubject] = useState("");
   const [editContent, setEditContent] = useState("");
 
-  // Fetch custom overrides from email_templates
   const { data: overrides, isLoading } = useQuery({
     queryKey: ["flow-template-overrides"],
     queryFn: async () => {
@@ -100,15 +124,9 @@ export function FlowTemplatesTab() {
           .eq("id", existing.id);
         if (error) throw error;
       } else {
-        const defaultTpl = FLOW_TEMPLATES[key];
         const { error } = await supabase
           .from("email_templates")
-          .insert({
-            template_key: key,
-            name: key,
-            subject,
-            content,
-          });
+          .insert({ template_key: key, name: key, subject, content });
         if (error) throw error;
       }
     },
@@ -124,10 +142,7 @@ export function FlowTemplatesTab() {
     mutationFn: async (key: string) => {
       const existing = overrides?.find(o => o.template_key === key);
       if (existing) {
-        const { error } = await supabase
-          .from("email_templates")
-          .delete()
-          .eq("id", existing.id);
+        const { error } = await supabase.from("email_templates").delete().eq("id", existing.id);
         if (error) throw error;
       }
     },
@@ -165,7 +180,7 @@ export function FlowTemplatesTab() {
   return (
     <div className="space-y-6">
       <p className="text-sm text-muted-foreground">
-        Rediger de beskeder der sendes i hvert trin af booking-flowet. Brug <Badge variant="secondary" className="text-[10px] px-1 py-0 font-mono">{"{{fornavn}}"}</Badge>, <Badge variant="secondary" className="text-[10px] px-1 py-0 font-mono">{"{{rolle}}"}</Badge>, <Badge variant="secondary" className="text-[10px] px-1 py-0 font-mono">{"{{ringetidspunkt}}"}</Badge>, <Badge variant="secondary" className="text-[10px] px-1 py-0 font-mono">{"{{telefonnummer}}"}</Badge>, <Badge variant="secondary" className="text-[10px] px-1 py-0 font-mono">{"{{booking_link}}"}</Badge> og <Badge variant="secondary" className="text-[10px] px-1 py-0 font-mono">{"{{afmeld_link}}"}</Badge> som merge-tags.
+        Rediger de beskeder der sendes i hvert trin af booking-flowet. Brug <Badge variant="secondary" className="text-[10px] px-1 py-0 font-mono">{"{{fornavn}}"}</Badge>, <Badge variant="secondary" className="text-[10px] px-1 py-0 font-mono">{"{{rolle}}"}</Badge>, <Badge variant="secondary" className="text-[10px] px-1 py-0 font-mono">{"{{booking_link}}"}</Badge> og <Badge variant="secondary" className="text-[10px] px-1 py-0 font-mono">{"{{afmeld_link}}"}</Badge> som merge-tags.
       </p>
 
       {TIER_GROUPS.map(group => (
@@ -186,7 +201,7 @@ export function FlowTemplatesTab() {
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-xs font-medium text-muted-foreground">{extractDay(key)}</span>
                       <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                        {def.channel === "email" ? "Email" : def.channel === "sms" ? "SMS" : "Opkald"}
+                        {def.channel === "email" ? "Email" : "SMS"}
                       </Badge>
                       {eff.isCustom && (
                         <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-blue-100 text-blue-700">
@@ -218,7 +233,6 @@ export function FlowTemplatesTab() {
         </Card>
       ))}
 
-      {/* Edit dialog */}
       <Dialog open={!!editKey} onOpenChange={(open) => !open && setEditKey(null)}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -240,7 +254,7 @@ export function FlowTemplatesTab() {
                 className="font-mono text-sm"
               />
               <p className="text-[10px] text-muted-foreground mt-1">
-                Merge-tags: {"{{fornavn}}"}, {"{{rolle}}"}, {"{{ringetidspunkt}}"}, {"{{telefonnummer}}"}, {"{{booking_link}}"}, {"{{afmeld_link}}"}
+                Merge-tags: {"{{fornavn}}"}, {"{{rolle}}"}, {"{{booking_link}}"}, {"{{afmeld_link}}"}
               </p>
             </div>
           </div>
