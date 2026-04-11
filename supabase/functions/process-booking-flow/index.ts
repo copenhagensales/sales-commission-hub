@@ -5,55 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Default template content per template_key
-const FLOW_TEMPLATES: Record<string, { subject: string; content: string; channel: string }> = {
-  flow_a_dag0_email: {
-    subject: "Book en tid til en snak om din ansøgning",
-    content: "Hej {{fornavn}},\n\nTak for din ansøgning til stillingen som {{rolle}} hos Copenhagen Sales.\n\nVi vil gerne invitere dig til en uforpligtende snak på 5–10 minutter over telefonen med Oscar, som er ansvarlig for rekruttering.\n\nBook selv den tid der passer dig bedst her:\n{{booking_link}}\n\nIkke interesseret længere? Klik her – det er helt okay:\n{{afmeld_link}}\n\nMed venlig hilsen\nCopenhagen Sales",
-    channel: "email",
-  },
-  flow_a_dag0_sms: {
-    subject: "",
-    content: "Hej {{fornavn}}! Tak for din ansøgning til {{rolle}}. Vi vil gerne tage en uforpligtende snak på 5–10 min over telefonen. Book selv en tid med Oscar her: {{booking_link}} – Afmeld: {{afmeld_link}}",
-    channel: "sms",
-  },
-  flow_a_dag1_sms: {
-    subject: "",
-    content: "Hej {{fornavn}} 👋 Har du set vores besked? Vi vil stadig gerne snakke med dig om {{rolle}}. Book en tid her: {{booking_link}} – Afmeld: {{afmeld_link}}",
-    channel: "sms",
-  },
-  flow_a_dag3_email: {
-    subject: "Lidt mere om stillingen som {{rolle}}",
-    content: "Hej {{fornavn}},\n\nVi ville lige følge op på din ansøgning til {{rolle}} hos Copenhagen Sales.\n\nHos os får du:\n• Grundig oplæring og sparring fra dag ét\n• Et ungt, ambitiøst team\n• Mulighed for at udvikle dig hurtigt\n\nBook en kort snak med Oscar her – det tager kun 5–10 min:\n{{booking_link}}\n\nIkke interesseret længere? Klik her – det er helt okay:\n{{afmeld_link}}\n\nMed venlig hilsen\nCopenhagen Sales",
-    channel: "email",
-  },
-  flow_a_dag6_sms: {
-    subject: "",
-    content: "Hej {{fornavn}}, vi har stadig en plads åben til {{rolle}} 🙌 Book en tid inden fredag: {{booking_link}} – Afmeld: {{afmeld_link}}",
-    channel: "sms",
-  },
-  flow_a_dag6_email: {
-    subject: "Pladsen er stadig åben – book inden fredag",
-    content: "Hej {{fornavn}},\n\nVi har stadig en plads åben til stillingen som {{rolle}}, og vi vil rigtig gerne høre fra dig.\n\nBook en tid til en kort snak her – det tager kun 5–10 min:\n{{booking_link}}\n\nVi holder pladsen åben til fredag.\n\nIkke interesseret længere? Klik her – det er helt okay:\n{{afmeld_link}}\n\nMed venlig hilsen\nCopenhagen Sales",
-    channel: "email",
-  },
-  flow_a_dag10_email: {
-    subject: "Vi lukker din ansøgning – men døren er åben",
-    content: "Hej {{fornavn}},\n\nVi har forsøgt at nå dig angående din ansøgning til {{rolle}} hos Copenhagen Sales, men har desværre ikke hørt fra dig.\n\nVi lukker derfor din ansøgning for nu – men døren er altid åben, hvis du får lyst til at tage en snak på et senere tidspunkt.\n\nDu er velkommen til at booke en tid her:\n{{booking_link}}\n\nVi ønsker dig alt det bedste!\n\nMed venlig hilsen\nCopenhagen Sales",
-    channel: "email",
-  },
-  flow_a_dag45_sms: {
-    subject: "",
-    content: "Hej {{fornavn}} 😊 Det er et stykke tid siden du søgte {{rolle}} hos Copenhagen Sales. Vi leder stadig – har du lyst til en uforpligtende snak? Book her: {{booking_link}} – Afmeld: {{afmeld_link}}",
-    channel: "sms",
-  },
-  flow_a_dag120_email: {
-    subject: "Vi har en ny mulighed til dig",
-    content: "Hej {{fornavn}},\n\nDet er et stykke tid siden, men vi tænkte på dig – vi søger lige nu en {{rolle}} hos Copenhagen Sales, og din profil passer godt.\n\nHar du lyst til en helt uforpligtende snak? Det tager kun 5–10 min:\n{{booking_link}}\n\nIngen pres – vi vil bare gerne høre, om det kunne have interesse.\n\nIkke interesseret? Klik her – det er helt okay:\n{{afmeld_link}}\n\nMed venlig hilsen\nCopenhagen Sales",
-    channel: "email",
-  },
-};
-
+// Templates are now stored in booking_flow_steps table
 function generateShortCode(length = 6): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let code = '';
