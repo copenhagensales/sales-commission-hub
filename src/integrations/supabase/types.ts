@@ -1494,6 +1494,149 @@ export type Database = {
           },
         ]
       }
+      booking_flow_criteria: {
+        Row: {
+          active: boolean
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      booking_flow_enrollments: {
+        Row: {
+          application_id: string | null
+          cancelled_at: string | null
+          cancelled_reason: string | null
+          candidate_id: string
+          completed_at: string | null
+          created_at: string
+          criteria_met: Json | null
+          current_day: number
+          enrolled_at: string
+          id: string
+          status: string
+          tier: string
+          updated_at: string
+        }
+        Insert: {
+          application_id?: string | null
+          cancelled_at?: string | null
+          cancelled_reason?: string | null
+          candidate_id: string
+          completed_at?: string | null
+          created_at?: string
+          criteria_met?: Json | null
+          current_day?: number
+          enrolled_at?: string
+          id?: string
+          status?: string
+          tier: string
+          updated_at?: string
+        }
+        Update: {
+          application_id?: string | null
+          cancelled_at?: string | null
+          cancelled_reason?: string | null
+          candidate_id?: string
+          completed_at?: string | null
+          created_at?: string
+          criteria_met?: Json | null
+          current_day?: number
+          enrolled_at?: string
+          id?: string
+          status?: string
+          tier?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_flow_enrollments_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_flow_enrollments_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "candidates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      booking_flow_touchpoints: {
+        Row: {
+          channel: string
+          created_at: string
+          day: number
+          enrollment_id: string
+          error_message: string | null
+          id: string
+          scheduled_at: string
+          sent_at: string | null
+          status: string
+          template_key: string | null
+          updated_at: string
+        }
+        Insert: {
+          channel: string
+          created_at?: string
+          day: number
+          enrollment_id: string
+          error_message?: string | null
+          id?: string
+          scheduled_at: string
+          sent_at?: string | null
+          status?: string
+          template_key?: string | null
+          updated_at?: string
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          day?: number
+          enrollment_id?: string
+          error_message?: string | null
+          id?: string
+          scheduled_at?: string
+          sent_at?: string | null
+          status?: string
+          template_key?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_flow_touchpoints_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "booking_flow_enrollments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       booking_hotel: {
         Row: {
           booked_days: number[] | null
@@ -2277,6 +2420,7 @@ export type Database = {
           source: string | null
           status: string
           team_id: string | null
+          tier: string | null
           updated_at: string
           winback_contact_date: string | null
         }
@@ -2303,6 +2447,7 @@ export type Database = {
           source?: string | null
           status?: string
           team_id?: string | null
+          tier?: string | null
           updated_at?: string
           winback_contact_date?: string | null
         }
@@ -2329,6 +2474,7 @@ export type Database = {
           source?: string | null
           status?: string
           team_id?: string | null
+          tier?: string | null
           updated_at?: string
           winback_contact_date?: string | null
         }
