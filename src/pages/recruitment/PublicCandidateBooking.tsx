@@ -313,7 +313,7 @@ export default function PublicCandidateBooking() {
             className="text-xs text-muted-foreground underline hover:text-foreground transition-colors"
             disabled={unsubMutation.isPending}
           >
-            {unsubMutation.isPending ? "Afmelder..." : "Jeg ønsker ikke at blive kontaktet — afmeld min ansøgning"}
+            {unsubMutation.isPending ? "Trækker tilbage..." : "Jeg ønsker ikke at blive kontaktet — træk min ansøgning tilbage"}
           </button>
         </div>
       </div>
