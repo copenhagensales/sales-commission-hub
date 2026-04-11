@@ -35,28 +35,44 @@ const statusConfig: Record<string, { label: string; icon: typeof CheckCircle; co
 
 const FLOW_DEFINITIONS: Record<string, Array<{ day: number; channel: string; template_key: string; offsetHours: number }>> = {
   A: [
+    // Dag 0 — Første kontakt
     { day: 0, channel: "email", template_key: "flow_a_dag0_email", offsetHours: 0 },
     { day: 0, channel: "sms", template_key: "flow_a_dag0_sms", offsetHours: 0.15 },
-    { day: 1, channel: "sms", template_key: "flow_a_dag1_precall_sms", offsetHours: 9 },
-    { day: 1, channel: "sms", template_key: "flow_a_dag1_followup_sms", offsetHours: 15 },
-    { day: 2, channel: "email", template_key: "flow_a_dag2_reminder_email", offsetHours: 9 },
-    { day: 3, channel: "email", template_key: "flow_a_dag3_last_attempt", offsetHours: 10 },
+    // Dag 1 — Første rykker (SMS-fokus)
+    { day: 1, channel: "sms", template_key: "flow_a_dag1_sms", offsetHours: 10 },
+    // Dag 3 — Anden rykker (Email, mere kontekst)
+    { day: 3, channel: "email", template_key: "flow_a_dag3_email", offsetHours: 9 },
+    // Dag 6 — Tredje rykker (SMS + Email, deadline)
+    { day: 6, channel: "sms", template_key: "flow_a_dag6_sms", offsetHours: 9 },
+    { day: 6, channel: "email", template_key: "flow_a_dag6_email", offsetHours: 9.5 },
+    // Dag 10 — Afslutning af aktiv fase
+    { day: 10, channel: "email", template_key: "flow_a_dag10_email", offsetHours: 10 },
+    // Dag 45 — Re-engagement 1 (genaktivering)
+    { day: 45, channel: "sms", template_key: "flow_a_dag45_sms", offsetHours: 10 },
+    // Dag 120 — Re-engagement 2 (sidste chance)
+    { day: 120, channel: "email", template_key: "flow_a_dag120_email", offsetHours: 10 },
   ],
   B: [
     { day: 0, channel: "email", template_key: "flow_a_dag0_email", offsetHours: 0 },
     { day: 0, channel: "sms", template_key: "flow_a_dag0_sms", offsetHours: 0.15 },
-    { day: 1, channel: "sms", template_key: "flow_a_dag1_precall_sms", offsetHours: 9 },
-    { day: 1, channel: "sms", template_key: "flow_a_dag1_followup_sms", offsetHours: 15 },
-    { day: 2, channel: "email", template_key: "flow_a_dag2_reminder_email", offsetHours: 9 },
-    { day: 3, channel: "email", template_key: "flow_a_dag3_last_attempt", offsetHours: 10 },
+    { day: 1, channel: "sms", template_key: "flow_a_dag1_sms", offsetHours: 10 },
+    { day: 3, channel: "email", template_key: "flow_a_dag3_email", offsetHours: 9 },
+    { day: 6, channel: "sms", template_key: "flow_a_dag6_sms", offsetHours: 9 },
+    { day: 6, channel: "email", template_key: "flow_a_dag6_email", offsetHours: 9.5 },
+    { day: 10, channel: "email", template_key: "flow_a_dag10_email", offsetHours: 10 },
+    { day: 45, channel: "sms", template_key: "flow_a_dag45_sms", offsetHours: 10 },
+    { day: 120, channel: "email", template_key: "flow_a_dag120_email", offsetHours: 10 },
   ],
   C: [
     { day: 0, channel: "email", template_key: "flow_a_dag0_email", offsetHours: 0 },
     { day: 0, channel: "sms", template_key: "flow_a_dag0_sms", offsetHours: 0.15 },
-    { day: 1, channel: "sms", template_key: "flow_a_dag1_precall_sms", offsetHours: 9 },
-    { day: 1, channel: "sms", template_key: "flow_a_dag1_followup_sms", offsetHours: 15 },
-    { day: 2, channel: "email", template_key: "flow_a_dag2_reminder_email", offsetHours: 9 },
-    { day: 3, channel: "email", template_key: "flow_a_dag3_last_attempt", offsetHours: 10 },
+    { day: 1, channel: "sms", template_key: "flow_a_dag1_sms", offsetHours: 10 },
+    { day: 3, channel: "email", template_key: "flow_a_dag3_email", offsetHours: 9 },
+    { day: 6, channel: "sms", template_key: "flow_a_dag6_sms", offsetHours: 9 },
+    { day: 6, channel: "email", template_key: "flow_a_dag6_email", offsetHours: 9.5 },
+    { day: 10, channel: "email", template_key: "flow_a_dag10_email", offsetHours: 10 },
+    { day: 45, channel: "sms", template_key: "flow_a_dag45_sms", offsetHours: 10 },
+    { day: 120, channel: "email", template_key: "flow_a_dag120_email", offsetHours: 10 },
   ],
 };
 
