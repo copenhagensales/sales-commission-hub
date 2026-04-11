@@ -14,18 +14,18 @@ import { Mail, MessageSquare, Phone, Pencil, Loader2 } from "lucide-react";
 // Mirrored from process-booking-flow defaults
 const FLOW_TEMPLATES: Record<string, { subject: string; content: string; channel: string }> = {
   flow_a_dag0_email: {
-    subject: "Tak for din ansøgning — vi vil gerne tale med dig!",
-    content: "Hej {{fornavn}},\n\nTak for din ansøgning til stillingen som {{rolle}} hos Copenhagen Sales.\n\nVi var begejstrede for din profil og vil meget gerne invitere dig til en kort samtale.\n\nVi ringer dig {{ringetidspunkt}} fra {{telefonnummer}}.\n\nPasser det ikke? Book selv en tid der passer dig her:\n{{booking_link}}\n\nØnsker du ikke at blive kontaktet? Afmeld dig her:\n{{afmeld_link}}\n\nMed venlig hilsen\nCopenhagen Sales",
+    subject: "Book en tid til en snak om din ansøgning",
+    content: "Hej {{fornavn}},\n\nTak for din ansøgning til stillingen som {{rolle}} hos Copenhagen Sales.\n\nVi vil gerne invitere dig til en uforpligtende snak på 5–10 minutter med Oscar, som er ansvarlig for rekruttering. Han kan svare på alt fra løn og arbejdstider til hverdagen i salg.\n\nBook selv den tid der passer dig bedst her:\n{{booking_link}}\n\nHvis du ikke booker noget, ringer Oscar bare til dig {{ringetidspunkt}} fra {{telefonnummer}}.\n\nIkke interesseret længere? Klik her – det er helt okay:\n{{afmeld_link}}\n\nMed venlig hilsen\nCopenhagen Sales",
     channel: "email",
   },
   flow_a_dag0_sms: {
     subject: "",
-    content: "Hej {{fornavn}}! Tak for din ansøgning til {{rolle}}. Vi ringer dig {{ringetidspunkt}} fra {{telefonnummer}}. Passer det ikke? Book selv en tid: {{booking_link}} — Afmeld: {{afmeld_link}}",
+    content: "Hej {{fornavn}}! Tak for din ansøgning til {{rolle}}. Book selv en tid til en uforpligtende snak med Oscar her: {{booking_link}} – booker du ikke, ringer han bare til dig 😊 Afmeld: {{afmeld_link}}",
     channel: "sms",
   },
   flow_a_dag1_precall_sms: {
     subject: "",
-    content: "Hej {{fornavn}}, vi ringer til dig i dag angående din ansøgning hos Copenhagen Sales. Glæder os til at tale med dig! 📞",
+    content: "Hej {{fornavn}}, har du booket en tid endnu? Gør det her: {{booking_link}} – ellers ringer Oscar dig i dag 📞",
     channel: "sms",
   },
   flow_a_dag1_call: {
@@ -35,22 +35,22 @@ const FLOW_TEMPLATES: Record<string, { subject: string; content: string; channel
   },
   flow_a_dag1_followup_sms: {
     subject: "",
-    content: "Hej {{fornavn}}, vi prøvede at ringe dig i dag. Hvornår passer det dig at tale? Book selv en tid her: {{booking_link}} — eller ring os på {{telefonnummer}} 😊",
+    content: "Hej {{fornavn}}, Oscar prøvede at ringe dig. Book selv en tid her: {{booking_link}} – ellers prøver vi igen 😊",
     channel: "sms",
   },
   flow_a_dag2_reminder_email: {
-    subject: "Reminder: Vi vil stadig gerne tale med dig",
-    content: "Hej {{fornavn}},\n\nVi sendte dig en invitation til samtale i går – har du haft mulighed for at kigge på den?\n\nVi er stadig meget interesserede i din profil til stillingen som {{rolle}}.\n\nSvar gerne med et par tidspunkter der passer dig.\n\nMed venlig hilsen\nCopenhagen Sales",
+    subject: "Du har stadig ikke booket en tid",
+    content: "Hej {{fornavn}},\n\nDu har stadig ikke booket en tid til en snak om din ansøgning til {{rolle}}.\n\nGør det nemt her:\n{{booking_link}}\n\nHvis du ikke booker, ringer Oscar dig i løbet af dagen.\n\nMed venlig hilsen\nCopenhagen Sales",
     channel: "email",
   },
   flow_a_dag2_call: {
     subject: "2. opkaldsforsøg",
-    content: "Ring til {{fornavn}} igen — 2. forsøg. Ansøgning til {{rolle}}.",
+    content: "Ring til {{fornavn}} igen – 2. forsøg. Ansøgning til {{rolle}}.",
     channel: "call_reminder",
   },
   flow_a_dag3_last_attempt: {
-    subject: "Sidste kontaktforsøg",
-    content: "Hej {{fornavn}},\n\nVi har forsøgt at kontakte dig et par gange vedrørende din ansøgning til {{rolle}} hos Copenhagen Sales.\n\nHvis du stadig er interesseret, vil vi meget gerne høre fra dig. Ellers lukker vi ansøgningen.\n\nMed venlig hilsen\nCopenhagen Sales",
+    subject: "Sidste chance for at booke en tid",
+    content: "Hej {{fornavn}},\n\nDet er sidste chance for at booke en tid til en snak om din ansøgning til {{rolle}} hos Copenhagen Sales.\n\nBook her:\n{{booking_link}}\n\nHører vi ikke fra dig, lukker vi ansøgningen.\n\nMed venlig hilsen\nCopenhagen Sales",
     channel: "email",
   },
 };
