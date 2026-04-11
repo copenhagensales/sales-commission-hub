@@ -28,38 +28,7 @@ export default function PublicCandidateBooking() {
   const [booked, setBooked] = useState(false);
   const [unsubscribed, setUnsubscribed] = useState(false);
 
-  // Fetch candidate info
-  const { data: candidate, isLoading: candidateLoading } = useQuery({
-    queryKey: ["public-candidate", candidateId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("candidates")
-        .select("id, first_name, last_name, email, phone")
-        .eq("id", candidateId!)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!candidateId,
-  });
-
-  // Fetch application role
-  const { data: application } = useQuery({
-    queryKey: ["public-candidate-app", candidateId],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("applications")
-        .select("role, status")
-        .eq("candidate_id", candidateId!)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      return data;
-    },
-    enabled: !!candidateId,
-  });
-
-  // Fetch availability
+  // Fetch availability + candidate + application from edge function (bypasses RLS)
   const { data: availability, isLoading: availLoading } = useQuery({
     queryKey: ["public-availability", candidateId],
     queryFn: async () => {
@@ -67,10 +36,17 @@ export default function PublicCandidateBooking() {
         body: { candidateId },
       });
       if (res.error) throw res.error;
-      return res.data as { days: AvailabilityDay[] };
+      return res.data as {
+        days: AvailabilityDay[];
+        candidate: { id: string; first_name: string; last_name: string; email: string; phone: string } | null;
+        application: { role: string; status: string } | null;
+      };
     },
     enabled: !!candidateId,
   });
+
+  const candidate = availability?.candidate ?? null;
+  const application = availability?.application ?? null;
 
   // Book mutation
   const bookMutation = useMutation({
