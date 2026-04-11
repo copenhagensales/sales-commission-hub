@@ -151,13 +151,21 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const { data: candidate } = await supabase
-      .from("candidates").select("id, first_name").eq("id", candidateId).maybeSingle();
+      .from("candidates").select("id, first_name, last_name, email, phone").eq("id", candidateId).maybeSingle();
 
     if (!candidate) {
       return new Response(JSON.stringify({ error: "Candidate not found" }), {
         status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    const { data: application } = await supabase
+      .from("applications")
+      .select("role, status")
+      .eq("candidate_id", candidateId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
     const settings = await fetchSettings(supabase);
     const now = new Date();
@@ -170,7 +178,7 @@ Deno.serve(async (req) => {
 
     if (!clientId || !clientSecret || !tenantId || !msUserEmail) {
       console.warn("[get-public-availability] M365 not configured, returning default slots");
-      return new Response(JSON.stringify({ days: generateDays(settings, now) }), {
+      return new Response(JSON.stringify({ days: generateDays(settings, now), candidate, application }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -189,7 +197,7 @@ Deno.serve(async (req) => {
 
     if (!tokenResponse.ok) {
       console.error("[get-public-availability] Token error:", await tokenResponse.text());
-      return new Response(JSON.stringify({ days: generateDays(settings, now) }), {
+      return new Response(JSON.stringify({ days: generateDays(settings, now), candidate, application }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -217,7 +225,7 @@ Deno.serve(async (req) => {
 
     if (!scheduleResponse.ok) {
       console.error("[get-public-availability] Schedule error:", await scheduleResponse.text());
-      return new Response(JSON.stringify({ days: generateDays(settings, now) }), {
+      return new Response(JSON.stringify({ days: generateDays(settings, now), candidate, application }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -226,7 +234,7 @@ Deno.serve(async (req) => {
     const schedule = scheduleData.value?.[0];
 
     if (!schedule) {
-      return new Response(JSON.stringify({ days: generateDays(settings, now) }), {
+      return new Response(JSON.stringify({ days: generateDays(settings, now), candidate, application }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -238,7 +246,7 @@ Deno.serve(async (req) => {
         end: new Date(item.end.dateTime + "Z"),
       }));
 
-    return new Response(JSON.stringify({ days: generateDays(settings, now, busyPeriods) }), {
+    return new Response(JSON.stringify({ days: generateDays(settings, now, busyPeriods), candidate, application }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: any) {
