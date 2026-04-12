@@ -641,21 +641,37 @@ export default function LocationHistoryContent() {
                   <TableHead className="text-right">Lokationer</TableHead>
                   <TableHead className="text-right">Dage</TableHead>
                   <TableHead className="text-right">Salg/dag</TableHead>
-                  <TableHead className="text-right">DB</TableHead>
-                  <TableHead className="text-right pr-6">DB/dag</TableHead>
+                  <TableHead className="text-right">30 dage</TableHead>
+                  <TableHead className="text-right">3 mdr</TableHead>
+                  <TableHead className="text-right">6 mdr</TableHead>
+                  <TableHead className="text-right pr-6">All time</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {vendorTypeSummary.map(row => (
-                  <TableRow key={row.type}>
-                    <TableCell className="pl-6 font-medium">{row.type}</TableCell>
-                    <TableCell className="text-right">{row.locations}</TableCell>
-                    <TableCell className="text-right">{row.days}</TableCell>
-                    <TableCell className="text-right">{row.salesPerDay.toFixed(1).replace(".", ",")}</TableCell>
-                    <TableCell className={`text-right ${row.db >= 0 ? "text-emerald-600" : "text-destructive"}`}>{formatKr(row.db)}</TableCell>
-                    <TableCell className={`text-right pr-6 font-semibold ${row.dbPerDay >= 0 ? "text-emerald-600" : "text-destructive"}`}>{formatKr(row.dbPerDay)}</TableCell>
-                  </TableRow>
-                ))}
+                {vendorTypeSummary.map(row => {
+                  const renderDbCell = (val: number | null, className?: string) => {
+                    if (val === null) return <TableCell className={`text-right text-muted-foreground ${className || ""}`}>–</TableCell>;
+                    return <TableCell className={`text-right ${val >= 0 ? "text-emerald-600" : "text-destructive"} ${className || ""}`}>{formatKr(val)}</TableCell>;
+                  };
+                  const trend = row.dbPerDay30 !== null && row.dbPerDayAll !== null
+                    ? row.dbPerDay30 > row.dbPerDayAll ? "↑" : row.dbPerDay30 < row.dbPerDayAll ? "↓" : ""
+                    : "";
+                  return (
+                    <TableRow key={row.type}>
+                      <TableCell className="pl-6 font-medium">
+                        {row.type}
+                        {trend && <span className={`ml-1 ${trend === "↑" ? "text-emerald-600" : "text-destructive"}`}>{trend}</span>}
+                      </TableCell>
+                      <TableCell className="text-right">{row.locations}</TableCell>
+                      <TableCell className="text-right">{row.days}</TableCell>
+                      <TableCell className="text-right">{row.salesPerDay.toFixed(1).replace(".", ",")}</TableCell>
+                      {renderDbCell(row.dbPerDay30)}
+                      {renderDbCell(row.dbPerDay90)}
+                      {renderDbCell(row.dbPerDay180)}
+                      {renderDbCell(row.dbPerDayAll, "pr-6 font-semibold")}
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </CardContent>
