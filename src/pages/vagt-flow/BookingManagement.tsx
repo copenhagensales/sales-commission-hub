@@ -18,6 +18,7 @@ const MarketsContent = lazy(() => import("./MarketsContent"));
 const VagtplanFMContent = lazy(() => import("./VagtplanFMContent"));
 const HotelsContent = lazy(() => import("./HotelsContent"));
 const LocationProfitabilityContent = lazy(() => import("./LocationProfitabilityContent"));
+const LocationHistoryContent = lazy(() => import("./LocationHistoryContent"));
 const FmChecklistContent = lazy(() => import("./FmChecklistContent"));
 
 
@@ -30,6 +31,7 @@ const allTabs = [
   { value: "vagtplan-fm", label: "Vagtplan", icon: CalendarDays, permissionKey: "tab_fm_vagtplan" },
   { value: "hotels", label: "Hoteller", icon: Hotel, permissionKey: "tab_fm_hotels" },
   { value: "okonomi", label: "Økonomi", icon: BarChart3, permissionKey: "tab_fm_locations" },
+  { value: "okonomi-butikker", label: "Økonomi Butikker", icon: BarChart3, permissionKey: "tab_fm_locations" },
   { value: "checklist", label: "Tjekliste", icon: ClipboardCheck, permissionKey: "tab_fm_checklist" },
 ];
 
@@ -186,6 +188,14 @@ export default function BookingManagement() {
             <TabsContent value="okonomi" className="mt-6">
               <Suspense fallback={<div className="flex items-center justify-center py-12">Indlæser...</div>}>
                 <LocationProfitabilityContent />
+              </Suspense>
+            </TabsContent>
+          )}
+
+          {visibleTabs.some(t => t.value === "okonomi-butikker") && (
+            <TabsContent value="okonomi-butikker" className="mt-6">
+              <Suspense fallback={<div className="flex items-center justify-center py-12">Indlæser...</div>}>
+                <LocationHistoryContent />
               </Suspense>
             </TabsContent>
           )}
