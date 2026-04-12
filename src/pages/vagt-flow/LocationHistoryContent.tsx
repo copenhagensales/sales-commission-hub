@@ -591,12 +591,48 @@ export default function LocationHistoryContent() {
         </span>
       </div>
 
+      {/* Vendor type summary */}
+      {!isLoading && vendorTypeSummary.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">DB/dag pr. leverandørtype</CardTitle>
+          </CardHeader>
+          <CardContent className="px-0 pb-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="pl-6">Type</TableHead>
+                  <TableHead className="text-right">Lokationer</TableHead>
+                  <TableHead className="text-right">Dage</TableHead>
+                  <TableHead className="text-right">Salg/dag</TableHead>
+                  <TableHead className="text-right">DB</TableHead>
+                  <TableHead className="text-right pr-6">DB/dag</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {vendorTypeSummary.map(row => (
+                  <TableRow key={row.type}>
+                    <TableCell className="pl-6 font-medium">{row.type}</TableCell>
+                    <TableCell className="text-right">{row.locations}</TableCell>
+                    <TableCell className="text-right">{row.days}</TableCell>
+                    <TableCell className="text-right">{row.salesPerDay.toFixed(1).replace(".", ",")}</TableCell>
+                    <TableCell className={`text-right ${row.db >= 0 ? "text-emerald-600" : "text-destructive"}`}>{formatKr(row.db)}</TableCell>
+                    <TableCell className={`text-right pr-6 font-semibold ${row.dbPerDay >= 0 ? "text-emerald-600" : "text-destructive"}`}>{formatKr(row.dbPerDay)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
       {/* KPI Cards */}
       <div className="space-y-4">
         {eesyLocations.length > 0 && <KpiCards label="Eesy FM" totals={totalEesy} />}
         {youseeLocations.length > 0 && <KpiCards label="YouSee" totals={totalYousee} />}
         <KpiCards label="Samlet" totals={totalAll} />
       </div>
+
 
       {/* Location table */}
       <Card>
