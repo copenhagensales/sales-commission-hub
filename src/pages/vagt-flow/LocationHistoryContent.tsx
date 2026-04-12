@@ -424,14 +424,13 @@ export default function LocationHistoryContent() {
   const totalEesy = useMemo(() => computeTotals(eesyLocations), [eesyLocations]);
   const totalYousee = useMemo(() => computeTotals(youseeLocations), [youseeLocations]);
 
-  // ── Vendor type summary with time periods ──
-  const vendorTypeSummary = useMemo(() => {
+  // ── Vendor type summary helper ──
+  const computeVendorSummary = (locations: AggregatedLocation[]) => {
     const now = new Date();
     const cutoff30 = new Date(now); cutoff30.setDate(cutoff30.getDate() - 30);
     const cutoff90 = new Date(now); cutoff90.setDate(cutoff90.getDate() - 90);
     const cutoff180 = new Date(now); cutoff180.setDate(cutoff180.getDate() - 180);
 
-    // Convert week/year to approximate date (Monday of ISO week)
     const weekToDate = (week: number, year: number): Date => {
       const jan4 = new Date(year, 0, 4);
       const dayOfWeek = jan4.getDay() || 7;
@@ -451,7 +450,7 @@ export default function LocationHistoryContent() {
     const groups = new Map<string, TypeGroup>();
     const emptyBucket = (): PeriodBucket => ({ days: 0, db: 0 });
 
-    for (const loc of locationData) {
+    for (const loc of locations) {
       const type = loc.locationType;
       if (!groups.has(type)) {
         groups.set(type, { locations: new Set(), days: 0, sales: 0, p30: emptyBucket(), p90: emptyBucket(), p180: emptyBucket(), pAll: emptyBucket() });
@@ -484,7 +483,10 @@ export default function LocationHistoryContent() {
         dbPerDayAll: dbPerDay(g.pAll),
       }))
       .sort((a, b) => (b.dbPerDayAll ?? -Infinity) - (a.dbPerDayAll ?? -Infinity));
-  }, [locationData]);
+  };
+
+  const vendorTypeSummaryEesy = useMemo(() => computeVendorSummary(eesyLocations), [eesyLocations]);
+  const vendorTypeSummaryYousee = useMemo(() => computeVendorSummary(youseeLocations), [youseeLocations]);
 
   const toggleExpand = (locId: string) => {
     setExpandedLocations(prev => {
@@ -495,6 +497,50 @@ export default function LocationHistoryContent() {
   };
 
   const isLoading = loadingBookings || loadingSales;
+
+  // ── Render vendor summary table ──
+  const renderVendorSummaryTable = (summary: typeof vendorTypeSummaryEesy) => (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead className="pl-6">Type</TableHead>
+          <TableHead className="text-right">Lokationer</TableHead>
+          <TableHead className="text-right">Dage</TableHead>
+          <TableHead className="text-right">Salg/dag</TableHead>
+          <TableHead className="text-right">30 dage</TableHead>
+          <TableHead className="text-right">3 mdr</TableHead>
+          <TableHead className="text-right">6 mdr</TableHead>
+          <TableHead className="text-right pr-6">All time</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {summary.map(row => {
+          const renderDbCell = (val: number | null, className?: string) => {
+            if (val === null) return <TableCell className={`text-right text-muted-foreground ${className || ""}`}>–</TableCell>;
+            return <TableCell className={`text-right ${val >= 0 ? "text-emerald-600" : "text-destructive"} ${className || ""}`}>{formatKr(val)}</TableCell>;
+          };
+          const trend = row.dbPerDay30 !== null && row.dbPerDayAll !== null
+            ? row.dbPerDay30 > row.dbPerDayAll ? "↑" : row.dbPerDay30 < row.dbPerDayAll ? "↓" : ""
+            : "";
+          return (
+            <TableRow key={row.type}>
+              <TableCell className="pl-6 font-medium">
+                {row.type}
+                {trend && <span className={`ml-1 ${trend === "↑" ? "text-emerald-600" : "text-destructive"}`}>{trend}</span>}
+              </TableCell>
+              <TableCell className="text-right">{row.locations}</TableCell>
+              <TableCell className="text-right">{row.days}</TableCell>
+              <TableCell className="text-right">{row.salesPerDay.toFixed(1).replace(".", ",")}</TableCell>
+              {renderDbCell(row.dbPerDay30)}
+              {renderDbCell(row.dbPerDay90)}
+              {renderDbCell(row.dbPerDay180)}
+              {renderDbCell(row.dbPerDayAll, "pr-6 font-semibold")}
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
+  );
 
   // ── Render helpers ──
   const renderLocationRows = (locations: AggregatedLocation[]) =>
@@ -627,53 +673,32 @@ export default function LocationHistoryContent() {
         </span>
       </div>
 
-      {/* Vendor type summary */}
-      {!isLoading && vendorTypeSummary.length > 0 && (
+      {/* Vendor type summary – Eesy FM */}
+      {!isLoading && vendorTypeSummaryEesy.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">DB/dag pr. leverandørtype</CardTitle>
+            <CardTitle className="text-base flex items-center gap-2">
+              DB/dag pr. leverandørtype
+              <Badge className="bg-orange-500 text-white hover:bg-orange-600">Eesy FM</Badge>
+            </CardTitle>
           </CardHeader>
           <CardContent className="px-0 pb-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="pl-6">Type</TableHead>
-                  <TableHead className="text-right">Lokationer</TableHead>
-                  <TableHead className="text-right">Dage</TableHead>
-                  <TableHead className="text-right">Salg/dag</TableHead>
-                  <TableHead className="text-right">30 dage</TableHead>
-                  <TableHead className="text-right">3 mdr</TableHead>
-                  <TableHead className="text-right">6 mdr</TableHead>
-                  <TableHead className="text-right pr-6">All time</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {vendorTypeSummary.map(row => {
-                  const renderDbCell = (val: number | null, className?: string) => {
-                    if (val === null) return <TableCell className={`text-right text-muted-foreground ${className || ""}`}>–</TableCell>;
-                    return <TableCell className={`text-right ${val >= 0 ? "text-emerald-600" : "text-destructive"} ${className || ""}`}>{formatKr(val)}</TableCell>;
-                  };
-                  const trend = row.dbPerDay30 !== null && row.dbPerDayAll !== null
-                    ? row.dbPerDay30 > row.dbPerDayAll ? "↑" : row.dbPerDay30 < row.dbPerDayAll ? "↓" : ""
-                    : "";
-                  return (
-                    <TableRow key={row.type}>
-                      <TableCell className="pl-6 font-medium">
-                        {row.type}
-                        {trend && <span className={`ml-1 ${trend === "↑" ? "text-emerald-600" : "text-destructive"}`}>{trend}</span>}
-                      </TableCell>
-                      <TableCell className="text-right">{row.locations}</TableCell>
-                      <TableCell className="text-right">{row.days}</TableCell>
-                      <TableCell className="text-right">{row.salesPerDay.toFixed(1).replace(".", ",")}</TableCell>
-                      {renderDbCell(row.dbPerDay30)}
-                      {renderDbCell(row.dbPerDay90)}
-                      {renderDbCell(row.dbPerDay180)}
-                      {renderDbCell(row.dbPerDayAll, "pr-6 font-semibold")}
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+            {renderVendorSummaryTable(vendorTypeSummaryEesy)}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Vendor type summary – YouSee */}
+      {!isLoading && vendorTypeSummaryYousee.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              DB/dag pr. leverandørtype
+              <Badge className="bg-blue-700 text-white hover:bg-blue-800">YouSee</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-0 pb-0">
+            {renderVendorSummaryTable(vendorTypeSummaryYousee)}
           </CardContent>
         </Card>
       )}
