@@ -1,21 +1,19 @@
 
 
-## Ændr DB% til ROI% (Return on Investment)
+## Erstat ROI% med DB/dag
 
 ### Ændring
-Erstat den nuværende DB%-kolonne (DB / Omsætning) med **ROI%** beregnet som:
-
-`ROI% = DB / (Lokationsomk. + Hotel + Diæt) × 100`
-
-Dette viser hvor meget I tjener pr. krone investeret i lokationen — en langt mere brugbar metrik til at vurdere lokationskvalitet.
+Erstat "ROI%" kolonnen med **"DB/dag"** — beregnet som `DB / bookedDaysCount`. Vises i kroner (fx "1.234 kr.") i stedet for procent.
 
 ### Fil der ændres
 
 | Fil | Ændring |
 |-----|---------|
-| `src/pages/vagt-flow/LocationHistoryContent.tsx` | Omdøb `dbPct` til `roi` overalt. Beregn som `db / (locationCost + hotelCost + dietCost) * 100`. Opdater kolonneheader fra "DB%" til "ROI%". Gælder hovedtabel, ugeopdeling og subtotaler. KPI-kortet opdateres også. |
+| `src/pages/vagt-flow/LocationHistoryContent.tsx` | Omdøb `roi` til `dbPerDay` overalt. Beregn som `db / days`. Vis med `formatKr()` i stedet for `formatPct()`. Opdater header fra "ROI%" til "DB/dag". Gælder KPI-kort, hovedtabel, ugeopdeling og subtotaler. |
 
-### Eksempel
-- Lokation med DB = 5.000 kr, lokationsomk. 2.000 kr, hotel 1.000 kr, diæt 500 kr → ROI = 5.000 / 3.500 × 100 = **143%** (godt)
-- Lokation med DB = -1.000 kr, omkostninger 4.000 kr → ROI = **-25%** (dårligt)
+### Beregning
+- **Hovedtabel**: `dbPerDay = totalDays > 0 ? db / totalDays : 0`
+- **Ugeopdeling**: `dbPerDay = wb.days > 0 ? db / wb.days : 0`
+- **Subtotaler**: `dbPerDay = totalDays > 0 ? totalDB / totalDays : 0`
+- **KPI-kort**: `dbPerDay = totalDays > 0 ? totals.totalDB / totalDays : 0`
 
