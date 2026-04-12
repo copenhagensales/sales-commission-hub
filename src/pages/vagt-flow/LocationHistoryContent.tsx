@@ -450,6 +450,7 @@ export default function LocationHistoryContent() {
       .sort((a, b) => b.dbPerDay - a.dbPerDay);
   }, [locationData]);
 
+  const toggleExpand = (locId: string) => {
     setExpandedLocations(prev => {
       const next = new Set(prev);
       next.has(locId) ? next.delete(locId) : next.add(locId);
