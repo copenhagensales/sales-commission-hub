@@ -122,6 +122,7 @@ function getPresetRange(key: PresetKey): { from: Date; to: Date } {
 interface AggregatedLocation {
   locationId: string;
   locationName: string;
+  locationType: string;
   clientName: string;
   bookedWeeks: number;
   bookedDaysCount: number;
@@ -171,7 +172,7 @@ export default function LocationHistoryContent() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("booking")
-        .select("id, location_id, booked_days, daily_rate_override, placement_id, week_number, year, start_date, end_date, client_id, client:clients!client_id(name), location!inner(id, name, daily_rate)")
+        .select("id, location_id, booked_days, daily_rate_override, placement_id, week_number, year, start_date, end_date, client_id, client:clients!client_id(name), location!inner(id, name, daily_rate, type)")
         .gte("start_date", startStr)
         .lte("end_date", endStr);
       if (error) throw error;
@@ -299,13 +300,13 @@ export default function LocationHistoryContent() {
     }
 
     const locAgg = new Map<string, {
-      locationName: string; clientName: string;
+      locationName: string; locationType: string; clientName: string;
       weeks: Map<string, WeekBucket>;
     }>();
 
-    const ensureLoc = (locId: string, name: string, client: string) => {
+    const ensureLoc = (locId: string, name: string, type: string, client: string) => {
       if (!locAgg.has(locId)) {
-        locAgg.set(locId, { locationName: name, clientName: client, weeks: new Map() });
+        locAgg.set(locId, { locationName: name, locationType: type, clientName: client, weeks: new Map() });
       }
       return locAgg.get(locId)!;
     };
@@ -320,7 +321,7 @@ export default function LocationHistoryContent() {
     for (const b of bookings) {
       const loc = b.location as any;
       const client = (b as any).client as any;
-      const locEntry = ensureLoc(b.location_id, loc?.name || "Ukendt", client?.name || "Ukendt");
+      const locEntry = ensureLoc(b.location_id, loc?.name || "Ukendt", loc?.type || "Ukendt", client?.name || "Ukendt");
       const wb = ensureWeek(locEntry.weeks, b.week_number, b.year);
 
       const selectedPlacement = b.placement_id ? placementMap.get(b.placement_id) : null;
@@ -345,7 +346,7 @@ export default function LocationHistoryContent() {
       const w = matchingBooking?.week_number || getISOWeek(dt);
       const y = matchingBooking?.year || dt.getFullYear();
 
-      const locEntry = ensureLoc(locId, locAgg.get(locId)?.locationName || "Ukendt lokation", locAgg.get(locId)?.clientName || "Ukendt");
+      const locEntry = ensureLoc(locId, locAgg.get(locId)?.locationName || "Ukendt lokation", locAgg.get(locId)?.locationType || "Ukendt", locAgg.get(locId)?.clientName || "Ukendt");
       const wb = ensureWeek(locEntry.weeks, w, y);
 
       const items = (sale as any).sale_items || [];
@@ -388,6 +389,7 @@ export default function LocationHistoryContent() {
       return {
         locationId: locId,
         locationName: entry.locationName,
+        locationType: entry.locationType,
         clientName: entry.clientName,
         bookedWeeks: entry.weeks.size,
         bookedDaysCount: totalDays,
@@ -421,6 +423,32 @@ export default function LocationHistoryContent() {
   const totalAll = useMemo(() => computeTotals(locationData), [locationData]);
   const totalEesy = useMemo(() => computeTotals(eesyLocations), [eesyLocations]);
   const totalYousee = useMemo(() => computeTotals(youseeLocations), [youseeLocations]);
+
+  // ── Vendor type summary ──
+  const vendorTypeSummary = useMemo(() => {
+    const groups = new Map<string, { locations: number; days: number; sales: number; db: number; revenue: number }>();
+    for (const loc of locationData) {
+      const type = loc.locationType;
+      const g = groups.get(type) || { locations: 0, days: 0, sales: 0, db: 0, revenue: 0 };
+      g.locations += 1;
+      g.days += loc.bookedDaysCount;
+      g.sales += loc.totalSales;
+      g.db += loc.db;
+      g.revenue += loc.totalRevenue;
+      groups.set(type, g);
+    }
+    return Array.from(groups.entries())
+      .map(([type, g]) => ({
+        type,
+        locations: g.locations,
+        days: g.days,
+        sales: g.sales,
+        salesPerDay: g.days > 0 ? g.sales / g.days : 0,
+        db: g.db,
+        dbPerDay: g.days > 0 ? g.db / g.days : 0,
+      }))
+      .sort((a, b) => b.dbPerDay - a.dbPerDay);
+  }, [locationData]);
 
   const toggleExpand = (locId: string) => {
     setExpandedLocations(prev => {
@@ -563,12 +591,48 @@ export default function LocationHistoryContent() {
         </span>
       </div>
 
+      {/* Vendor type summary */}
+      {!isLoading && vendorTypeSummary.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">DB/dag pr. leverandørtype</CardTitle>
+          </CardHeader>
+          <CardContent className="px-0 pb-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="pl-6">Type</TableHead>
+                  <TableHead className="text-right">Lokationer</TableHead>
+                  <TableHead className="text-right">Dage</TableHead>
+                  <TableHead className="text-right">Salg/dag</TableHead>
+                  <TableHead className="text-right">DB</TableHead>
+                  <TableHead className="text-right pr-6">DB/dag</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {vendorTypeSummary.map(row => (
+                  <TableRow key={row.type}>
+                    <TableCell className="pl-6 font-medium">{row.type}</TableCell>
+                    <TableCell className="text-right">{row.locations}</TableCell>
+                    <TableCell className="text-right">{row.days}</TableCell>
+                    <TableCell className="text-right">{row.salesPerDay.toFixed(1).replace(".", ",")}</TableCell>
+                    <TableCell className={`text-right ${row.db >= 0 ? "text-emerald-600" : "text-destructive"}`}>{formatKr(row.db)}</TableCell>
+                    <TableCell className={`text-right pr-6 font-semibold ${row.dbPerDay >= 0 ? "text-emerald-600" : "text-destructive"}`}>{formatKr(row.dbPerDay)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
       {/* KPI Cards */}
       <div className="space-y-4">
         {eesyLocations.length > 0 && <KpiCards label="Eesy FM" totals={totalEesy} />}
         {youseeLocations.length > 0 && <KpiCards label="YouSee" totals={totalYousee} />}
         <KpiCards label="Samlet" totals={totalAll} />
       </div>
+
 
       {/* Location table */}
       <Card>
