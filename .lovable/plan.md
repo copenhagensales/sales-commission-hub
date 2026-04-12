@@ -1,21 +1,19 @@
 
 
-## Tilføj leverandørtype-oversigt med DB/dag
+## Fix: Leverandørtyper viser "Ukendt"
 
-### Hvad bygges
-En opsummeringstabel øverst på siden der viser **DB/dag pr. leverandørtype** (Danske Shoppingcentre, Markeder, Coop butik, etc.). Sorteret efter DB/dag, så man hurtigt kan se hvilken type lokation der performer bedst.
+### Problem
+Alle lokationer vises som "Ukendt" i leverandørtype-oversigten. Databasen har korrekte typer (Markeder, Coop butik, etc.), og queryen henter `type` fra `location`-tabellen. Problemet er sandsynligvis at `b.location` objektet ikke parses korrekt, eller at tomme strenge ikke håndteres.
 
-### Ændringer i `src/pages/vagt-flow/LocationHistoryContent.tsx`
+### Ændring i `LocationHistoryContent.tsx`
 
-1. **Udvid booking-query**: Tilføj `type` til `location`-select: `location!inner(id, name, daily_rate, type)`
+1. **Tilføj fallback for tom streng**: Linje 324 ændres fra `loc?.type || "Ukendt"` til en eksplicit check der også fanger tomme strenge: `loc?.type?.trim() || "Ukendt"`
 
-2. **Gem `locationType` i data**: Tilføj `locationType: string` til `AggregatedLocation` og gem `loc?.type || "Ukendt"` under aggregering
+2. **Tilføj debug-logging** (midlertidigt): Log det første booking-objekt for at verificere at `location`-relationen returnerer korrekt data med `type`-feltet
 
-3. **Ny leverandørtype-aggregering** (`useMemo`): Gruppér `locationData` efter `locationType`, beregn pr. gruppe: antal lokationer, total dage, total DB, DB/dag, total salg, salg/dag
-
-4. **Ny opsummeringskomponent**: En kompakt tabel/kort-sektion **over** KPI-kortene med kolonner: Type | Lokationer | Dage | Salg/dag | DB | DB/dag — sorteret efter DB/dag (højeste først), med farve-indikation (grøn/rød)
+3. **Brug eksplicit FK-navn i query**: Ændr `location!inner(...)` til `location!booking_location_id_fkey(...)` for at sikre korrekt relation-matching, da Supabase kan have problemer med at auto-resolve relationen
 
 ### Teknisk detalje
-- `location.type` feltet indeholder værdier som: "Danske Shoppingcentre", "Markeder", "Coop butik", "Meny butik", "Anden lokation", "Ocean Outdoor", "Butik", "Messer"
-- Ingen database-ændringer nødvendige — feltet eksisterer allerede
+- Queryen på linje 175 ændres til: `location:location!booking_location_id_fkey(id, name, daily_rate, type)`
+- Dette sikrer at Supabase bruger den korrekte foreign key og returnerer location-objektet med alle felter inkl. `type`
 
