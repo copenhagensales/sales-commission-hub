@@ -125,6 +125,7 @@ interface AggregatedLocation {
   bookedWeeks: number;
   bookedDaysCount: number;
   totalSales: number;
+  salesPerDay: number;
   totalRevenue: number;
   totalCommission: number;
   sellerCost: number;
@@ -144,6 +145,7 @@ interface AggregatedLocation {
     db: number;
     dbPct: number;
     sales: number;
+    salesPerDay: number;
     days: number;
   }>;
 }
@@ -372,12 +374,15 @@ export default function LocationHistoryContent() {
           totalLocCost += wb.locationCost;
           totalHotelCost += wb.hotelCost;
           totalDietCost += wb.dietCost;
-          return { ...wb, sellerCost, db, dbPct, days: wb.days };
+          const salesPerDay = wb.days > 0 ? wb.sales / wb.days : 0;
+          return { ...wb, sellerCost, db, dbPct, days: wb.days, salesPerDay };
         });
 
       const sellerCost = totalCommission * (1 + VACATION_PAY_RATES.SELLER);
       const db = totalRevenue - sellerCost - totalLocCost - totalHotelCost - totalDietCost;
       const dbPct = totalRevenue > 0 ? (db / totalRevenue) * 100 : 0;
+
+      const salesPerDay = totalDays > 0 ? totalSales / totalDays : 0;
 
       return {
         locationId: locId,
@@ -386,6 +391,7 @@ export default function LocationHistoryContent() {
         bookedWeeks: entry.weeks.size,
         bookedDaysCount: totalDays,
         totalSales,
+        salesPerDay,
         totalRevenue,
         totalCommission,
         sellerCost,
@@ -396,7 +402,7 @@ export default function LocationHistoryContent() {
         dbPct,
         weeklyBreakdown,
       };
-    }).sort((a, b) => b.db - a.db);
+    }).sort((a, b) => b.salesPerDay - a.salesPerDay);
   }, [bookings, salesData, placements, hotelCostByBooking, dietCostByBooking]);
 
   // ── Split by client ──
@@ -446,6 +452,7 @@ export default function LocationHistoryContent() {
             <TableCell className="text-right">{loc.bookedWeeks}</TableCell>
             <TableCell className="text-right">{loc.bookedDaysCount}</TableCell>
             <TableCell className="text-right">{loc.totalSales}</TableCell>
+            <TableCell className="text-right font-semibold">{loc.salesPerDay.toFixed(1).replace(".", ",")}</TableCell>
             <TableCell className="text-right">{formatKr(loc.totalRevenue)}</TableCell>
             <TableCell className="text-right">{formatKr(loc.sellerCost)}</TableCell>
             <TableCell className="text-right">{formatKr(loc.locationCost)}</TableCell>
@@ -466,6 +473,7 @@ export default function LocationHistoryContent() {
               <TableCell className="text-right text-sm">1</TableCell>
               <TableCell className="text-right text-sm">{wb.days}</TableCell>
               <TableCell className="text-right text-sm">{wb.sales}</TableCell>
+              <TableCell className="text-right text-sm">{wb.salesPerDay.toFixed(1).replace(".", ",")}</TableCell>
               <TableCell className="text-right text-sm">{formatKr(wb.revenue)}</TableCell>
               <TableCell className="text-right text-sm">{formatKr(wb.sellerCost)}</TableCell>
               <TableCell className="text-right text-sm">{formatKr(wb.locationCost)}</TableCell>
@@ -490,6 +498,9 @@ export default function LocationHistoryContent() {
         <TableCell className="pl-6" colSpan={2}>{label} — subtotal</TableCell>
         <TableCell className="text-right">{locations.reduce((s, l) => s + l.bookedDaysCount, 0)}</TableCell>
         <TableCell className="text-right">{locations.reduce((s, l) => s + l.totalSales, 0)}</TableCell>
+        <TableCell className="text-right">
+          {(() => { const days = locations.reduce((s, l) => s + l.bookedDaysCount, 0); const sales = locations.reduce((s, l) => s + l.totalSales, 0); return days > 0 ? (sales / days).toFixed(1).replace(".", ",") : "0"; })()}
+        </TableCell>
         <TableCell className="text-right">{formatKr(t.totalRevenue)}</TableCell>
         <TableCell className="text-right">{formatKr(t.totalSellerCost)}</TableCell>
         <TableCell className="text-right">{formatKr(t.totalLocationCost)}</TableCell>
@@ -580,6 +591,7 @@ export default function LocationHistoryContent() {
                   <TableHead className="text-right">Uger</TableHead>
                   <TableHead className="text-right">Dage</TableHead>
                   <TableHead className="text-right">Salg</TableHead>
+                  <TableHead className="text-right font-semibold">Salg/dag</TableHead>
                   <TableHead className="text-right">Omsætning</TableHead>
                   <TableHead className="text-right">Sælgerløn</TableHead>
                   <TableHead className="text-right">Lokation</TableHead>
@@ -593,7 +605,7 @@ export default function LocationHistoryContent() {
                 {eesyLocations.length > 0 && (
                   <>
                     <TableRow className="bg-orange-50 dark:bg-orange-950/20">
-                      <TableCell colSpan={11} className="pl-6 py-2 font-semibold text-sm">
+                       <TableCell colSpan={12} className="pl-6 py-2 font-semibold text-sm">
                         <div className="flex items-center gap-2">
                           <Badge className="bg-orange-500 text-white hover:bg-orange-600">Eesy FM</Badge>
                           <span className="text-muted-foreground">({eesyLocations.length} lokationer)</span>
@@ -607,7 +619,7 @@ export default function LocationHistoryContent() {
                 {youseeLocations.length > 0 && (
                   <>
                     <TableRow className="bg-blue-50 dark:bg-blue-950/20">
-                      <TableCell colSpan={11} className="pl-6 py-2 font-semibold text-sm">
+                       <TableCell colSpan={12} className="pl-6 py-2 font-semibold text-sm">
                         <div className="flex items-center gap-2">
                           <Badge className="bg-blue-700 text-white hover:bg-blue-800">YouSee</Badge>
                           <span className="text-muted-foreground">({youseeLocations.length} lokationer)</span>
@@ -621,7 +633,7 @@ export default function LocationHistoryContent() {
                 {otherLocations.length > 0 && (
                   <>
                     <TableRow className="bg-muted/30">
-                      <TableCell colSpan={11} className="pl-6 py-2 font-semibold text-sm">
+                      <TableCell colSpan={12} className="pl-6 py-2 font-semibold text-sm">
                         <div className="flex items-center gap-2">
                           <Badge variant="secondary">Øvrige</Badge>
                           <span className="text-muted-foreground">({otherLocations.length} lokationer)</span>
