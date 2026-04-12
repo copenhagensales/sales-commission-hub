@@ -193,6 +193,17 @@ serve(async (req) => {
       if (linkError) console.error("Error linking auth_user_id:", linkError);
       else console.log(`Linked auth_user_id for existing employee ${email}`);
     } else {
+      // Lookup position_id from job_title
+      let positionId: string | null = null;
+      if (jobTitle) {
+        const { data: posData } = await supabase
+          .from("job_positions")
+          .select("id")
+          .ilike("name", jobTitle.trim())
+          .maybeSingle();
+        if (posData) positionId = posData.id;
+      }
+
       const employeeData: Record<string, unknown> = {
         first_name: firstName,
         last_name: lastName || '',
@@ -201,6 +212,7 @@ serve(async (req) => {
         auth_user_id: authData.user.id,
       };
       if (jobTitle) employeeData.job_title = jobTitle;
+      if (positionId) employeeData.position_id = positionId;
       if (isStaffEmployee !== undefined) employeeData.is_staff_employee = isStaffEmployee;
       
       const { error: employeeError } = await supabase
