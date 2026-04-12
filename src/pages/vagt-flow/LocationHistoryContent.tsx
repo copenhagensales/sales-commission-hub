@@ -89,7 +89,7 @@ function KpiCards({ label, totals }: { label: string; totals: KpiTotals }) {
   );
 }
 
-function computeTotals(locations: Array<{ totalRevenue: number; sellerCost: number; locationCost: number; hotelCost: number; dietCost: number }>) {
+function computeTotals(locations: Array<{ totalRevenue: number; sellerCost: number; locationCost: number; hotelCost: number; dietCost: number; bookedDaysCount: number }>) {
   const totalRevenue = locations.reduce((s, l) => s + l.totalRevenue, 0);
   const totalSellerCost = locations.reduce((s, l) => s + l.sellerCost, 0);
   const totalLocationCost = locations.reduce((s, l) => s + l.locationCost, 0);
