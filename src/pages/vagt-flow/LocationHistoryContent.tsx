@@ -122,6 +122,7 @@ function getPresetRange(key: PresetKey): { from: Date; to: Date } {
 interface AggregatedLocation {
   locationId: string;
   locationName: string;
+  locationType: string;
   clientName: string;
   bookedWeeks: number;
   bookedDaysCount: number;
@@ -171,7 +172,7 @@ export default function LocationHistoryContent() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("booking")
-        .select("id, location_id, booked_days, daily_rate_override, placement_id, week_number, year, start_date, end_date, client_id, client:clients!client_id(name), location!inner(id, name, daily_rate)")
+        .select("id, location_id, booked_days, daily_rate_override, placement_id, week_number, year, start_date, end_date, client_id, client:clients!client_id(name), location!inner(id, name, daily_rate, type)")
         .gte("start_date", startStr)
         .lte("end_date", endStr);
       if (error) throw error;
@@ -299,13 +300,13 @@ export default function LocationHistoryContent() {
     }
 
     const locAgg = new Map<string, {
-      locationName: string; clientName: string;
+      locationName: string; locationType: string; clientName: string;
       weeks: Map<string, WeekBucket>;
     }>();
 
-    const ensureLoc = (locId: string, name: string, client: string) => {
+    const ensureLoc = (locId: string, name: string, type: string, client: string) => {
       if (!locAgg.has(locId)) {
-        locAgg.set(locId, { locationName: name, clientName: client, weeks: new Map() });
+        locAgg.set(locId, { locationName: name, locationType: type, clientName: client, weeks: new Map() });
       }
       return locAgg.get(locId)!;
     };
@@ -320,7 +321,7 @@ export default function LocationHistoryContent() {
     for (const b of bookings) {
       const loc = b.location as any;
       const client = (b as any).client as any;
-      const locEntry = ensureLoc(b.location_id, loc?.name || "Ukendt", client?.name || "Ukendt");
+      const locEntry = ensureLoc(b.location_id, loc?.name || "Ukendt", loc?.type || "Ukendt", client?.name || "Ukendt");
       const wb = ensureWeek(locEntry.weeks, b.week_number, b.year);
 
       const selectedPlacement = b.placement_id ? placementMap.get(b.placement_id) : null;
@@ -345,7 +346,7 @@ export default function LocationHistoryContent() {
       const w = matchingBooking?.week_number || getISOWeek(dt);
       const y = matchingBooking?.year || dt.getFullYear();
 
-      const locEntry = ensureLoc(locId, locAgg.get(locId)?.locationName || "Ukendt lokation", locAgg.get(locId)?.clientName || "Ukendt");
+      const locEntry = ensureLoc(locId, locAgg.get(locId)?.locationName || "Ukendt lokation", locAgg.get(locId)?.locationType || "Ukendt", locAgg.get(locId)?.clientName || "Ukendt");
       const wb = ensureWeek(locEntry.weeks, w, y);
 
       const items = (sale as any).sale_items || [];
@@ -388,6 +389,7 @@ export default function LocationHistoryContent() {
       return {
         locationId: locId,
         locationName: entry.locationName,
+        locationType: entry.locationType,
         clientName: entry.clientName,
         bookedWeeks: entry.weeks.size,
         bookedDaysCount: totalDays,
