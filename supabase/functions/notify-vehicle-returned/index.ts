@@ -71,6 +71,60 @@ async function sendEmail(accessToken: string, recipients: string[], subject: str
   }
 }
 
+function normalizePhoneNumber(phoneNumber: string | null | undefined): string | null {
+  if (!phoneNumber) return null;
+  let cleaned = phoneNumber.replace(/[\s\-\(\)\.]/g, '');
+  if (!cleaned) return null;
+  if (cleaned.startsWith('+')) return cleaned;
+  if (cleaned.startsWith('00')) return '+' + cleaned.substring(2);
+  if (/^\d{8}$/.test(cleaned)) return '+45' + cleaned;
+  if (/^45\d{8}$/.test(cleaned)) return '+' + cleaned;
+  if (/^\d{7,15}$/.test(cleaned)) {
+    return cleaned.length >= 10 ? '+' + cleaned : '+45' + cleaned;
+  }
+  return '+' + cleaned;
+}
+
+async function sendSmsViaTwilio(toNumber: string, message: string): Promise<boolean> {
+  const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
+  const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
+  const fromNumber = Deno.env.get('TWILIO_PHONE_NUMBER');
+
+  if (!accountSid || !authToken || !fromNumber) {
+    console.warn('[notify-vehicle-returned] Missing Twilio credentials, skipping SMS');
+    return false;
+  }
+
+  try {
+    const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
+    const response = await fetch(twilioUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Basic ' + btoa(`${accountSid}:${authToken}`),
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        From: fromNumber,
+        To: toNumber,
+        Body: message,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error(`[notify-vehicle-returned] Twilio error for ${toNumber}:`, error);
+      return false;
+    }
+
+    const result = await response.json();
+    console.log(`[notify-vehicle-returned] SMS sent to ${toNumber}, SID: ${result.sid}`);
+    return true;
+  } catch (err) {
+    console.error(`[notify-vehicle-returned] SMS send failed for ${toNumber}:`, err);
+    return false;
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -149,72 +203,104 @@ serve(async (req) => {
 
     console.log("[notify-vehicle-returned] Confirmation saved");
 
-    // 3. Find FM assistant team leaders via junction table
+    // 3. Find FM teams and collect recipient info (emails + phone numbers)
     const { data: fmTeams } = await supabase
       .from("teams")
-      .select("id")
+      .select("id, team_leader_id")
       .ilike("name", "%fieldmarketing%");
 
     const fmTeamIds = (fmTeams ?? []).map((t: any) => t.id);
-    console.log("[notify-vehicle-returned] FM teams found:", fmTeamIds.length);
+    const teamLeaderIds = (fmTeams ?? [])
+      .map((t: any) => t.team_leader_id)
+      .filter(Boolean);
+    console.log("[notify-vehicle-returned] FM teams found:", fmTeamIds.length, "Team leader IDs:", teamLeaderIds);
 
     let recipientEmails: string[] = [];
+    let smsRecipientNumbers: string[] = [];
 
     if (fmTeamIds.length > 0) {
+      // Get assistant leader IDs
       const { data: assistants } = await supabase
         .from("team_assistant_leaders")
         .select("employee_id")
         .in("team_id", fmTeamIds);
 
       const assistantIds = (assistants ?? []).map((a: any) => a.employee_id);
-      console.log("[notify-vehicle-returned] Assistant leader IDs:", assistantIds);
+      
+      // Combine assistant leaders + team leaders (deduplicated)
+      const allRecipientIds = [...new Set([...assistantIds, ...teamLeaderIds])];
+      console.log("[notify-vehicle-returned] All recipient IDs:", allRecipientIds);
 
-      if (assistantIds.length > 0) {
+      if (allRecipientIds.length > 0) {
         const { data: employees } = await supabase
           .from("employee_master_data")
-          .select("work_email, private_email, first_name")
-          .in("id", assistantIds)
+          .select("work_email, private_email, private_phone, first_name")
+          .in("id", allRecipientIds)
           .eq("is_active", true);
 
         recipientEmails = (employees ?? [])
           .map((e: any) => e.work_email || e.private_email)
           .filter(Boolean);
 
-        console.log("[notify-vehicle-returned] Recipient emails:", recipientEmails);
+        smsRecipientNumbers = (employees ?? [])
+          .map((e: any) => normalizePhoneNumber(e.private_phone))
+          .filter(Boolean) as string[];
+
+        console.log("[notify-vehicle-returned] Email recipients:", recipientEmails);
+        console.log("[notify-vehicle-returned] SMS recipients:", smsRecipientNumbers);
       }
     }
 
-    if (recipientEmails.length === 0) {
-      console.warn("[notify-vehicle-returned] No FM leaders found to notify");
-      return new Response(
-        JSON.stringify({ ok: true, confirmed: true, notified: 0, recipients: [] }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    // 4. Send email (if recipients found)
+    if (recipientEmails.length > 0) {
+      const accessToken = await getM365AccessToken();
+
+      const photoHtml = photo_url
+        ? `<p style="margin-top: 12px;"><strong>Billede af nøgleaflevering:</strong></p><img src="${photo_url}" alt="Nøgle aflevering" style="max-width: 400px; border-radius: 8px; border: 1px solid #e5e7eb;" />`
+        : "";
+
+      const htmlBody = `
+        <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
+          <h2 style="color: #b45309;">🔑 Nøgle afleveret</h2>
+          <p><strong>${employeeName}</strong> har bekræftet aflevering af nøgle til <strong>${vehicle_name}</strong>.</p>
+          <p>Dato: <strong>${booking_date}</strong></p>
+          ${photoHtml}
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 16px 0;" />
+          <p style="font-size: 12px; color: #6b7280;">Denne email er sendt automatisk fra Copenhagen Sales vagtplan.</p>
+        </div>
+      `;
+
+      await sendEmail(accessToken, recipientEmails, `Nøgle afleveret: ${vehicle_name} (${booking_date})`, htmlBody);
+      console.log("[notify-vehicle-returned] Email sent to", recipientEmails.length, "recipients");
+    } else {
+      console.warn("[notify-vehicle-returned] No email recipients found");
     }
 
-    // 4. Send email
-    const accessToken = await getM365AccessToken();
+    // 5. Send SMS (if recipients found) - does not block on failure
+    let smsSentCount = 0;
+    if (smsRecipientNumbers.length > 0) {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Copenhagen" });
+      const [year, month, day] = booking_date.split("-");
+      const dateStr = `${day}/${month}-${year.slice(2)}`;
 
-    const photoHtml = photo_url
-      ? `<p style="margin-top: 12px;"><strong>Billede af nøgleaflevering:</strong></p><img src="${photo_url}" alt="Nøgle aflevering" style="max-width: 400px; border-radius: 8px; border: 1px solid #e5e7eb;" />`
-      : "";
+      const smsBody = `🔑 ${vehicle_name} afleveret d. ${dateStr} kl. ${timeStr} af ${employeeName}`;
 
-    const htmlBody = `
-      <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
-        <h2 style="color: #b45309;">🔑 Nøgle afleveret</h2>
-        <p><strong>${employeeName}</strong> har bekræftet aflevering af nøgle til <strong>${vehicle_name}</strong>.</p>
-        <p>Dato: <strong>${booking_date}</strong></p>
-        ${photoHtml}
-        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 16px 0;" />
-        <p style="font-size: 12px; color: #6b7280;">Denne email er sendt automatisk fra Copenhagen Sales vagtplan.</p>
-      </div>
-    `;
-
-    await sendEmail(accessToken, recipientEmails, `Nøgle afleveret: ${vehicle_name} (${booking_date})`, htmlBody);
-    console.log("[notify-vehicle-returned] Email sent successfully to", recipientEmails.length, "recipients");
+      const smsResults = await Promise.all(
+        smsRecipientNumbers.map(num => sendSmsViaTwilio(num, smsBody))
+      );
+      smsSentCount = smsResults.filter(Boolean).length;
+      console.log("[notify-vehicle-returned] SMS sent to", smsSentCount, "of", smsRecipientNumbers.length);
+    }
 
     return new Response(
-      JSON.stringify({ ok: true, confirmed: true, notified: recipientEmails.length, recipients: recipientEmails }),
+      JSON.stringify({
+        ok: true,
+        confirmed: true,
+        notified: recipientEmails.length,
+        recipients: recipientEmails,
+        sms_sent: smsSentCount,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
