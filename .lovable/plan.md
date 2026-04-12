@@ -1,22 +1,48 @@
 
 
-## Fix: Sygdoms-ikon vises ikke når medarbejder har en vagt
+## Fix: `position_id` mangler på medarbejdere
 
-### Problem
-Når Melissa meldes syg på en dag hvor hun allerede har en vagt, registreres sygdommen korrekt i databasen, men ikonet (Thermometer + "Syg") vises ikke i kalenderoversigten. Det skyldes at alle status-badges (Syg, Ferie, Fridag, Udeblivelse) kun renderes når `!hasShift` er opfyldt (linje 1465-1491 i `ShiftOverview.tsx`).
+### Årsag
+Ingen af medarbejder-oprettelsesflowene sætter `position_id`:
+- `create-employee-user` (edge function) — sætter aldrig `position_id`
+- `complete-employee-registration` (invitation flow) — sætter aldrig `position_id`
+- `auto-segment-candidate` (kandidat → medarbejder) — sætter aldrig `position_id`
+
+Uden `position_id` kan rettighedssystemet (`usePositionPermissions`) ikke slå rettigheder op, og medarbejdere mister adgang til funktioner.
 
 ### Løsning
-Ændr renderingslogikken i `ShiftOverview.tsx` så absence-badges vises OGSÅ når der er en vagt. Konkret:
 
-1. **Fjern `!hasShift`-betingelsen** fra sick/vacation/no_show/day_off badge-renderingen (linje 1465, 1472, 1479, 1486).
-2. **Vis badges under shift-kortet**, så begge informationer er synlige — man kan se både vagttiden og sygdoms-status.
+**1. Database: Ret eksisterende medarbejdere (data-update)**
 
-### Fil der ændres
+Sæt `position_id` baseret på `job_title` for alle aktive medarbejdere der mangler den:
 
-| Fil | Ændring |
-|-----|---------|
-| `src/pages/shift-planning/ShiftOverview.tsx` | Fjern `!hasShift &&` fra de 4 absence-badge betingelser (linje 1465, 1472, 1479, 1486) |
+| job_title | position_id | position_name |
+|-----------|-------------|---------------|
+| Salgskonsulent / salgskonsulent | `729194f5-...` | Salgskonsulent |
+| Fieldmarketing / fieldmarketing | `f4c737ca-...` | Fieldmarketing |
+| Rekruttering | `c5df66a2-...` | Rekruttering |
+| SOME | `8682730a-...` | SOME |
+| Ejer | `1ef14dcc-...` | Ejer |
+| Teamleder | `412a9da6-...` | Teamleder |
+
+**2. Database trigger: Auto-sæt `position_id` ved oprettelse**
+
+Opret en trigger-funktion `auto_set_position_id()` der kører på INSERT og UPDATE af `employee_master_data`. Hvis `position_id IS NULL` og `job_title` matcher en kendt position, sættes `position_id` automatisk (case-insensitive match).
+
+**3. Edge function: `create-employee-user/index.ts`**
+
+Tilføj `position_id`-lookup baseret på `job_title` ved oprettelse af ny medarbejder, så fremtidige medarbejdere altid får en position.
+
+### Filer der ændres
+
+| Ændring | Detalje |
+|---------|---------|
+| **Database (data-update)** | Sæt `position_id` på ~20 aktive medarbejdere |
+| **Database (migration)** | Opret trigger `auto_set_position_id` på `employee_master_data` |
+| `supabase/functions/create-employee-user/index.ts` | Tilføj `position_id`-lookup ved employee insert |
 
 ### Resultat
-Sygdoms-ikonet (og øvrige status-ikoner) vises uanset om medarbejderen har en planlagt vagt den dag.
+- Alle eksisterende medarbejdere får korrekt `position_id`
+- Fremtidige medarbejdere får automatisk `position_id` via trigger
+- Ingen medarbejder mister adgang pga. manglende position igen
 
