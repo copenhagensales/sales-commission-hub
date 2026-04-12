@@ -1,48 +1,40 @@
 
 
-## Fix: `position_id` mangler på medarbejdere
+## Fix: Forsinkelser kan ikke registreres
 
-### Årsag
-Ingen af medarbejder-oprettelsesflowene sætter `position_id`:
-- `create-employee-user` (edge function) — sætter aldrig `position_id`
-- `complete-employee-registration` (invitation flow) — sætter aldrig `position_id`
-- `auto-segment-candidate` (kandidat → medarbejder) — sætter aldrig `position_id`
+### Problem
+I `handleSetLateness` (linje 931-932) hentes medarbejderens planlagte starttid via `getWorkTimesForEmployeeAndDay()`. Denne funktion kan returnere sentinelværdien `"__NO_SPECIAL_SHIFT__"` (når medarbejderen ikke har en special-vagt og bruger team-standard eller personlig standard_start_time).
 
-Uden `position_id` kan rettighedssystemet (`usePositionPermissions`) ikke slå rettigheder op, og medarbejdere mister adgang til funktioner.
+Problemet er at `handleSetLateness` **ikke** håndterer denne sentinelværdi:
+
+```typescript
+const workTimes = getWorkTimesForEmployeeAndDay(employeeId, date);
+const startTime = workTimes ? workTimes.split('-')[0].trim() : "08:00";
+```
+
+Når `workTimes` er `"__NO_SPECIAL_SHIFT__"`, er den truthy, og `.split('-')` giver `["__NO_SPECIAL_SHIFT__"]` som starttid. Derefter i `handleDelaySubmit` giver `originalStartTime.split(':').map(Number)` → `NaN`, og `delayMinutes` bliver `NaN`, så `delayMinutes <= 0` evaluerer til `false`, og upsert'en fejler med ugyldig data.
+
+Renderings-koden (linje 1366-1369) håndterer dette korrekt ved at falde tilbage til `employee.standard_start_time`, men forsinkelsesregistreringen gør det ikke.
 
 ### Løsning
 
-**1. Database: Ret eksisterende medarbejdere (data-update)**
+Ret `handleSetLateness` (linje 931-932) til at håndtere `NO_SPECIAL_SHIFT` sentinelen og falde tilbage til medarbejderens `standard_start_time`:
 
-Sæt `position_id` baseret på `job_title` for alle aktive medarbejdere der mangler den:
+```typescript
+const rawWorkTimes = getWorkTimesForEmployeeAndDay(employeeId, date);
+const employee = employees?.find(e => e.id === employeeId);
+const workTimes = rawWorkTimes === NO_SPECIAL_SHIFT 
+  ? employee?.standard_start_time 
+  : rawWorkTimes;
+const startTime = workTimes ? workTimes.split('-')[0].trim() : "08:00";
+```
 
-| job_title | position_id | position_name |
-|-----------|-------------|---------------|
-| Salgskonsulent / salgskonsulent | `729194f5-...` | Salgskonsulent |
-| Fieldmarketing / fieldmarketing | `f4c737ca-...` | Fieldmarketing |
-| Rekruttering | `c5df66a2-...` | Rekruttering |
-| SOME | `8682730a-...` | SOME |
-| Ejer | `1ef14dcc-...` | Ejer |
-| Teamleder | `412a9da6-...` | Teamleder |
+### Fil der ændres
 
-**2. Database trigger: Auto-sæt `position_id` ved oprettelse**
-
-Opret en trigger-funktion `auto_set_position_id()` der kører på INSERT og UPDATE af `employee_master_data`. Hvis `position_id IS NULL` og `job_title` matcher en kendt position, sættes `position_id` automatisk (case-insensitive match).
-
-**3. Edge function: `create-employee-user/index.ts`**
-
-Tilføj `position_id`-lookup baseret på `job_title` ved oprettelse af ny medarbejder, så fremtidige medarbejdere altid får en position.
-
-### Filer der ændres
-
-| Ændring | Detalje |
-|---------|---------|
-| **Database (data-update)** | Sæt `position_id` på ~20 aktive medarbejdere |
-| **Database (migration)** | Opret trigger `auto_set_position_id` på `employee_master_data` |
-| `supabase/functions/create-employee-user/index.ts` | Tilføj `position_id`-lookup ved employee insert |
+| Fil | Ændring |
+|-----|---------|
+| `src/pages/shift-planning/ShiftOverview.tsx` | Ret `handleSetLateness` til at håndtere `NO_SPECIAL_SHIFT` fallback (linje 931-932) |
 
 ### Resultat
-- Alle eksisterende medarbejdere får korrekt `position_id`
-- Fremtidige medarbejdere får automatisk `position_id` via trigger
-- Ingen medarbejder mister adgang pga. manglende position igen
+Forsinkelser kan registreres korrekt for alle medarbejdere, uanset om de har en special-vagt, team-vagt, eller kun en personlig standard-mødetid.
 
