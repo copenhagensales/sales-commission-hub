@@ -49,7 +49,7 @@ interface KpiTotals {
   totalHotelCost: number;
   totalDietCost: number;
   totalDB: number;
-  dbPct: number;
+  roi: number;
 }
 
 function KpiCards({ label, totals }: { label: string; totals: KpiTotals }) {
@@ -76,12 +76,12 @@ function KpiCards({ label, totals }: { label: string; totals: KpiTotals }) {
           </p>
         </CardContent></Card>
         <Card><CardContent className="pt-3 pb-2 px-3">
-          <p className="text-xs text-muted-foreground">DB%</p>
+          <p className="text-xs text-muted-foreground">ROI%</p>
           <div className="flex items-center gap-1">
-            <p className={`text-lg font-bold ${totals.dbPct >= 0 ? "text-emerald-600" : "text-destructive"}`}>
-              {formatPct(totals.dbPct)}
+            <p className={`text-lg font-bold ${totals.roi >= 0 ? "text-emerald-600" : "text-destructive"}`}>
+              {formatPct(totals.roi)}
             </p>
-            {totals.dbPct >= 0 ? <TrendingUp className="h-3 w-3 text-emerald-600" /> : <TrendingDown className="h-3 w-3 text-destructive" />}
+            {totals.roi >= 0 ? <TrendingUp className="h-3 w-3 text-emerald-600" /> : <TrendingDown className="h-3 w-3 text-destructive" />}
           </div>
         </CardContent></Card>
       </div>
@@ -96,8 +96,9 @@ function computeTotals(locations: Array<{ totalRevenue: number; sellerCost: numb
   const totalHotelCost = locations.reduce((s, l) => s + l.hotelCost, 0);
   const totalDietCost = locations.reduce((s, l) => s + l.dietCost, 0);
   const totalDB = totalRevenue - totalSellerCost - totalLocationCost - totalHotelCost - totalDietCost;
-  const dbPct = totalRevenue > 0 ? (totalDB / totalRevenue) * 100 : 0;
-  return { totalRevenue, totalSellerCost, totalLocationCost, totalHotelCost, totalDietCost, totalDB, dbPct };
+  const totalInvestment = totalLocationCost + totalHotelCost + totalDietCost;
+  const roi = totalInvestment > 0 ? (totalDB / totalInvestment) * 100 : 0;
+  return { totalRevenue, totalSellerCost, totalLocationCost, totalHotelCost, totalDietCost, totalDB, roi };
 }
 
 // ── Preset periods ──
@@ -133,7 +134,7 @@ interface AggregatedLocation {
   hotelCost: number;
   dietCost: number;
   db: number;
-  dbPct: number;
+  roi: number;
   weeklyBreakdown: Array<{
     week: number;
     year: number;
@@ -143,7 +144,7 @@ interface AggregatedLocation {
     hotelCost: number;
     dietCost: number;
     db: number;
-    dbPct: number;
+    roi: number;
     sales: number;
     salesPerDay: number;
     days: number;
@@ -366,7 +367,8 @@ export default function LocationHistoryContent() {
         .map(wb => {
           const sellerCost = wb.commission * (1 + VACATION_PAY_RATES.SELLER);
           const db = wb.revenue - sellerCost - wb.locationCost - wb.hotelCost - wb.dietCost;
-          const dbPct = wb.revenue > 0 ? (db / wb.revenue) * 100 : 0;
+          const wbInvestment = wb.locationCost + wb.hotelCost + wb.dietCost;
+          const roi = wbInvestment > 0 ? (db / wbInvestment) * 100 : 0;
           totalRevenue += wb.revenue;
           totalCommission += wb.commission;
           totalSales += wb.sales;
@@ -375,12 +377,13 @@ export default function LocationHistoryContent() {
           totalHotelCost += wb.hotelCost;
           totalDietCost += wb.dietCost;
           const salesPerDay = wb.days > 0 ? wb.sales / wb.days : 0;
-          return { ...wb, sellerCost, db, dbPct, days: wb.days, salesPerDay };
+          return { ...wb, sellerCost, db, roi, days: wb.days, salesPerDay };
         });
 
       const sellerCost = totalCommission * (1 + VACATION_PAY_RATES.SELLER);
       const db = totalRevenue - sellerCost - totalLocCost - totalHotelCost - totalDietCost;
-      const dbPct = totalRevenue > 0 ? (db / totalRevenue) * 100 : 0;
+      const totalInvestment = totalLocCost + totalHotelCost + totalDietCost;
+      const roi = totalInvestment > 0 ? (db / totalInvestment) * 100 : 0;
 
       const salesPerDay = totalDays > 0 ? totalSales / totalDays : 0;
 
@@ -399,7 +402,7 @@ export default function LocationHistoryContent() {
         hotelCost: totalHotelCost,
         dietCost: totalDietCost,
         db,
-        dbPct,
+        roi,
         weeklyBreakdown,
       };
     }).sort((a, b) => b.salesPerDay - a.salesPerDay);
@@ -461,8 +464,8 @@ export default function LocationHistoryContent() {
             <TableCell className={`text-right font-semibold ${loc.db >= 0 ? "text-emerald-600" : "text-destructive"}`}>
               {formatKr(loc.db)}
             </TableCell>
-            <TableCell className={`text-right pr-6 ${loc.dbPct >= 0 ? "text-emerald-600" : "text-destructive"}`}>
-              {formatPct(loc.dbPct)}
+            <TableCell className={`text-right pr-6 ${loc.roi >= 0 ? "text-emerald-600" : "text-destructive"}`}>
+              {formatPct(loc.roi)}
             </TableCell>
           </TableRow>
           {isExpanded && loc.weeklyBreakdown.map(wb => (
@@ -482,8 +485,8 @@ export default function LocationHistoryContent() {
               <TableCell className={`text-right text-sm font-medium ${wb.db >= 0 ? "text-emerald-600" : "text-destructive"}`}>
                 {formatKr(wb.db)}
               </TableCell>
-              <TableCell className={`text-right pr-6 text-sm ${wb.dbPct >= 0 ? "text-emerald-600" : "text-destructive"}`}>
-                {formatPct(wb.dbPct)}
+              <TableCell className={`text-right pr-6 text-sm ${wb.roi >= 0 ? "text-emerald-600" : "text-destructive"}`}>
+                {formatPct(wb.roi)}
               </TableCell>
             </TableRow>
           ))}
@@ -507,7 +510,7 @@ export default function LocationHistoryContent() {
         <TableCell className="text-right">{formatKr(t.totalHotelCost)}</TableCell>
         <TableCell className="text-right">{formatKr(t.totalDietCost)}</TableCell>
         <TableCell className={`text-right ${t.totalDB >= 0 ? "text-emerald-600" : "text-destructive"}`}>{formatKr(t.totalDB)}</TableCell>
-        <TableCell className={`text-right pr-6 ${t.dbPct >= 0 ? "text-emerald-600" : "text-destructive"}`}>{formatPct(t.dbPct)}</TableCell>
+        <TableCell className={`text-right pr-6 ${t.roi >= 0 ? "text-emerald-600" : "text-destructive"}`}>{formatPct(t.roi)}</TableCell>
       </TableRow>
     );
   };
@@ -598,7 +601,7 @@ export default function LocationHistoryContent() {
                   <TableHead className="text-right">Hotel</TableHead>
                   <TableHead className="text-right">Diæt</TableHead>
                   <TableHead className="text-right">DB</TableHead>
-                  <TableHead className="text-right pr-6">DB%</TableHead>
+                  <TableHead className="text-right pr-6">ROI%</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
