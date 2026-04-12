@@ -928,7 +928,11 @@ export default function ShiftOverview() {
     }
     
     // Get employee's planned start time
-    const workTimes = getWorkTimesForEmployeeAndDay(employeeId, date);
+    const rawWorkTimes = getWorkTimesForEmployeeAndDay(employeeId, date);
+    const employee = employees?.find(e => e.id === employeeId);
+    const workTimes = rawWorkTimes === NO_SPECIAL_SHIFT 
+      ? employee?.standard_start_time 
+      : rawWorkTimes;
     const startTime = workTimes ? workTimes.split('-')[0].trim() : "08:00";
     
     setOriginalStartTime(startTime);
