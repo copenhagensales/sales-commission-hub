@@ -321,7 +321,7 @@ export default function LocationHistoryContent() {
     for (const b of bookings) {
       const loc = b.location as any;
       const client = (b as any).client as any;
-      const locEntry = ensureLoc(b.location_id, loc?.name || "Ukendt", loc?.type || "Ukendt", client?.name || "Ukendt");
+      const locEntry = ensureLoc(b.location_id, loc?.name || "Ukendt", loc?.type?.trim() || "Ukendt", client?.name || "Ukendt");
       const wb = ensureWeek(locEntry.weeks, b.week_number, b.year);
 
       const selectedPlacement = b.placement_id ? placementMap.get(b.placement_id) : null;
