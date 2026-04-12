@@ -424,30 +424,66 @@ export default function LocationHistoryContent() {
   const totalEesy = useMemo(() => computeTotals(eesyLocations), [eesyLocations]);
   const totalYousee = useMemo(() => computeTotals(youseeLocations), [youseeLocations]);
 
-  // ── Vendor type summary ──
+  // ── Vendor type summary with time periods ──
   const vendorTypeSummary = useMemo(() => {
-    const groups = new Map<string, { locations: number; days: number; sales: number; db: number; revenue: number }>();
+    const now = new Date();
+    const cutoff30 = new Date(now); cutoff30.setDate(cutoff30.getDate() - 30);
+    const cutoff90 = new Date(now); cutoff90.setDate(cutoff90.getDate() - 90);
+    const cutoff180 = new Date(now); cutoff180.setDate(cutoff180.getDate() - 180);
+
+    // Convert week/year to approximate date (Monday of ISO week)
+    const weekToDate = (week: number, year: number): Date => {
+      const jan4 = new Date(year, 0, 4);
+      const dayOfWeek = jan4.getDay() || 7;
+      const mondayWeek1 = new Date(jan4);
+      mondayWeek1.setDate(jan4.getDate() - dayOfWeek + 1);
+      const target = new Date(mondayWeek1);
+      target.setDate(mondayWeek1.getDate() + (week - 1) * 7);
+      return target;
+    };
+
+    type PeriodBucket = { days: number; db: number };
+    type TypeGroup = {
+      locations: Set<string>; days: number; sales: number;
+      p30: PeriodBucket; p90: PeriodBucket; p180: PeriodBucket; pAll: PeriodBucket;
+    };
+
+    const groups = new Map<string, TypeGroup>();
+    const emptyBucket = (): PeriodBucket => ({ days: 0, db: 0 });
+
     for (const loc of locationData) {
       const type = loc.locationType;
-      const g = groups.get(type) || { locations: 0, days: 0, sales: 0, db: 0, revenue: 0 };
-      g.locations += 1;
+      if (!groups.has(type)) {
+        groups.set(type, { locations: new Set(), days: 0, sales: 0, p30: emptyBucket(), p90: emptyBucket(), p180: emptyBucket(), pAll: emptyBucket() });
+      }
+      const g = groups.get(type)!;
+      g.locations.add(loc.locationId);
       g.days += loc.bookedDaysCount;
       g.sales += loc.totalSales;
-      g.db += loc.db;
-      g.revenue += loc.totalRevenue;
-      groups.set(type, g);
+
+      for (const wb of loc.weeklyBreakdown) {
+        const wDate = weekToDate(wb.week, wb.year);
+        g.pAll.days += wb.days; g.pAll.db += wb.db;
+        if (wDate >= cutoff180) { g.p180.days += wb.days; g.p180.db += wb.db; }
+        if (wDate >= cutoff90) { g.p90.days += wb.days; g.p90.db += wb.db; }
+        if (wDate >= cutoff30) { g.p30.days += wb.days; g.p30.db += wb.db; }
+      }
     }
+
+    const dbPerDay = (b: PeriodBucket) => b.days > 0 ? b.db / b.days : null;
+
     return Array.from(groups.entries())
       .map(([type, g]) => ({
         type,
-        locations: g.locations,
+        locations: g.locations.size,
         days: g.days,
-        sales: g.sales,
         salesPerDay: g.days > 0 ? g.sales / g.days : 0,
-        db: g.db,
-        dbPerDay: g.days > 0 ? g.db / g.days : 0,
+        dbPerDay30: dbPerDay(g.p30),
+        dbPerDay90: dbPerDay(g.p90),
+        dbPerDay180: dbPerDay(g.p180),
+        dbPerDayAll: dbPerDay(g.pAll),
       }))
-      .sort((a, b) => b.dbPerDay - a.dbPerDay);
+      .sort((a, b) => (b.dbPerDayAll ?? -Infinity) - (a.dbPerDayAll ?? -Infinity));
   }, [locationData]);
 
   const toggleExpand = (locId: string) => {
@@ -605,21 +641,37 @@ export default function LocationHistoryContent() {
                   <TableHead className="text-right">Lokationer</TableHead>
                   <TableHead className="text-right">Dage</TableHead>
                   <TableHead className="text-right">Salg/dag</TableHead>
-                  <TableHead className="text-right">DB</TableHead>
-                  <TableHead className="text-right pr-6">DB/dag</TableHead>
+                  <TableHead className="text-right">30 dage</TableHead>
+                  <TableHead className="text-right">3 mdr</TableHead>
+                  <TableHead className="text-right">6 mdr</TableHead>
+                  <TableHead className="text-right pr-6">All time</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {vendorTypeSummary.map(row => (
-                  <TableRow key={row.type}>
-                    <TableCell className="pl-6 font-medium">{row.type}</TableCell>
-                    <TableCell className="text-right">{row.locations}</TableCell>
-                    <TableCell className="text-right">{row.days}</TableCell>
-                    <TableCell className="text-right">{row.salesPerDay.toFixed(1).replace(".", ",")}</TableCell>
-                    <TableCell className={`text-right ${row.db >= 0 ? "text-emerald-600" : "text-destructive"}`}>{formatKr(row.db)}</TableCell>
-                    <TableCell className={`text-right pr-6 font-semibold ${row.dbPerDay >= 0 ? "text-emerald-600" : "text-destructive"}`}>{formatKr(row.dbPerDay)}</TableCell>
-                  </TableRow>
-                ))}
+                {vendorTypeSummary.map(row => {
+                  const renderDbCell = (val: number | null, className?: string) => {
+                    if (val === null) return <TableCell className={`text-right text-muted-foreground ${className || ""}`}>–</TableCell>;
+                    return <TableCell className={`text-right ${val >= 0 ? "text-emerald-600" : "text-destructive"} ${className || ""}`}>{formatKr(val)}</TableCell>;
+                  };
+                  const trend = row.dbPerDay30 !== null && row.dbPerDayAll !== null
+                    ? row.dbPerDay30 > row.dbPerDayAll ? "↑" : row.dbPerDay30 < row.dbPerDayAll ? "↓" : ""
+                    : "";
+                  return (
+                    <TableRow key={row.type}>
+                      <TableCell className="pl-6 font-medium">
+                        {row.type}
+                        {trend && <span className={`ml-1 ${trend === "↑" ? "text-emerald-600" : "text-destructive"}`}>{trend}</span>}
+                      </TableCell>
+                      <TableCell className="text-right">{row.locations}</TableCell>
+                      <TableCell className="text-right">{row.days}</TableCell>
+                      <TableCell className="text-right">{row.salesPerDay.toFixed(1).replace(".", ",")}</TableCell>
+                      {renderDbCell(row.dbPerDay30)}
+                      {renderDbCell(row.dbPerDay90)}
+                      {renderDbCell(row.dbPerDay180)}
+                      {renderDbCell(row.dbPerDayAll, "pr-6 font-semibold")}
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </CardContent>
