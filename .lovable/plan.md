@@ -1,21 +1,21 @@
 
 
-## Tilføj "Salg/dag" kolonne og sortér efter den
+## Ændr DB% til ROI% (Return on Investment)
 
 ### Ændring
-Tilføj en ny kolonne **"Salg/dag"** i tabellen i `LocationHistoryContent.tsx`. Beregningen er simpel: `totalSales / bookedDaysCount`. Tabellen sorteres som standard efter denne værdi (højeste først) i stedet for DB.
+Erstat den nuværende DB%-kolonne (DB / Omsætning) med **ROI%** beregnet som:
+
+`ROI% = DB / (Lokationsomk. + Hotel + Diæt) × 100`
+
+Dette viser hvor meget I tjener pr. krone investeret i lokationen — en langt mere brugbar metrik til at vurdere lokationskvalitet.
 
 ### Fil der ændres
 
 | Fil | Ændring |
 |-----|---------|
-| `src/pages/vagt-flow/LocationHistoryContent.tsx` | Tilføj `salesPerDay` felt i `AggregatedLocation`, beregn det, tilføj kolonneheader + celle, og sortér efter `salesPerDay` desc. Også i ugeopdeling og subtotaler. |
+| `src/pages/vagt-flow/LocationHistoryContent.tsx` | Omdøb `dbPct` til `roi` overalt. Beregn som `db / (locationCost + hotelCost + dietCost) * 100`. Opdater kolonneheader fra "DB%" til "ROI%". Gælder hovedtabel, ugeopdeling og subtotaler. KPI-kortet opdateres også. |
 
-### Detaljer
-- **Beregning**: `salesPerDay = bookedDaysCount > 0 ? totalSales / bookedDaysCount : 0`
-- **Format**: Vises med 1 decimal (fx "2,3")
-- **Sortering**: `.sort((a, b) => b.salesPerDay - a.salesPerDay)` erstatter den nuværende DB-sortering
-- **Ugeopdeling**: Viser også salg/dag pr. uge (`sales / days`)
-- **Subtotaler**: Beregner samlet salg/dag for gruppen
-- **Placering**: Kolonnen placeres lige efter "Salg" kolonnen
+### Eksempel
+- Lokation med DB = 5.000 kr, lokationsomk. 2.000 kr, hotel 1.000 kr, diæt 500 kr → ROI = 5.000 / 3.500 × 100 = **143%** (godt)
+- Lokation med DB = -1.000 kr, omkostninger 4.000 kr → ROI = **-25%** (dårligt)
 
