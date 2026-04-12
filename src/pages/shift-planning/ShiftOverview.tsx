@@ -1462,28 +1462,28 @@ export default function ShiftOverview() {
                                 </div>
                               )}
 
-                              {!hasShift && !isLate && isVacation && (
+                              {!isLate && isVacation && (
                                 <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
                                   <Palmtree className="h-3 w-3" />
                                   Ferie
                                 </span>
                               )}
 
-                              {!hasShift && !isLate && isSick && (
+                              {!isLate && isSick && (
                                 <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">
                                   <Thermometer className="h-3 w-3" />
                                   Syg
                                 </span>
                               )}
 
-                              {!hasShift && !isLate && isNoShow && (
+                              {!isLate && isNoShow && (
                                 <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full bg-gray-200 text-gray-700 dark:bg-gray-800/60 dark:text-gray-300">
                                   <UserX className="h-3 w-3" />
                                   Udeblivelse
                                 </span>
                               )}
 
-                              {!hasShift && !isLate && isDayOff && (
+                              {!isLate && isDayOff && (
                                 <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
                                   <CalendarX2 className="h-3 w-3" />
                                   Fridag
