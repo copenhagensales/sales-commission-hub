@@ -424,14 +424,13 @@ export default function LocationHistoryContent() {
   const totalEesy = useMemo(() => computeTotals(eesyLocations), [eesyLocations]);
   const totalYousee = useMemo(() => computeTotals(youseeLocations), [youseeLocations]);
 
-  // ── Vendor type summary with time periods ──
-  const vendorTypeSummary = useMemo(() => {
+  // ── Vendor type summary helper ──
+  const computeVendorSummary = (locations: AggregatedLocation[]) => {
     const now = new Date();
     const cutoff30 = new Date(now); cutoff30.setDate(cutoff30.getDate() - 30);
     const cutoff90 = new Date(now); cutoff90.setDate(cutoff90.getDate() - 90);
     const cutoff180 = new Date(now); cutoff180.setDate(cutoff180.getDate() - 180);
 
-    // Convert week/year to approximate date (Monday of ISO week)
     const weekToDate = (week: number, year: number): Date => {
       const jan4 = new Date(year, 0, 4);
       const dayOfWeek = jan4.getDay() || 7;
@@ -451,7 +450,7 @@ export default function LocationHistoryContent() {
     const groups = new Map<string, TypeGroup>();
     const emptyBucket = (): PeriodBucket => ({ days: 0, db: 0 });
 
-    for (const loc of locationData) {
+    for (const loc of locations) {
       const type = loc.locationType;
       if (!groups.has(type)) {
         groups.set(type, { locations: new Set(), days: 0, sales: 0, p30: emptyBucket(), p90: emptyBucket(), p180: emptyBucket(), pAll: emptyBucket() });
@@ -484,7 +483,10 @@ export default function LocationHistoryContent() {
         dbPerDayAll: dbPerDay(g.pAll),
       }))
       .sort((a, b) => (b.dbPerDayAll ?? -Infinity) - (a.dbPerDayAll ?? -Infinity));
-  }, [locationData]);
+  };
+
+  const vendorTypeSummaryEesy = useMemo(() => computeVendorSummary(eesyLocations), [eesyLocations]);
+  const vendorTypeSummaryYousee = useMemo(() => computeVendorSummary(youseeLocations), [youseeLocations]);
 
   const toggleExpand = (locId: string) => {
     setExpandedLocations(prev => {
