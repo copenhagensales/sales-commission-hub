@@ -1,19 +1,21 @@
 
 
-## Erstat ROI% med DB/dag
+## Tilføj leverandørtype-oversigt med DB/dag
 
-### Ændring
-Erstat "ROI%" kolonnen med **"DB/dag"** — beregnet som `DB / bookedDaysCount`. Vises i kroner (fx "1.234 kr.") i stedet for procent.
+### Hvad bygges
+En opsummeringstabel øverst på siden der viser **DB/dag pr. leverandørtype** (Danske Shoppingcentre, Markeder, Coop butik, etc.). Sorteret efter DB/dag, så man hurtigt kan se hvilken type lokation der performer bedst.
 
-### Fil der ændres
+### Ændringer i `src/pages/vagt-flow/LocationHistoryContent.tsx`
 
-| Fil | Ændring |
-|-----|---------|
-| `src/pages/vagt-flow/LocationHistoryContent.tsx` | Omdøb `roi` til `dbPerDay` overalt. Beregn som `db / days`. Vis med `formatKr()` i stedet for `formatPct()`. Opdater header fra "ROI%" til "DB/dag". Gælder KPI-kort, hovedtabel, ugeopdeling og subtotaler. |
+1. **Udvid booking-query**: Tilføj `type` til `location`-select: `location!inner(id, name, daily_rate, type)`
 
-### Beregning
-- **Hovedtabel**: `dbPerDay = totalDays > 0 ? db / totalDays : 0`
-- **Ugeopdeling**: `dbPerDay = wb.days > 0 ? db / wb.days : 0`
-- **Subtotaler**: `dbPerDay = totalDays > 0 ? totalDB / totalDays : 0`
-- **KPI-kort**: `dbPerDay = totalDays > 0 ? totals.totalDB / totalDays : 0`
+2. **Gem `locationType` i data**: Tilføj `locationType: string` til `AggregatedLocation` og gem `loc?.type || "Ukendt"` under aggregering
+
+3. **Ny leverandørtype-aggregering** (`useMemo`): Gruppér `locationData` efter `locationType`, beregn pr. gruppe: antal lokationer, total dage, total DB, DB/dag, total salg, salg/dag
+
+4. **Ny opsummeringskomponent**: En kompakt tabel/kort-sektion **over** KPI-kortene med kolonner: Type | Lokationer | Dage | Salg/dag | DB | DB/dag — sorteret efter DB/dag (højeste først), med farve-indikation (grøn/rød)
+
+### Teknisk detalje
+- `location.type` feltet indeholder værdier som: "Danske Shoppingcentre", "Markeder", "Coop butik", "Meny butik", "Anden lokation", "Ocean Outdoor", "Butik", "Messer"
+- Ingen database-ændringer nødvendige — feltet eksisterer allerede
 
