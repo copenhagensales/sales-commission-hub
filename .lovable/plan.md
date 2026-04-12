@@ -1,40 +1,31 @@
 
 
-## Fix: Forsinkelser kan ikke registreres
+## Tilføj SMS-notifikation ved bilaflevering
 
-### Problem
-I `handleSetLateness` (linje 931-932) hentes medarbejderens planlagte starttid via `getWorkTimesForEmployeeAndDay()`. Denne funktion kan returnere sentinelværdien `"__NO_SPECIAL_SHIFT__"` (når medarbejderen ikke har en special-vagt og bruger team-standard eller personlig standard_start_time).
+### Hvad sker der nu
+Når en bil afleveres, sendes kun en email til FM assistant team leaders. Ingen SMS.
 
-Problemet er at `handleSetLateness` **ikke** håndterer denne sentinelværdi:
+### Hvad ændres
+Edge function `notify-vehicle-returned` udvides til også at sende SMS via Twilio til FM assistant team leaders OG FM team leaders.
 
-```typescript
-const workTimes = getWorkTimesForEmployeeAndDay(employeeId, date);
-const startTime = workTimes ? workTimes.split('-')[0].trim() : "08:00";
-```
+SMS-tekst: `"🔑 [Bil] afleveret d. DD/MM-YY kl. HH:MM af [Medarbejder]"`
 
-Når `workTimes` er `"__NO_SPECIAL_SHIFT__"`, er den truthy, og `.split('-')` giver `["__NO_SPECIAL_SHIFT__"]` som starttid. Derefter i `handleDelaySubmit` giver `originalStartTime.split(':').map(Number)` → `NaN`, og `delayMinutes` bliver `NaN`, så `delayMinutes <= 0` evaluerer til `false`, og upsert'en fejler med ugyldig data.
+### Modtagere
+Funktionen finder allerede FM teams. Den udvides til også at hente `team_leader_id` fra `teams`-tabellen og slå telefonnumre op for både assistant leaders og team leaders.
 
-Renderings-koden (linje 1366-1369) håndterer dette korrekt ved at falde tilbage til `employee.standard_start_time`, men forsinkelsesregistreringen gør det ikke.
-
-### Løsning
-
-Ret `handleSetLateness` (linje 931-932) til at håndtere `NO_SPECIAL_SHIFT` sentinelen og falde tilbage til medarbejderens `standard_start_time`:
-
-```typescript
-const rawWorkTimes = getWorkTimesForEmployeeAndDay(employeeId, date);
-const employee = employees?.find(e => e.id === employeeId);
-const workTimes = rawWorkTimes === NO_SPECIAL_SHIFT 
-  ? employee?.standard_start_time 
-  : rawWorkTimes;
-const startTime = workTimes ? workTimes.split('-')[0].trim() : "08:00";
-```
+Nuværende modtagere baseret på data:
+- Thomas Wehage (assistant leader, Fieldmarketing) – `+4530141613`
+- William Krogh Bornak (team leader, Fieldmarketing) – `+45 42209395`
 
 ### Fil der ændres
 
 | Fil | Ændring |
 |-----|---------|
-| `src/pages/shift-planning/ShiftOverview.tsx` | Ret `handleSetLateness` til at håndtere `NO_SPECIAL_SHIFT` fallback (linje 931-932) |
+| `supabase/functions/notify-vehicle-returned/index.ts` | Tilføj SMS-afsendelse via Twilio efter email. Hent telefonnumre for både assistant leaders og team leaders fra FM teams. Send SMS med bilnavn, dato, klokkeslæt og medarbejdernavn. |
 
-### Resultat
-Forsinkelser kan registreres korrekt for alle medarbejdere, uanset om de har en special-vagt, team-vagt, eller kun en personlig standard-mødetid.
+### Teknisk detalje
+- Twilio credentials (`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`) er allerede konfigureret som secrets
+- SMS sendes direkte via Twilio REST API (samme mønster som `send-employee-sms`)
+- Telefonnumre normaliseres til E.164 format inden afsendelse
+- SMS-fejl logges men blokerer ikke email-notifikationen
 
