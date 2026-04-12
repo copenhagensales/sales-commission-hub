@@ -424,7 +424,32 @@ export default function LocationHistoryContent() {
   const totalEesy = useMemo(() => computeTotals(eesyLocations), [eesyLocations]);
   const totalYousee = useMemo(() => computeTotals(youseeLocations), [youseeLocations]);
 
-  const toggleExpand = (locId: string) => {
+  // ── Vendor type summary ──
+  const vendorTypeSummary = useMemo(() => {
+    const groups = new Map<string, { locations: number; days: number; sales: number; db: number; revenue: number }>();
+    for (const loc of locationData) {
+      const type = loc.locationType;
+      const g = groups.get(type) || { locations: 0, days: 0, sales: 0, db: 0, revenue: 0 };
+      g.locations += 1;
+      g.days += loc.bookedDaysCount;
+      g.sales += loc.totalSales;
+      g.db += loc.db;
+      g.revenue += loc.totalRevenue;
+      groups.set(type, g);
+    }
+    return Array.from(groups.entries())
+      .map(([type, g]) => ({
+        type,
+        locations: g.locations,
+        days: g.days,
+        sales: g.sales,
+        salesPerDay: g.days > 0 ? g.sales / g.days : 0,
+        db: g.db,
+        dbPerDay: g.days > 0 ? g.db / g.days : 0,
+      }))
+      .sort((a, b) => b.dbPerDay - a.dbPerDay);
+  }, [locationData]);
+
     setExpandedLocations(prev => {
       const next = new Set(prev);
       next.has(locId) ? next.delete(locId) : next.add(locId);
