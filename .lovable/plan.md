@@ -1,35 +1,21 @@
 
 
-## Økonomi Butikker — Historisk lokationsoversigt
+## Tilføj "Salg/dag" kolonne og sortér efter den
 
-### Hvad bygges
-En ny side/tab der viser **historisk** profitabilitet pr. lokation (butik) på tværs af alle uger. I stedet for at se én uge ad gangen (som den nuværende "Lokationsøkonomi"), aggregerer denne oversigt data over en **valgfri periode** (fx måned, kvartal, år) og rangerer lokationer efter samlet DB.
+### Ændring
+Tilføj en ny kolonne **"Salg/dag"** i tabellen i `LocationHistoryContent.tsx`. Beregningen er simpel: `totalSales / bookedDaysCount`. Tabellen sorteres som standard efter denne værdi (højeste først) i stedet for DB.
 
-### Brugeroplevelse
-- Datovælger med periode (fra/til eller forudindstillede perioder: "Seneste 3 mdr", "År til dato", "2025")
-- KPI-kort: Samlet omsætning, sælgerløn, lokationsomkostning, hotel, diæt, DB, DB%
-- Tabel med én række pr. lokation, sorteret efter DB (højeste først):
-  - Lokationsnavn, klient-badge, antal bookede uger, omsætning, sælgerløn, lokationsomk., hotel, diæt, DB, DB%
-  - Farvekodning: grøn for positiv DB, rød for negativ
-- Mulighed for at klikke og se ugeopdeling pr. lokation (expand-row)
-
-### Teknisk tilgang
+### Fil der ændres
 
 | Fil | Ændring |
 |-----|---------|
-| `src/pages/vagt-flow/LocationHistoryContent.tsx` | **Ny fil** — Historisk lokationsprofitabilitet. Genbruger `computeTotals`, `KpiCards`, `TeamBadge`, `formatKr`/`formatPct` fra den eksisterende kode. Henter bookings, sales, hotel, diæt for en hel periode (ikke kun én uge) og aggregerer pr. lokation. |
-| `src/pages/vagt-flow/BookingManagement.tsx` | Tilføj ny tab "Økonomi Butikker" med `LocationHistoryContent` (lazy-loaded). |
+| `src/pages/vagt-flow/LocationHistoryContent.tsx` | Tilføj `salesPerDay` felt i `AggregatedLocation`, beregn det, tilføj kolonneheader + celle, og sortér efter `salesPerDay` desc. Også i ugeopdeling og subtotaler. |
 
-### Datahentning
-- **Bookings**: `booking` filtreret på dato-range (`start_date`/`end_date`) i stedet for uge/år
-- **Sales**: `sales` med `source=fieldmarketing` i perioden, joined med `sale_items`
-- **Hotel/Diæt**: `booking_hotel` og `booking_diet` for de relevante booking-IDs
-- Aggregering sker client-side (samme mønster som eksisterende kode, bare over flere uger)
-
-### Beregning pr. lokation (identisk med eksisterende)
-- Omsætning = sum `mapped_revenue`
-- Sælgerløn = sum `mapped_commission` × (1 + 12,5% feriepenge)
-- Lokationsomk. = `daily_rate` × antal bookede dage
-- Hotel + Diæt = fra `booking_hotel`/`booking_diet`
-- DB = Omsætning − Sælgerløn − Lokationsomk. − Hotel − Diæt
+### Detaljer
+- **Beregning**: `salesPerDay = bookedDaysCount > 0 ? totalSales / bookedDaysCount : 0`
+- **Format**: Vises med 1 decimal (fx "2,3")
+- **Sortering**: `.sort((a, b) => b.salesPerDay - a.salesPerDay)` erstatter den nuværende DB-sortering
+- **Ugeopdeling**: Viser også salg/dag pr. uge (`sales / days`)
+- **Subtotaler**: Beregner samlet salg/dag for gruppen
+- **Placering**: Kolonnen placeres lige efter "Salg" kolonnen
 
