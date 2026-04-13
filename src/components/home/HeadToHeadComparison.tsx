@@ -282,20 +282,26 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
   });
 
   // Sync active challenge from database to local state on mount
+  // DB is the single source of truth — always override localStorage date fields
   useEffect(() => {
     if (!currentEmployeeId) return;
     
-    // If we have active challenges in DB but no local activeChallengeId, sync from DB
-    if (activeChallenges.length > 0 && !activeChallengeId) {
-      const activeChallenge = activeChallenges[0];
+    // If we have active challenges in DB, sync from DB (always override local dates)
+    if (activeChallenges.length > 0) {
+      const activeChallenge = activeChallengeId 
+        ? activeChallenges.find(c => c.id === activeChallengeId) || activeChallenges[0]
+        : activeChallenges[0];
       const isChallenger = activeChallenge.challenger_employee_id === currentEmployeeId;
       const opponentId = isChallenger 
         ? activeChallenge.opponent_employee_id 
         : activeChallenge.challenger_employee_id;
       
+      // Bug fix: For custom periods, use custom_start_at (not accepted_at) as start
+      const effectiveStart = activeChallenge.custom_start_at || activeChallenge.accepted_at;
+      
       setActiveChallengeId(activeChallenge.id);
       setOpponentTeam([opponentId]);
-      setMatchStartTime(activeChallenge.accepted_at);
+      setMatchStartTime(effectiveStart);
       setMatchEndTime(activeChallenge.custom_end_at || null);
       setPeriod(activeChallenge.period as PeriodType);
       setBattleMode(activeChallenge.battle_mode as BattleMode);
@@ -351,6 +357,15 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
         };
       }
       
+      // Bug fix: Target period runs until "now" (no fixed end)
+      if (period === "target") {
+        return {
+          start: startTime,
+          end: now,
+          label: "Først til mål"
+        };
+      }
+      
       const endTime = period === "today" 
         ? endOfDay(startTime) 
         : endOfWeek(startTime, { weekStartsOn: 1 });
@@ -367,8 +382,9 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
         return { start: startOfDay(now), end: endOfDay(now), label: "I dag" };
       case "week":
         return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }), label: "Denne uge" };
+      case "target":
+        return { start: startOfDay(now), end: now, label: "Først til mål" };
       case "custom":
-        // For custom without active match, just show current time range
         return { start: now, end: addHours(now, 24), label: "Brugerdefineret" };
       default:
         return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }), label: "Denne uge" };
