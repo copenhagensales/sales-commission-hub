@@ -246,7 +246,6 @@ export function useDashboardSalesData({
           .lte("clock_in", endStr + "T23:59:59");
         timeStampsData = stamps || [];
       }
-      }
 
       // Step 3: Build agent identifiers for fetching sales
       const allAgentIdentifiers: string[] = [];
