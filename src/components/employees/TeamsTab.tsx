@@ -1284,82 +1284,110 @@ export function TeamsTab() {
                 </div>
               </TabsContent>
 
-              {/* Clients Tab */}
-              <TabsContent value="clients" className="mt-0 py-6">
-                <div className="space-y-4">
-                  <div className="relative">
-                    <Input
-                      placeholder="Søg efter kunde..."
-                      value={clientSearch}
-                      onChange={(e) => setClientSearch(e.target.value)}
-                      className="h-11 pl-10"
-                    />
-                    <Building2 className="h-4 w-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
-                  </div>
-                  
-                  <div className="grid sm:grid-cols-2 gap-2">
-                    {filteredClients.length === 0 ? (
-                      <div className="col-span-2 py-8 text-center text-muted-foreground">
-                        Ingen kunder fundet
-                      </div>
-                    ) : (
-                      filteredClients.map((client) => {
-                        const isSelected = formData.client_ids.includes(client.id);
-                        // Check if this client belongs to another team
-                        const otherTeamClient = teamClients.find(
-                          (tc) => tc.client_id === client.id && tc.team_id !== editingTeam?.id
-                        );
-                        const otherTeamName = otherTeamClient
-                          ? teams.find((t) => t.id === otherTeamClient.team_id)?.name
-                          : null;
-                        const isDisabled = !!otherTeamName && !isSelected;
+              {/* Clients Tab - with sub-tabs */}
+              <TabsContent value="clients" className="mt-0 py-4">
+                <Tabs defaultValue="assign-clients" className="w-full">
+                  <TabsList className="w-full mb-4">
+                    <TabsTrigger value="assign-clients" className="flex-1">
+                      <Building2 className="h-4 w-4 mr-2" />
+                      Fordel kunder
+                    </TabsTrigger>
+                    <TabsTrigger value="assign-employees" className="flex-1">
+                      <UserCheck className="h-4 w-4 mr-2" />
+                      Fordel medarbejdere
+                    </TabsTrigger>
+                  </TabsList>
 
-                        return (
-                          <div 
-                            key={client.id} 
-                            onClick={() => !isDisabled && toggleClient(client.id)}
-                            className={`
-                              flex items-center gap-3 p-3 rounded-lg border transition-all
-                              ${isDisabled
-                                ? 'opacity-50 cursor-not-allowed bg-muted/30 border-border'
-                                : isSelected 
-                                  ? 'bg-primary/5 border-primary/30 ring-1 ring-primary/20 cursor-pointer' 
-                                  : 'hover:bg-muted/50 border-border cursor-pointer'
-                              }
-                            `}
-                          >
-                            <Checkbox
-                              id={`client-${client.id}`}
-                              checked={isSelected}
-                              onCheckedChange={() => !isDisabled && toggleClient(client.id)}
-                              className="pointer-events-none"
-                              disabled={isDisabled}
-                            />
-                            {client.logo_url ? (
-                              <img
-                                src={client.logo_url}
-                                alt=""
-                                className="h-6 w-6 object-contain rounded"
-                              />
-                            ) : (
-                              <div className="h-6 w-6 rounded bg-muted flex items-center justify-center">
-                                <Building2 className="h-3 w-3 text-muted-foreground" />
-                              </div>
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <span className="text-sm font-medium">{client.name}</span>
-                              {otherTeamName && (
-                                <span className="text-xs text-muted-foreground block">
-                                  Tilhører: {otherTeamName}
-                                </span>
-                              )}
-                            </div>
+                  {/* Sub-tab: Fordel kunder (existing client selection) */}
+                  <TabsContent value="assign-clients">
+                    <div className="space-y-4">
+                      <div className="relative">
+                        <Input
+                          placeholder="Søg efter kunde..."
+                          value={clientSearch}
+                          onChange={(e) => setClientSearch(e.target.value)}
+                          className="h-11 pl-10"
+                        />
+                        <Building2 className="h-4 w-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+                      </div>
+                      
+                      <div className="grid sm:grid-cols-2 gap-2">
+                        {filteredClients.length === 0 ? (
+                          <div className="col-span-2 py-8 text-center text-muted-foreground">
+                            Ingen kunder fundet
                           </div>
-                        );
-                      })
+                        ) : (
+                          filteredClients.map((client) => {
+                            const isSelected = formData.client_ids.includes(client.id);
+                            const otherTeamClient = teamClients.find(
+                              (tc) => tc.client_id === client.id && tc.team_id !== editingTeam?.id
+                            );
+                            const otherTeamName = otherTeamClient
+                              ? teams.find((t) => t.id === otherTeamClient.team_id)?.name
+                              : null;
+                            const isDisabled = !!otherTeamName && !isSelected;
+
+                            return (
+                              <div 
+                                key={client.id} 
+                                onClick={() => !isDisabled && toggleClient(client.id)}
+                                className={`
+                                  flex items-center gap-3 p-3 rounded-lg border transition-all
+                                  ${isDisabled
+                                    ? 'opacity-50 cursor-not-allowed bg-muted/30 border-border'
+                                    : isSelected 
+                                      ? 'bg-primary/5 border-primary/30 ring-1 ring-primary/20 cursor-pointer' 
+                                      : 'hover:bg-muted/50 border-border cursor-pointer'
+                                  }
+                                `}
+                              >
+                                <Checkbox
+                                  id={`client-${client.id}`}
+                                  checked={isSelected}
+                                  onCheckedChange={() => !isDisabled && toggleClient(client.id)}
+                                  className="pointer-events-none"
+                                  disabled={isDisabled}
+                                />
+                                {client.logo_url ? (
+                                  <img
+                                    src={client.logo_url}
+                                    alt=""
+                                    className="h-6 w-6 object-contain rounded"
+                                  />
+                                ) : (
+                                  <div className="h-6 w-6 rounded bg-muted flex items-center justify-center">
+                                    <Building2 className="h-3 w-3 text-muted-foreground" />
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <span className="text-sm font-medium">{client.name}</span>
+                                  {otherTeamName && (
+                                    <span className="text-xs text-muted-foreground block">
+                                      Tilhører: {otherTeamName}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  </TabsContent>
+
+                  {/* Sub-tab: Fordel medarbejdere (employee-to-client assignment) */}
+                  <TabsContent value="assign-employees">
+                    {editingTeam && (
+                      <TeamAssignEmployeesSubTab
+                        teamId={editingTeam.id}
+                        teamClientIds={formData.client_ids}
+                        teamEmployeeIds={formData.employee_ids}
+                        clients={clients}
+                        employees={employees}
+                      />
                     )}
-                  </div>
-                </div>
+                  </TabsContent>
+                </Tabs>
               </TabsContent>
 
               {/* Team Members Tab - Shows selected employees (read-only) */}
