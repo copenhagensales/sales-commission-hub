@@ -1861,7 +1861,8 @@ function calculateHoursForEmployees(
   employeeIds: string[],
   startStr: string,
   endStr: string,
-  shiftData: ShiftDataResult
+  shiftData: ShiftDataResult,
+  employeeTimeClocksMap?: Record<string, { clock_type: string; hourly_rate: number }>
 ): number {
   const { teamMembers, primaryShifts, shiftDays, timeStampsData } = shiftData;
   
@@ -1881,7 +1882,11 @@ function calculateHoursForEmployees(
       const empShift = primaryShifts.find((s: TeamStandardShift) => s.team_id === empTeam.team_id);
       if (!empShift) continue;
       
-      const hoursSource = empShift.hours_source || "shift";
+      // Use new resolver if available, otherwise legacy
+      const clockInfo = employeeTimeClocksMap?.[empId];
+      const hoursSource = clockInfo
+        ? (clockInfo.clock_type === 'override' || clockInfo.clock_type === 'revenue' ? 'timestamp' : 'shift')
+        : (empShift.hours_source || "shift");
       const empShiftDays = shiftDays.filter((sd: ShiftDay) => sd.shift_id === empShift.id);
       const shiftForDay = empShiftDays.find((sd: ShiftDay) => sd.day_of_week === adjustedDayOfWeek);
       
