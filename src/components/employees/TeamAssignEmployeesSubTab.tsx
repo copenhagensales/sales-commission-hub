@@ -51,12 +51,9 @@ export function TeamAssignEmployeesSubTab({ teamId, teamClientIds, teamEmployeeI
   // Fetch all clients (for "Andre kunder" section)
   const { data: allClients = [] } = useQuery({
     queryKey: ["all-clients-for-assignments"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("clients")
-        .select("id, name, logo_url")
-        .eq("is_active" as any, true)
-        .order("name");
+    queryFn: async (): Promise<Client[]> => {
+      const query = supabase.from("clients").select("id, name, logo_url");
+      const { data, error } = await (query as any).eq("is_active", true).order("name");
       if (error) throw error;
       return (data ?? []) as Client[];
     },
