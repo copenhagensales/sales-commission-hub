@@ -139,6 +139,122 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Send calendar invite email to recruiter
+    if (clientId && clientSecret && tenantId && msUserEmail) {
+      try {
+        // Get access token (reuse if Outlook event was created, otherwise fetch new)
+        let notifyToken: string | null = null;
+        const notifyTokenRes = await fetch(
+          `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+              client_id: clientId,
+              client_secret: clientSecret,
+              scope: "https://graph.microsoft.com/.default",
+              grant_type: "client_credentials",
+            }),
+          }
+        );
+        if (notifyTokenRes.ok) {
+          const tokenData = await notifyTokenRes.json();
+          notifyToken = tokenData.access_token;
+        }
+
+        if (notifyToken) {
+          const candidateName = `${candidate.first_name} ${candidate.last_name}`;
+          const uid = crypto.randomUUID();
+          const now = new Date().toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+          const dtStart = `${date.replace(/-/g, "")}T${startTime.replace(":", "")}00`;
+          const dtEnd = `${date.replace(/-/g, "")}T${endTime.replace(":", "")}00`;
+
+          const icsContent = [
+            "BEGIN:VCALENDAR",
+            "VERSION:2.0",
+            "PRODID:-//Copenhagen Sales//Booking//DA",
+            "METHOD:REQUEST",
+            "BEGIN:VEVENT",
+            `UID:${uid}`,
+            `DTSTAMP:${now}`,
+            `DTSTART;TZID=Europe/Copenhagen:${dtStart}`,
+            `DTEND;TZID=Europe/Copenhagen:${dtEnd}`,
+            `SUMMARY:Samtale: ${candidateName} — ${role}`,
+            `DESCRIPTION:Kandidatsamtale med ${candidateName}\\nStilling: ${role}\\nTelefon: ${candidate.phone || "Ikke oplyst"}\\nEmail: ${candidate.email || "Ikke oplyst"}`,
+            `ORGANIZER;CN=Copenhagen Sales:mailto:${msUserEmail}`,
+            `ATTENDEE;CN=Oscar;RSVP=TRUE:mailto:oscar@copenhagensales.dk`,
+            "STATUS:CONFIRMED",
+            "END:VEVENT",
+            "END:VCALENDAR",
+          ].join("\r\n");
+
+          // Base64 encode for Graph API attachment
+          const encoder = new TextEncoder();
+          const icsBytes = encoder.encode(icsContent);
+          let binary = "";
+          for (const byte of icsBytes) {
+            binary += String.fromCharCode(byte);
+          }
+          const icsBase64 = btoa(binary);
+
+          // Format date for subject
+          const dateObj = new Date(date + "T12:00:00");
+          const dayNum = dateObj.getDate();
+          const monthNum = dateObj.getMonth() + 1;
+          const dateShort = `${dayNum}/${monthNum}`;
+
+          const emailPayload = {
+            message: {
+              subject: `Ny booking: ${candidateName} — ${dateShort} kl. ${startTime}`,
+              body: {
+                contentType: "HTML",
+                content: `<h3>Ny kandidatbooking</h3>
+<p><strong>Kandidat:</strong> ${candidateName}</p>
+<p><strong>Stilling:</strong> ${role}</p>
+<p><strong>Dato:</strong> ${date}</p>
+<p><strong>Tid:</strong> ${startTime} – ${endTime}</p>
+<p><strong>Telefon:</strong> ${candidate.phone || "Ikke oplyst"}</p>
+<p><strong>Email:</strong> ${candidate.email || "Ikke oplyst"}</p>
+<p><em>Acceptér den vedhæftede kalenderinvitation for at tilføje samtalen til din kalender.</em></p>`,
+              },
+              toRecipients: [
+                { emailAddress: { address: "oscar@copenhagensales.dk", name: "Oscar" } },
+              ],
+              attachments: [
+                {
+                  "@odata.type": "#microsoft.graph.fileAttachment",
+                  name: "interview.ics",
+                  contentType: "text/calendar; method=REQUEST",
+                  contentBytes: icsBase64,
+                },
+              ],
+            },
+            saveToSentItems: false,
+          };
+
+          const sendRes = await fetch(
+            `https://graph.microsoft.com/v1.0/users/${msUserEmail}/sendMail`,
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${notifyToken}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(emailPayload),
+            }
+          );
+
+          if (sendRes.ok || sendRes.status === 202) {
+            console.log(`[public-book-candidate] Calendar invite sent to oscar@copenhagensales.dk for ${candidateName}`);
+          } else {
+            console.error("[public-book-candidate] Send invite error:", await sendRes.text());
+          }
+        }
+      } catch (notifyErr) {
+        console.error("[public-book-candidate] Notify email error:", notifyErr);
+      }
+    }
+
     // Update application status
     if (application) {
       await supabase
