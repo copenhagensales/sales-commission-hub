@@ -6560,21 +6560,21 @@ export type Database = {
           {
             foreignKeyName: "employee_standard_shifts_employee_id_fkey"
             columns: ["employee_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "employee_basic_info"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "employee_standard_shifts_employee_id_fkey"
             columns: ["employee_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "employee_master_data"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "employee_standard_shifts_employee_id_fkey"
             columns: ["employee_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "employee_referral_lookup"
             referencedColumns: ["id"]
           },
