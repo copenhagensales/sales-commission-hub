@@ -20,7 +20,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
 import { MyScheduleTabContent } from "@/components/profile/MyScheduleTabContent";
-import { VACATION_PAY_RATES, countWorkDaysInPeriod, getPayrollPeriod } from "@/lib/calculations";
+import { VACATION_PAY_RATES, getPayrollPeriod } from "@/lib/calculations";
 
 import { CareerWishesTabContent } from "@/components/profile/CareerWishesTabContent";
 import { HandbookTabContent } from "@/components/profile/HandbookTabContent";
@@ -628,9 +628,12 @@ export default function MyProfile() {
       return date.toISOString().split('T')[0];
     };
     
-    // Use central countWorkDaysInPeriod from @/lib/calculations
-    const totalWorkdays = countWorkDaysInPeriod(periodStart, periodEnd);
-    const workdaysPassed = countWorkDaysInPeriod(periodStart, now > periodEnd ? periodEnd : now);
+    // Simple day count (shift-aware hooks refine this downstream)
+    const diffMs = periodEnd.getTime() - periodStart.getTime();
+    const totalWorkdays = Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1;
+    const effectiveEnd = now > periodEnd ? periodEnd : now;
+    const passedMs = effectiveEnd.getTime() - periodStart.getTime();
+    const workdaysPassed = Math.max(0, Math.round(passedMs / (1000 * 60 * 60 * 24)) + 1);
     
     return {
       start: periodStart,

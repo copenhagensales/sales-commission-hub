@@ -304,8 +304,8 @@ export default function VagtplanFMContent() {
       return `${start}-${end}`;
     }
 
-    const isWeekend = dbDayOfWeek === 6 || dbDayOfWeek === 7;
-    if (isWeekend) return null;
+    // No day config found for this day — no shift (no weekday fallback)
+    return null;
 
     const start = primaryShift.start_time.slice(0, 5);
     const end = primaryShift.end_time.slice(0, 5);

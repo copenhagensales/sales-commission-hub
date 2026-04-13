@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { eachDayOfInterval, format, getDay, startOfMonth, endOfMonth } from "date-fns";
-import { VACATION_PAY_RATES, calculateHoursFromShift, countWorkDaysInPeriod } from "@/lib/calculations";
+import { VACATION_PAY_RATES, calculateHoursFromShift } from "@/lib/calculations";
 
 /** Threshold to distinguish hourly rate from monthly salary */
 const HOURLY_RATE_THRESHOLD = 1000;
@@ -165,8 +165,26 @@ export function useAssistantHoursCalculation(
           const monthStart = startOfMonth(periodStart);
           const monthEnd = endOfMonth(periodStart);
           
-          const workdaysInPeriod = countWorkDaysInPeriod(periodStart, periodEnd);
-          const workdaysInMonth = countWorkDaysInPeriod(monthStart, monthEnd);
+          // Shift-aware proration
+          const empShiftAssignment = employeeShiftAssignments?.find(a => a.employee_id === assistantId);
+          const empShiftId = empShiftAssignment?.shift_id;
+          const empShiftDaysArr = empShiftId ? shiftDaysMap.get(empShiftId) : undefined;
+          const assistantTeamId = employeeTeamMap.get(assistantId);
+          const teamShift = teamStandardShifts?.find(s => s.team_id === assistantTeamId);
+          const teamShiftDaysArr = teamShift?.id ? shiftDaysMap.get(teamShift.id) : undefined;
+          const applicableShiftDays = empShiftDaysArr || teamShiftDaysArr;
+          
+          const countShiftDays = (start: Date, end: Date) => {
+            const days = eachDayOfInterval({ start, end });
+            if (!applicableShiftDays || applicableShiftDays.length === 0) return days.length;
+            return days.filter(d => {
+              const dow = getDay(d);
+              return applicableShiftDays.some(sd => sd.dayOfWeek === dow);
+            }).length;
+          };
+          
+          const workdaysInPeriod = countShiftDays(periodStart, periodEnd);
+          const workdaysInMonth = countShiftDays(monthStart, monthEnd);
           
           const prorationFactor = workdaysInMonth > 0 
             ? workdaysInPeriod / workdaysInMonth 

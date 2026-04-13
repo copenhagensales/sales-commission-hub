@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { usePrecomputedKpis, getKpiValue } from "./usePrecomputedKpi";
-import { format, eachDayOfInterval, isWeekend, isBefore, startOfDay, differenceInMinutes } from "date-fns";
+import { format, eachDayOfInterval, isBefore, startOfDay, differenceInMinutes } from "date-fns";
 
 interface EffectiveHourlyRateResult {
   hourlyRate: number;
@@ -153,13 +153,14 @@ export function useEffectiveHourlyRate(
 
       const hoursPerDay = parseStandardHoursPerDay(employeeData?.standard_start_time);
       
-      // Count weekdays from start to today (excluding weekends)
+      // Count all days that could have a shift (shift-aware, no weekday fallback)
+      // Since we're in the fallback (no timestamps/shifts), use all days as approximation
       const allDays = eachDayOfInterval({ start: periodStart, end: effectiveEnd });
-      const weekdays = allDays.filter(day => !isWeekend(day)).length;
+      const dayCount = allDays.length;
       
       return { 
-        hours: Math.round(weekdays * hoursPerDay * 100) / 100,
-        workDays: weekdays 
+        hours: Math.round(dayCount * hoursPerDay * 100) / 100,
+        workDays: dayCount 
       };
     },
     enabled: !!employeeId,

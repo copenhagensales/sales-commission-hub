@@ -107,7 +107,6 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [isSpecialShift, setIsSpecialShift] = useState(false);
   const [editingShift, setEditingShift] = useState<StandardShift | null>(null);
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
   const [formData, setFormData] = useState({
@@ -328,8 +327,12 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
         if (daysError) throw daysError;
       }
 
-      // Create employee assignments for special shifts
+      // Create employee assignments
       if (data.employeeIds && data.employeeIds.length > 0) {
+        // Delete any existing assignments for these employees first (UNIQUE constraint)
+        for (const empId of data.employeeIds) {
+          await supabase.from("employee_standard_shifts").delete().eq("employee_id", empId);
+        }
         const { error: assignError } = await supabase
           .from("employee_standard_shifts")
           .insert(data.employeeIds.map(empId => ({
@@ -346,7 +349,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
       queryClient.invalidateQueries({ queryKey: ["employee-standard-shifts", teamId] });
       setDialogOpen(false);
       resetForm();
-      toast({ title: isSpecialShift ? "Speciel vagt oprettet" : "Standard vagt oprettet" });
+      toast({ title: "Standard vagt oprettet" });
     },
     onError: (error) => {
       toast({ title: "Fejl", description: error.message, variant: "destructive" });
@@ -443,11 +446,14 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
 
       // Update employee assignments if provided
       if (data.employeeIds !== undefined) {
-        // Delete existing assignments
+        // Delete existing assignments for this shift
         await supabase.from("employee_standard_shifts").delete().eq("shift_id", data.id);
         
-        // Add new assignments
+        // Also clear any existing assignments for these employees (UNIQUE constraint)
         if (data.employeeIds.length > 0) {
+          for (const empId of data.employeeIds) {
+            await supabase.from("employee_standard_shifts").delete().eq("employee_id", empId);
+          }
           const { error: assignError } = await supabase
             .from("employee_standard_shifts")
             .insert(data.employeeIds.map(empId => ({
@@ -517,7 +523,6 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
     setBreaks([]);
     setShiftTimeMode('same');
     setSelectedEmployees([]);
-    setIsSpecialShift(false);
     // Reset day configs
     const initial: Record<number, DayConfig> = {};
     for (let i = 0; i < 7; i++) {
@@ -528,16 +533,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
 
   const openCreate = () => {
     setEditingShift(null);
-    setIsSpecialShift(false);
     resetForm();
-    setDialogOpen(true);
-  };
-
-  const openCreateSpecial = () => {
-    setEditingShift(null);
-    setIsSpecialShift(true);
-    resetForm();
-    setIsSpecialShift(true); // Re-set after reset clears it
     setDialogOpen(true);
   };
 
@@ -547,9 +543,6 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
     const shiftDays = getShiftDays(shift.id);
     const shiftEmployees = getShiftEmployees(shift.id);
     
-    // Determine if this is a special shift (has employee assignments)
-    const hasEmployees = shiftEmployees.length > 0;
-    setIsSpecialShift(hasEmployees);
     setSelectedEmployees(shiftEmployees.map(e => e.id));
     
     setFormData({
@@ -623,11 +616,6 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
         toast({ title: "Udfyld navn", variant: "destructive" });
         return;
       }
-      // For special shifts, require at least one employee
-      if (isSpecialShift && selectedEmployees.length === 0) {
-        toast({ title: "Vælg mindst én medarbejder", variant: "destructive" });
-        return;
-      }
       
       // Create "no shifts" configuration - all days disabled, times set to 00:00
       const noShiftsDayConfigs: Record<number, DayConfig> = {};
@@ -635,7 +623,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
         noShiftsDayConfigs[i] = { enabled: false, start_time: "00:00", end_time: "00:00", breaks: [] };
       }
       
-      const employeeIds = isSpecialShift ? selectedEmployees : undefined;
+      const employeeIds = selectedEmployees.length > 0 ? selectedEmployees : undefined;
       const noShiftsFormData = { ...formData, start_time: "00:00", end_time: "00:00" };
       
       if (editingShift) {
@@ -648,12 +636,6 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
     
     if (!formData.name || !formData.start_time || !formData.end_time) {
       toast({ title: "Udfyld navn og tidspunkter", variant: "destructive" });
-      return;
-    }
-
-    // For special shifts, require at least one employee
-    if (isSpecialShift && selectedEmployees.length === 0) {
-      toast({ title: "Vælg mindst én medarbejder", variant: "destructive" });
       return;
     }
     
@@ -674,7 +656,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
       });
     }
 
-    const employeeIds = isSpecialShift ? selectedEmployees : undefined;
+    const employeeIds = selectedEmployees.length > 0 ? selectedEmployees : undefined;
     
     if (editingShift) {
       updateMutation.mutate({ ...formData, id: editingShift.id, breaks, dayConfigs: finalDayConfigs, employeeIds });
@@ -796,10 +778,6 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
           <Label className="text-base font-medium">Standard vagter</Label>
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={openCreateSpecial}>
-            <Users className="h-4 w-4 mr-1" />
-            Tilføj speciel vagt
-          </Button>
           <Button size="sm" onClick={openCreate}>
             <Plus className="h-4 w-4 mr-1" />
             Tilføj vagt
@@ -1006,16 +984,15 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
               />
             </div>
 
-            {/* Employee picker - only for special shifts */}
-            {isSpecialShift && (
-              <div className="space-y-3 p-3 border rounded-lg bg-blue-50/50 dark:bg-blue-950/20">
-                <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-blue-500" />
-                  <Label className="text-sm font-medium">Vælg medarbejdere *</Label>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Denne vagt vil overskrive standard-vagten for de valgte medarbejdere.
-                </p>
+            {/* Employee picker - optional, assign specific employees to this shift */}
+            <div className="space-y-3 p-3 border rounded-lg bg-muted/30">
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-muted-foreground" />
+                <Label className="text-sm font-medium">Tildel medarbejdere (valgfrit)</Label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Vælg medarbejdere der skal bruge denne vagt i stedet for teamets primære vagt. Hver medarbejder kan kun tildeles én vagt.
+              </p>
                 <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
                   {teamMembers.map(member => (
                     <label
@@ -1040,8 +1017,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
                     {selectedEmployees.length} medarbejder{selectedEmployees.length > 1 ? 'e' : ''} valgt
                   </p>
                 )}
-              </div>
-            )}
+            </div>
 
             {/* Toggle for same/different/none times - at the top */}
             <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">

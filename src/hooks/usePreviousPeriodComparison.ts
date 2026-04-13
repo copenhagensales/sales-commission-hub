@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { subMonths, format, eachDayOfInterval, isWeekend } from "date-fns";
+import { subMonths, format, eachDayOfInterval } from "date-fns";
 import { useSalesAggregatesExtended } from "./useSalesAggregatesExtended";
 
 interface PreviousPeriodData {
@@ -72,9 +72,9 @@ export function usePreviousPeriodComparison(
     end: previousPeriodEnd,
   });
   
-  const workingDaysInPrevPeriod = allDaysInPrevPeriod.filter(
-    (day) => !isWeekend(day)
-  );
+  // Use all days in previous period (shift-aware: no weekend filter)
+  // The currentDaysPassed already comes from the shift-aware hook
+  const workingDaysInPrevPeriod = allDaysInPrevPeriod;
 
   // Get the date that represents "same day" in previous period
   const sameDayDate = workingDaysInPrevPeriod[currentDaysPassed - 1];

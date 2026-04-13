@@ -4,7 +4,7 @@ import { useMemo, useEffect, useRef, useState } from "react";
 import { checkAchievements, type AchievementCheckData } from "@/lib/gamification-achievements";
 import { getProgressToNextLevel } from "@/lib/gamification-levels";
 import { getPerformanceStatus, getRandomQuote } from "@/lib/gamification-quotes";
-import { format, startOfWeek, subDays, isWeekend } from "date-fns";
+import { format, startOfWeek, subDays } from "date-fns";
 
 export type RecordType = "best_day" | "best_week" | null;
 
@@ -45,11 +45,9 @@ export function useSalesGamification({
   const { data: yesterdayTotal = 0 } = useQuery({
     queryKey: ["yesterday-provision", employeeId],
     queryFn: async () => {
-      // Find the last working day (skip weekends)
-      let checkDate = subDays(new Date(), 1);
-      while (isWeekend(checkDate)) {
-        checkDate = subDays(checkDate, 1);
-      }
+      // Use yesterday's date directly — no weekend skipping
+      // Shift-aware logic: if the employee worked yesterday, they'll have data
+      const checkDate = subDays(new Date(), 1);
       const startDate = format(checkDate, "yyyy-MM-dd");
       
       const { data, error } = await supabase.rpc("get_personal_daily_commission", {
