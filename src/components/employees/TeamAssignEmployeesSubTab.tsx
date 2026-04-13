@@ -64,16 +64,16 @@ export function TeamAssignEmployeesSubTab({ teamId, teamClientIds, teamEmployeeI
   });
 
   // Fetch all clients for secondary dropdown
-  const { data: allClients = [] } = useQuery({
+  const { data: allClients = [] } = useQuery<Client[]>({
     queryKey: ["all-clients-for-assignments"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase
         .from("clients")
-        .select("id, name, logo_url")
+        .select("id, name, logo_url") as any)
         .eq("is_active", true)
         .order("name");
       if (error) throw error;
-      return (data ?? []) as unknown as Client[];
+      return (data ?? []) as Client[];
     },
   });
 
