@@ -628,12 +628,12 @@ export default function MyProfile() {
       return date.toISOString().split('T')[0];
     };
     
-    // Approximate workdays using eachDayOfInterval (will be refined by shift-aware hooks downstream)
-    const allDays = eachDayOfInterval({ start: periodStart, end: periodEnd });
-    const totalWorkdays = allDays.length;
+    // Simple day count (shift-aware hooks refine this downstream)
+    const diffMs = periodEnd.getTime() - periodStart.getTime();
+    const totalWorkdays = Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1;
     const effectiveEnd = now > periodEnd ? periodEnd : now;
-    const passedDays = eachDayOfInterval({ start: periodStart, end: effectiveEnd });
-    const workdaysPassed = passedDays.length;
+    const passedMs = effectiveEnd.getTime() - periodStart.getTime();
+    const workdaysPassed = Math.max(0, Math.round(passedMs / (1000 * 60 * 60 * 24)) + 1);
     
     return {
       start: periodStart,
