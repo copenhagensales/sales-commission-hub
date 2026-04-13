@@ -1855,6 +1855,7 @@ type ShiftDataResult = {
   timeStampsData: TimeStampRecord[];
   startDate: string;
   endDate: string;
+  employeeTimeClocksMap?: Record<string, { clock_type: string; hourly_rate: number }>;
 };
 
 function calculateHoursForEmployees(
