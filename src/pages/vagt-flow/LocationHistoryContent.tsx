@@ -385,7 +385,8 @@ export default function LocationHistoryContent() {
       const w = matchingBooking?.week_number || getISOWeek(dt);
       const y = matchingBooking?.year || dt.getFullYear();
 
-      const locEntry = ensureLoc(locId, locAgg.get(locId)?.locationName || "Ukendt lokation", locAgg.get(locId)?.locationType || "Ukendt", locAgg.get(locId)?.clientName || "Ukendt");
+      const fallback = missingLocMap.get(locId);
+      const locEntry = ensureLoc(locId, locAgg.get(locId)?.locationName || fallback?.name || "Ukendt lokation", locAgg.get(locId)?.locationType || fallback?.type || "Ukendt", locAgg.get(locId)?.clientName || fallback?.clientName || "Ukendt");
       const wb = ensureWeek(locEntry.weeks, w, y);
 
       const items = (sale as any).sale_items || [];
