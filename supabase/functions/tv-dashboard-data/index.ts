@@ -1770,7 +1770,7 @@ async function handleTdcErhvervData(
   if (allTimestampEmps.length > 0) {
     const { data: stamps } = await supabase
       .from("time_stamps")
-      .select("employee_id, clock_in, clock_out, break_minutes")
+      .select("employee_id, clock_in, clock_out, break_minutes, client_id")
       .in("employee_id", allTimestampEmps)
       .gte("clock_in", payrollStartStr)
       .lte("clock_in", todayStr + "T23:59:59");
