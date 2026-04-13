@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { eachDayOfInterval, format, getDay, startOfMonth, endOfMonth } from "date-fns";
 import { VACATION_PAY_RATES, calculateHoursFromShift } from "@/lib/calculations";
+import { useFeatureFlag } from "@/hooks/useFeatureFlag";
+import { resolveHoursSourceBatch } from "@/lib/resolveHoursSource";
  
 interface StaffHoursData {
   employeeId: string;
@@ -28,12 +30,18 @@ const HOURLY_RATE_THRESHOLD = 1000; // Below this, it's likely an hourly rate, n
  export function useStaffHoursCalculation(
    periodStart: Date,
    periodEnd: Date,
-   staffIds: string[]
+   staffIds: string[],
+   useNewAssignments?: boolean
  ) {
    return useQuery<Record<string, StaffHoursData>>({
-     queryKey: ["staff-hours-calculation", periodStart.toISOString(), periodEnd.toISOString(), staffIds.sort().join(",")],
+     queryKey: ["staff-hours-calculation", periodStart.toISOString(), periodEnd.toISOString(), staffIds.sort().join(","), useNewAssignments],
      queryFn: async () => {
        if (staffIds.length === 0) return {};
+
+       // When feature flag is on, resolve hours source from employee_time_clocks
+       const hoursSourceMap = useNewAssignments
+         ? await resolveHoursSourceBatch(staffIds)
+         : null;
  
        // 1. Get salary info for staff from personnel_salaries (including hours_source)
        const { data: salaries } = await supabase
@@ -127,8 +135,11 @@ const HOURLY_RATE_THRESHOLD = 1000; // Below this, it's likely an hourly rate, n
          const salary = salaries?.find(s => s.employee_id === staffId);
          const monthlySalary = Number(salary?.monthly_salary) || 0;
          const hourlyRate = Number(salary?.hourly_rate) || 0;
-         const hoursSource = (salary?.hours_source as 'shift' | 'timestamp') || 'shift';
-         
+          // Use new resolver if feature flag is on, otherwise legacy
+          const hoursSource: 'shift' | 'timestamp' = hoursSourceMap
+            ? (hoursSourceMap[staffId]?.source === 'timestamp' ? 'timestamp' : 'shift')
+            : ((salary?.hours_source as 'shift' | 'timestamp') || 'shift');
+          
          // Determine if this is hourly-based or fixed monthly
          // Use hourly_rate if set, otherwise check if monthly_salary is low (likely hourly rate)
          const effectiveHourlyRate = hourlyRate > 0 ? hourlyRate : (monthlySalary < HOURLY_RATE_THRESHOLD ? monthlySalary : 0);
