@@ -116,6 +116,7 @@ interface EmployeeReportData {
 export default function DailyReports() {
   const { scopeReportsDaily } = usePermissions();
   const { data: currentEmployee } = useCurrentEmployee();
+  const useNewAssignmentsFlag = useFeatureFlag('employee_client_assignments');
   
   const [period, setPeriod] = useState<string>("today");
   const [customStartDate, setCustomStartDate] = useState<Date | undefined>(undefined);
@@ -345,7 +346,7 @@ export default function DailyReports() {
 
   // Fetch report data
   const { data: reportData = [], isLoading: isLoadingReport, refetch: fetchReport } = useQuery({
-    queryKey: ["daily-report-data", format(dateRange.start, "yyyy-MM-dd"), format(dateRange.end, "yyyy-MM-dd"), selectedTeam, selectedEmployee, selectedClient, employeeStatusFilter, scopeReportsDaily, ledTeamIds, currentEmployee?.id],
+    queryKey: ["daily-report-data", format(dateRange.start, "yyyy-MM-dd"), format(dateRange.end, "yyyy-MM-dd"), selectedTeam, selectedEmployee, selectedClient, employeeStatusFilter, scopeReportsDaily, ledTeamIds, currentEmployee?.id, useNewAssignmentsFlag],
     queryFn: async () => {
       const startStr = format(dateRange.start, "yyyy-MM-dd");
       const endStr = format(dateRange.end, "yyyy-MM-dd");
