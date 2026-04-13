@@ -245,7 +245,10 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
       queryClient.invalidateQueries({ queryKey: ["h2h-pending-challenges"] });
       queryClient.invalidateQueries({ queryKey: ["h2h-active-challenges"] });
       if (data?.acceptedAt && data?.challenge) {
-        setMatchStartTime(data.acceptedAt);
+        // For custom periods, use custom_start_at as the effective start
+        const effectiveStart = data.challenge.custom_start_at || data.acceptedAt;
+        setMatchStartTime(effectiveStart);
+        setMatchEndTime(data.challenge.custom_end_at || null);
         setActiveChallengeId(data.challenge.id);
         setPeriod(data.challenge.period as PeriodType);
         setBattleMode(data.challenge.battle_mode as BattleMode);
@@ -282,20 +285,26 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
   });
 
   // Sync active challenge from database to local state on mount
+  // DB is the single source of truth — always override localStorage date fields
   useEffect(() => {
     if (!currentEmployeeId) return;
     
-    // If we have active challenges in DB but no local activeChallengeId, sync from DB
-    if (activeChallenges.length > 0 && !activeChallengeId) {
-      const activeChallenge = activeChallenges[0];
+    // If we have active challenges in DB, sync from DB (always override local dates)
+    if (activeChallenges.length > 0) {
+      const activeChallenge = activeChallengeId 
+        ? activeChallenges.find(c => c.id === activeChallengeId) || activeChallenges[0]
+        : activeChallenges[0];
       const isChallenger = activeChallenge.challenger_employee_id === currentEmployeeId;
       const opponentId = isChallenger 
         ? activeChallenge.opponent_employee_id 
         : activeChallenge.challenger_employee_id;
       
+      // Bug fix: For custom periods, use custom_start_at (not accepted_at) as start
+      const effectiveStart = activeChallenge.custom_start_at || activeChallenge.accepted_at;
+      
       setActiveChallengeId(activeChallenge.id);
       setOpponentTeam([opponentId]);
-      setMatchStartTime(activeChallenge.accepted_at);
+      setMatchStartTime(effectiveStart);
       setMatchEndTime(activeChallenge.custom_end_at || null);
       setPeriod(activeChallenge.period as PeriodType);
       setBattleMode(activeChallenge.battle_mode as BattleMode);
@@ -351,6 +360,15 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
         };
       }
       
+      // Bug fix: Target period runs until "now" (no fixed end)
+      if (period === "target") {
+        return {
+          start: startTime,
+          end: now,
+          label: "Først til mål"
+        };
+      }
+      
       const endTime = period === "today" 
         ? endOfDay(startTime) 
         : endOfWeek(startTime, { weekStartsOn: 1 });
@@ -367,8 +385,9 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
         return { start: startOfDay(now), end: endOfDay(now), label: "I dag" };
       case "week":
         return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }), label: "Denne uge" };
+      case "target":
+        return { start: startOfDay(now), end: now, label: "Først til mål" };
       case "custom":
-        // For custom without active match, just show current time range
         return { start: now, end: addHours(now, 24), label: "Brugerdefineret" };
       default:
         return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }), label: "Denne uge" };
@@ -472,20 +491,20 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
     return [...new Set(ids)];
   }, [currentEmployeeId, myTeam, opponentTeam]);
 
-  // Fetch stats for teams - using same logic as DailyReports for accuracy
+  // Fetch stats for teams using central get_sales_aggregates_v2 RPC for consistency
   const { data: stats, dataUpdatedAt } = useQuery({
     queryKey: ["h2h-stats", allEmployeeIds.join(","), myTeamNames.join(","), opponentTeamNames.join(","), dateRange.start.toISOString(), dateRange.end.toISOString()],
     queryFn: async () => {
       const rangeStart = dateRange.start.toISOString();
       const rangeEnd = dateRange.end.toISOString();
 
-      // 1. Fetch agent mappings for all employees (like DailyReports)
+      // 1. Fetch agent mappings for all employees (needed for call stats + email mapping)
       const { data: agentMappingsData } = await supabase
         .from("employee_agent_mapping")
         .select("employee_id, agent_id, agents(email, external_dialer_id)")
         .in("employee_id", allEmployeeIds);
 
-      // Build map: employee_id -> { emails: string[], externalIds: string[] }
+      // Build map: employee_id -> { emails, externalIds }
       const employeeAgentMap = new Map<string, { emails: string[]; externalIds: string[] }>();
       (agentMappingsData || []).forEach(m => {
         const agent = m.agents as any;
@@ -494,101 +513,6 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
         if (agent?.external_dialer_id) existing.externalIds.push(agent.external_dialer_id);
         employeeAgentMap.set(m.employee_id, existing);
       });
-
-      // Collect all emails for sales query
-      const allAgentEmails: string[] = [];
-      employeeAgentMap.forEach(v => allAgentEmails.push(...v.emails));
-      const uniqueEmails = [...new Set(allAgentEmails)];
-
-      // 2. Fetch sales with campaign info (like DailyReports)
-      let salesData: any[] = [];
-      if (uniqueEmails.length > 0) {
-        const { data: sales } = await supabase
-          .from("sales")
-          .select(`
-            id,
-            agent_email,
-            sale_datetime,
-            dialer_campaign_id,
-            sale_items (
-              id,
-              quantity,
-              mapped_commission,
-              mapped_revenue,
-              product_id,
-              products:product_id (
-                counts_as_sale
-              )
-            )
-          `)
-           .gte("sale_datetime", rangeStart)
-          .lte("sale_datetime", rangeEnd)
-          .or("validation_status.neq.rejected,validation_status.is.null");
-        
-        // Filter by agent emails (case-insensitive)
-        salesData = (sales || []).filter(s => 
-          uniqueEmails.includes((s.agent_email || "").toLowerCase())
-        );
-      }
-
-      // 3. Fetch campaign mappings for campaign overrides
-      const { data: campaignMappings } = await supabase
-        .from("adversus_campaign_mappings")
-        .select("id, adversus_campaign_id");
-      
-      const dialerCampaignToMappingId = new Map<string, string>();
-      (campaignMappings || []).forEach(m => {
-        if (m.adversus_campaign_id) {
-          dialerCampaignToMappingId.set(m.adversus_campaign_id, m.id);
-        }
-      });
-
-      // 4. Fetch product pricing rules (replaces deprecated product_campaign_overrides)
-      const { data: productPricingRules } = await supabase
-        .from("product_pricing_rules")
-        .select("product_id, campaign_mapping_ids, commission_dkk, revenue_dkk, priority")
-        .eq("is_active", true);
-      
-      // Build override maps: campaign-specific AND universal rules
-      const campaignOverrideMap = new Map<string, { commission: number; revenue: number }>();
-      const universalOverrideMap = new Map<string, { commission: number; revenue: number }>();
-      
-      // Sort by priority desc
-      const sortedPricingRules = [...(productPricingRules || [])].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
-      
-      sortedPricingRules.forEach(rule => {
-        const campaignIds = rule.campaign_mapping_ids || [];
-        if (campaignIds.length === 0) {
-          // Universal rule
-          if (!universalOverrideMap.has(rule.product_id)) {
-            universalOverrideMap.set(rule.product_id, {
-              commission: rule.commission_dkk ?? 0,
-              revenue: rule.revenue_dkk ?? 0
-            });
-          }
-        } else {
-          campaignIds.forEach((campaignMappingId: string) => {
-            const key = `${rule.product_id}_${campaignMappingId}`;
-            if (!campaignOverrideMap.has(key)) {
-              campaignOverrideMap.set(key, {
-                commission: rule.commission_dkk ?? 0,
-                revenue: rule.revenue_dkk ?? 0
-              });
-            }
-          });
-        }
-      });
-
-      // 5. Fetch call stats
-      const allExternalIds: string[] = [];
-      employeeAgentMap.forEach(v => allExternalIds.push(...v.externalIds));
-      const uniqueExternalIds = [...new Set(allExternalIds)];
-
-      const { data: calls } = await supabase
-        .from("dialer_calls")
-        .select("agent_external_id, duration_seconds, total_duration_seconds, start_time")
-        .gte("start_time", rangeStart)
-        .lte("start_time", rangeEnd);
 
       // Helper to get team employee IDs from team names
       const getTeamEmployeeIds = (teamNames: string[]): string[] => {
@@ -600,112 +524,128 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
         return ids;
       };
 
-      // Helper function to calculate team stats (like DailyReports)
-      const calculateTeamStats = (teamNames: string[]): TeamStats => {
+      // Collect agent emails per team
+      const getTeamEmails = (teamNames: string[]): string[] => {
         const teamEmployeeIds = getTeamEmployeeIds(teamNames);
-        
-        // Collect all agent emails for this team
-        const teamAgentEmails: string[] = [];
-        const teamExternalIds: string[] = [];
+        const emails: string[] = [];
         teamEmployeeIds.forEach(empId => {
-          const agentInfo = employeeAgentMap.get(empId);
-          if (agentInfo) {
-            teamAgentEmails.push(...agentInfo.emails);
-            teamExternalIds.push(...agentInfo.externalIds);
-          }
+          const info = employeeAgentMap.get(empId);
+          if (info) emails.push(...info.emails);
         });
+        return [...new Set(emails)];
+      };
 
-        // Filter sales by team agent emails
-        const teamSales = salesData.filter(s => 
-          teamAgentEmails.includes((s.agent_email || "").toLowerCase())
-        );
-        
-        // Calculate sales count, revenue, and commission with campaign overrides
-        let salesCount = 0;
-        let revenue = 0;
-        let commission = 0;
-        
-        teamSales.forEach(sale => {
-          const dialerCampaignId = sale.dialer_campaign_id;
-          const campaignMappingId = dialerCampaignId 
-            ? dialerCampaignToMappingId.get(dialerCampaignId) 
-            : null;
-          
-          (sale.sale_items || []).forEach((item: any) => {
-            const countsAsSale = item.products?.counts_as_sale !== false;
-            if (countsAsSale) {
-              salesCount += Number(item.quantity) || 1;
-            }
-            
-            // Check for campaign override, then universal override, then fallback to mapped values
-            const overrideKey = campaignMappingId ? `${item.product_id}_${campaignMappingId}` : null;
-            const campaignOverride = overrideKey ? campaignOverrideMap.get(overrideKey) : null;
-            const universalOverride = universalOverrideMap.get(item.product_id);
-            
-            if (campaignOverride) {
-              revenue += campaignOverride.revenue;
-              commission += campaignOverride.commission;
-            } else if (universalOverride) {
-              revenue += universalOverride.revenue;
-              commission += universalOverride.commission;
-            } else {
-              // Fallback to mapped values from sale_items (already includes quantity)
-              revenue += Number(item.mapped_revenue) || 0;
-              commission += Number(item.mapped_commission) || 0;
-            }
-          });
-        });
+      const myEmails = getTeamEmails(myTeamNames);
+      const opponentEmails = getTeamEmails(opponentTeamNames);
 
-        // Calculate call stats
-        const teamCalls = (calls || []).filter(c => teamExternalIds.includes(c.agent_external_id));
-        const callCount = teamCalls.length;
-        const talkTimeSeconds = teamCalls.reduce((sum, c) => sum + (c.duration_seconds || 0), 0);
+      // 2. Fetch sales stats via RPC for both teams in parallel
+      const [myRpcResult, opponentRpcResult, callsResult] = await Promise.all([
+        myEmails.length > 0 
+          ? supabase.rpc("get_sales_aggregates_v2", {
+              p_start: rangeStart,
+              p_end: rangeEnd,
+              p_team_id: null,
+              p_employee_id: null,
+              p_client_id: null,
+              p_group_by: "none",
+              p_agent_emails: myEmails,
+            })
+          : Promise.resolve({ data: [], error: null }),
+        opponentEmails.length > 0
+          ? supabase.rpc("get_sales_aggregates_v2", {
+              p_start: rangeStart,
+              p_end: rangeEnd,
+              p_team_id: null,
+              p_employee_id: null,
+              p_client_id: null,
+              p_group_by: "none",
+              p_agent_emails: opponentEmails,
+            })
+          : Promise.resolve({ data: [], error: null }),
+        // 3. Fetch call stats
+        supabase
+          .from("dialer_calls")
+          .select("agent_external_id, duration_seconds, total_duration_seconds, start_time")
+          .gte("start_time", rangeStart)
+          .lte("start_time", rangeEnd),
+      ]);
 
+      // Parse RPC results
+      const parseRpcResult = (rpcData: any[]): { salesCount: number; commission: number; revenue: number } => {
+        if (!rpcData || rpcData.length === 0) return { salesCount: 0, commission: 0, revenue: 0 };
+        const row = rpcData[0];
         return {
-          id: teamNames.join(","),
-          name: teamNames.length === 1 ? teamNames[0] : `Hold (${teamNames.length})`,
-          salesCount,
-          revenue,
-          commission,
-          callCount,
-          talkTimeSeconds,
+          salesCount: Number(row.total_sales) || 0,
+          commission: Number(row.total_commission) || 0,
+          revenue: Number(row.total_revenue) || 0,
         };
       };
 
-      // Calculate recent activity for momentum
+      const myStats = parseRpcResult(myRpcResult.data || []);
+      const opponentStats = parseRpcResult(opponentRpcResult.data || []);
+
+      // Calculate call stats per team
+      const calls = callsResult.data || [];
+      const getTeamCallStats = (teamNames: string[]) => {
+        const teamEmployeeIds = getTeamEmployeeIds(teamNames);
+        const teamExternalIds: string[] = [];
+        teamEmployeeIds.forEach(empId => {
+          const info = employeeAgentMap.get(empId);
+          if (info) teamExternalIds.push(...info.externalIds);
+        });
+        const teamCalls = calls.filter(c => teamExternalIds.includes(c.agent_external_id));
+        return {
+          callCount: teamCalls.length,
+          talkTimeSeconds: teamCalls.reduce((sum, c) => sum + (c.duration_seconds || 0), 0),
+        };
+      };
+
+      const myCallStats = getTeamCallStats(myTeamNames);
+      const opponentCallStats = getTeamCallStats(opponentTeamNames);
+
+      // Calculate recent activity for momentum (last hour sales via simple query)
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-      const myTeamEmployeeIds = getTeamEmployeeIds(myTeamNames);
-      const opponentTeamEmployeeIds = getTeamEmployeeIds(opponentTeamNames);
-      
-      const myTeamEmails: string[] = [];
-      const opponentTeamEmails: string[] = [];
-      myTeamEmployeeIds.forEach(empId => {
-        const info = employeeAgentMap.get(empId);
-        if (info) myTeamEmails.push(...info.emails);
-      });
-      opponentTeamEmployeeIds.forEach(empId => {
-        const info = employeeAgentMap.get(empId);
-        if (info) opponentTeamEmails.push(...info.emails);
-      });
-      
-      const recentSales = salesData.filter(s => s.sale_datetime && s.sale_datetime >= oneHourAgo);
+      const allEmails = [...new Set([...myEmails, ...opponentEmails])];
       let myRecentActivity = 0;
       let opponentRecentActivity = 0;
-      recentSales.forEach(s => {
-        const email = (s.agent_email || "").toLowerCase();
-        if (myTeamEmails.includes(email)) myRecentActivity++;
-        if (opponentTeamEmails.includes(email)) opponentRecentActivity++;
-      });
+      
+      if (allEmails.length > 0) {
+        const { data: recentSales } = await supabase
+          .from("sales")
+          .select("agent_email")
+          .gte("sale_datetime", oneHourAgo)
+          .or("validation_status.neq.rejected,validation_status.is.null");
+        
+        (recentSales || []).forEach(s => {
+          const email = (s.agent_email || "").toLowerCase();
+          if (myEmails.includes(email)) myRecentActivity++;
+          if (opponentEmails.includes(email)) opponentRecentActivity++;
+        });
+      }
 
       return {
-        myTeam: calculateTeamStats(myTeamNames),
-        opponentTeam: opponentTeamNames.length > 0 ? calculateTeamStats(opponentTeamNames) : null,
+        myTeam: {
+          id: myTeamNames.join(","),
+          name: myTeamNames.length === 1 ? myTeamNames[0] : `Hold (${myTeamNames.length})`,
+          salesCount: myStats.salesCount,
+          revenue: myStats.revenue,
+          commission: myStats.commission,
+          ...myCallStats,
+        } as TeamStats,
+        opponentTeam: opponentTeamNames.length > 0 ? {
+          id: opponentTeamNames.join(","),
+          name: opponentTeamNames.length === 1 ? opponentTeamNames[0] : `Hold (${opponentTeamNames.length})`,
+          salesCount: opponentStats.salesCount,
+          revenue: opponentStats.revenue,
+          commission: opponentStats.commission,
+          ...opponentCallStats,
+        } as TeamStats : null,
         recentActivity: { my: myRecentActivity, opponent: opponentRecentActivity },
       };
     },
     enabled: myTeamNames.length > 0 && allEmployeeIds.length > 0,
-    staleTime: 60000, // 1 minute cache
-    refetchInterval: 120000, // 2 minutes instead of 30s - reduces DB load significantly
+    staleTime: 60000,
+    refetchInterval: 120000,
   });
 
   // Update momentum based on recent activity
