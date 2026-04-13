@@ -116,7 +116,7 @@ export function EmployeeCommissionHistory({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("time_stamps")
-        .select("*")
+        .select("*, client_id")
         .eq("employee_id", employeeId)
         .gte("clock_in", periodStart.toISOString())
         .lte("clock_in", periodEnd.toISOString());

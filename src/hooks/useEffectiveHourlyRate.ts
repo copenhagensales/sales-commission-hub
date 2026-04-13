@@ -81,7 +81,7 @@ export function useEffectiveHourlyRate(
       // Strategy 1: Get hours from timestamps (actual punched time)
       const { data: timestamps, error: tsError } = await supabase
         .from("time_stamps")
-        .select("clock_in, clock_out")
+        .select("clock_in, clock_out, client_id")
         .eq("employee_id", employeeId)
         .gte("clock_in", periodStart.toISOString())
         .lte("clock_in", effectiveEnd.toISOString())

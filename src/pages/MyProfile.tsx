@@ -400,7 +400,7 @@ export default function MyProfile() {
       if (!employee?.id) return [];
       const { data, error } = await supabase
         .from("time_stamps")
-        .select("*")
+        .select("*, clients:client_id(id, name)")
         .eq("employee_id", employee.id)
         .order("clock_in", { ascending: false })
         .limit(100);
