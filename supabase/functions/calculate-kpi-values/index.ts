@@ -1723,6 +1723,36 @@ async function fetchShiftData(
   startDate: string;
   endDate: string;
 } | null> {
+  // Check feature flag for new hours resolver
+  let useNewResolver = false;
+  let employeeTimeClocksMap: Record<string, { clock_type: string; hourly_rate: number }> = {};
+  
+  const { data: featureFlagData } = await supabase
+    .from("feature_flags")
+    .select("enabled")
+    .eq("key", "employee_client_assignments")
+    .maybeSingle();
+  
+  useNewResolver = featureFlagData?.enabled === true;
+  
+  if (useNewResolver) {
+    const { data: clocks } = await supabase
+      .from("employee_time_clocks")
+      .select("employee_id, clock_type, hourly_rate")
+      .eq("is_active", true);
+    
+    for (const clock of clocks || []) {
+      // First match wins per employee (client-specific would need clientId context)
+      if (!employeeTimeClocksMap[clock.employee_id]) {
+        employeeTimeClocksMap[clock.employee_id] = {
+          clock_type: clock.clock_type,
+          hourly_rate: Number(clock.hourly_rate) || 0,
+        };
+      }
+    }
+    console.log(`[HoursCalc] New resolver active: ${Object.keys(employeeTimeClocksMap).length} time clocks loaded`);
+  }
+
   // Fetch static shift configuration ONCE (team members, shifts, shift days don't change per date range)
   if (!shiftConfigCache) {
     console.log("[HoursCalc] Fetching shift configuration data (one-time)...");
