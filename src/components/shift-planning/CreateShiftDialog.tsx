@@ -205,37 +205,25 @@ export function CreateShiftDialog({
   // Get the selected employee's team via team_members table
   const { data: employeeTeamId } = useEmployeeTeamId(employeeId || undefined);
   
-  // Get work days and existing shifts for the selected employee
-  const { data: workDaysData } = useEmployeeWorkDays(employeeId || undefined);
+  // Get shift resolution data for the selected employee
+  const { data: shiftData } = useShiftResolution(employeeId || undefined);
   
   const { data: primaryShiftData } = usePrimaryStandardShift(employeeTeamId);
 
-  // Function to check if a date is disabled (already has a shift or is a standard work day)
+  // Function to check if a date is disabled (already has a shift via resolver)
   const isDateDisabled = useCallback((checkDate: Date) => {
-    if (!workDaysData) return false;
+    if (!shiftData) return false;
     
-    // Check individual shifts from shift table
-    if (workDaysData.individualShiftDates?.length > 0) {
-      const hasIndividualShift = workDaysData.individualShiftDates.some(
-        shiftDate => isSameDay(parseISO(shiftDate), checkDate)
-      );
-      if (hasIndividualShift) return true;
-    }
-    
-    // Allow holidays even if they fall on a standard work day
+    // Allow holidays even if they fall on a shift day
     if (holidays?.length) {
       const isHoliday = holidays.some(h => isSameDay(parseISO(h.date), checkDate));
       if (isHoliday) return false;
     }
 
-    // Check standard work days (0 = Sunday, 1 = Monday, etc.)
-    if (workDaysData.workDays?.length > 0) {
-      const dayOfWeek = getDay(checkDate);
-      if (workDaysData.workDays.includes(dayOfWeek)) return true;
-    }
-    
-    return false;
-  }, [workDaysData]);
+    // Use the centralized resolver to check for existing shifts
+    const existing = hasExistingShift(checkDate, shiftData);
+    return existing.exists;
+  }, [shiftData, holidays]);
 
   useEffect(() => {
     if (selectedDate) {
