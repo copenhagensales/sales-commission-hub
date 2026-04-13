@@ -1721,7 +1721,7 @@ export async function calculateHoursByType(start: Date, end: Date, employeeId?: 
     // 7. Time stamps for timestamp-based hours (use clock_in for date filtering)
     supabase
       .from("time_stamps")
-      .select("employee_id, clock_in, clock_out, break_minutes, effective_hours")
+      .select("employee_id, clock_in, clock_out, break_minutes, effective_hours, client_id")
       .in("employee_id", employeeIds)
       .gte("clock_in", `${startStr}T00:00:00`)
       .lte("clock_in", `${endStr}T23:59:59`)

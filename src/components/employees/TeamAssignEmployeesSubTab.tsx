@@ -1,10 +1,14 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Building2, AlertTriangle, UserCheck } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Building2, AlertTriangle, UserCheck, Star, X, Plus, Clock, History } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useEmployeeClientAssignments } from "@/hooks/useEmployeeClientAssignments";
+import { Button } from "@/components/ui/button";
+import { format } from "date-fns";
+import { da } from "date-fns/locale";
 
 interface Client {
   id: string;
@@ -33,68 +37,61 @@ export function TeamAssignEmployeesSubTab({ teamId, teamClientIds, teamEmployeeI
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch all assignments for team employees
-  const { data: assignments = [] } = useQuery({
-    queryKey: ["employee-client-assignments", "team", teamId],
+  const {
+    assignments,
+    isLoading: assignmentsLoading,
+    setPrimary,
+    addSecondary,
+    removeSecondary,
+    isSettingPrimary,
+  } = useEmployeeClientAssignments({});
+
+  // Fetch change logs
+  const { data: changeLogs = [] } = useQuery({
+    queryKey: ["employee-client-change-log", teamEmployeeIds],
     queryFn: async () => {
-      if (teamEmployeeIds.length === 0) return [] as { id: string; employee_id: string; client_id: string; created_at: string }[];
+      if (teamEmployeeIds.length === 0) return [];
       const { data, error } = await supabase
-        .from("employee_client_assignments")
-        .select("id, employee_id, client_id, created_at")
-        .in("employee_id", teamEmployeeIds);
-      if (error) throw error;
-      return data as { id: string; employee_id: string; client_id: string; created_at: string }[];
+        .from("employee_client_change_log")
+        .select("employee_id, old_client_id, new_client_id, changed_at")
+        .in("employee_id", teamEmployeeIds)
+        .order("changed_at", { ascending: false })
+        .limit(100);
+      if (error) return [];
+      return data || [];
     },
     enabled: teamEmployeeIds.length > 0,
   });
 
-  // Fetch all clients (for "Andre kunder" section)
-  const { data: allClients = [] } = useQuery({
+  // Fetch all clients for secondary dropdown
+  const { data: allClients = [] } = useQuery<Client[]>({
     queryKey: ["all-clients-for-assignments"],
-    queryFn: async (): Promise<Client[]> => {
-      const query = supabase.from("clients").select("id, name, logo_url");
-      const { data, error } = await (query as any).eq("is_active", true).order("name");
+    queryFn: async () => {
+      const { data, error } = await (supabase
+        .from("clients")
+        .select("id, name, logo_url") as any)
+        .eq("is_active", true)
+        .order("name");
       if (error) throw error;
       return (data ?? []) as Client[];
     },
   });
 
-  const toggleMutation = useMutation({
-    mutationFn: async ({ employeeId, clientId, assigned }: { employeeId: string; clientId: string; assigned: boolean }) => {
-      if (assigned) {
-        const { error } = await supabase
-          .from("employee_client_assignments")
-          .delete()
-          .eq("employee_id", employeeId)
-          .eq("client_id", clientId);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from("employee_client_assignments")
-          .insert({ employee_id: employeeId, client_id: clientId });
-        if (error) throw error;
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["employee-client-assignments"] });
-    },
-    onError: (err: any) => {
-      if (err?.code === "23505") {
-        toast({ title: "Allerede tildelt", variant: "destructive" });
-      } else {
-        toast({ title: "Fejl", description: "Kunne ikke opdatere tildeling", variant: "destructive" });
-      }
-    },
-  });
-
-  const isAssigned = (employeeId: string, clientId: string) =>
-    assignments.some((a) => a.employee_id === employeeId && a.client_id === clientId);
-
   const teamMembers = employees.filter((e) => teamEmployeeIds.includes(e.id));
   const teamClientsFiltered = clients.filter((c) => teamClientIds.includes(c.id));
-  const otherClients = allClients.filter((c) => !teamClientIds.includes(c.id));
 
-  // Find employees with no assignments at all
+  // Build helper maps
+  const clientMap = new Map<string, Client>();
+  allClients.forEach(c => clientMap.set(c.id, c));
+  teamClientsFiltered.forEach(c => clientMap.set(c.id, c));
+
+  const getEmployeeAssignments = (empId: string) =>
+    assignments.filter(a => a.employee_id === empId);
+
+  const getLatestChange = (empId: string) =>
+    changeLogs.find(cl => cl.employee_id === empId);
+
+  // Find employees with no assignments
   const unassignedEmployees = teamMembers.filter(
     (emp) => !assignments.some((a) => a.employee_id === emp.id)
   );
@@ -120,6 +117,16 @@ export function TeamAssignEmployeesSubTab({ teamId, teamClientIds, teamEmployeeI
 
   return (
     <div className="space-y-6">
+      {/* Info box */}
+      <div className="border rounded-lg p-3 bg-muted/30 text-xs text-muted-foreground space-y-1">
+        <div className="flex items-center gap-1.5 font-medium text-foreground text-sm">
+          <Clock className="h-3.5 w-3.5 text-primary" />
+          Kundetildeling og stempelur
+        </div>
+        <p>Vælg en <strong>primær kunde</strong> (timer fra vagtplan) og eventuelt <strong>sekundære kunder</strong> (får automatisk stempelur).</p>
+        <p>Sekundære stempeltimer fratrækkes primær kundes vagtplan-timer.</p>
+      </div>
+
       {/* Warning: unassigned employees */}
       {unassignedEmployees.length > 0 && (
         <div className="border border-dashed border-yellow-500/50 rounded-lg p-4 bg-yellow-500/5">
@@ -139,120 +146,33 @@ export function TeamAssignEmployeesSubTab({ teamId, teamClientIds, teamEmployeeI
         </div>
       )}
 
-      {/* Team clients assignment matrix */}
+      {/* Employee-centric list */}
       <div className="space-y-3">
-        <h4 className="text-sm font-medium text-muted-foreground">Teamets kunder</h4>
-        {teamClientsFiltered.map((client) => (
-          <ClientEmployeeRow
-            key={client.id}
-            client={client}
-            employees={teamMembers}
-            isAssigned={isAssigned}
-            onToggle={(employeeId) =>
-              toggleMutation.mutate({
-                employeeId,
-                clientId: client.id,
-                assigned: isAssigned(employeeId, client.id),
-              })
-            }
-            isPending={toggleMutation.isPending}
-          />
-        ))}
-      </div>
+        {teamMembers.map((emp) => {
+          const empAssignments = getEmployeeAssignments(emp.id);
+          const primary = empAssignments.find(a => a.is_primary);
+          const secondaries = empAssignments.filter(a => !a.is_primary);
+          const latestChange = getLatestChange(emp.id);
 
-      {/* Cross-team clients (Andre kunder) */}
-      {otherClients.length > 0 && (
-        <div className="space-y-3">
-          <h4 className="text-sm font-medium text-muted-foreground">Andre kunder (kryds-team)</h4>
-          <p className="text-xs text-muted-foreground">
-            Tildel medarbejdere til kunder fra andre teams
-          </p>
-          {otherClients
-            .filter((c) => assignments.some((a) => a.client_id === c.id))
-            .map((client) => (
-              <ClientEmployeeRow
-                key={client.id}
-                client={client}
-                employees={teamMembers}
-                isAssigned={isAssigned}
-                onToggle={(employeeId) =>
-                  toggleMutation.mutate({
-                    employeeId,
-                    clientId: client.id,
-                    assigned: isAssigned(employeeId, client.id),
-                  })
-                }
-                isPending={toggleMutation.isPending}
-                isCrossTeam
-              />
-            ))}
-          {/* Show a collapsed list for adding new cross-team assignments */}
-          <CrossTeamAddSection
-            otherClients={otherClients.filter(
-              (c) => !assignments.some((a) => a.client_id === c.id)
-            )}
-            employees={teamMembers}
-            onAssign={(employeeId, clientId) =>
-              toggleMutation.mutate({ employeeId, clientId, assigned: false })
-            }
-            isPending={toggleMutation.isPending}
-          />
-        </div>
-      )}
-    </div>
-  );
-}
+          // Clients available to set as secondary (not already assigned)
+          const assignedClientIds = new Set(empAssignments.map(a => a.client_id));
+          const availableForSecondary = allClients.filter(c => !assignedClientIds.has(c.id));
 
-function ClientEmployeeRow({
-  client,
-  employees,
-  isAssigned,
-  onToggle,
-  isPending,
-  isCrossTeam,
-}: {
-  client: { id: string; name: string; logo_url: string | null };
-  employees: Employee[];
-  isAssigned: (empId: string, clientId: string) => boolean;
-  onToggle: (empId: string) => void;
-  isPending: boolean;
-  isCrossTeam?: boolean;
-}) {
-  const assignedCount = employees.filter((e) => isAssigned(e.id, client.id)).length;
-
-  return (
-    <div className={`border rounded-lg p-3 ${isCrossTeam ? 'border-dashed' : ''}`}>
-      <div className="flex items-center gap-2 mb-3">
-        {client.logo_url ? (
-          <img src={client.logo_url} alt="" className="h-5 w-5 object-contain rounded" />
-        ) : (
-          <Building2 className="h-4 w-4 text-muted-foreground" />
-        )}
-        <span className="text-sm font-medium">{client.name}</span>
-        <Badge variant="secondary" className="ml-auto text-xs h-5 px-1.5">
-          {assignedCount}/{employees.length}
-        </Badge>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {employees.map((emp) => {
-          const assigned = isAssigned(emp.id, client.id);
           return (
-            <button
+            <EmployeeClientRow
               key={emp.id}
-              type="button"
-              disabled={isPending}
-              onClick={() => onToggle(emp.id)}
-              className={`
-                inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium border transition-colors
-                ${assigned
-                  ? 'bg-primary/10 border-primary/30 text-primary'
-                  : 'bg-muted/30 border-border text-muted-foreground hover:bg-muted/50'
-                }
-              `}
-            >
-              <Checkbox checked={assigned} className="h-3 w-3 pointer-events-none" />
-              {emp.first_name} {emp.last_name.charAt(0)}.
-            </button>
+              employee={emp}
+              primaryClientId={primary?.client_id || null}
+              secondaryAssignments={secondaries}
+              latestChange={latestChange}
+              teamClients={teamClientsFiltered}
+              availableForSecondary={availableForSecondary}
+              clientMap={clientMap}
+              onSetPrimary={(clientId) => setPrimary({ employeeId: emp.id, newClientId: clientId })}
+              onAddSecondary={(clientId) => addSecondary({ employeeId: emp.id, clientId })}
+              onRemoveSecondary={(clientId) => removeSecondary({ employeeId: emp.id, clientId })}
+              isSettingPrimary={isSettingPrimary}
+            />
           );
         })}
       </div>
@@ -260,59 +180,143 @@ function ClientEmployeeRow({
   );
 }
 
-function CrossTeamAddSection({
-  otherClients,
-  employees,
-  onAssign,
-  isPending,
+function EmployeeClientRow({
+  employee,
+  primaryClientId,
+  secondaryAssignments,
+  latestChange,
+  teamClients,
+  availableForSecondary,
+  clientMap,
+  onSetPrimary,
+  onAddSecondary,
+  onRemoveSecondary,
+  isSettingPrimary,
 }: {
-  otherClients: { id: string; name: string; logo_url: string | null }[];
-  employees: Employee[];
-  onAssign: (empId: string, clientId: string) => void;
-  isPending: boolean;
+  employee: Employee;
+  primaryClientId: string | null;
+  secondaryAssignments: { id: string; client_id: string }[];
+  latestChange: { changed_at: string; old_client_id: string | null; new_client_id: string } | undefined;
+  teamClients: Client[];
+  availableForSecondary: Client[];
+  clientMap: Map<string, Client>;
+  onSetPrimary: (clientId: string) => void;
+  onAddSecondary: (clientId: string) => void;
+  onRemoveSecondary: (clientId: string) => void;
+  isSettingPrimary: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
-
-  if (otherClients.length === 0) return null;
+  const [showAddSecondary, setShowAddSecondary] = useState(false);
 
   return (
-    <div>
-      <button
-        type="button"
-        onClick={() => setExpanded(!expanded)}
-        className="text-xs text-primary hover:underline"
-      >
-        {expanded ? "Skjul" : `Vis ${otherClients.length} andre kunder...`}
-      </button>
-      {expanded && (
-        <div className="mt-2 space-y-2 max-h-64 overflow-y-auto">
-          {otherClients.map((client) => (
-            <div key={client.id} className="border border-dashed rounded-lg p-3">
-              <div className="flex items-center gap-2 mb-2">
-                {client.logo_url ? (
-                  <img src={client.logo_url} alt="" className="h-4 w-4 object-contain rounded" />
-                ) : (
-                  <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
-                )}
-                <span className="text-xs font-medium">{client.name}</span>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {employees.map((emp) => (
-                  <button
-                    key={emp.id}
-                    type="button"
-                    disabled={isPending}
-                    onClick={() => onAssign(emp.id, client.id)}
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] border border-dashed border-border text-muted-foreground hover:bg-muted/50 transition-colors"
-                  >
-                    + {emp.first_name} {emp.last_name.charAt(0)}.
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
+    <div className="border rounded-lg p-4 space-y-3">
+      {/* Employee header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-sm">
+            {employee.first_name} {employee.last_name}
+          </span>
+          {employee.job_title && (
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+              {employee.job_title}
+            </Badge>
+          )}
         </div>
-      )}
+        {latestChange && (
+          <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+            <History className="h-3 w-3" />
+            Skiftet {format(new Date(latestChange.changed_at), "d. MMM yyyy", { locale: da })}
+          </div>
+        )}
+      </div>
+
+      {/* Primary client selector */}
+      <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-[80px]">
+          <Star className="h-3 w-3 text-amber-500" />
+          Primær
+        </div>
+        <Select
+          value={primaryClientId || ""}
+          onValueChange={(val) => onSetPrimary(val)}
+          disabled={isSettingPrimary}
+        >
+          <SelectTrigger className="h-8 text-xs flex-1">
+            <SelectValue placeholder="Vælg primær kunde..." />
+          </SelectTrigger>
+          <SelectContent>
+            {teamClients.map(c => (
+              <SelectItem key={c.id} value={c.id} className="text-xs">
+                {c.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Secondary clients */}
+      <div className="flex items-start gap-2">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-[80px] pt-1">
+          <Clock className="h-3 w-3 text-primary" />
+          Sekundær
+        </div>
+        <div className="flex-1">
+          <div className="flex flex-wrap gap-1.5">
+            {secondaryAssignments.map(sa => {
+              const client = clientMap.get(sa.client_id);
+              return (
+                <Badge
+                  key={sa.id}
+                  variant="outline"
+                  className="text-xs gap-1 pr-1"
+                >
+                  {client?.name || "Ukendt"}
+                  <button
+                    type="button"
+                    onClick={() => onRemoveSecondary(sa.client_id)}
+                    className="ml-0.5 hover:text-destructive transition-colors"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              );
+            })}
+            {!showAddSecondary ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs text-primary"
+                onClick={() => setShowAddSecondary(true)}
+              >
+                <Plus className="h-3 w-3 mr-0.5" />
+                Tilføj
+              </Button>
+            ) : (
+              <Select
+                onValueChange={(val) => {
+                  onAddSecondary(val);
+                  setShowAddSecondary(false);
+                }}
+              >
+                <SelectTrigger className="h-7 text-xs w-[180px]">
+                  <SelectValue placeholder="Vælg kunde..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableForSecondary.map(c => (
+                    <SelectItem key={c.id} value={c.id} className="text-xs">
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+          {secondaryAssignments.length > 0 && (
+            <p className="text-[10px] text-muted-foreground mt-1">
+              Stempelur oprettes automatisk for sekundære kunder
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
