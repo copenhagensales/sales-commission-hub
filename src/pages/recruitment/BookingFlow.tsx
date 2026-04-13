@@ -559,6 +559,10 @@ export default function BookingFlow() {
           <TabsContent value="samtaler">
             <BookingCalendarTab />
           </TabsContent>
+
+          <TabsContent value="notifications">
+            <BookingNotificationsTab />
+          </TabsContent>
         </Tabs>
 
         {/* Add candidate dialog */}
