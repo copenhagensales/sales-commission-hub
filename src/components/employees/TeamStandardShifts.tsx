@@ -523,7 +523,6 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
     setBreaks([]);
     setShiftTimeMode('same');
     setSelectedEmployees([]);
-    setIsSpecialShift(false);
     // Reset day configs
     const initial: Record<number, DayConfig> = {};
     for (let i = 0; i < 7; i++) {
@@ -534,16 +533,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
 
   const openCreate = () => {
     setEditingShift(null);
-    setIsSpecialShift(false);
     resetForm();
-    setDialogOpen(true);
-  };
-
-  const openCreateSpecial = () => {
-    setEditingShift(null);
-    setIsSpecialShift(true);
-    resetForm();
-    setIsSpecialShift(true); // Re-set after reset clears it
     setDialogOpen(true);
   };
 
@@ -553,9 +543,6 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
     const shiftDays = getShiftDays(shift.id);
     const shiftEmployees = getShiftEmployees(shift.id);
     
-    // Determine if this is a special shift (has employee assignments)
-    const hasEmployees = shiftEmployees.length > 0;
-    setIsSpecialShift(hasEmployees);
     setSelectedEmployees(shiftEmployees.map(e => e.id));
     
     setFormData({
@@ -629,11 +616,6 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
         toast({ title: "Udfyld navn", variant: "destructive" });
         return;
       }
-      // For special shifts, require at least one employee
-      if (isSpecialShift && selectedEmployees.length === 0) {
-        toast({ title: "Vælg mindst én medarbejder", variant: "destructive" });
-        return;
-      }
       
       // Create "no shifts" configuration - all days disabled, times set to 00:00
       const noShiftsDayConfigs: Record<number, DayConfig> = {};
@@ -641,7 +623,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
         noShiftsDayConfigs[i] = { enabled: false, start_time: "00:00", end_time: "00:00", breaks: [] };
       }
       
-      const employeeIds = isSpecialShift ? selectedEmployees : undefined;
+      const employeeIds = selectedEmployees.length > 0 ? selectedEmployees : undefined;
       const noShiftsFormData = { ...formData, start_time: "00:00", end_time: "00:00" };
       
       if (editingShift) {
@@ -654,12 +636,6 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
     
     if (!formData.name || !formData.start_time || !formData.end_time) {
       toast({ title: "Udfyld navn og tidspunkter", variant: "destructive" });
-      return;
-    }
-
-    // For special shifts, require at least one employee
-    if (isSpecialShift && selectedEmployees.length === 0) {
-      toast({ title: "Vælg mindst én medarbejder", variant: "destructive" });
       return;
     }
     
@@ -680,7 +656,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
       });
     }
 
-    const employeeIds = isSpecialShift ? selectedEmployees : undefined;
+    const employeeIds = selectedEmployees.length > 0 ? selectedEmployees : undefined;
     
     if (editingShift) {
       updateMutation.mutate({ ...formData, id: editingShift.id, breaks, dayConfigs: finalDayConfigs, employeeIds });
@@ -802,10 +778,6 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
           <Label className="text-base font-medium">Standard vagter</Label>
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={openCreateSpecial}>
-            <Users className="h-4 w-4 mr-1" />
-            Tilføj speciel vagt
-          </Button>
           <Button size="sm" onClick={openCreate}>
             <Plus className="h-4 w-4 mr-1" />
             Tilføj vagt
