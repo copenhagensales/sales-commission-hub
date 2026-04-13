@@ -113,7 +113,7 @@ export function BookingSettingsTab() {
           lookahead_days: settings.lookahead_days,
           blocked_dates: (settings.blocked_dates as string[] | null) ?? [],
           day_time_windows: buildDayTimeWindows(
-            settings.day_time_windows as DayTimeWindows | null,
+            settings.day_time_windows as unknown as DayTimeWindows | null,
             timeWindows,
             weekdays
           ),
