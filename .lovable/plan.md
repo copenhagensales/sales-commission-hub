@@ -1,21 +1,37 @@
 
 
-## Fix: Ukendte lokationer i Økonomi Butikker
+## Fix: Head-to-Head viser forkerte/forskellige tal
 
 ### Problem
-Når salg har et `fm_location_id` der ikke matcher nogen booking i den valgte periode, opretter koden (linje 349 i `LocationHistoryContent.tsx`) lokationen med navnet "Ukendt lokation" — selvom lokationen faktisk eksisterer i databasen med et rigtigt navn (f.eks. "Frihedens Butikscenter", "Superbrugsen Ølsted").
+Der er flere bugs i H2H-systemet som gør at tallene ikke stemmer og kan variere mellem brugere:
 
-Det sker fordi lokationsnavne kun hentes via booking-joins. Salg uden booking i perioden har ingen kilde til navnet.
+### Bug 1: Custom-periode bruger forkert startdato
+Koden bruger `accepted_at` som startdato for custom-perioder i stedet for `custom_start_at`. Eksempel: en duel med `custom_start_at: 2026-04-12 22:00` bruger i stedet `accepted_at: 2026-04-13 06:47` — dermed mangler salg fra aftenen før.
+
+### Bug 2: Sync-effekten sætter ikke `custom_start_at`
+I sync-effekten (linje 298) sættes `matchStartTime = accepted_at` — men for custom-perioder burde den bruge `custom_start_at`.
+
+### Bug 3: Target-periode har ingen meningsfuld slutdato
+"Target"-perioder (først til X kr) falder igennem til `endOfWeek(startTime)`, hvilket er forkert. De burde køre til "nu".
+
+### Bug 4: Manuel salgsberegning i stedet for central RPC
+H2H bruger sin egen manuelle salgs-aggregering (henter alle sales, filtrerer klient-side) i stedet for `get_sales_aggregates_v2` RPC'en. Det kan give afvigelser fra resten af systemet.
+
+### Bug 5: localStorage kan desync mellem brugere
+Challenger og opponent kan have stale localStorage-værdier der overskriver DB-data, fx med gammel `matchStartTime`.
 
 ### Løsning
-Hent lokationsdata direkte for alle `fm_location_id`'er fra salgsdata der IKKE allerede er dækket af bookings.
 
-### Ændringer i `LocationHistoryContent.tsx`
+**`src/components/home/HeadToHeadComparison.tsx`**:
 
-1. **Ny query**: Efter salesData er loaded, find alle unikke `fm_location_id`'er fra salg der ikke er i `locationIds` (fra bookings). Hent navn, type og daily_rate fra `location`-tabellen for disse.
+1. **dateRange beregning** — For custom-perioder: brug `custom_start_at` (ikke `accepted_at`) som start. For target-perioder: brug `accepted_at` som start og "nu" som slut.
 
-2. **Brug i aggregering** (linje 349): I stedet for fallback til "Ukendt lokation", slå op i den nye lokations-map for korrekt navn, type og klientnavn.
+2. **Sync-effekt** — Sæt `matchStartTime` til `custom_start_at || accepted_at` i stedet for altid `accepted_at`.
+
+3. **Stats query** — Erstat den manuelle salgs-aggregering med `get_sales_aggregates_v2` RPC, scoped til de relevante employee IDs. Samme datakilde som resten af systemet = konsistente tal.
+
+4. **DB som single source of truth** — Når en aktiv challenge findes i DB, brug altid dens værdier (start/slut/periode) direkte, og ignorer localStorage for dato-relaterede felter.
 
 ### Filer
-- `src/pages/vagt-flow/LocationHistoryContent.tsx` — tilføj ekstra lokations-query og brug den i salgs-aggregeringen
+- `src/components/home/HeadToHeadComparison.tsx` — alle rettelser i dateRange, sync-effekt, og stats query
 
