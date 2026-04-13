@@ -1,43 +1,49 @@
 
 
-## Fleksible tidsvinduer per ugedag
+## Notifikationer-fane i Booking Flow
 
 ### Idé
-I stedet for at alle ugedage deler de samme tidsvinduer, får hver dag sine egne tidsvinduer. Admins kan justere mandag uafhængigt af tirsdag osv.
+En ny fane "Notifikationer" i Booking Flow, hvor man kan tilføje/fjerne email-modtagere der får besked når en kandidat booker eller afmelder en samtale. Erstatter den hardcodede `oscar@copenhagensales.dk`.
 
 ### Database
-Tilføj en ny `jsonb`-kolonne `day_time_windows` til `booking_settings`. Strukturen:
-```json
-{
-  "1": [{"start": "09:00", "end": "12:00"}, {"start": "13:00", "end": "16:00"}],
-  "2": [{"start": "10:00", "end": "14:00"}],
-  "3": [],
-  ...
-}
-```
-Nøglerne er ugedagsnumre (1=Ma, 7=Sø). Tomme arrays = lukket den dag. Den eksisterende `time_windows`-kolonne beholdes som fallback for bagudkompatibilitet.
-
-### UI-ændring (`BookingSettingsTab.tsx`)
-- Erstat den nuværende flade tidsvindue-liste med en **per-dag accordion/tabs**-visning
-- Hver aktiv ugedag (fra toggles) viser sine egne tidsvinduer med tilføj/fjern
-- Knap "Kopiér til alle dage" for hurtigt at sætte samme tider på alle aktive dage
-- Weekday-toggles virker stadig — slår man en dag fra, ignoreres dens tidsvinduer
-
-### Backend-ændring (`get-public-availability/index.ts`)
-- `getTimeWindows()` modtager dagensnummer og slår op i `day_time_windows[dayNumber]`
-- Falder tilbage til `time_windows` hvis `day_time_windows` ikke er sat eller mangler den dag
-- `generateDays()` kalder `getTimeWindows(dayOfWeek)` per dag i stedet for én gang
-
-### `public-book-candidate/index.ts`
-Ingen ændring nødvendig — den bruger allerede de genererede slots.
-
-### Migration
+Ny tabel `booking_notification_recipients`:
 ```sql
-ALTER TABLE booking_settings ADD COLUMN day_time_windows jsonb DEFAULT NULL;
+CREATE TABLE booking_notification_recipients (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  email text NOT NULL,
+  name text,
+  notify_on_booking boolean DEFAULT true,
+  notify_on_cancel boolean DEFAULT true,
+  created_at timestamptz DEFAULT now()
+);
 ```
+RLS: authenticated users kan SELECT, INSERT, DELETE.
 
-### Filer der ændres
-1. **Migration** — tilføj `day_time_windows` kolonne
-2. `src/components/recruitment/BookingSettingsTab.tsx` — per-dag UI
-3. `supabase/functions/get-public-availability/index.ts` — per-dag slot-generering
+Seed med `oscar@copenhagensales.dk` så eksisterende setup bevares.
+
+### UI: `BookingNotificationsTab.tsx`
+- Liste over modtagere med navn, email, toggles for booking/afmelding
+- Tilføj-formular med navn + email
+- Slet-knap per modtager
+- Mønster fra `ComplianceNotifications.tsx`
+
+### Backend-ændringer
+
+**`public-book-candidate/index.ts`**:
+- Erstat hardcodet `oscar@copenhagensales.dk` med opslag i `booking_notification_recipients` (hvor `notify_on_booking = true`)
+- Send til alle modtagere via Resend
+
+**`unsubscribe-candidate/index.ts`**:
+- Tilføj email-notifikation til modtagere med `notify_on_cancel = true` når en kandidat afmelder
+
+### Fane i BookingFlow.tsx
+- Tilføj `TabsTrigger value="notifications"` med `Bell`-ikon og label "Notifikationer"
+- Tilføj `TabsContent` med `<BookingNotificationsTab />`
+
+### Filer
+1. Migration — ny tabel + seed
+2. `src/components/recruitment/BookingNotificationsTab.tsx` — ny komponent
+3. `src/pages/recruitment/BookingFlow.tsx` — tilføj fane
+4. `supabase/functions/public-book-candidate/index.ts` — dynamiske modtagere
+5. `supabase/functions/unsubscribe-candidate/index.ts` — afmeldings-notifikation
 
