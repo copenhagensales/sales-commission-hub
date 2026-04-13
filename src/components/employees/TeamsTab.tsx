@@ -1305,23 +1305,35 @@ export function TeamsTab() {
                     ) : (
                       filteredClients.map((client) => {
                         const isSelected = formData.client_ids.includes(client.id);
+                        // Check if this client belongs to another team
+                        const otherTeamClient = teamClients.find(
+                          (tc) => tc.client_id === client.id && tc.team_id !== editingTeam?.id
+                        );
+                        const otherTeamName = otherTeamClient
+                          ? teams.find((t) => t.id === otherTeamClient.team_id)?.name
+                          : null;
+                        const isDisabled = !!otherTeamName && !isSelected;
+
                         return (
                           <div 
                             key={client.id} 
-                            onClick={() => toggleClient(client.id)}
+                            onClick={() => !isDisabled && toggleClient(client.id)}
                             className={`
-                              flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all
-                              ${isSelected 
-                                ? 'bg-primary/5 border-primary/30 ring-1 ring-primary/20' 
-                                : 'hover:bg-muted/50 border-border'
+                              flex items-center gap-3 p-3 rounded-lg border transition-all
+                              ${isDisabled
+                                ? 'opacity-50 cursor-not-allowed bg-muted/30 border-border'
+                                : isSelected 
+                                  ? 'bg-primary/5 border-primary/30 ring-1 ring-primary/20 cursor-pointer' 
+                                  : 'hover:bg-muted/50 border-border cursor-pointer'
                               }
                             `}
                           >
                             <Checkbox
                               id={`client-${client.id}`}
                               checked={isSelected}
-                              onCheckedChange={() => toggleClient(client.id)}
+                              onCheckedChange={() => !isDisabled && toggleClient(client.id)}
                               className="pointer-events-none"
+                              disabled={isDisabled}
                             />
                             {client.logo_url ? (
                               <img
@@ -1334,7 +1346,14 @@ export function TeamsTab() {
                                 <Building2 className="h-3 w-3 text-muted-foreground" />
                               </div>
                             )}
-                            <span className="text-sm font-medium">{client.name}</span>
+                            <div className="flex-1 min-w-0">
+                              <span className="text-sm font-medium">{client.name}</span>
+                              {otherTeamName && (
+                                <span className="text-xs text-muted-foreground block">
+                                  Tilhører: {otherTeamName}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         );
                       })
