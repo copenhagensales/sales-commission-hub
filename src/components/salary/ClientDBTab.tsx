@@ -772,7 +772,8 @@ export function ClientDBTab() {
     const clientsByTeam: Record<string, ClientDBData[]> = {};
 
     for (const client of clientsWithTeams) {
-      const teamClientData = (client.team_clients as any[])?.[0];
+      const teamClientArr2 = Array.isArray(client.team_clients) ? client.team_clients : [client.team_clients].filter(Boolean);
+      const teamClientData = (teamClientArr2 as any[])?.[0];
       const teamId = teamClientData?.team_id || null;
       const teamName = teamClientData?.teams?.name || null;
       
