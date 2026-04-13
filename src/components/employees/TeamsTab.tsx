@@ -1492,6 +1492,11 @@ export function TeamsTab() {
                   )}
                 </div>
               </TabsContent>
+
+              {/* Time Clocks Tab */}
+              <TabsContent value="time-clocks" className="mt-0 py-6">
+                <TeamTimeClockTab teamId={editingTeam?.id || null} teamMemberIds={formData.employee_ids} />
+              </TabsContent>
             </div>
           </Tabs>
 
