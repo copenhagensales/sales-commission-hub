@@ -6,6 +6,7 @@ import { fetchAllPostgrestRows } from "@/utils/postgrestFetch";
 import { BREAK_THRESHOLD_MINUTES, BREAK_DURATION_MINUTES } from "@/lib/calculations";
 import { REFRESH_PROFILES } from "@/utils/tvMode";
 import { trackFetch } from "@/utils/fetchPerformance";
+import { resolveHoursSourceBatch, type HoursSourceResult } from "@/lib/resolveHoursSource";
 
 export interface DashboardEmployeeStats {
   employeeId: string;
@@ -35,6 +36,7 @@ interface UseDashboardSalesDataParams {
   teamId?: string;
   enabled?: boolean;
   refetchInterval?: number; // Auto-refresh interval in milliseconds
+  useNewAssignments?: boolean; // Feature flag for new hours resolver
 }
 
 /**
@@ -50,6 +52,7 @@ export function useDashboardSalesData({
   teamId,
   enabled = true,
   refetchInterval,
+  useNewAssignments = false,
 }: UseDashboardSalesDataParams): DashboardSalesData {
   const { data, isLoading } = useQuery({
     queryKey: [
@@ -59,6 +62,7 @@ export function useDashboardSalesData({
       format(startDate, "yyyy-MM-dd"),
       format(endDate, "yyyy-MM-dd"),
       teamId,
+      useNewAssignments,
     ],
     refetchInterval,
     queryFn: () => trackFetch("dashboard-sales-data", async () => {
@@ -193,6 +197,11 @@ export function useDashboardSalesData({
       }
 
       // Step 2: Get team shift configuration for hours calculation
+      // When feature flag is on, resolve hours source from employee_time_clocks
+      const hoursSourceMap = useNewAssignments
+        ? await resolveHoursSourceBatch(employeeIds, resolvedClientId)
+        : null;
+
       const { data: teamMembers } = await supabase
         .from("team_members")
         .select("employee_id, team_id")
@@ -211,24 +220,31 @@ export function useDashboardSalesData({
         .select("shift_id, day_of_week, start_time, end_time")
         .in("shift_id", primaryShifts?.map((s) => s.id) || []);
 
-      // Fetch timestamps for teams using 'timestamp' hours_source
-      const teamsUsingTimestamps = primaryShifts?.filter((s) => s.hours_source === "timestamp").map((s) => s.team_id) || [];
-      let timeStampsData: any[] = [];
-      if (teamsUsingTimestamps.length > 0) {
-        const timestampTeamIds = new Set(teamsUsingTimestamps);
-        const employeesWithTimestampTeams = teamMembers
-          ?.filter((tm) => timestampTeamIds.has(tm.team_id))
-          .map((tm) => tm.employee_id) || [];
-
-        if (employeesWithTimestampTeams.length > 0) {
-          const { data: stamps } = await supabase
-            .from("time_stamps")
-            .select("employee_id, clock_in, clock_out, break_minutes")
-            .in("employee_id", employeesWithTimestampTeams)
-            .gte("clock_in", startStr)
-            .lte("clock_in", endStr + "T23:59:59");
-          timeStampsData = stamps || [];
+      // Determine which employees need timestamps
+      let employeesNeedingTimestamps: string[] = [];
+      if (hoursSourceMap) {
+        // New logic: employees with 'timestamp' source from resolver
+        employeesNeedingTimestamps = employeeIds.filter(id => hoursSourceMap[id]?.source === 'timestamp');
+      } else {
+        // Legacy logic: teams with hours_source='timestamp'
+        const teamsUsingTimestamps = primaryShifts?.filter((s) => s.hours_source === "timestamp").map((s) => s.team_id) || [];
+        if (teamsUsingTimestamps.length > 0) {
+          const timestampTeamIds = new Set(teamsUsingTimestamps);
+          employeesNeedingTimestamps = teamMembers
+            ?.filter((tm) => timestampTeamIds.has(tm.team_id))
+            .map((tm) => tm.employee_id) || [];
         }
+      }
+
+      let timeStampsData: any[] = [];
+      if (employeesNeedingTimestamps.length > 0) {
+        const { data: stamps } = await supabase
+          .from("time_stamps")
+          .select("employee_id, clock_in, clock_out, break_minutes")
+          .in("employee_id", employeesNeedingTimestamps)
+          .gte("clock_in", startStr)
+          .lte("clock_in", endStr + "T23:59:59");
+        timeStampsData = stamps || [];
       }
 
       // Step 3: Build agent identifiers for fetching sales
@@ -558,7 +574,10 @@ export function useDashboardSalesData({
 
         const empTeamId = teamMemberByEmployeeId.get(empId);
         const empPrimaryShift = empTeamId ? primaryShiftByTeamId.get(empTeamId) : null;
-        const hoursSource = empPrimaryShift?.hours_source || "shift";
+        // Use new resolver if available, otherwise legacy
+        const hoursSource = hoursSourceMap
+          ? (hoursSourceMap[empId]?.source || "shift")
+          : (empPrimaryShift?.hours_source || "shift");
 
         let totalHours = 0;
         if (hoursSource === "timestamp") {

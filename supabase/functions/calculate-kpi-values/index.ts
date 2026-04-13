@@ -1723,6 +1723,36 @@ async function fetchShiftData(
   startDate: string;
   endDate: string;
 } | null> {
+  // Check feature flag for new hours resolver
+  let useNewResolver = false;
+  let employeeTimeClocksMap: Record<string, { clock_type: string; hourly_rate: number }> = {};
+  
+  const { data: featureFlagData } = await supabase
+    .from("feature_flags")
+    .select("enabled")
+    .eq("key", "employee_client_assignments")
+    .maybeSingle();
+  
+  useNewResolver = featureFlagData?.enabled === true;
+  
+  if (useNewResolver) {
+    const { data: clocks } = await supabase
+      .from("employee_time_clocks")
+      .select("employee_id, clock_type, hourly_rate")
+      .eq("is_active", true);
+    
+    for (const clock of clocks || []) {
+      // First match wins per employee (client-specific would need clientId context)
+      if (!employeeTimeClocksMap[clock.employee_id]) {
+        employeeTimeClocksMap[clock.employee_id] = {
+          clock_type: clock.clock_type,
+          hourly_rate: Number(clock.hourly_rate) || 0,
+        };
+      }
+    }
+    console.log(`[HoursCalc] New resolver active: ${Object.keys(employeeTimeClocksMap).length} time clocks loaded`);
+  }
+
   // Fetch static shift configuration ONCE (team members, shifts, shift days don't change per date range)
   if (!shiftConfigCache) {
     console.log("[HoursCalc] Fetching shift configuration data (one-time)...");
@@ -1759,18 +1789,29 @@ async function fetchShiftData(
   
   // Fetch timestamps only if needed and date range differs or extends beyond cached range
   let timeStampsData: TimeStampRecord[] = [];
+  
+  // Determine which employees need timestamps: legacy (team-based) + new resolver (clock-based)
   const teamsUsingTimestamps = shiftConfigCache.primaryShifts
     .filter(s => s.hours_source === "timestamp")
     .map(s => s.team_id);
   
-  if (teamsUsingTimestamps.length > 0) {
-    // Check if we need to fetch timestamps (new range or no cache)
+  const employeesFromLegacy = teamsUsingTimestamps.length > 0
+    ? shiftConfigCache.teamMembers.filter(tm => teamsUsingTimestamps.includes(tm.team_id)).map(tm => tm.employee_id)
+    : [];
+  const employeesFromResolver = useNewResolver
+    ? Object.keys(employeeTimeClocksMap).filter(id => {
+        const ct = employeeTimeClocksMap[id]?.clock_type;
+        return ct === 'override' || ct === 'revenue';
+      })
+    : [];
+  const allTimestampEmployees = [...new Set([...employeesFromLegacy, ...employeesFromResolver])];
+  
+  if (allTimestampEmployees.length > 0) {
     const needsFetch = !timestampCache || 
       new Date(startStr) < new Date(timestampCache.startDate) ||
       new Date(endStr) > new Date(timestampCache.endDate);
     
     if (needsFetch) {
-      // Determine the widest range we might need (payroll period is typically widest)
       const fetchStart = timestampCache && new Date(startStr) >= new Date(timestampCache.startDate) 
         ? timestampCache.startDate 
         : startStr;
@@ -1778,16 +1819,12 @@ async function fetchShiftData(
         ? timestampCache.endDate
         : endStr;
       
-      const employeesWithTimestampTeams = shiftConfigCache.teamMembers
-        .filter(tm => teamsUsingTimestamps.includes(tm.team_id))
-        .map(tm => tm.employee_id);
-      
-      if (employeesWithTimestampTeams.length > 0) {
-        console.log(`[HoursCalc] Fetching timestamps for ${employeesWithTimestampTeams.length} employees...`);
+      if (allTimestampEmployees.length > 0) {
+        console.log(`[HoursCalc] Fetching timestamps for ${allTimestampEmployees.length} employees...`);
         const { data: stamps } = await supabase
           .from("time_stamps")
           .select("employee_id, clock_in, clock_out, break_minutes")
-          .in("employee_id", employeesWithTimestampTeams)
+          .in("employee_id", allTimestampEmployees)
           .gte("clock_in", fetchStart)
           .lte("clock_in", fetchEnd);
         
@@ -1813,7 +1850,8 @@ async function fetchShiftData(
     ...shiftConfigCache, 
     timeStampsData, 
     startDate: startStr, 
-    endDate: endStr 
+    endDate: endStr,
+    employeeTimeClocksMap: useNewResolver ? employeeTimeClocksMap : undefined,
   };
 }
 
@@ -1825,6 +1863,7 @@ type ShiftDataResult = {
   timeStampsData: TimeStampRecord[];
   startDate: string;
   endDate: string;
+  employeeTimeClocksMap?: Record<string, { clock_type: string; hourly_rate: number }>;
 };
 
 function calculateHoursForEmployees(
@@ -1833,6 +1872,7 @@ function calculateHoursForEmployees(
   endStr: string,
   shiftData: ShiftDataResult
 ): number {
+  const { teamMembers, primaryShifts, shiftDays, timeStampsData, employeeTimeClocksMap } = shiftData;
   const { teamMembers, primaryShifts, shiftDays, timeStampsData } = shiftData;
   
   let totalHours = 0;
@@ -1851,7 +1891,11 @@ function calculateHoursForEmployees(
       const empShift = primaryShifts.find((s: TeamStandardShift) => s.team_id === empTeam.team_id);
       if (!empShift) continue;
       
-      const hoursSource = empShift.hours_source || "shift";
+      // Use new resolver if available, otherwise legacy
+      const clockInfo = employeeTimeClocksMap?.[empId];
+      const hoursSource = clockInfo
+        ? (clockInfo.clock_type === 'override' || clockInfo.clock_type === 'revenue' ? 'timestamp' : 'shift')
+        : (empShift.hours_source || "shift");
       const empShiftDays = shiftDays.filter((sd: ShiftDay) => sd.shift_id === empShift.id);
       const shiftForDay = empShiftDays.find((sd: ShiftDay) => sd.day_of_week === adjustedDayOfWeek);
       

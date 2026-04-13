@@ -23,6 +23,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/usePositionPermissions";
+import { useFeatureFlag } from "@/hooks/useFeatureFlag";
+import { resolveHoursSourceBatch, type HoursSourceResult } from "@/lib/resolveHoursSource";
 
 interface LatenessRecord {
   id: string;
@@ -76,6 +78,7 @@ export default function ShiftOverview() {
 
   const queryClient = useQueryClient();
   const { canEditShiftOverview } = usePermissions();
+  const useNewAssignmentsFlag = useFeatureFlag('employee_client_assignments');
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
@@ -109,7 +112,15 @@ export default function ShiftOverview() {
     format(weekEnd, "yyyy-MM-dd")
   );
 
-  // Fetch lateness records for the week
+  // Fetch hours source map from new resolver when feature flag is on
+  const employeeIdsForResolver = useMemo(() => employees?.map(e => e.id) || [], [employees]);
+  const { data: hoursSourceMap } = useQuery({
+    queryKey: ["hours-source-resolver", employeeIdsForResolver, useNewAssignmentsFlag],
+    queryFn: () => resolveHoursSourceBatch(employeeIdsForResolver),
+    enabled: useNewAssignmentsFlag && employeeIdsForResolver.length > 0,
+    staleTime: 60000,
+  });
+
   const { data: latenessRecords } = useQuery({
     queryKey: ["lateness-records", format(weekStart, "yyyy-MM-dd"), format(weekEnd, "yyyy-MM-dd")],
     queryFn: async () => {
@@ -670,30 +681,32 @@ export default function ShiftOverview() {
     return (endMinutes - startMinutes) / 60;
   }, []);
 
-  // Get hours source for employee - check special shift first, then team primary shift
+  // Get hours source for employee - new resolver takes priority when feature flag is on
   const getHoursSourceForEmployee = useCallback((employeeId: string): 'timestamp' | 'shift' => {
-    // 1. FIRST: Check if employee has a special shift assigned
+    // NEW: Use resolver from employee_time_clocks when feature flag is on
+    if (hoursSourceMap && hoursSourceMap[employeeId]) {
+      return hoursSourceMap[employeeId].source === 'timestamp' ? 'timestamp' : 'shift';
+    }
+
+    // LEGACY: Check special shift first, then team primary shift
     const specialShift = employeeSpecialShifts?.assignments?.find(s => s.employee_id === employeeId);
     if (specialShift?.team_standard_shifts?.hours_source) {
       return specialShift.team_standard_shifts.hours_source;
     }
     
-    // 2. FALLBACK: Use team's primary shift (excluding special shifts)
     const membership = teamMemberships?.find(m => m.employee_id === employeeId);
     if (!membership) return 'shift';
     
-    // Get shift IDs that are used as special shifts
     const specialShiftIds = new Set(
       employeeSpecialShifts?.assignments?.map(s => s.shift_id) || []
     );
     
-    // Find team primary shift that is NOT a special shift
     const teamPrimaryShift = primaryShiftsData?.shifts.find(
       s => s.team_id === membership.team_id && !specialShiftIds.has(s.id)
     );
     
     return teamPrimaryShift?.hours_source || 'shift';
-  }, [teamMemberships, primaryShiftsData, employeeSpecialShifts]);
+  }, [teamMemberships, primaryShiftsData, employeeSpecialShifts, hoursSourceMap]);
 
   const getDailyBonusEligibility = useCallback((
     employeeId: string, 

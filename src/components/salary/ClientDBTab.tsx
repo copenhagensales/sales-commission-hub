@@ -36,6 +36,7 @@ import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 import type { KpiPeriod } from "@/hooks/usePrecomputedKpi";
+import { useFeatureFlag } from "@/hooks/useFeatureFlag";
 
 type SortColumn = "clientName" | "teamName" | "sales" | "revenue" | "costs" | "finalDB" | "dbPercent" | "revenuePerFTE";
 type SortDirection = "asc" | "desc";
@@ -117,6 +118,7 @@ export function ClientDBTab() {
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [hideZeroClients, setHideZeroClients] = useState(true);
   const queryClient = useQueryClient();
+  const useNewAssignments = useFeatureFlag('employee_client_assignments');
 
   // Stable "today" reference to prevent infinite query loops (new Date() changes every render)
   const today = useMemo(() => {
@@ -310,7 +312,8 @@ export function ClientDBTab() {
   const { data: staffHoursData, isLoading: staffHoursLoading } = useStaffHoursCalculation(
     periodStart,
     periodEnd,
-    staffEmployeeIds
+    staffEmployeeIds,
+    useNewAssignments
   );
 
   // Staff salary list with names for display

@@ -10,6 +10,8 @@ import { useShifts, useEmployeesForShifts, useDanishHolidays, useAbsencesForDate
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { useFeatureFlag } from "@/hooks/useFeatureFlag";
+import { resolveHoursSourceBatch, type HoursSourceResult } from "@/lib/resolveHoursSource";
 
 interface LatenessRecord {
   id: string;
