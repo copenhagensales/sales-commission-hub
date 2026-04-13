@@ -191,6 +191,7 @@ export const PERMISSION_KEYS = {
   menu_sms_templates: { label: 'SMS skabeloner', section: 'rekruttering', parent: 'menu_section_rekruttering' },
   menu_email_templates: { label: 'E-mail skabeloner', section: 'rekruttering', parent: 'menu_section_rekruttering' },
   menu_referrals: { label: 'Henvisninger', section: 'rekruttering', parent: 'menu_section_rekruttering' },
+  menu_booking_flow: { label: 'Booking Flow', section: 'rekruttering', parent: 'menu_section_rekruttering' },
 
   // Rekruttering Tabs
   tab_recruitment_pipeline: { label: 'Fane: Pipeline', section: 'rekruttering', parent: 'menu_candidates' },
