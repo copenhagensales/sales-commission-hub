@@ -75,7 +75,7 @@ interface KpiSectionProps {
     totalHotelCost: number;
     totalDietCost: number;
     totalDB: number;
-    dbPct: number;
+    dbPerDay: number;
   };
 }
 
@@ -111,12 +111,12 @@ function KpiCards({ label, totals }: KpiSectionProps) {
           </p>
         </CardContent></Card>
         <Card><CardContent className="pt-3 pb-2 px-3">
-          <p className="text-xs text-muted-foreground">DB%</p>
+          <p className="text-xs text-muted-foreground">DB/dag</p>
           <div className="flex items-center gap-1">
-            <p className={`text-lg font-bold ${totals.dbPct >= 0 ? "text-emerald-600" : "text-destructive"}`}>
-              {formatPct(totals.dbPct)}
+            <p className={`text-lg font-bold ${totals.dbPerDay >= 0 ? "text-emerald-600" : "text-destructive"}`}>
+              {formatKr(totals.dbPerDay)}
             </p>
-            {totals.dbPct >= 0 ? <TrendingUp className="h-3 w-3 text-emerald-600" /> : <TrendingDown className="h-3 w-3 text-destructive" />}
+            {totals.dbPerDay >= 0 ? <TrendingUp className="h-3 w-3 text-emerald-600" /> : <TrendingDown className="h-3 w-3 text-destructive" />}
           </div>
         </CardContent></Card>
       </div>
@@ -124,15 +124,16 @@ function KpiCards({ label, totals }: KpiSectionProps) {
   );
 }
 
-function computeTotals(locations: Array<{ totalRevenue: number; sellerCost: number; locationCost: number; hotelCost: number; dietCost: number; db: number }>) {
+function computeTotals(locations: Array<{ totalRevenue: number; sellerCost: number; locationCost: number; hotelCost: number; dietCost: number; db: number; bookedDays: number[] }>) {
   const totalRevenue = locations.reduce((s, l) => s + l.totalRevenue, 0);
   const totalSellerCost = locations.reduce((s, l) => s + l.sellerCost, 0);
   const totalLocationCost = locations.reduce((s, l) => s + l.locationCost, 0);
   const totalHotelCost = locations.reduce((s, l) => s + l.hotelCost, 0);
   const totalDietCost = locations.reduce((s, l) => s + l.dietCost, 0);
   const totalDB = totalRevenue - totalSellerCost - totalLocationCost - totalHotelCost - totalDietCost;
-  const dbPct = totalRevenue > 0 ? (totalDB / totalRevenue) * 100 : 0;
-  return { totalRevenue, totalSellerCost, totalLocationCost, totalHotelCost, totalDietCost, totalDB, dbPct };
+  const totalDays = locations.reduce((s, l) => s + l.bookedDays.length, 0);
+  const dbPerDay = totalDays > 0 ? totalDB / totalDays : 0;
+  return { totalRevenue, totalSellerCost, totalLocationCost, totalHotelCost, totalDietCost, totalDB, dbPerDay };
 }
 
 export default function LocationProfitabilityContent() {
@@ -411,8 +412,8 @@ export default function LocationProfitabilityContent() {
         const hotelCost = hotelCostByLocation.get(loc.locationId) || 0;
         const dietCost = dietCostByLocation.get(loc.locationId) || 0;
         const db = totalRevenue - sellerCost - locationCost - hotelCost - dietCost;
-        const dbPct = totalRevenue > 0 ? (db / totalRevenue) * 100 : 0;
-        return { ...loc, totalRevenue, totalCommission, totalSales, sellerCost, locationCost, hotelCost, dietCost, db, dbPct };
+        const dbPerDay = loc.bookedDays.length > 0 ? db / loc.bookedDays.length : 0;
+        return { ...loc, totalRevenue, totalCommission, totalSales, sellerCost, locationCost, hotelCost, dietCost, db, dbPerDay };
       })
       .sort((a, b) => b.db - a.db);
   }, [bookings, salesData, placements, hotelCostByLocation, dietCostByLocation]);
@@ -521,8 +522,8 @@ export default function LocationProfitabilityContent() {
             <TableCell className={`text-right font-semibold ${loc.db >= 0 ? "text-emerald-600" : "text-destructive"}`}>
               {formatKr(loc.db)}
             </TableCell>
-            <TableCell className={`text-right pr-6 ${loc.dbPct >= 0 ? "text-emerald-600" : "text-destructive"}`}>
-              {formatPct(loc.dbPct)}
+            <TableCell className={`text-right pr-6 ${loc.dbPerDay >= 0 ? "text-emerald-600" : "text-destructive"}`}>
+              {formatKr(loc.dbPerDay)}
             </TableCell>
           </TableRow>
           {isExpanded && weekDates.map((date) => {
@@ -561,7 +562,7 @@ export default function LocationProfitabilityContent() {
                   {formatKr(dayDB)}
                 </TableCell>
                 <TableCell className="text-right pr-6 text-sm">
-                  {dayRevenue > 0 ? formatPct((dayDB / dayRevenue) * 100) : "–"}
+                  {formatKr(dayDB)}
                 </TableCell>
               </TableRow>
             );
@@ -583,7 +584,7 @@ export default function LocationProfitabilityContent() {
         <TableCell className="text-right">{formatKr(t.totalHotelCost)}</TableCell>
         <TableCell className="text-right">{formatKr(t.totalDietCost)}</TableCell>
         <TableCell className={`text-right ${t.totalDB >= 0 ? "text-emerald-600" : "text-destructive"}`}>{formatKr(t.totalDB)}</TableCell>
-        <TableCell className={`text-right pr-6 ${t.dbPct >= 0 ? "text-emerald-600" : "text-destructive"}`}>{formatPct(t.dbPct)}</TableCell>
+        <TableCell className={`text-right pr-6 ${t.dbPerDay >= 0 ? "text-emerald-600" : "text-destructive"}`}>{formatKr(t.dbPerDay)}</TableCell>
       </TableRow>
     );
   };
@@ -643,7 +644,7 @@ export default function LocationProfitabilityContent() {
                   <TableHead className="text-right">Hotel</TableHead>
                   <TableHead className="text-right">Diæt</TableHead>
                   <TableHead className="text-right">DB</TableHead>
-                  <TableHead className="text-right pr-6">DB%</TableHead>
+                  <TableHead className="text-right pr-6">DB/dag</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
