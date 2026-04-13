@@ -550,7 +550,8 @@ export function ClientDBTab() {
     for (const client of clientsWithTeams) {
       const salesData = chartSalesByClient[client.id];
       if (!salesData || (salesData.sales === 0 && salesData.revenue === 0)) continue;
-      const teamClientData = (client.team_clients as any[])?.[0];
+      const teamClientArr = Array.isArray(client.team_clients) ? client.team_clients : [client.team_clients].filter(Boolean);
+      const teamClientData = (teamClientArr as any[])?.[0];
       const teamId = teamClientData?.team_id || null;
       const adjustment = adjustmentMap.get(client.id);
       const cancellationPercent = Number(adjustment?.cancellation_percent) || 0;
@@ -771,7 +772,8 @@ export function ClientDBTab() {
     const clientsByTeam: Record<string, ClientDBData[]> = {};
 
     for (const client of clientsWithTeams) {
-      const teamClientData = (client.team_clients as any[])?.[0];
+      const teamClientArr2 = Array.isArray(client.team_clients) ? client.team_clients : [client.team_clients].filter(Boolean);
+      const teamClientData = (teamClientArr2 as any[])?.[0];
       const teamId = teamClientData?.team_id || null;
       const teamName = teamClientData?.teams?.name || null;
       

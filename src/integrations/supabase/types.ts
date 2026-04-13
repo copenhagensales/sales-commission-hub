@@ -5646,6 +5646,56 @@ export type Database = {
           },
         ]
       }
+      employee_client_assignments: {
+        Row: {
+          client_id: string
+          created_at: string
+          employee_id: string
+          id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          employee_id: string
+          id?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          employee_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_client_assignments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_client_assignments_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_client_assignments_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_client_assignments_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_dashboards: {
         Row: {
           created_at: string
@@ -6587,6 +6637,68 @@ export type Database = {
           },
         ]
       }
+      employee_time_clocks: {
+        Row: {
+          client_id: string | null
+          clock_type: Database["public"]["Enums"]["clock_type"]
+          created_at: string
+          created_by: string | null
+          employee_id: string
+          hourly_rate: number
+          id: string
+          is_active: boolean
+        }
+        Insert: {
+          client_id?: string | null
+          clock_type: Database["public"]["Enums"]["clock_type"]
+          created_at?: string
+          created_by?: string | null
+          employee_id: string
+          hourly_rate?: number
+          id?: string
+          is_active?: boolean
+        }
+        Update: {
+          client_id?: string | null
+          clock_type?: Database["public"]["Enums"]["clock_type"]
+          created_at?: string
+          created_by?: string | null
+          employee_id?: string
+          hourly_rate?: number
+          id?: string
+          is_active?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_time_clocks_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_time_clocks_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_time_clocks_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_time_clocks_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_attendees: {
         Row: {
           created_at: string
@@ -6854,6 +6966,24 @@ export type Database = {
           id?: string
           ip_address?: string | null
           user_agent?: string | null
+        }
+        Relationships: []
+      }
+      feature_flags: {
+        Row: {
+          enabled: boolean
+          key: string
+          updated_at: string
+        }
+        Insert: {
+          enabled?: boolean
+          key: string
+          updated_at?: string
+        }
+        Update: {
+          enabled?: boolean
+          key?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -12316,7 +12446,7 @@ export type Database = {
           {
             foreignKeyName: "team_clients_client_id_fkey"
             columns: ["client_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
@@ -14121,6 +14251,7 @@ export type Database = {
         | "internal_workshop"
         | "legal_update"
       app_role: "admin" | "payroll" | "manager" | "agent"
+      clock_type: "override" | "documentation" | "revenue"
       commission_transaction_type: "earn" | "clawback" | "manual_adjustment"
       commission_type: "fixed" | "percentage"
       communication_channel: "Telefon" | "Mail" | "Andet"
@@ -14329,6 +14460,7 @@ export const Constants = {
         "legal_update",
       ],
       app_role: ["admin", "payroll", "manager", "agent"],
+      clock_type: ["override", "documentation", "revenue"],
       commission_transaction_type: ["earn", "clawback", "manual_adjustment"],
       commission_type: ["fixed", "percentage"],
       communication_channel: ["Telefon", "Mail", "Andet"],

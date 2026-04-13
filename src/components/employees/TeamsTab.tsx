@@ -14,9 +14,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Users, Building2, UserCheck, UserX, X, Coins, ArrowRightLeft, CalendarIcon } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Building2, UserCheck, UserX, X, Coins, ArrowRightLeft, CalendarIcon, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { TeamStandardShifts } from "./TeamStandardShifts";
+import { TeamTimeClockTab } from "./TeamTimeClockTab";
 import { format, isToday, startOfDay } from "date-fns";
 import { da } from "date-fns/locale";
 import { useTeamAssistantLeaders, getTeamAssistantIds, useUpdateTeamAssistants } from "@/hooks/useTeamAssistantLeaders";
@@ -1166,6 +1167,13 @@ export function TeamsTab() {
                   <Coins className="h-4 w-4 mr-2" />
                   Dagsbonus
                 </TabsTrigger>
+                <TabsTrigger 
+                  value="time-clocks"
+                  className="data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg px-4 py-2 text-sm font-medium"
+                >
+                  <Clock className="h-4 w-4 mr-2" />
+                  Stempelur
+                </TabsTrigger>
               </TabsList>
             </div>
 
@@ -1297,23 +1305,35 @@ export function TeamsTab() {
                     ) : (
                       filteredClients.map((client) => {
                         const isSelected = formData.client_ids.includes(client.id);
+                        // Check if this client belongs to another team
+                        const otherTeamClient = teamClients.find(
+                          (tc) => tc.client_id === client.id && tc.team_id !== editingTeam?.id
+                        );
+                        const otherTeamName = otherTeamClient
+                          ? teams.find((t) => t.id === otherTeamClient.team_id)?.name
+                          : null;
+                        const isDisabled = !!otherTeamName && !isSelected;
+
                         return (
                           <div 
                             key={client.id} 
-                            onClick={() => toggleClient(client.id)}
+                            onClick={() => !isDisabled && toggleClient(client.id)}
                             className={`
-                              flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all
-                              ${isSelected 
-                                ? 'bg-primary/5 border-primary/30 ring-1 ring-primary/20' 
-                                : 'hover:bg-muted/50 border-border'
+                              flex items-center gap-3 p-3 rounded-lg border transition-all
+                              ${isDisabled
+                                ? 'opacity-50 cursor-not-allowed bg-muted/30 border-border'
+                                : isSelected 
+                                  ? 'bg-primary/5 border-primary/30 ring-1 ring-primary/20 cursor-pointer' 
+                                  : 'hover:bg-muted/50 border-border cursor-pointer'
                               }
                             `}
                           >
                             <Checkbox
                               id={`client-${client.id}`}
                               checked={isSelected}
-                              onCheckedChange={() => toggleClient(client.id)}
+                              onCheckedChange={() => !isDisabled && toggleClient(client.id)}
                               className="pointer-events-none"
+                              disabled={isDisabled}
                             />
                             {client.logo_url ? (
                               <img
@@ -1326,7 +1346,14 @@ export function TeamsTab() {
                                 <Building2 className="h-3 w-3 text-muted-foreground" />
                               </div>
                             )}
-                            <span className="text-sm font-medium">{client.name}</span>
+                            <div className="flex-1 min-w-0">
+                              <span className="text-sm font-medium">{client.name}</span>
+                              {otherTeamName && (
+                                <span className="text-xs text-muted-foreground block">
+                                  Tilhører: {otherTeamName}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         );
                       })
@@ -1483,6 +1510,11 @@ export function TeamsTab() {
                     </div>
                   )}
                 </div>
+              </TabsContent>
+
+              {/* Time Clocks Tab */}
+              <TabsContent value="time-clocks" className="mt-0 py-6">
+                <TeamTimeClockTab teamId={editingTeam?.id || null} teamMemberIds={formData.employee_ids} />
               </TabsContent>
             </div>
           </Tabs>
