@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format, eachDayOfInterval, isWeekend } from "date-fns";
+import { format, eachDayOfInterval } from "date-fns";
 import { da } from "date-fns/locale";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -171,7 +171,13 @@ export function PayrollDayByDay({ employeeId, payrollPeriod }: PayrollDayByDayPr
     }
 
     return allDays
-      .filter((d) => !isWeekend(d))
+      .filter((d) => {
+        // Show days that have a shift or sales data — no hardcoded weekend filter
+        const key = format(d, "yyyy-MM-dd");
+        const hasShift = shiftMap.has(key);
+        const hasSales = salesMap.has(key);
+        return hasShift || hasSales;
+      })
       .map((d) => {
         const key = format(d, "yyyy-MM-dd");
         const sales = salesMap.get(key) || [];

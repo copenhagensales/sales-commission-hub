@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { usePrecomputedKpis, getKpiValue } from "./usePrecomputedKpi";
-import { format, eachDayOfInterval, isWeekend, isBefore, startOfDay, differenceInMinutes } from "date-fns";
+import { format, eachDayOfInterval, isBefore, startOfDay, differenceInMinutes } from "date-fns";
 
 interface EffectiveHourlyRateResult {
   hourlyRate: number;

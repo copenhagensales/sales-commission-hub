@@ -24,7 +24,7 @@ import {
   ReferenceLine,
   Scatter,
 } from "recharts";
-import { format, eachDayOfInterval, isWeekend, isBefore, isAfter, isSameDay, startOfDay } from "date-fns";
+import { format, eachDayOfInterval, isBefore, isAfter, isSameDay, startOfDay } from "date-fns";
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
 import { useSalesGamification } from "@/hooks/useSalesGamification";
@@ -100,15 +100,8 @@ export function SalesGoalTracker({
     payrollPeriod.end
   );
 
-  // Calculate passed days early for comparison hook
-  const today = startOfDay(new Date());
-  const allDaysForComparison = eachDayOfInterval({
-    start: payrollPeriod.start,
-    end: payrollPeriod.end,
-  });
-  const passedDaysForComparison = allDaysForComparison.filter(
-    (day) => !isWeekend(day) && (isBefore(day, today) || isSameDay(day, today))
-  ).length;
+  // Calculate passed working days using the shift-aware hook
+  const passedDaysForComparison = workingDaysData.data.passed;
 
   // Fetch previous period comparison data
   const previousPeriodData = usePreviousPeriodComparison(
