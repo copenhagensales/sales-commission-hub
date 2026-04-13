@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Users, Zap, Clock, CheckCircle, XCircle, Plus, Mail, MessageSquare, Loader2, ShieldCheck, AlertTriangle, FileText, CalendarDays, Eye, PhoneCall } from "lucide-react";
+import { Users, Zap, Clock, CheckCircle, XCircle, Plus, Mail, MessageSquare, Loader2, ShieldCheck, AlertTriangle, FileText, CalendarDays, Eye, PhoneCall, Bell } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { da } from "date-fns/locale";
 import { SegmentationModal } from "@/components/recruitment/SegmentationModal";
@@ -18,6 +18,7 @@ import { FlowTemplatesTab } from "@/components/recruitment/FlowTemplatesTab";
 import { BookingSettingsTab } from "@/components/recruitment/BookingSettingsTab";
 import { BookingPreviewTab } from "@/components/recruitment/BookingPreviewTab";
 import { BookingCalendarTab } from "@/components/recruitment/BookingCalendarTab";
+import { BookingNotificationsTab } from "@/components/recruitment/BookingNotificationsTab";
 import { addDays, setHours, setMinutes } from "date-fns";
 
 const tierConfig = {
@@ -279,6 +280,10 @@ export default function BookingFlow() {
             <TabsTrigger value="samtaler" className="gap-2">
               <PhoneCall className="h-4 w-4" />
               Samtaler
+            </TabsTrigger>
+            <TabsTrigger value="notifications" className="gap-2">
+              <Bell className="h-4 w-4" />
+              Notifikationer
             </TabsTrigger>
           </TabsList>
 
