@@ -177,13 +177,6 @@ export function SalesGoalTracker({
     },
   });
 
-  // Calculate working days using shift hierarchy (individual → employee standard → team standard → fallback weekday)
-  const { data: workingDaysData } = useEmployeeWorkingDays(
-    employeeId,
-    payrollPeriod,
-    absences,
-    danishHolidays
-  );
 
   // Calculate KPIs
   const kpis = useMemo(() => {
