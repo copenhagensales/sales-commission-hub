@@ -1,14 +1,15 @@
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
-import { Clock, Save } from "lucide-react";
+import { Clock, Save, Building2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 interface TimeStamp {
@@ -21,6 +22,7 @@ interface TimeStamp {
   effective_hours: number | null;
   break_minutes: number | null;
   note: string | null;
+  client_id: string | null;
 }
 
 interface EditTimeStampDialogProps {
@@ -44,38 +46,65 @@ export function EditTimeStampDialog({
   const [clockIn, setClockIn] = useState("");
   const [clockOut, setClockOut] = useState("");
   const [note, setNote] = useState("");
+  const [clientId, setClientId] = useState<string>("none");
+
+  // Fetch employee's secondary client assignments for the dropdown
+  const { data: clientAssignments = [] } = useQuery({
+    queryKey: ["employee-client-assignments-for-stamp", employeeId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_client_assignments")
+        .select("client_id, is_primary, clients(id, name)")
+        .eq("employee_id", employeeId)
+        .eq("is_primary", false);
+      if (error) return [];
+      return (data || []).map((row: any) => ({
+        client_id: row.client_id,
+        client_name: row.clients?.name || "Ukendt",
+      }));
+    },
+    enabled: !!employeeId && open,
+  });
 
   useEffect(() => {
     if (timeStamp) {
       setClockIn(format(new Date(timeStamp.clock_in), "HH:mm"));
       setClockOut(timeStamp.clock_out ? format(new Date(timeStamp.clock_out), "HH:mm") : "");
       setNote(timeStamp.note || "");
+      setClientId(timeStamp.client_id || "none");
     } else {
       setClockIn("");
       setClockOut("");
       setNote("");
+      setClientId("none");
     }
   }, [timeStamp, open]);
 
+  const buildTimestamps = (data: { clockIn: string; clockOut: string }) => {
+    const dateStr = format(date, "yyyy-MM-dd");
+    const tzOffset = new Date().getTimezoneOffset();
+    const tzSign = tzOffset <= 0 ? '+' : '-';
+    const tzHours = String(Math.floor(Math.abs(tzOffset) / 60)).padStart(2, '0');
+    const tzMins = String(Math.abs(tzOffset) % 60).padStart(2, '0');
+    const tz = `${tzSign}${tzHours}:${tzMins}`;
+    
+    const clockInTime = `${dateStr}T${data.clockIn}:00${tz}`;
+    const clockOutTime = data.clockOut ? `${dateStr}T${data.clockOut}:00${tz}` : null;
+
+    let effectiveHours: number | null = null;
+    if (clockOutTime) {
+      const diffMs = new Date(clockOutTime).getTime() - new Date(clockInTime).getTime();
+      effectiveHours = Math.max(0, diffMs / (1000 * 60 * 60) - 1);
+    }
+
+    return { clockInTime, clockOutTime, effectiveHours };
+  };
+
+  const resolvedClientId = clientId === "none" ? null : clientId;
+
   const updateTimeStamp = useMutation({
     mutationFn: async (data: { clockIn: string; clockOut: string; note: string }) => {
-      const dateStr = format(date, "yyyy-MM-dd");
-      // Use timezone offset to ensure correct local time is stored
-      const tzOffset = new Date().getTimezoneOffset();
-      const tzSign = tzOffset <= 0 ? '+' : '-';
-      const tzHours = String(Math.floor(Math.abs(tzOffset) / 60)).padStart(2, '0');
-      const tzMins = String(Math.abs(tzOffset) % 60).padStart(2, '0');
-      const tz = `${tzSign}${tzHours}:${tzMins}`;
-      
-      const clockInTime = `${dateStr}T${data.clockIn}:00${tz}`;
-      const clockOutTime = data.clockOut ? `${dateStr}T${data.clockOut}:00${tz}` : null;
-
-      // Calculate effective hours if both times are set
-      let effectiveHours: number | null = null;
-      if (clockOutTime) {
-        const diffMs = new Date(clockOutTime).getTime() - new Date(clockInTime).getTime();
-        effectiveHours = Math.max(0, diffMs / (1000 * 60 * 60) - 1); // Minus 1 hour break
-      }
+      const { clockInTime, clockOutTime, effectiveHours } = buildTimestamps(data);
 
       const { error } = await supabase
         .from("time_stamps")
@@ -86,6 +115,7 @@ export function EditTimeStampDialog({
           effective_clock_out: clockOutTime,
           effective_hours: effectiveHours,
           note: data.note || null,
+          client_id: resolvedClientId,
           edited_at: new Date().toISOString(),
         })
         .eq("id", timeStamp!.id);
@@ -105,22 +135,7 @@ export function EditTimeStampDialog({
 
   const createTimeStamp = useMutation({
     mutationFn: async (data: { clockIn: string; clockOut: string; note: string }) => {
-      const dateStr = format(date, "yyyy-MM-dd");
-      // Use timezone offset to ensure correct local time is stored
-      const tzOffset = new Date().getTimezoneOffset();
-      const tzSign = tzOffset <= 0 ? '+' : '-';
-      const tzHours = String(Math.floor(Math.abs(tzOffset) / 60)).padStart(2, '0');
-      const tzMins = String(Math.abs(tzOffset) % 60).padStart(2, '0');
-      const tz = `${tzSign}${tzHours}:${tzMins}`;
-      
-      const clockInTime = `${dateStr}T${data.clockIn}:00${tz}`;
-      const clockOutTime = data.clockOut ? `${dateStr}T${data.clockOut}:00${tz}` : null;
-
-      let effectiveHours: number | null = null;
-      if (clockOutTime) {
-        const diffMs = new Date(clockOutTime).getTime() - new Date(clockInTime).getTime();
-        effectiveHours = Math.max(0, diffMs / (1000 * 60 * 60) - 1);
-      }
+      const { clockInTime, clockOutTime, effectiveHours } = buildTimestamps(data);
 
       const { error } = await supabase
         .from("time_stamps")
@@ -132,6 +147,7 @@ export function EditTimeStampDialog({
           effective_clock_out: clockOutTime,
           effective_hours: effectiveHours,
           note: data.note || null,
+          client_id: resolvedClientId,
         });
 
       if (error) throw error;
@@ -200,6 +216,29 @@ export function EditTimeStampDialog({
               />
             </div>
           </div>
+
+          {/* Client selector for secondary clients */}
+          {clientAssignments.length > 0 && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1.5">
+                <Building2 className="h-3.5 w-3.5" />
+                Kunde
+              </Label>
+              <Select value={clientId} onValueChange={setClientId}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Primær kunde</SelectItem>
+                  {clientAssignments.map(ca => (
+                    <SelectItem key={ca.client_id} value={ca.client_id}>
+                      {ca.client_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="note">Note (valgfri)</Label>
