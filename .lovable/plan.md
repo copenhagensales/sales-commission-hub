@@ -1,20 +1,21 @@
 
 
-## Send booking-notifikation til oscar@copenhagensales.dk
+## Tilføj Booking Flow til rettighedskortet
 
-### Ændring
-Opdater `supabase/functions/public-book-candidate/index.ts` til at sende en email med `.ics` kalenderinvitation til `oscar@copenhagensales.dk` hver gang en kandidat booker en tid. Ingen secret nødvendig — emailen hardcodes direkte.
+### Problem
+`menu_booking_flow` bruges allerede i sidebar og `usePositionPermissions`, men nøglen er ikke defineret i `src/config/permissionKeys.ts` — den centrale kilde til alle rettigheder. Derfor vises den ikke i rettighedskortet (Permission Map), og rettigheden kan ikke fordeles til roller.
 
-### Hvad tilføjes (efter eksisterende Outlook-event blok)
+### Løsning
+Tilføj `menu_booking_flow` til `PERMISSION_KEYS` i `src/config/permissionKeys.ts` under rekrutteringssektionen, sammen med de øvrige rekrutteringsnøgler.
 
-1. **Generer ICS-kalenderstreng** med `VEVENT` (dato, tid, kandidatnavn, rolle, telefon, timezone Europe/Copenhagen)
-2. **Send email via Graph API** (`/users/${msUserEmail}/sendMail`) med:
-   - Modtager: `oscar@copenhagensales.dk`
-   - Emne: `Ny booking: [kandidatnavn] — [dato] kl. [tid]`
-   - HTML body med kandidatinfo
-   - `.ics` fil som base64 `fileAttachment`
-3. **Fejlhåndtering**: Logges men stopper ikke resten af flowet
+### Fil: `src/config/permissionKeys.ts`
+- Tilføj efter `menu_referrals` (linje ~193):
+  ```
+  menu_booking_flow: { label: 'Booking Flow', section: 'rekruttering', parent: 'menu_section_rekruttering' },
+  ```
+- Nøglen vil automatisk dukke op i rettighedskortet under "Rekruttering"-sektionen
+- Auto-seeding opretter databaserækker, når en rolle vælges
 
-### Fil
-- `supabase/functions/public-book-candidate/index.ts`
+### Ingen andre ændringer nødvendige
+Sidebar og `usePositionPermissions` bruger allerede `menu_booking_flow` — de virker med det samme, når nøglen er registreret.
 
