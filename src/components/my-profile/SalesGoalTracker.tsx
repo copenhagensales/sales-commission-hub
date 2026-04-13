@@ -100,8 +100,16 @@ export function SalesGoalTracker({
     payrollPeriod.end
   );
 
+  // Calculate working days using shift hierarchy (individual → standard → no shift)
+  const { data: workingDaysData } = useEmployeeWorkingDays(
+    employeeId,
+    payrollPeriod,
+    absences,
+    danishHolidays
+  );
+
   // Calculate passed working days using the shift-aware hook
-  const passedDaysForComparison = workingDaysData.data.passed;
+  const passedDaysForComparison = workingDaysData.passed;
 
   // Fetch previous period comparison data
   const previousPeriodData = usePreviousPeriodComparison(
