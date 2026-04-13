@@ -11,8 +11,9 @@ import { Slider } from "@/components/ui/slider";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Toggle } from "@/components/ui/toggle";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { toast } from "sonner";
-import { ExternalLink, Copy, Search, CalendarIcon, Save, X, Settings, Eye, Plus, Trash2 } from "lucide-react";
+import { ExternalLink, Copy, Search, CalendarIcon, Save, X, Settings, Eye, Plus, Trash2, CopyPlus } from "lucide-react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -21,6 +22,8 @@ interface TimeWindow {
   start: string;
   end: string;
 }
+
+type DayTimeWindows = Record<string, TimeWindow[]>;
 
 const TIME_OPTIONS: string[] = [];
 for (let h = 6; h <= 20; h++) {
@@ -31,21 +34,43 @@ for (let h = 6; h <= 20; h++) {
 }
 
 const WEEKDAY_LABELS = [
-  { value: 1, label: "Ma" },
-  { value: 2, label: "Ti" },
-  { value: 3, label: "On" },
-  { value: 4, label: "To" },
-  { value: 5, label: "Fr" },
-  { value: 6, label: "Lø" },
-  { value: 7, label: "Sø" },
+  { value: 1, label: "Ma", full: "Mandag" },
+  { value: 2, label: "Ti", full: "Tirsdag" },
+  { value: 3, label: "On", full: "Onsdag" },
+  { value: 4, label: "To", full: "Torsdag" },
+  { value: 5, label: "Fr", full: "Fredag" },
+  { value: 6, label: "Lø", full: "Lørdag" },
+  { value: 7, label: "Sø", full: "Søndag" },
 ];
 
 interface FormState {
   slot_duration_minutes: number;
   lookahead_days: number;
   blocked_dates: string[];
-  time_windows: TimeWindow[];
+  day_time_windows: DayTimeWindows;
   available_weekdays: number[];
+}
+
+function buildDayTimeWindows(
+  dayTimeWindows: DayTimeWindows | null | undefined,
+  timeWindows: TimeWindow[] | null | undefined,
+  weekdays: number[]
+): DayTimeWindows {
+  if (dayTimeWindows && Object.keys(dayTimeWindows).length > 0) {
+    // Ensure all active weekdays have entries
+    const result: DayTimeWindows = {};
+    for (const d of weekdays) {
+      result[String(d)] = dayTimeWindows[String(d)] ?? timeWindows ?? [{ start: "09:00", end: "17:00" }];
+    }
+    return result;
+  }
+  // Fallback: apply flat time_windows to all active weekdays
+  const fallback = timeWindows ?? [{ start: "09:00", end: "17:00" }];
+  const result: DayTimeWindows = {};
+  for (const d of weekdays) {
+    result[String(d)] = [...fallback.map(tw => ({ ...tw }))];
+  }
+  return result;
 }
 
 export function BookingSettingsTab() {
@@ -73,20 +98,28 @@ export function BookingSettingsTab() {
     slot_duration_minutes: 15,
     lookahead_days: 14,
     blocked_dates: [],
-    time_windows: [{ start: "09:00", end: "17:00" }],
+    day_time_windows: buildDayTimeWindows(null, null, [1, 2, 3, 4, 5]),
     available_weekdays: [1, 2, 3, 4, 5],
   };
 
   const settingsForm: FormState | null = settings
-    ? {
-        slot_duration_minutes: settings.slot_duration_minutes,
-        lookahead_days: settings.lookahead_days,
-        blocked_dates: (settings.blocked_dates as string[] | null) ?? [],
-        time_windows: (settings.time_windows as unknown as TimeWindow[] | null) ?? [
+    ? (() => {
+        const weekdays = (settings.available_weekdays as number[] | null) ?? [1, 2, 3, 4, 5];
+        const timeWindows = (settings.time_windows as unknown as TimeWindow[] | null) ?? [
           { start: `${String(settings.work_start_hour).padStart(2, "0")}:00`, end: `${String(settings.work_end_hour).padStart(2, "0")}:00` },
-        ],
-        available_weekdays: (settings.available_weekdays as number[] | null) ?? [1, 2, 3, 4, 5],
-      }
+        ];
+        return {
+          slot_duration_minutes: settings.slot_duration_minutes,
+          lookahead_days: settings.lookahead_days,
+          blocked_dates: (settings.blocked_dates as string[] | null) ?? [],
+          day_time_windows: buildDayTimeWindows(
+            settings.day_time_windows as unknown as DayTimeWindows | null,
+            timeWindows,
+            weekdays
+          ),
+          available_weekdays: weekdays,
+        };
+      })()
     : null;
 
   const form = formState ?? settingsForm ?? defaultForm;
@@ -97,16 +130,21 @@ export function BookingSettingsTab() {
 
   const saveMutation = useMutation({
     mutationFn: async (values: FormState) => {
+      // Also update legacy time_windows for backward compat (use first active day's windows)
+      const firstDay = values.available_weekdays[0];
+      const legacyWindows = values.day_time_windows[String(firstDay)] ?? [{ start: "09:00", end: "17:00" }];
+
       const { error } = await supabase
         .from("booking_settings")
         .update({
           slot_duration_minutes: values.slot_duration_minutes,
           lookahead_days: values.lookahead_days,
           blocked_dates: values.blocked_dates,
-          time_windows: values.time_windows as any,
+          time_windows: legacyWindows as any,
+          day_time_windows: values.day_time_windows as any,
           available_weekdays: values.available_weekdays,
-          work_start_hour: parseInt(values.time_windows[0]?.start?.split(":")[0] ?? "9"),
-          work_end_hour: parseInt(values.time_windows[values.time_windows.length - 1]?.end?.split(":")[0] ?? "17"),
+          work_start_hour: parseInt(legacyWindows[0]?.start?.split(":")[0] ?? "9"),
+          work_end_hour: parseInt(legacyWindows[legacyWindows.length - 1]?.end?.split(":")[0] ?? "17"),
         })
         .eq("id", settings?.id);
       if (error) throw error;
@@ -169,29 +207,69 @@ export function BookingSettingsTab() {
     updateForm({ blocked_dates: (form.blocked_dates || []).filter((d) => d !== dateStr) });
   };
 
-  // Time window helpers
-  const addTimeWindow = () => {
-    updateForm({ time_windows: [...form.time_windows, { start: "09:00", end: "12:00" }] });
+  // Per-day time window helpers
+  const addDayTimeWindow = (day: number) => {
+    const key = String(day);
+    const current = form.day_time_windows[key] ?? [];
+    updateForm({
+      day_time_windows: {
+        ...form.day_time_windows,
+        [key]: [...current, { start: "09:00", end: "12:00" }],
+      },
+    });
   };
 
-  const removeTimeWindow = (index: number) => {
-    if (form.time_windows.length <= 1) return;
-    updateForm({ time_windows: form.time_windows.filter((_, i) => i !== index) });
+  const removeDayTimeWindow = (day: number, index: number) => {
+    const key = String(day);
+    const current = form.day_time_windows[key] ?? [];
+    if (current.length <= 1) return;
+    updateForm({
+      day_time_windows: {
+        ...form.day_time_windows,
+        [key]: current.filter((_, i) => i !== index),
+      },
+    });
   };
 
-  const updateTimeWindow = (index: number, field: "start" | "end", value: string) => {
-    const updated = form.time_windows.map((w, i) => (i === index ? { ...w, [field]: value } : w));
-    updateForm({ time_windows: updated });
+  const updateDayTimeWindow = (day: number, index: number, field: "start" | "end", value: string) => {
+    const key = String(day);
+    const current = form.day_time_windows[key] ?? [];
+    updateForm({
+      day_time_windows: {
+        ...form.day_time_windows,
+        [key]: current.map((w, i) => (i === index ? { ...w, [field]: value } : w)),
+      },
+    });
   };
 
-  // Weekday toggle
+  const copyToAllDays = (sourceDay: number) => {
+    const sourceWindows = form.day_time_windows[String(sourceDay)] ?? [];
+    const updated: DayTimeWindows = {};
+    for (const d of form.available_weekdays) {
+      updated[String(d)] = sourceWindows.map(tw => ({ ...tw }));
+    }
+    updateForm({ day_time_windows: updated });
+    toast.success("Tidsvinduer kopieret til alle aktive dage");
+  };
+
+  // Weekday toggle – also manage day_time_windows
   const toggleWeekday = (day: number) => {
     const current = form.available_weekdays;
-    const updated = current.includes(day)
+    const isActive = current.includes(day);
+    const updated = isActive
       ? current.filter((d) => d !== day)
       : [...current, day].sort((a, b) => a - b);
-    if (updated.length === 0) return; // must have at least one
-    updateForm({ available_weekdays: updated });
+    if (updated.length === 0) return;
+
+    const newDayWindows = { ...form.day_time_windows };
+    if (!isActive) {
+      // Adding day – give it default windows
+      newDayWindows[String(day)] = [{ start: "09:00", end: "17:00" }];
+    } else {
+      // Removing day
+      delete newDayWindows[String(day)];
+    }
+    updateForm({ available_weekdays: updated, day_time_windows: newDayWindows });
   };
 
   const hasChanges = formState !== null;
@@ -284,49 +362,74 @@ export function BookingSettingsTab() {
                 </div>
               </div>
 
-              {/* Time windows */}
+              {/* Per-day time windows */}
               <div className="space-y-3">
-                <Label>Tidsvinduerner</Label>
-                <div className="space-y-2">
-                  {form.time_windows.map((tw, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
-                      <Select value={tw.start} onValueChange={(v) => updateTimeWindow(idx, "start", v)}>
-                        <SelectTrigger className="w-28">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {TIME_OPTIONS.map((t) => (
-                            <SelectItem key={t} value={t}>{t}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <span className="text-muted-foreground">–</span>
-                      <Select value={tw.end} onValueChange={(v) => updateTimeWindow(idx, "end", v)}>
-                        <SelectTrigger className="w-28">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {TIME_OPTIONS.map((t) => (
-                            <SelectItem key={t} value={t}>{t}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeTimeWindow(idx)}
-                        disabled={form.time_windows.length <= 1}
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-                <Button type="button" variant="outline" size="sm" onClick={addTimeWindow} className="gap-1.5">
-                  <Plus className="h-3.5 w-3.5" /> Tilføj tidsvindue
-                </Button>
+                <Label>Tidsvinduer per dag</Label>
+                <Accordion type="multiple" className="w-full">
+                  {form.available_weekdays.map((day) => {
+                    const dayInfo = WEEKDAY_LABELS.find(w => w.value === day)!;
+                    const windows = form.day_time_windows[String(day)] ?? [{ start: "09:00", end: "17:00" }];
+                    const summary = windows.map(w => `${w.start}–${w.end}`).join(", ");
+
+                    return (
+                      <AccordionItem key={day} value={String(day)}>
+                        <AccordionTrigger className="text-sm hover:no-underline py-3">
+                          <div className="flex items-center gap-3">
+                            <span className="font-medium w-16 text-left">{dayInfo.full}</span>
+                            <span className="text-muted-foreground text-xs">{summary}</span>
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                          <div className="space-y-2 pt-1">
+                            {windows.map((tw, idx) => (
+                              <div key={idx} className="flex items-center gap-2">
+                                <Select value={tw.start} onValueChange={(v) => updateDayTimeWindow(day, idx, "start", v)}>
+                                  <SelectTrigger className="w-28">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {TIME_OPTIONS.map((t) => (
+                                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <span className="text-muted-foreground">–</span>
+                                <Select value={tw.end} onValueChange={(v) => updateDayTimeWindow(day, idx, "end", v)}>
+                                  <SelectTrigger className="w-28">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {TIME_OPTIONS.map((t) => (
+                                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => removeDayTimeWindow(day, idx)}
+                                  disabled={windows.length <= 1}
+                                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ))}
+                            <div className="flex gap-2 pt-1">
+                              <Button type="button" variant="outline" size="sm" onClick={() => addDayTimeWindow(day)} className="gap-1.5">
+                                <Plus className="h-3.5 w-3.5" /> Tilføj
+                              </Button>
+                              <Button type="button" variant="ghost" size="sm" onClick={() => copyToAllDays(day)} className="gap-1.5 text-muted-foreground">
+                                <CopyPlus className="h-3.5 w-3.5" /> Kopiér til alle dage
+                              </Button>
+                            </div>
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    );
+                  })}
+                </Accordion>
               </div>
 
               {/* Slot duration */}

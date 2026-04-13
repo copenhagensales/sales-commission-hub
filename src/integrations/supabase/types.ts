@@ -1758,6 +1758,7 @@ export type Database = {
         Row: {
           available_weekdays: number[] | null
           blocked_dates: string[] | null
+          day_time_windows: Json | null
           id: string
           lookahead_days: number
           slot_duration_minutes: number
@@ -1769,6 +1770,7 @@ export type Database = {
         Insert: {
           available_weekdays?: number[] | null
           blocked_dates?: string[] | null
+          day_time_windows?: Json | null
           id?: string
           lookahead_days?: number
           slot_duration_minutes?: number
@@ -1780,6 +1782,7 @@ export type Database = {
         Update: {
           available_weekdays?: number[] | null
           blocked_dates?: string[] | null
+          day_time_windows?: Json | null
           id?: string
           lookahead_days?: number
           slot_duration_minutes?: number
