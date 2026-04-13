@@ -20,7 +20,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
 import { MyScheduleTabContent } from "@/components/profile/MyScheduleTabContent";
-import { VACATION_PAY_RATES, countWorkDaysInPeriod, getPayrollPeriod } from "@/lib/calculations";
+import { VACATION_PAY_RATES, getPayrollPeriod } from "@/lib/calculations";
 
 import { CareerWishesTabContent } from "@/components/profile/CareerWishesTabContent";
 import { HandbookTabContent } from "@/components/profile/HandbookTabContent";
