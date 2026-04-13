@@ -18,6 +18,7 @@ import { Plus, Pencil, Trash2, Users, Building2, UserCheck, UserX, X, Coins, Arr
 import { useNavigate } from "react-router-dom";
 import { TeamStandardShifts } from "./TeamStandardShifts";
 import { TeamTimeClockTab } from "./TeamTimeClockTab";
+import { TeamAssignEmployeesSubTab } from "./TeamAssignEmployeesSubTab";
 import { format, isToday, startOfDay } from "date-fns";
 import { da } from "date-fns/locale";
 import { useTeamAssistantLeaders, getTeamAssistantIds, useUpdateTeamAssistants } from "@/hooks/useTeamAssistantLeaders";

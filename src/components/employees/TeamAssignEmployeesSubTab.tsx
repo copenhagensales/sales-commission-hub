@@ -37,13 +37,13 @@ export function TeamAssignEmployeesSubTab({ teamId, teamClientIds, teamEmployeeI
   const { data: assignments = [] } = useQuery({
     queryKey: ["employee-client-assignments", "team", teamId],
     queryFn: async () => {
-      if (teamEmployeeIds.length === 0) return [];
+      if (teamEmployeeIds.length === 0) return [] as { id: string; employee_id: string; client_id: string; created_at: string }[];
       const { data, error } = await supabase
         .from("employee_client_assignments")
-        .select("*")
+        .select("id, employee_id, client_id, created_at")
         .in("employee_id", teamEmployeeIds);
       if (error) throw error;
-      return data;
+      return data as { id: string; employee_id: string; client_id: string; created_at: string }[];
     },
     enabled: teamEmployeeIds.length > 0,
   });
