@@ -1843,7 +1843,8 @@ async function fetchShiftData(
     ...shiftConfigCache, 
     timeStampsData, 
     startDate: startStr, 
-    endDate: endStr 
+    endDate: endStr,
+    employeeTimeClocksMap: useNewResolver ? employeeTimeClocksMap : undefined,
   };
 }
 
@@ -1862,9 +1863,9 @@ function calculateHoursForEmployees(
   employeeIds: string[],
   startStr: string,
   endStr: string,
-  shiftData: ShiftDataResult,
-  employeeTimeClocksMap?: Record<string, { clock_type: string; hourly_rate: number }>
+  shiftData: ShiftDataResult
 ): number {
+  const { teamMembers, primaryShifts, shiftDays, timeStampsData, employeeTimeClocksMap } = shiftData;
   const { teamMembers, primaryShifts, shiftDays, timeStampsData } = shiftData;
   
   let totalHours = 0;
