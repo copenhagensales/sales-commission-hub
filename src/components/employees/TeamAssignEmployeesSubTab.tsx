@@ -55,10 +55,10 @@ export function TeamAssignEmployeesSubTab({ teamId, teamClientIds, teamEmployeeI
       const { data, error } = await supabase
         .from("clients")
         .select("id, name, logo_url")
-        .eq("is_active", true)
+        .eq("is_active" as any, true)
         .order("name");
       if (error) throw error;
-      return data as Client[];
+      return (data ?? []) as Client[];
     },
   });
 
