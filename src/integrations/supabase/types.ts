@@ -5652,18 +5652,21 @@ export type Database = {
           created_at: string
           employee_id: string
           id: string
+          is_primary: boolean
         }
         Insert: {
           client_id: string
           created_at?: string
           employee_id: string
           id?: string
+          is_primary?: boolean
         }
         Update: {
           client_id?: string
           created_at?: string
           employee_id?: string
           id?: string
+          is_primary?: boolean
         }
         Relationships: [
           {
@@ -5692,6 +5695,75 @@ export type Database = {
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_client_change_log: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          created_at: string
+          employee_id: string
+          id: string
+          new_client_id: string
+          old_client_id: string | null
+          reason: string | null
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          created_at?: string
+          employee_id: string
+          id?: string
+          new_client_id: string
+          old_client_id?: string | null
+          reason?: string | null
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          created_at?: string
+          employee_id?: string
+          id?: string
+          new_client_id?: string
+          old_client_id?: string | null
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_client_change_log_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_client_change_log_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_client_change_log_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_client_change_log_new_client_id_fkey"
+            columns: ["new_client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_client_change_log_old_client_id_fkey"
+            columns: ["old_client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
         ]
@@ -13015,6 +13087,7 @@ export type Database = {
       time_stamps: {
         Row: {
           break_minutes: number | null
+          client_id: string | null
           clock_in: string
           clock_out: string | null
           created_at: string
@@ -13031,6 +13104,7 @@ export type Database = {
         }
         Insert: {
           break_minutes?: number | null
+          client_id?: string | null
           clock_in?: string
           clock_out?: string | null
           created_at?: string
@@ -13047,6 +13121,7 @@ export type Database = {
         }
         Update: {
           break_minutes?: number | null
+          client_id?: string | null
           clock_in?: string
           clock_out?: string | null
           created_at?: string
@@ -13062,6 +13137,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "time_stamps_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "time_stamps_employee_id_fkey"
             columns: ["employee_id"]
