@@ -1789,18 +1789,29 @@ async function fetchShiftData(
   
   // Fetch timestamps only if needed and date range differs or extends beyond cached range
   let timeStampsData: TimeStampRecord[] = [];
+  
+  // Determine which employees need timestamps: legacy (team-based) + new resolver (clock-based)
   const teamsUsingTimestamps = shiftConfigCache.primaryShifts
     .filter(s => s.hours_source === "timestamp")
     .map(s => s.team_id);
   
-  if (teamsUsingTimestamps.length > 0) {
-    // Check if we need to fetch timestamps (new range or no cache)
+  const employeesFromLegacy = teamsUsingTimestamps.length > 0
+    ? shiftConfigCache.teamMembers.filter(tm => teamsUsingTimestamps.includes(tm.team_id)).map(tm => tm.employee_id)
+    : [];
+  const employeesFromResolver = useNewResolver
+    ? Object.keys(employeeTimeClocksMap).filter(id => {
+        const ct = employeeTimeClocksMap[id]?.clock_type;
+        return ct === 'override' || ct === 'revenue';
+      })
+    : [];
+  const allTimestampEmployees = [...new Set([...employeesFromLegacy, ...employeesFromResolver])];
+  
+  if (allTimestampEmployees.length > 0) {
     const needsFetch = !timestampCache || 
       new Date(startStr) < new Date(timestampCache.startDate) ||
       new Date(endStr) > new Date(timestampCache.endDate);
     
     if (needsFetch) {
-      // Determine the widest range we might need (payroll period is typically widest)
       const fetchStart = timestampCache && new Date(startStr) >= new Date(timestampCache.startDate) 
         ? timestampCache.startDate 
         : startStr;
@@ -1808,11 +1819,7 @@ async function fetchShiftData(
         ? timestampCache.endDate
         : endStr;
       
-      const employeesWithTimestampTeams = shiftConfigCache.teamMembers
-        .filter(tm => teamsUsingTimestamps.includes(tm.team_id))
-        .map(tm => tm.employee_id);
-      
-      if (employeesWithTimestampTeams.length > 0) {
+      if (allTimestampEmployees.length > 0) {
         console.log(`[HoursCalc] Fetching timestamps for ${employeesWithTimestampTeams.length} employees...`);
         const { data: stamps } = await supabase
           .from("time_stamps")
