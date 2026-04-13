@@ -36,6 +36,7 @@ interface UseDashboardSalesDataParams {
   teamId?: string;
   enabled?: boolean;
   refetchInterval?: number; // Auto-refresh interval in milliseconds
+  useNewAssignments?: boolean; // Feature flag for new hours resolver
 }
 
 /**
