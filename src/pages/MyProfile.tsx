@@ -628,9 +628,12 @@ export default function MyProfile() {
       return date.toISOString().split('T')[0];
     };
     
-    // Use central countWorkDaysInPeriod from @/lib/calculations
-    const totalWorkdays = countWorkDaysInPeriod(periodStart, periodEnd);
-    const workdaysPassed = countWorkDaysInPeriod(periodStart, now > periodEnd ? periodEnd : now);
+    // Approximate workdays using eachDayOfInterval (will be refined by shift-aware hooks downstream)
+    const allDays = eachDayOfInterval({ start: periodStart, end: periodEnd });
+    const totalWorkdays = allDays.length;
+    const effectiveEnd = now > periodEnd ? periodEnd : now;
+    const passedDays = eachDayOfInterval({ start: periodStart, end: effectiveEnd });
+    const workdaysPassed = passedDays.length;
     
     return {
       start: periodStart,
