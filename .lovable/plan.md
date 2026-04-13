@@ -1,37 +1,54 @@
 
 
-## Fix: Head-to-Head viser forkerte/forskellige tal
+## Konsolidering af vagtlogik — Implementeringsplan
 
-### Problem
-Der er flere bugs i H2H-systemet som gør at tallene ikke stemmer og kan variere mellem brugere:
+**Scope:** 2 nye filer + 1 DB-migration + 38 fil-opdateringer = 41 ændringer
 
-### Bug 1: Custom-periode bruger forkert startdato
-Koden bruger `accepted_at` som startdato for custom-perioder i stedet for `custom_start_at`. Eksempel: en duel med `custom_start_at: 2026-04-12 22:00` bruger i stedet `accepted_at: 2026-04-13 06:47` — dermed mangler salg fra aftenen før.
+**DB-status:** 0 dubletter i `employee_standard_shifts` — klar til UNIQUE constraint.
 
-### Bug 2: Sync-effekten sætter ikke `custom_start_at`
-I sync-effekten (linje 298) sættes `matchStartTime = accepted_at` — men for custom-perioder burde den bruge `custom_start_at`.
+---
 
-### Bug 3: Target-periode har ingen meningsfuld slutdato
-"Target"-perioder (først til X kr) falder igennem til `endOfWeek(startTime)`, hvilket er forkert. De burde køre til "nu".
+### Fase 1: DB-migration
+UNIQUE constraint på `employee_standard_shifts.employee_id`
 
-### Bug 4: Manuel salgsberegning i stedet for central RPC
-H2H bruger sin egen manuelle salgs-aggregering (henter alle sales, filtrerer klient-side) i stedet for `get_sales_aggregates_v2` RPC'en. Det kan give afvigelser fra resten af systemet.
+### Fase 2: Nye kernefiler
+- **`src/lib/shiftResolution.ts`** — `resolveShiftForDay()`, `resolveShiftsForPeriod()`, `hasExistingShift()`
+- **`src/hooks/useShiftResolution.ts`** — React Query wrapper med caching
 
-### Bug 5: localStorage kan desync mellem brugere
-Challenger og opponent kan have stale localStorage-værdier der overskriver DB-data, fx med gammel `matchStartTime`.
+Hierarki: Individuel vagt → Tildelt standardvagt → Ingen vagt (0 timer). Ingen weekday-fallback.
 
-### Løsning
+### Fase 3: Vagtadmin UI (2 filer)
+`TeamStandardShifts.tsx`, `CreateShiftDialog.tsx` — fjern "speciel vagt", dobbelt-vagt-beskyttelse
 
-**`src/components/home/HeadToHeadComparison.tsx`**:
+### Fase 4: Vagtplan-visninger (4 filer)
+`ShiftOverview.tsx`, `MySchedule.tsx`, `MyScheduleTabContent.tsx`, `VagtplanFMContent.tsx`
 
-1. **dateRange beregning** — For custom-perioder: brug `custom_start_at` (ikke `accepted_at`) som start. For target-perioder: brug `accepted_at` som start og "nu" som slut.
+### Fase 5: Rapporter + kalender (4 filer)
+`DailyReports.tsx`, `MissingShiftsAlert.tsx`, `EmployeeCommissionHistory.tsx`, `EmployeeCalendar.tsx` (7-dages visning)
 
-2. **Sync-effekt** — Sæt `matchStartTime` til `custom_start_at || accepted_at` i stedet for altid `accepted_at`.
+### Fase 6: KPI & beregninger (5 filer)
+`useEmployeeWorkingDays.ts`, `useKpiTest.ts`, `FormulaLiveTest.tsx`, `useEffectiveHourlyRate.ts`, `useDashboardKpiData.ts`
 
-3. **Stats query** — Erstat den manuelle salgs-aggregering med `get_sales_aggregates_v2` RPC, scoped til de relevante employee IDs. Samme datakilde som resten af systemet = konsistente tal.
+### Fase 7: Løn + profil (9 filer)
+`useStaffHoursCalculation.ts`, `useAssistantHoursCalculation.ts`, `PayrollDayByDay.tsx`, `MyProfile.tsx`, `SalesGoalTracker.tsx`, `usePreviousPeriodComparison.ts`, `ClientDBTab.tsx`, `useSalesGamification.ts`, `DailyCommissionChart.tsx`
 
-4. **DB som single source of truth** — Når en aktiv challenge findes i DB, brug altid dens værdier (start/slut/periode) direkte, og ignorer localStorage for dato-relaterede felter.
+### Fase 8: Forecast + dashboards (4 filer)
+`useTeamGoalForecast.ts`, `useClientForecast.ts`, `useDashboardSalesData.ts`, `CphSalesDashboard.tsx`
 
-### Filer
-- `src/components/home/HeadToHeadComparison.tsx` — alle rettelser i dateRange, sync-effekt, og stats query
+### Fase 9: FM dialoger + booking (5 filer)
+`EditBookingDialog.tsx`, `AddEmployeeDialog.tsx`, `CapacityPanel.tsx`, `BookingsContent.tsx`, `useFmBookingConflicts.ts`
+
+### Fase 10: Edge functions + docs (5 filer)
+`calculate-kpi-values/index.ts`, `tv-dashboard-data/index.ts`, `parse-expense-formula/index.ts`, `_shared/date-helpers.ts`, `Logikker.tsx`
+
+---
+
+### Regler der overholdes
+- Weekend-**styling** bevares (orange farver, chart-labels)
+- Weekend-**filtrering** fjernes fra alle beregninger
+- `useCalendarBooking.ts`, `usePersonalWeeklyStats.ts`, `MarketCalendarWidget.tsx` — uberørt
+- Eksisterende bookinger uden vagt = flagges som konflikter, slettes ikke
+- FM-tildeling blokeres uden vagt, booking-tider fra faktisk vagt (ikke hardcoded 09-17)
+
+Starter med Fase 1+2, derefter fase for fase.
 
