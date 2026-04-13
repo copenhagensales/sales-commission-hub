@@ -6,6 +6,7 @@ import { fetchAllPostgrestRows } from "@/utils/postgrestFetch";
 import { BREAK_THRESHOLD_MINUTES, BREAK_DURATION_MINUTES } from "@/lib/calculations";
 import { REFRESH_PROFILES } from "@/utils/tvMode";
 import { trackFetch } from "@/utils/fetchPerformance";
+import { resolveHoursSourceBatch, type HoursSourceResult } from "@/lib/resolveHoursSource";
 
 export interface DashboardEmployeeStats {
   employeeId: string;
