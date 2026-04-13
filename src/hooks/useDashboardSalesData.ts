@@ -52,6 +52,7 @@ export function useDashboardSalesData({
   teamId,
   enabled = true,
   refetchInterval,
+  useNewAssignments = false,
 }: UseDashboardSalesDataParams): DashboardSalesData {
   const { data, isLoading } = useQuery({
     queryKey: [
@@ -61,6 +62,7 @@ export function useDashboardSalesData({
       format(startDate, "yyyy-MM-dd"),
       format(endDate, "yyyy-MM-dd"),
       teamId,
+      useNewAssignments,
     ],
     refetchInterval,
     queryFn: () => trackFetch("dashboard-sales-data", async () => {
