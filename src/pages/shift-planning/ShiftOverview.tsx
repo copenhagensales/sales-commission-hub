@@ -681,30 +681,32 @@ export default function ShiftOverview() {
     return (endMinutes - startMinutes) / 60;
   }, []);
 
-  // Get hours source for employee - check special shift first, then team primary shift
+  // Get hours source for employee - new resolver takes priority when feature flag is on
   const getHoursSourceForEmployee = useCallback((employeeId: string): 'timestamp' | 'shift' => {
-    // 1. FIRST: Check if employee has a special shift assigned
+    // NEW: Use resolver from employee_time_clocks when feature flag is on
+    if (hoursSourceMap && hoursSourceMap[employeeId]) {
+      return hoursSourceMap[employeeId].source === 'timestamp' ? 'timestamp' : 'shift';
+    }
+
+    // LEGACY: Check special shift first, then team primary shift
     const specialShift = employeeSpecialShifts?.assignments?.find(s => s.employee_id === employeeId);
     if (specialShift?.team_standard_shifts?.hours_source) {
       return specialShift.team_standard_shifts.hours_source;
     }
     
-    // 2. FALLBACK: Use team's primary shift (excluding special shifts)
     const membership = teamMemberships?.find(m => m.employee_id === employeeId);
     if (!membership) return 'shift';
     
-    // Get shift IDs that are used as special shifts
     const specialShiftIds = new Set(
       employeeSpecialShifts?.assignments?.map(s => s.shift_id) || []
     );
     
-    // Find team primary shift that is NOT a special shift
     const teamPrimaryShift = primaryShiftsData?.shifts.find(
       s => s.team_id === membership.team_id && !specialShiftIds.has(s.id)
     );
     
     return teamPrimaryShift?.hours_source || 'shift';
-  }, [teamMemberships, primaryShiftsData, employeeSpecialShifts]);
+  }, [teamMemberships, primaryShiftsData, employeeSpecialShifts, hoursSourceMap]);
 
   const getDailyBonusEligibility = useCallback((
     employeeId: string, 
