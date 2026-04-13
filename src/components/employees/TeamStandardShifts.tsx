@@ -1022,23 +1022,36 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
                 Vælg medarbejdere der skal bruge denne vagt i stedet for teamets primære vagt. Hver medarbejder kan kun tildeles én vagt.
               </p>
                 <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
-                  {teamMembers.map(member => (
-                    <label
-                      key={member.id}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-md border cursor-pointer transition-colors ${
-                        selectedEmployees.includes(member.id)
-                          ? "bg-blue-100 dark:bg-blue-900/30 border-blue-500 text-blue-700 dark:text-blue-300"
-                          : "bg-background hover:bg-muted border-border"
-                      }`}
-                    >
-                      <Checkbox
-                        checked={selectedEmployees.includes(member.id)}
-                        onCheckedChange={() => toggleEmployeeSelection(member.id)}
-                        className="sr-only"
-                      />
-                      <span className="text-sm">{member.first_name} {member.last_name}</span>
-                    </label>
-                  ))}
+                  {teamMembers.map(member => {
+                    const otherShiftName = employeeOtherShiftMap.get(member.id);
+                    const isAssignedElsewhere = !!otherShiftName && !selectedEmployees.includes(member.id);
+                    return (
+                      <label
+                        key={member.id}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-md border transition-colors ${
+                          isAssignedElsewhere
+                            ? "opacity-50 cursor-not-allowed bg-muted border-border"
+                            : selectedEmployees.includes(member.id)
+                              ? "bg-blue-100 dark:bg-blue-900/30 border-blue-500 text-blue-700 dark:text-blue-300 cursor-pointer"
+                              : "bg-background hover:bg-muted border-border cursor-pointer"
+                        }`}
+                        title={isAssignedElsewhere ? `Allerede tildelt: ${otherShiftName}` : undefined}
+                      >
+                        <Checkbox
+                          checked={selectedEmployees.includes(member.id)}
+                          onCheckedChange={() => !isAssignedElsewhere && toggleEmployeeSelection(member.id)}
+                          disabled={isAssignedElsewhere}
+                          className="sr-only"
+                        />
+                        <span className="text-sm truncate">
+                          {member.first_name} {member.last_name}
+                          {isAssignedElsewhere && (
+                            <span className="block text-xs text-muted-foreground">({otherShiftName})</span>
+                          )}
+                        </span>
+                      </label>
+                    );
+                  })}
                 </div>
                 {selectedEmployees.length > 0 && (
                   <p className="text-xs text-blue-600 dark:text-blue-400">
