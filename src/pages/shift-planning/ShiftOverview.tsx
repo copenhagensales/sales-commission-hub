@@ -45,6 +45,7 @@ type TimeStampData = {
   effective_hours: number | null;
   break_minutes: number | null;
   note: string | null;
+  client_id?: string | null;
 };
 
 export default function ShiftOverview() {
@@ -58,7 +59,7 @@ export default function ShiftOverview() {
   const [newStartTime, setNewStartTime] = useState<string>("");
   const [pendingDelayCell, setPendingDelayCell] = useState<{ employeeId: string; date: string } | null>(null);
   const [editTimeStampDialogOpen, setEditTimeStampDialogOpen] = useState(false);
-  const [selectedTimeStamp, setSelectedTimeStamp] = useState<{ id: string; employee_id: string; clock_in: string; clock_out: string | null; effective_clock_in: string | null; effective_clock_out: string | null; effective_hours: number | null; break_minutes: number | null; note: string | null; client_id: string | null } | null>(null);
+  const [selectedTimeStamp, setSelectedTimeStamp] = useState<TimeStampData | null>(null);
   const [selectedTimeStampEmployee, setSelectedTimeStampEmployee] = useState<{ id: string; name: string; date: Date } | null>(null);
   const [openPopoverKey, setOpenPopoverKey] = useState<string | null>(null);
   const [showWeekendStamps, setShowWeekendStamps] = useState(false);
