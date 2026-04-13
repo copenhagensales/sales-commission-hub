@@ -37,6 +37,7 @@ const EXPENSE_CATEGORIES = [
   { key: "team_arrangement", label: "Team arrangement" },
   { key: "banken", label: "Banken" },
   { key: "boeder", label: "Bøder" },
+  { key: "uforudsete", label: "Uforudsete udgifter" },
 ];
 
 const AUTO_CATEGORIES = new Set(EXPENSE_CATEGORIES.filter(c => c.auto).map(c => c.key));
