@@ -140,7 +140,7 @@ export default function VagtplanFMContent() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("time_stamps")
-        .select("*")
+        .select("*, client_id")
         .gte("clock_in", `${format(weekStart, "yyyy-MM-dd")}T00:00:00`)
         .lte("clock_in", `${format(weekEnd, "yyyy-MM-dd")}T23:59:59`);
       if (error) throw error;

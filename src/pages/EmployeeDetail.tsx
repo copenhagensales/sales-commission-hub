@@ -283,7 +283,7 @@ export default function EmployeeDetail() {
       if (!id) return [];
       const { data, error } = await supabase
         .from("time_stamps")
-        .select("*")
+        .select("*, clients:client_id(id, name)")
         .eq("employee_id", id)
         .order("clock_in", { ascending: false })
         .limit(50);
@@ -1156,8 +1156,9 @@ export default function EmployeeDetail() {
                     <div className="overflow-x-auto">
                       <Table>
                         <TableHeader>
-                          <TableRow>
+                            <TableRow>
                             <TableHead>Dato</TableHead>
+                            <TableHead>Kunde</TableHead>
                             <TableHead>Ind</TableHead>
                             <TableHead>Ud</TableHead>
                             <TableHead>Pause</TableHead>
@@ -1180,6 +1181,13 @@ export default function EmployeeDetail() {
                               <TableRow key={stamp.id}>
                                 <TableCell className="font-medium">
                                   {format(clockIn, "EEE d. MMM", { locale: da })}
+                                </TableCell>
+                                <TableCell>
+                                  {(stamp as any).clients?.name ? (
+                                    <Badge variant="outline" className="text-xs">{(stamp as any).clients.name}</Badge>
+                                  ) : (
+                                    <span className="text-muted-foreground text-xs">Primær</span>
+                                  )}
                                 </TableCell>
                                 <TableCell>
                                   {format(clockIn, "HH:mm")}
