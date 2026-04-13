@@ -21,6 +21,8 @@ import { usePermissions } from "@/hooks/usePositionPermissions";
 import { useCurrentEmployee } from "@/hooks/useShiftPlanning";
 import { BREAK_THRESHOLD_MINUTES, BREAK_DURATION_MINUTES } from "@/lib/calculations";
 import { fetchAllRows } from "@/utils/supabasePagination";
+import { useFeatureFlag } from "@/hooks/useFeatureFlag";
+import { resolveHoursSourceBatch, type HoursSourceResult } from "@/lib/resolveHoursSource";
 
 // Helper function to fetch employees with activity on a specific client
 // Uses agent_name (email) from sales, matches to agents, then maps to employees via employee_agent_mapping
@@ -527,6 +529,11 @@ export default function DailyReports() {
         .gte("end_date", startStr)
         .eq("status", "approved");
 
+      // Resolve hours source (new system vs legacy)
+      const hoursSourceMap = useNewAssignmentsFlag
+        ? await resolveHoursSourceBatch(employeeIds)
+        : null;
+
       // Fetch team standard shift data
       const { data: teamMembers } = await supabase
         .from("team_members")
@@ -546,27 +553,32 @@ export default function DailyReports() {
         .select("shift_id, day_of_week, start_time, end_time")
         .in("shift_id", primaryShifts?.map(s => s.id) || []);
 
-      // Fetch time_stamps for employees if any team uses 'timestamp' hours_source
-      const teamsUsingTimestamps = primaryShifts?.filter(s => s.hours_source === 'timestamp').map(s => s.team_id) || [];
-      let timeStampsData: any[] = [];
-      if (teamsUsingTimestamps.length > 0) {
-        const employeesWithTimestampTeams = teamMembers
-          ?.filter(tm => teamsUsingTimestamps.includes(tm.team_id))
-          .map(tm => tm.employee_id) || [];
-        
-        if (employeesWithTimestampTeams.length > 0) {
-          const { data: stamps } = await supabase
-            .from("time_stamps")
-            .select("employee_id, clock_in, clock_out, break_minutes")
-            .in("employee_id", employeesWithTimestampTeams)
-            .gte("clock_in", startStr)
-            .lte("clock_in", endStr + "T23:59:59");
-          // Map timestamps with computed date field for matching
-          timeStampsData = (stamps || []).map(ts => ({
-            ...ts,
-            date: ts.clock_in ? format(parseISO(ts.clock_in), 'yyyy-MM-dd') : null
-          }));
+      // Determine which employees need timestamps
+      let employeesNeedingTimestamps: string[] = [];
+      if (hoursSourceMap) {
+        employeesNeedingTimestamps = employeeIds.filter(id => hoursSourceMap[id]?.source === 'timestamp');
+      } else {
+        const teamsUsingTimestamps = primaryShifts?.filter(s => s.hours_source === 'timestamp').map(s => s.team_id) || [];
+        if (teamsUsingTimestamps.length > 0) {
+          employeesNeedingTimestamps = teamMembers
+            ?.filter(tm => teamsUsingTimestamps.includes(tm.team_id))
+            .map(tm => tm.employee_id) || [];
         }
+      }
+
+      let timeStampsData: any[] = [];
+      if (employeesNeedingTimestamps.length > 0) {
+        const { data: stamps } = await supabase
+          .from("time_stamps")
+          .select("employee_id, clock_in, clock_out, break_minutes")
+          .in("employee_id", employeesNeedingTimestamps)
+          .gte("clock_in", startStr)
+          .lte("clock_in", endStr + "T23:59:59");
+        // Map timestamps with computed date field for matching
+        timeStampsData = (stamps || []).map(ts => ({
+          ...ts,
+          date: ts.clock_in ? format(parseISO(ts.clock_in), 'yyyy-MM-dd') : null
+        }));
       }
 
       // Build list of all possible agent identifiers for fetching sales
