@@ -1,0 +1,1 @@
+ALTER TABLE booking_settings ADD COLUMN day_time_windows jsonb DEFAULT NULL;
