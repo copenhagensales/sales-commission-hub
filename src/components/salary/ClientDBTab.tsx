@@ -118,6 +118,7 @@ export function ClientDBTab() {
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [hideZeroClients, setHideZeroClients] = useState(true);
   const queryClient = useQueryClient();
+  const useNewAssignments = useFeatureFlag('employee_client_assignments');
 
   // Stable "today" reference to prevent infinite query loops (new Date() changes every render)
   const today = useMemo(() => {
@@ -311,7 +312,8 @@ export function ClientDBTab() {
   const { data: staffHoursData, isLoading: staffHoursLoading } = useStaffHoursCalculation(
     periodStart,
     periodEnd,
-    staffEmployeeIds
+    staffEmployeeIds,
+    useNewAssignments
   );
 
   // Staff salary list with names for display
