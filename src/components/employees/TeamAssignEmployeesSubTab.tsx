@@ -66,14 +66,14 @@ export function TeamAssignEmployeesSubTab({ teamId, teamClientIds, teamEmployeeI
   // Fetch all clients for secondary dropdown
   const { data: allClients = [] } = useQuery({
     queryKey: ["all-clients-for-assignments"],
-    queryFn: async (): Promise<Client[]> => {
+    queryFn: async () => {
       const { data, error } = await supabase
         .from("clients")
         .select("id, name, logo_url")
         .eq("is_active", true)
         .order("name");
       if (error) throw error;
-      return (data ?? []) as Client[];
+      return (data ?? []) as unknown as Client[];
     },
   });
 

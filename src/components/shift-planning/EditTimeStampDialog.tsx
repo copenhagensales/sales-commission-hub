@@ -22,7 +22,7 @@ interface TimeStamp {
   effective_hours: number | null;
   break_minutes: number | null;
   note: string | null;
-  client_id: string | null;
+  client_id?: string | null;
 }
 
 interface EditTimeStampDialogProps {
