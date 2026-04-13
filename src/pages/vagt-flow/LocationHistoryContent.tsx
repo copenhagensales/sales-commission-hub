@@ -262,6 +262,45 @@ export default function LocationHistoryContent() {
     },
   });
 
+  // ── Collect fm_location_ids from sales not covered by bookings ──
+  const missingLocationIds = useMemo(() => {
+    if (!salesData || !bookings) return [];
+    const bookedLocIds = new Set((bookings || []).map(b => b.location_id));
+    const salesLocIds = new Set<string>();
+    for (const sale of salesData) {
+      const locId = (sale.raw_payload as any)?.fm_location_id;
+      if (locId && !bookedLocIds.has(locId)) salesLocIds.add(locId);
+    }
+    return Array.from(salesLocIds);
+  }, [salesData, bookings]);
+
+  // ── Fetch missing location details ──
+  const { data: missingLocations } = useQuery({
+    queryKey: ["loc-history-missing-locs", missingLocationIds],
+    queryFn: async () => {
+      if (!missingLocationIds.length) return [];
+      const { data, error } = await supabase
+        .from("location")
+        .select("id, name, type, daily_rate, client:clients!location_client_id_fkey(name)")
+        .in("id", missingLocationIds);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: missingLocationIds.length > 0,
+  });
+
+  const missingLocMap = useMemo(() => {
+    const map = new Map<string, { name: string; type: string; clientName: string }>();
+    for (const loc of missingLocations || []) {
+      map.set(loc.id, {
+        name: (loc as any).name || "Ukendt",
+        type: (loc as any).type?.trim() || "Ukendt",
+        clientName: (loc as any).client?.name || "Ukendt",
+      });
+    }
+    return map;
+  }, [missingLocations]);
+
   // ── Pre-compute maps ──
   const bookingToLocation = useMemo(() => {
     const map = new Map<string, string>();
