@@ -36,6 +36,7 @@ import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 import type { KpiPeriod } from "@/hooks/usePrecomputedKpi";
+import { useFeatureFlag } from "@/hooks/useFeatureFlag";
 
 type SortColumn = "clientName" | "teamName" | "sales" | "revenue" | "costs" | "finalDB" | "dbPercent" | "revenuePerFTE";
 type SortDirection = "asc" | "desc";
