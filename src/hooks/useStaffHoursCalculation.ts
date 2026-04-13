@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { eachDayOfInterval, format, getDay, startOfMonth, endOfMonth } from "date-fns";
-import { VACATION_PAY_RATES, calculateHoursFromShift, countWorkDaysInPeriod } from "@/lib/calculations";
+import { VACATION_PAY_RATES, calculateHoursFromShift } from "@/lib/calculations";
  
 interface StaffHoursData {
   employeeId: string;
@@ -135,15 +135,31 @@ const HOURLY_RATE_THRESHOLD = 1000; // Below this, it's likely an hourly rate, n
          const isHourlyBased = effectiveHourlyRate > 0;
          
          if (!isHourlyBased) {
-          // Fixed monthly salary - prorate based on workdays in period vs full month
-          // Get the month containing most of the period (use periodStart's month)
+          // Fixed monthly salary - prorate based on shift days in period vs full month
           const monthStart = startOfMonth(periodStart);
           const monthEnd = endOfMonth(periodStart);
           
-          const workdaysInPeriod = countWorkDaysInPeriod(periodStart, periodEnd);
-          const workdaysInMonth = countWorkDaysInPeriod(monthStart, monthEnd);
+          // Count shift days using the shift hierarchy already fetched
+          const empShiftAssignment = employeeShiftAssignments?.find(a => a.employee_id === staffId);
+          const empShiftId = empShiftAssignment?.shift_id;
+          const empShiftDays = empShiftId ? shiftDaysMap.get(empShiftId) : undefined;
+          const employeeTeamId = employeeTeamMap.get(staffId);
+          const teamShift = teamStandardShifts?.find(s => s.team_id === employeeTeamId);
+          const teamShiftDaysForProration = teamShift?.id ? shiftDaysMap.get(teamShift.id) : undefined;
+          const applicableShiftDays = empShiftDays || teamShiftDaysForProration;
           
-          // Prorate: if viewing 1 day, salary = monthly / workdays_in_month
+          const countShiftDays = (start: Date, end: Date) => {
+            const days = eachDayOfInterval({ start, end });
+            if (!applicableShiftDays || applicableShiftDays.length === 0) return days.length; // fallback
+            return days.filter(d => {
+              const dow = getDay(d);
+              return applicableShiftDays.some(sd => sd.dayOfWeek === dow);
+            }).length;
+          };
+          
+          const workdaysInPeriod = countShiftDays(periodStart, periodEnd);
+          const workdaysInMonth = countShiftDays(monthStart, monthEnd);
+          
           const prorationFactor = workdaysInMonth > 0 ? workdaysInPeriod / workdaysInMonth : 1;
           const baseSalary = Math.round(monthlySalary * prorationFactor * 100) / 100;
            const vacationPay = baseSalary * VACATION_PAY_RATES.STAFF;
