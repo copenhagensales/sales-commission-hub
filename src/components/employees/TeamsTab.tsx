@@ -1167,6 +1167,13 @@ export function TeamsTab() {
                   <Coins className="h-4 w-4 mr-2" />
                   Dagsbonus
                 </TabsTrigger>
+                <TabsTrigger 
+                  value="time-clocks"
+                  className="data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg px-4 py-2 text-sm font-medium"
+                >
+                  <Clock className="h-4 w-4 mr-2" />
+                  Stempelur
+                </TabsTrigger>
               </TabsList>
             </div>
 
