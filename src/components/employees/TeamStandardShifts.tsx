@@ -107,7 +107,6 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [isSpecialShift, setIsSpecialShift] = useState(false);
   const [editingShift, setEditingShift] = useState<StandardShift | null>(null);
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
   const [formData, setFormData] = useState({
@@ -328,8 +327,12 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
         if (daysError) throw daysError;
       }
 
-      // Create employee assignments for special shifts
+      // Create employee assignments
       if (data.employeeIds && data.employeeIds.length > 0) {
+        // Delete any existing assignments for these employees first (UNIQUE constraint)
+        for (const empId of data.employeeIds) {
+          await supabase.from("employee_standard_shifts").delete().eq("employee_id", empId);
+        }
         const { error: assignError } = await supabase
           .from("employee_standard_shifts")
           .insert(data.employeeIds.map(empId => ({
@@ -346,7 +349,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
       queryClient.invalidateQueries({ queryKey: ["employee-standard-shifts", teamId] });
       setDialogOpen(false);
       resetForm();
-      toast({ title: isSpecialShift ? "Speciel vagt oprettet" : "Standard vagt oprettet" });
+      toast({ title: "Standard vagt oprettet" });
     },
     onError: (error) => {
       toast({ title: "Fejl", description: error.message, variant: "destructive" });
@@ -443,11 +446,14 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
 
       // Update employee assignments if provided
       if (data.employeeIds !== undefined) {
-        // Delete existing assignments
+        // Delete existing assignments for this shift
         await supabase.from("employee_standard_shifts").delete().eq("shift_id", data.id);
         
-        // Add new assignments
+        // Also clear any existing assignments for these employees (UNIQUE constraint)
         if (data.employeeIds.length > 0) {
+          for (const empId of data.employeeIds) {
+            await supabase.from("employee_standard_shifts").delete().eq("employee_id", empId);
+          }
           const { error: assignError } = await supabase
             .from("employee_standard_shifts")
             .insert(data.employeeIds.map(empId => ({
