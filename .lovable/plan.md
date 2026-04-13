@@ -1,49 +1,21 @@
 
 
-## Notifikationer-fane i Booking Flow
+## Fix: Ukendte lokationer i Økonomi Butikker
 
-### Idé
-En ny fane "Notifikationer" i Booking Flow, hvor man kan tilføje/fjerne email-modtagere der får besked når en kandidat booker eller afmelder en samtale. Erstatter den hardcodede `oscar@copenhagensales.dk`.
+### Problem
+Når salg har et `fm_location_id` der ikke matcher nogen booking i den valgte periode, opretter koden (linje 349 i `LocationHistoryContent.tsx`) lokationen med navnet "Ukendt lokation" — selvom lokationen faktisk eksisterer i databasen med et rigtigt navn (f.eks. "Frihedens Butikscenter", "Superbrugsen Ølsted").
 
-### Database
-Ny tabel `booking_notification_recipients`:
-```sql
-CREATE TABLE booking_notification_recipients (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  email text NOT NULL,
-  name text,
-  notify_on_booking boolean DEFAULT true,
-  notify_on_cancel boolean DEFAULT true,
-  created_at timestamptz DEFAULT now()
-);
-```
-RLS: authenticated users kan SELECT, INSERT, DELETE.
+Det sker fordi lokationsnavne kun hentes via booking-joins. Salg uden booking i perioden har ingen kilde til navnet.
 
-Seed med `oscar@copenhagensales.dk` så eksisterende setup bevares.
+### Løsning
+Hent lokationsdata direkte for alle `fm_location_id`'er fra salgsdata der IKKE allerede er dækket af bookings.
 
-### UI: `BookingNotificationsTab.tsx`
-- Liste over modtagere med navn, email, toggles for booking/afmelding
-- Tilføj-formular med navn + email
-- Slet-knap per modtager
-- Mønster fra `ComplianceNotifications.tsx`
+### Ændringer i `LocationHistoryContent.tsx`
 
-### Backend-ændringer
+1. **Ny query**: Efter salesData er loaded, find alle unikke `fm_location_id`'er fra salg der ikke er i `locationIds` (fra bookings). Hent navn, type og daily_rate fra `location`-tabellen for disse.
 
-**`public-book-candidate/index.ts`**:
-- Erstat hardcodet `oscar@copenhagensales.dk` med opslag i `booking_notification_recipients` (hvor `notify_on_booking = true`)
-- Send til alle modtagere via Resend
-
-**`unsubscribe-candidate/index.ts`**:
-- Tilføj email-notifikation til modtagere med `notify_on_cancel = true` når en kandidat afmelder
-
-### Fane i BookingFlow.tsx
-- Tilføj `TabsTrigger value="notifications"` med `Bell`-ikon og label "Notifikationer"
-- Tilføj `TabsContent` med `<BookingNotificationsTab />`
+2. **Brug i aggregering** (linje 349): I stedet for fallback til "Ukendt lokation", slå op i den nye lokations-map for korrekt navn, type og klientnavn.
 
 ### Filer
-1. Migration — ny tabel + seed
-2. `src/components/recruitment/BookingNotificationsTab.tsx` — ny komponent
-3. `src/pages/recruitment/BookingFlow.tsx` — tilføj fane
-4. `supabase/functions/public-book-candidate/index.ts` — dynamiske modtagere
-5. `supabase/functions/unsubscribe-candidate/index.ts` — afmeldings-notifikation
+- `src/pages/vagt-flow/LocationHistoryContent.tsx` — tilføj ekstra lokations-query og brug den i salgs-aggregeringen
 
