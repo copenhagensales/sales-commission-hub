@@ -201,6 +201,34 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
     enabled: !!teamId && shiftIds.length > 0,
   });
 
+  // Fetch ALL employee_standard_shifts for team members (to detect cross-shift assignments)
+  const memberIds = teamMembers.map(m => m.id);
+  const { data: allMemberShiftAssignments = [] } = useQuery({
+    queryKey: ["all-member-shift-assignments", memberIds],
+    queryFn: async () => {
+      if (memberIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("employee_standard_shifts")
+        .select("employee_id, shift_id, team_standard_shifts:shift_id(name)")
+        .in("employee_id", memberIds);
+      if (error) throw error;
+      return data as { employee_id: string; shift_id: string; team_standard_shifts: { name: string } | null }[];
+    },
+    enabled: memberIds.length > 0,
+  });
+
+  // Map: employeeId → shift name for employees assigned to OTHER shifts (not the one being edited)
+  const employeeOtherShiftMap = useMemo(() => {
+    const currentShiftId = editingShift?.id;
+    const map = new Map<string, string>();
+    allMemberShiftAssignments.forEach(a => {
+      if (a.shift_id !== currentShiftId) {
+        map.set(a.employee_id, a.team_standard_shifts?.name || "Anden vagt");
+      }
+    });
+    return map;
+  }, [allMemberShiftAssignments, editingShift]);
+
   // Fetch all breaks for all shifts
   const { data: allBreaks = [] } = useQuery({
     queryKey: ["team-shift-breaks", teamId, shiftIds],
