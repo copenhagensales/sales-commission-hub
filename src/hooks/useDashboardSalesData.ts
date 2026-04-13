@@ -240,7 +240,7 @@ export function useDashboardSalesData({
       if (employeesNeedingTimestamps.length > 0) {
         const { data: stamps } = await supabase
           .from("time_stamps")
-          .select("employee_id, clock_in, clock_out, break_minutes")
+          .select("employee_id, clock_in, clock_out, break_minutes, client_id")
           .in("employee_id", employeesNeedingTimestamps)
           .gte("clock_in", startStr)
           .lte("clock_in", endStr + "T23:59:59");
