@@ -112,7 +112,15 @@ export default function ShiftOverview() {
     format(weekEnd, "yyyy-MM-dd")
   );
 
-  // Fetch lateness records for the week
+  // Fetch hours source map from new resolver when feature flag is on
+  const employeeIdsForResolver = useMemo(() => employees?.map(e => e.id) || [], [employees]);
+  const { data: hoursSourceMap } = useQuery({
+    queryKey: ["hours-source-resolver", employeeIdsForResolver, useNewAssignmentsFlag],
+    queryFn: () => resolveHoursSourceBatch(employeeIdsForResolver),
+    enabled: useNewAssignmentsFlag && employeeIdsForResolver.length > 0,
+    staleTime: 60000,
+  });
+
   const { data: latenessRecords } = useQuery({
     queryKey: ["lateness-records", format(weekStart, "yyyy-MM-dd"), format(weekEnd, "yyyy-MM-dd")],
     queryFn: async () => {
