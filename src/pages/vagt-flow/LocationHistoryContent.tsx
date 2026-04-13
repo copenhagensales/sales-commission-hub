@@ -446,7 +446,7 @@ export default function LocationHistoryContent() {
         weeklyBreakdown,
       };
     }).sort((a, b) => b.salesPerDay - a.salesPerDay);
-  }, [bookings, salesData, placements, hotelCostByBooking, dietCostByBooking]);
+  }, [bookings, salesData, placements, hotelCostByBooking, dietCostByBooking, missingLocMap]);
 
   // ── Split by client ──
   const { eesyLocations, youseeLocations, otherLocations } = useMemo(() => {
