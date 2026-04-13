@@ -44,7 +44,7 @@ export function TeamAssignEmployeesSubTab({ teamId, teamClientIds, teamEmployeeI
     addSecondary,
     removeSecondary,
     isSettingPrimary,
-  } = useEmployeeClientAssignments();
+  } = useEmployeeClientAssignments({});
 
   // Fetch change logs
   const { data: changeLogs = [] } = useQuery({
