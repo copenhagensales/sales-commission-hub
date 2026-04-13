@@ -1724,6 +1724,27 @@ async function handleTdcErhvervData(
 
   const teamIds = [...new Set(teamMembers?.map((tm: any) => tm.team_id) || [])];
 
+  // Check feature flag for new hours resolver
+  let employeeTimeClocksMap: Record<string, { clock_type: string; hourly_rate: number }> = {};
+  const { data: featureFlagData } = await supabase
+    .from("feature_flags")
+    .select("enabled")
+    .eq("key", "employee_client_assignments")
+    .maybeSingle();
+  
+  if (featureFlagData?.enabled === true) {
+    const { data: clocks } = await supabase
+      .from("employee_time_clocks")
+      .select("employee_id, clock_type, hourly_rate")
+      .eq("is_active", true)
+      .in("employee_id", employeeIds);
+    for (const clock of clocks || []) {
+      if (!employeeTimeClocksMap[clock.employee_id]) {
+        employeeTimeClocksMap[clock.employee_id] = { clock_type: clock.clock_type, hourly_rate: Number(clock.hourly_rate) || 0 };
+      }
+    }
+  }
+
   // Fetch team shifts
   const { data: primaryShifts } = await supabase
     .from("team_standard_shifts")
@@ -1736,23 +1757,24 @@ async function handleTdcErhvervData(
     .select("shift_id, day_of_week, start_time, end_time")
     .in("shift_id", primaryShifts?.map((s: any) => s.id) || []);
 
-  // Fetch timestamps for teams using 'timestamp' hours_source
+  // Fetch timestamps for employees needing them
   const teamsUsingTimestamps = primaryShifts?.filter((s: any) => s.hours_source === "timestamp").map((s: any) => s.team_id) || [];
-  let timeStampsData: any[] = [];
-  if (teamsUsingTimestamps.length > 0) {
-    const employeesWithTimestampTeams = teamMembers
-      ?.filter((tm: any) => teamsUsingTimestamps.includes(tm.team_id))
-      .map((tm: any) => tm.employee_id) || [];
+  const legacyTimestampEmps = teamMembers?.filter((tm: any) => teamsUsingTimestamps.includes(tm.team_id)).map((tm: any) => tm.employee_id) || [];
+  const resolverTimestampEmps = Object.keys(employeeTimeClocksMap).filter(id => {
+    const ct = employeeTimeClocksMap[id]?.clock_type;
+    return ct === 'override' || ct === 'revenue';
+  });
+  const allTimestampEmps = [...new Set([...legacyTimestampEmps, ...resolverTimestampEmps])];
 
-    if (employeesWithTimestampTeams.length > 0) {
-      const { data: stamps } = await supabase
-        .from("time_stamps")
-        .select("employee_id, clock_in, clock_out, break_minutes")
-        .in("employee_id", employeesWithTimestampTeams)
-        .gte("clock_in", payrollStartStr)
-        .lte("clock_in", todayStr + "T23:59:59");
-      timeStampsData = stamps || [];
-    }
+  let timeStampsData: any[] = [];
+  if (allTimestampEmps.length > 0) {
+    const { data: stamps } = await supabase
+      .from("time_stamps")
+      .select("employee_id, clock_in, clock_out, break_minutes")
+      .in("employee_id", allTimestampEmps)
+      .gte("clock_in", payrollStartStr)
+      .lte("clock_in", todayStr + "T23:59:59");
+    timeStampsData = stamps || [];
   }
 
   // Helper function to calculate hours for a date range
