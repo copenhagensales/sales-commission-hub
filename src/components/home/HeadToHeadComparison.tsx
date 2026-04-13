@@ -245,7 +245,10 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
       queryClient.invalidateQueries({ queryKey: ["h2h-pending-challenges"] });
       queryClient.invalidateQueries({ queryKey: ["h2h-active-challenges"] });
       if (data?.acceptedAt && data?.challenge) {
-        setMatchStartTime(data.acceptedAt);
+        // For custom periods, use custom_start_at as the effective start
+        const effectiveStart = data.challenge.custom_start_at || data.acceptedAt;
+        setMatchStartTime(effectiveStart);
+        setMatchEndTime(data.challenge.custom_end_at || null);
         setActiveChallengeId(data.challenge.id);
         setPeriod(data.challenge.period as PeriodType);
         setBattleMode(data.challenge.battle_mode as BattleMode);
