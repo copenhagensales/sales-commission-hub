@@ -1820,11 +1820,11 @@ async function fetchShiftData(
         : endStr;
       
       if (allTimestampEmployees.length > 0) {
-        console.log(`[HoursCalc] Fetching timestamps for ${employeesWithTimestampTeams.length} employees...`);
+        console.log(`[HoursCalc] Fetching timestamps for ${allTimestampEmployees.length} employees...`);
         const { data: stamps } = await supabase
           .from("time_stamps")
           .select("employee_id, clock_in, clock_out, break_minutes")
-          .in("employee_id", employeesWithTimestampTeams)
+          .in("employee_id", allTimestampEmployees)
           .gte("clock_in", fetchStart)
           .lte("clock_in", fetchEnd);
         
