@@ -15,6 +15,7 @@ export interface TimeStamp {
   note: string | null;
   edited_by: string | null;
   edited_at: string | null;
+  client_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -37,9 +38,6 @@ export function parseWorkingHours(timeString: string | null): { start: string; e
 }
 
 // Calculate effective clock times based on shift schedule
-// NOTE: This function calculates effective times for payroll purposes only.
-// The actual clock_in/clock_out times are ALWAYS preserved in the database.
-// Effective times are used for calculating billable/payable hours within shift boundaries.
 export function calculateEffectiveTimes(
   clockIn: Date,
   clockOut: Date | null,
@@ -47,7 +45,6 @@ export function calculateEffectiveTimes(
   shiftEnd: string,
   breakMinutes: number = 60
 ): { effectiveIn: Date; effectiveOut: Date | null; effectiveHours: number | null } {
-  // If no shift times configured, use actual clock times
   if (!shiftStart || !shiftEnd) {
     let effectiveHours: number | null = null;
     if (clockOut) {
@@ -58,22 +55,15 @@ export function calculateEffectiveTimes(
   }
 
   const today = clockIn.toISOString().split("T")[0];
-  
   const shiftStartTime = new Date(today + "T" + shiftStart.padStart(5, "0") + ":00");
   const shiftEndTime = new Date(today + "T" + shiftEnd.padStart(5, "0") + ":00");
   
-  // For effective times calculation (payroll):
-  // - If clocked in before shift start, count hours from shift start
-  // - If clocked out after shift end, count hours until shift end
-  // This ensures employees are paid for their scheduled shift, not extra time
   const effectiveIn = clockIn < shiftStartTime ? shiftStartTime : clockIn;
-  
   let effectiveOut: Date | null = null;
   if (clockOut) {
     effectiveOut = clockOut > shiftEndTime ? shiftEndTime : clockOut;
   }
   
-  // Calculate effective hours (with break deduction)
   let effectiveHours: number | null = null;
   if (effectiveOut) {
     const diffMs = effectiveOut.getTime() - effectiveIn.getTime();
@@ -82,6 +72,11 @@ export function calculateEffectiveTimes(
   }
   
   return { effectiveIn, effectiveOut, effectiveHours };
+}
+
+export interface SecondaryClient {
+  client_id: string;
+  client_name: string;
 }
 
 export function useTimeStamps() {
@@ -106,6 +101,25 @@ export function useTimeStamps() {
 
   const employeeId = employee?.id || null;
 
+  // Fetch secondary client assignments for this employee
+  const { data: secondaryClients = [] } = useQuery({
+    queryKey: ["my-secondary-clients", employeeId],
+    queryFn: async (): Promise<SecondaryClient[]> => {
+      if (!employeeId) return [];
+      const { data, error } = await supabase
+        .from("employee_client_assignments")
+        .select("client_id, clients(id, name)")
+        .eq("employee_id", employeeId)
+        .eq("is_primary", false);
+      if (error) throw error;
+      return (data || []).map((row: any) => ({
+        client_id: row.client_id,
+        client_name: row.clients?.name || "Ukendt",
+      }));
+    },
+    enabled: !!employeeId,
+  });
+
   // Get active clock-in (no clock_out yet)
   const { data: activeStamp, isLoading: isLoadingActive } = useQuery({
     queryKey: ["active-time-stamp", employeeId],
@@ -122,7 +136,7 @@ export function useTimeStamps() {
       return data as TimeStamp | null;
     },
     enabled: !!employeeId,
-    refetchInterval: 60000, // Reduced from 30s to 60s
+    refetchInterval: 60000,
   });
 
   // Get today's time stamps
@@ -163,15 +177,18 @@ export function useTimeStamps() {
     enabled: !!employeeId,
   });
 
-  // Clock in mutation with effective time calculation
+  // Clock in mutation — now accepts optional clientId
   const clockIn = useMutation({
-    mutationFn: async (note?: string) => {
+    mutationFn: async (params?: string | { note?: string; clientId?: string }) => {
       if (!employeeId || !employee) throw new Error("Employee not found");
+      
+      // Support both old API (note string) and new API (object with clientId)
+      const note = typeof params === "string" ? params : params?.note;
+      const clientId = typeof params === "object" ? params?.clientId : undefined;
       
       const clockInTime = new Date();
       const workingHours = parseWorkingHours(employee.standard_start_time);
       
-      // Calculate effective times
       const { effectiveIn } = calculateEffectiveTimes(
         clockInTime,
         null,
@@ -188,6 +205,7 @@ export function useTimeStamps() {
           effective_clock_in: effectiveIn.toISOString(),
           break_minutes: employee.salary_type === "hourly" ? 60 : 0,
           note: note || null,
+          client_id: clientId || null,
         })
         .select()
         .single();
@@ -202,12 +220,11 @@ export function useTimeStamps() {
     },
   });
 
-  // Clock out mutation with effective time calculation
+  // Clock out mutation
   const clockOut = useMutation({
     mutationFn: async ({ id, note }: { id: string; note?: string }) => {
       if (!employee) throw new Error("Employee not found");
       
-      // Get the current stamp to get clock_in time
       const { data: stampData } = await supabase
         .from("time_stamps")
         .select("*")
@@ -215,8 +232,6 @@ export function useTimeStamps() {
         .single();
       
       if (!stampData) throw new Error("Time stamp not found");
-      
-      // Cast to include new columns that may not be in generated types yet
       const stamp = stampData as TimeStamp;
       
       const clockInTime = new Date(stamp.clock_in);
@@ -224,7 +239,6 @@ export function useTimeStamps() {
       const workingHours = parseWorkingHours(employee.standard_start_time);
       const breakMins = stamp.break_minutes ?? (employee.salary_type === "hourly" ? 60 : 0);
       
-      // Calculate effective times
       const { effectiveIn, effectiveOut, effectiveHours } = calculateEffectiveTimes(
         clockInTime,
         clockOutTime,
@@ -256,20 +270,19 @@ export function useTimeStamps() {
     },
   });
 
-  // Calculate total hours worked today (using effective hours when available)
+  // Calculate total hours worked today
   const totalHoursToday = todayStamps.reduce((total, stamp) => {
     if (stamp.effective_hours !== null) {
       return total + stamp.effective_hours;
     }
     if (!stamp.clock_out) {
-      // Still clocked in, calculate from effective_clock_in to now
-      const clockIn = new Date(stamp.effective_clock_in || stamp.clock_in);
+      const ci = new Date(stamp.effective_clock_in || stamp.clock_in);
       const now = new Date();
-      return total + (now.getTime() - clockIn.getTime()) / (1000 * 60 * 60);
+      return total + (now.getTime() - ci.getTime()) / (1000 * 60 * 60);
     }
-    const clockIn = new Date(stamp.effective_clock_in || stamp.clock_in);
-    const clockOut = new Date(stamp.effective_clock_out || stamp.clock_out);
-    return total + (clockOut.getTime() - clockIn.getTime()) / (1000 * 60 * 60);
+    const ci = new Date(stamp.effective_clock_in || stamp.clock_in);
+    const co = new Date(stamp.effective_clock_out || stamp.clock_out);
+    return total + (co.getTime() - ci.getTime()) / (1000 * 60 * 60);
   }, 0);
 
   return {
@@ -278,6 +291,7 @@ export function useTimeStamps() {
     activeStamp,
     todayStamps,
     recentStamps,
+    secondaryClients,
     totalHoursToday,
     isLoading: isLoadingActive || isLoadingToday,
     isLoadingRecent,

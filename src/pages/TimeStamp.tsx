@@ -3,7 +3,9 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Clock, Play, Square, Timer, Calendar, CheckCircle2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Clock, Play, Square, Timer, Calendar, CheckCircle2, Building2 } from "lucide-react";
 import { useTimeStamps } from "@/hooks/useTimeStamps";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -14,6 +16,7 @@ export default function TimeStamp() {
     activeStamp, 
     todayStamps, 
     recentStamps,
+    secondaryClients,
     totalHoursToday, 
     isLoading, 
     clockIn, 
@@ -23,11 +26,17 @@ export default function TimeStamp() {
   } = useTimeStamps();
   
   const [note, setNote] = useState("");
+  const [selectedClientId, setSelectedClientId] = useState<string>("primary");
   const [currentTime, setCurrentTime] = useState(new Date());
   const [elapsedTime, setElapsedTime] = useState("");
   
   const isFixedSalary = employee?.salary_type === "fixed";
   const isHourly = !isFixedSalary;
+  const hasSecondaryClients = secondaryClients.length > 0;
+
+  // Build a client name lookup for today's stamps
+  const clientNameMap = new Map<string, string>();
+  secondaryClients.forEach(sc => clientNameMap.set(sc.client_id, sc.client_name));
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -50,7 +59,8 @@ export default function TimeStamp() {
 
   const handleClockIn = async () => {
     try {
-      await clockIn.mutateAsync(note || undefined);
+      const clientId = selectedClientId === "primary" ? undefined : selectedClientId;
+      await clockIn.mutateAsync({ note: note || undefined, clientId });
       setNote("");
       toast.success("Du er nu stemplet ind");
     } catch (error) {
@@ -124,6 +134,11 @@ export default function TimeStamp() {
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
                 </span>
                 Aktiv · {elapsedTime}
+                {activeStamp?.client_id && clientNameMap.has(activeStamp.client_id) && (
+                  <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">
+                    {clientNameMap.get(activeStamp.client_id)}
+                  </Badge>
+                )}
               </>
             ) : (
               <>
@@ -143,6 +158,29 @@ export default function TimeStamp() {
         {/* Action Section */}
         <Card className="border-0 shadow-lg bg-card/50 backdrop-blur">
           <CardContent className="p-4 sm:p-6 space-y-4">
+            {/* Client selector — only show if employee has secondary clients and is not clocked in */}
+            {hasSecondaryClients && !isClockedIn && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                  <Building2 className="h-3.5 w-3.5" />
+                  Stempl på kunde
+                </label>
+                <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+                  <SelectTrigger className="bg-background/50">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="primary">Primær kunde</SelectItem>
+                    {secondaryClients.map(sc => (
+                      <SelectItem key={sc.client_id} value={sc.client_id}>
+                        {sc.client_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <Textarea
               placeholder="Tilføj en note (valgfrit)..."
               value={note}
@@ -208,9 +246,9 @@ export default function TimeStamp() {
               <div className="text-2xl font-semibold">
                 {recentStamps.reduce((total, stamp) => {
                   if (!stamp.clock_out) return total;
-                  const clockIn = new Date(stamp.clock_in);
-                  const clockOut = new Date(stamp.clock_out);
-                  return total + (clockOut.getTime() - clockIn.getTime()) / (1000 * 60 * 60);
+                  const ci = new Date(stamp.clock_in);
+                  const co = new Date(stamp.clock_out);
+                  return total + (co.getTime() - ci.getTime()) / (1000 * 60 * 60);
                 }, 0).toFixed(1)}t
               </div>
               <p className="text-xs text-muted-foreground mt-1">
@@ -228,13 +266,11 @@ export default function TimeStamp() {
             </h2>
             <div className="space-y-2">
               {todayStamps.map((stamp) => {
-                // Always show actual clock times
                 const actualIn = format(new Date(stamp.clock_in), "HH:mm");
                 const actualOut = stamp.clock_out 
                   ? format(new Date(stamp.clock_out), "HH:mm")
                   : null;
                 
-                // Show effective times only if they differ from actual times
                 const effectiveIn = stamp.effective_clock_in 
                   ? format(new Date(stamp.effective_clock_in), "HH:mm")
                   : null;
@@ -245,6 +281,8 @@ export default function TimeStamp() {
                 const hasEffectiveDifference = 
                   (effectiveIn && effectiveIn !== actualIn) || 
                   (effectiveOut && actualOut && effectiveOut !== actualOut);
+
+                const stampClientName = stamp.client_id ? clientNameMap.get(stamp.client_id) : null;
                 
                 return (
                   <Card key={stamp.id} className="border-0 shadow-sm bg-card/50">
@@ -259,10 +297,17 @@ export default function TimeStamp() {
                             )}
                           </div>
                           <div>
-                            <div className="font-medium">
-                              {actualIn}
-                              <span className="text-muted-foreground mx-1.5">→</span>
-                              {actualOut || "..."}
+                            <div className="font-medium flex items-center gap-2">
+                              <span>
+                                {actualIn}
+                                <span className="text-muted-foreground mx-1.5">→</span>
+                                {actualOut || "..."}
+                              </span>
+                              {stampClientName && (
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-normal">
+                                  {stampClientName}
+                                </Badge>
+                              )}
                             </div>
                             {stamp.note && (
                               <p className="text-xs text-muted-foreground mt-0.5">
