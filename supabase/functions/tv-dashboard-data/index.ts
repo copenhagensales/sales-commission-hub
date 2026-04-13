@@ -1795,7 +1795,10 @@ async function handleTdcErhvervData(
         const empShift = primaryShifts?.find((s: any) => s.team_id === empTeam.team_id);
         if (!empShift) return;
 
-        const hoursSource = empShift.hours_source || "shift";
+        const clockInfo = employeeTimeClocksMap[empId];
+        const hoursSource = clockInfo
+          ? (clockInfo.clock_type === 'override' || clockInfo.clock_type === 'revenue' ? 'timestamp' : 'shift')
+          : (empShift.hours_source || "shift");
         const empShiftDays = shiftDays?.filter((sd: any) => sd.shift_id === empShift.id) || [];
         const shiftForDay = empShiftDays.find((sd: any) => sd.day_of_week === adjustedDayOfWeek);
 
