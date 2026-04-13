@@ -23,6 +23,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/usePositionPermissions";
+import { useFeatureFlag } from "@/hooks/useFeatureFlag";
+import { resolveHoursSourceBatch, type HoursSourceResult } from "@/lib/resolveHoursSource";
 
 interface LatenessRecord {
   id: string;
