@@ -262,6 +262,45 @@ export default function LocationHistoryContent() {
     },
   });
 
+  // ── Collect fm_location_ids from sales not covered by bookings ──
+  const missingLocationIds = useMemo(() => {
+    if (!salesData || !bookings) return [];
+    const bookedLocIds = new Set((bookings || []).map(b => b.location_id));
+    const salesLocIds = new Set<string>();
+    for (const sale of salesData) {
+      const locId = (sale.raw_payload as any)?.fm_location_id;
+      if (locId && !bookedLocIds.has(locId)) salesLocIds.add(locId);
+    }
+    return Array.from(salesLocIds);
+  }, [salesData, bookings]);
+
+  // ── Fetch missing location details ──
+  const { data: missingLocations } = useQuery({
+    queryKey: ["loc-history-missing-locs", missingLocationIds],
+    queryFn: async () => {
+      if (!missingLocationIds.length) return [];
+      const { data, error } = await supabase
+        .from("location")
+        .select("id, name, type, daily_rate, client:clients!location_client_id_fkey(name)")
+        .in("id", missingLocationIds);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: missingLocationIds.length > 0,
+  });
+
+  const missingLocMap = useMemo(() => {
+    const map = new Map<string, { name: string; type: string; clientName: string }>();
+    for (const loc of missingLocations || []) {
+      map.set(loc.id, {
+        name: (loc as any).name || "Ukendt",
+        type: (loc as any).type?.trim() || "Ukendt",
+        clientName: (loc as any).client?.name || "Ukendt",
+      });
+    }
+    return map;
+  }, [missingLocations]);
+
   // ── Pre-compute maps ──
   const bookingToLocation = useMemo(() => {
     const map = new Map<string, string>();
@@ -346,7 +385,8 @@ export default function LocationHistoryContent() {
       const w = matchingBooking?.week_number || getISOWeek(dt);
       const y = matchingBooking?.year || dt.getFullYear();
 
-      const locEntry = ensureLoc(locId, locAgg.get(locId)?.locationName || "Ukendt lokation", locAgg.get(locId)?.locationType || "Ukendt", locAgg.get(locId)?.clientName || "Ukendt");
+      const fallback = missingLocMap.get(locId);
+      const locEntry = ensureLoc(locId, locAgg.get(locId)?.locationName || fallback?.name || "Ukendt lokation", locAgg.get(locId)?.locationType || fallback?.type || "Ukendt", locAgg.get(locId)?.clientName || fallback?.clientName || "Ukendt");
       const wb = ensureWeek(locEntry.weeks, w, y);
 
       const items = (sale as any).sale_items || [];
@@ -406,7 +446,7 @@ export default function LocationHistoryContent() {
         weeklyBreakdown,
       };
     }).sort((a, b) => b.salesPerDay - a.salesPerDay);
-  }, [bookings, salesData, placements, hotelCostByBooking, dietCostByBooking]);
+  }, [bookings, salesData, placements, hotelCostByBooking, dietCostByBooking, missingLocMap]);
 
   // ── Split by client ──
   const { eesyLocations, youseeLocations, otherLocations } = useMemo(() => {
