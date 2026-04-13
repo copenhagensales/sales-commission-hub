@@ -8,6 +8,7 @@ const corsHeaders = {
 interface TimeSlot { start: string; end: string; }
 interface TimeWindow { start: string; end: string; }
 interface AvailabilityDay { date: string; slots: TimeSlot[]; }
+interface DayTimeWindows { [dayNumber: string]: TimeWindow[]; }
 interface BookingSettings {
   work_start_hour: number;
   work_end_hour: number;
@@ -16,6 +17,7 @@ interface BookingSettings {
   blocked_dates: string[];
   time_windows: TimeWindow[] | null;
   available_weekdays: number[] | null;
+  day_time_windows: DayTimeWindows | null;
 }
 
 const DEFAULT_SETTINGS: BookingSettings = {
@@ -26,6 +28,7 @@ const DEFAULT_SETTINGS: BookingSettings = {
   blocked_dates: [],
   time_windows: [{ start: "09:00", end: "17:00" }],
   available_weekdays: [1, 2, 3, 4, 5],
+  day_time_windows: null,
 };
 
 async function fetchSettings(supabase: any): Promise<BookingSettings> {
@@ -33,10 +36,23 @@ async function fetchSettings(supabase: any): Promise<BookingSettings> {
   return data ?? DEFAULT_SETTINGS;
 }
 
-function getTimeWindows(settings: BookingSettings): TimeWindow[] {
+/**
+ * Get time windows for a specific day of week (1=Mon..7=Sun).
+ * Uses day_time_windows if available, falls back to time_windows, then work hours.
+ */
+function getTimeWindowsForDay(settings: BookingSettings, isoDay: number): TimeWindow[] {
+  // Try per-day windows first
+  if (settings.day_time_windows) {
+    const dayWindows = settings.day_time_windows[String(isoDay)];
+    if (dayWindows && Array.isArray(dayWindows) && dayWindows.length > 0) {
+      return dayWindows;
+    }
+  }
+  // Fallback to flat time_windows
   if (settings.time_windows && Array.isArray(settings.time_windows) && settings.time_windows.length > 0) {
     return settings.time_windows;
   }
+  // Fallback to work hours
   return [{
     start: `${String(settings.work_start_hour).padStart(2, "0")}:00`,
     end: `${String(settings.work_end_hour).padStart(2, "0")}:00`,
@@ -45,10 +61,14 @@ function getTimeWindows(settings: BookingSettings): TimeWindow[] {
 
 function getWeekdays(settings: BookingSettings): Set<number> {
   if (settings.available_weekdays && Array.isArray(settings.available_weekdays) && settings.available_weekdays.length > 0) {
-    // Convert 1=Mon..7=Sun to JS getDay() 0=Sun..6=Sat
     return new Set(settings.available_weekdays.map(d => d === 7 ? 0 : d));
   }
-  return new Set([1, 2, 3, 4, 5]); // Mon-Fri
+  return new Set([1, 2, 3, 4, 5]);
+}
+
+/** Convert JS getDay (0=Sun) to ISO day (1=Mon..7=Sun) */
+function jsToIsoDay(jsDay: number): number {
+  return jsDay === 0 ? 7 : jsDay;
 }
 
 function parseTime(t: string): { h: number; m: number } {
@@ -64,7 +84,6 @@ function generateSlotsForDay(
   busyPeriods?: { start: Date; end: Date }[]
 ): TimeSlot[] {
   const slots: TimeSlot[] = [];
-
   for (const tw of windows) {
     const winStart = parseTime(tw.start);
     const winEnd = parseTime(tw.end);
@@ -95,7 +114,6 @@ function generateSlotsForDay(
       });
     }
   }
-
   return slots;
 }
 
@@ -104,26 +122,32 @@ function generateDays(
   now: Date,
   busyPeriods?: { start: Date; end: Date }[]
 ): AvailabilityDay[] {
-  const windows = getTimeWindows(settings);
   const weekdays = getWeekdays(settings);
   const blockedSet = new Set(settings.blocked_dates || []);
   const days: AvailabilityDay[] = [];
 
   const current = new Date(now);
   current.setHours(0, 0, 0, 0);
-  // If past all windows today, start tomorrow
-  const lastWindow = windows[windows.length - 1];
-  const lastEnd = parseTime(lastWindow.end);
-  if (now.getHours() > lastEnd.h || (now.getHours() === lastEnd.h && now.getMinutes() >= lastEnd.m)) {
-    current.setDate(current.getDate() + 1);
+
+  // Check if past all windows today using per-day windows
+  const todayIsoDay = jsToIsoDay(current.getDay());
+  const todayWindows = getTimeWindowsForDay(settings, todayIsoDay);
+  if (todayWindows.length > 0) {
+    const lastWindow = todayWindows[todayWindows.length - 1];
+    const lastEnd = parseTime(lastWindow.end);
+    if (now.getHours() > lastEnd.h || (now.getHours() === lastEnd.h && now.getMinutes() >= lastEnd.m)) {
+      current.setDate(current.getDate() + 1);
+    }
   }
 
   const totalDays = Math.ceil(settings.lookahead_days * 2);
   for (let i = 0; i < totalDays && days.length < settings.lookahead_days; i++) {
-    const dow = current.getDay(); // 0=Sun..6=Sat
+    const dow = current.getDay();
     if (weekdays.has(dow)) {
       const dateStr = current.toISOString().split("T")[0];
       if (!blockedSet.has(dateStr)) {
+        const isoDay = jsToIsoDay(dow);
+        const windows = getTimeWindowsForDay(settings, isoDay);
         const slots = generateSlotsForDay(current, windows, settings.slot_duration_minutes, now, busyPeriods);
         if (slots.length > 0) days.push({ date: dateStr, slots });
       }
