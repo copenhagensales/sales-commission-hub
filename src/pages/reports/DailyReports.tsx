@@ -783,7 +783,6 @@ export default function DailyReports() {
         const teamName = emp.team_members?.[0]?.team?.name || null;
         
         const empTeamMembership = teamMembers?.find(tm => tm.employee_id === empId);
-        // Prioritize shift with hours_source='shift' over 'timestamp' for consistent behavior
         const empPrimaryShift = empTeamMembership 
           ? (primaryShifts?.find(ps => ps.team_id === empTeamMembership.team_id && ps.hours_source === 'shift')
              || primaryShifts?.find(ps => ps.team_id === empTeamMembership.team_id))
@@ -791,7 +790,10 @@ export default function DailyReports() {
         const empShiftDays = empPrimaryShift 
           ? shiftDays?.filter(sd => sd.shift_id === empPrimaryShift.id) || []
           : [];
-        const hoursSource = empPrimaryShift?.hours_source || 'shift';
+        // Use new resolver if available, otherwise legacy
+        const hoursSource = hoursSourceMap
+          ? (hoursSourceMap[empId]?.source || 'shift')
+          : (empPrimaryShift?.hours_source || 'shift');
 
         // Get all agent identifiers for this employee
         const empAgentMappings = agentMappings?.filter(m => m.employee_id === empId) || [];
