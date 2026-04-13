@@ -1304,39 +1304,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
               <Badge variant="default">{formatDuration(workingMinutes)}</Badge>
             </div>
 
-            {/* Hours source selection */}
-            <div className="space-y-2 border-t pt-4">
-              <Label className="text-sm font-medium">Timer registreres ud fra</Label>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, hours_source: "shift" })}
-                  className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
-                    formData.hours_source === "shift"
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-background hover:bg-muted border-border"
-                  }`}
-                >
-                  Vagtplan
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, hours_source: "timestamp" })}
-                  className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
-                    formData.hours_source === "timestamp"
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-background hover:bg-muted border-border"
-                  }`}
-                >
-                  Indstempling
-                </button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {formData.hours_source === "shift" 
-                  ? "Timer beregnes ud fra planlagte vagttider" 
-                  : "Timer beregnes ud fra faktiske ind-/udstemplinger"}
-              </p>
-            </div>
+            {/* Hours source is now managed via Stempelur (employee_time_clocks) in the team edit dialog */}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
