@@ -1017,8 +1017,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
                     {selectedEmployees.length} medarbejder{selectedEmployees.length > 1 ? 'e' : ''} valgt
                   </p>
                 )}
-              </div>
-            )}
+            </div>
 
             {/* Toggle for same/different/none times - at the top */}
             <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
