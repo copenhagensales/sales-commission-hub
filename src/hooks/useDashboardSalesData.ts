@@ -574,7 +574,10 @@ export function useDashboardSalesData({
 
         const empTeamId = teamMemberByEmployeeId.get(empId);
         const empPrimaryShift = empTeamId ? primaryShiftByTeamId.get(empTeamId) : null;
-        const hoursSource = empPrimaryShift?.hours_source || "shift";
+        // Use new resolver if available, otherwise legacy
+        const hoursSource = hoursSourceMap
+          ? (hoursSourceMap[empId]?.source || "shift")
+          : (empPrimaryShift?.hours_source || "shift");
 
         let totalHours = 0;
         if (hoursSource === "timestamp") {
