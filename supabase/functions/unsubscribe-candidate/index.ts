@@ -81,6 +81,40 @@ Deno.serve(async (req) => {
 
     console.log(`[unsubscribe-candidate] Candidate ${candidateId} unsubscribed. Cancelled ${activeEnrollments?.length || 0} enrollments.`);
 
+    // Send cancellation notification emails
+    const resendApiKey = Deno.env.get("RESEND_API_KEY");
+    if (resendApiKey) {
+      try {
+        const { data: notifRecipients } = await supabase
+          .from("booking_notification_recipients")
+          .select("email")
+          .eq("notify_on_cancel", true);
+
+        const recipientEmails = (notifRecipients || []).map(r => r.email);
+        if (recipientEmails.length > 0) {
+          const candidateName = `${candidate.first_name}`;
+          await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${resendApiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              from: "Copenhagen Sales <noreply@copenhagensales.dk>",
+              to: recipientEmails,
+              subject: `Afmelding: ${candidateName} har afmeldt sig`,
+              html: `<h3>Kandidat afmeldt</h3>
+<p><strong>${candidateName}</strong> har afmeldt sig via afmeldingslinket.</p>
+<p>Alle aktive flows er blevet annulleret, og ansøgningen er markeret som trukket.</p>`,
+            }),
+          });
+          console.log(`[unsubscribe-candidate] Cancel notification sent to ${recipientEmails.join(", ")}`);
+        }
+      } catch (emailErr) {
+        console.error("[unsubscribe-candidate] Email notification error:", emailErr);
+      }
+    }
+
     const firstName = candidate.first_name || '';
     return new Response(
       renderSuccessHtml(firstName),

@@ -139,40 +139,50 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Send booking notification email to Oscar via Resend
+    // Send booking notification emails to configured recipients via Resend
     const resendApiKey = Deno.env.get("RESEND_API_KEY");
     if (resendApiKey) {
       try {
+        const { data: notifRecipients } = await supabase
+          .from("booking_notification_recipients")
+          .select("email, name")
+          .eq("notify_on_booking", true);
+
         const candidateName = `${candidate.first_name} ${candidate.last_name}`;
         const dateObj = new Date(date + "T12:00:00");
         const dayNum = dateObj.getDate();
         const monthNum = dateObj.getMonth() + 1;
         const dateShort = `${dayNum}/${monthNum}`;
 
-        const emailRes = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${resendApiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            from: "Copenhagen Sales <noreply@copenhagensales.dk>",
-            to: ["oscar@copenhagensales.dk"],
-            subject: `Ny booking: ${candidateName} — ${dateShort} kl. ${startTime}`,
-            html: `<h3>Ny kandidatbooking</h3>
+        const recipientEmails = (notifRecipients || []).map(r => r.email);
+        if (recipientEmails.length > 0) {
+          const emailRes = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${resendApiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              from: "Copenhagen Sales <noreply@copenhagensales.dk>",
+              to: recipientEmails,
+              subject: `Ny booking: ${candidateName} — ${dateShort} kl. ${startTime}`,
+              html: `<h3>Ny kandidatbooking</h3>
 <p><strong>Kandidat:</strong> ${candidateName}</p>
 <p><strong>Stilling:</strong> ${role}</p>
 <p><strong>Dato:</strong> ${date}</p>
 <p><strong>Tid:</strong> ${startTime} – ${endTime}</p>
 <p><strong>Telefon:</strong> ${candidate.phone || "Ikke oplyst"}</p>
 <p><strong>Email:</strong> ${candidate.email || "Ikke oplyst"}</p>`,
-          }),
-        });
+            }),
+          });
 
-        if (emailRes.ok) {
-          console.log(`[public-book-candidate] Booking email sent to oscar@copenhagensales.dk for ${candidateName}`);
+          if (emailRes.ok) {
+            console.log(`[public-book-candidate] Booking email sent to ${recipientEmails.join(", ")} for ${candidateName}`);
+          } else {
+            console.error("[public-book-candidate] Resend email error:", await emailRes.text());
+          }
         } else {
-          console.error("[public-book-candidate] Resend email error:", await emailRes.text());
+          console.log("[public-book-candidate] No booking notification recipients configured");
         }
       } catch (emailErr) {
         console.error("[public-book-candidate] Email error:", emailErr);

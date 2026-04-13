@@ -1754,6 +1754,33 @@ export type Database = {
           },
         ]
       }
+      booking_notification_recipients: {
+        Row: {
+          created_at: string | null
+          email: string
+          id: string
+          name: string | null
+          notify_on_booking: boolean | null
+          notify_on_cancel: boolean | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          id?: string
+          name?: string | null
+          notify_on_booking?: boolean | null
+          notify_on_cancel?: boolean | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          id?: string
+          name?: string | null
+          notify_on_booking?: boolean | null
+          notify_on_cancel?: boolean | null
+        }
+        Relationships: []
+      }
       booking_settings: {
         Row: {
           available_weekdays: number[] | null
