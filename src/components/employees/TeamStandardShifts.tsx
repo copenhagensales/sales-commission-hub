@@ -984,16 +984,15 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
               />
             </div>
 
-            {/* Employee picker - only for special shifts */}
-            {isSpecialShift && (
-              <div className="space-y-3 p-3 border rounded-lg bg-blue-50/50 dark:bg-blue-950/20">
-                <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-blue-500" />
-                  <Label className="text-sm font-medium">Vælg medarbejdere *</Label>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Denne vagt vil overskrive standard-vagten for de valgte medarbejdere.
-                </p>
+            {/* Employee picker - optional, assign specific employees to this shift */}
+            <div className="space-y-3 p-3 border rounded-lg bg-muted/30">
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-muted-foreground" />
+                <Label className="text-sm font-medium">Tildel medarbejdere (valgfrit)</Label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Vælg medarbejdere der skal bruge denne vagt i stedet for teamets primære vagt. Hver medarbejder kan kun tildeles én vagt.
+              </p>
                 <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
                   {teamMembers.map(member => (
                     <label
