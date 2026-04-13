@@ -78,6 +78,7 @@ export default function ShiftOverview() {
 
   const queryClient = useQueryClient();
   const { canEditShiftOverview } = usePermissions();
+  const useNewAssignmentsFlag = useFeatureFlag('employee_client_assignments');
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
