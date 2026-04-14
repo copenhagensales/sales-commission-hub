@@ -405,42 +405,42 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   // This ensures the sidebar matches what the Permission Editor shows
   
   // Check if SOME menu should be visible
-  const showSomeMenu = p.canViewSome || p.canViewExtraWork;
+  const showSomeMenu = !isMenuHidden('section_some') && (p.canViewSome || p.canViewExtraWork);
 
   // Check if any Personnel menu items are visible (requires section permission)
-  const showPersonnelMenu = p.canView("menu_section_personale") && 
+  const showPersonnelMenu = !isMenuHidden('section_personale') && p.canView("menu_section_personale") && 
     (p.canViewEmployees || p.canViewTeams || p.canViewLoginLog || p.canViewUpcomingStarts);
   
   // Check if any Ledelse menu items are visible (requires section permission)
-  const showLedelseMenu = p.canView("menu_section_ledelse") && 
+  const showLedelseMenu = !isMenuHidden('section_ledelse') && p.canView("menu_section_ledelse") && 
     (p.canViewContracts || p.canViewPermissions || p.canViewCareerWishesOverview || p.canViewSecurityDashboard || p.canViewCarQuizAdmin || p.canViewCocAdmin || p.canViewPulseSurvey || p.canView("menu_customer_inquiries") || p.canViewClientForecast || true);
   
   // Check if any MG menu items are visible (requires section permission)
-  const showMgMenu = p.canView("menu_section_mg") && p.canViewMgTest;
+  const showMgMenu = !isMenuHidden('section_mg') && p.canView("menu_section_mg") && p.canViewMgTest;
   
   // Check if any Fieldmarketing items are visible (requires section permission)
-  const showFieldmarketingMenu = p.canView("menu_section_fieldmarketing") && 
+  const showFieldmarketingMenu = !isMenuHidden('section_fieldmarketing') && p.canView("menu_section_fieldmarketing") && 
     (p.canViewFmMySchedule || p.canViewFmOverview || p.canViewFmBookWeek || 
      p.canViewFmBookings || p.canViewFmLocations || p.canViewFmVehicles ||
      p.canViewFmBilling || p.canViewFmTimeOff || p.canViewFmSalesRegistration ||
      false);
   
   // Check if any Shift Planning items are visible (requires section permission)
-  const showShiftPlanningMenu = p.canView("menu_section_vagtplan") && 
+  const showShiftPlanningMenu = !isMenuHidden('section_vagtplan') && p.canView("menu_section_vagtplan") && 
     (p.canViewShiftOverview || p.canViewAbsence || p.canViewTimeTracking || p.canViewTimeStamp || p.canViewClosingShifts);
   
   
   // Check if any Recruitment items are visible (requires section permission)
-  const showRecruitmentMenu = p.canView("menu_section_rekruttering") && 
+  const showRecruitmentMenu = !isMenuHidden('section_rekruttering') && p.canView("menu_section_rekruttering") && 
     (p.canViewRecruitmentDashboard || p.canViewCandidates || p.canViewMessages ||
      p.canViewSmsTemplates || p.canViewEmailTemplates || p.canViewWinback ||
      p.canViewUpcomingInterviews || p.canViewUpcomingHires || p.canViewBookingFlow);
   
   // Check if any Onboarding items are visible (requires section permission) - only show for admin users
-  const showOnboardingMenu = p.canView("menu_section_onboarding") && p.canViewOnboardingAdmin;
+  const showOnboardingMenu = !isMenuHidden('section_onboarding') && p.canView("menu_section_onboarding") && p.canViewOnboardingAdmin;
 
   // Check if any Reports menu items are visible (requires section permission)
-  const showReportsMenu = p.canView("menu_section_reports") && 
+  const showReportsMenu = !isMenuHidden('section_rapporter') && p.canView("menu_section_reports") && 
     (p.canViewReportsAdmin || p.canViewReportsDailyReports || p.canViewReportsManagement || p.canViewReportsEmployee || canViewCancellations);
   
   // HARDCODED: Only Kasper, Mathias and Lone can see salary menu
@@ -449,18 +449,18 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
     '71267f4e-fd9e-4c16-8fe9-da0f48ce2598', // Mathias Grubak
     'e1ac7b84-aedb-400e-88f6-dd24687317e4', // Lone Mikkelsen
   ];
-  const showSalaryMenu = user?.id ? SALARY_ALLOWED_USER_IDS.includes(user.id) : false;
+  const showSalaryMenu = !isMenuHidden('section_lon') && (user?.id ? SALARY_ALLOWED_USER_IDS.includes(user.id) : false);
   
   // Check if Admin menu should be visible
-  const showAdminMenu = p.canViewKpiDefinitions;
+  const showAdminMenu = !isMenuHidden('section_admin') && p.canViewKpiDefinitions;
   
   // Check if AMO menu should be visible
-  const showAmoMenu = p.canView("menu_section_amo") && (
+  const showAmoMenu = !isMenuHidden('section_amo') && p.canView("menu_section_amo") && (
     p.canViewAmoDashboard || p.canViewAmoOrganisation || p.canViewAmoMeetings || p.canViewAmoApv
   );
   
   // Check if Spil (Games) menu should be visible
-  const showSpilMenu = p.canViewH2h || p.canViewCommissionLeague;
+  const showSpilMenu = !isMenuHidden('section_spil') && (p.canViewH2h || p.canViewCommissionLeague);
   
   // Check if Economic menu should be visible (owner always has access)
   const isOwner = p.position?.name?.toLowerCase() === "ejer";
