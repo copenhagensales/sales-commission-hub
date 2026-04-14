@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, ShieldCheck, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, ClipboardCheck, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity, Swords, Mail, Gift, FileBarChart, CreditCard, Pencil, Trophy, Wrench, BookOpen, TrendingUp, TrendingDown, PanelLeft, XCircle, List, Inbox, Bug } from "lucide-react";
+import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, ShieldCheck, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, ClipboardCheck, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity, Swords, Mail, Gift, FileBarChart, CreditCard, Pencil, Trophy, Wrench, BookOpen, TrendingUp, TrendingDown, PanelLeft, XCircle, List, Inbox, Bug, Menu as MenuIcon } from "lucide-react";
 import { EnvironmentSwitcher } from "./EnvironmentSwitcher";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import cphSalesLogo from "@/assets/cph-sales-logo.png";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +27,7 @@ import { useIsSalgskonsulent, useCodeOfConductLock } from "@/hooks/useCodeOfCond
 import { useHasImmediatePaymentSales } from "@/hooks/useHasImmediatePaymentSales";
 import { useFmBookingConflicts } from "@/hooks/useFmBookingConflicts";
 import { useTranslation } from "react-i18next";
+import { useSidebarMenuConfig, type MenuConfigItem } from "@/hooks/useSidebarMenuConfig";
 
 type NavItem = { name: string; href: string; icon: typeof Users; badgeKey?: string };
 
@@ -55,7 +56,27 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   
   const pulseSurvey = useShouldShowPulseSurvey();
   const { data: hasImmediatePaymentSales } = useHasImmediatePaymentSales();
+
+  // Menu config from database - controls sort_order and visibility
+  const { data: menuConfig } = useSidebarMenuConfig();
   
+  // Helper: check if a menu item is hidden via the menu editor
+  const isMenuHidden = useMemo(() => {
+    if (!menuConfig) return (_key: string) => false;
+    const configMap = new Map(menuConfig.map(c => [c.item_key, c]));
+    return (key: string) => {
+      const config = configMap.get(key);
+      return config ? !config.visible : false;
+    };
+  }, [menuConfig]);
+
+  // Helper: get sort order for top-level items
+  const getSortOrder = useMemo(() => {
+    if (!menuConfig) return (_key: string) => 0;
+    const configMap = new Map(menuConfig.map(c => [c.item_key, c]));
+    return (key: string) => configMap.get(key)?.sort_order ?? 999;
+  }, [menuConfig]);
+
   const [mitHjemOpen, setMitHjemOpen] = useState(
     ["/home", "/messages", "/my-profile", "/my-feedback", "/pulse-survey", "/refer-a-friend", "/my-goals", "/team-goals", "/immediate-payment-ase", "/tdc-opsummering"].some(path => location.pathname === path || location.pathname.startsWith(path))
   );
@@ -384,42 +405,42 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   // This ensures the sidebar matches what the Permission Editor shows
   
   // Check if SOME menu should be visible
-  const showSomeMenu = p.canViewSome || p.canViewExtraWork;
+  const showSomeMenu = !isMenuHidden('section_some') && (p.canViewSome || p.canViewExtraWork);
 
   // Check if any Personnel menu items are visible (requires section permission)
-  const showPersonnelMenu = p.canView("menu_section_personale") && 
+  const showPersonnelMenu = !isMenuHidden('section_personale') && p.canView("menu_section_personale") && 
     (p.canViewEmployees || p.canViewTeams || p.canViewLoginLog || p.canViewUpcomingStarts);
   
   // Check if any Ledelse menu items are visible (requires section permission)
-  const showLedelseMenu = p.canView("menu_section_ledelse") && 
+  const showLedelseMenu = !isMenuHidden('section_ledelse') && p.canView("menu_section_ledelse") && 
     (p.canViewContracts || p.canViewPermissions || p.canViewCareerWishesOverview || p.canViewSecurityDashboard || p.canViewCarQuizAdmin || p.canViewCocAdmin || p.canViewPulseSurvey || p.canView("menu_customer_inquiries") || p.canViewClientForecast || true);
   
   // Check if any MG menu items are visible (requires section permission)
-  const showMgMenu = p.canView("menu_section_mg") && p.canViewMgTest;
+  const showMgMenu = !isMenuHidden('section_mg') && p.canView("menu_section_mg") && p.canViewMgTest;
   
   // Check if any Fieldmarketing items are visible (requires section permission)
-  const showFieldmarketingMenu = p.canView("menu_section_fieldmarketing") && 
+  const showFieldmarketingMenu = !isMenuHidden('section_fieldmarketing') && p.canView("menu_section_fieldmarketing") && 
     (p.canViewFmMySchedule || p.canViewFmOverview || p.canViewFmBookWeek || 
      p.canViewFmBookings || p.canViewFmLocations || p.canViewFmVehicles ||
      p.canViewFmBilling || p.canViewFmTimeOff || p.canViewFmSalesRegistration ||
      false);
   
   // Check if any Shift Planning items are visible (requires section permission)
-  const showShiftPlanningMenu = p.canView("menu_section_vagtplan") && 
+  const showShiftPlanningMenu = !isMenuHidden('section_vagtplan') && p.canView("menu_section_vagtplan") && 
     (p.canViewShiftOverview || p.canViewAbsence || p.canViewTimeTracking || p.canViewTimeStamp || p.canViewClosingShifts);
   
   
   // Check if any Recruitment items are visible (requires section permission)
-  const showRecruitmentMenu = p.canView("menu_section_rekruttering") && 
+  const showRecruitmentMenu = !isMenuHidden('section_rekruttering') && p.canView("menu_section_rekruttering") && 
     (p.canViewRecruitmentDashboard || p.canViewCandidates || p.canViewMessages ||
      p.canViewSmsTemplates || p.canViewEmailTemplates || p.canViewWinback ||
      p.canViewUpcomingInterviews || p.canViewUpcomingHires || p.canViewBookingFlow);
   
   // Check if any Onboarding items are visible (requires section permission) - only show for admin users
-  const showOnboardingMenu = p.canView("menu_section_onboarding") && p.canViewOnboardingAdmin;
+  const showOnboardingMenu = !isMenuHidden('section_onboarding') && p.canView("menu_section_onboarding") && p.canViewOnboardingAdmin;
 
   // Check if any Reports menu items are visible (requires section permission)
-  const showReportsMenu = p.canView("menu_section_reports") && 
+  const showReportsMenu = !isMenuHidden('section_rapporter') && p.canView("menu_section_reports") && 
     (p.canViewReportsAdmin || p.canViewReportsDailyReports || p.canViewReportsManagement || p.canViewReportsEmployee || canViewCancellations);
   
   // HARDCODED: Only Kasper, Mathias and Lone can see salary menu
@@ -428,22 +449,22 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
     '71267f4e-fd9e-4c16-8fe9-da0f48ce2598', // Mathias Grubak
     'e1ac7b84-aedb-400e-88f6-dd24687317e4', // Lone Mikkelsen
   ];
-  const showSalaryMenu = user?.id ? SALARY_ALLOWED_USER_IDS.includes(user.id) : false;
+  const showSalaryMenu = !isMenuHidden('section_lon') && (user?.id ? SALARY_ALLOWED_USER_IDS.includes(user.id) : false);
   
-  // Check if Admin menu should be visible
-  const showAdminMenu = p.canViewKpiDefinitions;
+  // Check if Economic menu should be visible (owner always has access)
+  const isOwner = p.position?.name?.toLowerCase() === "ejer";
+  const showEconomicMenu = !isMenuHidden('section_economic') && (isOwner || p.canView("menu_section_economic"));
+
+  // Check if Admin menu should be visible (KPI or owner for menu editor)
+  const showAdminMenu = !isMenuHidden('section_admin') && (p.canViewKpiDefinitions || isOwner);
   
   // Check if AMO menu should be visible
-  const showAmoMenu = p.canView("menu_section_amo") && (
+  const showAmoMenu = !isMenuHidden('section_amo') && p.canView("menu_section_amo") && (
     p.canViewAmoDashboard || p.canViewAmoOrganisation || p.canViewAmoMeetings || p.canViewAmoApv
   );
   
   // Check if Spil (Games) menu should be visible
-  const showSpilMenu = p.canViewH2h || p.canViewCommissionLeague;
-  
-  // Check if Economic menu should be visible (owner always has access)
-  const isOwner = p.position?.name?.toLowerCase() === "ejer";
-  const showEconomicMenu = isOwner || p.canView("menu_section_economic");
+  const showSpilMenu = !isMenuHidden('section_spil') && (p.canViewH2h || p.canViewCommissionLeague);
   return (
     <aside className={sidebarClasses}>
       <div className="flex h-full flex-col">
@@ -1718,6 +1739,15 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                   )}>
                     <BookOpen className="h-4 w-4" />
                     KPI Definitioner
+                  </NavLink>
+                )}
+                {isOwner && (
+                  <NavLink to="/admin/menu-editor" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/admin/menu-editor" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <MenuIcon className="h-4 w-4" />
+                    Menu Editor
                   </NavLink>
                 )}
               </CollapsibleContent>

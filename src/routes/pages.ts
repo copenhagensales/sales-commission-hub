@@ -234,3 +234,4 @@ export const ComplianceSensitiveAccessLog = lazyPage(() => import("@/pages/compl
 export const ComplianceContractAccessLog = lazyPage(() => import("@/pages/compliance/ContractAccessLog"));
 
 export const ShortLinkRedirect = lazyPage(() => import("@/pages/ShortLinkRedirect"));
+export const MenuEditor = lazyPage(() => import("@/pages/MenuEditor"));

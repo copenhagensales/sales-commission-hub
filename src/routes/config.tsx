@@ -158,6 +158,7 @@ import {
   ComplianceSensitiveAccessLog,
   ComplianceContractAccessLog,
   ShortLinkRedirect,
+  MenuEditor,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -468,6 +469,9 @@ export const routes: RouteConfig[] = [
   { path: "/compliance/ai-governance", component: ComplianceAiGovernance, access: "role", positionPermission: "menu_compliance_admin" },
   { path: "/compliance/access-log", component: ComplianceSensitiveAccessLog, access: "role", positionPermission: "menu_compliance_admin" },
   { path: "/compliance/contract-access-log", component: ComplianceContractAccessLog, access: "role", positionPermission: "menu_compliance_admin" },
+
+  // Menu Editor (owner only)
+  { path: "/admin/menu-editor", component: MenuEditor, access: "role", positionPermission: "menu_permissions" },
 
   { path: "*", component: NotFound, access: "public" },
 ];
