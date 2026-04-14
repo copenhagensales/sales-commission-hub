@@ -56,7 +56,27 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   
   const pulseSurvey = useShouldShowPulseSurvey();
   const { data: hasImmediatePaymentSales } = useHasImmediatePaymentSales();
+
+  // Menu config from database - controls sort_order and visibility
+  const { data: menuConfig } = useSidebarMenuConfig();
   
+  // Helper: check if a menu item is hidden via the menu editor
+  const isMenuHidden = useMemo(() => {
+    if (!menuConfig) return (_key: string) => false;
+    const configMap = new Map(menuConfig.map(c => [c.item_key, c]));
+    return (key: string) => {
+      const config = configMap.get(key);
+      return config ? !config.visible : false;
+    };
+  }, [menuConfig]);
+
+  // Helper: get sort order for top-level items
+  const getSortOrder = useMemo(() => {
+    if (!menuConfig) return (_key: string) => 0;
+    const configMap = new Map(menuConfig.map(c => [c.item_key, c]));
+    return (key: string) => configMap.get(key)?.sort_order ?? 999;
+  }, [menuConfig]);
+
   const [mitHjemOpen, setMitHjemOpen] = useState(
     ["/home", "/messages", "/my-profile", "/my-feedback", "/pulse-survey", "/refer-a-friend", "/my-goals", "/team-goals", "/immediate-payment-ase", "/tdc-opsummering"].some(path => location.pathname === path || location.pathname.startsWith(path))
   );
