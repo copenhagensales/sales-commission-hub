@@ -272,13 +272,23 @@ export function ProductPricingRulesDialog({
           applied_at: new Date().toISOString()
         });
         
-        // Auto-rematch all sale_items for this product
-        toast.info("Opdaterer historiske salg...");
-        const rematchResult = await rematchMutation.mutateAsync({ productId });
-        
-        if (rematchResult.stats.updated > 0) {
-          toast.success(`Opdaterede ${rematchResult.stats.updated} historiske salg med nye priser`);
-        }
+        // Fire-and-forget rematch in background
+        toast.info("Opdaterer salg i baggrunden...");
+        rematchMutation.mutate(
+          { productId },
+          {
+            onSuccess: (result) => {
+              if (result.stats.updated > 0) {
+                toast.success(`✓ ${result.stats.updated} salg opdateret med nye priser`);
+              } else {
+                toast.info("Ingen salg blev opdateret");
+              }
+            },
+            onError: () => {
+              toast.error("Baggrundsopdatering fejlede — prøv rematch manuelt");
+            },
+          }
+        );
         
         if (isRetroactive) {
           toast.warning("Prisændring gemt med retroaktiv dato");

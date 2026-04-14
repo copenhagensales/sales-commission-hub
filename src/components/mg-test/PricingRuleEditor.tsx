@@ -305,24 +305,27 @@ export function PricingRuleEditor({
         });
       }
     },
-    onSuccess: async () => {
+    onSuccess: () => {
       toast.success(existingRule ? "Regel opdateret" : "Regel oprettet");
-      
-      // Auto-rematch sale_items for this product
-      setIsRematching(true);
-      try {
-        toast.info("Opdaterer historiske salg...");
-        const result = await rematchMutation.mutateAsync({ productId });
-        if (result.stats.updated > 0) {
-          toast.success(`Opdaterede ${result.stats.updated} salg med nye prisregler`);
-        }
-      } catch {
-        // Error already handled by hook
-      } finally {
-        setIsRematching(false);
-      }
-      
       onSave();
+      
+      // Fire-and-forget rematch in background
+      toast.info("Opdaterer salg i baggrunden...");
+      rematchMutation.mutate(
+        { productId },
+        {
+          onSuccess: (result) => {
+            if (result.stats.updated > 0) {
+              toast.success(`✓ ${result.stats.updated} salg opdateret med nye prisregler`);
+            } else {
+              toast.info("Ingen salg blev opdateret");
+            }
+          },
+          onError: () => {
+            toast.error("Baggrundsopdatering fejlede — prøv rematch manuelt");
+          },
+        }
+      );
     },
     onError: (error) => {
       toast.error("Kunne ikke gemme regel: " + error.message);
