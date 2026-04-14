@@ -451,8 +451,8 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   ];
   const showSalaryMenu = !isMenuHidden('section_lon') && (user?.id ? SALARY_ALLOWED_USER_IDS.includes(user.id) : false);
   
-  // Check if Admin menu should be visible
-  const showAdminMenu = !isMenuHidden('section_admin') && p.canViewKpiDefinitions;
+  // Check if Admin menu should be visible (KPI or owner for menu editor)
+  const showAdminMenu = !isMenuHidden('section_admin') && (p.canViewKpiDefinitions || isOwner);
   
   // Check if AMO menu should be visible
   const showAmoMenu = !isMenuHidden('section_amo') && p.canView("menu_section_amo") && (
