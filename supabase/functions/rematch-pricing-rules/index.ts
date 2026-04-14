@@ -372,71 +372,85 @@ serve(async (req) => {
       }
     }
 
-    // Fetch sale_items - either all for specific product, or unmatched items
-    let query = supabase
-      .from("sale_items")
-      .select(`
-        id,
-        sale_id,
-        product_id,
-        quantity,
-        matched_pricing_rule_id,
-        mapped_commission,
-        mapped_revenue,
-        needs_mapping,
-        is_immediate_payment,
-        adversus_product_title,
-        sales!inner (
-          id,
-          source,
-          raw_payload,
-          dialer_campaign_id,
-          sale_datetime
-        )
-      `);
+    // Fetch sale_items with pagination to avoid 1000-row default limit
+    const PAGE_SIZE = 1000;
+    const saleItems: any[] = [];
+    let offset = 0;
+    let hasMore = true;
 
-    // Filter by specific sale_item IDs (highest priority)
-    if (saleItemIds && saleItemIds.length > 0) {
-      query = query.in("id", saleItemIds);
-    } else if (saleIds && saleIds.length > 0) {
-      // Filter by specific sale IDs
-      query = query.in("sale_id", saleIds);
-    } else if (productId) {
-      // If product_id is specified, rematch ALL items for that product (for price updates)
-      query = query.eq("product_id", productId);
-    } else {
-      // Otherwise, only process items without matched rule
-      // Include recently resolved needs_mapping items
-      if (resolvedItemIds.length > 0) {
-        // Fetch both: unmatched items AND recently resolved items
-        query = query.or(
-          `and(matched_pricing_rule_id.is.null,product_id.not.is.null),id.in.(${resolvedItemIds.join(",")})`
-        );
+    const selectFields = `
+      id,
+      sale_id,
+      product_id,
+      quantity,
+      matched_pricing_rule_id,
+      mapped_commission,
+      mapped_revenue,
+      needs_mapping,
+      is_immediate_payment,
+      adversus_product_title,
+      sales!inner (
+        id,
+        source,
+        raw_payload,
+        dialer_campaign_id,
+        sale_datetime
+      )
+    `;
+
+    while (hasMore) {
+      let query = supabase
+        .from("sale_items")
+        .select(selectFields)
+        .order("created_at", { ascending: true })
+        .range(offset, offset + PAGE_SIZE - 1);
+
+      // Filter by specific sale_item IDs (highest priority)
+      if (saleItemIds && saleItemIds.length > 0) {
+        query = query.in("id", saleItemIds);
+      } else if (saleIds && saleIds.length > 0) {
+        query = query.in("sale_id", saleIds);
+      } else if (productId) {
+        query = query.eq("product_id", productId);
       } else {
-        query = query
-          .is("matched_pricing_rule_id", null)
-          .not("product_id", "is", null);
+        if (resolvedItemIds.length > 0) {
+          query = query.or(
+            `and(matched_pricing_rule_id.is.null,product_id.not.is.null),id.in.(${resolvedItemIds.join(",")})`
+          );
+        } else {
+          query = query
+            .is("matched_pricing_rule_id", null)
+            .not("product_id", "is", null);
+        }
+      }
+
+      if (source) {
+        query = query.eq("sales.source", source);
+      }
+
+      if (limit && saleItems.length + PAGE_SIZE >= limit) {
+        query = query.limit(limit - saleItems.length);
+      }
+
+      const { data, error: itemsError } = await query;
+
+      if (itemsError) {
+        console.error("[rematch-pricing-rules] Error fetching sale_items at offset", offset, itemsError);
+        throw new Error(`Failed to fetch sale_items: ${itemsError.message}`);
+      }
+
+      if (data && data.length > 0) {
+        saleItems.push(...data);
+        offset += data.length;
+        hasMore = data.length === PAGE_SIZE && (!limit || saleItems.length < limit);
+      } else {
+        hasMore = false;
       }
     }
 
-    if (source) {
-      query = query.eq("sales.source", source);
-    }
+    console.log(`[rematch-pricing-rules] Fetched ${saleItems.length} sale_items in ${Math.ceil(offset / PAGE_SIZE) || 1} page(s)`);
 
-    if (limit) {
-      query = query.limit(limit);
-    }
-
-    const { data: saleItems, error: itemsError } = await query;
-
-    if (itemsError) {
-      console.error("[rematch-pricing-rules] Error fetching sale_items:", itemsError);
-      throw new Error(`Failed to fetch sale_items: ${itemsError.message}`);
-    }
-
-    console.log(`[rematch-pricing-rules] Found ${saleItems?.length || 0} sale_items to process`);
-
-    if (!saleItems || saleItems.length === 0) {
+    if (saleItems.length === 0) {
       return new Response(
         JSON.stringify({
           success: true,
