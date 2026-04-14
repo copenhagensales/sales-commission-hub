@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Building2, AlertTriangle, UserCheck, Star, X, Plus, Clock, History } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useEmployeeClientAssignments } from "@/hooks/useEmployeeClientAssignments";
