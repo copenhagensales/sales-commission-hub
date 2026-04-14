@@ -1,70 +1,28 @@
 
 
-## Menu Admin — Drag-and-drop styring af AppSidebar
+## Flyt menupunkter mellem sektioner med drag-and-drop
 
-### Baggrund
-AppSidebar.tsx er ~1950 linjer med hardcodet rækkefølge af ~15 sektioner (Mit Hjem, Spil, SOME, Personale, Ledelse, Vagtplan, Fieldmarketing, Rekruttering, Onboarding, Rapporter, Løn, Økonomi, Admin, AMO, Indstillinger) og ~60+ underpunkter. Rækkefølge og synlighed kan kun ændres via kodeændringer.
-
-### Hvad bygges
-
-En admin-side (`/admin/menu-editor`) hvor du kan:
-- **Trække sektioner op/ned** for at ændre rækkefølgen i sidebaren
-- **Trække menupunkter mellem sektioner** (f.eks. flytte "Fejlrapportering" ind under "Ledelse")
-- **Skjule/vise** sektioner og enkeltpunkter med en toggle
-- **Omdøbe** labels ved at klikke på teksten
-- Se en **live preview** af den nye menustruktur
-
-Permissions styrer stadig hvem der *kan* se et punkt — menu-editoren styrer kun *rækkefølge* og *synlighed* oveni permissions.
-
----
-
-### Teknisk arkitektur
-
-#### 1. Database: `sidebar_menu_config` tabel (migration)
-
+### Problem
+Linje 335 i `MenuEditor.tsx` blokerer eksplicit flytning mellem sektioner:
+```typescript
+if (activeItem.parent_key !== overItem.parent_key) return;
 ```
-id          uuid PK
-item_key    text UNIQUE   -- f.eks. "section_mit_hjem", "item_messages", "item_my_profile"
-parent_key  text NULL     -- NULL = top-level sektion, ellers sektionens item_key
-sort_order  int
-visible     boolean DEFAULT true
-label_override text NULL  -- NULL = brug default label
-icon_name   text NULL     -- Lucide icon navn (til fremtidig brug)
-created_at  timestamptz
-updated_at  timestamptz
-```
+Man kan kun sortere inden for samme sektion — ikke trække et punkt fra én sektion til en anden.
 
-Seed med nuværende struktur (alle ~75 rækker). RLS: kun brugere med owner/admin rolle kan læse/skrive.
+### Løsning
+Udvid drag-and-drop logikken til at understøtte cross-container flytning:
 
-#### 2. Hook: `useSidebarMenuConfig`
-- Henter menu-konfigurationen fra databasen
-- Fallback til hardcodet rækkefølge hvis tabellen er tom
-- Caches med React Query (staleTime: 5 min)
-- Eksporterer sorteret, hierarkisk struktur
+1. **Tilføj `onDragOver`-handler** — Når man trækker et item hen over en anden sektion eller et item i en anden sektion, opdater `parent_key` i realtid så man visuelt kan se hvor det lander.
 
-#### 3. Admin-side: `src/pages/MenuEditor.tsx`
-- Bruger `@dnd-kit/core` + `@dnd-kit/sortable` (allerede installeret i projektet)
-- Venstre side: Sortérbar liste af sektioner, hver med sortérbare underpunkter
-- Hver række: drag-handle ⠿ | ikon | label (klikbar for redigering) | synlighed-toggle
-- "Gem ændringer"-knap der batch-opdaterer hele konfigurationen
-- Preview-panel til højre der viser sidebaren som den vil se ud
+2. **Opdater `handleDragEnd`** — Fjern begrænsningen `parent_key !== overItem.parent_key`. Når et item droppes på/i en sektion det ikke tilhørte, sæt dets `parent_key` til den nye sektions `item_key` og re-beregn `sort_order`.
 
-#### 4. Refaktor AppSidebar.tsx
-- Erstat hardcodet rækkefølge med config fra `useSidebarMenuConfig`
-- Bevar al permissions-logik (den filtrerer stadig items)
-- Config bestemmer kun `sort_order` og `visible` — permissions har altid forrang
+3. **Droppable sektions-zoner** — Gør hver sektions børne-område til en droppable zone (via `useDroppable` fra `@dnd-kit/core`), så man kan trække et item direkte ind i en sektion — også når den er tom eller foldet ud.
 
-### Filer der oprettes/ændres
+4. **Visuel feedback** — Highlight den sektion man hoverer over med en farvet border, så det er tydeligt hvor punktet lander.
 
-| Fil | Handling |
-|-----|----------|
-| Migration (ny) | Opret `sidebar_menu_config` + seed + RLS |
-| `src/hooks/useSidebarMenuConfig.ts` | Ny hook til menu config CRUD |
-| `src/pages/MenuEditor.tsx` | Ny admin-side med drag-and-drop |
-| `src/components/layout/AppSidebar.tsx` | Læs rækkefølge fra config |
-| `src/routes/config.tsx` | Tilføj route til `/admin/menu-editor` |
+### Fil der ændres
 
-### Begrænsninger
-- Menupunkter med dynamisk logik (f.eks. Firmabil der kun vises for fieldmarketing-ansatte, Straksbetaling der vises baseret på salg) bevarer deres dynamiske visning — menu-editoren kan kun skjule dem yderligere, ikke tvinge dem synlige.
-- Badges (ulæste beskeder, ventende kontrakter) følger stadig de eksisterende hooks.
+| Fil | Ændring |
+|-----|---------|
+| `src/pages/MenuEditor.tsx` | Tilføj `onDragOver`, fjern parent_key-guard, tilføj droppable sektionszoner, visuel drop-feedback |
 
