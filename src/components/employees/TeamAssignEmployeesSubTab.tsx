@@ -247,11 +247,32 @@ function EmployeeClientRow({
             <SelectValue placeholder="Vælg primær kunde..." />
           </SelectTrigger>
           <SelectContent>
-            {teamClients.map(c => (
-              <SelectItem key={c.id} value={c.id} className="text-xs">
-                {c.name}
-              </SelectItem>
-            ))}
+            {(() => {
+              const teamClientIds = new Set(teamClients.map(c => c.id));
+              const otherClients = allClients.filter(c => !teamClientIds.has(c.id));
+              return (
+                <>
+                  <SelectGroup>
+                    <SelectLabel className="text-xs text-muted-foreground">Teamets kunder</SelectLabel>
+                    {teamClients.map(c => (
+                      <SelectItem key={c.id} value={c.id} className="text-xs">
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                  {otherClients.length > 0 && (
+                    <SelectGroup>
+                      <SelectLabel className="text-xs text-muted-foreground">Andre kunder</SelectLabel>
+                      {otherClients.map(c => (
+                        <SelectItem key={c.id} value={c.id} className="text-xs">
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  )}
+                </>
+              );
+            })()}
           </SelectContent>
         </Select>
       </div>
