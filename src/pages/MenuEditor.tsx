@@ -405,7 +405,7 @@ export default function MenuEditor() {
       </div>
 
       {hasChanges && (
-        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 text-sm text-yellow-700 dark:text-yellow-400">
+        <div className="bg-accent border border-border rounded-lg p-3 text-sm text-accent-foreground">
           Du har ugemte ændringer. Klik "Gem ændringer" for at anvende dem.
         </div>
       )}
