@@ -238,6 +238,14 @@ export function useUpdateEmailConfig() {
         .update({ ...updates, updated_at: new Date().toISOString() })
         .eq("id", existing.id);
       if (error) throw error;
+
+      // Sync cron job schedule when send_time changes
+      if (updates.send_time) {
+        const { error: rpcError } = await supabase.rpc("update_checklist_email_cron", {
+          new_time: updates.send_time,
+        });
+        if (rpcError) throw rpcError;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["fm-checklist-email-config"] });
