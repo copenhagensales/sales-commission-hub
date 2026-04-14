@@ -2,28 +2,29 @@
 
 ## Problem
 
-Cron-jobbet `fm-checklist-daily-summary` kører med schedule `0 18 * * *` (18:00 UTC = 20:00 dansk sommertid). Konfigurationen i `fm_checklist_email_config` siger `send_time: 15:00`, men **ingen kode synkroniserer `send_time` til cron-jobbet**.
+"Nulstil kode"-knappen på medarbejder-detaljesiden (EmployeeDetail.tsx linje 594) bruger `supabase.auth.resetPasswordForEmail()` — Supabase's indbyggede nulstilling. Men appen bruger et **custom token-baseret** reset-flow via edge functions:
 
-Når man ændrer afsendelsestidspunkt i admin-panelet, opdateres kun databaserækken — cron-jobbet forbliver uændret.
+1. `initiate-password-reset` — genererer token og sender email
+2. `validate-reset-token` — validerer token
+3. `complete-password-reset` — sætter ny adgangskode
+
+Den indbyggede Supabase-reset virker sandsynligvis ikke, fordi redirect-URL'en og flowet ikke matcher appens custom `/reset-password` side.
 
 ## Løsning
 
-### 1. Ret cron-jobbet NU (migration)
-Opdater det eksisterende cron-job til `0 13 * * *` (13:00 UTC = 15:00 CEST).
+Udskift `supabase.auth.resetPasswordForEmail()` kaldet i `EmployeeDetail.tsx` med et kald til `initiate-password-reset` edge function:
 
-### 2. Synkroniser `send_time` → cron ved ændring
-Udvid `useUpdateEmailConfig` i `useFmChecklist.ts` så den kalder en RPC-funktion der opdaterer cron-schedulet når `send_time` ændres.
+```typescript
+const { data, error } = await supabase.functions.invoke("initiate-password-reset", {
+  body: { email: employee.private_email }
+});
+```
 
-Opret en database-funktion `update_checklist_email_cron(new_time text)` der:
-- Parser `HH:mm` til UTC (fratrækker 2 timer for CEST / 1 time for CET)
-- Kører `cron.alter_job()` eller `unschedule` + `schedule` med det nye tidspunkt
+### Fil der ændres
 
-### 3. Tidszonebevidst konvertering
-Da Danmark skifter mellem CET (UTC+1) og CEST (UTC+2), brug `AT TIME ZONE 'Europe/Copenhagen'` i SQL-funktionen for korrekt UTC-konvertering hele året.
-
-### Filer der ændres
 | Fil | Ændring |
 |-----|---------|
-| Migration (ny) | Ret cron til `0 13 * * *` + opret `update_checklist_email_cron()` funktion |
-| `src/hooks/useFmChecklist.ts` | Kald RPC efter `send_time` opdatering |
+| `src/pages/EmployeeDetail.tsx` | Linje 594-596: Erstat `supabase.auth.resetPasswordForEmail` med `supabase.functions.invoke("initiate-password-reset", ...)` |
+
+En enkelt ændring — ca. 3 linjer kode.
 
