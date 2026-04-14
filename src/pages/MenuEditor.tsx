@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   DndContext,
   closestCenter,
@@ -9,6 +9,8 @@ import {
   DragEndEvent,
   DragOverlay,
   DragStartEvent,
+  DragOverEvent,
+  useDroppable,
 } from "@dnd-kit/core";
 import {
   arrayMove,
@@ -144,6 +146,33 @@ function getLabel(item: MenuConfigItem): string {
   return item.label_override || DEFAULT_LABELS[item.item_key] || item.item_key;
 }
 
+// Droppable zone for a section's children area
+function DroppableSectionZone({
+  sectionKey,
+  isOver,
+  children,
+}: {
+  sectionKey: string;
+  isOver: boolean;
+  children: React.ReactNode;
+}) {
+  const { setNodeRef } = useDroppable({ id: `droppable_${sectionKey}` });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "ml-8 mt-1 mb-2 space-y-1 min-h-[36px] rounded-md border-2 border-dashed p-1 transition-colors",
+        isOver
+          ? "border-primary bg-primary/10"
+          : "border-transparent"
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
 // Sortable menu item row
 function SortableMenuItem({
   item,
@@ -172,7 +201,7 @@ function SortableMenuItem({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: item.id });
+  } = useSortable({ id: item.id, data: { item } });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -268,6 +297,7 @@ export default function MenuEditor() {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
   const [hasChanges, setHasChanges] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [overSectionKey, setOverSectionKey] = useState<string | null>(null);
 
   useEffect(() => {
     if (rawItems) {
@@ -281,9 +311,13 @@ export default function MenuEditor() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  const sections = items
-    .filter((i) => i.parent_key === null)
-    .sort((a, b) => a.sort_order - b.sort_order);
+  const sections = useMemo(
+    () =>
+      items
+        .filter((i) => i.parent_key === null)
+        .sort((a, b) => a.sort_order - b.sort_order),
+    [items]
+  );
 
   const getChildren = useCallback(
     (sectionKey: string) =>
@@ -318,42 +352,112 @@ export default function MenuEditor() {
     });
   };
 
+  // Find which section a droppable/sortable id belongs to
+  const findSectionKeyForId = useCallback(
+    (id: string): string | null => {
+      // Check if it's a droppable zone id
+      if (typeof id === "string" && id.startsWith("droppable_")) {
+        return id.replace("droppable_", "");
+      }
+      const item = items.find((i) => i.id === id);
+      if (!item) return null;
+      // If it's a top-level section, return its item_key
+      if (item.parent_key === null) return item.item_key;
+      // Otherwise return its parent
+      return item.parent_key;
+    },
+    [items]
+  );
+
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string);
   };
 
+  const handleDragOver = (event: DragOverEvent) => {
+    const { active, over } = event;
+    if (!over) {
+      setOverSectionKey(null);
+      return;
+    }
+
+    const activeItem = items.find((i) => i.id === active.id);
+    if (!activeItem || activeItem.parent_key === null) {
+      // Don't allow sections to move into other sections
+      setOverSectionKey(null);
+      return;
+    }
+
+    const targetSectionKey = findSectionKeyForId(over.id as string);
+    setOverSectionKey(targetSectionKey);
+
+    // If hovering over a different section's child or droppable zone, move the item there
+    if (targetSectionKey && targetSectionKey !== activeItem.parent_key) {
+      // Auto-expand the target section
+      setExpandedSections((prev) => {
+        const next = new Set(prev);
+        next.add(targetSectionKey);
+        return next;
+      });
+
+      // Move item to new parent
+      setItems((prev) => {
+        const targetChildren = prev
+          .filter((i) => i.parent_key === targetSectionKey && i.id !== active.id)
+          .sort((a, b) => a.sort_order - b.sort_order);
+
+        const newSortOrder =
+          targetChildren.length > 0
+            ? targetChildren[targetChildren.length - 1].sort_order + 10
+            : 10;
+
+        return prev.map((i) =>
+          i.id === active.id
+            ? { ...i, parent_key: targetSectionKey, sort_order: newSortOrder }
+            : i
+        );
+      });
+      setHasChanges(true);
+    }
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveId(null);
+    setOverSectionKey(null);
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
     const activeItem = items.find((i) => i.id === active.id);
     const overItem = items.find((i) => i.id === over.id);
-    if (!activeItem || !overItem) return;
+    if (!activeItem) return;
 
-    // Only allow reordering within same parent
-    if (activeItem.parent_key !== overItem.parent_key) return;
+    // If dropping on a droppable zone (empty section), item was already moved in onDragOver
+    if ((over.id as string).startsWith("droppable_")) return;
 
-    const parentKey = activeItem.parent_key;
-    const siblings = items
-      .filter((i) => i.parent_key === parentKey)
-      .sort((a, b) => a.sort_order - b.sort_order);
+    if (!overItem) return;
 
-    const oldIndex = siblings.findIndex((i) => i.id === active.id);
-    const newIndex = siblings.findIndex((i) => i.id === over.id);
-    if (oldIndex === -1 || newIndex === -1) return;
+    // Reorder within same parent
+    if (activeItem.parent_key === overItem.parent_key) {
+      const parentKey = activeItem.parent_key;
+      const siblings = items
+        .filter((i) => i.parent_key === parentKey)
+        .sort((a, b) => a.sort_order - b.sort_order);
 
-    const reordered = arrayMove(siblings, oldIndex, newIndex);
+      const oldIndex = siblings.findIndex((i) => i.id === active.id);
+      const newIndex = siblings.findIndex((i) => i.id === over.id);
+      if (oldIndex === -1 || newIndex === -1) return;
 
-    setItems((prev) => {
-      const updated = [...prev];
-      reordered.forEach((item, idx) => {
-        const i = updated.findIndex((u) => u.id === item.id);
-        if (i !== -1) updated[i] = { ...updated[i], sort_order: (idx + 1) * 10 };
+      const reordered = arrayMove(siblings, oldIndex, newIndex);
+
+      setItems((prev) => {
+        const updated = [...prev];
+        reordered.forEach((item, idx) => {
+          const i = updated.findIndex((u) => u.id === item.id);
+          if (i !== -1) updated[i] = { ...updated[i], sort_order: (idx + 1) * 10 };
+        });
+        return updated;
       });
-      return updated;
-    });
-    setHasChanges(true);
+      setHasChanges(true);
+    }
   };
 
   const handleSave = async () => {
@@ -389,7 +493,7 @@ export default function MenuEditor() {
         <div>
           <h1 className="text-2xl font-bold">Menu Editor</h1>
           <p className="text-muted-foreground text-sm">
-            Træk og slip for at ændre rækkefølge. Klik på navn for at omdøbe. Permissions styrer stadig adgang.
+            Træk og slip for at ændre rækkefølge eller flytte punkter mellem sektioner. Klik på navn for at omdøbe.
           </p>
         </div>
         <div className="flex gap-2">
@@ -414,6 +518,7 @@ export default function MenuEditor() {
         sensors={sensors}
         collisionDetection={closestCenter}
         onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
         {/* Top-level sections */}
@@ -430,6 +535,7 @@ export default function MenuEditor() {
                 const isSection = section.item_key.startsWith("section_");
                 const children = isSection ? getChildren(section.item_key) : [];
                 const expanded = expandedSections.has(section.item_key);
+                const isSectionDropTarget = overSectionKey === section.item_key;
 
                 return (
                   <div key={section.id}>
@@ -443,9 +549,12 @@ export default function MenuEditor() {
                       childCount={isSection ? children.length : undefined}
                     />
 
-                    {/* Children */}
-                    {isSection && expanded && children.length > 0 && (
-                      <div className="ml-8 mt-1 mb-2 space-y-1">
+                    {/* Children — always show droppable zone when expanded or when it's a drop target */}
+                    {isSection && (expanded || isSectionDropTarget) && (
+                      <DroppableSectionZone
+                        sectionKey={section.item_key}
+                        isOver={isSectionDropTarget}
+                      >
                         <SortableContext
                           items={children.map((c) => c.id)}
                           strategy={verticalListSortingStrategy}
@@ -458,8 +567,13 @@ export default function MenuEditor() {
                               onLabelChange={updateLabel}
                             />
                           ))}
+                          {children.length === 0 && (
+                            <div className="text-xs text-muted-foreground text-center py-2">
+                              Træk et menupunkt herind
+                            </div>
+                          )}
                         </SortableContext>
-                      </div>
+                      </DroppableSectionZone>
                     )}
                   </div>
                 );
