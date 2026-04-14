@@ -158,6 +158,7 @@ import {
   ComplianceSensitiveAccessLog,
   ComplianceContractAccessLog,
   ShortLinkRedirect,
+  MenuEditor,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
