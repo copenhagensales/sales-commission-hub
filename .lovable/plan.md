@@ -1,28 +1,24 @@
 
 
-## Flyt menupunkter mellem sektioner med drag-and-drop
+## Baggrunds-rematch + fjern 1000-rækkers begrænsning
 
 ### Problem
-Linje 335 i `MenuEditor.tsx` blokerer eksplicit flytning mellem sektioner:
-```typescript
-if (activeItem.parent_key !== overItem.parent_key) return;
-```
-Man kan kun sortere inden for samme sektion — ikke trække et punkt fra én sektion til en anden.
+1. **Blokerende UI**: `PricingRuleEditor.tsx` bruger `await rematchMutation.mutateAsync()` i `onSuccess` — dialogen venter på at rematchen er færdig før den lukker.
+2. **1000-rækkers grænse**: Edge function `rematch-pricing-rules` bruger Supabase's standard `query` uden `.limit()` override eller paginering, så den henter max 1000 `sale_items` (Supabase default). Produkter med >1000 sale_items får kun opdateret de første 1000.
 
 ### Løsning
-Udvid drag-and-drop logikken til at understøtte cross-container flytning:
 
-1. **Tilføj `onDragOver`-handler** — Når man trækker et item hen over en anden sektion eller et item i en anden sektion, opdater `parent_key` i realtid så man visuelt kan se hvor det lander.
+#### 1. Baggrunds-rematch i PricingRuleEditor (+ ProductPricingRulesDialog)
+Ændr `onSuccess` så reglen gemmes og dialogen lukker med det samme. Rematchen kører som fire-and-forget via `rematchMutation.mutate()` (ikke `mutateAsync`). En toast informerer om at salg opdateres i baggrunden.
 
-2. **Opdater `handleDragEnd`** — Fjern begrænsningen `parent_key !== overItem.parent_key`. Når et item droppes på/i en sektion det ikke tilhørte, sæt dets `parent_key` til den nye sektions `item_key` og re-beregn `sort_order`.
+#### 2. Pagineret fetch i edge function
+Tilføj loop i `rematch-pricing-rules/index.ts` der henter sale_items i batches af 1000 (via `.range(offset, offset+999)`) indtil alle er hentet. Samme mønster som `fetchAllPaginated` i `integration-engine/utils/batch.ts`.
 
-3. **Droppable sektions-zoner** — Gør hver sektions børne-område til en droppable zone (via `useDroppable` fra `@dnd-kit/core`), så man kan trække et item direkte ind i en sektion — også når den er tom eller foldet ud.
-
-4. **Visuel feedback** — Highlight den sektion man hoverer over med en farvet border, så det er tydeligt hvor punktet lander.
-
-### Fil der ændres
+### Filer der ændres
 
 | Fil | Ændring |
 |-----|---------|
-| `src/pages/MenuEditor.tsx` | Tilføj `onDragOver`, fjern parent_key-guard, tilføj droppable sektionszoner, visuel drop-feedback |
+| `src/components/mg-test/PricingRuleEditor.tsx` | Linje 308-326: Fjern `await`, brug `mutate()` fire-and-forget, luk dialog med det samme |
+| `src/components/mg-test/ProductPricingRulesDialog.tsx` | Linje 275-280: Samme ændring — fire-and-forget rematch |
+| `supabase/functions/rematch-pricing-rules/index.ts` | Linje 376-430: Paginér sale_items fetch med `.range()` loop |
 
