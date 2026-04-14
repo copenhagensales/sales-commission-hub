@@ -1,24 +1,23 @@
 
 
-## Baggrunds-rematch + fjern 1000-rækkers begrænsning
+## Problem
 
-### Problem
-1. **Blokerende UI**: `PricingRuleEditor.tsx` bruger `await rematchMutation.mutateAsync()` i `onSuccess` — dialogen venter på at rematchen er færdig før den lukker.
-2. **1000-rækkers grænse**: Edge function `rematch-pricing-rules` bruger Supabase's standard `query` uden `.limit()` override eller paginering, så den henter max 1000 `sale_items` (Supabase default). Produkter med >1000 sale_items får kun opdateret de første 1000.
+The primary client selector in "Fordel medarbejdere" only lists clients assigned to the current team (`teamClients`). Cross-team client assignments are not possible for the primary selection.
 
-### Løsning
+## Solution
 
-#### 1. Baggrunds-rematch i PricingRuleEditor (+ ProductPricingRulesDialog)
-Ændr `onSuccess` så reglen gemmes og dialogen lukker med det samme. Rematchen kører som fire-and-forget via `rematchMutation.mutate()` (ikke `mutateAsync`). En toast informerer om at salg opdateres i baggrunden.
+Update `EmployeeClientRow` to show **all active clients** in the primary dropdown, not just team clients. Team clients will be shown first, with a visual separator, followed by other available clients.
 
-#### 2. Pagineret fetch i edge function
-Tilføj loop i `rematch-pricing-rules/index.ts` der henter sale_items i batches af 1000 (via `.range(offset, offset+999)`) indtil alle er hentet. Samme mønster som `fetchAllPaginated` i `integration-engine/utils/batch.ts`.
+### Changes
 
-### Filer der ændres
+**File: `src/components/employees/TeamAssignEmployeesSubTab.tsx`**
 
-| Fil | Ændring |
-|-----|---------|
-| `src/components/mg-test/PricingRuleEditor.tsx` | Linje 308-326: Fjern `await`, brug `mutate()` fire-and-forget, luk dialog med det samme |
-| `src/components/mg-test/ProductPricingRulesDialog.tsx` | Linje 275-280: Samme ændring — fire-and-forget rematch |
-| `supabase/functions/rematch-pricing-rules/index.ts` | Linje 376-430: Paginér sale_items fetch med `.range()` loop |
+1. Pass `allClients` to `EmployeeClientRow` (already fetched on line 67-78).
+2. In the primary `<Select>`, replace `teamClients.map(...)` with a grouped list:
+   - **Group 1**: Team clients (labeled "Teamets kunder")
+   - **Group 2**: Other clients (labeled "Andre kunder")
+   - Uses `SelectGroup` and `SelectLabel` from the select component for grouping.
+3. Update the `EmployeeClientRow` props to accept `allClients`.
+
+This is a small, focused change — only the primary dropdown rendering and its props need updating. The secondary dropdown already works correctly with all clients.
 
