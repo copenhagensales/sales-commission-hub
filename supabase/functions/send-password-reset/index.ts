@@ -153,7 +153,7 @@ serve(async (req) => {
     }
 
     // Build reset URL - use production URL
-    const productionUrl = "https://40ce8d9b-c988-4d3b-a8ed-63eb5bed2204.lovableproject.com";
+    const productionUrl = "https://stork.copenhagensales.dk";
     const resetUrl = `${productionUrl}/reset-password?token=${token}`;
     
     console.log("Reset URL created for employee:", employeeId);
