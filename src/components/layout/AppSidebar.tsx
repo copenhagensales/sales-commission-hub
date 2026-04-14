@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, ShieldCheck, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, ClipboardCheck, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity, Swords, Mail, Gift, FileBarChart, CreditCard, Pencil, Trophy, Wrench, BookOpen, TrendingUp, TrendingDown, PanelLeft, XCircle, List, Inbox, Bug } from "lucide-react";
+import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, ShieldCheck, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, ClipboardCheck, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity, Swords, Mail, Gift, FileBarChart, CreditCard, Pencil, Trophy, Wrench, BookOpen, TrendingUp, TrendingDown, PanelLeft, XCircle, List, Inbox, Bug, Menu as MenuIcon } from "lucide-react";
 import { EnvironmentSwitcher } from "./EnvironmentSwitcher";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import cphSalesLogo from "@/assets/cph-sales-logo.png";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +27,7 @@ import { useIsSalgskonsulent, useCodeOfConductLock } from "@/hooks/useCodeOfCond
 import { useHasImmediatePaymentSales } from "@/hooks/useHasImmediatePaymentSales";
 import { useFmBookingConflicts } from "@/hooks/useFmBookingConflicts";
 import { useTranslation } from "react-i18next";
+import { useSidebarMenuConfig, type MenuConfigItem } from "@/hooks/useSidebarMenuConfig";
 
 type NavItem = { name: string; href: string; icon: typeof Users; badgeKey?: string };
 
