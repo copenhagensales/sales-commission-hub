@@ -166,6 +166,7 @@ export function TeamAssignEmployeesSubTab({ teamId, teamClientIds, teamEmployeeI
               secondaryAssignments={secondaries}
               latestChange={latestChange}
               teamClients={teamClientsFiltered}
+              allClients={allClients}
               availableForSecondary={availableForSecondary}
               clientMap={clientMap}
               onSetPrimary={(clientId) => setPrimary({ employeeId: emp.id, newClientId: clientId })}
@@ -186,6 +187,7 @@ function EmployeeClientRow({
   secondaryAssignments,
   latestChange,
   teamClients,
+  allClients,
   availableForSecondary,
   clientMap,
   onSetPrimary,
@@ -198,6 +200,7 @@ function EmployeeClientRow({
   secondaryAssignments: { id: string; client_id: string }[];
   latestChange: { changed_at: string; old_client_id: string | null; new_client_id: string } | undefined;
   teamClients: Client[];
+  allClients: Client[];
   availableForSecondary: Client[];
   clientMap: Map<string, Client>;
   onSetPrimary: (clientId: string) => void;
