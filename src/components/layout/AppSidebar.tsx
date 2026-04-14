@@ -464,7 +464,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   
   // Check if Economic menu should be visible (owner always has access)
   const isOwner = p.position?.name?.toLowerCase() === "ejer";
-  const showEconomicMenu = isOwner || p.canView("menu_section_economic");
+  const showEconomicMenu = !isMenuHidden('section_economic') && (isOwner || p.canView("menu_section_economic"));
   return (
     <aside className={sidebarClasses}>
       <div className="flex h-full flex-col">
