@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Building2, AlertTriangle, UserCheck, Star, X, Plus, Clock, History } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useEmployeeClientAssignments } from "@/hooks/useEmployeeClientAssignments";
@@ -166,6 +166,7 @@ export function TeamAssignEmployeesSubTab({ teamId, teamClientIds, teamEmployeeI
               secondaryAssignments={secondaries}
               latestChange={latestChange}
               teamClients={teamClientsFiltered}
+              allClients={allClients}
               availableForSecondary={availableForSecondary}
               clientMap={clientMap}
               onSetPrimary={(clientId) => setPrimary({ employeeId: emp.id, newClientId: clientId })}
@@ -186,6 +187,7 @@ function EmployeeClientRow({
   secondaryAssignments,
   latestChange,
   teamClients,
+  allClients,
   availableForSecondary,
   clientMap,
   onSetPrimary,
@@ -198,6 +200,7 @@ function EmployeeClientRow({
   secondaryAssignments: { id: string; client_id: string }[];
   latestChange: { changed_at: string; old_client_id: string | null; new_client_id: string } | undefined;
   teamClients: Client[];
+  allClients: Client[];
   availableForSecondary: Client[];
   clientMap: Map<string, Client>;
   onSetPrimary: (clientId: string) => void;
@@ -244,11 +247,32 @@ function EmployeeClientRow({
             <SelectValue placeholder="Vælg primær kunde..." />
           </SelectTrigger>
           <SelectContent>
-            {teamClients.map(c => (
-              <SelectItem key={c.id} value={c.id} className="text-xs">
-                {c.name}
-              </SelectItem>
-            ))}
+            {(() => {
+              const teamClientIds = new Set(teamClients.map(c => c.id));
+              const otherClients = allClients.filter(c => !teamClientIds.has(c.id));
+              return (
+                <>
+                  <SelectGroup>
+                    <SelectLabel className="text-xs text-muted-foreground">Teamets kunder</SelectLabel>
+                    {teamClients.map(c => (
+                      <SelectItem key={c.id} value={c.id} className="text-xs">
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                  {otherClients.length > 0 && (
+                    <SelectGroup>
+                      <SelectLabel className="text-xs text-muted-foreground">Andre kunder</SelectLabel>
+                      {otherClients.map(c => (
+                        <SelectItem key={c.id} value={c.id} className="text-xs">
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  )}
+                </>
+              );
+            })()}
           </SelectContent>
         </Select>
       </div>
