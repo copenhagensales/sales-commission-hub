@@ -209,8 +209,17 @@ async function syncSalesSafe({ supabase, baseUrl, authHeader }: any, days: numbe
   const prodMappings = await fetchAll('adversus_product_mappings', '*');
   const agents = await fetchAll('agents', 'id, external_adversus_id, name');
 
-  // Mapas para búsqueda rápida
-  const mapByExtId = new Map(prodMappings.map((m: any) => [m.adversus_external_id, m.product_id]));
+  // Mapas para búsqueda rápida — price-aware mapping
+  // Build two maps: one for price-specific mappings, one for generic (null price) mappings
+  const mapByExtIdPrice = new Map<string, string>(); // key: "extId|price" -> product_id
+  const mapByExtIdGeneric = new Map<string, string>(); // key: "extId" -> product_id (fallback)
+  for (const m of prodMappings) {
+    if (m.unit_price != null) {
+      mapByExtIdPrice.set(`${m.adversus_external_id}|${m.unit_price}`, m.product_id);
+    } else {
+      mapByExtIdGeneric.set(m.adversus_external_id, m.product_id);
+    }
+  }
   const mapByName = new Map(products.map((p: any) => [p.name.toLowerCase(), p]));
   const mapAgents = new Map(agents.map((a: any) => [String(a.external_adversus_id), a]));
 
@@ -271,7 +280,9 @@ async function syncSalesSafe({ supabase, baseUrl, authHeader }: any, days: numbe
         const title = line.title || 'Producto desconocido'
         const quantity = line.quantity || 1
         
-        let productId = mapByExtId.get(extProdId)
+        // Price-aware mapping: try price-specific first, then generic fallback
+        const unitPrice = line.unitPrice || 0
+        let productId = mapByExtIdPrice.get(`${extProdId}|${unitPrice}`) || mapByExtIdGeneric.get(extProdId)
         let commission = 0
         let revenue = 0
         

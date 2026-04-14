@@ -321,7 +321,7 @@ serve(async (req) => {
     {
       const { data: needsMappingItems, error: nmError } = await supabase
         .from("sale_items")
-        .select("id, adversus_product_title")
+        .select("id, adversus_product_title, adversus_external_id, unit_price")
         .eq("needs_mapping", true)
         .is("product_id", null)
         .not("adversus_product_title", "is", null)
@@ -332,22 +332,32 @@ serve(async (req) => {
       } else if (needsMappingItems && needsMappingItems.length > 0) {
         console.log(`[rematch-pricing-rules] Found ${needsMappingItems.length} items with needs_mapping=true`);
 
-        // Get all adversus_product_mappings
-        const titles = [...new Set(needsMappingItems.map((i: any) => i.adversus_product_title))];
+        // Get all adversus_product_mappings (including unit_price for price-aware matching)
         const { data: mappings } = await supabase
           .from("adversus_product_mappings")
-          .select("adversus_product_title, product_id")
-          .in("adversus_product_title", titles)
+          .select("adversus_external_id, adversus_product_title, product_id, unit_price")
           .not("product_id", "is", null);
 
         if (mappings && mappings.length > 0) {
-          const titleToProductId = new Map<string, string>();
+          // Build price-aware and generic lookup maps
+          const priceSpecificMap = new Map<string, string>(); // "extId|price" -> product_id
+          const titleMap = new Map<string, string>(); // title -> product_id (generic fallback)
           for (const m of mappings) {
-            titleToProductId.set(m.adversus_product_title!, m.product_id!);
+            if (m.unit_price != null && m.adversus_external_id) {
+              priceSpecificMap.set(`${m.adversus_external_id}|${m.unit_price}`, m.product_id!);
+            }
+            if (m.adversus_product_title && !titleMap.has(m.adversus_product_title)) {
+              titleMap.set(m.adversus_product_title, m.product_id!);
+            }
           }
 
           for (const item of needsMappingItems) {
-            const resolvedProductId = titleToProductId.get(item.adversus_product_title!);
+            // Try price-specific mapping first, then title-based fallback
+            const priceKey = item.adversus_external_id && item.unit_price != null 
+              ? `${item.adversus_external_id}|${item.unit_price}` 
+              : null;
+            const resolvedProductId = (priceKey && priceSpecificMap.get(priceKey)) || titleMap.get(item.adversus_product_title!);
+            
             if (resolvedProductId) {
               if (!dryRun) {
                 const { error: updateErr } = await supabase

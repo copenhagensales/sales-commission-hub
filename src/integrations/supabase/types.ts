@@ -189,6 +189,7 @@ export type Database = {
           created_at: string | null
           id: string
           product_id: string | null
+          unit_price: number | null
           updated_at: string | null
         }
         Insert: {
@@ -197,6 +198,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           product_id?: string | null
+          unit_price?: number | null
           updated_at?: string | null
         }
         Update: {
@@ -205,6 +207,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           product_id?: string | null
+          unit_price?: number | null
           updated_at?: string | null
         }
         Relationships: [
