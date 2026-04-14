@@ -280,7 +280,9 @@ async function syncSalesSafe({ supabase, baseUrl, authHeader }: any, days: numbe
         const title = line.title || 'Producto desconocido'
         const quantity = line.quantity || 1
         
-        let productId = mapByExtId.get(extProdId)
+        // Price-aware mapping: try price-specific first, then generic fallback
+        const unitPrice = line.unitPrice || 0
+        let productId = mapByExtIdPrice.get(`${extProdId}|${unitPrice}`) || mapByExtIdGeneric.get(extProdId)
         let commission = 0
         let revenue = 0
         
