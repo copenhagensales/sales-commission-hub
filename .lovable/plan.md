@@ -2,29 +2,23 @@
 
 ## Problem
 
-"Nulstil kode"-knappen på medarbejder-detaljesiden (EmployeeDetail.tsx linje 594) bruger `supabase.auth.resetPasswordForEmail()` — Supabase's indbyggede nulstilling. Men appen bruger et **custom token-baseret** reset-flow via edge functions:
+Begge password-reset edge functions hardcoder reset-linket til:
+```
+https://40ce8d9b-c988-4d3b-a8ed-63eb5bed2204.lovableproject.com/reset-password?token=...
+```
 
-1. `initiate-password-reset` — genererer token og sender email
-2. `validate-reset-token` — validerer token
-3. `complete-password-reset` — sætter ny adgangskode
+Brugerne tilgår appen via `stork.copenhagensales.dk`, så linket virker ikke / ser ukendt ud.
 
-Den indbyggede Supabase-reset virker sandsynligvis ikke, fordi redirect-URL'en og flowet ikke matcher appens custom `/reset-password` side.
+Selve `/reset-password`-siden og hele flowet (validate → set password → login) er allerede implementeret og korrekt.
 
 ## Løsning
 
-Udskift `supabase.auth.resetPasswordForEmail()` kaldet i `EmployeeDetail.tsx` med et kald til `initiate-password-reset` edge function:
+Ret URL'en i begge edge functions:
 
-```typescript
-const { data, error } = await supabase.functions.invoke("initiate-password-reset", {
-  body: { email: employee.private_email }
-});
-```
+| Fil | Linje | Ændring |
+|-----|-------|---------|
+| `supabase/functions/initiate-password-reset/index.ts` | 187 | Ret til `"https://stork.copenhagensales.dk"` |
+| `supabase/functions/send-password-reset/index.ts` | 156 | Ret til `"https://stork.copenhagensales.dk"` |
 
-### Fil der ændres
-
-| Fil | Ændring |
-|-----|---------|
-| `src/pages/EmployeeDetail.tsx` | Linje 594-596: Erstat `supabase.auth.resetPasswordForEmail` med `supabase.functions.invoke("initiate-password-reset", ...)` |
-
-En enkelt ændring — ca. 3 linjer kode.
+To linjer ændres — derefter deployes begge functions. Herefter virker hele flowet: bruger modtager email → klikker link → lander på `/reset-password` → sætter nyt password → kan logge ind.
 
