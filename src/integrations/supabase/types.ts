@@ -11764,6 +11764,53 @@ export type Database = {
           },
         ]
       }
+      sidebar_menu_config: {
+        Row: {
+          created_at: string
+          href: string | null
+          icon_name: string | null
+          id: string
+          item_key: string
+          label_override: string | null
+          parent_key: string | null
+          sort_order: number
+          updated_at: string
+          visible: boolean
+        }
+        Insert: {
+          created_at?: string
+          href?: string | null
+          icon_name?: string | null
+          id?: string
+          item_key: string
+          label_override?: string | null
+          parent_key?: string | null
+          sort_order?: number
+          updated_at?: string
+          visible?: boolean
+        }
+        Update: {
+          created_at?: string
+          href?: string | null
+          icon_name?: string | null
+          id?: string
+          item_key?: string
+          label_override?: string | null
+          parent_key?: string | null
+          sort_order?: number
+          updated_at?: string
+          visible?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sidebar_menu_config_parent_key_fkey"
+            columns: ["parent_key"]
+            isOneToOne: false
+            referencedRelation: "sidebar_menu_config"
+            referencedColumns: ["item_key"]
+          },
+        ]
+      }
       sms_notification_log: {
         Row: {
           booking_assignment_id: string | null
