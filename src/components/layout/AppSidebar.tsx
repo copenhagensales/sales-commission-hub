@@ -451,6 +451,10 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   ];
   const showSalaryMenu = !isMenuHidden('section_lon') && (user?.id ? SALARY_ALLOWED_USER_IDS.includes(user.id) : false);
   
+  // Check if Economic menu should be visible (owner always has access)
+  const isOwner = p.position?.name?.toLowerCase() === "ejer";
+  const showEconomicMenu = !isMenuHidden('section_economic') && (isOwner || p.canView("menu_section_economic"));
+
   // Check if Admin menu should be visible (KPI or owner for menu editor)
   const showAdminMenu = !isMenuHidden('section_admin') && (p.canViewKpiDefinitions || isOwner);
   
@@ -461,10 +465,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   
   // Check if Spil (Games) menu should be visible
   const showSpilMenu = !isMenuHidden('section_spil') && (p.canViewH2h || p.canViewCommissionLeague);
-  
-  // Check if Economic menu should be visible (owner always has access)
-  const isOwner = p.position?.name?.toLowerCase() === "ejer";
-  const showEconomicMenu = !isMenuHidden('section_economic') && (isOwner || p.canView("menu_section_economic"));
   return (
     <aside className={sidebarClasses}>
       <div className="flex h-full flex-col">
