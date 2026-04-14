@@ -591,10 +591,9 @@ export default function EmployeeDetail() {
                   return;
                 }
                 
-                const { error } = await supabase.auth.resetPasswordForEmail(
-                  employee.private_email,
-                  { redirectTo: `${window.location.origin}/auth` }
-                );
+                const { data, error } = await supabase.functions.invoke("initiate-password-reset", {
+                  body: { email: employee.private_email }
+                });
                 
                 if (error) {
                   toast({ 
