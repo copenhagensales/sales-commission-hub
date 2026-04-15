@@ -26,6 +26,7 @@ import { useCarQuizCompletion } from "@/hooks/useCarQuiz";
 import { useIsSalgskonsulent, useCodeOfConductLock } from "@/hooks/useCodeOfConduct";
 import { useHasImmediatePaymentSales } from "@/hooks/useHasImmediatePaymentSales";
 import { useFmBookingConflicts } from "@/hooks/useFmBookingConflicts";
+import { useHasActiveTimeClock } from "@/hooks/useHasActiveTimeClock";
 import { useTranslation } from "react-i18next";
 import { useSidebarMenuConfig, type MenuConfigItem } from "@/hooks/useSidebarMenuConfig";
 
@@ -56,6 +57,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   
   const pulseSurvey = useShouldShowPulseSurvey();
   const { data: hasImmediatePaymentSales } = useHasImmediatePaymentSales();
+  const { data: hasActiveTimeClock } = useHasActiveTimeClock();
 
   // Menu config from database - controls sort_order and visibility
   const { data: menuConfig } = useSidebarMenuConfig();
@@ -502,7 +504,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
           <Collapsible open={mitHjemOpen} onOpenChange={setMitHjemOpen}>
             <CollapsibleTrigger className={cn(
               "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-              ["/home", "/messages", "/my-profile", "/my-feedback", "/refer-a-friend"].some(path => location.pathname === path || location.pathname.startsWith(path))
+              ["/home", "/messages", "/my-profile", "/my-feedback", "/refer-a-friend", "/my-time-clock"].some(path => location.pathname === path || location.pathname.startsWith(path))
                 ? "bg-sidebar-accent text-sidebar-accent-foreground"
                 : "text-sidebar-foreground hover:bg-sidebar-accent/50"
             )}>
@@ -677,6 +679,21 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                 >
                   <FileText className="h-4 w-4" />
                   TDC Opsummering
+                </NavLink>
+              )}
+
+              {/* Stempelur - only visible if employee has active time clocks */}
+              {hasActiveTimeClock && (
+                <NavLink
+                  to="/my-time-clock"
+                  onClick={handleNavClick}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/my-time-clock" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}
+                >
+                  <Timer className="h-4 w-4" />
+                  Stempelur
                 </NavLink>
               )}
             </CollapsibleContent>
