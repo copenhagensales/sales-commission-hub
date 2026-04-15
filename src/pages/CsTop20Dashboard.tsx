@@ -115,7 +115,7 @@ function formatDisplayName(fullName: string): string {
 
 export default function CsTop20Dashboard() {
   // Runtime access check - redirects if user doesn't have team-based permission
-  const { canView, isLoading: accessLoading } = useRequireDashboardAccess("cs-top-20");
+  const { canView, isLoading: accessLoading } = useRequireDashboardAccess("cs-top-20", { skip: tvMode });
   
   const tvMode = isTvMode();
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodSelection>(() => getDefaultPeriod("payroll_period"));
