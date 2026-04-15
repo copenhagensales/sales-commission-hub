@@ -253,6 +253,31 @@ function getDiffTone(diff: DiffField) {
   };
 }
 
+interface TdcUploadedStructured {
+  products: { name: string; quantity: number }[];
+  cpoTotal: string;
+  ttTrin: string;
+}
+
+function buildTdcUploadedStructured(
+  uploadedData: Record<string, unknown> | null,
+): TdcUploadedStructured | null {
+  if (!uploadedData) return null;
+  const products: { name: string; quantity: number }[] = [];
+  const productRows = uploadedData._product_rows as Record<string, unknown>[] | undefined;
+  if (productRows && productRows.length > 0) {
+    for (const r of productRows) {
+      const name = String(r["Produkt"] || r["produkt"] || "").trim();
+      if (!name) continue;
+      const qty = Number(r["Antal"] || r["antal"] || 1);
+      products.push({ name, quantity: qty });
+    }
+  }
+  const cpoTotal = uploadedData["CPO Total"] != null ? String(uploadedData["CPO Total"]).trim() : "";
+  const ttTrin = uploadedData["TT trin"] != null ? String(uploadedData["TT trin"]).trim() : "";
+  return products.length > 0 || cpoTotal || ttTrin ? { products, cpoTotal, ttTrin } : null;
+}
+
 function buildUploadedPreview(
   uploadedData: Record<string, unknown> | null,
   mapping: ColumnMapping | null,
@@ -260,9 +285,9 @@ function buildUploadedPreview(
 ): PreviewField[] {
   if (!uploadedData || Object.keys(uploadedData).length === 0) return [];
 
-  // TDC Erhverv: exclude TT and TT mandat fields
+  // TDC Erhverv: hide extra fields (structured rendering handles the rest)
   const hiddenFields = clientId === TDC_ERHVERV_CLIENT_ID
-    ? new Set(["TT", "TT mandat", "tt", "tt mandat"])
+    ? new Set(["TT", "TT mandat", "tt", "tt mandat", "OPP-nr.", "Produkt: Total", "Lukkedato", "Provision", "provision", "CPO Total", "TT trin"])
     : new Set<string>();
 
   const fields: PreviewField[] = [];
@@ -276,21 +301,20 @@ function buildUploadedPreview(
     seen.add(label);
   };
 
-  const productRows = uploadedData._product_rows as Record<string, unknown>[] | undefined;
-  if (productRows && productRows.length > 0) {
-    const productLabels = productRows
-      .map(r => {
-        const name = String(r["Produkt"] || r["produkt"] || "").trim();
-        if (!name) return "";
-        if (clientId === TDC_ERHVERV_CLIENT_ID) {
-          const antal = Number(r["Antal"] || r["antal"] || 1);
-          return antal > 1 ? `${name} ×${antal}` : name;
-        }
-        return name;
-      })
-      .filter(Boolean);
-    if (productLabels.length > 0) {
-      addField("Produkter", productLabels.join(", "));
+  // For TDC Erhverv, skip product rows here (rendered separately)
+  if (clientId !== TDC_ERHVERV_CLIENT_ID) {
+    const productRows = uploadedData._product_rows as Record<string, unknown>[] | undefined;
+    if (productRows && productRows.length > 0) {
+      const productLabels = productRows
+        .map(r => {
+          const name = String(r["Produkt"] || r["produkt"] || "").trim();
+          if (!name) return "";
+          return name;
+        })
+        .filter(Boolean);
+      if (productLabels.length > 0) {
+        addField("Produkter", productLabels.join(", "));
+      }
     }
   }
 
@@ -303,7 +327,7 @@ function buildUploadedPreview(
     addField(mapping.revenue_column, uploadedData[mapping.revenue_column]);
   }
 
-  if (mapping?.commission_column && !isIrrelevantValue(uploadedData[mapping.commission_column])) {
+  if (clientId !== TDC_ERHVERV_CLIENT_ID && mapping?.commission_column && !isIrrelevantValue(uploadedData[mapping.commission_column])) {
     addField(mapping.commission_column, uploadedData[mapping.commission_column]);
   }
 
@@ -1254,17 +1278,44 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                           )}
                         </TableCell>
                         <TableCell className="text-xs min-w-[260px] align-top">
-                          {uploadedPreview.length > 0 ? (
-                            <div className="space-y-1 max-h-32 overflow-auto">
-                              {uploadedPreview.map((field) => (
-                                <div key={field.label} className="leading-relaxed break-words">
-                                  <span className="text-muted-foreground">{field.label}:</span> {field.value}
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
+                          {(() => {
+                            if (clientId === TDC_ERHVERV_CLIENT_ID) {
+                              const structured = buildTdcUploadedStructured(g.uploadedData);
+                              if (structured) {
+                                return (
+                                  <div className="space-y-2">
+                                    {structured.products.length > 0 && (
+                                      <>
+                                        <div className="font-medium">Produkter</div>
+                                        <div className="flex flex-wrap gap-1.5">
+                                          {structured.products.map((p, idx) => (
+                                            <Badge key={`${p.name}-${idx}`} variant="outline" className="whitespace-normal break-words text-left h-auto py-1">
+                                              {p.name}{p.quantity > 1 ? ` ×${p.quantity}` : ""}
+                                            </Badge>
+                                          ))}
+                                        </div>
+                                      </>
+                                    )}
+                                    <div className="text-muted-foreground border-t pt-1 mt-1 space-y-0.5">
+                                      {structured.cpoTotal && <div>CPO Total: {structured.cpoTotal} kr</div>}
+                                      {structured.ttTrin !== "" && <div>TT trin: {structured.ttTrin}</div>}
+                                    </div>
+                                  </div>
+                                );
+                              }
+                            }
+                            return uploadedPreview.length > 0 ? (
+                              <div className="space-y-1 max-h-32 overflow-auto">
+                                {uploadedPreview.map((field) => (
+                                  <div key={field.label} className="leading-relaxed break-words">
+                                    <span className="text-muted-foreground">{field.label}:</span> {field.value}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell className="text-xs min-w-[220px] align-top">
                           {g.diffs.length > 0 ? (
