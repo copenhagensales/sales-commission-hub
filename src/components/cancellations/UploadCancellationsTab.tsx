@@ -1292,7 +1292,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           }
 
           // Only try condition-based matching if not already locked to a phone_excluded product
-          if (!resolvedProduct && groupedConditions.length > 0) {
+          if (!resolvedProduct && groupedConditions.length > 0 && uploadType !== "basket_difference") {
             // For TDC Erhverv: evaluate against each _product_rows sub-row
             const productRows = row.originalRow?._product_rows;
             if (Array.isArray(productRows) && productRows.length > 0) {
@@ -1529,7 +1529,8 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             }
 
             // Only try condition-based matching if not already locked to a phone_excluded product
-            if (!resolvedProductTitle && groupedConditions.length > 0) {
+            // Skip for basket_difference — product resolution happens in approval phase
+            if (!resolvedProductTitle && groupedConditions.length > 0 && uploadType !== "basket_difference") {
               // For TDC Erhverv: evaluate against each _product_rows sub-row
               const productRows = row.originalRow?._product_rows;
               if (Array.isArray(productRows) && productRows.length > 0) {
