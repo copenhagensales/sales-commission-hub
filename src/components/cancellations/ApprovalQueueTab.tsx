@@ -86,8 +86,20 @@ function isIrrelevantValue(val: unknown): boolean {
   return s === "total" || s === "0" || s === "";
 }
 
-function parseExcelDate(val: unknown): Date | null {
+function parseExcelDate(val: unknown, handleSerialDates = false): Date | null {
   if (!val) return null;
+
+  // Excel serial dates (days since 1900-01-01) — only for TDC Erhverv
+  if (handleSerialDates) {
+    const num = typeof val === "number" ? val
+      : (typeof val === "string" && /^\d{4,6}$/.test(val.trim()) ? Number(val) : null);
+    if (num && num > 1 && num < 200000) {
+      const epoch = new Date(Date.UTC(1900, 0, 1));
+      const d = new Date(epoch.getTime() + (num - 2) * 86400000);
+      return isNaN(d.getTime()) ? null : d;
+    }
+  }
+
   const s = String(val).trim();
   // dd/MM/yyyy or dd-MM-yyyy
   const dmy = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/);
@@ -112,6 +124,7 @@ function computeDiff(
   mapping: ColumnMapping | null,
   saleDate?: string,
   targetProductName?: string | null,
+  isTdcErhverv = false,
 ): DiffField[] {
   if (!uploadedData || Object.keys(uploadedData).length === 0) return [];
   if (!mapping) return [];
@@ -121,7 +134,7 @@ function computeDiff(
   // Date comparison
   if (mapping.date_column) {
     const excelRaw = uploadedData[mapping.date_column];
-    const excelDate = parseExcelDate(excelRaw);
+    const excelDate = parseExcelDate(excelRaw, isTdcErhverv);
     if (excelDate && saleDate) {
       const sysDate = new Date(saleDate);
       const excelStr = format(excelDate, "dd/MM/yyyy");
@@ -592,7 +605,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
             )
           : false;
 
-        const diffs = computeDiff(uploaded, saleItems, mapping, saleDateVal, targetProductName);
+        const diffs = computeDiff(uploaded, saleItems, mapping, saleDateVal, targetProductName, item.client_id === TDC_ERHVERV_CLIENT_ID);
         if (isPhoneExcluded || item.upload_type === "basket_difference") {
           for (const d of diffs) {
             if (d.isDifferent && mapping?.product_columns?.some(pc => d.label === pc)) {
@@ -651,7 +664,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
         }, "" as string);
         const groupTargetProducts = [...new Set(items.map((i) => i.target_product_name).filter(Boolean))];
         const groupTargetProductName = groupTargetProducts.length === 1 ? groupTargetProducts[0] : null;
-        const diffs = computeDiff(uploaded, aggregatedItems, mapping, earliestDate, groupTargetProductName);
+        const diffs = computeDiff(uploaded, aggregatedItems, mapping, earliestDate, groupTargetProductName, true);
         const isPhoneExcludedGroup = items.some((i) => i.isPhoneExcluded);
         if (isPhoneExcludedGroup || items[0]?.upload_type === "basket_difference") {
           for (const d of diffs) {
