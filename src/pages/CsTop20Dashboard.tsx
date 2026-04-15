@@ -265,12 +265,12 @@ export default function CsTop20Dashboard() {
         ) : (
           <div className={`divide-y ${tvMode ? 'divide-slate-700/30' : 'divide-border/40'}`}>
             {sellers.map((seller, index) => {
-              const name = seller.employeeName;
-              const sales = seller.salesCount;
-              const commission = seller.commission;
+              const name = seller.employeeName || seller.displayName || "Ukendt";
+              const sales = seller.salesCount ?? 0;
+              const commission = seller.commission ?? 0;
               const avatarUrl = seller.avatarUrl;
               const rankBadge = getRankBadge(index);
-              const displayName = seller.displayName;
+              const displayName = seller.displayName || name;
               
               // Top 3 get subtle highlight
               const isTopThree = index < 3;
