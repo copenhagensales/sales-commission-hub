@@ -278,11 +278,19 @@ function buildUploadedPreview(
 
   const productRows = uploadedData._product_rows as Record<string, unknown>[] | undefined;
   if (productRows && productRows.length > 0) {
-    const productNames = productRows
-      .map(r => String(r["Produkt"] || r["produkt"] || "").trim())
+    const productLabels = productRows
+      .map(r => {
+        const name = String(r["Produkt"] || r["produkt"] || "").trim();
+        if (!name) return "";
+        if (clientId === TDC_ERHVERV_CLIENT_ID) {
+          const antal = Number(r["Antal"] || r["antal"] || 1);
+          return antal > 1 ? `${name} ×${antal}` : name;
+        }
+        return name;
+      })
       .filter(Boolean);
-    if (productNames.length > 0) {
-      addField("Produkter", productNames.join(", "));
+    if (productLabels.length > 0) {
+      addField("Produkter", productLabels.join(", "));
     }
   }
 
