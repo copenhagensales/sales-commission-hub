@@ -169,6 +169,25 @@ const parseClientFromTitle = (title: string | null, clientList?: ClientRow[]): C
   );
 };
 
+/** Strip known client suffixes (e.g. " - TDC Erhverv") from product titles to avoid duplicates */
+const stripClientSuffix = (title: string, clientList?: ClientRow[]): string => {
+  if (!clientList) return title;
+  const separators = [" - ", " – ", "|"];
+  for (const sep of separators) {
+    const idx = title.lastIndexOf(sep);
+    if (idx !== -1) {
+      const suffix = title.slice(idx + sep.length).trim().toLowerCase();
+      const matchedClient = clientList.find(
+        (c) => c.name && c.name.trim().toLowerCase() === suffix
+      );
+      if (matchedClient) {
+        return title.slice(0, idx).trim();
+      }
+    }
+  }
+  return title;
+};
+
 // Parse client from source (e.g., "Eesy" -> "Eesy TM")
 const parseClientFromSource = (source: string | null, clientList?: ClientRow[]): ClientRow | null => {
   if (!source || !clientList || clientList.length === 0) return null;
@@ -1296,7 +1315,7 @@ export default function MgTest() {
       const { data: newProduct, error: insertError } = await supabase
         .from("products")
         .insert({
-          name: row.adversus_product_title || "Ukendt produkt",
+          name: stripClientSuffix(row.adversus_product_title || "Ukendt produkt", clients),
           external_product_code: row.adversus_external_id,
           commission_dkk: 0,
           revenue_dkk: 0,
@@ -1339,7 +1358,7 @@ export default function MgTest() {
       const { data, error } = await supabase
         .from("products")
         .insert({
-          name: row.adversus_product_title || "Ukendt produkt",
+          name: stripClientSuffix(row.adversus_product_title || "Ukendt produkt", clients),
           external_product_code: row.adversus_external_id,
           commission_dkk: 0,
           revenue_dkk: 0,
