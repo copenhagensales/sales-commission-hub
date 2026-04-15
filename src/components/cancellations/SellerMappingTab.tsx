@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { CLIENT_IDS } from "@/utils/clientIds";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -168,7 +169,12 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
   const [conditionDrafts, setConditionDrafts] = useState<Record<string, ConditionDraft>>({});
   const [customInputs, setCustomInputs] = useState<Record<string, string>>({});
 
-  const ALLOWED_COLUMNS = ["Operator", "Subscription Name", "Sales Department"] as const;
+  const TDC_ERHVERV_ID = CLIENT_IDS["TDC Erhverv"];
+  const isTdc = clientId === TDC_ERHVERV_ID;
+  const ALLOWED_COLUMNS = useMemo(() =>
+    isTdc ? ["Produkt", "TT trin"] as const : ["Operator", "Subscription Name", "Sales Department"] as const,
+    [isTdc]
+  );
 
   // Fetch existing conditions
   const { data: conditions = [], isLoading } = useQuery({
