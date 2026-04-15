@@ -1315,7 +1315,7 @@ export default function MgTest() {
       const { data: newProduct, error: insertError } = await supabase
         .from("products")
         .insert({
-          name: row.adversus_product_title || "Ukendt produkt",
+          name: stripClientSuffix(row.adversus_product_title || "Ukendt produkt", clients),
           external_product_code: row.adversus_external_id,
           commission_dkk: 0,
           revenue_dkk: 0,
@@ -1358,7 +1358,7 @@ export default function MgTest() {
       const { data, error } = await supabase
         .from("products")
         .insert({
-          name: row.adversus_product_title || "Ukendt produkt",
+          name: stripClientSuffix(row.adversus_product_title || "Ukendt produkt", clients),
           external_product_code: row.adversus_external_id,
           commission_dkk: 0,
           revenue_dkk: 0,
