@@ -105,7 +105,7 @@ function useCustomPeriodLeaderboard(
   });
 }
 
-function formatDisplayName(fullName: string): string {
+function formatDisplayName(fullName: string | null | undefined): string {
   if (!fullName) return "Ukendt";
   const parts = fullName.trim().split(" ");
   if (parts.length >= 2) {
