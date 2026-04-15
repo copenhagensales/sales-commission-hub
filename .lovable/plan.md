@@ -1,59 +1,31 @@
 
 
-# TDC Erhverv Produkt-betingelser for Kurv-rettelser
+# Fix: Tilføj OPP-matching i produkt-aware blokken for TDC Erhverv
 
-## Formål
-Opsæt produkt-conditions så Excel-produktrækker fra `_product_rows` (med `Produkt` og `TT trin`) kan mappes til interne produkter. Alt kan rettes manuelt via Mapping-tabben efterfølgende.
+## Problem
+Produkt-betingelserne sætter `hasAdvancedProductMatching = true`, som returnerer ved linje 1812 — **før** OPP-matchingen (linje 1833). TDC Erhverv bruger udelukkende OPP til at finde salg, så resultatet er 0 matches.
 
-## Ændringer
+## Excel-struktur bekræftet
+Filen har kolonnerne: `Lukkedato`, `OPP-nr.`, `Salgsmulighed opretter`, `TT`, `TT mandat`, `TT trin`, `Produkt`, `Pris`, `Indeks`, `Antal`, `CPO Total`. Flere produktrækker per OPP grupperet med en "Total"-række. Strukturen er identisk med hvad systemet allerede parser via `consolidateOppRows`.
 
-### 1. Dynamisk ALLOWED_COLUMNS i SellerMappingTab.tsx (linje 171)
-Gør kolonnerne kundeafhængige:
-- **TDC Erhverv**: `["Produkt", "TT trin"]`
-- **Alle andre**: `["Operator", "Subscription Name", "Sales Department"]` (uændret)
+## Løsning
+Indsæt **Pass 1c: OPP-matching** i den produkt-aware blok (efter Pass 1b log på linje 1435, før Pass 2 på linje 1437).
 
-For TDC, hent `columnValues` fra `_product_rows` i `uploaded_data` (nested JSON), ikke top-level felter.
+### Pass 1c logik:
+1. Tjek om `oppColumn !== "__none__"` og der er OPP-numre i data
+2. Byg `uploadedRowsByOpp` map og `indexByOpp` fra `dedupedData` (samme logik som standard-blokken linje 1863-1945)
+3. Brug `consolidateOppRows` til at samle produktrækker per OPP (genbrug funktionen fra linje 1897)
+4. Iterér `candidateSales`, match via `extractOpp(sale.raw_payload)`
+5. For hvert match:
+   - **Annulleringer**: Bestem `targetProductName` via `findMatchingProductId` mod `_product_rows`
+   - **Kurvrettelser** (`basket_difference`): Bestem `targetProductName` fra systemets eksisterende `sale_items` (sammenlign CPO/dato)
+6. Tilføj til `productMatched` og `matchedIndicesLocal`
 
-### 2. Opdater matching-logik i 3 filer
-Når `_product_rows` findes i uploaded data (TDC Erhverv), iterér over hver sub-række og kør `findMatchingProductId` mod den i stedet for top-level rækken:
+### Fil: `src/components/cancellations/UploadCancellationsTab.tsx`
+- Flyt `consolidateOppRows`-funktionen op **før** den produkt-aware blok (eller definer som separat utility), så den kan bruges begge steder
+- Indsæt Pass 1c mellem linje 1435 og 1437
+- Ingen andre filer ændres
 
-- **UploadCancellationsTab.tsx** (linje ~1296 og ~1522)
-- **ApprovalQueueTab.tsx** (linje ~761)
-
-### 3. Indsæt initielle produkt-betingelser i databasen
-Baseret på faktisk Excel-data. Alle 40 TDC-produkter:
-
-**Med tilskud (2 betingelser: Produkt + TT trin):**
-
-| Excel Produkt | TT trin | → Internt produkt |
-|---|---|---|
-| MOBIL PROFESSIONEL 100GB | 0/50/100 | Professionel mobil (100GB) 0/50/100% |
-| MOBIL PREMIUM 1TB | 0/50/100 | Premium mobil (1TB) 0/50/100% |
-| MOBIL STANDARD 40GB | 0/50/100 | Standard mobil (40GB) 0/50/100% |
-| MOBIL BASIS 40GB | 0/50/100 | Mobil Basis (40GB BTL) 0/50/100% |
-| MOBIL BASIS 15GB | 0/50/100 | Basis mobil (15GB) 0/50/100% |
-| MOBIL BASIS 5GB | 0/50/100 | Mobil Basis (5GB BTL) 0/50/100% |
-| MOBIL DK 3GB | 0/50/100 | Mobil DK (3GB) 0/50/100% |
-| MOBIL MINUT | 0/50/100 | Mobil minut 0/50/100% |
-| ERHVERV 5G FRI<50/10 | 0 | 5G - 50/10 |
-| ERHVERV 5G FRI<100/20 | 0 | 5G - 100/20 - TDC Erhverv |
-| ERHVERV 5G FRI<200/40 | 0 | 5G - 200/40 |
-| ERHVERV 5G FRI<500/100 | 0 | 5G - 500/100 |
-
-**Uden tilskud (kun Produkt):**
-
-| Excel Produkt | → Internt produkt |
-|---|---|
-| STANDARD OMSTILLING | Omstilling |
-| PROFESSIONEL OMSTILLING | Omstilling PROFESSIONEL |
-| INTERNETFILTER | Internetfilter |
-| READY SUPPORT AFTALE | Ready Support |
-
-Det giver ~80 condition-rækker (2 per produkt-variant). MBB-produkter og NUMMERRESERVATION har ingen Excel-data der kan mappes entydigt endnu — kan tilføjes manuelt via UI'et.
-
-### Filer der ændres
-1. **`src/components/cancellations/SellerMappingTab.tsx`** — Dynamiske kolonner + nested data extraction for TDC
-2. **`src/components/cancellations/UploadCancellationsTab.tsx`** — `_product_rows` sub-række evaluation
-3. **`src/components/cancellations/ApprovalQueueTab.tsx`** — Samme tilpasning
-4. **Database** — ~80 INSERT i `cancellation_product_conditions`
+### Resultat
+TDC Erhverv-uploads matcher igen via OPP-nummer, med korrekt produktmapping for annulleringer og CPO-baseret matching for kurvrettelser.
 
