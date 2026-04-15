@@ -80,7 +80,7 @@ async function parseWithExcelJS(
 ): Promise<{ rows: Record<string, unknown>[]; columns: string[]; sheetName: string }> {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(data);
-  const ws = wb.getWorksheet(1);
+  const ws = wb.worksheets[0];
   if (!ws) return { rows: [], columns: [], sheetName: "" };
 
   const headers: string[] = [];
