@@ -269,6 +269,7 @@ function buildUploadedPreview(
   const seen = new Set<string>();
 
   const addField = (label: string, value: unknown) => {
+    if (hiddenFields.has(label)) return;
     const rendered = value == null ? "" : String(value).trim();
     if (!rendered || seen.has(label)) return;
     fields.push({ label, value: rendered });
