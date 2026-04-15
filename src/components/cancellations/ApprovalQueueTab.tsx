@@ -605,7 +605,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
             )
           : false;
 
-        const diffs = computeDiff(uploaded, saleItems, mapping, saleDateVal, targetProductName);
+        const diffs = computeDiff(uploaded, saleItems, mapping, saleDateVal, targetProductName, item.client_id === TDC_ERHVERV_CLIENT_ID);
         if (isPhoneExcluded || item.upload_type === "basket_difference") {
           for (const d of diffs) {
             if (d.isDifferent && mapping?.product_columns?.some(pc => d.label === pc)) {
@@ -664,7 +664,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
         }, "" as string);
         const groupTargetProducts = [...new Set(items.map((i) => i.target_product_name).filter(Boolean))];
         const groupTargetProductName = groupTargetProducts.length === 1 ? groupTargetProducts[0] : null;
-        const diffs = computeDiff(uploaded, aggregatedItems, mapping, earliestDate, groupTargetProductName);
+        const diffs = computeDiff(uploaded, aggregatedItems, mapping, earliestDate, groupTargetProductName, true);
         const isPhoneExcludedGroup = items.some((i) => i.isPhoneExcluded);
         if (isPhoneExcludedGroup || items[0]?.upload_type === "basket_difference") {
           for (const d of diffs) {
