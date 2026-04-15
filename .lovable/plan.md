@@ -1,86 +1,60 @@
 
-# CS Top 20 fejler efter 10–20 min — sandsynlig årsag og fix
 
-## Hvad der sandsynligvis sker
-CS Top 20 i TV-mode bruger to forskellige datakilder:
+# Giv SOME-rollen adgang til Booking Flow — dynamisk via permissions
 
-1. `useCachedLeaderboards()` fra `kpi_leaderboard_cache`
-2. fallback til edge-funktionen `tv-dashboard-data?action=cs-top-20-data`
+## Problem
+RLS på `booking_flow_steps` bruger kun `is_teamleder_or_above()`, som ikke inkluderer SOME-rollen. Laura har `can_edit: true` på `menu_booking_flow` i permission-systemet, men databasen blokerer hende alligevel.
 
-De to kilder returnerer ikke samme shape:
+## Løsning
+Opretter en generisk DB-funktion der tjekker `role_page_permissions` dynamisk, så RLS følger permission-systemet i stedet for at hardcode roller.
 
-```text
-Cache:
-employeeName, displayName, salesCount, commission, avatarUrl, teamName
+### 1. Migration — ny funktion + opdaterede RLS policies
 
-Fallback:
-name, sales, commission, avatarUrl, employeeId, goalTarget, teamName
+**Ny funktion** `has_page_permission(user_id, permission_key, check_edit)`:
+```sql
+CREATE OR REPLACE FUNCTION public.has_page_permission(
+  _user_id uuid, _permission_key text, _check_edit boolean DEFAULT false
+) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public'
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM role_page_permissions rpp
+    JOIN job_positions jp ON jp.system_role_key = rpp.role_key
+    JOIN employee_master_data emd ON emd.position_id = jp.id
+    WHERE emd.auth_user_id = _user_id
+      AND rpp.permission_key = _permission_key
+      AND rpp.can_view = true
+      AND (_check_edit = false OR rpp.can_edit = true)
+  )
+$$;
 ```
 
-UI’en i `CsTop20Dashboard.tsx` forventer cache-shape hele tiden og kalder bl.a.:
+**Erstat de 4 hardcodede policies** med dynamiske:
+```sql
+-- Drop gamle
+DROP POLICY "Teamledere can view flow steps" ON booking_flow_steps;
+DROP POLICY "Teamledere can insert flow steps" ON booking_flow_steps;
+DROP POLICY "Teamledere can update flow steps" ON booking_flow_steps;
+DROP POLICY "Teamledere can delete flow steps" ON booking_flow_steps;
 
-```text
-const name = seller.employeeName
-getInitials(name) -> name.split(" ")
+-- Nye dynamiske policies
+CREATE POLICY "Can view flow steps" ON booking_flow_steps
+  FOR SELECT USING (has_page_permission(auth.uid(), 'menu_booking_flow'));
+
+CREATE POLICY "Can insert flow steps" ON booking_flow_steps
+  FOR INSERT WITH CHECK (has_page_permission(auth.uid(), 'menu_booking_flow', true));
+
+CREATE POLICY "Can update flow steps" ON booking_flow_steps
+  FOR UPDATE USING (has_page_permission(auth.uid(), 'menu_booking_flow', true));
+
+CREATE POLICY "Can delete flow steps" ON booking_flow_steps
+  FOR DELETE USING (has_page_permission(auth.uid(), 'menu_booking_flow', true));
 ```
 
-Når cache-data midlertidigt bliver tomt/fejler, slår siden over på fallback-data. Der mangler `employeeName`, så render crasher. Det forklarer godt hvorfor:
+### Resultat
+- Laura (SOME) får øjeblikkeligt adgang fordi hun allerede har `can_edit: true` i permission-systemet
+- Fremover styres adgangen 100% fra PermissionMap UI — ingen nye migrationer nødvendige
+- Owners bevarer adgang via `is_owner` fallback i permission-systemet (de har altid `can_view/can_edit`)
+- Ingen kodeændringer nødvendige — kun én migration
 
-- den virker i starten
-- den bryder efter noget tid
-- Superliga Live ikke har samme problem, fordi den bruger en dedikeret TV-datakilde med konsistent payload
-
-## Plan
-### 1. Gør TV-mode i CS Top 20 datakonsistent
-Opdater `src/pages/CsTop20Dashboard.tsx` så TV-mode aldrig renderer rå fallback-data direkte.
-
-- Lav en normalizer der mapper edge-function resultater til `LeaderboardEntry`
-- Map fx:
-  - `name -> employeeName`
-  - `name -> displayName` (eller formatteret navn)
-  - `sales -> salesCount`
-
-### 2. Brug den robuste TV-kilde som primær kilde
-For `/t/...` bør CS Top 20 hente TV-data på samme robuste måde som de dashboards der kører stabilt længe.
-
-- Brug edge-function fetch som primær kilde i TV-mode
-- Send publishable key/anon auth headers eksplicit, samme mønster som TV League
-- Behold cache som sekundær fallback eller fjern dobbeltkilde helt i TV-mode
-
-Det gør TV-boardet mindre afhængigt af browserens auth-/sessiontilstand over tid.
-
-### 3. Hardening i UI så én dårlig række ikke kan vælte hele boardet
-Opdater render-logikken i `CsTop20Dashboard.tsx`:
-
-- brug sikker navne-fallback:
-  - `seller.displayName || seller.employeeName || "Ukendt"`
-- gør `getInitials` tolerant over for tomme/undefined navne
-- undgå at avatar/navn-render kan kaste runtime errors
-
-### 4. Brug TV refresh-profil i stedet for dashboard-profil
-TV-mode skal bruge TV-refresh-konfiguration, ikke standard dashboard-refresh.
-
-- skift TV-queries i CS Top 20 fra `REFRESH_PROFILES.dashboard` til `REFRESH_PROFILES.tv`
-
-Det matcher resten af TV-arkitekturen bedre.
-
-## Filer der skal opdateres
-- `src/pages/CsTop20Dashboard.tsx`
-- evt. `src/hooks/useCachedLeaderboard.ts` hvis vi vil dele normalisering/sikre typer
-- evt. lille helper til safe initials, hvis det skal centraliseres
-
-## Teknisk note
-Den vigtigste konkrete fejl er kontrakt-brud mellem cache-data og fallback-data. Det er den slags fejl der ofte først viser sig efter noget tid, fordi fallback-path først bliver brugt ved cache-miss, transient fejl eller refresh-problemer.
-
-```text
-Cache virker -> board virker
-Cache bliver tom/fejler kortvarigt -> fallback aktiveres
-Fallback har forkert shape -> render crash
-```
-
-## QA efter implementering
-- Test `/t/5G2T` direkte
-- Lad boardet stå åbent i mindst 20–30 minutter
-- Verificér at det overlever flere refresh-cyklusser
-- Bekræft at både cache-path og fallback-path renderer korrekt
-- Tjek at der ikke længere kommer console-fejl fra `employeeName`, `displayName` eller `split()`
