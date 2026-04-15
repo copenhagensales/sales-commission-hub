@@ -14,7 +14,8 @@ import { toast } from "sonner";
  * if (!canView) return null; // Redirect handled by hook
  * ```
  */
-export function useRequireDashboardAccess(dashboardSlug: string) {
+export function useRequireDashboardAccess(dashboardSlug: string, options?: { skip?: boolean }) {
+  const skip = options?.skip ?? false;
   const navigate = useNavigate();
   const { canView, isLoading: canViewLoading } = useCanViewDashboard(dashboardSlug);
   const { isLoading: accessLoading, data: accessibleDashboards = [] } = useAccessibleDashboards();
@@ -31,9 +32,10 @@ export function useRequireDashboardAccess(dashboardSlug: string) {
     }
   }, [dashboardSlug]);
 
-  const isLoading = canViewLoading || accessLoading;
+  const isLoading = skip ? false : (canViewLoading || accessLoading);
 
   useEffect(() => {
+    if (skip) return;
     // Don't redirect if already redirected for this slug
     if (hasRedirectedRef.current) return;
     
@@ -48,7 +50,7 @@ export function useRequireDashboardAccess(dashboardSlug: string) {
         navigate("/dashboards", { replace: true });
       }
     }
-  }, [isLoading, canView, navigate, accessibleDashboards, dashboardSlug]);
+  }, [isLoading, canView, navigate, accessibleDashboards, dashboardSlug, skip]);
 
-  return { canView, isLoading };
+  return { canView: skip ? true : canView, isLoading };
 }
