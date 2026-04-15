@@ -62,6 +62,7 @@ export const CodeOfConduct = lazyPage(() => import("@/pages/CodeOfConduct"));
 export const CodeOfConductAdmin = lazyPage(() => import("@/pages/CodeOfConductAdmin"));
 export const ExtraWork = lazyPage(() => import("@/pages/ExtraWork"));
 export const ExtraWorkAdmin = lazyPage(() => import("@/pages/ExtraWorkAdmin"));
+export const MyTimeClock = lazyPage(() => import("@/pages/MyTimeClock"));
 
 export const RecruitmentDashboard = lazyPage(() => import("@/pages/recruitment/RecruitmentDashboard"));
 export const RecruitmentCandidates = lazyPage(() => import("@/pages/recruitment/Candidates"));

@@ -182,6 +182,7 @@ export const routes: RouteConfig[] = [
   { path: "/car-quiz", component: CarQuiz, access: "protected" },
   { path: "/code-of-conduct", component: CodeOfConduct, access: "protected" },
   { path: "/time-stamp", component: TimeStamp, access: "role", positionPermission: "menu_time_stamp" },
+  { path: "/my-time-clock", component: MyTimeClock, access: "protected" },
   { path: "/extra-work", component: ExtraWork, access: "role", positionPermission: "menu_extra_work" },
   { path: "/some", component: Some, access: "role", positionPermission: "menu_some" },
   { path: "/messages", component: Messages, access: "role", positionPermission: "menu_messages_personal" },
