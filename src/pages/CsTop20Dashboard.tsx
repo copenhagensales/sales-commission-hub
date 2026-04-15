@@ -106,11 +106,28 @@ function useCustomPeriodLeaderboard(
 }
 
 function formatDisplayName(fullName: string): string {
+  if (!fullName) return "Ukendt";
   const parts = fullName.trim().split(" ");
   if (parts.length >= 2) {
     return `${parts[0]} ${parts[parts.length - 1][0]}.`;
   }
   return fullName;
+}
+
+/** Normalize edge function seller data to LeaderboardEntry shape */
+function normalizeEdgeSellers(sellers: any[]): LeaderboardEntry[] {
+  if (!Array.isArray(sellers)) return [];
+  return sellers.map((s: any) => ({
+    employeeId: s.employeeId || s.employee_id || "",
+    employeeName: s.employeeName || s.name || "Ukendt",
+    displayName: s.displayName || formatDisplayName(s.employeeName || s.name || "Ukendt"),
+    avatarUrl: s.avatarUrl || s.avatar_url || null,
+    teamName: s.teamName || s.team_name || null,
+    salesCount: s.salesCount ?? s.sales ?? 0,
+    crossSaleCount: s.crossSaleCount ?? 0,
+    commission: s.commission ?? 0,
+    goalTarget: s.goalTarget ?? s.goal_target ?? null,
+  }));
 }
 
 export default function CsTop20Dashboard() {
@@ -134,7 +151,7 @@ export default function CsTop20Dashboard() {
     { enabled: canUseCache && !tvMode, limit: 20 }
   );
 
-  // TV mode: fetch all 3 periods at once
+  // TV mode: fetch all 3 periods at once from cache
   const { sellersToday, sellersWeek, sellersPayroll, isLoading: tvCachedLoading } = useCachedLeaderboards(
     { type: "global" },
     { enabled: tvMode, limit: 20 }
@@ -146,7 +163,7 @@ export default function CsTop20Dashboard() {
     { enabled: !canUseCache && !tvMode, limit: 20 }
   );
 
-  // For TV mode, also fetch from edge function as fallback (will be phased out)
+  // TV mode: edge function as primary fallback (with explicit anon key for session independence)
   const { data: tvData } = useQuery<{
     sellersToday: LeaderboardEntry[];
     sellersWeek: LeaderboardEntry[];
@@ -155,19 +172,31 @@ export default function CsTop20Dashboard() {
     queryKey: ["tv-cs-top-20-data"],
     queryFn: async () => {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       const response = await fetch(
-        `${supabaseUrl}/functions/v1/tv-dashboard-data?action=cs-top-20-data`
+        `${supabaseUrl}/functions/v1/tv-dashboard-data?action=cs-top-20-data`,
+        {
+          headers: {
+            "apikey": anonKey,
+            "Authorization": `Bearer ${anonKey}`,
+          },
+        }
       );
       if (!response.ok) {
         throw new Error("Failed to fetch TV data");
       }
-      return response.json();
+      const raw = await response.json();
+      return {
+        sellersToday: normalizeEdgeSellers(raw.sellersToday),
+        sellersWeek: normalizeEdgeSellers(raw.sellersWeek),
+        sellersPayroll: normalizeEdgeSellers(raw.sellersPayroll),
+      };
     },
-    enabled: tvMode && !sellersToday.length && !sellersWeek.length && !sellersPayroll.length,
-    ...REFRESH_PROFILES.dashboard,
+    enabled: tvMode,
+    ...REFRESH_PROFILES.tv,
   });
 
-  // TV mode: merge cached + fallback data for all 3 periods
+  // TV mode: prefer cache, fallback to edge function (both now have consistent shape)
   const tvSellersToday = sellersToday.length ? sellersToday : (tvData?.sellersToday || []);
   const tvSellersWeek = sellersWeek.length ? sellersWeek : (tvData?.sellersWeek || []);
   const tvSellersPayroll = sellersPayroll.length ? sellersPayroll : (tvData?.sellersPayroll || []);
@@ -236,12 +265,12 @@ export default function CsTop20Dashboard() {
         ) : (
           <div className={`divide-y ${tvMode ? 'divide-slate-700/30' : 'divide-border/40'}`}>
             {sellers.map((seller, index) => {
-              const name = seller.employeeName;
-              const sales = seller.salesCount;
-              const commission = seller.commission;
+              const name = seller.employeeName || seller.displayName || "Ukendt";
+              const sales = seller.salesCount ?? 0;
+              const commission = seller.commission ?? 0;
               const avatarUrl = seller.avatarUrl;
               const rankBadge = getRankBadge(index);
-              const displayName = seller.displayName;
+              const displayName = seller.displayName || name;
               
               // Top 3 get subtle highlight
               const isTopThree = index < 3;

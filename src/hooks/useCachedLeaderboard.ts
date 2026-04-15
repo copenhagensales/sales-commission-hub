@@ -109,7 +109,8 @@ export function formatDisplayName(fullName: string): string {
  * Get initials from name
  */
 export function getInitials(name: string): string {
-  const parts = name.split(" ");
+  if (!name) return "??";
+  const parts = name.trim().split(" ");
   if (parts.length >= 2) {
     return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
   }
