@@ -19,6 +19,7 @@ Deno.serve(async (req) => {
       candidatePhone,
       referrerName,
       referrerEmployeeName,
+      appliedPosition,
       message
     } = await req.json();
 
@@ -121,6 +122,14 @@ Deno.serve(async (req) => {
                       <a href="tel:${candidatePhone}" style="color: #667eea;">${candidatePhone || 'Ikke angivet'}</a>
                     </td>
                   </tr>
+                  ${appliedPosition ? `
+                  <tr>
+                    <td style="padding: 10px 0; border-bottom: 1px solid #eee; color: #666;">Søger stilling:</td>
+                    <td style="padding: 10px 0; border-bottom: 1px solid #eee; font-weight: bold;">
+                      ${appliedPosition}
+                    </td>
+                  </tr>
+                  ` : ''}
                 </table>
                 
                 <h3 style="color: #333; margin-top: 25px;">Henviser</h3>
