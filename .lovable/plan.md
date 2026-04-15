@@ -1,60 +1,48 @@
 
 
-# Giv SOME-rollen adgang til Booking Flow — dynamisk via permissions
+# Restyle "Uploadet data" kolonne for TDC Erhverv
 
-## Problem
-RLS på `booking_flow_steps` bruger kun `is_teamleder_or_above()`, som ikke inkluderer SOME-rollen. Laura har `can_edit: true` på `menu_booking_flow` i permission-systemet, men databasen blokerer hende alligevel.
+## Hvad der ændres
+For TDC Erhverv-rækker i OPP-grupperet visning: "Uploadet data"-kolonnen skal visuelt matche "System (aggregeret)"-kolonnens layout med produkter i Badge-bokse og en bundlinje med omsætning.
 
-## Løsning
-Opretter en generisk DB-funktion der tjekker `role_page_permissions` dynamisk, så RLS følger permission-systemet i stedet for at hardcode roller.
+## Ændringer i `src/components/cancellations/ApprovalQueueTab.tsx`
 
-### 1. Migration — ny funktion + opdaterede RLS policies
+### 1. Opdater `buildUploadedPreview` for TDC Erhverv
+Tilføj en ny returstruktur specifikt for TDC Erhverv der separerer:
+- **Produkter** → array af `{ name, quantity }` objekter (til Badge-visning)
+- **Bundfelter** → CPO Total og TT trin
+- **Skjulte felter** → OPP-nr., Produkt: Total, Lukkedato, Provision (udover de allerede skjulte TT/TT mandat)
 
-**Ny funktion** `has_page_permission(user_id, permission_key, check_edit)`:
-```sql
-CREATE OR REPLACE FUNCTION public.has_page_permission(
-  _user_id uuid, _permission_key text, _check_edit boolean DEFAULT false
-) RETURNS boolean
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public'
-AS $$
-  SELECT EXISTS (
-    SELECT 1
-    FROM role_page_permissions rpp
-    JOIN job_positions jp ON jp.system_role_key = rpp.role_key
-    JOIN employee_master_data emd ON emd.position_id = jp.id
-    WHERE emd.auth_user_id = _user_id
-      AND rpp.permission_key = _permission_key
-      AND rpp.can_view = true
-      AND (_check_edit = false OR rpp.can_edit = true)
-  )
-$$;
+Konkret: Udvid `hiddenFields` for TDC Erhverv med `"OPP-nr."`, `"Produkt: Total"`, `"Lukkedato"`, og provision-relaterede felter. Tilføj et flag eller separat funktion der returnerer struktureret data for TDC.
+
+### 2. Opdater renderingen af "Uploadet data"-cellen (linje ~1256-1268)
+For TDC Erhverv OPP-rækker: erstat den flade liste med:
+
+```text
+┌────────────────────────────────┐
+│ Produkter:                     │
+│ ┌──────────────────────┐       │
+│ │ MOBIL PROFESSIONEL   │       │
+│ │ 100GB ×3             │       │
+│ └──────────────────────┘       │
+│ ┌──────────────────────┐       │
+│ │ STANDARD OMSTILLING  │       │
+│ └──────────────────────┘       │
+│                                │
+│ CPO Total: 8400 kr             │
+│ TT trin: 0                     │
+└────────────────────────────────┘
 ```
 
-**Erstat de 4 hardcodede policies** med dynamiske:
-```sql
--- Drop gamle
-DROP POLICY "Teamledere can view flow steps" ON booking_flow_steps;
-DROP POLICY "Teamledere can insert flow steps" ON booking_flow_steps;
-DROP POLICY "Teamledere can update flow steps" ON booking_flow_steps;
-DROP POLICY "Teamledere can delete flow steps" ON booking_flow_steps;
+- Produkter vises i `Badge variant="outline"` med `×antal` (samme stil som System-kolonnen)
+- Bundlinje viser CPO Total og TT trin i `text-muted-foreground`
+- Ingen provision, OPP-nr., Produkt: Total eller Lukkedato
 
--- Nye dynamiske policies
-CREATE POLICY "Can view flow steps" ON booking_flow_steps
-  FOR SELECT USING (has_page_permission(auth.uid(), 'menu_booking_flow'));
+### 3. Ingen ændring for andre klienter
+Andre klienter beholder den eksisterende flade felt-liste.
 
-CREATE POLICY "Can insert flow steps" ON booking_flow_steps
-  FOR INSERT WITH CHECK (has_page_permission(auth.uid(), 'menu_booking_flow', true));
-
-CREATE POLICY "Can update flow steps" ON booking_flow_steps
-  FOR UPDATE USING (has_page_permission(auth.uid(), 'menu_booking_flow', true));
-
-CREATE POLICY "Can delete flow steps" ON booking_flow_steps
-  FOR DELETE USING (has_page_permission(auth.uid(), 'menu_booking_flow', true));
-```
-
-### Resultat
-- Laura (SOME) får øjeblikkeligt adgang fordi hun allerede har `can_edit: true` i permission-systemet
-- Fremover styres adgangen 100% fra PermissionMap UI — ingen nye migrationer nødvendige
-- Owners bevarer adgang via `is_owner` fallback i permission-systemet (de har altid `can_view/can_edit`)
-- Ingen kodeændringer nødvendige — kun én migration
+## Teknisk detalje
+- Én fil ændres: `ApprovalQueueTab.tsx`
+- Ca. 30-40 linjer ændret/tilføjet i `buildUploadedPreview` og renderingen
+- Bruger `clientId === TDC_ERHVERV_CLIENT_ID` guards som allerede eksisterer
 
