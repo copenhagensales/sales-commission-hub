@@ -106,11 +106,28 @@ function useCustomPeriodLeaderboard(
 }
 
 function formatDisplayName(fullName: string): string {
+  if (!fullName) return "Ukendt";
   const parts = fullName.trim().split(" ");
   if (parts.length >= 2) {
     return `${parts[0]} ${parts[parts.length - 1][0]}.`;
   }
   return fullName;
+}
+
+/** Normalize edge function seller data to LeaderboardEntry shape */
+function normalizeEdgeSellers(sellers: any[]): LeaderboardEntry[] {
+  if (!Array.isArray(sellers)) return [];
+  return sellers.map((s: any) => ({
+    employeeId: s.employeeId || s.employee_id || "",
+    employeeName: s.employeeName || s.name || "Ukendt",
+    displayName: s.displayName || formatDisplayName(s.employeeName || s.name || "Ukendt"),
+    avatarUrl: s.avatarUrl || s.avatar_url || null,
+    teamName: s.teamName || s.team_name || null,
+    salesCount: s.salesCount ?? s.sales ?? 0,
+    crossSaleCount: s.crossSaleCount ?? 0,
+    commission: s.commission ?? 0,
+    goalTarget: s.goalTarget ?? s.goal_target ?? null,
+  }));
 }
 
 export default function CsTop20Dashboard() {
