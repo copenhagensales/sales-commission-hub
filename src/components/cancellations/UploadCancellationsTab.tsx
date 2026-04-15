@@ -1434,6 +1434,98 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
         console.log("[handleMatch] productMatched (after pass 1b FM):", productMatched.length);
 
+        // --- PASS 1c: OPP-based matching (TDC Erhverv etc.) ---
+        if (oppColumn !== "__none__" && oppNumbers.length > 0) {
+          console.log("[handleMatch] PASS 1c: OPP matching within product-aware block", { oppCount: oppNumbers.length });
+
+          const oppRowsMap = new Map<string, Record<string, unknown>[]>();
+          const oppIndicesMap = new Map<string, number[]>();
+          dedupedData.forEach((row) => {
+            const ov = getCaseInsensitive(row.originalRow, oppColumn);
+            if (!ov) return;
+            const key = String(ov).toUpperCase().trim();
+            if (!key) return;
+            const rows = oppRowsMap.get(key) || [];
+            rows.push(row.originalRow);
+            oppRowsMap.set(key, rows);
+            const indices = oppIndicesMap.get(key) || [];
+            indices.push(row.originalIndex);
+            oppIndicesMap.set(key, indices);
+          });
+
+          const consolidateOppRowsLocal = (rows: Record<string, unknown>[]): Record<string, unknown> => {
+            const totalRow = rows.find(r => {
+              const pv = String(r["Produkt"] || r["produkt"] || "").trim();
+              return pv.toLowerCase() === "total";
+            }) || rows[rows.length - 1];
+            const productRows = rows.filter(r => {
+              const pv = String(r["Produkt"] || r["produkt"] || "").trim();
+              return pv.toLowerCase() !== "total" && pv !== "";
+            });
+            return { ...totalRow, _product_rows: productRows.length > 0 ? productRows : undefined };
+          };
+
+          const oppSet1c = new Set(oppNumbers.map(o => o.toUpperCase().trim()));
+
+          for (const sale of candidateSales) {
+            if (existingIds.has(sale.id)) continue;
+            const saleOpp = extractOpp(sale.raw_payload).toUpperCase().trim();
+            if (!saleOpp || !oppSet1c.has(saleOpp)) continue;
+
+            (oppIndicesMap.get(saleOpp) || []).forEach(i => matchedIndicesLocal.add(i));
+
+            const consolidatedRow = oppRowsMap.has(saleOpp)
+              ? consolidateOppRowsLocal(oppRowsMap.get(saleOpp)!)
+              : {};
+
+            const items = saleItemsMap.get(sale.id) || [];
+            const firstItem = items[0];
+            let targetProductName: string | undefined;
+
+            if (uploadType === "basket_difference") {
+              targetProductName = firstItem?.adversus_product_title || undefined;
+            } else {
+              const productRows = consolidatedRow._product_rows as Record<string, unknown>[] | undefined;
+              if (productRows && groupedConditions.length > 0) {
+                for (const subRow of productRows) {
+                  if (subRow && typeof subRow === "object") {
+                    const matchedPid = findMatchingProductId(groupedConditions, subRow as Record<string, unknown>, false);
+                    if (matchedPid) {
+                      targetProductName = condProductNames.get(matchedPid) || undefined;
+                      break;
+                    }
+                  }
+                }
+              }
+              if (!targetProductName) {
+                targetProductName = firstItem?.adversus_product_title || undefined;
+              }
+            }
+
+            const dedupKey = `${sale.id}|${targetProductName || ""}`;
+            if (matchedSaleProductKeys.has(dedupKey)) continue;
+            matchedSaleProductKeys.add(dedupKey);
+            existingIds.add(sale.id);
+
+            productMatched.push({
+              saleId: sale.id,
+              phone: sale.customer_phone || "",
+              company: sale.customer_company || "",
+              oppNumber: saleOpp,
+              saleDate: sale.sale_datetime || "",
+              employee: sale.agent_name || "Ukendt",
+              currentStatus: sale.validation_status || "pending",
+              uploadedRowData: consolidatedRow,
+              targetProductName,
+              realProductName: firstItem?.adversus_product_title || "Ukendt produkt",
+              commission: firstItem?.mapped_commission ?? undefined,
+              revenue: firstItem?.mapped_revenue ?? undefined,
+            });
+          }
+
+          console.log("[handleMatch] productMatched (after pass 1c OPP):", productMatched.length);
+        }
+
         // --- PASS 2: Seller + Date + Product fallback for phone-less / phone-excluded rows ---
         const unmatchedSellers: UnmatchedSellerRow[] = [];
         const hasPass2Sources = Boolean(
