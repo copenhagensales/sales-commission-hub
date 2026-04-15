@@ -6716,32 +6716,38 @@ export type Database = {
         Row: {
           client_id: string | null
           clock_type: Database["public"]["Enums"]["clock_type"]
+          cpo_per_hour: number | null
           created_at: string
           created_by: string | null
           employee_id: string
           hourly_rate: number
           id: string
           is_active: boolean
+          project_name: string | null
         }
         Insert: {
           client_id?: string | null
           clock_type: Database["public"]["Enums"]["clock_type"]
+          cpo_per_hour?: number | null
           created_at?: string
           created_by?: string | null
           employee_id: string
           hourly_rate?: number
           id?: string
           is_active?: boolean
+          project_name?: string | null
         }
         Update: {
           client_id?: string | null
           clock_type?: Database["public"]["Enums"]["clock_type"]
+          cpo_per_hour?: number | null
           created_at?: string
           created_by?: string | null
           employee_id?: string
           hourly_rate?: number
           id?: string
           is_active?: boolean
+          project_name?: string | null
         }
         Relationships: [
           {
