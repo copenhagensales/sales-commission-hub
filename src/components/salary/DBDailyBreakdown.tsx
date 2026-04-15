@@ -100,13 +100,15 @@ export function DBDailyBreakdown({ teamId, teamName, periodStart, periodEnd, onC
     const dailyData: DailyData[] = salesDates
       .sort()
       .map(date => {
-        const dayData = salesByDate[date];
+        const dayData = salesByDate[date] || { revenue: 0, commission: 0, sales: 0 };
+        const cpoRev = cpoRevenue?.byDate[date] || 0;
+        const totalRevenue = dayData.revenue + cpoRev;
         const specificExpense = expenseData.expensesByDate[date] || 0;
-        const db = dayData.revenue - dayData.commission - expensePerSalesDay - specificExpense;
+        const db = totalRevenue - dayData.commission - expensePerSalesDay - specificExpense;
         
         return {
           date,
-          revenue: dayData.revenue,
+          revenue: totalRevenue,
           sellerCommission: dayData.commission,
           distributedExpense: expensePerSalesDay,
           specificExpense,
