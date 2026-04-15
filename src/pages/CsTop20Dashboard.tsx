@@ -151,7 +151,7 @@ export default function CsTop20Dashboard() {
     { enabled: canUseCache && !tvMode, limit: 20 }
   );
 
-  // TV mode: fetch all 3 periods at once
+  // TV mode: fetch all 3 periods at once from cache
   const { sellersToday, sellersWeek, sellersPayroll, isLoading: tvCachedLoading } = useCachedLeaderboards(
     { type: "global" },
     { enabled: tvMode, limit: 20 }
@@ -163,7 +163,7 @@ export default function CsTop20Dashboard() {
     { enabled: !canUseCache && !tvMode, limit: 20 }
   );
 
-  // For TV mode, also fetch from edge function as fallback (will be phased out)
+  // TV mode: edge function as primary fallback (with explicit anon key for session independence)
   const { data: tvData } = useQuery<{
     sellersToday: LeaderboardEntry[];
     sellersWeek: LeaderboardEntry[];
@@ -172,19 +172,31 @@ export default function CsTop20Dashboard() {
     queryKey: ["tv-cs-top-20-data"],
     queryFn: async () => {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       const response = await fetch(
-        `${supabaseUrl}/functions/v1/tv-dashboard-data?action=cs-top-20-data`
+        `${supabaseUrl}/functions/v1/tv-dashboard-data?action=cs-top-20-data`,
+        {
+          headers: {
+            "apikey": anonKey,
+            "Authorization": `Bearer ${anonKey}`,
+          },
+        }
       );
       if (!response.ok) {
         throw new Error("Failed to fetch TV data");
       }
-      return response.json();
+      const raw = await response.json();
+      return {
+        sellersToday: normalizeEdgeSellers(raw.sellersToday),
+        sellersWeek: normalizeEdgeSellers(raw.sellersWeek),
+        sellersPayroll: normalizeEdgeSellers(raw.sellersPayroll),
+      };
     },
-    enabled: tvMode && !sellersToday.length && !sellersWeek.length && !sellersPayroll.length,
-    ...REFRESH_PROFILES.dashboard,
+    enabled: tvMode,
+    ...REFRESH_PROFILES.tv,
   });
 
-  // TV mode: merge cached + fallback data for all 3 periods
+  // TV mode: prefer cache, fallback to edge function (both now have consistent shape)
   const tvSellersToday = sellersToday.length ? sellersToday : (tvData?.sellersToday || []);
   const tvSellersWeek = sellersWeek.length ? sellersWeek : (tvData?.sellersWeek || []);
   const tvSellersPayroll = sellersPayroll.length ? sellersPayroll : (tvData?.sellersPayroll || []);
