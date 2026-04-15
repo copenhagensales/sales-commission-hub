@@ -32,6 +32,7 @@ import { useTeamAssistantLeaders, getTeamAssistantIds, getAllAssistantIds } from
 import { useStaffHoursCalculation } from "@/hooks/useStaffHoursCalculation";
 import { useClientPeriodComparison } from "@/hooks/useClientPeriodComparison";
 import { useSalesAggregatesExtended } from "@/hooks/useSalesAggregatesExtended";
+import { useCpoRevenue } from "@/hooks/useCpoRevenue";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
