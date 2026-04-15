@@ -11,6 +11,8 @@ export interface EmployeeTimeClock {
   is_active: boolean;
   created_at: string;
   created_by: string | null;
+  project_name: string | null;
+  cpo_per_hour: number;
 }
 
 export function useEmployeeTimeClocks(filters?: {
@@ -54,6 +56,8 @@ export function useEmployeeTimeClocks(filters?: {
       clientId?: string | null;
       clockType: "override" | "documentation" | "revenue";
       hourlyRate?: number;
+      projectName?: string | null;
+      cpoPerHour?: number;
     }) => {
       const { data: { user } } = await supabase.auth.getUser();
       const { error } = await supabase.from("employee_time_clocks").insert({
@@ -61,6 +65,8 @@ export function useEmployeeTimeClocks(filters?: {
         client_id: params.clientId || null,
         clock_type: params.clockType,
         hourly_rate: params.hourlyRate ?? 0,
+        project_name: params.projectName || null,
+        cpo_per_hour: params.cpoPerHour ?? 0,
         created_by: user?.id || null,
       });
       if (error) throw error;
@@ -84,11 +90,15 @@ export function useEmployeeTimeClocks(filters?: {
       clockType?: "override" | "documentation" | "revenue";
       hourlyRate?: number;
       isActive?: boolean;
+      projectName?: string | null;
+      cpoPerHour?: number;
     }) => {
       const updates: Record<string, any> = {};
       if (params.clockType !== undefined) updates.clock_type = params.clockType;
       if (params.hourlyRate !== undefined) updates.hourly_rate = params.hourlyRate;
       if (params.isActive !== undefined) updates.is_active = params.isActive;
+      if (params.projectName !== undefined) updates.project_name = params.projectName;
+      if (params.cpoPerHour !== undefined) updates.cpo_per_hour = params.cpoPerHour;
 
       const { error } = await supabase
         .from("employee_time_clocks")
