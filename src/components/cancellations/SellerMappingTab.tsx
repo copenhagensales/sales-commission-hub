@@ -226,7 +226,17 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
 
       for (const row of queueResult.data || []) {
         if (row.uploaded_data && typeof row.uploaded_data === "object") {
-          extractFromRow(row.uploaded_data as Record<string, unknown>);
+          const ud = row.uploaded_data as Record<string, unknown>;
+          // For TDC: extract from nested _product_rows
+          if (isTdc && Array.isArray(ud._product_rows)) {
+            for (const subRow of ud._product_rows) {
+              if (subRow && typeof subRow === "object") {
+                extractFromRow(subRow as Record<string, unknown>);
+              }
+            }
+          } else {
+            extractFromRow(ud);
+          }
         }
       }
 
@@ -234,7 +244,16 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
         if (!Array.isArray(imp.unmatched_rows)) continue;
         for (const row of imp.unmatched_rows) {
           if (row && typeof row === "object") {
-            extractFromRow(row as Record<string, unknown>);
+            const r = row as Record<string, unknown>;
+            if (isTdc && Array.isArray(r._product_rows)) {
+              for (const subRow of r._product_rows) {
+                if (subRow && typeof subRow === "object") {
+                  extractFromRow(subRow as Record<string, unknown>);
+                }
+              }
+            } else {
+              extractFromRow(r);
+            }
           }
         }
       }
