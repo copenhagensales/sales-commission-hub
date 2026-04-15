@@ -713,6 +713,13 @@ export function ClientDBTab() {
     enabled: !useKpiCache && clientsWithTeams !== undefined,
   });
 
+  // Get CPO-based revenue per client
+  const { data: cpoRevenue } = useCpoRevenue({
+    periodStart,
+    periodEnd,
+    enabled: true,
+  });
+
   // Merge data sources
   const salesByClient = useMemo(() => {
     if (useKpiCache && kpiClientData) {
