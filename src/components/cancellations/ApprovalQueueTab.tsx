@@ -124,6 +124,7 @@ function computeDiff(
   mapping: ColumnMapping | null,
   saleDate?: string,
   targetProductName?: string | null,
+  isTdcErhverv = false,
 ): DiffField[] {
   if (!uploadedData || Object.keys(uploadedData).length === 0) return [];
   if (!mapping) return [];
@@ -133,7 +134,7 @@ function computeDiff(
   // Date comparison
   if (mapping.date_column) {
     const excelRaw = uploadedData[mapping.date_column];
-    const excelDate = parseExcelDate(excelRaw);
+    const excelDate = parseExcelDate(excelRaw, isTdcErhverv);
     if (excelDate && saleDate) {
       const sysDate = new Date(saleDate);
       const excelStr = format(excelDate, "dd/MM/yyyy");
