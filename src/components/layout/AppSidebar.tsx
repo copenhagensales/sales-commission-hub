@@ -679,6 +679,21 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                   TDC Opsummering
                 </NavLink>
               )}
+
+              {/* Stempelur - only visible if employee has active time clocks */}
+              {hasActiveTimeClock && (
+                <NavLink
+                  to="/my-time-clock"
+                  onClick={handleNavClick}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/my-time-clock" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}
+                >
+                  <Timer className="h-4 w-4" />
+                  Stempelur
+                </NavLink>
+              )}
             </CollapsibleContent>
           </Collapsible>
 
