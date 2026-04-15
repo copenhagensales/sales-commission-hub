@@ -333,6 +333,20 @@ export function TeamTimeClockTab({ teamId, teamMemberIds }: Props) {
               </Select>
             </div>
 
+            {/* Project name */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Projektnavn (valgfri)</Label>
+              <Input
+                value={form.projectName}
+                onChange={(e) => setForm({ ...form, projectName: e.target.value })}
+                placeholder="f.eks. Q2 Kampagne"
+                className="h-11"
+              />
+              <p className="text-xs text-muted-foreground">
+                Bruges til fakturering — navngiv projektet kunden faktureres under
+              </p>
+            </div>
+
             {/* Hourly rate (only for revenue) */}
             {form.clockType === "revenue" && (
               <div className="space-y-2">
@@ -351,6 +365,23 @@ export function TeamTimeClockTab({ teamId, teamMemberIds }: Props) {
                 </p>
               </div>
             )}
+
+            {/* CPO per hour */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">CPO pr. time (DKK)</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.cpoPerHour || ""}
+                onChange={(e) => setForm({ ...form, cpoPerHour: parseFloat(e.target.value) || 0 })}
+                placeholder="0.00"
+                className="h-11"
+              />
+              <p className="text-xs text-muted-foreground">
+                Cost-per-order pr. time — bruges til beregning og fakturering
+              </p>
+            </div>
           </div>
 
           <DialogFooter>
