@@ -86,8 +86,20 @@ function isIrrelevantValue(val: unknown): boolean {
   return s === "total" || s === "0" || s === "";
 }
 
-function parseExcelDate(val: unknown): Date | null {
+function parseExcelDate(val: unknown, handleSerialDates = false): Date | null {
   if (!val) return null;
+
+  // Excel serial dates (days since 1900-01-01) — only for TDC Erhverv
+  if (handleSerialDates) {
+    const num = typeof val === "number" ? val
+      : (typeof val === "string" && /^\d{4,6}$/.test(val.trim()) ? Number(val) : null);
+    if (num && num > 1 && num < 200000) {
+      const epoch = new Date(Date.UTC(1900, 0, 1));
+      const d = new Date(epoch.getTime() + (num - 2) * 86400000);
+      return isNaN(d.getTime()) ? null : d;
+    }
+  }
+
   const s = String(val).trim();
   // dd/MM/yyyy or dd-MM-yyyy
   const dmy = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/);
