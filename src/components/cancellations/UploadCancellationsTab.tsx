@@ -1293,8 +1293,19 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
           // Only try condition-based matching if not already locked to a phone_excluded product
           if (!resolvedProduct && groupedConditions.length > 0) {
-            const matchedPid = findMatchingProductId(groupedConditions, row.originalRow, idx < 3);
-            if (matchedPid) resolvedProduct = condProductNames.get(matchedPid) || null;
+            // For TDC Erhverv: evaluate against each _product_rows sub-row
+            const productRows = row.originalRow?._product_rows;
+            if (Array.isArray(productRows) && productRows.length > 0) {
+              for (const subRow of productRows) {
+                if (subRow && typeof subRow === "object") {
+                  const matchedPid = findMatchingProductId(groupedConditions, subRow as Record<string, unknown>, idx < 3);
+                  if (matchedPid) { resolvedProduct = condProductNames.get(matchedPid) || null; break; }
+                }
+              }
+            } else {
+              const matchedPid = findMatchingProductId(groupedConditions, row.originalRow, idx < 3);
+              if (matchedPid) resolvedProduct = condProductNames.get(matchedPid) || null;
+            }
           }
 
           if (!resolvedProduct && rawRowProduct) {
@@ -1519,9 +1530,20 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
             // Only try condition-based matching if not already locked to a phone_excluded product
             if (!resolvedProductTitle && groupedConditions.length > 0) {
-              const matchedPid = findMatchingProductId(groupedConditions, row.originalRow, idx < 3);
-              if (matchedPid) {
-                resolvedProductTitle = condProductNames.get(matchedPid) || null;
+              // For TDC Erhverv: evaluate against each _product_rows sub-row
+              const productRows = row.originalRow?._product_rows;
+              if (Array.isArray(productRows) && productRows.length > 0) {
+                for (const subRow of productRows) {
+                  if (subRow && typeof subRow === "object") {
+                    const matchedPid = findMatchingProductId(groupedConditions, subRow as Record<string, unknown>, idx < 3);
+                    if (matchedPid) { resolvedProductTitle = condProductNames.get(matchedPid) || null; break; }
+                  }
+                }
+              } else {
+                const matchedPid = findMatchingProductId(groupedConditions, row.originalRow, idx < 3);
+                if (matchedPid) {
+                  resolvedProductTitle = condProductNames.get(matchedPid) || null;
+                }
               }
             }
 

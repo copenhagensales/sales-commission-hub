@@ -758,7 +758,19 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
 
           for (const qi of itemsNeedingResolution) {
             const ud = qi.uploaded_data as Record<string, unknown>;
-            const matchedPid = findMatchingProductId(grouped, ud);
+            // For TDC Erhverv: evaluate against each _product_rows sub-row
+            const productRows = ud._product_rows;
+            let matchedPid: string | null = null;
+            if (Array.isArray(productRows) && productRows.length > 0) {
+              for (const subRow of productRows) {
+                if (subRow && typeof subRow === "object") {
+                  matchedPid = findMatchingProductId(grouped, subRow as Record<string, unknown>);
+                  if (matchedPid) break;
+                }
+              }
+            } else {
+              matchedPid = findMatchingProductId(grouped, ud);
+            }
             if (matchedPid) {
               const pName = condProductNames.get(matchedPid);
               if (pName) {
