@@ -1,39 +1,24 @@
 
 
-# Tilføj stillingsvælger til anbefalingsformularen
+# Fix: "Tom fil" ved Excel-upload
 
 ## Problem
-Når nogen anbefales via det offentlige henvisningslink, bliver der ikke registreret hvilken stilling de søger. Denne information mangler derfor også når de konverteres til kandidat og videre til personale.
+`parseWithExcelJS` bruger `wb.getWorksheet(1)` som henter worksheet efter **ID**, ikke efter position. Hvis Excel-filen har et worksheet med ID ≠ 1 (f.eks. efter kopiering/redigering), returnerer ExcelJS `undefined`. Funktionen returnerer da `{ rows: [], columns: [] }` — uden at kaste en fejl. Dermed trigges SheetJS-fallbacken aldrig, og systemet viser "Tom fil".
 
 ## Løsning
-Tilføj et `applied_position` felt hele vejen gennem flowet: offentlig formular → edge function → `employee_referrals` tabel → kandidat-konvertering.
+Ændr `wb.getWorksheet(1)` til `wb.worksheets[0]` som altid henter det første worksheet uanset ID.
 
-## Ændringer
+## Ændring
 
-### 1. Database: Tilføj kolonne til `employee_referrals`
-Migration der tilføjer `applied_position TEXT` til `employee_referrals`.
+### `src/utils/excel.ts` — linje 83
+Fra:
+```ts
+const ws = wb.getWorksheet(1);
+```
+Til:
+```ts
+const ws = wb.worksheets[0];
+```
 
-### 2. Edge function: `submit-referral/index.ts`
-- Tilføj `applied_position?: string` til `ReferralRequest` interface
-- Inkludér feltet i INSERT
-
-### 3. Offentlig formular: `PublicReferralForm.tsx`
-- Tilføj `appliedPosition` til `FormData` interface
-- Tilføj en Select dropdown med stillingerne: Salgskonsulent, Fieldmarketing, Teamleder, Backoffice (samme som `NewCandidateDialog`)
-- Send `applied_position` med i `submitReferral.mutateAsync()`
-
-### 4. Hook: `useReferrals.ts`
-- Tilføj `applied_position` til `useSubmitReferral` mutation data og body
-- Tilføj `applied_position` til `Referral` interface
-- I `useConvertReferralToCandidate`: sæt `applied_position` fra referral ved kandidat-oprettelse
-
-### 5. Notifikation: `notify-referral-received/index.ts`
-- Inkludér `appliedPosition` i email-body så rekruttering kan se det
-
-## Berørte filer
-- `supabase/functions/submit-referral/index.ts`
-- `supabase/functions/notify-referral-received/index.ts`
-- `src/pages/PublicReferralForm.tsx`
-- `src/hooks/useReferrals.ts`
-- 1 migration (ny kolonne)
+Én linje ændres. Ingen andre filer berørt.
 
