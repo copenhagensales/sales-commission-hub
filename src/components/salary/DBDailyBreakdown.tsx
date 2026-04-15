@@ -81,10 +81,16 @@ export function DBDailyBreakdown({ teamId, teamName, periodStart, periodEnd, onC
   const computedData = (() => {
     if (isLoading || !expenseData) return null;
 
-    const salesDates = Object.keys(salesByDate).filter(date => {
-      const data = salesByDate[date];
-      return data.revenue > 0 || data.commission > 0;
-    });
+    // Combine sales dates and CPO dates
+    const cpoDates = cpoRevenue ? Object.keys(cpoRevenue.byDate) : [];
+    const allDatesSet = new Set([
+      ...Object.keys(salesByDate).filter(date => {
+        const data = salesByDate[date];
+        return data.revenue > 0 || data.commission > 0;
+      }),
+      ...cpoDates.filter(date => (cpoRevenue?.byDate[date] || 0) > 0),
+    ]);
+    const salesDates = Array.from(allDatesSet);
     const salesDaysCount = salesDates.length;
 
     // Distribute all_days expenses per sales day
