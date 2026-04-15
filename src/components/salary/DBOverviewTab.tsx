@@ -92,7 +92,7 @@ export function DBOverviewTab() {
   );
 
   const { data: teamsDB, isLoading: teamsLoading } = useQuery<TeamDB[]>({
-    queryKey: ["teams-db-structure", periodStart.toISOString(), periodEnd.toISOString(), JSON.stringify(assistantHoursData), JSON.stringify(teamAssistants)],
+    queryKey: ["teams-db-structure", periodStart.toISOString(), periodEnd.toISOString(), JSON.stringify(assistantHoursData), JSON.stringify(teamAssistants), JSON.stringify(cpoRevenue)],
     queryFn: async (): Promise<TeamDB[]> => {
       const teams = teamsBasic || [];
 
@@ -145,6 +145,10 @@ export function DBOverviewTab() {
             revenue += employeeData.revenue;
             sellerSalaryCosts += employeeData.commission;
           }
+          // Add CPO-based revenue for this employee
+          if (cpoRevenue?.byEmployee[employeeId]) {
+            revenue += cpoRevenue.byEmployee[employeeId];
+          }
         }
 
         // Leader salary calculation
@@ -196,10 +200,10 @@ export function DBOverviewTab() {
 
       return teamsWithDB.sort((a, b) => b.db - a.db);
     },
-    enabled: !aggregatesLoading && !!teamsBasic && !assistantHoursLoading,
+    enabled: !aggregatesLoading && !!teamsBasic && !assistantHoursLoading && !cpoLoading,
   });
 
-  const isLoading = teamsLoading || aggregatesLoading || assistantHoursLoading;
+  const isLoading = teamsLoading || aggregatesLoading || assistantHoursLoading || cpoLoading;
 
   // formatCurrency imported from @/lib/calculations
 
