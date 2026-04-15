@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
+import * as XLSX from "xlsx";
 
 /**
  * Create and download an Excel file with multiple sheets.
@@ -71,9 +72,9 @@ export async function downloadExcelAoa(
 }
 
 /**
- * Parse an Excel file (ArrayBuffer or binary string) and return rows as JSON objects.
+ * Parse with ExcelJS (primary parser).
  */
-export async function parseExcelFile(
+async function parseWithExcelJS(
   data: ArrayBuffer,
   options?: { defval?: string }
 ): Promise<{ rows: Record<string, unknown>[]; columns: string[]; sheetName: string }> {
@@ -88,12 +89,11 @@ export async function parseExcelFile(
     headers[colNumber - 1] = String(cell.value ?? "");
   });
 
-  // Filter out empty trailing headers
   const validHeaders = headers.filter((h) => h !== "");
 
   const rows: Record<string, unknown>[] = [];
   ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-    if (rowNumber === 1) return; // skip header
+    if (rowNumber === 1) return;
     const obj: Record<string, unknown> = {};
     let hasValue = false;
     validHeaders.forEach((header, i) => {
@@ -110,4 +110,43 @@ export async function parseExcelFile(
   });
 
   return { rows, columns: validHeaders, sheetName: ws.name };
+}
+
+/**
+ * Parse with SheetJS (fallback for files ExcelJS cannot handle).
+ */
+function parseWithSheetJS(
+  data: ArrayBuffer,
+  options?: { defval?: string }
+): { rows: Record<string, unknown>[]; columns: string[]; sheetName: string } {
+  const wb = XLSX.read(new Uint8Array(data), { type: "array" });
+  const sheetName = wb.SheetNames[0] || "";
+  const ws = wb.Sheets[sheetName];
+  if (!ws) return { rows: [], columns: [], sheetName: "" };
+
+  const jsonRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, {
+    defval: options?.defval ?? undefined,
+  });
+
+  if (jsonRows.length === 0) return { rows: [], columns: [], sheetName };
+
+  const columns = Object.keys(jsonRows[0]);
+  return { rows: jsonRows, columns, sheetName };
+}
+
+/**
+ * Parse an Excel file (ArrayBuffer) and return rows as JSON objects.
+ * Uses ExcelJS as primary parser with SheetJS as fallback for incompatible files.
+ */
+export async function parseExcelFile(
+  data: ArrayBuffer,
+  options?: { defval?: string }
+): Promise<{ rows: Record<string, unknown>[]; columns: string[]; sheetName: string }> {
+  try {
+    return await parseWithExcelJS(data, options);
+  } catch {
+    // ExcelJS failed (e.g. invalid styles.xml) – fall back to SheetJS
+    console.warn("ExcelJS parse failed, falling back to SheetJS");
+    return parseWithSheetJS(data, options);
+  }
 }
