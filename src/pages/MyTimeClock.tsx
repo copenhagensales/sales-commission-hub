@@ -111,12 +111,6 @@ export default function MyTimeClock() {
                       <span className="font-medium">{clock.hourly_rate} DKK</span>
                     </div>
                   )}
-                  {clock.cpo_per_hour > 0 && (
-                    <div>
-                      <span className="text-muted-foreground">CPO/time:</span>{" "}
-                      <span className="font-medium">{clock.cpo_per_hour} DKK</span>
-                    </div>
-                  )}
                 </div>
               </CardContent>
             </Card>
