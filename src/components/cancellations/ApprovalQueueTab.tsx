@@ -1290,15 +1290,15 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                                         <div className="flex flex-wrap gap-1.5">
                                           {structured.products.map((p, idx) => (
                                             <Badge key={`${p.name}-${idx}`} variant="outline" className="whitespace-normal break-words text-left h-auto py-1">
-                                              {p.name}{p.quantity > 1 ? ` ×${p.quantity}` : ""}
+                                              {p.name} ×{p.quantity}
                                             </Badge>
                                           ))}
                                         </div>
                                       </>
                                     )}
-                                    <div className="text-muted-foreground border-t pt-1 mt-1 space-y-0.5">
-                                      {structured.cpoTotal && <div>CPO Total: {structured.cpoTotal} kr</div>}
-                                      {structured.ttTrin !== "" && <div>TT trin: {structured.ttTrin}</div>}
+                                    <div className="text-muted-foreground border-t pt-1 mt-1 flex gap-3 text-xs">
+                                      {structured.cpoTotal && <span>CPO Total: {structured.cpoTotal} kr</span>}
+                                      {structured.ttTrin !== "" && <span>TT trin: {structured.ttTrin}</span>}
                                     </div>
                                   </div>
                                 );
