@@ -1,48 +1,39 @@
 
 
-# Fix Excel seriel-datoer — kun TDC Erhverv
+# Tilføj stillingsvælger til anbefalingsformularen
 
 ## Problem
-Excel gemmer datoer som serielle tal (f.eks. `46027` = 5. januar 2026). `parseExcelDate` håndterer kun tekstformater, så `46027` falder igennem til `new Date("46027")` → år 46027. Resultatet er "01/01/46027" i Uploadet data og Forskelle.
+Når nogen anbefales via det offentlige henvisningslink, bliver der ikke registreret hvilken stilling de søger. Denne information mangler derfor også når de konverteres til kandidat og videre til personale.
 
 ## Løsning
-Tilføj Excel serial number-håndtering i `parseExcelDate`, men kun aktiveret via en parameter så det kun bruges for TDC Erhverv.
+Tilføj et `applied_position` felt hele vejen gennem flowet: offentlig formular → edge function → `employee_referrals` tabel → kandidat-konvertering.
 
-### Ændringer i `ApprovalQueueTab.tsx`
+## Ændringer
 
-**1. Udvid `parseExcelDate` med valgfri serial-support (linje 89-107):**
-```tsx
-function parseExcelDate(val: unknown, handleSerialDates = false): Date | null {
-  if (!val) return null;
+### 1. Database: Tilføj kolonne til `employee_referrals`
+Migration der tilføjer `applied_position TEXT` til `employee_referrals`.
 
-  // Excel serial dates (only for TDC Erhverv)
-  if (handleSerialDates) {
-    const num = typeof val === "number" ? val
-      : (typeof val === "string" && /^\d{4,6}$/.test(val.trim()) ? Number(val) : null);
-    if (num && num > 1 && num < 200000) {
-      const epoch = new Date(Date.UTC(1900, 0, 1));
-      const d = new Date(epoch.getTime() + (num - 2) * 86400000);
-      return isNaN(d.getTime()) ? null : d;
-    }
-  }
+### 2. Edge function: `submit-referral/index.ts`
+- Tilføj `applied_position?: string` til `ReferralRequest` interface
+- Inkludér feltet i INSERT
 
-  // ...eksisterende dd/MM/yyyy, yyyy-MM-dd og native parse logik uændret
-}
-```
+### 3. Offentlig formular: `PublicReferralForm.tsx`
+- Tilføj `appliedPosition` til `FormData` interface
+- Tilføj en Select dropdown med stillingerne: Salgskonsulent, Fieldmarketing, Teamleder, Backoffice (samme som `NewCandidateDialog`)
+- Send `applied_position` med i `submitReferral.mutateAsync()`
 
-**2. I `computeDiff` — pass `handleSerialDates` videre (kaldested linje 124):**
-Udvid `computeDiff` med en `isTdcErhverv` parameter og send den til `parseExcelDate`:
-```tsx
-function computeDiff(..., isTdcErhverv = false): DiffField[] {
-  // ...
-  const excelDate = parseExcelDate(excelRaw, isTdcErhverv);
-```
+### 4. Hook: `useReferrals.ts`
+- Tilføj `applied_position` til `useSubmitReferral` mutation data og body
+- Tilføj `applied_position` til `Referral` interface
+- I `useConvertReferralToCandidate`: sæt `applied_position` fra referral ved kandidat-oprettelse
 
-**3. Ved kald af `computeDiff` — tilføj TDC-check:**
-Send `clientId === TDC_ERHVERV_CLIENT_ID` som den nye parameter, der allerede eksisterer som konstant i filen.
+### 5. Notifikation: `notify-referral-received/index.ts`
+- Inkludér `appliedPosition` i email-body så rekruttering kan se det
 
-### Resultat
-- `46027` → "05/01/2026" for TDC Erhverv
-- Andre klienter: ingen ændring i adfærd
-- Én fil ændres, ~15 linjer tilføjet/ændret
+## Berørte filer
+- `supabase/functions/submit-referral/index.ts`
+- `supabase/functions/notify-referral-received/index.ts`
+- `src/pages/PublicReferralForm.tsx`
+- `src/hooks/useReferrals.ts`
+- 1 migration (ny kolonne)
 
