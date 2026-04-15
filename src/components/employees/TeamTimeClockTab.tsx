@@ -191,8 +191,10 @@ export function TeamTimeClockTab({ teamId, teamMemberIds }: Props) {
               <TableRow>
                 <TableHead className="text-xs">Medarbejder</TableHead>
                 <TableHead className="text-xs">Kunde</TableHead>
+                <TableHead className="text-xs">Projekt</TableHead>
                 <TableHead className="text-xs">Type</TableHead>
-                <TableHead className="text-xs">Timesats</TableHead>
+                <TableHead className="text-xs">Provision/time</TableHead>
+                <TableHead className="text-xs">CPO/time</TableHead>
                 <TableHead className="text-xs w-20"></TableHead>
               </TableRow>
             </TableHeader>
@@ -207,6 +209,9 @@ export function TeamTimeClockTab({ teamId, teamMemberIds }: Props) {
                     <TableCell className="text-sm text-muted-foreground">
                       {clock.client_id ? (clientMap[clock.client_id] || "–") : "Alle kunder"}
                     </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {clock.project_name || "–"}
+                    </TableCell>
                     <TableCell>
                       <Badge className={`${typeInfo?.color} border-0 text-xs`}>
                         {typeInfo?.label || clock.clock_type}
@@ -214,8 +219,11 @@ export function TeamTimeClockTab({ teamId, teamMemberIds }: Props) {
                     </TableCell>
                     <TableCell className="text-sm">
                       {clock.clock_type === "revenue" && clock.hourly_rate > 0
-                        ? `${clock.hourly_rate} DKK/time`
+                        ? `${clock.hourly_rate} DKK`
                         : "–"}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {clock.cpo_per_hour > 0 ? `${clock.cpo_per_hour} DKK` : "–"}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
