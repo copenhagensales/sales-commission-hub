@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTeamDBStats } from "@/hooks/useTeamDBStats";
+import { useCpoRevenue } from "@/hooks/useCpoRevenue";
 import { formatCurrency } from "@/lib/calculations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -36,6 +37,14 @@ export function DBDailyBreakdown({ teamId, teamName, periodStart, periodEnd, onC
     true
   );
 
+  // Get CPO-based revenue for this team
+  const { data: cpoRevenue, isLoading: cpoLoading } = useCpoRevenue({
+    periodStart,
+    periodEnd,
+    teamId,
+    enabled: true,
+  });
+
   // Fetch team expenses separately (not part of sales aggregation)
   const { data: expenseData, isLoading: expenseLoading } = useQuery({
     queryKey: ["team-daily-expenses", teamId, periodStart.toISOString(), periodEnd.toISOString()],
@@ -66,16 +75,22 @@ export function DBDailyBreakdown({ teamId, teamName, periodStart, periodEnd, onC
     },
   });
 
-  const isLoading = aggregatesLoading || expenseLoading;
+  const isLoading = aggregatesLoading || expenseLoading || cpoLoading;
 
   // Build daily data array from aggregated sales and expenses
   const computedData = (() => {
     if (isLoading || !expenseData) return null;
 
-    const salesDates = Object.keys(salesByDate).filter(date => {
-      const data = salesByDate[date];
-      return data.revenue > 0 || data.commission > 0;
-    });
+    // Combine sales dates and CPO dates
+    const cpoDates = cpoRevenue ? Object.keys(cpoRevenue.byDate) : [];
+    const allDatesSet = new Set([
+      ...Object.keys(salesByDate).filter(date => {
+        const data = salesByDate[date];
+        return data.revenue > 0 || data.commission > 0;
+      }),
+      ...cpoDates.filter(date => (cpoRevenue?.byDate[date] || 0) > 0),
+    ]);
+    const salesDates = Array.from(allDatesSet);
     const salesDaysCount = salesDates.length;
 
     // Distribute all_days expenses per sales day
@@ -85,13 +100,15 @@ export function DBDailyBreakdown({ teamId, teamName, periodStart, periodEnd, onC
     const dailyData: DailyData[] = salesDates
       .sort()
       .map(date => {
-        const dayData = salesByDate[date];
+        const dayData = salesByDate[date] || { revenue: 0, commission: 0, sales: 0 };
+        const cpoRev = cpoRevenue?.byDate[date] || 0;
+        const totalRevenue = dayData.revenue + cpoRev;
         const specificExpense = expenseData.expensesByDate[date] || 0;
-        const db = dayData.revenue - dayData.commission - expensePerSalesDay - specificExpense;
+        const db = totalRevenue - dayData.commission - expensePerSalesDay - specificExpense;
         
         return {
           date,
-          revenue: dayData.revenue,
+          revenue: totalRevenue,
           sellerCommission: dayData.commission,
           distributedExpense: expensePerSalesDay,
           specificExpense,

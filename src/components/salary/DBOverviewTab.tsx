@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTeamDBStats } from "@/hooks/useTeamDBStats";
 import { useAssistantHoursCalculation } from "@/hooks/useAssistantHoursCalculation";
 import { useTeamAssistantLeaders, getTeamAssistantIds, getAllAssistantIds } from "@/hooks/useTeamAssistantLeaders";
+import { useCpoRevenue } from "@/hooks/useCpoRevenue";
 import { formatCurrency } from "@/lib/calculations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -56,6 +57,13 @@ export function DBOverviewTab() {
     true
   );
 
+  // Get CPO-based revenue from time clocks
+  const { data: cpoRevenue, isLoading: cpoLoading } = useCpoRevenue({
+    periodStart,
+    periodEnd,
+    enabled: true,
+  });
+
   // First, fetch basic team structure
   const { data: teamsBasic } = useQuery({
     queryKey: ["teams-basic-structure"],
@@ -84,7 +92,7 @@ export function DBOverviewTab() {
   );
 
   const { data: teamsDB, isLoading: teamsLoading } = useQuery<TeamDB[]>({
-    queryKey: ["teams-db-structure", periodStart.toISOString(), periodEnd.toISOString(), JSON.stringify(assistantHoursData), JSON.stringify(teamAssistants)],
+    queryKey: ["teams-db-structure", periodStart.toISOString(), periodEnd.toISOString(), JSON.stringify(assistantHoursData), JSON.stringify(teamAssistants), JSON.stringify(cpoRevenue)],
     queryFn: async (): Promise<TeamDB[]> => {
       const teams = teamsBasic || [];
 
@@ -137,6 +145,10 @@ export function DBOverviewTab() {
             revenue += employeeData.revenue;
             sellerSalaryCosts += employeeData.commission;
           }
+          // Add CPO-based revenue for this employee
+          if (cpoRevenue?.byEmployee[employeeId]) {
+            revenue += cpoRevenue.byEmployee[employeeId];
+          }
         }
 
         // Leader salary calculation
@@ -188,10 +200,10 @@ export function DBOverviewTab() {
 
       return teamsWithDB.sort((a, b) => b.db - a.db);
     },
-    enabled: !aggregatesLoading && !!teamsBasic && !assistantHoursLoading,
+    enabled: !aggregatesLoading && !!teamsBasic && !assistantHoursLoading && !cpoLoading,
   });
 
-  const isLoading = teamsLoading || aggregatesLoading || assistantHoursLoading;
+  const isLoading = teamsLoading || aggregatesLoading || assistantHoursLoading || cpoLoading;
 
   // formatCurrency imported from @/lib/calculations
 

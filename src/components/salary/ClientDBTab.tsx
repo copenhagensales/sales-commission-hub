@@ -32,6 +32,7 @@ import { useTeamAssistantLeaders, getTeamAssistantIds, getAllAssistantIds } from
 import { useStaffHoursCalculation } from "@/hooks/useStaffHoursCalculation";
 import { useClientPeriodComparison } from "@/hooks/useClientPeriodComparison";
 import { useSalesAggregatesExtended } from "@/hooks/useSalesAggregatesExtended";
+import { useCpoRevenue } from "@/hooks/useCpoRevenue";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
@@ -712,6 +713,13 @@ export function ClientDBTab() {
     enabled: !useKpiCache && clientsWithTeams !== undefined,
   });
 
+  // Get CPO-based revenue per client
+  const { data: cpoRevenue } = useCpoRevenue({
+    periodStart,
+    periodEnd,
+    enabled: true,
+  });
+
   // Merge data sources
   const salesByClient = useMemo(() => {
     if (useKpiCache && kpiClientData) {
@@ -781,6 +789,10 @@ export function ClientDBTab() {
       const teamName = teamClientData?.teams?.name || null;
       
       const salesData = salesByClient[client.id] || { sales: 0, commission: 0, revenue: 0 };
+      // Add CPO-based revenue (not subject to cancellation adjustment)
+      const clientCpoRevenue = cpoRevenue?.byClient[client.id] || 0;
+      const totalRevenue = salesData.revenue + clientCpoRevenue;
+      
       const adjustment = adjustmentMap.get(client.id);
       const cancellationPercent = Number(adjustment?.cancellation_percent) || 0;
       const sickPayPercent = Number(adjustment?.sick_pay_percent) || 0;
@@ -792,9 +804,9 @@ export function ClientDBTab() {
       const sellerVacationPay = commission * VACATION_PAY_RATES.SELLER;
       const sellerSalaryCost = commission + sellerVacationPay;
 
-      // Cancellation reduces revenue and seller cost proportionally
+      // Cancellation reduces sales revenue and seller cost proportionally, but NOT CPO revenue
       const cancellationFactor = 1 - (cancellationPercent / 100);
-      const adjustedRevenue = salesData.revenue * cancellationFactor;
+      const adjustedRevenue = (salesData.revenue * cancellationFactor) + clientCpoRevenue;
       const adjustedSellerCost = sellerSalaryCost * cancellationFactor;
 
       // Sick pay is a fixed expense independent of cancellations
@@ -810,7 +822,7 @@ export function ClientDBTab() {
         teamId,
         teamName,
         sales: salesData.sales,
-        revenue: salesData.revenue,
+        revenue: totalRevenue,
         commission,
         sellerVacationPay,
         sellerSalaryCost,
