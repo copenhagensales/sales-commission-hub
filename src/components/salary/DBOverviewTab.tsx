@@ -57,6 +57,13 @@ export function DBOverviewTab() {
     true
   );
 
+  // Get CPO-based revenue from time clocks
+  const { data: cpoRevenue, isLoading: cpoLoading } = useCpoRevenue({
+    periodStart,
+    periodEnd,
+    enabled: true,
+  });
+
   // First, fetch basic team structure
   const { data: teamsBasic } = useQuery({
     queryKey: ["teams-basic-structure"],
