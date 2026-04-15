@@ -256,13 +256,20 @@ function getDiffTone(diff: DiffField) {
 function buildUploadedPreview(
   uploadedData: Record<string, unknown> | null,
   mapping: ColumnMapping | null,
+  clientId?: string,
 ): PreviewField[] {
   if (!uploadedData || Object.keys(uploadedData).length === 0) return [];
+
+  // TDC Erhverv: exclude TT and TT mandat fields
+  const hiddenFields = clientId === TDC_ERHVERV_CLIENT_ID
+    ? new Set(["TT", "TT mandat", "tt", "tt mandat"])
+    : new Set<string>();
 
   const fields: PreviewField[] = [];
   const seen = new Set<string>();
 
   const addField = (label: string, value: unknown) => {
+    if (hiddenFields.has(label)) return;
     const rendered = value == null ? "" : String(value).trim();
     if (!rendered || seen.has(label)) return;
     fields.push({ label, value: rendered });
@@ -1204,7 +1211,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                 <TableBody>
                   {paginatedOppGroups.map((g) => {
                     const summarizedItems = summarizeSaleItems(g.saleItems);
-                    const uploadedPreview = buildUploadedPreview(g.uploadedData, g.mapping);
+                    const uploadedPreview = buildUploadedPreview(g.uploadedData, g.mapping, clientId);
                     return (
                       <TableRow key={g.oppGroup}>
                         <TableCell className="font-mono text-xs">{g.oppGroup}</TableCell>
@@ -1326,7 +1333,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                 <TableBody>
                   {paginatedFlatItems.map((item) => {
                     const summarizedItems = summarizeSaleItems(item.saleItems);
-                    const uploadedPreview = buildUploadedPreview(item.uploadedData, item.mapping);
+                    const uploadedPreview = buildUploadedPreview(item.uploadedData, item.mapping, clientId);
                     return (
                       <TableRow key={item.id}>
                         <TableCell>{item.saleDate ? format(new Date(item.saleDate), "dd/MM/yyyy HH:mm") : "-"}</TableCell>
