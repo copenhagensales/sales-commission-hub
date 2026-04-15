@@ -2,22 +2,27 @@
 
 ## Problem
 
-The primary client selector in "Fordel medarbejdere" only lists clients assigned to the current team (`teamClients`). Cross-team client assignments are not possible for the primary selection.
+`CsTop20Dashboard` kalder `useRequireDashboardAccess("cs-top-20")` på linje 118. Denne hook kræver en autentificeret bruger for at tjekke team-baserede tilladelser. I TV-mode er der ingen session, så hooket returnerer `canView: false` og redirecter dashboardet til `/dashboards`.
 
-## Solution
+## Løsning
 
-Update `EmployeeClientRow` to show **all active clients** in the primary dropdown, not just team clients. Team clients will be shown first, with a visual separator, followed by other available clients.
+Skip adgangstjekket når dashboardet kører i TV-mode. TV-adgang er allerede verificeret via access-koden i `TvBoardDirect.tsx`.
 
-### Changes
+### Ændring
 
-**File: `src/components/employees/TeamAssignEmployeesSubTab.tsx`**
+**File: `src/pages/CsTop20Dashboard.tsx`** (linje 118)
 
-1. Pass `allClients` to `EmployeeClientRow` (already fetched on line 67-78).
-2. In the primary `<Select>`, replace `teamClients.map(...)` with a grouped list:
-   - **Group 1**: Team clients (labeled "Teamets kunder")
-   - **Group 2**: Other clients (labeled "Andre kunder")
-   - Uses `SelectGroup` and `SelectLabel` from the select component for grouping.
-3. Update the `EmployeeClientRow` props to accept `allClients`.
+Ændr fra:
+```tsx
+const { canView, isLoading: accessLoading } = useRequireDashboardAccess("cs-top-20");
+```
 
-This is a small, focused change — only the primary dropdown rendering and its props need updating. The secondary dropdown already works correctly with all clients.
+Til:
+```tsx
+const { canView, isLoading: accessLoading } = useRequireDashboardAccess("cs-top-20", { skip: tvMode });
+```
+
+**File: `src/hooks/useRequireDashboardAccess.ts`**
+
+Tilføj en `skip` option der deaktiverer redirectet og returnerer `canView: true` med det samme. Dette sikrer at TV-dashboards aldrig bliver blokeret af bruger-auth.
 
