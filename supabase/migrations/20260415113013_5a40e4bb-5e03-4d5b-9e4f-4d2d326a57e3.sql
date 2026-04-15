@@ -1,0 +1,1 @@
+ALTER TABLE public.employee_referrals ADD COLUMN applied_position TEXT;

@@ -12,6 +12,7 @@ export interface Referral {
   candidate_phone: string | null;
   referrer_name_provided: string;
   message: string | null;
+  applied_position: string | null;
   status: 'pending' | 'contacted' | 'hired' | 'eligible_for_bonus' | 'bonus_paid' | 'rejected';
   hired_date: string | null;
   hired_employee_id: string | null;
@@ -100,9 +101,9 @@ export function useSubmitReferral() {
       candidate_email: string;
       candidate_phone?: string;
       referrer_name_provided: string;
+      applied_position?: string;
       message?: string;
     }) => {
-      // Use edge function for secure submission (bypasses anon RLS restrictions)
       const { data: result, error } = await supabase.functions.invoke('submit-referral', {
         body: {
           referral_code: data.referral_code,
@@ -111,6 +112,7 @@ export function useSubmitReferral() {
           candidate_email: data.candidate_email,
           candidate_phone: data.candidate_phone,
           referrer_name_provided: data.referrer_name_provided,
+          applied_position: data.applied_position,
           message: data.message,
         },
       });
@@ -301,6 +303,7 @@ export function useConvertReferralToCandidate() {
           last_name: referral.candidate_last_name,
           email: referral.candidate_email,
           phone: referral.candidate_phone,
+          applied_position: referral.applied_position || null,
           source: `Henvisning fra ${referrerName}`,
           notes: noteParts.join('\n'),
           status: 'new',

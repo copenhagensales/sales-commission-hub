@@ -13,6 +13,7 @@ interface ReferralRequest {
   candidate_email: string;
   candidate_phone?: string;
   referrer_name_provided: string;
+  applied_position?: string;
   message?: string;
 }
 
@@ -86,6 +87,7 @@ serve(async (req) => {
         candidate_email: data.candidate_email.toLowerCase().trim(),
         candidate_phone: data.candidate_phone?.trim() || null,
         referrer_name_provided: data.referrer_name_provided.trim(),
+        applied_position: data.applied_position?.trim() || null,
         message: data.message?.trim() || null,
         status: 'pending',
       })
@@ -113,6 +115,7 @@ serve(async (req) => {
           candidatePhone: data.candidate_phone,
           referrerName: data.referrer_name_provided,
           referrerEmployeeName: `${referrerEmployee.first_name} ${referrerEmployee.last_name}`,
+          appliedPosition: data.applied_position,
           message: data.message,
         },
       });

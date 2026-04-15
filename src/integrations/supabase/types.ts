@@ -6243,6 +6243,7 @@ export type Database = {
       }
       employee_referrals: {
         Row: {
+          applied_position: string | null
           bonus_amount: number | null
           bonus_eligible_date: string | null
           bonus_paid_date: string | null
@@ -6264,6 +6265,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          applied_position?: string | null
           bonus_amount?: number | null
           bonus_eligible_date?: string | null
           bonus_paid_date?: string | null
@@ -6285,6 +6287,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          applied_position?: string | null
           bonus_amount?: number | null
           bonus_eligible_date?: string | null
           bonus_paid_date?: string | null
