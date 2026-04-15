@@ -5,16 +5,25 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Gift, Loader2, CheckCircle2, AlertCircle, Building2 } from "lucide-react";
 import { useReferrerByCode, useSubmitReferral } from "@/hooks/useReferrals";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { toast } from "sonner";
+
+const POSITION_OPTIONS = [
+  { value: "Salgskonsulent", label: "Salgskonsulent" },
+  { value: "Fieldmarketing", label: "Fieldmarketing" },
+  { value: "Teamleder", label: "Teamleder" },
+  { value: "Backoffice", label: "Backoffice" },
+];
 
 interface FormData {
   firstName: string;
   lastName: string;
   email: string;
   phone: string;
+  appliedPosition: string;
   message: string;
 }
 
@@ -26,12 +35,13 @@ export default function PublicReferralForm() {
   const { data: referrer, isLoading: isLoadingReferrer, error: referrerError } = useReferrerByCode(code);
   const submitReferral = useSubmitReferral();
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
+  const { register, handleSubmit, control, formState: { errors, isSubmitting } } = useForm<FormData>({
     defaultValues: {
       firstName: '',
       lastName: '',
       email: '',
       phone: '',
+      appliedPosition: '',
       message: '',
     }
   });
@@ -51,6 +61,7 @@ export default function PublicReferralForm() {
         candidate_email: data.email,
         candidate_phone: data.phone || undefined,
         referrer_name_provided: `${referrer.first_name} ${referrer.last_name}`,
+        applied_position: data.appliedPosition || undefined,
         message: data.message || undefined,
       });
       
@@ -186,6 +197,32 @@ export default function PublicReferralForm() {
               />
             </div>
 
+
+            <div className="space-y-2">
+              <Label>Hvilken stilling søger du? *</Label>
+              <Controller
+                name="appliedPosition"
+                control={control}
+                rules={{ required: "Vælg venligst en stilling" }}
+                render={({ field }) => (
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Vælg stilling" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {POSITION_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {errors.appliedPosition && (
+                <p className="text-sm text-destructive">{errors.appliedPosition.message}</p>
+              )}
+            </div>
 
             <div className="space-y-2">
               <Label htmlFor="message">Kort om dig selv (valgfrit)</Label>
