@@ -57,6 +57,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   
   const pulseSurvey = useShouldShowPulseSurvey();
   const { data: hasImmediatePaymentSales } = useHasImmediatePaymentSales();
+  const { data: hasActiveTimeClock } = useHasActiveTimeClock();
 
   // Menu config from database - controls sort_order and visibility
   const { data: menuConfig } = useSidebarMenuConfig();
