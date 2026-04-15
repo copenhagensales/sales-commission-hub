@@ -26,6 +26,7 @@ import { useCarQuizCompletion } from "@/hooks/useCarQuiz";
 import { useIsSalgskonsulent, useCodeOfConductLock } from "@/hooks/useCodeOfConduct";
 import { useHasImmediatePaymentSales } from "@/hooks/useHasImmediatePaymentSales";
 import { useFmBookingConflicts } from "@/hooks/useFmBookingConflicts";
+import { useHasActiveTimeClock } from "@/hooks/useHasActiveTimeClock";
 import { useTranslation } from "react-i18next";
 import { useSidebarMenuConfig, type MenuConfigItem } from "@/hooks/useSidebarMenuConfig";
 
