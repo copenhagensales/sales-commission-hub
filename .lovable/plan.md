@@ -1,48 +1,21 @@
 
 
-# Restyle "Uploadet data" kolonne for TDC Erhverv
-
-## Hvad der ændres
-For TDC Erhverv-rækker i OPP-grupperet visning: "Uploadet data"-kolonnen skal visuelt matche "System (aggregeret)"-kolonnens layout med produkter i Badge-bokse og en bundlinje med omsætning.
+# Layout-ændringer i "Uploadet data" for TDC Erhverv
 
 ## Ændringer i `src/components/cancellations/ApprovalQueueTab.tsx`
 
-### 1. Opdater `buildUploadedPreview` for TDC Erhverv
-Tilføj en ny returstruktur specifikt for TDC Erhverv der separerer:
-- **Produkter** → array af `{ name, quantity }` objekter (til Badge-visning)
-- **Bundfelter** → CPO Total og TT trin
-- **Skjulte felter** → OPP-nr., Produkt: Total, Lukkedato, Provision (udover de allerede skjulte TT/TT mandat)
-
-Konkret: Udvid `hiddenFields` for TDC Erhverv med `"OPP-nr."`, `"Produkt: Total"`, `"Lukkedato"`, og provision-relaterede felter. Tilføj et flag eller separat funktion der returnerer struktureret data for TDC.
-
-### 2. Opdater renderingen af "Uploadet data"-cellen (linje ~1256-1268)
-For TDC Erhverv OPP-rækker: erstat den flade liste med:
-
-```text
-┌────────────────────────────────┐
-│ Produkter:                     │
-│ ┌──────────────────────┐       │
-│ │ MOBIL PROFESSIONEL   │       │
-│ │ 100GB ×3             │       │
-│ └──────────────────────┘       │
-│ ┌──────────────────────┐       │
-│ │ STANDARD OMSTILLING  │       │
-│ └──────────────────────┘       │
-│                                │
-│ CPO Total: 8400 kr             │
-│ TT trin: 0                     │
-└────────────────────────────────┘
+### 1. CPO Total og TT trin side om side (linje ~1299-1302)
+Erstat `space-y-0.5` med `flex gap-3` så de to felter vises horisontalt:
+```tsx
+<div className="text-muted-foreground border-t pt-1 mt-1 flex gap-3">
+  {structured.cpoTotal && <span>CPO Total: {structured.cpoTotal} kr</span>}
+  {structured.ttTrin !== "" && <span>TT trin: {structured.ttTrin}</span>}
+</div>
 ```
 
-- Produkter vises i `Badge variant="outline"` med `×antal` (samme stil som System-kolonnen)
-- Bundlinje viser CPO Total og TT trin i `text-muted-foreground`
-- Ingen provision, OPP-nr., Produkt: Total eller Lukkedato
-
-### 3. Ingen ændring for andre klienter
-Andre klienter beholder den eksisterende flade felt-liste.
-
-## Teknisk detalje
-- Én fil ændres: `ApprovalQueueTab.tsx`
-- Ca. 30-40 linjer ændret/tilføjet i `buildUploadedPreview` og renderingen
-- Bruger `clientId === TDC_ERHVERV_CLIENT_ID` guards som allerede eksisterer
+### 2. Vis altid ×antal på produkter (linje ~1293)
+Ændr fra `p.quantity > 1 ? ` ×${p.quantity}` : ""` til altid at vise antal:
+```tsx
+{p.name} ×{p.quantity}
+```
 
