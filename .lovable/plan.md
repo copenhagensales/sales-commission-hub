@@ -1,42 +1,50 @@
 
 
-## Problem
+# CPO/time som omsætning — beregnet fra timer
 
-`MyGoals.tsx` finder kun medarbejderen via `auth_user_id`. Hvis en medarbejder logger ind med en anden konto end den, der er gemt i `employee_master_data.auth_user_id`, finder systemet dem ikke — selvom deres email matcher `private_email` eller `work_email`.
+## Overblik
+CPO/time-satsen på stempelure skal generere omsætning automatisk: **timer × CPO-sats = omsætning**. Denne omsætning lægges oven i den eksisterende salgsomsætning i DB-oversigt, klient-DB og daglige breakdowns.
 
-Databasen har allerede funktionen `get_current_employee_id()` som håndterer dette korrekt med email-fallback og auto-linking.
+## Tilgang
+I stedet for at ændre den centrale salgsaggregerings-hook (som kun handler om salg), opretter vi en dedikeret hook der beregner CPO-omsætning fra `time_stamps` + `employee_time_clocks`, og tilføjer resultatet i de komponenter der viser omsætning.
 
-## Løsning
+## Trin
 
-Ændr `MyGoals.tsx` til at bruge `get_current_employee_id()` RPC i stedet for direkte `auth_user_id` lookup.
+### 1. Ny hook: `useCpoRevenue`
+Opretter `src/hooks/useCpoRevenue.ts` der:
+- Henter alle aktive `employee_time_clocks` med `cpo_per_hour > 0` for den givne periode/team/klient
+- Henter `time_stamps` for de relevante medarbejdere i perioden
+- Beregner `effective_hours × cpo_per_hour` per medarbejder og per dato
+- Returnerer `{ totals, byEmployee, byDate }` med samme form som `AggregateData` (revenue-feltet)
 
-### Ændring
+### 2. Integrer CPO-omsætning i DB-oversigt
+Opdaterer `DBOverviewTab.tsx`:
+- Kalder `useCpoRevenue` med samme periode/team-filtre
+- Lægger CPO-revenue oven i salgsrevenue per team-medlem ved DB-beregning
+- Revenue-tallet i UI afspejler nu salg + CPO
 
-**File: `src/pages/MyGoals.tsx`** (linje 61-69)
+### 3. Integrer i daglig breakdown
+Opdaterer `DBDailyBreakdown.tsx`:
+- Kalder `useCpoRevenue` grupperet per dato
+- Lægger CPO-revenue til daglig revenue
 
-Erstat:
-```tsx
-const { data } = await (supabase as any)
-  .from("employee_master_data")
-  .select("id, salary_type, first_name, last_name")
-  .eq("auth_user_id", currentUser.id)
-  .single();
+### 4. Integrer i klient-DB
+Opdaterer `ClientDBTab.tsx`:
+- Tilføjer CPO-omsætning per klient baseret på `time_stamps.client_id`
+
+### 5. Opdater memory
+Opdaterer time-clock memory med den nye CPO-beregningslogik.
+
+## Teknisk detalje
+```text
+time_stamps (med client_id)
+    ↓ join via employee_id
+employee_time_clocks (cpo_per_hour > 0)
+    ↓
+effective_hours × cpo_per_hour = CPO-omsætning
+    ↓ tilføjes til
+DB-beregning (revenue += cpo_revenue)
 ```
 
-Med:
-```tsx
-// Use RPC that matches on auth_user_id OR email, with auto-linking
-const { data: employeeId } = await supabase.rpc("get_current_employee_id");
-if (!employeeId) return null;
-
-const { data } = await (supabase as any)
-  .from("employee_master_data")
-  .select("id, salary_type, first_name, last_name")
-  .eq("id", employeeId)
-  .single();
-```
-
-Dette sikrer at uanset hvilken konto medarbejderen logger ind med, finder systemet dem via email-match — og auto-linker `auth_user_id` for fremtidige opslag.
-
-Vi bør også stadig køre migrationen for at rette Emma's `auth_user_id` til hendes aktive konto, så andre steder i systemet også fungerer korrekt.
+Hooken matcher `time_stamps.client_id` med `employee_time_clocks.client_id` OG `employee_id` for at finde den korrekte CPO-sats. Timer uden tilknyttet stempelur med CPO ignoreres.
 
