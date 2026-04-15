@@ -256,8 +256,14 @@ function getDiffTone(diff: DiffField) {
 function buildUploadedPreview(
   uploadedData: Record<string, unknown> | null,
   mapping: ColumnMapping | null,
+  clientId?: string,
 ): PreviewField[] {
   if (!uploadedData || Object.keys(uploadedData).length === 0) return [];
+
+  // TDC Erhverv: exclude TT and TT mandat fields
+  const hiddenFields = clientId === TDC_ERHVERV_CLIENT_ID
+    ? new Set(["TT", "TT mandat", "tt", "tt mandat"])
+    : new Set<string>();
 
   const fields: PreviewField[] = [];
   const seen = new Set<string>();
