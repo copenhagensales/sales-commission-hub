@@ -42,6 +42,8 @@ export function TeamTimeClockTab({ teamId, teamMemberIds }: Props) {
     clientId: "",
     clockType: "" as "override" | "documentation" | "revenue" | "",
     hourlyRate: 0,
+    projectName: "",
+    cpoPerHour: 0,
   });
 
   const { clocks, isLoading, createClock, updateClock, deleteClock, isCreating } = useEmployeeTimeClocks({
@@ -91,7 +93,7 @@ export function TeamTimeClockTab({ teamId, teamMemberIds }: Props) {
   const teamEmployees = employees.filter((e) => teamMemberIds.includes(e.id));
 
   const resetForm = () => {
-    setForm({ employeeId: "", clientId: "", clockType: "", hourlyRate: 0 });
+    setForm({ employeeId: "", clientId: "", clockType: "", hourlyRate: 0, projectName: "", cpoPerHour: 0 });
     setEditingClock(null);
   };
 
@@ -103,6 +105,8 @@ export function TeamTimeClockTab({ teamId, teamMemberIds }: Props) {
         id: editingClock,
         clockType: form.clockType as "override" | "documentation" | "revenue",
         hourlyRate: form.hourlyRate,
+        projectName: form.projectName || null,
+        cpoPerHour: form.cpoPerHour,
       });
     } else {
       createClock({
@@ -110,6 +114,8 @@ export function TeamTimeClockTab({ teamId, teamMemberIds }: Props) {
         clientId: form.clientId || null,
         clockType: form.clockType as "override" | "documentation" | "revenue",
         hourlyRate: form.hourlyRate,
+        projectName: form.projectName || null,
+        cpoPerHour: form.cpoPerHour,
       });
     }
     setAddDialogOpen(false);
@@ -123,6 +129,8 @@ export function TeamTimeClockTab({ teamId, teamMemberIds }: Props) {
       clientId: clock.client_id || "",
       clockType: clock.clock_type,
       hourlyRate: clock.hourly_rate,
+      projectName: clock.project_name || "",
+      cpoPerHour: clock.cpo_per_hour || 0,
     });
     setAddDialogOpen(true);
   };
