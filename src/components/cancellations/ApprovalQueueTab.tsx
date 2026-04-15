@@ -1211,7 +1211,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                 <TableBody>
                   {paginatedOppGroups.map((g) => {
                     const summarizedItems = summarizeSaleItems(g.saleItems);
-                    const uploadedPreview = buildUploadedPreview(g.uploadedData, g.mapping);
+                    const uploadedPreview = buildUploadedPreview(g.uploadedData, g.mapping, clientId);
                     return (
                       <TableRow key={g.oppGroup}>
                         <TableCell className="font-mono text-xs">{g.oppGroup}</TableCell>
@@ -1333,7 +1333,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                 <TableBody>
                   {paginatedFlatItems.map((item) => {
                     const summarizedItems = summarizeSaleItems(item.saleItems);
-                    const uploadedPreview = buildUploadedPreview(item.uploadedData, item.mapping);
+                    const uploadedPreview = buildUploadedPreview(item.uploadedData, item.mapping, clientId);
                     return (
                       <TableRow key={item.id}>
                         <TableCell>{item.saleDate ? format(new Date(item.saleDate), "dd/MM/yyyy HH:mm") : "-"}</TableCell>
