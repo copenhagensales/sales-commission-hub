@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTeamDBStats } from "@/hooks/useTeamDBStats";
+import { useCpoRevenue } from "@/hooks/useCpoRevenue";
 import { formatCurrency } from "@/lib/calculations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -36,6 +37,14 @@ export function DBDailyBreakdown({ teamId, teamName, periodStart, periodEnd, onC
     true
   );
 
+  // Get CPO-based revenue for this team
+  const { data: cpoRevenue, isLoading: cpoLoading } = useCpoRevenue({
+    periodStart,
+    periodEnd,
+    teamId,
+    enabled: true,
+  });
+
   // Fetch team expenses separately (not part of sales aggregation)
   const { data: expenseData, isLoading: expenseLoading } = useQuery({
     queryKey: ["team-daily-expenses", teamId, periodStart.toISOString(), periodEnd.toISOString()],
@@ -66,7 +75,7 @@ export function DBDailyBreakdown({ teamId, teamName, periodStart, periodEnd, onC
     },
   });
 
-  const isLoading = aggregatesLoading || expenseLoading;
+  const isLoading = aggregatesLoading || expenseLoading || cpoLoading;
 
   // Build daily data array from aggregated sales and expenses
   const computedData = (() => {
