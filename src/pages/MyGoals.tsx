@@ -60,11 +60,15 @@ export default function MyGoals() {
       
       if (!currentUser?.id) return null;
       
+      // Use RPC that matches on auth_user_id OR email, with auto-linking
+      const { data: employeeId } = await supabase.rpc("get_current_employee_id");
+      if (!employeeId) return null;
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data } = await (supabase as any)
         .from("employee_master_data")
         .select("id, salary_type, first_name, last_name")
-        .eq("auth_user_id", currentUser.id)
+        .eq("id", employeeId)
         .single();
       return data as EmployeeData | null;
     },
