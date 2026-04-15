@@ -822,7 +822,7 @@ export function ClientDBTab() {
         teamId,
         teamName,
         sales: salesData.sales,
-        revenue: salesData.revenue,
+        revenue: totalRevenue,
         commission,
         sellerVacationPay,
         sellerSalaryCost,
