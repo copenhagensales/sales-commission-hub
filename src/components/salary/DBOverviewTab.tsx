@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTeamDBStats } from "@/hooks/useTeamDBStats";
 import { useAssistantHoursCalculation } from "@/hooks/useAssistantHoursCalculation";
 import { useTeamAssistantLeaders, getTeamAssistantIds, getAllAssistantIds } from "@/hooks/useTeamAssistantLeaders";
+import { useCpoRevenue } from "@/hooks/useCpoRevenue";
 import { formatCurrency } from "@/lib/calculations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
