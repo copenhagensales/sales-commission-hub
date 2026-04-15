@@ -114,10 +114,10 @@ function formatDisplayName(fullName: string): string {
 }
 
 export default function CsTop20Dashboard() {
-  // Runtime access check - redirects if user doesn't have team-based permission
-  const { canView, isLoading: accessLoading } = useRequireDashboardAccess("cs-top-20", { skip: tvMode });
-  
   const tvMode = isTvMode();
+  
+  // Runtime access check - redirects if user doesn't have team-based permission (skipped in TV mode)
+  const { canView, isLoading: accessLoading } = useRequireDashboardAccess("cs-top-20", { skip: tvMode });
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodSelection>(() => getDefaultPeriod("payroll_period"));
   
   // Auto-reload for TV mode to pick up layout/code changes
