@@ -42,6 +42,8 @@ export function TeamTimeClockTab({ teamId, teamMemberIds }: Props) {
     clientId: "",
     clockType: "" as "override" | "documentation" | "revenue" | "",
     hourlyRate: 0,
+    projectName: "",
+    cpoPerHour: 0,
   });
 
   const { clocks, isLoading, createClock, updateClock, deleteClock, isCreating } = useEmployeeTimeClocks({
@@ -91,7 +93,7 @@ export function TeamTimeClockTab({ teamId, teamMemberIds }: Props) {
   const teamEmployees = employees.filter((e) => teamMemberIds.includes(e.id));
 
   const resetForm = () => {
-    setForm({ employeeId: "", clientId: "", clockType: "", hourlyRate: 0 });
+    setForm({ employeeId: "", clientId: "", clockType: "", hourlyRate: 0, projectName: "", cpoPerHour: 0 });
     setEditingClock(null);
   };
 
@@ -103,6 +105,8 @@ export function TeamTimeClockTab({ teamId, teamMemberIds }: Props) {
         id: editingClock,
         clockType: form.clockType as "override" | "documentation" | "revenue",
         hourlyRate: form.hourlyRate,
+        projectName: form.projectName || null,
+        cpoPerHour: form.cpoPerHour,
       });
     } else {
       createClock({
@@ -110,6 +114,8 @@ export function TeamTimeClockTab({ teamId, teamMemberIds }: Props) {
         clientId: form.clientId || null,
         clockType: form.clockType as "override" | "documentation" | "revenue",
         hourlyRate: form.hourlyRate,
+        projectName: form.projectName || null,
+        cpoPerHour: form.cpoPerHour,
       });
     }
     setAddDialogOpen(false);
@@ -123,6 +129,8 @@ export function TeamTimeClockTab({ teamId, teamMemberIds }: Props) {
       clientId: clock.client_id || "",
       clockType: clock.clock_type,
       hourlyRate: clock.hourly_rate,
+      projectName: clock.project_name || "",
+      cpoPerHour: clock.cpo_per_hour || 0,
     });
     setAddDialogOpen(true);
   };
@@ -183,8 +191,10 @@ export function TeamTimeClockTab({ teamId, teamMemberIds }: Props) {
               <TableRow>
                 <TableHead className="text-xs">Medarbejder</TableHead>
                 <TableHead className="text-xs">Kunde</TableHead>
+                <TableHead className="text-xs">Projekt</TableHead>
                 <TableHead className="text-xs">Type</TableHead>
-                <TableHead className="text-xs">Timesats</TableHead>
+                <TableHead className="text-xs">Provision/time</TableHead>
+                <TableHead className="text-xs">CPO/time</TableHead>
                 <TableHead className="text-xs w-20"></TableHead>
               </TableRow>
             </TableHeader>
@@ -199,6 +209,9 @@ export function TeamTimeClockTab({ teamId, teamMemberIds }: Props) {
                     <TableCell className="text-sm text-muted-foreground">
                       {clock.client_id ? (clientMap[clock.client_id] || "–") : "Alle kunder"}
                     </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {clock.project_name || "–"}
+                    </TableCell>
                     <TableCell>
                       <Badge className={`${typeInfo?.color} border-0 text-xs`}>
                         {typeInfo?.label || clock.clock_type}
@@ -206,8 +219,11 @@ export function TeamTimeClockTab({ teamId, teamMemberIds }: Props) {
                     </TableCell>
                     <TableCell className="text-sm">
                       {clock.clock_type === "revenue" && clock.hourly_rate > 0
-                        ? `${clock.hourly_rate} DKK/time`
+                        ? `${clock.hourly_rate} DKK`
                         : "–"}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {clock.cpo_per_hour > 0 ? `${clock.cpo_per_hour} DKK` : "–"}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
@@ -317,6 +333,20 @@ export function TeamTimeClockTab({ teamId, teamMemberIds }: Props) {
               </Select>
             </div>
 
+            {/* Project name */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Projektnavn (valgfri)</Label>
+              <Input
+                value={form.projectName}
+                onChange={(e) => setForm({ ...form, projectName: e.target.value })}
+                placeholder="f.eks. Q2 Kampagne"
+                className="h-11"
+              />
+              <p className="text-xs text-muted-foreground">
+                Bruges til fakturering — navngiv projektet kunden faktureres under
+              </p>
+            </div>
+
             {/* Hourly rate (only for revenue) */}
             {form.clockType === "revenue" && (
               <div className="space-y-2">
@@ -335,6 +365,23 @@ export function TeamTimeClockTab({ teamId, teamMemberIds }: Props) {
                 </p>
               </div>
             )}
+
+            {/* CPO per hour */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">CPO pr. time (DKK)</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.cpoPerHour || ""}
+                onChange={(e) => setForm({ ...form, cpoPerHour: parseFloat(e.target.value) || 0 })}
+                placeholder="0.00"
+                className="h-11"
+              />
+              <p className="text-xs text-muted-foreground">
+                Cost-per-order pr. time — bruges til beregning og fakturering
+              </p>
+            </div>
           </div>
 
           <DialogFooter>
