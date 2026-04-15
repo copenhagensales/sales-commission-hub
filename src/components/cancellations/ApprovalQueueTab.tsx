@@ -1278,17 +1278,44 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                           )}
                         </TableCell>
                         <TableCell className="text-xs min-w-[260px] align-top">
-                          {uploadedPreview.length > 0 ? (
-                            <div className="space-y-1 max-h-32 overflow-auto">
-                              {uploadedPreview.map((field) => (
-                                <div key={field.label} className="leading-relaxed break-words">
-                                  <span className="text-muted-foreground">{field.label}:</span> {field.value}
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
+                          {(() => {
+                            if (clientId === TDC_ERHVERV_CLIENT_ID) {
+                              const structured = buildTdcUploadedStructured(g.uploadedData);
+                              if (structured) {
+                                return (
+                                  <div className="space-y-2">
+                                    {structured.products.length > 0 && (
+                                      <>
+                                        <div className="font-medium">Produkter</div>
+                                        <div className="flex flex-wrap gap-1.5">
+                                          {structured.products.map((p, idx) => (
+                                            <Badge key={`${p.name}-${idx}`} variant="outline" className="whitespace-normal break-words text-left h-auto py-1">
+                                              {p.name}{p.quantity > 1 ? ` ×${p.quantity}` : ""}
+                                            </Badge>
+                                          ))}
+                                        </div>
+                                      </>
+                                    )}
+                                    <div className="text-muted-foreground border-t pt-1 mt-1 space-y-0.5">
+                                      {structured.cpoTotal && <div>CPO Total: {structured.cpoTotal} kr</div>}
+                                      {structured.ttTrin !== "" && <div>TT trin: {structured.ttTrin}</div>}
+                                    </div>
+                                  </div>
+                                );
+                              }
+                            }
+                            return uploadedPreview.length > 0 ? (
+                              <div className="space-y-1 max-h-32 overflow-auto">
+                                {uploadedPreview.map((field) => (
+                                  <div key={field.label} className="leading-relaxed break-words">
+                                    <span className="text-muted-foreground">{field.label}:</span> {field.value}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell className="text-xs min-w-[220px] align-top">
                           {g.diffs.length > 0 ? (
