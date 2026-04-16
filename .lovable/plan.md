@@ -1,31 +1,26 @@
 
 
-# Fix: Tilføj OPP-matching i produkt-aware blokken for TDC Erhverv
+# Fix: Proratér individuelle stabslønninger i summary-kortet
 
 ## Problem
-Produkt-betingelserne sætter `hasAdvancedProductMatching = true`, som returnerer ved linje 1812 — **før** OPP-matchingen (linje 1833). TDC Erhverv bruger udelukkende OPP til at finde salg, så resultatet er 0 matches.
+"Samlet Oversigt" viser det proraterede total for Stabslønninger (-46.500 kr), men de individuelle medarbejdere (Oscar, Lone, Laura osv.) viser deres **fulde** månedsbeløb. Det giver ikke mening at totalen er prorateret, men de individuelle linjer ikke er det.
 
-## Excel-struktur bekræftet
-Filen har kolonnerne: `Lukkedato`, `OPP-nr.`, `Salgsmulighed opretter`, `TT`, `TT mandat`, `TT trin`, `Produkt`, `Pris`, `Indeks`, `Antal`, `CPO Total`. Flere produktrækker per OPP grupperet med en "Total"-række. Strukturen er identisk med hvad systemet allerede parser via `consolidateOppRows`.
+Oscar Belchers 39.375 kr er hans fulde staff-løn for hele måneden — den burde vises prorateret (~21.000 kr) på samme måde som totalen.
 
 ## Løsning
-Indsæt **Pass 1c: OPP-matching** i den produkt-aware blok (efter Pass 1b log på linje 1435, før Pass 2 på linje 1437).
+Anvend `prorationFactor` på hver medarbejders `totalSalary` i staffSalaryList, når listen sendes til `ClientDBSummaryCard`.
 
-### Pass 1c logik:
-1. Tjek om `oppColumn !== "__none__"` og der er OPP-numre i data
-2. Byg `uploadedRowsByOpp` map og `indexByOpp` fra `dedupedData` (samme logik som standard-blokken linje 1863-1945)
-3. Brug `consolidateOppRows` til at samle produktrækker per OPP (genbrug funktionen fra linje 1897)
-4. Iterér `candidateSales`, match via `extractOpp(sale.raw_payload)`
-5. For hvert match:
-   - **Annulleringer**: Bestem `targetProductName` via `findMatchingProductId` mod `_product_rows`
-   - **Kurvrettelser** (`basket_difference`): Bestem `targetProductName` fra systemets eksisterende `sale_items` (sammenlign CPO/dato)
-6. Tilføj til `productMatched` og `matchedIndicesLocal`
+## Tekniske ændringer
 
-### Fil: `src/components/cancellations/UploadCancellationsTab.tsx`
-- Flyt `consolidateOppRows`-funktionen op **før** den produkt-aware blok (eller definer som separat utility), så den kan bruges begge steder
-- Indsæt Pass 1c mellem linje 1435 og 1437
-- Ingen andre filer ændres
+### Fil: `src/components/salary/ClientDBTab.tsx`
+**Linje ~1260**: Når `staffSalaryList` sendes til `ClientDBSummaryCard`, map den med prorationFactor:
 
-### Resultat
-TDC Erhverv-uploads matcher igen via OPP-nummer, med korrekt produktmapping for annulleringer og CPO-baseret matching for kurvrettelser.
+```tsx
+staffSalaryList={staffSalaryList.map(s => ({
+  ...s,
+  totalSalary: s.totalSalary * prorationFactor,
+}))}
+```
+
+Ingen andre filer ændres. De fulde beløb vises stadig i parentes via `fullStaffSalaries`.
 
