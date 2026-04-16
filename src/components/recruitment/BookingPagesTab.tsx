@@ -14,12 +14,20 @@ const CS_GREEN = "#52c68d";
 const CS_GREEN_LIGHT = "#e8f8f0";
 const CS_DARK = "#2e3136";
 
+interface SocialLinks {
+  instagram?: string;
+  linkedin?: string;
+  tiktok?: string;
+  website?: string;
+}
+
 interface PageContent {
   id: string;
   page_key: string;
   title: string;
   body_lines: string[];
   tip_text: string | null;
+  social_links: SocialLinks | null;
 }
 
 export function BookingPagesTab() {
