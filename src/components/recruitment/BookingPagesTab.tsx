@@ -246,6 +246,30 @@ function BookingSuccessPreview({ page }: { page: PageContent }) {
           <p className="text-[10px]" style={{ color: "#999" }}>{page.tip_text}</p>
         )}
         <p className="text-[10px] italic" style={{ color: "#bbb" }}>Dato, tid og rekrutterernavn indsættes automatisk på kandidatsiden</p>
+        {page.social_links && Object.values(page.social_links).some(v => v) && (
+          <div className="flex items-center justify-center gap-2">
+            {(page.social_links as SocialLinks).instagram && (
+              <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: CS_GREEN }}>
+                <span className="text-[8px] text-white font-bold">IG</span>
+              </div>
+            )}
+            {(page.social_links as SocialLinks).linkedin && (
+              <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: CS_GREEN }}>
+                <span className="text-[8px] text-white font-bold">IN</span>
+              </div>
+            )}
+            {(page.social_links as SocialLinks).tiktok && (
+              <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: CS_GREEN }}>
+                <span className="text-[8px] text-white font-bold">TT</span>
+              </div>
+            )}
+            {(page.social_links as SocialLinks).website && (
+              <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: CS_GREEN }}>
+                <span className="text-[8px] text-white font-bold">WEB</span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
