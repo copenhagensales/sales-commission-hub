@@ -159,6 +159,7 @@ import {
   ComplianceSensitiveAccessLog,
   ComplianceContractAccessLog,
   ShortLinkRedirect,
+  PublicUnsubscribe,
   MenuEditor,
 } from "./pages";
 import { SmartRedirect } from "./guards";
@@ -195,6 +196,7 @@ export const routes: RouteConfig[] = [
   { path: "/refer/:code", component: PublicReferralForm, access: "public" },
   { path: "/tdc-public", component: TdcOpsummeringPublic, access: "public" },
   { path: "/book/:candidateId", component: PublicCandidateBooking, access: "public" },
+  { path: "/unsubscribe/:candidateId", component: PublicUnsubscribe, access: "public" },
   { path: "/r/:code", component: ShortLinkRedirect, access: "public" },
   { path: "/contract/:id", component: ContractSign, access: "public" },
   { path: "/contract/sign/:id", component: ContractSign, access: "public" },
