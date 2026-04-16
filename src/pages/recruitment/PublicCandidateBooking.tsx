@@ -143,7 +143,7 @@ export default function PublicCandidateBooking() {
     .replace(/\{\{recruiterName\}\}/g, recruiterName);
   const step1 = config?.step1_label || "Vælg tid";
   const step2 = (config?.step2_label || "{{recruiterName}} ringer dig").replace("{{recruiterName}}", recruiterName);
-  const step3 = config?.step3_label || "Start dit nye job";
+  const step3 = config?.step3_label || "Jobsamtale";
   const unsubText = config?.unsubscribe_text || "Ikke interesseret længere? Klik her – det er helt okay";
 
   if (unsubscribed) {

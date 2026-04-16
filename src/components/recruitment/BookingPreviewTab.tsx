@@ -100,7 +100,7 @@ export function BookingPreviewTab() {
     .replace(/\{\{recruiterName\}\}/g, recruiterName);
   const step1 = (config?.step1_label || "Vælg tid");
   const step2 = (config?.step2_label || "{{recruiterName}} ringer dig").replace("{{recruiterName}}", recruiterName);
-  const step3 = (config?.step3_label || "Start dit nye job");
+  const step3 = (config?.step3_label || "Jobsamtale");
   const unsubText = config?.unsubscribe_text || "Ikke interesseret længere? Klik her – det er helt okay";
   const roleLabel = config?.role_label || "Sælger";
 
@@ -127,7 +127,7 @@ export function BookingPreviewTab() {
       unsubscribe_text: config?.unsubscribe_text || "Ikke interesseret længere? Klik her – det er helt okay",
       step1_label: config?.step1_label || "Vælg tid",
       step2_label: config?.step2_label || "{{recruiterName}} ringer dig",
-      step3_label: config?.step3_label || "Start dit nye job",
+      step3_label: config?.step3_label || "Jobsamtale",
     });
     setEditing(true);
   };
