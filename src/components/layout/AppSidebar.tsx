@@ -106,8 +106,18 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   const [salaryOpen, setSalaryOpen] = useState(
     location.pathname.startsWith("/salary")
   );
-  
-  // Check if user can view cancellations
+
+  // Live clock (Danish time)
+  const [clockTime, setClockTime] = useState(() =>
+    new Date().toLocaleTimeString("da-DK", { timeZone: "Europe/Copenhagen", hour: "2-digit", minute: "2-digit" })
+  );
+  useEffect(() => {
+    const id = setInterval(() => {
+      setClockTime(new Date().toLocaleTimeString("da-DK", { timeZone: "Europe/Copenhagen", hour: "2-digit", minute: "2-digit" }));
+    }, 15000);
+    return () => clearInterval(id);
+  }, []);
+
   const canViewCancellations = p.canView("menu_cancellations");
   const [adminOpen, setAdminOpen] = useState(
     location.pathname.startsWith("/admin")
