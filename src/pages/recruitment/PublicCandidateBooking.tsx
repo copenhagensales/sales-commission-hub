@@ -250,6 +250,9 @@ export default function PublicCandidateBooking() {
             <Calendar className="h-4 w-4" />
             Hvornår passer det dig?
           </div>
+          <div className="rounded-xl px-4 py-2.5 text-center text-sm" style={{ backgroundColor: "#FFF8E1", color: "#8B6914" }}>
+            ⚡ Jo hurtigere du booker, jo hurtigere kommer du i gang
+          </div>
           {availableDays.length === 0 ? (
             <p className="text-sm text-center py-4" style={{ color: "#999" }}>Ingen ledige dage lige nu.</p>
           ) : (
@@ -257,14 +260,23 @@ export default function PublicCandidateBooking() {
               {availableDays.map((day, index) => {
                 const date = parseISO(day.date);
                 const isSelected = selectedDate && isSameDay(date, selectedDate);
+                const todayDate = isToday(date);
+                const isFirst = index === 0;
+                const isFaded = index >= 3;
+                const badgeText = todayDate ? "I dag ✓" : (isFirst ? "Anbefalet" : null);
                 return (
                   <button key={day.date} onClick={() => { setSelectedDate(date); setSelectedSlot(null); }}
-                    className="flex flex-col items-center gap-0.5 rounded-xl border px-3 py-3 text-sm font-medium transition-all"
-                    style={{ backgroundColor: isSelected ? CS_GREEN : "#fff", color: isSelected ? "#fff" : CS_DARK, borderColor: isSelected ? CS_GREEN : "#e5e7eb" }}>
-                    {index === 0 && (
+                    className={`flex flex-col items-center gap-0.5 rounded-xl border px-3 py-3 text-sm font-medium transition-all ${isFirst && !isSelected ? "ring-2 ring-offset-1 scale-[1.03]" : ""} ${isFaded && !isSelected ? "opacity-60" : ""}`}
+                    style={{
+                      backgroundColor: isSelected ? CS_GREEN : "#fff",
+                      color: isSelected ? "#fff" : CS_DARK,
+                      borderColor: isSelected ? CS_GREEN : isFirst ? CS_GREEN : "#e5e7eb",
+                      ringColor: isFirst ? CS_GREEN : undefined,
+                    }}>
+                    {badgeText && (
                       <span className="text-[9px] font-semibold uppercase tracking-wide rounded px-1.5 py-0.5"
                         style={{ backgroundColor: isSelected ? "rgba(255,255,255,0.25)" : CS_GREEN_LIGHT, color: isSelected ? "#fff" : CS_GREEN }}>
-                        Anbefalet
+                        {badgeText}
                       </span>
                     )}
                     <span className="text-xs capitalize">{format(date, "EEEE", { locale: da })}</span>
