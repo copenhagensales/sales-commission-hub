@@ -1,55 +1,66 @@
 
 
-# Plan: Ny fane "Provisionssatser" på MgTest-siden
+# Redesign: Provisionssatser — deduplikering og kampagnesynlighed
 
-## Formål
-En read-only oversigt hvor man vælger en kunde og ser alle produkter med deres effektive provisionssatser — inkl. eventuelle kampagne-specifikke prisregler.
+## Dataanalyse
 
-## Design
+| Kunde | Unikke produkter | Dublet-rækker | Aktive regler | Bemærkning |
+|-------|------------------|---------------|---------------|------------|
+| Eesy FM | 9 | 8 (alle × 2) | Kampagnespecifikke (gaden vs marked) | Eneste med dubletter |
+| Eesy TM | 6 | 0 | Op til 41 pr. produkt | Mange kampagne-bundne |
+| TDC Erhverv | 40 | 0 | Tilskud-regler | Stort katalog |
+| Tryg | 18 | 0 | Blandet | - |
+| Yousee | 19 | 0 | Ingen regler | Kun base-priser |
+| Øvrige | 14 | 0 | Få/ingen | - |
 
-Fanen viser:
-1. **Kunde-vælger** (Select dropdown med alle kunder)
-2. **Produkttabel** med kolonnerne:
-   - Produktnavn
-   - Base provision (fra `products.commission_dkk`)
-   - Base omsætning (fra `products.revenue_dkk`)
-   - Antal aktive prisregler (link/expand til detaljer)
-3. **Ekspanderbar sektion** per produkt der viser aktive `product_pricing_rules` med:
-   - Regelnavn
-   - Provision / Omsætning
-   - Prioritet
-   - Kampagne-binding (hvis relevant)
+**Hovedproblemer:**
+1. Eesy FM viser 17 rækker i stedet for 9 (samme produkt under "Eesy gaden" + "Eesy marked")
+2. Regler vises som "Unavngivet regel" — kampagnenavne (Eesy gaden, Eesy marked, Adversus, Enreach) resolves ikke
+3. Ingen visuel forskel mellem base-pris og kampagne-override
+
+## Løsning
+
+### 1. Gruppér produkter efter navn
+Produkter med identisk `name` samles i én række. Base-prisen tages fra det første match (de er identiske for dubletter).
+
+### 2. Resolve kampagnenavne
+Hent `adversus_campaign_mappings` for at oversætte `campaign_mapping_ids` → læsbare navne (f.eks. "Eesy gaden", "Eesy marked").
+
+### 3. Nyt visuelt layout for regler
 
 ```text
-┌─────────────────────────────────────────────┐
-│  Kunde: [▼ Eesy FM                        ] │
-├─────────────────────────────────────────────┤
-│  Produkt          Base Prov  Base Oms  Regler│
-│  ▶ 5G Internet      300 kr    650 kr    2   │
-│  ▼ Eesy 99 m/1.md   200 kr    950 kr    2   │
-│    ├ Adversus regel  200 kr    950 kr  p:0   │
-│    └ Enreach regel   355 kr    950 kr  p:0   │
-│  ▶ Eesy 99 u/1.md   220 kr   1000 kr    2   │
-└─────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────┐
+│ ▼ Eesy 99 med 1. md (IKKE Nuuday)    200 kr    950 kr    2   │
+│   ┌──────────────────────────────────────────────────────────┐ │
+│   │ Eesy gaden      200 kr   950 kr                         │ │
+│   │ Eesy marked     355 kr   950 kr   ▲155 kr               │ │
+│   └──────────────────────────────────────────────────────────┘ │
+│                                                                │
+│ ▶ Eesy uden 1. md (Nuuday)            360 kr  1.000 kr    2   │
+│ ▶ 5G Internet                         300 kr    650 kr    2   │
+│                                                                │
+│   Yousee Fri tale + 50 GB             125 kr    250 kr    —   │
+└────────────────────────────────────────────────────────────────┘
 ```
+
+- Farvekodede badges for kampagnenavne
+- ▲/▼ difference-indikatorer vs base-pris
+- Regler uden navn viser kampagnenavn i stedet
+- "Udvid alle / Luk alle" knap
+
+### 4. Søgefelt
+Tilføj et simpelt tekstfilter over tabellen så man hurtigt kan finde produkter i store kataloger (TDC har 40 produkter).
 
 ## Tekniske ændringer
 
-### 1. Ny komponent: `src/components/mg-test/CommissionRatesTab.tsx`
-- Henter kunder fra `clients` tabellen
-- Henter produkter filtreret via `products → client_campaigns → clients`
-- Henter aktive `product_pricing_rules` for de viste produkter
-- Viser alt i en ekspanderbar tabel
-- Rent read-only — ingen mutations
+### Fil: `src/components/mg-test/CommissionRatesTab.tsx` (omskrives)
 
-### 2. Opdater `src/pages/MgTest.tsx`
-- Tilføj ny `TabsTrigger value="commission-rates"` med label "Provisionssatser"
-- Tilføj `TabsContent` der renderer `<CommissionRatesTab />`
+1. **Ny query**: Hent `adversus_campaign_mappings` (id, adversus_campaign_name) for at resolve kampagnenavne
+2. **Gruppering**: `useMemo` der samler produkter med samme `name` → én grupperet række med alle tilhørende regler
+3. **Kampagne-labels**: Map `campaign_mapping_ids` → kampagnenavne fra den nye query
+4. **Difference-visning**: Beregn `rule.commission - base.commission` og vis som ▲/▼
+5. **Søgefelt**: `Input` med `onChange` filter på produktnavn
+6. **Udvid alle**: Toggle-knap der åbner/lukker alle grupper
 
-### Datahentning (3 queries)
-1. `SELECT id, name FROM clients ORDER BY name`
-2. `SELECT p.*, cc.client_id FROM products p JOIN client_campaigns cc ON p.client_campaign_id = cc.id WHERE cc.client_id = :selectedClient AND p.is_hidden = false`
-3. `SELECT pr.* FROM product_pricing_rules pr WHERE pr.product_id IN (:productIds) AND pr.is_active = true ORDER BY pr.priority DESC`
-
-Ingen nye tabeller eller migrationer nødvendige.
+Ingen nye tabeller eller migrationer.
 
