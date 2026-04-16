@@ -4,7 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Calendar, Clock, Phone, CheckCircle2, Loader2, XCircle } from "lucide-react";
-import { format, isSameDay, parseISO } from "date-fns";
+import { format, isSameDay, isToday, parseISO } from "date-fns";
 import { da } from "date-fns/locale";
 
 interface TimeSlot { start: string; end: string; }
