@@ -140,36 +140,41 @@ function generateSlotsForDay(
 
 function generateDays(
   settings: BookingSettings,
-  now: Date,
   busyPeriods?: { start: Date; end: Date }[]
 ): AvailabilityDay[] {
   const weekdays = getWeekdays(settings);
   const blockedSet = new Set(settings.blocked_dates || []);
   const days: AvailabilityDay[] = [];
 
-  const current = new Date(now);
-  current.setHours(0, 0, 0, 0);
+  const danish = getDanishNow();
+  const danishNowMinutes = danish.hour * 60 + danish.minute;
+  const todayStr = getDanishDateStr();
+
+  // Start iterating from today's date (Danish time)
+  const current = new Date(todayStr + "T00:00:00Z");
 
   // Check if past all windows today using per-day windows
-  const todayIsoDay = jsToIsoDay(current.getDay());
+  const todayIsoDay = jsToIsoDay(current.getUTCDay());
   const todayWindows = getTimeWindowsForDay(settings, todayIsoDay);
   if (todayWindows.length > 0) {
     const lastWindow = todayWindows[todayWindows.length - 1];
     const lastEnd = parseTime(lastWindow.end);
-    if (now.getHours() > lastEnd.h || (now.getHours() === lastEnd.h && now.getMinutes() >= lastEnd.m)) {
-      current.setDate(current.getDate() + 1);
+    const lastEndMin = lastEnd.h * 60 + lastEnd.m;
+    if (danishNowMinutes >= lastEndMin) {
+      current.setUTCDate(current.getUTCDate() + 1);
     }
   }
 
   const totalDays = Math.ceil(settings.lookahead_days * 2);
   for (let i = 0; i < totalDays && days.length < settings.lookahead_days; i++) {
-    const dow = current.getDay();
+    const dow = current.getUTCDay();
     if (weekdays.has(dow)) {
       const dateStr = current.toISOString().split("T")[0];
       if (!blockedSet.has(dateStr)) {
         const isoDay = jsToIsoDay(dow);
         const windows = getTimeWindowsForDay(settings, isoDay);
-        const slots = generateSlotsForDay(current, windows, settings.slot_duration_minutes, now, busyPeriods);
+        const isToday = dateStr === todayStr;
+        const slots = generateSlotsForDay(dateStr, windows, settings.slot_duration_minutes, isToday, danishNowMinutes, busyPeriods);
         if (slots.length > 0) days.push({ date: dateStr, slots });
       }
     }
