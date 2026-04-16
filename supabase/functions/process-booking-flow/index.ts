@@ -184,16 +184,26 @@ Deno.serve(async (req) => {
         ringetidspunkt = 'i morgen mellem kl. 11:00 og 12:00';
       }
 
+      // Format date for {{dato}} and {{tidspunkt}} merge tags
+      const dayNames = ['søndag', 'mandag', 'tirsdag', 'onsdag', 'torsdag', 'fredag', 'lørdag'];
+      const monthNames = ['januar', 'februar', 'marts', 'april', 'maj', 'juni', 'juli', 'august', 'september', 'oktober', 'november', 'december'];
+      const datoFormatted = `${dayNames[scheduledDate.getDay()]} d. ${scheduledDate.getDate()}. ${monthNames[scheduledDate.getMonth()]}`;
+      const tidspunktFormatted = `${String(scheduledDate.getHours()).padStart(2, '0')}:${String(scheduledDate.getMinutes()).padStart(2, '0')}`;
+
       const mergedContent = content
         .replace(/\{\{fornavn\}\}/g, candidate.first_name || '')
         .replace(/\{\{rolle\}\}/g, role)
         .replace(/\{\{afmeld_link\}\}/g, unsubscribeUrl)
         .replace(/\{\{booking_link\}\}/g, bookingLink)
         .replace(/\{\{ringetidspunkt\}\}/g, ringetidspunkt)
-        .replace(/\{\{telefonnummer\}\}/g, recruitmentPhone);
+        .replace(/\{\{telefonnummer\}\}/g, recruitmentPhone)
+        .replace(/\{\{dato\}\}/g, datoFormatted)
+        .replace(/\{\{tidspunkt\}\}/g, tidspunktFormatted);
       const mergedSubject = subject
         .replace(/\{\{fornavn\}\}/g, candidate.first_name || '')
-        .replace(/\{\{rolle\}\}/g, role);
+        .replace(/\{\{rolle\}\}/g, role)
+        .replace(/\{\{dato\}\}/g, datoFormatted)
+        .replace(/\{\{tidspunkt\}\}/g, tidspunktFormatted);
 
       try {
         if (tp.channel === 'email' && candidate.email) {
