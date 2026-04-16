@@ -1,20 +1,21 @@
 
 
-# Plan: Vis kun starttidspunkt i tidsslots
+# Plan: Fix tidszone-bug i slot-filtrering
 
-## Opsummering
-Fjern sluttidspunktet fra tidsslot-visningen, så der fx står "11:30" i stedet for "11:30 – 11:45".
+## Problem
+Edge-funktionen `get-public-availability` bruger `new Date()` som er UTC-tid på serveren. Danmark er UTC+2 (CEST i april), så når klokken er 13:36 i DK, er `now` kun 11:36 UTC. Slot-sammenligning med `slotStart.setHours(11, 45)` sætter også UTC-tid, men time-vinduer er defineret i dansk tid. Resultatet er at slots som 11:45 og 12:00 dansk tid fejlagtigt vises som ledige.
 
-## Ændringer
+## Løsning
+Konverter `now` til dansk tid ved at beregne Danish-offset og sammenligne minutter-fra-midnat i stedet for `Date`-objekter.
 
-### 1. `src/pages/recruitment/PublicCandidateBooking.tsx`
-- **Linje 314**: Ændr `{slot.start} – {slot.end}` → `{slot.start}`
+## Ændringer i `supabase/functions/get-public-availability/index.ts`
 
-### 2. `src/components/recruitment/CalendarBookingModal.tsx`
-- **Linje 283**: Ændr `kl. {selectedSlot.startTime}–{selectedSlot.endTime}` → `kl. {selectedSlot.startTime}`
-- Andre steder i filen der viser `startTime–endTime` tilsvarende
+1. Tilføj en hjælpefunktion `getDanishNowMinutes()` der beregner nuværende tidspunkt i dansk tid som minutter fra midnat
+2. I `generateSlotsForDay`: For dage der er i dag (dansk tid), sammenlign `startMin` med danske nuværende minutter i stedet for at bruge `Date`-objekter
+3. I `generateDays`: Brug dansk dato til at afgøre om "i dag" er overstået (samme tidszone-fix)
 
-## Filer der ændres
-- `src/pages/recruitment/PublicCandidateBooking.tsx`
-- `src/components/recruitment/CalendarBookingModal.tsx`
+Konkret: Brug `Intl.DateTimeFormat('da-DK', { timeZone: 'Europe/Copenhagen' })` til at finde aktuel dansk time/minut, og filtrer slots baseret på det.
+
+## Fil der ændres
+- `supabase/functions/get-public-availability/index.ts`
 
