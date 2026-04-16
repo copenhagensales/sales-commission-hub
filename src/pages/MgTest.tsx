@@ -30,6 +30,7 @@ import { DataMappingTab } from "@/components/mg-test/DataMappingTab";
 import { CampaignSuggestionDialog, generateClientSuggestions, type CampaignSuggestion } from "@/components/mg-test/CampaignSuggestionDialog";
 import { ProductPricingRulesDialog } from "@/components/mg-test/ProductPricingRulesDialog";
 import { ProductMergeDialog } from "@/components/mg-test/ProductMergeDialog";
+import { CommissionRatesTab } from "@/components/mg-test/CommissionRatesTab";
 
 interface InspectorField {
   fieldId: string;
@@ -2261,6 +2262,7 @@ export default function MgTest() {
             <TabsTrigger value="customers">{t("mgTest.tabCustomers")}</TabsTrigger>
             <TabsTrigger value="client-sales">Client Sales</TabsTrigger>
             <TabsTrigger value="datamapping">Datamapping</TabsTrigger>
+            <TabsTrigger value="commission-rates">Provisionssatser</TabsTrigger>
           </TabsList>
 
           <TabsContent value="product" className="space-y-4">
@@ -3310,6 +3312,11 @@ export default function MgTest() {
           {/* Datamapping Tab */}
           <TabsContent value="datamapping">
             <DataMappingTab />
+          </TabsContent>
+
+          {/* Commission Rates Tab */}
+          <TabsContent value="commission-rates">
+            <CommissionRatesTab />
           </TabsContent>
         </Tabs>
       </div>
