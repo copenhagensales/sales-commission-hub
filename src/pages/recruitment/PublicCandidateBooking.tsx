@@ -109,6 +109,14 @@ export default function PublicCandidateBooking() {
     return availability.days.filter(d => d.slots.length > 0).slice(0, 7);
   }, [availability]);
 
+  // Auto-select first available day on load
+  useEffect(() => {
+    if (availableDays.length > 0 && !autoSelected) {
+      setSelectedDate(parseISO(availableDays[0].date));
+      setAutoSelected(true);
+    }
+  }, [availableDays, autoSelected]);
+
   const slotsForDate = useMemo(() => {
     if (!selectedDate || !availability?.days) return [];
     const dateStr = format(selectedDate, "yyyy-MM-dd");
