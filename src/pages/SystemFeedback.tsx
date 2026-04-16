@@ -197,11 +197,8 @@ export default function SystemFeedback() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, status, notes, feedbackTitle, submittedById, adminResponseText }: { id: string; status: string; notes: string; feedbackTitle: string; submittedById: string | null; adminResponseText?: string }) => {
+    mutationFn: async ({ id, status, notes, feedbackTitle, submittedById }: { id: string; status: string; notes: string; feedbackTitle: string; submittedById: string | null }) => {
       const updatePayload: any = { status, admin_notes: notes || null, updated_at: new Date().toISOString() };
-      if (adminResponseText !== undefined) {
-        updatePayload.admin_response = adminResponseText || null;
-      }
       const { error } = await supabase
         .from("system_feedback")
         .update(updatePayload)
@@ -218,7 +215,7 @@ export default function SystemFeedback() {
 
         const email = empData?.work_email || empData?.private_email;
         if (email) {
-          return { employeeEmail: email, employeeName: `${empData.first_name || ""} ${empData.last_name || ""}`.trim(), feedbackTitle, newStatus: status, adminNotes: notes, adminResponse: adminResponseText };
+          return { employeeEmail: email, employeeName: `${empData.first_name || ""} ${empData.last_name || ""}`.trim(), feedbackTitle, newStatus: status, adminNotes: notes };
         }
       }
       return null;
