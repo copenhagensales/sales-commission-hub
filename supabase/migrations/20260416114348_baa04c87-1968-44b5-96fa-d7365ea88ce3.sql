@@ -1,0 +1,1 @@
+UPDATE booking_page_config SET step3_label = 'Jobsamtale' WHERE id = 'b18c9da7-6e14-4685-9571-77f30a549d8a';
