@@ -178,7 +178,7 @@ function generateDays(
         if (slots.length > 0) days.push({ date: dateStr, slots });
       }
     }
-    current.setDate(current.getDate() + 1);
+    current.setUTCDate(current.getUTCDate() + 1);
   }
   return days;
 }
