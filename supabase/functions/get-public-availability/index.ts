@@ -276,9 +276,9 @@ Deno.serve(async (req) => {
 
     const { access_token } = await tokenResponse.json();
 
-    const startDate = new Date(now);
-    startDate.setHours(0, 0, 0, 0);
-    const endDate = new Date(startDate);
+    const msStartDate = new Date(now);
+    msStartDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(msStartDate);
     endDate.setDate(endDate.getDate() + Math.ceil(settings.lookahead_days * 2));
 
     const scheduleResponse = await fetch(
