@@ -1,41 +1,33 @@
 
 
-# Plan: Flyt auto-enrollment trigger til `candidates`-tabellen
+# Plan: Synkroniser booking-bekræftelsessiden med redigerbar tekst
 
 ## Problem
-Triggeren `trg_auto_enroll_application` sidder på `applications`, men webhook'en kun inserter i `candidates`. Derfor sker der ingenting automatisk.
+1. **BookingPagesTab** (admin-preview) har hardcoded "Hvad sker der nu?"-sektion med faste tekster
+2. **PublicCandidateBooking** (den rigtige kandidatside) har sine egne hardcoded tekster
+3. Kun `title` og `tip_text` bruges fra databasen — `body_lines` ignoreres begge steder
+4. Preview og kandidatside viser forskellige tekster
 
 ## Løsning
-Én database-migration der:
+Gør `body_lines` fra `booking_page_content`-tabellen til den autoritative kilde for bullet-punkterne, og brug dem både i preview og på den rigtige side.
 
-1. Dropper den eksisterende trigger og funktion på `applications`
-2. Opretter ny funktion `auto_enroll_new_candidate()` på `candidates`-tabellen
-3. Opretter trigger `trg_auto_enroll_candidate` AFTER INSERT på `candidates`
+## Ændringer
 
-```sql
-DROP TRIGGER IF EXISTS trg_auto_enroll_application ON public.applications;
-DROP FUNCTION IF EXISTS public.auto_enroll_new_application();
+### 1. `src/pages/recruitment/PublicCandidateBooking.tsx` (booking success-visning, linje 163-196)
+- Hent `body_lines` fra `pageContent` (allerede loaded)
+- Erstat de 3 hardcoded `<li>`-elementer med en loop over `body_lines`
+- Behold fallback-defaults hvis `body_lines` er tomme
 
-CREATE OR REPLACE FUNCTION public.auto_enroll_new_candidate()
-RETURNS trigger AS $$
-BEGIN
-  INSERT INTO public.booking_flow_enrollments (
-    candidate_id, tier, status, approval_status
-  ) VALUES (
-    NEW.id, 'A', 'pending_approval', 'pending'
-  ) ON CONFLICT DO NOTHING;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public';
+### 2. `src/components/recruitment/BookingPagesTab.tsx` (BookingSuccessPreview, linje 183-213)
+- Erstat den hardcoded "Hvad sker der nu?"-sektion med `page.body_lines`
+- Vis `body_lines` som bullet points i stedet for faste tekster
+- Behold den hardcoded eksempel-tekst ("Oscar ringer dig tirsdag d. 22. april…") som demo af den dynamiske dato/tid
 
-CREATE TRIGGER trg_auto_enroll_candidate
-AFTER INSERT ON public.candidates
-FOR EACH ROW EXECUTE FUNCTION public.auto_enroll_new_candidate();
-```
+### 3. Ingen databaseændringer
+`body_lines` eksisterer allerede i `booking_page_content`-tabellen. De skal blot populeres med de rigtige tekster hvis de er tomme.
 
-## Ingen kodeændringer
-BookingFlow.tsx håndterer allerede `application_id = NULL` korrekt.
-
-## Fil der ændres
-- Ny database-migration (SQL)
+## Resultat
+- Admin ser det samme som kandidaten
+- Ændringer i editoren slår igennem på den rigtige side
+- Bullet-punkterne kan tilpasses uden kodeændringer
 
