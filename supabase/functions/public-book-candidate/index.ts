@@ -64,6 +64,24 @@ Deno.serve(async (req) => {
 
     const role = application?.role || "Salgskonsulent";
 
+    // Prevent double-booking if another candidate already took the slot
+    const requestedInterviewDatetime = `${date}T${startTime}:00+02:00`;
+    const { data: conflictingCandidate } = await supabase
+      .from("candidates")
+      .select("id, first_name, last_name")
+      .eq("interview_date", requestedInterviewDatetime)
+      .in("status", ["interview_scheduled", "hired"])
+      .neq("id", candidateId)
+      .limit(1)
+      .maybeSingle();
+
+    if (conflictingCandidate) {
+      return new Response(
+        JSON.stringify({ error: "Tiden er lige blevet booket af en anden. Vælg venligst en ny tid." }),
+        { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Create Outlook event if M365 is configured
     const clientId = Deno.env.get("AZURE_CLIENT_ID");
     const clientSecret = Deno.env.get("AZURE_CLIENT_SECRET");
