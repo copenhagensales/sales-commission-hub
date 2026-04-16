@@ -1,29 +1,17 @@
 
-
-# Plan: Synkroniser preview-kort med editor-indhold
+# Plan: Omdøb "5G - 100/20 - TDC Erhverv" produktet
 
 ## Problem
-Preview-kortet i "Sider"-fanen viser tekst der **ikke matcher editoren**:
-
-1. **Hardcoded demo-linje** i preview: "Oscar ringer dig tirsdag d. 22. april kl. 10:00. Samtalen er helt uforpligtende." — denne linje er ikke redigerbar og stammer ikke fra `body_lines`
-2. **Fallback-titel** på den offentlige side er "Perfekt – du er booket! 🎉" mens editoren og preview bruger det gemte `page.title`
-3. Preview viser indhold der ikke kan redigeres, hvilket giver falsk forventning om hvad kandidaten ser
+Produktet `5G - 100/20 - TDC Erhverv` (id: `cb3143a5-971c-4060-b157-99f1d6477a99`) har "- TDC Erhverv" i navnet, mens de øvrige 5G-produkter (50/10, 200/40, 500/100) bare hedder fx "5G - 50/10".
 
 ## Løsning
+Opdater produktnavnet i `products`-tabellen:
 
-### 1. Fjern hardcoded demo-linje fra preview (`BookingPagesTab.tsx`)
-- Slet linje 192-194 (den faste "Oscar ringer dig tirsdag d. 22. april..."-tekst)
-- Preview skal **kun** vise det der faktisk kan redigeres: titel, body_lines, tip_text
-- Tilføj en lille note under preview: "Dato, tid og rekrutterernavn indsættes automatisk på kandidatsiden"
+```sql
+UPDATE products SET name = '5G - 100/20' WHERE id = 'cb3143a5-971c-4060-b157-99f1d6477a99';
+```
 
-### 2. Synkroniser fallback-tekster (`PublicCandidateBooking.tsx`)
-- Ændr titel-fallback fra "Perfekt – du er booket! 🎉" til "Din samtale er booket! 🎉" så det matcher preview
-- Ændr tip-fallback til at matche preview
+Én enkelt data-opdatering. Ingen kodeændringer nødvendige.
 
-## Filer der ændres
-- `src/components/recruitment/BookingPagesTab.tsx` — fjern hardcoded demo-tekst fra preview
-- `src/pages/recruitment/PublicCandidateBooking.tsx` — synkroniser fallback-værdier
-
-## Resultat
-Preview-kortet viser præcis det editoren styrer. Kandidatsiden tilføjer dynamisk dato/tid automatisk, og det fremgår af en note.
-
+## Bemærkning
+Der findes også et kampagnepris-produkt "5G - 100/20 - Kampagnepris - TDC Erhverv" — dette beholder vi uændret, da de andre kampagnepris-produkter også har "- TDC Erhverv" i navnet (fx "5G - 50/10 - Kampagnepris - TDC Erhverv").
