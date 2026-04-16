@@ -1,17 +1,39 @@
 
-# Plan: Omdøb "5G - 100/20 - TDC Erhverv" produktet
 
-## Problem
-Produktet `5G - 100/20 - TDC Erhverv` (id: `cb3143a5-971c-4060-b157-99f1d6477a99`) har "- TDC Erhverv" i navnet, mens de øvrige 5G-produkter (50/10, 200/40, 500/100) bare hedder fx "5G - 50/10".
+# Plan: Tilføj sociale medier-links til booking-bekræftelsen
+
+## Hvad skal bygges
+En ny sektion med runde ikon-knapper (Instagram, LinkedIn, TikTok, hjemmeside) der vises nederst på booking-bekræftelsessiden. Linkene skal kunne redigeres af admin i "Sider"-fanen.
 
 ## Løsning
-Opdater produktnavnet i `products`-tabellen:
 
-```sql
-UPDATE products SET name = '5G - 100/20' WHERE id = 'cb3143a5-971c-4060-b157-99f1d6477a99';
+### 1. Database: Tilføj `social_links` kolonne
+Tilføj en JSONB-kolonne til `booking_page_content` med struktur:
+```json
+{
+  "instagram": "https://instagram.com/copenhagensales",
+  "linkedin": "https://linkedin.com/company/copenhagensales",
+  "tiktok": "https://tiktok.com/@copenhagensales",
+  "website": "https://copenhagensales.dk"
+}
 ```
+Migration sætter default-værdier på `booking_success`-rækken.
 
-Én enkelt data-opdatering. Ingen kodeændringer nødvendige.
+### 2. Admin-editor (`BookingPagesTab.tsx`)
+- Tilføj 4 input-felter i edit-dialogen (kun for `booking_success`): Instagram, LinkedIn, TikTok, Hjemmeside
+- Gem og hent `social_links` sammen med de øvrige felter
+- Vis ikon-tags i preview-kortet
 
-## Bemærkning
-Der findes også et kampagnepris-produkt "5G - 100/20 - Kampagnepris - TDC Erhverv" — dette beholder vi uændret, da de andre kampagnepris-produkter også har "- TDC Erhverv" i navnet (fx "5G - 50/10 - Kampagnepris - TDC Erhverv").
+### 3. Kandidatside (`PublicCandidateBooking.tsx`)
+- Vis en række med runde sociale medie-ikoner under tip-teksten på success-siden
+- Links åbner i nyt vindue
+- Kun de links der er udfyldt vises
+
+### 4. Visuelt design
+Runde ikoner i Copenhagen Sales-grøn med hvid ikon, placeret vandret centreret under tip-teksten. Subtilt og professionelt.
+
+## Filer der ændres
+- Database-migration (ny kolonne)
+- `src/components/recruitment/BookingPagesTab.tsx` — editor + preview
+- `src/pages/recruitment/PublicCandidateBooking.tsx` — kandidatens success-side
+
