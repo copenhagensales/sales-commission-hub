@@ -220,6 +220,28 @@ Deno.serve(async (req) => {
     const settings = await fetchSettings(supabase);
     const now = new Date();
 
+    // Fetch already-booked interview slots from the database to prevent double-booking
+    const startDate = new Date(now);
+    startDate.setHours(0, 0, 0, 0);
+    const dbEndDate = new Date(startDate);
+    dbEndDate.setDate(dbEndDate.getDate() + Math.ceil(settings.lookahead_days * 2));
+
+    const { data: bookedCandidates } = await supabase
+      .from("candidates")
+      .select("interview_date")
+      .not("interview_date", "is", null)
+      .gte("interview_date", startDate.toISOString())
+      .lte("interview_date", dbEndDate.toISOString())
+      .in("status", ["interview_scheduled", "hired"]);
+
+    const dbBusyPeriods: { start: Date; end: Date }[] = (bookedCandidates || [])
+      .filter((c: any) => c.interview_date)
+      .map((c: any) => {
+        const start = new Date(c.interview_date);
+        const end = new Date(start.getTime() + settings.slot_duration_minutes * 60 * 1000);
+        return { start, end };
+      });
+
     // Microsoft 365 integration
     const clientId = Deno.env.get("AZURE_CLIENT_ID");
     const clientSecret = Deno.env.get("AZURE_CLIENT_SECRET");
@@ -228,7 +250,7 @@ Deno.serve(async (req) => {
 
     if (!clientId || !clientSecret || !tenantId || !msUserEmail) {
       console.warn("[get-public-availability] M365 not configured, returning default slots");
-      return new Response(JSON.stringify({ days: generateDays(settings), candidate, application }), {
+      return new Response(JSON.stringify({ days: generateDays(settings, dbBusyPeriods), candidate, application }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
