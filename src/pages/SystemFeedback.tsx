@@ -99,8 +99,8 @@ export default function SystemFeedback() {
   // Detail dialog
   const [selectedFeedback, setSelectedFeedback] = useState<any>(null);
   const [adminNotes, setAdminNotes] = useState("");
-  const [adminResponse, setAdminResponse] = useState("");
   const [newStatus, setNewStatus] = useState("");
+  const [commentText, setCommentText] = useState("");
 
   // Filters
   const [filterCategory, setFilterCategory] = useState("all");
