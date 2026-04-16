@@ -44,6 +44,7 @@ const STATUSES = [
   { value: "in_progress", label: "Under arbejde", color: "bg-yellow-500/20 text-yellow-400" },
   { value: "resolved", label: "Løst", color: "bg-primary/20 text-primary" },
   { value: "wont_fix", label: "Afvist", color: "bg-destructive/20 text-destructive" },
+  { value: "needs_clarification", label: "Afventer svar", color: "bg-purple-500/20 text-purple-400" },
 ];
 
 function useCurrentEmployeeId() {
@@ -98,6 +99,7 @@ export default function SystemFeedback() {
   // Detail dialog
   const [selectedFeedback, setSelectedFeedback] = useState<any>(null);
   const [adminNotes, setAdminNotes] = useState("");
+  const [adminResponse, setAdminResponse] = useState("");
   const [newStatus, setNewStatus] = useState("");
 
   // Filters
@@ -195,10 +197,14 @@ export default function SystemFeedback() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, status, notes, feedbackTitle, submittedById }: { id: string; status: string; notes: string; feedbackTitle: string; submittedById: string | null }) => {
+    mutationFn: async ({ id, status, notes, feedbackTitle, submittedById, adminResponseText }: { id: string; status: string; notes: string; feedbackTitle: string; submittedById: string | null; adminResponseText?: string }) => {
+      const updatePayload: any = { status, admin_notes: notes || null, updated_at: new Date().toISOString() };
+      if (adminResponseText !== undefined) {
+        updatePayload.admin_response = adminResponseText || null;
+      }
       const { error } = await supabase
         .from("system_feedback")
-        .update({ status, admin_notes: notes || null, updated_at: new Date().toISOString() })
+        .update(updatePayload)
         .eq("id", id);
       if (error) throw error;
 
@@ -212,7 +218,7 @@ export default function SystemFeedback() {
 
         const email = empData?.work_email || empData?.private_email;
         if (email) {
-          return { employeeEmail: email, employeeName: `${empData.first_name || ""} ${empData.last_name || ""}`.trim(), feedbackTitle, newStatus: status, adminNotes: notes };
+          return { employeeEmail: email, employeeName: `${empData.first_name || ""} ${empData.last_name || ""}`.trim(), feedbackTitle, newStatus: status, adminNotes: notes, adminResponse: adminResponseText };
         }
       }
       return null;
@@ -449,6 +455,7 @@ export default function SystemFeedback() {
                             <TableRow key={fb.id} className="cursor-pointer hover:bg-muted/30" onClick={() => {
                               setSelectedFeedback(fb);
                               setAdminNotes(fb.admin_notes || "");
+                              setAdminResponse(fb.admin_response || "");
                               setNewStatus(fb.status);
                             }}>
                               <TableCell className="font-medium max-w-[200px] truncate">{fb.title}</TableCell>
@@ -504,8 +511,9 @@ export default function SystemFeedback() {
                               {resolvedFeedback.map((fb: any) => (
                                 <TableRow key={fb.id} className="cursor-pointer hover:bg-muted/30 opacity-60" onClick={() => {
                                   setSelectedFeedback(fb);
-                                  setAdminNotes(fb.admin_notes || "");
-                                  setNewStatus(fb.status);
+                                setAdminNotes(fb.admin_notes || "");
+                                setAdminResponse(fb.admin_response || "");
+                                setNewStatus(fb.status);
                                 }}>
                                   <TableCell className="font-medium max-w-[200px] truncate">{fb.title}</TableCell>
                                   <TableCell>{getCategoryLabel(fb.category)}</TableCell>
