@@ -115,9 +115,16 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Fetch customizable page content from DB
+    const { data: pageContent } = await supabase
+      .from('booking_page_content')
+      .select('title, body_lines, tip_text')
+      .eq('page_key', 'unsubscribe_success')
+      .maybeSingle();
+
     const firstName = candidate.first_name || '';
     return new Response(
-      renderSuccessHtml(firstName),
+      renderSuccessHtml(firstName, pageContent),
       { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
     );
   } catch (error: any) {
@@ -129,8 +136,20 @@ Deno.serve(async (req) => {
   }
 });
 
-function renderSuccessHtml(firstName: string): string {
-  const greeting = firstName ? `Tak for din interesse, ${firstName}!` : 'Tak for din interesse!';
+function renderSuccessHtml(firstName: string, pageContent?: { title: string; body_lines: string[]; tip_text: string | null } | null): string {
+  const defaultTitle = firstName ? `Tak for din interesse, ${firstName}!` : 'Tak for din interesse!';
+  const title = pageContent?.title
+    ? pageContent.title.replace('{{firstName}}', firstName || '')
+    : defaultTitle;
+
+  const defaultLines = [
+    'Vi har modtaget din afmelding, og du vil ikke modtage flere beskeder fra os.',
+    'Vi sætter stor pris på, at du tog dig tid til at søge hos os – <span class="highlight">det betyder meget</span>.',
+    'Du er altid velkommen til at søge igen en anden gang. Vi vil med glæde høre fra dig!',
+  ];
+  const bodyLines = pageContent?.body_lines?.length ? pageContent.body_lines : defaultLines;
+  const bodyHtml = bodyLines.map(line => `<p>${line}</p>`).join('\n    ');
+
   return `<!DOCTYPE html>
 <html lang="da">
 <head>
@@ -154,10 +173,8 @@ function renderSuccessHtml(firstName: string): string {
     <div class="icon">
       <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
     </div>
-    <h1>${greeting}</h1>
-    <p>Vi har modtaget din afmelding, og du vil ikke modtage flere beskeder fra os.</p>
-    <p>Vi sætter stor pris på, at du tog dig tid til at søge hos os – <span class="highlight">det betyder meget</span>.</p>
-    <p>Du er altid velkommen til at søge igen en anden gang. Vi vil med glæde høre fra dig!</p>
+    <h1>${title}</h1>
+    ${bodyHtml}
     <div class="divider"></div>
     <p class="brand">Venlig hilsen, Copenhagen Sales</p>
   </div>

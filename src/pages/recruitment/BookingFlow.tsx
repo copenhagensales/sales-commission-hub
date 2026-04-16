@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Users, Zap, Clock, CheckCircle, XCircle, Plus, Mail, MessageSquare, Loader2, ShieldCheck, AlertTriangle, FileText, CalendarDays, Eye, PhoneCall, Bell } from "lucide-react";
+import { Users, Zap, Clock, CheckCircle, XCircle, Plus, Mail, MessageSquare, Loader2, ShieldCheck, AlertTriangle, FileText, CalendarDays, Eye, PhoneCall, Bell, Layout } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { da } from "date-fns/locale";
 import { SegmentationModal } from "@/components/recruitment/SegmentationModal";
@@ -19,6 +19,7 @@ import { BookingSettingsTab } from "@/components/recruitment/BookingSettingsTab"
 import { BookingPreviewTab } from "@/components/recruitment/BookingPreviewTab";
 import { BookingCalendarTab } from "@/components/recruitment/BookingCalendarTab";
 import { BookingNotificationsTab } from "@/components/recruitment/BookingNotificationsTab";
+import { BookingPagesTab } from "@/components/recruitment/BookingPagesTab";
 import { addDays, setHours, setMinutes } from "date-fns";
 
 const tierConfig = {
@@ -284,6 +285,10 @@ export default function BookingFlow() {
             <TabsTrigger value="notifications" className="gap-2">
               <Bell className="h-4 w-4" />
               Notifikationer
+            </TabsTrigger>
+            <TabsTrigger value="pages" className="gap-2">
+              <Layout className="h-4 w-4" />
+              Sider
             </TabsTrigger>
           </TabsList>
 
@@ -562,6 +567,10 @@ export default function BookingFlow() {
 
           <TabsContent value="notifications">
             <BookingNotificationsTab />
+          </TabsContent>
+
+          <TabsContent value="pages">
+            <BookingPagesTab />
           </TabsContent>
         </Tabs>
 

@@ -1784,6 +1784,33 @@ export type Database = {
         }
         Relationships: []
       }
+      booking_page_content: {
+        Row: {
+          body_lines: string[]
+          id: string
+          page_key: string
+          tip_text: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          body_lines?: string[]
+          id?: string
+          page_key: string
+          tip_text?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          body_lines?: string[]
+          id?: string
+          page_key?: string
+          tip_text?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       booking_settings: {
         Row: {
           available_weekdays: number[] | null
