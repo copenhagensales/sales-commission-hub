@@ -102,9 +102,13 @@ Deno.serve(async (req) => {
 
     console.log(`[unsubscribe-candidate] Candidate ${candidateId} unsubscribed. Cancelled ${activeEnrollments?.length || 0} enrollments.`);
 
-    // Send cancellation notification emails
-    const resendApiKey = Deno.env.get("RESEND_API_KEY");
-    if (resendApiKey) {
+    // Send cancellation notification emails via M365 Graph API
+    const m365TenantId = Deno.env.get("M365_TENANT_ID");
+    const m365ClientId = Deno.env.get("M365_CLIENT_ID");
+    const m365ClientSecret = Deno.env.get("M365_CLIENT_SECRET");
+    const m365SenderEmail = Deno.env.get("M365_SENDER_EMAIL");
+
+    if (m365TenantId && m365ClientId && m365ClientSecret && m365SenderEmail) {
       try {
         const { data: notifRecipients } = await supabase
           .from("booking_notification_recipients")
@@ -114,22 +118,51 @@ Deno.serve(async (req) => {
         const recipientEmails = (notifRecipients || []).map(r => r.email);
         if (recipientEmails.length > 0) {
           const candidateName = `${candidate.first_name}`;
-          await fetch("https://api.resend.com/emails", {
+
+          // Get M365 OAuth token
+          const tokenRes = await fetch(`https://login.microsoftonline.com/${m365TenantId}/oauth2/v2.0/token`, {
             method: "POST",
-            headers: {
-              Authorization: `Bearer ${resendApiKey}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              from: "Copenhagen Sales <noreply@copenhagensales.dk>",
-              to: recipientEmails,
-              subject: `Afmelding: ${candidateName} har afmeldt sig`,
-              html: `<h3>Kandidat afmeldt</h3>
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+              client_id: m365ClientId,
+              client_secret: m365ClientSecret,
+              scope: "https://graph.microsoft.com/.default",
+              grant_type: "client_credentials",
+            }).toString(),
+          });
+          const tokenData = await tokenRes.json();
+
+          if (!tokenRes.ok) {
+            console.error("[unsubscribe-candidate] M365 token error:", tokenData);
+          } else {
+            const sendMailUrl = `https://graph.microsoft.com/v1.0/users/${m365SenderEmail}/sendMail`;
+            const emailRes = await fetch(sendMailUrl, {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${tokenData.access_token}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                message: {
+                  subject: `Afmelding: ${candidateName} har afmeldt sig`,
+                  body: {
+                    contentType: "HTML",
+                    content: `<h3>Kandidat afmeldt</h3>
 <p><strong>${candidateName}</strong> har afmeldt sig via afmeldingslinket.</p>
 <p>Alle aktive flows er blevet annulleret, og ansøgningen er markeret som trukket.</p>`,
-            }),
-          });
-          console.log(`[unsubscribe-candidate] Cancel notification sent to ${recipientEmails.join(", ")}`);
+                  },
+                  toRecipients: recipientEmails.map(e => ({ emailAddress: { address: e } })),
+                },
+                saveToSentItems: false,
+              }),
+            });
+
+            if (emailRes.ok) {
+              console.log(`[unsubscribe-candidate] Cancel notification sent via M365 to ${recipientEmails.join(", ")}`);
+            } else {
+              console.error("[unsubscribe-candidate] M365 email error:", await emailRes.text());
+            }
+          }
         }
       } catch (emailErr) {
         console.error("[unsubscribe-candidate] Email notification error:", emailErr);
