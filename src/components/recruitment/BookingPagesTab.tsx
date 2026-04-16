@@ -36,6 +36,7 @@ export function BookingPagesTab() {
   const [editTitle, setEditTitle] = useState("");
   const [editBodyLines, setEditBodyLines] = useState("");
   const [editTipText, setEditTipText] = useState("");
+  const [editSocialLinks, setEditSocialLinks] = useState<SocialLinks>({});
 
   const { data: pages, isLoading } = useQuery({
     queryKey: ["booking-page-content"],
@@ -50,13 +51,14 @@ export function BookingPagesTab() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (page: { id: string; title: string; body_lines: string[]; tip_text: string | null }) => {
+    mutationFn: async (page: { id: string; title: string; body_lines: string[]; tip_text: string | null; social_links: SocialLinks | null }) => {
       const { error } = await supabase
         .from("booking_page_content")
         .update({
           title: page.title,
           body_lines: page.body_lines,
           tip_text: page.tip_text,
+          social_links: page.social_links as any,
           updated_at: new Date().toISOString(),
         })
         .eq("id", page.id);
@@ -75,6 +77,7 @@ export function BookingPagesTab() {
     setEditTitle(page.title);
     setEditBodyLines(page.body_lines.join("\n"));
     setEditTipText(page.tip_text || "");
+    setEditSocialLinks((page.social_links as SocialLinks) || {});
   };
 
   const handleSave = () => {
@@ -84,6 +87,7 @@ export function BookingPagesTab() {
       title: editTitle,
       body_lines: editBodyLines.split("\n").filter(l => l.trim()),
       tip_text: editTipText.trim() || null,
+      social_links: editingPage.page_key === "booking_success" ? editSocialLinks : editingPage.social_links,
     });
   };
 
