@@ -161,6 +161,7 @@ export function useSubmitPulseSurvey() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pulse-survey-completion'] });
       queryClient.invalidateQueries({ queryKey: ['pulse-survey-active'] });
+      queryClient.invalidateQueries({ queryKey: ['pulse-survey-lock'] });
     }
   });
 }
