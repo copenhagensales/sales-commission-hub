@@ -166,7 +166,7 @@ Deno.serve(async (req) => {
 
       // Generate short links
       const fullBookingUrl = `${siteUrl}/book/${enrollment.candidate_id}`;
-      const fullUnsubscribeUrl = `${supabaseUrl}/functions/v1/unsubscribe-candidate?id=${enrollment.candidate_id}`;
+      const fullUnsubscribeUrl = `${siteUrl}/unsubscribe/${enrollment.candidate_id}`;
       const bookingLink = await createShortLink(supabase, fullBookingUrl, enrollment.candidate_id, 'booking', shortDomain);
       const unsubscribeUrl = await createShortLink(supabase, fullUnsubscribeUrl, enrollment.candidate_id, 'unsubscribe', shortDomain);
 

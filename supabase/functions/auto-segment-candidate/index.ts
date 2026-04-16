@@ -350,7 +350,7 @@ Deno.serve(async (req) => {
 
         // Generate short links
         const fullBookingUrl = `${siteUrl}/book/${candidate.id}`;
-        const fullUnsubscribeUrl = `${supabaseUrl}/functions/v1/unsubscribe-candidate?id=${candidate.id}`;
+        const fullUnsubscribeUrl = `${siteUrl}/unsubscribe/${candidate.id}`;
 
         const bookingCode = generateShortCode();
         await supabase.from('short_links').insert({ code: bookingCode, target_url: fullBookingUrl, candidate_id: candidate.id, link_type: 'booking' });
