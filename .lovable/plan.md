@@ -1,27 +1,26 @@
 
 
-# Fix: Booking/afmeldings-notifikationer sender ikke email
+# Plan: Fjern tier-segmentering, tilføj manuel tilføjelse med godkendelse
 
-## Problem
-`public-book-candidate` og `unsubscribe-candidate` bruger **Resend API** til at sende notifikationsmails, mens alle andre email-funktioner i systemet bruger **M365 Graph API**. Resend-kaldene fejler sandsynligvis fordi domænet `copenhagensales.dk` ikke er verificeret i Resend, eller API-nøglen ikke har korrekt scope. M365 fungerer derimod fejlfrit i resten af systemet.
-
-## Løsning
-Erstat Resend-kaldene i begge edge-funktioner med M365 Graph API — samme mønster som bruges i `send-recruitment-email`, `check-compliance-reviews`, `notify-referral-received` osv.
+## Opsummering
+Fjern den automatiske A/B/C-segmentering. Når en kandidat tilføjes, oprettes den som `pending_approval`. Kandidaten aktiveres og flow startes kun efter manuel godkendelse (den eksisterende Godkend/Afvis-funktionalitet bevares).
 
 ## Tekniske ændringer
 
-### 1. `supabase/functions/public-book-candidate/index.ts`
-- Fjern Resend-blokken (linje 142-192)
-- Tilføj M365 token-hentning (genbruger `M365_TENANT_ID`, `M365_CLIENT_ID`, `M365_CLIENT_SECRET`, `M365_SENDER_EMAIL`)
-- Send booking-notifikation via `https://graph.microsoft.com/v1.0/users/{sender}/sendMail`
+### `src/pages/recruitment/BookingFlow.tsx`
+- **Fjern** `SegmentationModal`-import og `segModalOpen` state
+- **Fjern** `tierConfig`, `filterTier` state, tier-filter dropdown, tier-stats kort (Tier A/B/C)
+- **Fjern** tier-badges fra enrollment-listen og pending approvals
+- **Fjern** `segmentation_signals`-badges (alder, erfaring, sprog, deltid) fra pending approvals
+- **Ændr** "Tilføj kandidat"-dialogen: Når en kandidat vælges, insertes direkte i `booking_flow_enrollments` med `status: 'pending_approval'` (ingen SegmentationModal, ingen edge function-kald)
+- **Behold** "Afventer godkendelse"-sektionen med Godkend/Afvis-knapper — dette er nu den eneste vej til at aktivere et flow
+- **Behold** `approveMutation` (som allerede sætter `status: 'active'` og opretter touchpoints)
+- **Opdater** subtitle fra "Automatiseret outreach med intelligent A/B/C-segmentering" til "Automatiseret outreach med manuel godkendelse"
+- **Stats**: Vis kun "Aktive flows" og "Afventer godkendelse" kort (fjern 3 tier-kort, grid fra 5 til 2 kolonner)
 
-### 2. `supabase/functions/unsubscribe-candidate/index.ts`
-- Fjern Resend-blokken (linje 106-137)
-- Tilføj M365 token-hentning og send afmeldings-notifikation via Graph API
-
-Begge funktioner beholder den eksisterende HTML-skabelon og modtagerliste fra `booking_notification_recipients`.
+### `src/components/recruitment/SegmentationModal.tsx`
+- Ingen ændring — bruges bare ikke længere
 
 ## Filer der ændres
-- `supabase/functions/public-book-candidate/index.ts`
-- `supabase/functions/unsubscribe-candidate/index.ts`
+- `src/pages/recruitment/BookingFlow.tsx`
 
