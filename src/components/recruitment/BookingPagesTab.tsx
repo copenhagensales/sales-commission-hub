@@ -206,6 +206,7 @@ function BookingSuccessPreview({ page }: { page: PageContent }) {
         {page.tip_text && (
           <p className="text-[10px]" style={{ color: "#999" }}>{page.tip_text}</p>
         )}
+        <p className="text-[10px] italic" style={{ color: "#bbb" }}>Dato, tid og rekrutterernavn indsættes automatisk på kandidatsiden</p>
       </div>
     </div>
   );
