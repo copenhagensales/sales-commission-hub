@@ -76,11 +76,29 @@ function parseTime(t: string): { h: number; m: number } {
   return { h, m };
 }
 
+/** Get current Danish time components using Intl */
+function getDanishNow(): { year: number; month: number; day: number; hour: number; minute: number } {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Copenhagen",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hour12: false,
+  }).formatToParts(now);
+  const get = (t: string) => parseInt(parts.find(p => p.type === t)?.value || "0", 10);
+  return { year: get("year"), month: get("month"), day: get("day"), hour: get("hour"), minute: get("minute") };
+}
+
+function getDanishDateStr(): string {
+  const d = getDanishNow();
+  return `${d.year}-${String(d.month).padStart(2,"0")}-${String(d.day).padStart(2,"0")}`;
+}
+
 function generateSlotsForDay(
-  date: Date,
+  dateStr: string,
   windows: TimeWindow[],
   slotDuration: number,
-  now: Date,
+  isToday: boolean,
+  danishNowMinutes: number,
   busyPeriods?: { start: Date; end: Date }[]
 ): TimeSlot[] {
   const slots: TimeSlot[] = [];
@@ -92,22 +110,25 @@ function generateSlotsForDay(
 
     for (let startMin = winStartMin; startMin + slotDuration <= winEndMin; startMin += slotDuration) {
       const endMin = startMin + slotDuration;
-      const sH = Math.floor(startMin / 60);
-      const sM = startMin % 60;
-      const eH = Math.floor(endMin / 60);
-      const eM = endMin % 60;
 
-      const slotStart = new Date(date);
-      slotStart.setHours(sH, sM, 0, 0);
-      if (slotStart <= now) continue;
+      // For today, skip slots that have already passed in Danish time
+      if (isToday && startMin <= danishNowMinutes) continue;
 
       if (busyPeriods) {
-        const slotEnd = new Date(date);
-        slotEnd.setHours(eH, eM, 0, 0);
+        const sH = Math.floor(startMin / 60);
+        const sM = startMin % 60;
+        const eH = Math.floor(endMin / 60);
+        const eM = endMin % 60;
+        const slotStart = new Date(dateStr + "T" + String(sH).padStart(2,"0") + ":" + String(sM).padStart(2,"0") + ":00+02:00");
+        const slotEnd = new Date(dateStr + "T" + String(eH).padStart(2,"0") + ":" + String(eM).padStart(2,"0") + ":00+02:00");
         const isBusy = busyPeriods.some(busy => slotStart < busy.end && slotEnd > busy.start);
         if (isBusy) continue;
       }
 
+      const sH = Math.floor(startMin / 60);
+      const sM = startMin % 60;
+      const eH = Math.floor(endMin / 60);
+      const eM = endMin % 60;
       slots.push({
         start: `${String(sH).padStart(2, "0")}:${String(sM).padStart(2, "0")}`,
         end: `${String(eH).padStart(2, "0")}:${String(eM).padStart(2, "0")}`,
@@ -119,40 +140,45 @@ function generateSlotsForDay(
 
 function generateDays(
   settings: BookingSettings,
-  now: Date,
   busyPeriods?: { start: Date; end: Date }[]
 ): AvailabilityDay[] {
   const weekdays = getWeekdays(settings);
   const blockedSet = new Set(settings.blocked_dates || []);
   const days: AvailabilityDay[] = [];
 
-  const current = new Date(now);
-  current.setHours(0, 0, 0, 0);
+  const danish = getDanishNow();
+  const danishNowMinutes = danish.hour * 60 + danish.minute;
+  const todayStr = getDanishDateStr();
+
+  // Start iterating from today's date (Danish time)
+  const current = new Date(todayStr + "T00:00:00Z");
 
   // Check if past all windows today using per-day windows
-  const todayIsoDay = jsToIsoDay(current.getDay());
+  const todayIsoDay = jsToIsoDay(current.getUTCDay());
   const todayWindows = getTimeWindowsForDay(settings, todayIsoDay);
   if (todayWindows.length > 0) {
     const lastWindow = todayWindows[todayWindows.length - 1];
     const lastEnd = parseTime(lastWindow.end);
-    if (now.getHours() > lastEnd.h || (now.getHours() === lastEnd.h && now.getMinutes() >= lastEnd.m)) {
-      current.setDate(current.getDate() + 1);
+    const lastEndMin = lastEnd.h * 60 + lastEnd.m;
+    if (danishNowMinutes >= lastEndMin) {
+      current.setUTCDate(current.getUTCDate() + 1);
     }
   }
 
   const totalDays = Math.ceil(settings.lookahead_days * 2);
   for (let i = 0; i < totalDays && days.length < settings.lookahead_days; i++) {
-    const dow = current.getDay();
+    const dow = current.getUTCDay();
     if (weekdays.has(dow)) {
       const dateStr = current.toISOString().split("T")[0];
       if (!blockedSet.has(dateStr)) {
         const isoDay = jsToIsoDay(dow);
         const windows = getTimeWindowsForDay(settings, isoDay);
-        const slots = generateSlotsForDay(current, windows, settings.slot_duration_minutes, now, busyPeriods);
+        const isToday = dateStr === todayStr;
+        const slots = generateSlotsForDay(dateStr, windows, settings.slot_duration_minutes, isToday, danishNowMinutes, busyPeriods);
         if (slots.length > 0) days.push({ date: dateStr, slots });
       }
     }
-    current.setDate(current.getDate() + 1);
+    current.setUTCDate(current.getUTCDate() + 1);
   }
   return days;
 }
@@ -202,7 +228,7 @@ Deno.serve(async (req) => {
 
     if (!clientId || !clientSecret || !tenantId || !msUserEmail) {
       console.warn("[get-public-availability] M365 not configured, returning default slots");
-      return new Response(JSON.stringify({ days: generateDays(settings, now), candidate, application }), {
+      return new Response(JSON.stringify({ days: generateDays(settings), candidate, application }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -221,7 +247,7 @@ Deno.serve(async (req) => {
 
     if (!tokenResponse.ok) {
       console.error("[get-public-availability] Token error:", await tokenResponse.text());
-      return new Response(JSON.stringify({ days: generateDays(settings, now), candidate, application }), {
+      return new Response(JSON.stringify({ days: generateDays(settings), candidate, application }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -249,7 +275,7 @@ Deno.serve(async (req) => {
 
     if (!scheduleResponse.ok) {
       console.error("[get-public-availability] Schedule error:", await scheduleResponse.text());
-      return new Response(JSON.stringify({ days: generateDays(settings, now), candidate, application }), {
+      return new Response(JSON.stringify({ days: generateDays(settings), candidate, application }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -258,7 +284,7 @@ Deno.serve(async (req) => {
     const schedule = scheduleData.value?.[0];
 
     if (!schedule) {
-      return new Response(JSON.stringify({ days: generateDays(settings, now), candidate, application }), {
+      return new Response(JSON.stringify({ days: generateDays(settings), candidate, application }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -270,7 +296,7 @@ Deno.serve(async (req) => {
         end: new Date(item.end.dateTime + "Z"),
       }));
 
-    return new Response(JSON.stringify({ days: generateDays(settings, now, busyPeriods), candidate, application }), {
+    return new Response(JSON.stringify({ days: generateDays(settings, busyPeriods), candidate, application }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: any) {
