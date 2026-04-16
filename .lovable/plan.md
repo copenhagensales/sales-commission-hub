@@ -1,39 +1,25 @@
 
 
-# Fix: "Sæt ny kode" fejler for ikke-ejere
+# Fix: Tilføj "Bekræftelse"-fasen til FlowTemplatesTab
 
 ## Problem
-Knappen "Sæt ny kode" vises for alle med `canEditEmployees`-rettighed (inkl. teamledere), men edge-funktionen `set-user-password` kræver `is_owner`. Når en ikke-ejer (f.eks. Kasper som teamleder/manager) forsøger at sætte en ny kode for Oscar Belcher, returnerer edge-funktionen en 403-fejl: "Kun ejere kan udføre denne handling".
-
-Fejltoasten vises i højre hjørne som rapporteret.
+Databasen har 3 faser: `active`, `confirmation` og `reengagement`. Men `PHASE_GROUPS` i `FlowTemplatesTab.tsx` definerer kun `active` og `reengagement` — så bekræftelses-SMS'en (template_key: `booking_confirmation_sms`) vises aldrig i UI'et og kan ikke redigeres.
 
 ## Løsning
-Ændr adgangskontrollen i edge-funktionen til at bruge `is_manager_or_above` i stedet for `is_owner`, så den matcher UI-gaten. Teamledere og managers skal kunne sætte nye koder for deres medarbejdere.
+Tilføj `confirmation`-fasen til `PHASE_GROUPS`-arrayet.
 
-## Tekniske ændringer
+## Teknisk ændring
 
-### Fil: `supabase/functions/set-user-password/index.ts`
-**Linje 45-51**: Ændr `is_owner` til `is_manager_or_above`:
+### Fil: `src/components/recruitment/FlowTemplatesTab.tsx`
+**Linje 29-32**: Tilføj confirmation-fasen:
 
 ```typescript
-// Før:
-const { data: isOwner } = await supabaseAdmin.rpc("is_owner", { _user_id: callingUser.id });
-if (!isOwner) {
-  return new Response(
-    JSON.stringify({ error: "Kun ejere kan udføre denne handling" }),
-    ...
-  );
-}
-
-// Efter:
-const { data: isManager } = await supabaseAdmin.rpc("is_manager_or_above", { _user_id: callingUser.id });
-if (!isManager) {
-  return new Response(
-    JSON.stringify({ error: "Kun ledere kan udføre denne handling" }),
-    ...
-  );
-}
+const PHASE_GROUPS = [
+  { phase: "confirmation", label: "Bekræftelse — Ved booking", color: "text-foreground" },
+  { phase: "active", label: "Aktiv booking — Dag 0–10", color: "text-foreground" },
+  { phase: "reengagement", label: "Re-engagement — Dag 45+", color: "text-foreground" },
+];
 ```
 
-Ingen andre filer ændres.
+Én linje tilføjet, ingen andre filer ændres.
 
