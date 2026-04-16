@@ -51,12 +51,18 @@ export function CommissionRatesTab() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, commission_dkk, revenue_dkk, is_hidden, client_campaign_id, client_campaigns!inner(client_id)")
-        .eq("client_campaigns.client_id", selectedClientId)
+        .select("id, name, commission_dkk, revenue_dkk, is_hidden, client_campaign_id, client_campaigns(client_id)")
         .eq("is_hidden", false)
         .order("name");
       if (error) throw error;
-      return data;
+      // Filter client-side: include products whose campaign belongs to selected client
+      return data.filter((p: any) => {
+        const cc = p.client_campaigns;
+        if (!cc) return false;
+        // cc can be an object or array depending on the join
+        if (Array.isArray(cc)) return cc.some((c: any) => c.client_id === selectedClientId);
+        return cc.client_id === selectedClientId;
+      });
     },
   });
 
