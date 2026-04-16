@@ -115,9 +115,16 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Fetch customizable page content from DB
+    const { data: pageContent } = await supabase
+      .from('booking_page_content')
+      .select('title, body_lines, tip_text')
+      .eq('page_key', 'unsubscribe_success')
+      .maybeSingle();
+
     const firstName = candidate.first_name || '';
     return new Response(
-      renderSuccessHtml(firstName),
+      renderSuccessHtml(firstName, pageContent),
       { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
     );
   } catch (error: any) {
