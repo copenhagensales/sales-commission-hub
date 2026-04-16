@@ -1784,6 +1784,45 @@ export type Database = {
         }
         Relationships: []
       }
+      booking_page_config: {
+        Row: {
+          description: string
+          greeting_template: string
+          id: string
+          recruiter_name: string
+          role_label: string
+          step1_label: string
+          step2_label: string
+          step3_label: string
+          unsubscribe_text: string
+          updated_at: string | null
+        }
+        Insert: {
+          description?: string
+          greeting_template?: string
+          id?: string
+          recruiter_name?: string
+          role_label?: string
+          step1_label?: string
+          step2_label?: string
+          step3_label?: string
+          unsubscribe_text?: string
+          updated_at?: string | null
+        }
+        Update: {
+          description?: string
+          greeting_template?: string
+          id?: string
+          recruiter_name?: string
+          role_label?: string
+          step1_label?: string
+          step2_label?: string
+          step3_label?: string
+          unsubscribe_text?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       booking_page_content: {
         Row: {
           body_lines: string[]
