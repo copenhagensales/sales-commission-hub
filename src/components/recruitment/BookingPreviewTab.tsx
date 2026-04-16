@@ -193,6 +193,8 @@ export function BookingPreviewTab() {
               <span className="flex items-center gap-1"><span>📞</span> {step2}</span>
               <span style={{ color: "#ddd" }}>→</span>
               <span className="flex items-center gap-1"><span>🚀</span> {step3}</span>
+              <span style={{ color: "#ddd" }}>→</span>
+              <span className="flex items-center gap-1"><span>🎉</span> Ansættelse</span>
             </div>
 
             <div className="space-y-4">
