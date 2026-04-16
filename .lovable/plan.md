@@ -1,31 +1,43 @@
 
 
-# Fix: Produkter med manglende kampagnetilknytning
+# Plan: Send besked tilbage til indberetteren med anmodning om uddybning
 
-## Problem
-226 af 435 produkter har `client_campaign_id = NULL`, hvilket gør dem usynlige i Provisionssatser-fanen. De fleste er forældede, men ca. 20 bruges aktivt i salg.
+## Nuværende situation
+- `system_feedback` tabellen har allerede en `admin_response` kolonne (ubrugt)
+- Admin kan ændre status og skrive interne noter, men kan ikke sende en synlig besked tilbage til indberetteren
+- Der er allerede en `notify-feedback-status-change` Edge Function der sender email via M365
 
-## Løsning (2 dele)
+## Løsning
+Tilføj et "Bed om uddybning"-felt i admin-dialogen, som gemmer beskeden i `admin_response`, sætter status til `needs_clarification`, og sender en email til indberetteren med spørgsmålet.
 
-### 1. UI-fix: Vis også produkter uden kampagne
-Ændre queryen i `CommissionRatesTab.tsx` så den bruger et LEFT JOIN i stedet for `!inner`, og viser produkter uden kampagne under en "Ikke tilknyttet"-gruppe.
+## Tekniske ændringer
 
-**Fil:** `src/components/mg-test/CommissionRatesTab.tsx`
-- Ændr `.select("id, name, commission_dkk, revenue_dkk, client_campaign_id, client_campaigns!inner(client_id)")` til `.select("id, name, commission_dkk, revenue_dkk, client_campaign_id, client_campaigns(client_id)")`
-- Filtrer manuelt på `client_id` i koden i stedet for at lade `!inner` gøre det
-
-### 2. Data-fix: Link AKA-produktet (godkendt)
-Kør den allerede godkendte migration for "Salg - AKA":
-```sql
-UPDATE products
-SET client_campaign_id = '823f33d0-e405-4e1a-a20b-f73baaadaefa'
-WHERE id = 'efb8f102-15b7-4fbf-a88c-da0be48f37bb'
-  AND client_campaign_id IS NULL;
+### 1. Tilføj ny status
+I `SystemFeedback.tsx`, tilføj til `STATUSES`:
+```typescript
+{ value: "needs_clarification", label: "Afventer svar", color: "bg-purple-500/20 text-purple-400" }
 ```
 
-De øvrige 225 produkter forbliver uændrede — de fleste er ubrugte og bør linkes manuelt hvis de skal bruges igen.
+### 2. Udvid admin-dialogen
+I detail-dialogen (linje ~605-636), tilføj:
+- Et tekstfelt "Besked til indberetteren" der gemmer i `admin_response`
+- En "Send & bed om uddybning" knap der sætter status til `needs_clarification`, gemmer `admin_response`, og sender email
+- Vis eksisterende `admin_response` i dialogen hvis den allerede er sat
+
+### 3. Opdater updateMutation
+- Inkluder `admin_response` i `.update()`-kaldet
+- Send `adminResponse` med i notification-data
+
+### 4. Opdater `notify-feedback-status-change` Edge Function
+- Accepter `adminResponse` parameter
+- Når status er `needs_clarification`, brug en anden email-skabelon med beskeden og en opfordring til at svare/kontakte admin
+
+### 5. Vis admin-svar for indberetteren
+- I feedback-listen (for ikke-owners), vis `admin_response` som en synlig besked på den pågældende feedback-post, så indberetteren kan se hvad der bliver spurgt om
 
 ## Filer der ændres
-- `src/components/mg-test/CommissionRatesTab.tsx` (query + filter)
-- Én data-migration for AKA-produktet
+- `src/pages/SystemFeedback.tsx` — ny status, admin_response felt, vis svar
+- `supabase/functions/notify-feedback-status-change/index.ts` — håndter uddybnings-email
+
+Ingen database-migration nødvendig — `admin_response`-kolonnen eksisterer allerede.
 
