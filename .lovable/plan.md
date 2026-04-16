@@ -1,56 +1,42 @@
 
 
-# Plan: Beskedtråd direkte i ticket (erstat email-uddybning)
+# Plan: Brug kandidatens ansøgte rolle i booking flow SMS'er
 
-## Hvad ændres
-I stedet for at "Bed om uddybning" sender en email, bygges en beskedtråd direkte i ticket-dialogen. Admin og indberetter kan skrive frem og tilbage inde i selve ticketen.
+## Problem
+Når `process-booking-flow` sender SMS'er, henter den `role` fra `applications.role` — men det felt eksisterer sandsynligvis ikke eller er altid tomt. Fallback er hardcodet til `'Salgskonsulent'`, uanset om kandidaten har søgt som Fieldmarketing.
 
-## 1. Database: Ny `system_feedback_comments` tabel
+I `auto-segment-candidate` (dag 0 SMS) bruges korrekt `candidate.applied_position` som fallback, men `process-booking-flow` (dag 1, 7, 14 osv.) gør det ikke.
 
-```sql
-CREATE TABLE public.system_feedback_comments (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  feedback_id UUID NOT NULL REFERENCES public.system_feedback(id) ON DELETE CASCADE,
-  author_employee_id UUID REFERENCES public.employee_master_data(id),
-  message TEXT NOT NULL,
-  is_admin BOOLEAN NOT NULL DEFAULT false,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+## Løsning
+Opdater `process-booking-flow/index.ts` til også at hente `candidate.applied_position` og bruge det som fallback:
 
-ALTER TABLE public.system_feedback_comments ENABLE ROW LEVEL SECURITY;
+**Fil:** `supabase/functions/process-booking-flow/index.ts`
 
--- Indberettere ser kommentarer på egne tickets, admins ser alle
-CREATE POLICY "Users can view comments on own feedback"
-  ON public.system_feedback_comments FOR SELECT TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.system_feedback sf
-      WHERE sf.id = feedback_id AND sf.submitted_by = (
-        SELECT emd.id FROM public.employee_master_data emd
-        WHERE emd.auth_user_id = auth.uid() LIMIT 1
-      )
-    )
-    OR public.has_role(auth.uid(), 'admin')
-  );
-
--- Alle autentificerede kan indsætte kommentarer
-CREATE POLICY "Authenticated users can insert comments"
-  ON public.system_feedback_comments FOR INSERT TO authenticated
-  WITH CHECK (true);
+Linje 152-160 ændres fra:
+```ts
+const { data: app } = await supabase
+  .from('applications')
+  .select('role')
+  .eq('candidate_id', enrollment.candidate_id)
+  ...
+const role = app?.role || 'Salgskonsulent';
 ```
 
-## 2. UI-ændringer i `SystemFeedback.tsx`
+Til:
+```ts
+const { data: app } = await supabase
+  .from('applications')
+  .select('role')
+  .eq('candidate_id', enrollment.candidate_id)
+  ...
 
-- **Beskedtråd i dialogen**: Mellem ticket-detaljer og admin-sektionen vises en tråd med alle kommentarer (admin-beskeder i lilla, bruger-beskeder i standard farve), sorteret kronologisk
-- **Nyt svar-felt**: Både admin og indberetter får et tekstfelt + "Send"-knap til at skrive i tråden
-- **"Bed om uddybning"-knappen**: Ændres til at sætte status til `needs_clarification` + scrolle til svar-feltet (ingen email)
-- **Admin response-feltet**: Fjernes (erstattes af tråden)
-- **Indberetter-visning**: Når status er `needs_clarification`, vises en tydelig prompt om at svare
+const role = app?.role || candidate.applied_position || 'Salgskonsulent';
+```
 
-## 3. Eksisterende admin_response
-Migrér ikke — det eksisterende `admin_response`-felt beholdes i databasen for historik, men vises kun som en legacy-besked i tråden hvis den findes.
+Det kræver at `applied_position` allerede er inkluderet i candidate-queryen. Jeg tjekker og tilføjer det om nødvendigt.
 
-## Filer der ændres
-- Database-migration (ny tabel + RLS)
-- `src/pages/SystemFeedback.tsx` — beskedtråd + nyt input
+## Omfang
+- 1 fil ændres: `supabase/functions/process-booking-flow/index.ts`
+- Ingen database-ændringer
+- Ingen UI-ændringer
 
