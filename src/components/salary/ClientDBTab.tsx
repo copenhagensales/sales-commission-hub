@@ -1257,7 +1257,7 @@ export function ClientDBTab() {
                 stabExpenses={proratedStabExpenses}
                 staffSalaries={proratedStaffSalaries}
                 netEarnings={proratedNetEarnings}
-                staffSalaryList={staffSalaryList}
+                staffSalaryList={isProrated ? staffSalaryList.map(s => ({ ...s, totalSalary: s.totalSalary * prorationFactor })) : staffSalaryList}
                 fullStabExpenses={isProrated ? totals.stabExpenses : undefined}
                 fullStaffSalaries={isProrated ? totals.staffSalaries : undefined}
               />
