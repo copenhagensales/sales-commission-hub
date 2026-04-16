@@ -1,26 +1,55 @@
 
 
-# Fix: Proratér individuelle stabslønninger i summary-kortet
+# Plan: Ny fane "Provisionssatser" på MgTest-siden
 
-## Problem
-"Samlet Oversigt" viser det proraterede total for Stabslønninger (-46.500 kr), men de individuelle medarbejdere (Oscar, Lone, Laura osv.) viser deres **fulde** månedsbeløb. Det giver ikke mening at totalen er prorateret, men de individuelle linjer ikke er det.
+## Formål
+En read-only oversigt hvor man vælger en kunde og ser alle produkter med deres effektive provisionssatser — inkl. eventuelle kampagne-specifikke prisregler.
 
-Oscar Belchers 39.375 kr er hans fulde staff-løn for hele måneden — den burde vises prorateret (~21.000 kr) på samme måde som totalen.
+## Design
 
-## Løsning
-Anvend `prorationFactor` på hver medarbejders `totalSalary` i staffSalaryList, når listen sendes til `ClientDBSummaryCard`.
+Fanen viser:
+1. **Kunde-vælger** (Select dropdown med alle kunder)
+2. **Produkttabel** med kolonnerne:
+   - Produktnavn
+   - Base provision (fra `products.commission_dkk`)
+   - Base omsætning (fra `products.revenue_dkk`)
+   - Antal aktive prisregler (link/expand til detaljer)
+3. **Ekspanderbar sektion** per produkt der viser aktive `product_pricing_rules` med:
+   - Regelnavn
+   - Provision / Omsætning
+   - Prioritet
+   - Kampagne-binding (hvis relevant)
+
+```text
+┌─────────────────────────────────────────────┐
+│  Kunde: [▼ Eesy FM                        ] │
+├─────────────────────────────────────────────┤
+│  Produkt          Base Prov  Base Oms  Regler│
+│  ▶ 5G Internet      300 kr    650 kr    2   │
+│  ▼ Eesy 99 m/1.md   200 kr    950 kr    2   │
+│    ├ Adversus regel  200 kr    950 kr  p:0   │
+│    └ Enreach regel   355 kr    950 kr  p:0   │
+│  ▶ Eesy 99 u/1.md   220 kr   1000 kr    2   │
+└─────────────────────────────────────────────┘
+```
 
 ## Tekniske ændringer
 
-### Fil: `src/components/salary/ClientDBTab.tsx`
-**Linje ~1260**: Når `staffSalaryList` sendes til `ClientDBSummaryCard`, map den med prorationFactor:
+### 1. Ny komponent: `src/components/mg-test/CommissionRatesTab.tsx`
+- Henter kunder fra `clients` tabellen
+- Henter produkter filtreret via `products → client_campaigns → clients`
+- Henter aktive `product_pricing_rules` for de viste produkter
+- Viser alt i en ekspanderbar tabel
+- Rent read-only — ingen mutations
 
-```tsx
-staffSalaryList={staffSalaryList.map(s => ({
-  ...s,
-  totalSalary: s.totalSalary * prorationFactor,
-}))}
-```
+### 2. Opdater `src/pages/MgTest.tsx`
+- Tilføj ny `TabsTrigger value="commission-rates"` med label "Provisionssatser"
+- Tilføj `TabsContent` der renderer `<CommissionRatesTab />`
 
-Ingen andre filer ændres. De fulde beløb vises stadig i parentes via `fullStaffSalaries`.
+### Datahentning (3 queries)
+1. `SELECT id, name FROM clients ORDER BY name`
+2. `SELECT p.*, cc.client_id FROM products p JOIN client_campaigns cc ON p.client_campaign_id = cc.id WHERE cc.client_id = :selectedClient AND p.is_hidden = false`
+3. `SELECT pr.* FROM product_pricing_rules pr WHERE pr.product_id IN (:productIds) AND pr.is_active = true ORDER BY pr.priority DESC`
+
+Ingen nye tabeller eller migrationer nødvendige.
 
