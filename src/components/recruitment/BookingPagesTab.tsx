@@ -14,12 +14,20 @@ const CS_GREEN = "#52c68d";
 const CS_GREEN_LIGHT = "#e8f8f0";
 const CS_DARK = "#2e3136";
 
+interface SocialLinks {
+  instagram?: string;
+  linkedin?: string;
+  tiktok?: string;
+  website?: string;
+}
+
 interface PageContent {
   id: string;
   page_key: string;
   title: string;
   body_lines: string[];
   tip_text: string | null;
+  social_links: SocialLinks | null;
 }
 
 export function BookingPagesTab() {
@@ -28,6 +36,7 @@ export function BookingPagesTab() {
   const [editTitle, setEditTitle] = useState("");
   const [editBodyLines, setEditBodyLines] = useState("");
   const [editTipText, setEditTipText] = useState("");
+  const [editSocialLinks, setEditSocialLinks] = useState<SocialLinks>({});
 
   const { data: pages, isLoading } = useQuery({
     queryKey: ["booking-page-content"],
@@ -42,13 +51,14 @@ export function BookingPagesTab() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (page: { id: string; title: string; body_lines: string[]; tip_text: string | null }) => {
+    mutationFn: async (page: { id: string; title: string; body_lines: string[]; tip_text: string | null; social_links: SocialLinks | null }) => {
       const { error } = await supabase
         .from("booking_page_content")
         .update({
           title: page.title,
           body_lines: page.body_lines,
           tip_text: page.tip_text,
+          social_links: page.social_links as any,
           updated_at: new Date().toISOString(),
         })
         .eq("id", page.id);
@@ -67,6 +77,7 @@ export function BookingPagesTab() {
     setEditTitle(page.title);
     setEditBodyLines(page.body_lines.join("\n"));
     setEditTipText(page.tip_text || "");
+    setEditSocialLinks((page.social_links as SocialLinks) || {});
   };
 
   const handleSave = () => {
@@ -76,6 +87,7 @@ export function BookingPagesTab() {
       title: editTitle,
       body_lines: editBodyLines.split("\n").filter(l => l.trim()),
       tip_text: editTipText.trim() || null,
+      social_links: editingPage.page_key === "booking_success" ? editSocialLinks : editingPage.social_links,
     });
   };
 
@@ -167,6 +179,33 @@ export function BookingPagesTab() {
                 placeholder="F.eks. 💡 Tip: Hav gerne dit CV klar"
               />
             </div>
+            {editingPage?.page_key === "booking_success" && (
+              <div className="space-y-2">
+                <Label>Sociale medier (valgfri)</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    value={editSocialLinks.instagram || ""}
+                    onChange={e => setEditSocialLinks(prev => ({ ...prev, instagram: e.target.value }))}
+                    placeholder="Instagram URL"
+                  />
+                  <Input
+                    value={editSocialLinks.linkedin || ""}
+                    onChange={e => setEditSocialLinks(prev => ({ ...prev, linkedin: e.target.value }))}
+                    placeholder="LinkedIn URL"
+                  />
+                  <Input
+                    value={editSocialLinks.tiktok || ""}
+                    onChange={e => setEditSocialLinks(prev => ({ ...prev, tiktok: e.target.value }))}
+                    placeholder="TikTok URL"
+                  />
+                  <Input
+                    value={editSocialLinks.website || ""}
+                    onChange={e => setEditSocialLinks(prev => ({ ...prev, website: e.target.value }))}
+                    placeholder="Hjemmeside URL"
+                  />
+                </div>
+              </div>
+            )}
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setEditingPage(null)}>Annuller</Button>
               <Button onClick={handleSave} disabled={updateMutation.isPending}>
@@ -207,6 +246,30 @@ function BookingSuccessPreview({ page }: { page: PageContent }) {
           <p className="text-[10px]" style={{ color: "#999" }}>{page.tip_text}</p>
         )}
         <p className="text-[10px] italic" style={{ color: "#bbb" }}>Dato, tid og rekrutterernavn indsættes automatisk på kandidatsiden</p>
+        {page.social_links && Object.values(page.social_links).some(v => v) && (
+          <div className="flex items-center justify-center gap-2">
+            {(page.social_links as SocialLinks).instagram && (
+              <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: CS_GREEN }}>
+                <span className="text-[8px] text-white font-bold">IG</span>
+              </div>
+            )}
+            {(page.social_links as SocialLinks).linkedin && (
+              <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: CS_GREEN }}>
+                <span className="text-[8px] text-white font-bold">IN</span>
+              </div>
+            )}
+            {(page.social_links as SocialLinks).tiktok && (
+              <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: CS_GREEN }}>
+                <span className="text-[8px] text-white font-bold">TT</span>
+              </div>
+            )}
+            {(page.social_links as SocialLinks).website && (
+              <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: CS_GREEN }}>
+                <span className="text-[8px] text-white font-bold">WEB</span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
