@@ -12404,6 +12404,62 @@ export type Database = {
           },
         ]
       }
+      system_feedback_comments: {
+        Row: {
+          author_employee_id: string | null
+          created_at: string
+          feedback_id: string
+          id: string
+          is_admin: boolean
+          message: string
+        }
+        Insert: {
+          author_employee_id?: string | null
+          created_at?: string
+          feedback_id: string
+          id?: string
+          is_admin?: boolean
+          message: string
+        }
+        Update: {
+          author_employee_id?: string | null
+          created_at?: string
+          feedback_id?: string
+          id?: string
+          is_admin?: boolean
+          message?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "system_feedback_comments_author_employee_id_fkey"
+            columns: ["author_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "system_feedback_comments_author_employee_id_fkey"
+            columns: ["author_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "system_feedback_comments_author_employee_id_fkey"
+            columns: ["author_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "system_feedback_comments_feedback_id_fkey"
+            columns: ["feedback_id"]
+            isOneToOne: false
+            referencedRelation: "system_feedback"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       system_feedback_recipients: {
         Row: {
           created_at: string
