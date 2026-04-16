@@ -1952,9 +1952,12 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
             <LogOut className="h-5 w-5" />
             {t("sidebar.logout")}
           </button>
-          <div className="flex items-center gap-2 px-3 py-1 text-xs text-sidebar-foreground/70">
-            <User className="h-3 w-3" />
-            <span className="truncate">{employeeName || user?.email}</span>
+          <div className="flex items-center justify-between px-3 py-1 text-xs text-sidebar-foreground/70">
+            <div className="flex items-center gap-2 min-w-0">
+              <User className="h-3 w-3 shrink-0" />
+              <span className="truncate">{employeeName || user?.email}</span>
+            </div>
+            <span className="shrink-0 tabular-nums">{clockTime}</span>
           </div>
         </div>
       </div>
