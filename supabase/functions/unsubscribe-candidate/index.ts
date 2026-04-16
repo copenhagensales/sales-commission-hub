@@ -11,10 +11,25 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const url = new URL(req.url);
-    const candidateId = url.searchParams.get('id');
+    // Determine candidate ID based on request method
+    let candidateId: string | null = null;
+    const isPost = req.method === 'POST';
+
+    if (isPost) {
+      const body = await req.json();
+      candidateId = body.candidateId || null;
+    } else {
+      const url = new URL(req.url);
+      candidateId = url.searchParams.get('id');
+    }
 
     if (!candidateId) {
+      if (isPost) {
+        return new Response(JSON.stringify({ error: "Missing candidateId" }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
       return new Response(renderHtml("Ugyldigt link", "Dette afmeldingslink er ikke gyldigt."), {
         status: 400,
         headers: { 'Content-Type': 'text/html; charset=utf-8' },
@@ -33,6 +48,12 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (!candidate) {
+      if (isPost) {
+        return new Response(JSON.stringify({ error: "Candidate not found" }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
       return new Response(renderHtml("Ukendt kandidat", "Vi kunne ikke finde din profil."), {
         status: 404,
         headers: { 'Content-Type': 'text/html; charset=utf-8' },
@@ -115,7 +136,15 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Fetch customizable page content from DB
+    // POST → return JSON
+    if (isPost) {
+      return new Response(JSON.stringify({ success: true, cancelledEnrollments: activeEnrollments?.length || 0 }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // GET → return HTML page
     const { data: pageContent } = await supabase
       .from('booking_page_content')
       .select('title, body_lines, tip_text')
@@ -129,6 +158,12 @@ Deno.serve(async (req) => {
     );
   } catch (error: any) {
     console.error('[unsubscribe-candidate] Error:', error);
+    if (req.method === 'POST') {
+      return new Response(JSON.stringify({ error: "Internal server error" }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     return new Response(renderHtml("Fejl", "Der opstod en fejl. Prøv igen senere."), {
       status: 500,
       headers: { 'Content-Type': 'text/html; charset=utf-8' },
