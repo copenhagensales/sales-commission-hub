@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
         *,
         booking_flow_enrollments!inner(
           id, candidate_id, tier, status, application_id,
-          candidates!inner(id, first_name, last_name, email, phone)
+          candidates!inner(id, first_name, last_name, email, phone, applied_position)
         )
       `)
       .eq('status', 'pending')
