@@ -1,26 +1,18 @@
 
 
-# Plan: Fjern tier-segmentering, tilføj manuel tilføjelse med godkendelse
+# Plan: Gør det tydeligere at i dag er den anbefalede bookingdag
 
 ## Opsummering
-Fjern den automatiske A/B/C-segmentering. Når en kandidat tilføjes, oprettes den som `pending_approval`. Kandidaten aktiveres og flow startes kun efter manuel godkendelse (den eksisterende Godkend/Afvis-funktionalitet bevares).
+Forstærk den visuelle prioritering af "i dag" på den offentlige bookingside, så kandidaten intuitivt vælger den tidligste dato.
 
-## Tekniske ændringer
+## Ændringer i `src/pages/recruitment/PublicCandidateBooking.tsx`
 
-### `src/pages/recruitment/BookingFlow.tsx`
-- **Fjern** `SegmentationModal`-import og `segModalOpen` state
-- **Fjern** `tierConfig`, `filterTier` state, tier-filter dropdown, tier-stats kort (Tier A/B/C)
-- **Fjern** tier-badges fra enrollment-listen og pending approvals
-- **Fjern** `segmentation_signals`-badges (alder, erfaring, sprog, deltid) fra pending approvals
-- **Ændr** "Tilføj kandidat"-dialogen: Når en kandidat vælges, insertes direkte i `booking_flow_enrollments` med `status: 'pending_approval'` (ingen SegmentationModal, ingen edge function-kald)
-- **Behold** "Afventer godkendelse"-sektionen med Godkend/Afvis-knapper — dette er nu den eneste vej til at aktivere et flow
-- **Behold** `approveMutation` (som allerede sætter `status: 'active'` og opretter touchpoints)
-- **Opdater** subtitle fra "Automatiseret outreach med intelligent A/B/C-segmentering" til "Automatiseret outreach med manuel godkendelse"
-- **Stats**: Vis kun "Aktive flows" og "Afventer godkendelse" kort (fjern 3 tier-kort, grid fra 5 til 2 kolonner)
+1. **Auto-vælg i dag**: Sæt `selectedDate` til den første tilgængelige dag automatisk, så tidsslots allerede vises ved load
+2. **Urgency-banner over dagene**: Tilføj en lille besked som "Jo hurtigere du booker, jo hurtigere kommer du i gang 🚀" over dag-vælgeren
+3. **Forstørret "i dag"-knap**: Gør den første dag visuelt større/mere fremtrædende med en pulserende ring eller tykkere border + grøn baggrund som default
+4. **"Anbefalet"-badge → "I dag ✓"**: Ændr badge-teksten til "I dag" når datoen faktisk er i dag, og behold "Anbefalet" for andre dage
+5. **Subtil opacity på senere dage**: Giv dag 3+ en lavere opacity (0.7) så de fremstår som sekundære valg
 
-### `src/components/recruitment/SegmentationModal.tsx`
-- Ingen ændring — bruges bare ikke længere
-
-## Filer der ændres
-- `src/pages/recruitment/BookingFlow.tsx`
+## Fil der ændres
+- `src/pages/recruitment/PublicCandidateBooking.tsx`
 
