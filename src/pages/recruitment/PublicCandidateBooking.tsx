@@ -119,11 +119,13 @@ export default function PublicCandidateBooking() {
   }
 
   if (booked) {
+    const successTitle = pageContent?.title || "Perfekt – du er booket! 🎉";
+    const successTip = pageContent?.tip_text || "Tip: Tænk over hvad der motiverer dig – det spørger Oscar nemlig om 😊";
     return (
       <div className="min-h-screen bg-white flex items-center justify-center p-4" style={fontStyle}>
         <div className="max-w-md w-full text-center rounded-2xl border border-gray-100 shadow-sm p-8 space-y-5">
           <CheckCircle2 className="h-12 w-12 mx-auto" style={{ color: CS_GREEN }} />
-          <h2 className="text-xl font-semibold tracking-[-0.02em]" style={{ color: CS_DARK }}>Perfekt – du er booket! 🎉</h2>
+          <h2 className="text-xl font-semibold tracking-[-0.02em]" style={{ color: CS_DARK }}>{successTitle}</h2>
           <p className="text-sm" style={{ color: "#666" }}>
             Oscar ringer dig {selectedDate && format(selectedDate, "EEEE 'd.' d. MMMM", { locale: da })} kl. {selectedSlot?.start}. Samtalen er helt uforpligtende.
           </p>
@@ -145,7 +147,7 @@ export default function PublicCandidateBooking() {
             </ul>
           </div>
           <p className="text-xs" style={{ color: "#999" }}>
-            Tip: Tænk over hvad der motiverer dig – det spørger Oscar nemlig om 😊
+            {successTip}
           </p>
         </div>
       </div>
