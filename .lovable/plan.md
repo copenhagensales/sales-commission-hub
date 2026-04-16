@@ -1,21 +1,22 @@
 
 
-# Plan: Fix tidszone-bug i slot-filtrering
+# Plan: Vis ansøgningstekst i godkendelses-kort
 
-## Problem
-Edge-funktionen `get-public-availability` bruger `new Date()` som er UTC-tid på serveren. Danmark er UTC+2 (CEST i april), så når klokken er 13:36 i DK, er `now` kun 11:36 UTC. Slot-sammenligning med `slotStart.setHours(11, 45)` sætter også UTC-tid, men time-vinduer er defineret i dansk tid. Resultatet er at slots som 11:45 og 12:00 dansk tid fejlagtigt vises som ledige.
+## Opsummering
+Tilføj et uddrag af kandidatens noter/ansøgningstekst i hvert "afventer godkendelse"-kort, så recruiter kan læse hvad kandidaten har skrevet uden at åbne profilen.
 
-## Løsning
-Konverter `now` til dansk tid ved at beregne Danish-offset og sammenligne minutter-fra-midnat i stedet for `Date`-objekter.
+## Ændringer i `src/pages/recruitment/BookingFlow.tsx`
 
-## Ændringer i `supabase/functions/get-public-availability/index.ts`
+### 1. Udvid data-query (linje 66-70)
+Tilføj `notes` til både `candidates` og `applications` select:
+```
+candidates!inner(id, first_name, last_name, email, phone, notes)
+applications(id, role, status, notes)
+```
 
-1. Tilføj en hjælpefunktion `getDanishNowMinutes()` der beregner nuværende tidspunkt i dansk tid som minutter fra midnat
-2. I `generateSlotsForDay`: For dage der er i dag (dansk tid), sammenlign `startMin` med danske nuværende minutter i stedet for at bruge `Date`-objekter
-3. I `generateDays`: Brug dansk dato til at afgøre om "i dag" er overstået (samme tidszone-fix)
-
-Konkret: Brug `Intl.DateTimeFormat('da-DK', { timeZone: 'Europe/Copenhagen' })` til at finde aktuel dansk time/minut, og filtrer slots baseret på det.
+### 2. Vis tekst i godkendelses-kortet (linje 344-355)
+Under kandidatens navn/email, vis et truncated uddrag af ansøgningsteksten (candidates.notes eller applications[0].notes). Max 2-3 linjer med `line-clamp-2` styling i en lille grå tekst.
 
 ## Fil der ændres
-- `supabase/functions/get-public-availability/index.ts`
+- `src/pages/recruitment/BookingFlow.tsx`
 
