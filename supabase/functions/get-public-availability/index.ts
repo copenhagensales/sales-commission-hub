@@ -220,6 +220,28 @@ Deno.serve(async (req) => {
     const settings = await fetchSettings(supabase);
     const now = new Date();
 
+    // Fetch already-booked interview slots from the database to prevent double-booking
+    const startDate = new Date(now);
+    startDate.setHours(0, 0, 0, 0);
+    const dbEndDate = new Date(startDate);
+    dbEndDate.setDate(dbEndDate.getDate() + Math.ceil(settings.lookahead_days * 2));
+
+    const { data: bookedCandidates } = await supabase
+      .from("candidates")
+      .select("interview_date")
+      .not("interview_date", "is", null)
+      .gte("interview_date", startDate.toISOString())
+      .lte("interview_date", dbEndDate.toISOString())
+      .in("status", ["interview_scheduled", "hired"]);
+
+    const dbBusyPeriods: { start: Date; end: Date }[] = (bookedCandidates || [])
+      .filter((c: any) => c.interview_date)
+      .map((c: any) => {
+        const start = new Date(c.interview_date);
+        const end = new Date(start.getTime() + settings.slot_duration_minutes * 60 * 1000);
+        return { start, end };
+      });
+
     // Microsoft 365 integration
     const clientId = Deno.env.get("AZURE_CLIENT_ID");
     const clientSecret = Deno.env.get("AZURE_CLIENT_SECRET");
@@ -228,7 +250,7 @@ Deno.serve(async (req) => {
 
     if (!clientId || !clientSecret || !tenantId || !msUserEmail) {
       console.warn("[get-public-availability] M365 not configured, returning default slots");
-      return new Response(JSON.stringify({ days: generateDays(settings), candidate, application }), {
+      return new Response(JSON.stringify({ days: generateDays(settings, dbBusyPeriods), candidate, application }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -247,16 +269,16 @@ Deno.serve(async (req) => {
 
     if (!tokenResponse.ok) {
       console.error("[get-public-availability] Token error:", await tokenResponse.text());
-      return new Response(JSON.stringify({ days: generateDays(settings), candidate, application }), {
+      return new Response(JSON.stringify({ days: generateDays(settings, dbBusyPeriods), candidate, application }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const { access_token } = await tokenResponse.json();
 
-    const startDate = new Date(now);
-    startDate.setHours(0, 0, 0, 0);
-    const endDate = new Date(startDate);
+    const msStartDate = new Date(now);
+    msStartDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(msStartDate);
     endDate.setDate(endDate.getDate() + Math.ceil(settings.lookahead_days * 2));
 
     const scheduleResponse = await fetch(
@@ -266,7 +288,7 @@ Deno.serve(async (req) => {
         headers: { Authorization: `Bearer ${access_token}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           schedules: [msUserEmail],
-          startTime: { dateTime: startDate.toISOString().split(".")[0], timeZone: "Europe/Copenhagen" },
+          startTime: { dateTime: msStartDate.toISOString().split(".")[0], timeZone: "Europe/Copenhagen" },
           endTime: { dateTime: endDate.toISOString().split(".")[0], timeZone: "Europe/Copenhagen" },
           availabilityViewInterval: settings.slot_duration_minutes,
         }),
@@ -275,7 +297,7 @@ Deno.serve(async (req) => {
 
     if (!scheduleResponse.ok) {
       console.error("[get-public-availability] Schedule error:", await scheduleResponse.text());
-      return new Response(JSON.stringify({ days: generateDays(settings), candidate, application }), {
+      return new Response(JSON.stringify({ days: generateDays(settings, dbBusyPeriods), candidate, application }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -284,19 +306,22 @@ Deno.serve(async (req) => {
     const schedule = scheduleData.value?.[0];
 
     if (!schedule) {
-      return new Response(JSON.stringify({ days: generateDays(settings), candidate, application }), {
+      return new Response(JSON.stringify({ days: generateDays(settings, dbBusyPeriods), candidate, application }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const busyPeriods = (schedule.scheduleItems || [])
+    const outlookBusyPeriods = (schedule.scheduleItems || [])
       .filter((item: any) => item.status !== "free")
       .map((item: any) => ({
         start: new Date(item.start.dateTime + "Z"),
         end: new Date(item.end.dateTime + "Z"),
       }));
 
-    return new Response(JSON.stringify({ days: generateDays(settings, busyPeriods), candidate, application }), {
+    // Merge Outlook busy periods with database-booked slots
+    const allBusyPeriods = [...outlookBusyPeriods, ...dbBusyPeriods];
+
+    return new Response(JSON.stringify({ days: generateDays(settings, allBusyPeriods), candidate, application }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: any) {
