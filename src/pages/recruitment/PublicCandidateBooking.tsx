@@ -57,8 +57,21 @@ export default function PublicCandidateBooking() {
     },
   });
 
+  const { data: config } = useQuery({
+    queryKey: ["booking-page-config-public"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("booking_page_config")
+        .select("*")
+        .limit(1)
+        .maybeSingle();
+      return data as { greeting_template: string; description: string; recruiter_name: string; role_label: string; unsubscribe_text: string; step1_label: string; step2_label: string; step3_label: string } | null;
+    },
+  });
+
   const candidate = availability?.candidate ?? null;
   const application = availability?.application ?? null;
+  const recruiterName = config?.recruiter_name || "Oscar";
 
   const bookMutation = useMutation({
     mutationFn: async () => {
@@ -104,6 +117,26 @@ export default function PublicCandidateBooking() {
 
   const fontStyle = { fontFamily: "'Figtree', sans-serif" };
 
+  const renderDescription = (text: string) => {
+    const parts = text.split(/(\*\*.*?\*\*)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith("**") && part.endsWith("**")) {
+        return <strong key={i} style={{ color: CS_DARK }}>{part.slice(2, -2)}</strong>;
+      }
+      return part;
+    });
+  };
+
+  const greeting = candidate
+    ? (config?.greeting_template || "Hej {{firstName}} 👋").replace("{{firstName}}", candidate.first_name)
+    : "Hej 👋";
+  const description = (config?.description || "Book en kort snak med **{{recruiterName}}**, vores rekrutteringsansvarlige. På 5–10 minutter tager I en uforpligtende snak om jobbet – og {{recruiterName}} svarer gerne på spørgsmål om løn, arbejdstider og hverdagen i salg.")
+    .replace(/\{\{recruiterName\}\}/g, recruiterName);
+  const step1 = config?.step1_label || "Vælg tid";
+  const step2 = (config?.step2_label || "{{recruiterName}} ringer dig").replace("{{recruiterName}}", recruiterName);
+  const step3 = config?.step3_label || "Start dit nye job";
+  const unsubText = config?.unsubscribe_text || "Ikke interesseret længere? Klik her – det er helt okay";
+
   if (unsubscribed) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center p-4" style={fontStyle}>
@@ -127,14 +160,14 @@ export default function PublicCandidateBooking() {
           <CheckCircle2 className="h-12 w-12 mx-auto" style={{ color: CS_GREEN }} />
           <h2 className="text-xl font-semibold tracking-[-0.02em]" style={{ color: CS_DARK }}>{successTitle}</h2>
           <p className="text-sm" style={{ color: "#666" }}>
-            Oscar ringer dig {selectedDate && format(selectedDate, "EEEE 'd.' d. MMMM", { locale: da })} kl. {selectedSlot?.start}. Samtalen er helt uforpligtende.
+            {recruiterName} ringer dig {selectedDate && format(selectedDate, "EEEE 'd.' d. MMMM", { locale: da })} kl. {selectedSlot?.start}. Samtalen er helt uforpligtende.
           </p>
           <div className="rounded-xl p-4 text-left space-y-2" style={{ backgroundColor: CS_GREEN_LIGHT }}>
             <p className="text-sm font-semibold" style={{ color: CS_DARK }}>Hvad sker der nu?</p>
             <ul className="text-sm space-y-1.5" style={{ color: "#444" }}>
               <li className="flex items-start gap-2">
                 <Phone className="h-4 w-4 mt-0.5 shrink-0" style={{ color: CS_GREEN }} />
-                Oscar ringer dig op på det aftalte tidspunkt
+                {recruiterName} ringer dig op på det aftalte tidspunkt
               </li>
               <li className="flex items-start gap-2">
                 <Clock className="h-4 w-4 mt-0.5 shrink-0" style={{ color: CS_GREEN }} />
@@ -142,7 +175,7 @@ export default function PublicCandidateBooking() {
               </li>
               <li className="flex items-start gap-2">
                 <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" style={{ color: CS_GREEN }} />
-                Hav gerne et par spørgsmål klar – Oscar fortæller gerne om løn, arbejdstider og hverdagen
+                Hav gerne et par spørgsmål klar – {recruiterName} fortæller gerne om løn, arbejdstider og hverdagen
               </li>
             </ul>
           </div>
@@ -175,87 +208,59 @@ export default function PublicCandidateBooking() {
   return (
     <div className="min-h-screen bg-white" style={fontStyle}>
       <div className="max-w-lg mx-auto p-4 py-8 space-y-6">
-        {/* Header */}
         <div className="text-center space-y-3">
-          <div
-            className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium"
-            style={{ backgroundColor: CS_DARK, color: "#e6f0f1" }}
-          >
+          <div className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium"
+            style={{ backgroundColor: CS_DARK, color: "#e6f0f1" }}>
             <Phone className="h-4 w-4" />
             Copenhagen Sales
           </div>
           <h1 className="text-2xl font-semibold tracking-[-0.02em]" style={{ color: CS_DARK }}>
-            Hej {candidate.first_name} 👋
+            {greeting}
           </h1>
           <p className="text-sm leading-relaxed" style={{ color: "#666" }}>
-            Book en kort snak med <strong style={{ color: CS_DARK }}>Oscar</strong>, vores rekrutteringsansvarlige.
-            På 5–10 minutter tager I en uforpligtende snak om jobbet – og Oscar svarer gerne på spørgsmål om løn, arbejdstider og hverdagen i salg.
+            {renderDescription(description)}
           </p>
           {application?.role && (
-            <span
-              className="inline-block rounded-full px-3 py-1 text-xs font-medium"
-              style={{ backgroundColor: CS_GREEN_LIGHT, color: CS_GREEN }}
-            >
+            <span className="inline-block rounded-full px-3 py-1 text-xs font-medium"
+              style={{ backgroundColor: CS_GREEN_LIGHT, color: CS_GREEN }}>
               {application.role}
             </span>
           )}
         </div>
 
-        {/* 3-step flow */}
         <div className="flex items-center justify-center gap-2 text-xs" style={{ color: "#888" }}>
-          <span className="flex items-center gap-1"><span>📅</span> Vælg tid</span>
+          <span className="flex items-center gap-1"><span>📅</span> {step1}</span>
           <span style={{ color: "#ddd" }}>→</span>
-          <span className="flex items-center gap-1"><span>📞</span> Oscar ringer dig</span>
+          <span className="flex items-center gap-1"><span>📞</span> {step2}</span>
           <span style={{ color: "#ddd" }}>→</span>
-          <span className="flex items-center gap-1"><span>🚀</span> Start dit nye job</span>
+          <span className="flex items-center gap-1"><span>🚀</span> {step3}</span>
         </div>
 
-        {/* Day selector */}
         <div className="space-y-4">
           <div className="flex items-center gap-2 text-sm font-medium" style={{ color: "#888" }}>
             <Calendar className="h-4 w-4" />
             Hvornår passer det dig?
           </div>
           {availableDays.length === 0 ? (
-            <p className="text-sm text-center py-4" style={{ color: "#999" }}>
-              Ingen ledige dage lige nu.
-            </p>
+            <p className="text-sm text-center py-4" style={{ color: "#999" }}>Ingen ledige dage lige nu.</p>
           ) : (
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
               {availableDays.map((day, index) => {
                 const date = parseISO(day.date);
                 const isSelected = selectedDate && isSameDay(date, selectedDate);
                 return (
-                  <button
-                    key={day.date}
-                    onClick={() => { setSelectedDate(date); setSelectedSlot(null); }}
+                  <button key={day.date} onClick={() => { setSelectedDate(date); setSelectedSlot(null); }}
                     className="flex flex-col items-center gap-0.5 rounded-xl border px-3 py-3 text-sm font-medium transition-all"
-                    style={{
-                      backgroundColor: isSelected ? CS_GREEN : "#fff",
-                      color: isSelected ? "#fff" : CS_DARK,
-                      borderColor: isSelected ? CS_GREEN : "#e5e7eb",
-                    }}
-                  >
+                    style={{ backgroundColor: isSelected ? CS_GREEN : "#fff", color: isSelected ? "#fff" : CS_DARK, borderColor: isSelected ? CS_GREEN : "#e5e7eb" }}>
                     {index === 0 && (
-                      <span
-                        className="text-[9px] font-semibold uppercase tracking-wide rounded px-1.5 py-0.5"
-                        style={{
-                          backgroundColor: isSelected ? "rgba(255,255,255,0.25)" : CS_GREEN_LIGHT,
-                          color: isSelected ? "#fff" : CS_GREEN,
-                        }}
-                      >
+                      <span className="text-[9px] font-semibold uppercase tracking-wide rounded px-1.5 py-0.5"
+                        style={{ backgroundColor: isSelected ? "rgba(255,255,255,0.25)" : CS_GREEN_LIGHT, color: isSelected ? "#fff" : CS_GREEN }}>
                         Anbefalet
                       </span>
                     )}
-                    <span className="text-xs capitalize">
-                      {format(date, "EEEE", { locale: da })}
-                    </span>
-                    <span className="text-base font-semibold">
-                      {format(date, "d")}
-                    </span>
-                    <span className="text-[10px]" style={{ opacity: 0.6 }}>
-                      {format(date, "MMM", { locale: da })}
-                    </span>
+                    <span className="text-xs capitalize">{format(date, "EEEE", { locale: da })}</span>
+                    <span className="text-base font-semibold">{format(date, "d")}</span>
+                    <span className="text-[10px]" style={{ opacity: 0.6 }}>{format(date, "MMM", { locale: da })}</span>
                   </button>
                 );
               })}
@@ -263,7 +268,6 @@ export default function PublicCandidateBooking() {
           )}
         </div>
 
-        {/* Time Slots */}
         {selectedDate && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -271,76 +275,49 @@ export default function PublicCandidateBooking() {
                 <Clock className="h-4 w-4" />
                 Vælg et tidspunkt – {format(selectedDate, "EEEE d. MMM", { locale: da })}
               </div>
-              <span
-                className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-medium"
-                style={{ backgroundColor: CS_GREEN_LIGHT, color: CS_GREEN }}
-              >
+              <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-medium"
+                style={{ backgroundColor: CS_GREEN_LIGHT, color: CS_GREEN }}>
                 <Clock className="h-3 w-3" />
                 5–10 min · uforpligtende
               </span>
             </div>
             {slotsForDate.length === 0 ? (
-              <p className="text-sm text-center py-4" style={{ color: "#999" }}>
-                Ingen ledige tider denne dag.
-              </p>
+              <p className="text-sm text-center py-4" style={{ color: "#999" }}>Ingen ledige tider denne dag.</p>
             ) : (
               <div className="grid grid-cols-2 gap-2">
                 {slotsForDate.map(slot => {
                   const isActive = selectedSlot?.start === slot.start;
                   return (
-                    <button
-                      key={slot.start}
-                      onClick={() => setSelectedSlot(slot)}
+                    <button key={slot.start} onClick={() => setSelectedSlot(slot)}
                       className="px-3 py-2.5 rounded-xl border text-sm font-medium transition-all"
-                      style={{
-                        backgroundColor: isActive ? CS_GREEN : "#fff",
-                        color: isActive ? "#fff" : CS_DARK,
-                        borderColor: isActive ? CS_GREEN : "#e5e7eb",
-                      }}
-                    >
+                      style={{ backgroundColor: isActive ? CS_GREEN : "#fff", color: isActive ? "#fff" : CS_DARK, borderColor: isActive ? CS_GREEN : "#e5e7eb" }}>
                       {slot.start} – {slot.end}
                     </button>
                   );
                 })}
               </div>
             )}
-
             {selectedSlot && (
-              <button
-                className="w-full rounded-full py-3 text-sm font-semibold transition-all disabled:opacity-50"
+              <button className="w-full rounded-full py-3 text-sm font-semibold transition-all disabled:opacity-50"
                 style={{ backgroundColor: CS_GREEN, color: "#fff" }}
-                onClick={() => bookMutation.mutate()}
-                disabled={bookMutation.isPending}
-              >
+                onClick={() => bookMutation.mutate()} disabled={bookMutation.isPending}>
                 {bookMutation.isPending ? (
-                  <span className="inline-flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Booker...
-                  </span>
+                  <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />Booker...</span>
                 ) : (
-                  <span className="inline-flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    Book snak med Oscar kl. {selectedSlot.start} →
-                  </span>
+                  <span className="inline-flex items-center gap-2"><Calendar className="h-4 w-4" />Book snak med {recruiterName} kl. {selectedSlot.start} →</span>
                 )}
               </button>
             )}
           </div>
         )}
 
-        {/* Unsubscribe */}
         <div className="text-center pt-4">
-          <button
-            onClick={() => {
-              if (confirm("Er du sikker på at du vil afmelde din ansøgning? Du vil ikke modtage flere beskeder.")) {
-                unsubMutation.mutate();
-              }
-            }}
-            className="text-xs underline transition-colors"
-            style={{ color: "#aaa" }}
-            disabled={unsubMutation.isPending}
-          >
-            {unsubMutation.isPending ? "Trækker tilbage..." : "Ikke interesseret længere? Klik her – det er helt okay"}
+          <button onClick={() => {
+            if (confirm("Er du sikker på at du vil afmelde din ansøgning? Du vil ikke modtage flere beskeder.")) {
+              unsubMutation.mutate();
+            }
+          }} className="text-xs underline transition-colors" style={{ color: "#aaa" }} disabled={unsubMutation.isPending}>
+            {unsubMutation.isPending ? "Trækker tilbage..." : unsubText}
           </button>
         </div>
       </div>
