@@ -45,6 +45,18 @@ export default function PublicCandidateBooking() {
     enabled: !!candidateId,
   });
 
+  const { data: pageContent } = useQuery({
+    queryKey: ["booking-page-content-public"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("booking_page_content")
+        .select("*")
+        .eq("page_key", "booking_success")
+        .maybeSingle();
+      return data;
+    },
+  });
+
   const candidate = availability?.candidate ?? null;
   const application = availability?.application ?? null;
 
