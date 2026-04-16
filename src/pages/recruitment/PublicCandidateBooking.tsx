@@ -161,8 +161,8 @@ export default function PublicCandidateBooking() {
   }
 
   if (booked) {
-    const successTitle = pageContent?.title || "Perfekt – du er booket! 🎉";
-    const successTip = pageContent?.tip_text || "Tip: Tænk over hvad der motiverer dig – det spørger Oscar nemlig om 😊";
+    const successTitle = pageContent?.title || "Din samtale er booket! 🎉";
+    const successTip = pageContent?.tip_text || "💡 Tip: Hav gerne dit CV klar";
     return (
       <div className="min-h-screen bg-white flex items-center justify-center p-4" style={fontStyle}>
         <div className="max-w-md w-full text-center rounded-2xl border border-gray-100 shadow-sm p-8 space-y-5">

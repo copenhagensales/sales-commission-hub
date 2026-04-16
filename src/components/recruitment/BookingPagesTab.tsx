@@ -189,9 +189,6 @@ function BookingSuccessPreview({ page }: { page: PageContent }) {
         <h2 className="text-lg font-semibold tracking-[-0.02em]" style={{ color: CS_DARK }}>
           {page.title}
         </h2>
-        <p className="text-sm" style={{ color: "#666" }}>
-          Oscar ringer dig <strong>tirsdag d. 22. april</strong> kl. <strong>10:00</strong>. Samtalen er helt uforpligtende.
-        </p>
         <div className="rounded-xl p-3 text-left space-y-1.5" style={{ backgroundColor: CS_GREEN_LIGHT }}>
           <p className="text-xs font-semibold" style={{ color: CS_DARK }}>Hvad sker der nu?</p>
           <ul className="text-xs space-y-1" style={{ color: "#444" }}>
@@ -209,6 +206,7 @@ function BookingSuccessPreview({ page }: { page: PageContent }) {
         {page.tip_text && (
           <p className="text-[10px]" style={{ color: "#999" }}>{page.tip_text}</p>
         )}
+        <p className="text-[10px] italic" style={{ color: "#bbb" }}>Dato, tid og rekrutterernavn indsættes automatisk på kandidatsiden</p>
       </div>
     </div>
   );
