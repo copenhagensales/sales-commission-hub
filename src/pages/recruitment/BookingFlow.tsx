@@ -65,8 +65,8 @@ export default function BookingFlow() {
         .from("booking_flow_enrollments")
         .select(`
           *,
-          candidates!inner(id, first_name, last_name, email, phone),
-          applications(id, role, status)
+          candidates!inner(id, first_name, last_name, email, phone, notes),
+          applications(id, role, status, notes)
         `)
         .eq("status", "pending_approval")
         .order("enrolled_at", { ascending: false });
@@ -352,6 +352,11 @@ export default function BookingFlow() {
                           <p className="text-xs text-muted-foreground">
                             {candidate?.email} {candidate?.phone ? `· ${candidate.phone}` : ""}
                           </p>
+                          {(candidate?.notes || enrollment.applications?.[0]?.notes) && (
+                            <p className="mt-1 text-xs text-muted-foreground/70 line-clamp-2 italic max-w-md">
+                              "{candidate?.notes || enrollment.applications?.[0]?.notes}"
+                            </p>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
