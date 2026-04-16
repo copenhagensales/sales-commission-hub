@@ -242,10 +242,10 @@ function BookingSuccessPreview({ page }: { page: PageContent }) {
             ))}
           </ul>
         </div>
-        {page.tip_text && (
-          <p className="text-[10px]" style={{ color: "#999" }}>{page.tip_text}</p>
-        )}
         <p className="text-[10px] italic" style={{ color: "#bbb" }}>Dato, tid og rekrutterernavn indsættes automatisk på kandidatsiden</p>
+        {page.tip_text && (
+          <p className="text-[10px] font-medium" style={{ color: "#666" }}>{page.tip_text}</p>
+        )}
         {page.social_links && Object.values(page.social_links).some(v => v) && (
           <div className="flex items-center justify-center gap-2">
             {(page.social_links as SocialLinks).instagram && (
