@@ -455,8 +455,8 @@ export default function SystemFeedback() {
                             <TableRow key={fb.id} className="cursor-pointer hover:bg-muted/30" onClick={() => {
                               setSelectedFeedback(fb);
                               setAdminNotes(fb.admin_notes || "");
-                              setAdminResponse(fb.admin_response || "");
                               setNewStatus(fb.status);
+                              setCommentText("");
                             }}>
                               <TableCell className="font-medium max-w-[200px] truncate">{fb.title}</TableCell>
                               <TableCell>{getCategoryLabel(fb.category)}</TableCell>
@@ -511,9 +511,9 @@ export default function SystemFeedback() {
                               {resolvedFeedback.map((fb: any) => (
                                 <TableRow key={fb.id} className="cursor-pointer hover:bg-muted/30 opacity-60" onClick={() => {
                                   setSelectedFeedback(fb);
-                                setAdminNotes(fb.admin_notes || "");
-                                setAdminResponse(fb.admin_response || "");
-                                setNewStatus(fb.status);
+                                  setAdminNotes(fb.admin_notes || "");
+                                  setNewStatus(fb.status);
+                                  setCommentText("");
                                 }}>
                                   <TableCell className="font-medium max-w-[200px] truncate">{fb.title}</TableCell>
                                   <TableCell>{getCategoryLabel(fb.category)}</TableCell>
@@ -570,102 +570,23 @@ export default function SystemFeedback() {
       <Dialog open={!!selectedFeedback} onOpenChange={open => !open && setSelectedFeedback(null)}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           {selectedFeedback && (
-            <>
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  {getCategoryLabel(selectedFeedback.category)}
-                  <span className="ml-1">{selectedFeedback.title}</span>
-                </DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="flex flex-wrap gap-2">
-                  {getPriorityBadge(selectedFeedback.priority)}
-                  {getStatusBadge(selectedFeedback.status)}
-                  {selectedFeedback.system_area && <Badge variant="outline">{selectedFeedback.system_area}</Badge>}
-                </div>
-
-                {selectedFeedback.affected_employee_name && (
-                  <div>
-                    <p className="text-xs text-muted-foreground">Berørt bruger</p>
-                    <p className="text-sm font-medium">{selectedFeedback.affected_employee_name}</p>
-                  </div>
-                )}
-
-                {selectedFeedback.description && (
-                  <div>
-                    <p className="text-xs text-muted-foreground">Beskrivelse</p>
-                    <p className="text-sm whitespace-pre-wrap">{selectedFeedback.description}</p>
-                  </div>
-                )}
-
-                {selectedFeedback.screenshot_url && (
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Screenshot</p>
-                    <img src={selectedFeedback.screenshot_url} alt="Screenshot" className="max-w-full rounded-md border border-border" />
-                  </div>
-                )}
-
-                <div className="text-xs text-muted-foreground">
-                  Indsendt {format(new Date(selectedFeedback.created_at), "d. MMMM yyyy 'kl.' HH:mm", { locale: da })}
-                  {selectedFeedback.submitted_by_employee && ` af ${selectedFeedback.submitted_by_employee.first_name} ${selectedFeedback.submitted_by_employee.last_name}`}
-                </div>
-
-                {/* Show admin response to non-owners */}
-                {!isOwner && selectedFeedback.admin_response && (
-                  <div className="border border-purple-500/30 bg-purple-500/10 rounded-md p-3">
-                    <p className="text-xs font-medium text-purple-400 mb-1">Besked fra admin</p>
-                    <p className="text-sm whitespace-pre-wrap">{selectedFeedback.admin_response}</p>
-                  </div>
-                )}
-
-                {/* Admin controls */}
-                {isOwner && (
-                  <div className="border-t border-border pt-4 space-y-3">
-                    <p className="text-sm font-medium">Administration</p>
-                    <div>
-                      <label className="text-xs text-muted-foreground block mb-1">Status</label>
-                      <Select value={newStatus} onValueChange={setNewStatus}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {STATUSES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground block mb-1">Besked til indberetteren (sendes som email)</label>
-                      <Textarea value={adminResponse} onChange={e => setAdminResponse(e.target.value)} rows={3} maxLength={2000} placeholder="Skriv en besked der sendes til indberetteren..." />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground block mb-1">Admin-noter (kun synlige for dig)</label>
-                      <Textarea value={adminNotes} onChange={e => setAdminNotes(e.target.value)} rows={3} maxLength={2000} />
-                    </div>
-                    <div className="flex gap-2 flex-wrap">
-                      <Button
-                        size="sm"
-                        onClick={() => updateMutation.mutate({ id: selectedFeedback.id, status: newStatus, notes: adminNotes, feedbackTitle: selectedFeedback.title, submittedById: selectedFeedback.submitted_by, adminResponseText: adminResponse })}
-                        disabled={updateMutation.isPending}
-                      >
-                        <CheckCircle2 className="h-4 w-4 mr-1" />
-                        Gem
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        className="bg-purple-500/20 text-purple-400 hover:bg-purple-500/30"
-                        onClick={() => updateMutation.mutate({ id: selectedFeedback.id, status: "needs_clarification", notes: adminNotes, feedbackTitle: selectedFeedback.title, submittedById: selectedFeedback.submitted_by, adminResponseText: adminResponse })}
-                        disabled={updateMutation.isPending || !adminResponse.trim()}
-                      >
-                        Bed om uddybning
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => copyForLovable(selectedFeedback)}>
-                        <Copy className="h-4 w-4 mr-1" />
-                        Kopiér til Lovable
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </>
+            <FeedbackDetailContent
+              feedback={selectedFeedback}
+              isOwner={!!isOwner}
+              employeeId={employeeId}
+              employeeName={employeeName}
+              adminNotes={adminNotes}
+              setAdminNotes={setAdminNotes}
+              newStatus={newStatus}
+              setNewStatus={setNewStatus}
+              commentText={commentText}
+              setCommentText={setCommentText}
+              updateMutation={updateMutation}
+              copyForLovable={copyForLovable}
+              getCategoryLabel={getCategoryLabel}
+              getPriorityBadge={getPriorityBadge}
+              getStatusBadge={getStatusBadge}
+            />
           )}
         </DialogContent>
       </Dialog>
