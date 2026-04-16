@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
         *,
         booking_flow_enrollments!inner(
           id, candidate_id, tier, status, application_id,
-          candidates!inner(id, first_name, last_name, email, phone)
+          candidates!inner(id, first_name, last_name, email, phone, applied_position)
         )
       `)
       .eq('status', 'pending')
@@ -157,7 +157,7 @@ Deno.serve(async (req) => {
         .limit(1)
         .maybeSingle();
 
-      const role = app?.role || 'Salgskonsulent';
+      const role = app?.role || candidate.applied_position || 'Salgskonsulent';
 
       // Replace merge tags
       const shortDomain = Deno.env.get('SHORT_LINK_DOMAIN') || 'https://job.cphsales.dk';
