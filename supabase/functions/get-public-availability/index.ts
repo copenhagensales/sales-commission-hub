@@ -76,11 +76,29 @@ function parseTime(t: string): { h: number; m: number } {
   return { h, m };
 }
 
+/** Get current Danish time components using Intl */
+function getDanishNow(): { year: number; month: number; day: number; hour: number; minute: number } {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Copenhagen",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hour12: false,
+  }).formatToParts(now);
+  const get = (t: string) => parseInt(parts.find(p => p.type === t)?.value || "0", 10);
+  return { year: get("year"), month: get("month"), day: get("day"), hour: get("hour"), minute: get("minute") };
+}
+
+function getDanishDateStr(): string {
+  const d = getDanishNow();
+  return `${d.year}-${String(d.month).padStart(2,"0")}-${String(d.day).padStart(2,"0")}`;
+}
+
 function generateSlotsForDay(
-  date: Date,
+  dateStr: string,
   windows: TimeWindow[],
   slotDuration: number,
-  now: Date,
+  isToday: boolean,
+  danishNowMinutes: number,
   busyPeriods?: { start: Date; end: Date }[]
 ): TimeSlot[] {
   const slots: TimeSlot[] = [];
@@ -92,22 +110,25 @@ function generateSlotsForDay(
 
     for (let startMin = winStartMin; startMin + slotDuration <= winEndMin; startMin += slotDuration) {
       const endMin = startMin + slotDuration;
-      const sH = Math.floor(startMin / 60);
-      const sM = startMin % 60;
-      const eH = Math.floor(endMin / 60);
-      const eM = endMin % 60;
 
-      const slotStart = new Date(date);
-      slotStart.setHours(sH, sM, 0, 0);
-      if (slotStart <= now) continue;
+      // For today, skip slots that have already passed in Danish time
+      if (isToday && startMin <= danishNowMinutes) continue;
 
       if (busyPeriods) {
-        const slotEnd = new Date(date);
-        slotEnd.setHours(eH, eM, 0, 0);
+        const sH = Math.floor(startMin / 60);
+        const sM = startMin % 60;
+        const eH = Math.floor(endMin / 60);
+        const eM = endMin % 60;
+        const slotStart = new Date(dateStr + "T" + String(sH).padStart(2,"0") + ":" + String(sM).padStart(2,"0") + ":00+02:00");
+        const slotEnd = new Date(dateStr + "T" + String(eH).padStart(2,"0") + ":" + String(eM).padStart(2,"0") + ":00+02:00");
         const isBusy = busyPeriods.some(busy => slotStart < busy.end && slotEnd > busy.start);
         if (isBusy) continue;
       }
 
+      const sH = Math.floor(startMin / 60);
+      const sM = startMin % 60;
+      const eH = Math.floor(endMin / 60);
+      const eM = endMin % 60;
       slots.push({
         start: `${String(sH).padStart(2, "0")}:${String(sM).padStart(2, "0")}`,
         end: `${String(eH).padStart(2, "0")}:${String(eM).padStart(2, "0")}`,
