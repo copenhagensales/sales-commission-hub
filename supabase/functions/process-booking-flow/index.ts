@@ -157,7 +157,7 @@ Deno.serve(async (req) => {
         .limit(1)
         .maybeSingle();
 
-      const role = app?.role || 'Salgskonsulent';
+      const role = app?.role || candidate.applied_position || 'Salgskonsulent';
 
       // Replace merge tags
       const shortDomain = Deno.env.get('SHORT_LINK_DOMAIN') || 'https://job.cphsales.dk';
