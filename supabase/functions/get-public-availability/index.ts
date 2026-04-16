@@ -269,7 +269,7 @@ Deno.serve(async (req) => {
 
     if (!tokenResponse.ok) {
       console.error("[get-public-availability] Token error:", await tokenResponse.text());
-      return new Response(JSON.stringify({ days: generateDays(settings), candidate, application }), {
+      return new Response(JSON.stringify({ days: generateDays(settings, dbBusyPeriods), candidate, application }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -297,7 +297,7 @@ Deno.serve(async (req) => {
 
     if (!scheduleResponse.ok) {
       console.error("[get-public-availability] Schedule error:", await scheduleResponse.text());
-      return new Response(JSON.stringify({ days: generateDays(settings), candidate, application }), {
+      return new Response(JSON.stringify({ days: generateDays(settings, dbBusyPeriods), candidate, application }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -306,19 +306,22 @@ Deno.serve(async (req) => {
     const schedule = scheduleData.value?.[0];
 
     if (!schedule) {
-      return new Response(JSON.stringify({ days: generateDays(settings), candidate, application }), {
+      return new Response(JSON.stringify({ days: generateDays(settings, dbBusyPeriods), candidate, application }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const busyPeriods = (schedule.scheduleItems || [])
+    const outlookBusyPeriods = (schedule.scheduleItems || [])
       .filter((item: any) => item.status !== "free")
       .map((item: any) => ({
         start: new Date(item.start.dateTime + "Z"),
         end: new Date(item.end.dateTime + "Z"),
       }));
 
-    return new Response(JSON.stringify({ days: generateDays(settings, busyPeriods), candidate, application }), {
+    // Merge Outlook busy periods with database-booked slots
+    const allBusyPeriods = [...outlookBusyPeriods, ...dbBusyPeriods];
+
+    return new Response(JSON.stringify({ days: generateDays(settings, allBusyPeriods), candidate, application }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: any) {
