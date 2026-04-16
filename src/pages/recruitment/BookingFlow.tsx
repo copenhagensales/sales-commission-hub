@@ -286,6 +286,10 @@ export default function BookingFlow() {
               <Bell className="h-4 w-4" />
               Notifikationer
             </TabsTrigger>
+            <TabsTrigger value="pages" className="gap-2">
+              <Layout className="h-4 w-4" />
+              Sider
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="dashboard" className="space-y-6">
@@ -563,6 +567,10 @@ export default function BookingFlow() {
 
           <TabsContent value="notifications">
             <BookingNotificationsTab />
+          </TabsContent>
+
+          <TabsContent value="pages">
+            <BookingPagesTab />
           </TabsContent>
         </Tabs>
 
