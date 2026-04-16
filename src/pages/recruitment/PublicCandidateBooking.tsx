@@ -271,7 +271,6 @@ export default function PublicCandidateBooking() {
                       backgroundColor: isSelected ? CS_GREEN : "#fff",
                       color: isSelected ? "#fff" : CS_DARK,
                       borderColor: isSelected ? CS_GREEN : isFirst ? CS_GREEN : "#e5e7eb",
-                      ringColor: isFirst ? CS_GREEN : undefined,
                     }}>
                     {badgeText && (
                       <span className="text-[9px] font-semibold uppercase tracking-wide rounded px-1.5 py-0.5"
