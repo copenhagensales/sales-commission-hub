@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import cphSalesLogo from "@/assets/cph-sales-logo.png";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
@@ -106,8 +106,18 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   const [salaryOpen, setSalaryOpen] = useState(
     location.pathname.startsWith("/salary")
   );
-  
-  // Check if user can view cancellations
+
+  // Live clock (Danish time)
+  const [clockTime, setClockTime] = useState(() =>
+    new Date().toLocaleTimeString("da-DK", { timeZone: "Europe/Copenhagen", hour: "2-digit", minute: "2-digit" })
+  );
+  useEffect(() => {
+    const id = setInterval(() => {
+      setClockTime(new Date().toLocaleTimeString("da-DK", { timeZone: "Europe/Copenhagen", hour: "2-digit", minute: "2-digit" }));
+    }, 15000);
+    return () => clearInterval(id);
+  }, []);
+
   const canViewCancellations = p.canView("menu_cancellations");
   const [adminOpen, setAdminOpen] = useState(
     location.pathname.startsWith("/admin")
@@ -1942,9 +1952,12 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
             <LogOut className="h-5 w-5" />
             {t("sidebar.logout")}
           </button>
-          <div className="flex items-center gap-2 px-3 py-1 text-xs text-sidebar-foreground/70">
-            <User className="h-3 w-3" />
-            <span className="truncate">{employeeName || user?.email}</span>
+          <div className="flex items-center justify-between px-3 py-1 text-xs text-sidebar-foreground/70">
+            <div className="flex items-center gap-2 min-w-0">
+              <User className="h-3 w-3 shrink-0" />
+              <span className="truncate">{employeeName || user?.email}</span>
+            </div>
+            <span className="shrink-0 tabular-nums">{clockTime}</span>
           </div>
         </div>
       </div>
