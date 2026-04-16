@@ -1326,6 +1326,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                                     <div className="text-muted-foreground border-t pt-1 mt-1 flex gap-3 text-xs">
                                       {structured.cpoTotal && <span>CPO Total: {structured.cpoTotal} kr</span>}
                                       {structured.ttTrin !== "" && <span>TT trin: {structured.ttTrin}</span>}
+                                      {structured.kampagnePris !== "" && <span>Kampagne pris: {structured.kampagnePris}</span>}
                                     </div>
                                   </div>
                                 );
