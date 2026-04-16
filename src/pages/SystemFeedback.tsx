@@ -44,6 +44,7 @@ const STATUSES = [
   { value: "in_progress", label: "Under arbejde", color: "bg-yellow-500/20 text-yellow-400" },
   { value: "resolved", label: "Løst", color: "bg-primary/20 text-primary" },
   { value: "wont_fix", label: "Afvist", color: "bg-destructive/20 text-destructive" },
+  { value: "needs_clarification", label: "Afventer svar", color: "bg-purple-500/20 text-purple-400" },
 ];
 
 function useCurrentEmployeeId() {
@@ -98,6 +99,7 @@ export default function SystemFeedback() {
   // Detail dialog
   const [selectedFeedback, setSelectedFeedback] = useState<any>(null);
   const [adminNotes, setAdminNotes] = useState("");
+  const [adminResponse, setAdminResponse] = useState("");
   const [newStatus, setNewStatus] = useState("");
 
   // Filters
@@ -195,10 +197,14 @@ export default function SystemFeedback() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, status, notes, feedbackTitle, submittedById }: { id: string; status: string; notes: string; feedbackTitle: string; submittedById: string | null }) => {
+    mutationFn: async ({ id, status, notes, feedbackTitle, submittedById, adminResponseText }: { id: string; status: string; notes: string; feedbackTitle: string; submittedById: string | null; adminResponseText?: string }) => {
+      const updatePayload: any = { status, admin_notes: notes || null, updated_at: new Date().toISOString() };
+      if (adminResponseText !== undefined) {
+        updatePayload.admin_response = adminResponseText || null;
+      }
       const { error } = await supabase
         .from("system_feedback")
-        .update({ status, admin_notes: notes || null, updated_at: new Date().toISOString() })
+        .update(updatePayload)
         .eq("id", id);
       if (error) throw error;
 
@@ -212,7 +218,7 @@ export default function SystemFeedback() {
 
         const email = empData?.work_email || empData?.private_email;
         if (email) {
-          return { employeeEmail: email, employeeName: `${empData.first_name || ""} ${empData.last_name || ""}`.trim(), feedbackTitle, newStatus: status, adminNotes: notes };
+          return { employeeEmail: email, employeeName: `${empData.first_name || ""} ${empData.last_name || ""}`.trim(), feedbackTitle, newStatus: status, adminNotes: notes, adminResponse: adminResponseText };
         }
       }
       return null;
@@ -449,6 +455,7 @@ export default function SystemFeedback() {
                             <TableRow key={fb.id} className="cursor-pointer hover:bg-muted/30" onClick={() => {
                               setSelectedFeedback(fb);
                               setAdminNotes(fb.admin_notes || "");
+                              setAdminResponse(fb.admin_response || "");
                               setNewStatus(fb.status);
                             }}>
                               <TableCell className="font-medium max-w-[200px] truncate">{fb.title}</TableCell>
@@ -504,8 +511,9 @@ export default function SystemFeedback() {
                               {resolvedFeedback.map((fb: any) => (
                                 <TableRow key={fb.id} className="cursor-pointer hover:bg-muted/30 opacity-60" onClick={() => {
                                   setSelectedFeedback(fb);
-                                  setAdminNotes(fb.admin_notes || "");
-                                  setNewStatus(fb.status);
+                                setAdminNotes(fb.admin_notes || "");
+                                setAdminResponse(fb.admin_response || "");
+                                setNewStatus(fb.status);
                                 }}>
                                   <TableCell className="font-medium max-w-[200px] truncate">{fb.title}</TableCell>
                                   <TableCell>{getCategoryLabel(fb.category)}</TableCell>
@@ -602,6 +610,14 @@ export default function SystemFeedback() {
                   {selectedFeedback.submitted_by_employee && ` af ${selectedFeedback.submitted_by_employee.first_name} ${selectedFeedback.submitted_by_employee.last_name}`}
                 </div>
 
+                {/* Show admin response to non-owners */}
+                {!isOwner && selectedFeedback.admin_response && (
+                  <div className="border border-purple-500/30 bg-purple-500/10 rounded-md p-3">
+                    <p className="text-xs font-medium text-purple-400 mb-1">Besked fra admin</p>
+                    <p className="text-sm whitespace-pre-wrap">{selectedFeedback.admin_response}</p>
+                  </div>
+                )}
+
                 {/* Admin controls */}
                 {isOwner && (
                   <div className="border-t border-border pt-4 space-y-3">
@@ -616,17 +632,30 @@ export default function SystemFeedback() {
                       </Select>
                     </div>
                     <div>
+                      <label className="text-xs text-muted-foreground block mb-1">Besked til indberetteren (sendes som email)</label>
+                      <Textarea value={adminResponse} onChange={e => setAdminResponse(e.target.value)} rows={3} maxLength={2000} placeholder="Skriv en besked der sendes til indberetteren..." />
+                    </div>
+                    <div>
                       <label className="text-xs text-muted-foreground block mb-1">Admin-noter (kun synlige for dig)</label>
                       <Textarea value={adminNotes} onChange={e => setAdminNotes(e.target.value)} rows={3} maxLength={2000} />
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                       <Button
                         size="sm"
-                        onClick={() => updateMutation.mutate({ id: selectedFeedback.id, status: newStatus, notes: adminNotes, feedbackTitle: selectedFeedback.title, submittedById: selectedFeedback.submitted_by })}
+                        onClick={() => updateMutation.mutate({ id: selectedFeedback.id, status: newStatus, notes: adminNotes, feedbackTitle: selectedFeedback.title, submittedById: selectedFeedback.submitted_by, adminResponseText: adminResponse })}
                         disabled={updateMutation.isPending}
                       >
                         <CheckCircle2 className="h-4 w-4 mr-1" />
                         Gem
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="bg-purple-500/20 text-purple-400 hover:bg-purple-500/30"
+                        onClick={() => updateMutation.mutate({ id: selectedFeedback.id, status: "needs_clarification", notes: adminNotes, feedbackTitle: selectedFeedback.title, submittedById: selectedFeedback.submitted_by, adminResponseText: adminResponse })}
+                        disabled={updateMutation.isPending || !adminResponse.trim()}
+                      >
+                        Bed om uddybning
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => copyForLovable(selectedFeedback)}>
                         <Copy className="h-4 w-4 mr-1" />

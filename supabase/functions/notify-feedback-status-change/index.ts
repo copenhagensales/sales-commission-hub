@@ -38,6 +38,7 @@ const statusLabels: Record<string, string> = {
   in_progress: "Under arbejde",
   resolved: "Løst",
   wont_fix: "Afvist",
+  needs_clarification: "Afventer svar",
 };
 
 Deno.serve(async (req) => {
@@ -47,7 +48,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { feedbackTitle, newStatus, adminNotes, employeeEmail, employeeName } = body;
+    const { feedbackTitle, newStatus, adminNotes, adminResponse, employeeEmail, employeeName } = body;
 
     if (!feedbackTitle || !newStatus || !employeeEmail) {
       return new Response(JSON.stringify({ error: "feedbackTitle, newStatus, and employeeEmail are required" }), {
@@ -57,24 +58,42 @@ Deno.serve(async (req) => {
     }
 
     const statusLabel = statusLabels[newStatus] || newStatus;
+    const isClarification = newStatus === "needs_clarification";
 
-    const notesRow = adminNotes
+    const notesRow = adminNotes && !isClarification
       ? `<tr><td style="padding:8px 12px;font-weight:bold;color:#374151;vertical-align:top;">Kommentar fra admin</td><td style="padding:8px 12px;">${adminNotes.replace(/\n/g, "<br>")}</td></tr>`
       : "";
+
+    const clarificationBlock = isClarification && adminResponse
+      ? `<div style="margin-top:16px;padding:16px;background:#f3e8ff;border-left:4px solid #8b5cf6;border-radius:4px;">
+           <p style="font-size:14px;font-weight:bold;color:#6d28d9;margin:0 0 8px 0;">💬 Besked fra admin:</p>
+           <p style="font-size:14px;color:#374151;margin:0;white-space:pre-wrap;">${adminResponse.replace(/\n/g, "<br>")}</p>
+         </div>
+         <p style="margin-top:12px;font-size:14px;color:#374151;">Vi vil gerne bede dig om at vende tilbage med en uddybning. Du kan svare på denne email eller kontakte din leder.</p>`
+      : "";
+
+    const subject = isClarification
+      ? `Vi har brug for din uddybning: ${feedbackTitle}`
+      : `Din indrapportering er opdateret: ${feedbackTitle}`;
+
+    const introText = isClarification
+      ? "Vi har brug for lidt flere detaljer om din indrapportering."
+      : "Din indrapportering er blevet opdateret.";
 
     const htmlBody = `
       <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
         <div style="background:#1a365d;color:white;padding:20px;text-align:center;border-radius:8px 8px 0 0;">
-          <h2 style="margin:0;">📋 Opdatering på din indrapportering</h2>
+          <h2 style="margin:0;">${isClarification ? "💬 Vi har brug for din hjælp" : "📋 Opdatering på din indrapportering"}</h2>
         </div>
         <div style="padding:20px;background:#fff;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;">
           <p style="font-size:14px;color:#374151;">Hej ${employeeName || ""},</p>
-          <p style="font-size:14px;color:#374151;">Din indrapportering er blevet opdateret.</p>
+          <p style="font-size:14px;color:#374151;">${introText}</p>
           <table style="width:100%;border-collapse:collapse;margin-top:12px;">
             <tr><td style="padding:8px 12px;font-weight:bold;color:#374151;width:140px;">Titel</td><td style="padding:8px 12px;">${feedbackTitle}</td></tr>
             <tr><td style="padding:8px 12px;font-weight:bold;color:#374151;">Ny status</td><td style="padding:8px 12px;"><strong style="color:#1a365d;">${statusLabel}</strong></td></tr>
             ${notesRow}
           </table>
+          ${clarificationBlock}
           <p style="margin-top:16px;font-size:13px;color:#6b7280;">Denne email er sendt automatisk fra Copenhagen Sales.</p>
         </div>
       </div>`;
@@ -86,7 +105,7 @@ Deno.serve(async (req) => {
 
     const emailPayload = {
       message: {
-        subject: `Din indrapportering er opdateret: ${feedbackTitle}`,
+        subject,
         body: { contentType: "HTML", content: htmlBody },
         toRecipients: [
           { emailAddress: { address: employeeEmail } },
@@ -113,7 +132,7 @@ Deno.serve(async (req) => {
       throw new Error("Failed to send status change notification");
     }
 
-    console.log(`Feedback status change notification sent to ${employeeEmail}`);
+    console.log(`Feedback status change notification sent to ${employeeEmail} (status: ${newStatus})`);
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
