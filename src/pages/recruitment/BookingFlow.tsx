@@ -131,6 +131,47 @@ export default function BookingFlow() {
           tier: "A",
         });
       if (error) throw error;
+
+      // Fetch candidate info for the notification email
+      const { data: candidate } = await supabase
+        .from("candidates")
+        .select("first_name, last_name, email, phone, role")
+        .eq("id", candidateId)
+        .single();
+
+      // Fetch notification recipients
+      const { data: recipients } = await supabase
+        .from("booking_notification_recipients")
+        .select("email, name")
+        .eq("notify_on_booking", true);
+
+      if (candidate && recipients?.length) {
+        const candidateName = `${candidate.first_name} ${candidate.last_name}`;
+        const subject = `Ny kandidat i booking flow: ${candidateName}`;
+        const content = `<p>Hej,</p>
+<p>En ny kandidat er blevet tilføjet til booking flowet og afventer godkendelse:</p>
+<ul>
+  <li><strong>Navn:</strong> ${candidateName}</li>
+  <li><strong>Stilling:</strong> ${candidate.role || "Ikke angivet"}</li>
+  <li><strong>Email:</strong> ${candidate.email || "Ikke angivet"}</li>
+  <li><strong>Telefon:</strong> ${candidate.phone || "Ikke angivet"}</li>
+</ul>
+<p>Gå til booking flowet for at godkende eller afvise kandidaten.</p>`;
+
+        // Send email to all recipients in parallel
+        await Promise.allSettled(
+          recipients.map((r) =>
+            supabase.functions.invoke("send-recruitment-email", {
+              body: {
+                candidateId,
+                email: r.email,
+                subject,
+                content,
+              },
+            })
+          )
+        );
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["booking-flow-enrollments"] });
