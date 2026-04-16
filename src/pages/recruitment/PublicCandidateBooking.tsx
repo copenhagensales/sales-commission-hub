@@ -19,6 +19,7 @@ export default function PublicCandidateBooking() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
   const [booked, setBooked] = useState(false);
+  const [autoSelected, setAutoSelected] = useState(false);
   const [unsubscribed, setUnsubscribed] = useState(false);
 
   useEffect(() => {
