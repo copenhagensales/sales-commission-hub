@@ -270,6 +270,7 @@ interface TdcUploadedStructured {
   products: { name: string; quantity: number }[];
   cpoTotal: string;
   ttTrin: string;
+  kampagnePris: string;
 }
 
 function buildTdcUploadedStructured(
@@ -288,7 +289,8 @@ function buildTdcUploadedStructured(
   }
   const cpoTotal = uploadedData["CPO Total"] != null ? String(uploadedData["CPO Total"]).trim() : "";
   const ttTrin = uploadedData["TT trin"] != null ? String(uploadedData["TT trin"]).trim() : "";
-  return products.length > 0 || cpoTotal || ttTrin ? { products, cpoTotal, ttTrin } : null;
+  const kampagnePris = uploadedData["Kampagne pris"] != null ? String(uploadedData["Kampagne pris"]).trim() : "";
+  return products.length > 0 || cpoTotal || ttTrin || kampagnePris ? { products, cpoTotal, ttTrin, kampagnePris } : null;
 }
 
 function buildUploadedPreview(
@@ -300,7 +302,7 @@ function buildUploadedPreview(
 
   // TDC Erhverv: hide extra fields (structured rendering handles the rest)
   const hiddenFields = clientId === TDC_ERHVERV_CLIENT_ID
-    ? new Set(["TT", "TT mandat", "tt", "tt mandat", "OPP-nr.", "Produkt: Total", "Lukkedato", "Provision", "provision", "CPO Total", "TT trin"])
+    ? new Set(["TT", "TT mandat", "tt", "tt mandat", "OPP-nr.", "Produkt: Total", "Lukkedato", "Provision", "provision", "CPO Total", "TT trin", "Kampagne pris"])
     : new Set<string>();
 
   const fields: PreviewField[] = [];

@@ -172,9 +172,11 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
   const TDC_ERHVERV_ID = CLIENT_IDS["TDC Erhverv"];
   const isTdc = clientId === TDC_ERHVERV_ID;
   const ALLOWED_COLUMNS = useMemo(() =>
-    isTdc ? ["Produkt", "TT trin"] as const : ["Operator", "Subscription Name", "Sales Department"] as const,
+    isTdc ? ["Produkt", "TT trin", "Kampagne pris"] as const : ["Operator", "Subscription Name", "Sales Department"] as const,
     [isTdc]
   );
+
+  const BOOLEAN_COLUMNS = new Set(["Kampagne pris"]);
 
   // Fetch existing conditions
   const { data: conditions = [], isLoading } = useQuery({
@@ -571,10 +573,10 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
 
                   {showValues && (
                     <div className="space-y-2">
-                      {/* Known values from uploads */}
-                      {knownValues.length > 0 && (
+                      {BOOLEAN_COLUMNS.has(col) ? (
+                        /* Boolean column: Ja/Nej only */
                         <div className="max-h-[150px] overflow-auto space-y-1">
-                          {knownValues.map((val: string) => (
+                          {["Ja", "Nej"].map((val) => (
                             <label key={val} className="flex items-center gap-2.5 rounded-md border px-2.5 py-1.5 cursor-pointer hover:bg-muted/50 transition-colors text-xs">
                               <Checkbox
                                 checked={draft.values.includes(val)}
@@ -584,30 +586,47 @@ function ProductMappingSection({ clientId }: { clientId: string }) {
                             </label>
                           ))}
                         </div>
+                      ) : (
+                        <>
+                          {/* Known values from uploads */}
+                          {knownValues.length > 0 && (
+                            <div className="max-h-[150px] overflow-auto space-y-1">
+                              {knownValues.map((val: string) => (
+                                <label key={val} className="flex items-center gap-2.5 rounded-md border px-2.5 py-1.5 cursor-pointer hover:bg-muted/50 transition-colors text-xs">
+                                  <Checkbox
+                                    checked={draft.values.includes(val)}
+                                    onCheckedChange={() => toggleDraftValue(col, val)}
+                                  />
+                                  <span>{val}</span>
+                                </label>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Custom-added values not in known list */}
+                          {draft.values.filter(v => !knownValues.includes(v)).map(v => (
+                            <label key={v} className="flex items-center gap-2.5 rounded-md border border-primary/30 px-2.5 py-1.5 cursor-pointer hover:bg-muted/50 transition-colors text-xs">
+                              <Checkbox checked onCheckedChange={() => toggleDraftValue(col, v)} />
+                              <span>{v}</span>
+                              <Badge variant="outline" className="text-[9px] ml-auto">Manuelt</Badge>
+                            </label>
+                          ))}
+
+                          {/* Add custom value */}
+                          <div className="flex gap-1.5">
+                            <Input
+                              placeholder="Tilføj værdi..."
+                              value={customInputs[col] || ""}
+                              onChange={e => setCustomInputs(prev => ({ ...prev, [col]: e.target.value }))}
+                              onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addCustomValue(col); } }}
+                              className="h-8 text-xs"
+                            />
+                            <Button variant="outline" size="sm" className="h-8 shrink-0 px-2" onClick={() => addCustomValue(col)} disabled={!(customInputs[col] || "").trim()}>
+                              <Plus className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </>
                       )}
-
-                      {/* Custom-added values not in known list */}
-                      {draft.values.filter(v => !knownValues.includes(v)).map(v => (
-                        <label key={v} className="flex items-center gap-2.5 rounded-md border border-primary/30 px-2.5 py-1.5 cursor-pointer hover:bg-muted/50 transition-colors text-xs">
-                          <Checkbox checked onCheckedChange={() => toggleDraftValue(col, v)} />
-                          <span>{v}</span>
-                          <Badge variant="outline" className="text-[9px] ml-auto">Manuelt</Badge>
-                        </label>
-                      ))}
-
-                      {/* Add custom value */}
-                      <div className="flex gap-1.5">
-                        <Input
-                          placeholder="Tilføj værdi..."
-                          value={customInputs[col] || ""}
-                          onChange={e => setCustomInputs(prev => ({ ...prev, [col]: e.target.value }))}
-                          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addCustomValue(col); } }}
-                          className="h-8 text-xs"
-                        />
-                        <Button variant="outline" size="sm" className="h-8 shrink-0 px-2" onClick={() => addCustomValue(col)} disabled={!(customInputs[col] || "").trim()}>
-                          <Plus className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
 
                       {draft.values.length === 0 && (
                         <p className="text-[11px] text-muted-foreground">Vælg mindst én værdi</p>
