@@ -135,7 +135,7 @@ export default function BookingFlow() {
       // Fetch candidate info for the notification email
       const { data: candidate } = await supabase
         .from("candidates")
-        .select("first_name, last_name, email, phone, role")
+        .select("first_name, last_name, email, phone, applied_position")
         .eq("id", candidateId)
         .single();
 
