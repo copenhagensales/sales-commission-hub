@@ -189,9 +189,6 @@ export default function PublicCandidateBooking() {
               ))}
             </ul>
           </div>
-          <p className="text-xs" style={{ color: "#999" }}>
-            {successTip}
-          </p>
           {pageContent?.social_links && (
             <div className="flex items-center justify-center gap-3 pt-1">
               {(pageContent.social_links as any).instagram && (
