@@ -311,7 +311,7 @@ export default function PublicCandidateBooking() {
                     <button key={slot.start} onClick={() => setSelectedSlot(slot)}
                       className="px-3 py-2.5 rounded-xl border text-sm font-medium transition-all"
                       style={{ backgroundColor: isActive ? CS_GREEN : "#fff", color: isActive ? "#fff" : CS_DARK, borderColor: isActive ? CS_GREEN : "#e5e7eb" }}>
-                      {slot.start} – {slot.end}
+                      {slot.start}
                     </button>
                   );
                 })}

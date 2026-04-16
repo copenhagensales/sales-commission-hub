@@ -280,7 +280,7 @@ export function CalendarBookingModal({
                   <div className="flex items-center gap-2 mb-1">
                     <Clock className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm font-medium">
-                      {format(selectedSlot.date, "EEEE d. MMMM", { locale: da })} kl. {selectedSlot.startTime}–{selectedSlot.endTime}
+                      {format(selectedSlot.date, "EEEE d. MMMM", { locale: da })} kl. {selectedSlot.startTime}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground">
