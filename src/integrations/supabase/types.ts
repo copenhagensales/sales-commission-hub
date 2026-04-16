@@ -1828,6 +1828,7 @@ export type Database = {
           body_lines: string[]
           id: string
           page_key: string
+          social_links: Json | null
           tip_text: string | null
           title: string
           updated_at: string | null
@@ -1836,6 +1837,7 @@ export type Database = {
           body_lines?: string[]
           id?: string
           page_key: string
+          social_links?: Json | null
           tip_text?: string | null
           title: string
           updated_at?: string | null
@@ -1844,6 +1846,7 @@ export type Database = {
           body_lines?: string[]
           id?: string
           page_key?: string
+          social_links?: Json | null
           tip_text?: string | null
           title?: string
           updated_at?: string | null
