@@ -195,14 +195,15 @@ function BookingSuccessPreview({ page }: { page: PageContent }) {
         <div className="rounded-xl p-3 text-left space-y-1.5" style={{ backgroundColor: CS_GREEN_LIGHT }}>
           <p className="text-xs font-semibold" style={{ color: CS_DARK }}>Hvad sker der nu?</p>
           <ul className="text-xs space-y-1" style={{ color: "#444" }}>
-            <li className="flex items-start gap-1.5">
-              <Phone className="h-3 w-3 mt-0.5 shrink-0" style={{ color: CS_GREEN }} />
-              Oscar ringer dig op på det aftalte tidspunkt
-            </li>
-            <li className="flex items-start gap-1.5">
-              <Clock className="h-3 w-3 mt-0.5 shrink-0" style={{ color: CS_GREEN }} />
-              Samtalen tager 5–10 minutter
-            </li>
+            {(page.body_lines.length > 0
+              ? page.body_lines
+              : ["Oscar ringer dig op på det aftalte tidspunkt", "Samtalen tager 5–10 minutter"]
+            ).map((line, i) => (
+              <li key={i} className="flex items-start gap-1.5">
+                <CheckCircle2 className="h-3 w-3 mt-0.5 shrink-0" style={{ color: CS_GREEN }} />
+                {line}
+              </li>
+            ))}
           </ul>
         </div>
         {page.tip_text && (

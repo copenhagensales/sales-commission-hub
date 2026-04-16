@@ -174,18 +174,19 @@ export default function PublicCandidateBooking() {
           <div className="rounded-xl p-4 text-left space-y-2" style={{ backgroundColor: CS_GREEN_LIGHT }}>
             <p className="text-sm font-semibold" style={{ color: CS_DARK }}>Hvad sker der nu?</p>
             <ul className="text-sm space-y-1.5" style={{ color: "#444" }}>
-              <li className="flex items-start gap-2">
-                <Phone className="h-4 w-4 mt-0.5 shrink-0" style={{ color: CS_GREEN }} />
-                {recruiterName} ringer dig op på det aftalte tidspunkt
-              </li>
-              <li className="flex items-start gap-2">
-                <Clock className="h-4 w-4 mt-0.5 shrink-0" style={{ color: CS_GREEN }} />
-                Samtalen tager 5–10 minutter
-              </li>
-              <li className="flex items-start gap-2">
-                <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" style={{ color: CS_GREEN }} />
-                Hav gerne et par spørgsmål klar – {recruiterName} fortæller gerne om løn, arbejdstider og hverdagen
-              </li>
+              {(pageContent?.body_lines && pageContent.body_lines.length > 0
+                ? pageContent.body_lines
+                : [
+                    `${recruiterName} ringer dig op på det aftalte tidspunkt`,
+                    "Samtalen tager 5–10 minutter",
+                    `Hav gerne et par spørgsmål klar – ${recruiterName} fortæller gerne om løn, arbejdstider og hverdagen`,
+                  ]
+              ).map((line, i) => (
+                <li key={i} className="flex items-start gap-2">
+                  <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" style={{ color: CS_GREEN }} />
+                  {line}
+                </li>
+              ))}
             </ul>
           </div>
           <p className="text-xs" style={{ color: "#999" }}>
