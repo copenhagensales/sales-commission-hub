@@ -152,7 +152,7 @@ export default function BookingFlow() {
 <p>En ny kandidat er blevet tilføjet til booking flowet og afventer godkendelse:</p>
 <ul>
   <li><strong>Navn:</strong> ${candidateName}</li>
-  <li><strong>Stilling:</strong> ${candidate.role || "Ikke angivet"}</li>
+  <li><strong>Stilling:</strong> ${candidate.applied_position || "Ikke angivet"}</li>
   <li><strong>Email:</strong> ${candidate.email || "Ikke angivet"}</li>
   <li><strong>Telefon:</strong> ${candidate.phone || "Ikke angivet"}</li>
 </ul>
