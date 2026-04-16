@@ -27,6 +27,7 @@ interface FlowStep {
 }
 
 const PHASE_GROUPS = [
+  { phase: "confirmation", label: "Bekræftelse — Ved booking", color: "text-foreground" },
   { phase: "active", label: "Aktiv booking — Dag 0–10", color: "text-foreground" },
   { phase: "reengagement", label: "Re-engagement — Dag 45+", color: "text-foreground" },
 ];
