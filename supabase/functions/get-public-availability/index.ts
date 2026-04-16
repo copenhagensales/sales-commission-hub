@@ -288,7 +288,7 @@ Deno.serve(async (req) => {
         headers: { Authorization: `Bearer ${access_token}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           schedules: [msUserEmail],
-          startTime: { dateTime: startDate.toISOString().split(".")[0], timeZone: "Europe/Copenhagen" },
+          startTime: { dateTime: msStartDate.toISOString().split(".")[0], timeZone: "Europe/Copenhagen" },
           endTime: { dateTime: endDate.toISOString().split(".")[0], timeZone: "Europe/Copenhagen" },
           availabilityViewInterval: settings.slot_duration_minutes,
         }),
