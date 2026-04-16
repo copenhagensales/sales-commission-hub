@@ -179,6 +179,33 @@ export function BookingPagesTab() {
                 placeholder="F.eks. 💡 Tip: Hav gerne dit CV klar"
               />
             </div>
+            {editingPage?.page_key === "booking_success" && (
+              <div className="space-y-2">
+                <Label>Sociale medier (valgfri)</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    value={editSocialLinks.instagram || ""}
+                    onChange={e => setEditSocialLinks(prev => ({ ...prev, instagram: e.target.value }))}
+                    placeholder="Instagram URL"
+                  />
+                  <Input
+                    value={editSocialLinks.linkedin || ""}
+                    onChange={e => setEditSocialLinks(prev => ({ ...prev, linkedin: e.target.value }))}
+                    placeholder="LinkedIn URL"
+                  />
+                  <Input
+                    value={editSocialLinks.tiktok || ""}
+                    onChange={e => setEditSocialLinks(prev => ({ ...prev, tiktok: e.target.value }))}
+                    placeholder="TikTok URL"
+                  />
+                  <Input
+                    value={editSocialLinks.website || ""}
+                    onChange={e => setEditSocialLinks(prev => ({ ...prev, website: e.target.value }))}
+                    placeholder="Hjemmeside URL"
+                  />
+                </div>
+              </div>
+            )}
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setEditingPage(null)}>Annuller</Button>
               <Button onClick={handleSave} disabled={updateMutation.isPending}>
