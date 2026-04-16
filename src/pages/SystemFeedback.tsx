@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
-import { Bug, Lightbulb, Sparkles, Upload, Image, AlertTriangle, ArrowUp, Minus, ArrowDown, Eye, Copy, CheckCircle2, UserPlus, X, Bell, Shield, ChevronDown } from "lucide-react";
+import { Bug, Lightbulb, Sparkles, Upload, Image, AlertTriangle, ArrowUp, Minus, ArrowDown, Eye, Copy, CheckCircle2, UserPlus, X, Bell, Shield, ChevronDown, Send, MessageCircle } from "lucide-react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 
