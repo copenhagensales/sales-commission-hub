@@ -42,10 +42,10 @@ serve(async (req) => {
       );
     }
 
-    const { data: isOwner } = await supabaseAdmin.rpc("is_owner", { _user_id: callingUser.id });
-    if (!isOwner) {
+    const { data: isManager } = await supabaseAdmin.rpc("is_teamleder_or_above", { _user_id: callingUser.id });
+    if (!isManager) {
       return new Response(
-        JSON.stringify({ error: "Kun ejere kan udføre denne handling" }),
+        JSON.stringify({ error: "Kun ledere kan udføre denne handling" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
