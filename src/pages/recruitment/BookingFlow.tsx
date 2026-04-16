@@ -9,10 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Users, Zap, Clock, CheckCircle, XCircle, Plus, Mail, MessageSquare, Loader2, ShieldCheck, AlertTriangle, FileText, CalendarDays, Eye, PhoneCall, Bell, Layout } from "lucide-react";
+import { Users, Zap, Clock, CheckCircle, XCircle, Plus, Loader2, ShieldCheck, AlertTriangle, FileText, CalendarDays, Eye, PhoneCall, Bell, Layout } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { da } from "date-fns/locale";
-import { SegmentationModal } from "@/components/recruitment/SegmentationModal";
 import { BookingFlowTimeline } from "@/components/recruitment/BookingFlowTimeline";
 import { FlowTemplatesTab } from "@/components/recruitment/FlowTemplatesTab";
 import { BookingSettingsTab } from "@/components/recruitment/BookingSettingsTab";
@@ -21,12 +20,6 @@ import { BookingCalendarTab } from "@/components/recruitment/BookingCalendarTab"
 import { BookingNotificationsTab } from "@/components/recruitment/BookingNotificationsTab";
 import { BookingPagesTab } from "@/components/recruitment/BookingPagesTab";
 import { addDays, setHours, setMinutes } from "date-fns";
-
-const tierConfig = {
-  A: { label: "Tier A", color: "bg-emerald-500/10 text-emerald-700 border-emerald-500/30", dot: "bg-emerald-500" },
-  B: { label: "Tier B", color: "bg-violet-500/10 text-violet-700 border-violet-500/30", dot: "bg-violet-500" },
-  C: { label: "Tier C", color: "bg-gray-500/10 text-gray-600 border-gray-500/30", dot: "bg-gray-500" },
-};
 
 const statusConfig: Record<string, { label: string; icon: typeof CheckCircle; color: string }> = {
   active: { label: "Aktiv", icon: Zap, color: "bg-blue-500/10 text-blue-600 border-blue-500/30" },
@@ -37,15 +30,13 @@ const statusConfig: Record<string, { label: string; icon: typeof CheckCircle; co
 
 export default function BookingFlow() {
   const queryClient = useQueryClient();
-  const [segModalOpen, setSegModalOpen] = useState(false);
   const [selectedEnrollment, setSelectedEnrollment] = useState<string | null>(null);
-  const [filterTier, setFilterTier] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("active");
   const [addCandidateOpen, setAddCandidateOpen] = useState(false);
 
   // Fetch all enrollments
   const { data: enrollments, isLoading } = useQuery({
-    queryKey: ["booking-flow-enrollments", filterTier, filterStatus],
+    queryKey: ["booking-flow-enrollments", filterStatus],
     queryFn: async () => {
       let query = supabase
         .from("booking_flow_enrollments")
@@ -58,9 +49,6 @@ export default function BookingFlow() {
 
       if (filterStatus !== "all") {
         query = query.eq("status", filterStatus);
-      }
-      if (filterTier !== "all") {
-        query = query.eq("tier", filterTier);
       }
 
       const { data, error } = await query;
@@ -81,7 +69,6 @@ export default function BookingFlow() {
           applications(id, role, status)
         `)
         .eq("status", "pending_approval")
-        .order("tier", { ascending: true })
         .order("enrolled_at", { ascending: false });
       if (error) throw error;
       return data;
@@ -132,10 +119,31 @@ export default function BookingFlow() {
     enabled: addCandidateOpen,
   });
 
+  // Add candidate directly as pending_approval
+  const addCandidateMutation = useMutation({
+    mutationFn: async (candidateId: string) => {
+      const { error } = await supabase
+        .from("booking_flow_enrollments")
+        .insert({
+          candidate_id: candidateId,
+          status: "pending_approval",
+          approval_status: "pending",
+          tier: "A",
+        });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["booking-flow-enrollments"] });
+      queryClient.invalidateQueries({ queryKey: ["booking-flow-pending-approvals"] });
+      queryClient.invalidateQueries({ queryKey: ["unenrolled-candidates"] });
+      toast.success("Kandidat tilføjet — afventer godkendelse");
+    },
+    onError: (err: any) => toast.error("Fejl: " + err.message),
+  });
+
   // Approve enrollment mutation
   const approveMutation = useMutation({
     mutationFn: async (enrollmentId: string) => {
-      // Get enrollment details
       const { data: enrollment, error: fetchErr } = await supabase
         .from("booking_flow_enrollments")
         .select("*")
@@ -143,7 +151,6 @@ export default function BookingFlow() {
         .single();
       if (fetchErr) throw fetchErr;
 
-      // Update status to active
       const { error: updateErr } = await supabase
         .from("booking_flow_enrollments")
         .update({
@@ -153,7 +160,6 @@ export default function BookingFlow() {
         .eq("id", enrollmentId);
       if (updateErr) throw updateErr;
 
-      // Fetch flow steps from DB
       const { data: flowSteps, error: stepsErr } = await supabase
         .from("booking_flow_steps")
         .select("*")
@@ -238,9 +244,6 @@ export default function BookingFlow() {
   });
 
   const activeCount = enrollments?.filter(e => e.status === "active").length || 0;
-  const tierACnt = enrollments?.filter(e => e.tier === "A" && e.status === "active").length || 0;
-  const tierBCnt = enrollments?.filter(e => e.tier === "B" && e.status === "active").length || 0;
-  const tierCCnt = enrollments?.filter(e => e.tier === "C" && e.status === "active").length || 0;
   const pendingCount = pendingApprovals?.length || 0;
 
   return (
@@ -251,7 +254,7 @@ export default function BookingFlow() {
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Booking Flow</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Automatiseret outreach med intelligent A/B/C-segmentering
+              Automatiseret outreach med manuel godkendelse
             </p>
           </div>
           <Button onClick={() => setAddCandidateOpen(true)} className="gap-2">
@@ -295,7 +298,7 @@ export default function BookingFlow() {
           <TabsContent value="dashboard" className="space-y-6">
 
         {/* Stats */}
-        <div className="grid grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 gap-4">
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
@@ -317,30 +320,11 @@ export default function BookingFlow() {
                 </div>
                 <div>
                   <p className="text-2xl font-semibold">{pendingCount}</p>
-                  <p className="text-xs text-muted-foreground">Afventer</p>
+                  <p className="text-xs text-muted-foreground">Afventer godkendelse</p>
                 </div>
               </div>
             </CardContent>
           </Card>
-          {[
-            { tier: "A", count: tierACnt, color: "emerald" },
-            { tier: "B", count: tierBCnt, color: "violet" },
-            { tier: "C", count: tierCCnt, color: "gray" },
-          ].map(({ tier, count, color }) => (
-            <Card key={tier}>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg bg-${color}-500/10`}>
-                    <Zap className={`h-5 w-5 text-${color}-600`} />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-semibold">{count}</p>
-                    <p className="text-xs text-muted-foreground">Tier {tier}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
         </div>
 
         {/* Pending Approval Section */}
@@ -356,53 +340,21 @@ export default function BookingFlow() {
               <div className="divide-y">
                 {pendingApprovals?.map((enrollment: any) => {
                   const candidate = enrollment.candidates;
-                  const tier = tierConfig[enrollment.tier as keyof typeof tierConfig];
-                  const signals = enrollment.segmentation_signals as any;
 
                   return (
                     <div key={enrollment.id} className="flex items-center justify-between py-3 px-1">
                       <div className="flex items-center gap-4">
-                        <div className={`w-2 h-2 rounded-full ${tier?.dot}`} />
+                        <div className="w-2 h-2 rounded-full bg-amber-500" />
                         <div>
                           <p className="font-medium text-sm">
                             {candidate?.first_name} {candidate?.last_name}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            {enrollment.tier === "B"
-                              ? "Erfaren kandidat — godkend for at starte flow"
-                              : "Muligt mismatch — gennemse inden flow"
-                            }
+                            {candidate?.email} {candidate?.phone ? `· ${candidate.phone}` : ""}
                           </p>
-                          {signals && (
-                            <div className="flex gap-1.5 mt-1">
-                              {signals.detectedAge && (
-                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                                  {signals.detectedAge} år
-                                </Badge>
-                              )}
-                              {signals.detectedExperienceYears !== null && (
-                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                                  {signals.detectedExperienceYears} års erfaring
-                                </Badge>
-                              )}
-                              {!signals.isDanish && (
-                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-red-100 text-red-700">
-                                  Engelsk ({signals.englishWordPct}%)
-                                </Badge>
-                              )}
-                              {signals.isPartTime && (
-                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-red-100 text-red-700">
-                                  Deltid
-                                </Badge>
-                              )}
-                            </div>
-                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Badge variant="outline" className={tier?.color}>
-                          {tier?.label}
-                        </Badge>
                         <Button
                           size="sm"
                           variant="outline"
@@ -419,7 +371,7 @@ export default function BookingFlow() {
                           disabled={approveMutation.isPending}
                         >
                           <ShieldCheck className="h-3.5 w-3.5 mr-1" />
-                          Godkend
+                          Godkend & start flow
                         </Button>
                       </div>
                     </div>
@@ -441,17 +393,6 @@ export default function BookingFlow() {
               <SelectItem value="active">Aktive</SelectItem>
               <SelectItem value="completed">Fuldførte</SelectItem>
               <SelectItem value="cancelled">Annullerede</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={filterTier} onValueChange={setFilterTier}>
-            <SelectTrigger className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Alle tiers</SelectItem>
-              <SelectItem value="A">Tier A</SelectItem>
-              <SelectItem value="B">Tier B</SelectItem>
-              <SelectItem value="C">Tier C</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -476,7 +417,6 @@ export default function BookingFlow() {
               <div className="divide-y">
                 {enrollments.map((enrollment: any) => {
                   const candidate = enrollment.candidates;
-                  const tier = tierConfig[enrollment.tier as keyof typeof tierConfig];
                   const status = statusConfig[enrollment.status as string];
                   const StatusIcon = status?.icon || Clock;
 
@@ -487,7 +427,6 @@ export default function BookingFlow() {
                       onClick={() => setSelectedEnrollment(enrollment.id)}
                     >
                       <div className="flex items-center gap-4">
-                        <div className={`w-2 h-2 rounded-full ${tier?.dot}`} />
                         <div>
                           <p className="font-medium text-sm">
                             {candidate?.first_name} {candidate?.last_name}
@@ -498,18 +437,10 @@ export default function BookingFlow() {
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
-                        <Badge variant="outline" className={tier?.color}>
-                          {tier?.label}
-                        </Badge>
                         <Badge variant="outline" className={status?.color}>
                           <StatusIcon className="h-3 w-3 mr-1" />
                           {status?.label}
                         </Badge>
-                        {enrollment.approval_status === "auto_approved" && (
-                          <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30 text-[10px]">
-                            Auto
-                          </Badge>
-                        )}
                         <span className="text-xs text-muted-foreground">
                           Dag {enrollment.current_day}
                         </span>
@@ -587,8 +518,7 @@ export default function BookingFlow() {
                   className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
                   onClick={() => {
                     setAddCandidateOpen(false);
-                    setSegModalOpen(true);
-                    (window as any).__selectedCandidateForFlow = c;
+                    addCandidateMutation.mutate(c.id);
                   }}
                 >
                   <div>
@@ -606,17 +536,6 @@ export default function BookingFlow() {
             </div>
           </DialogContent>
         </Dialog>
-
-        {/* Segmentation modal */}
-        <SegmentationModal
-          open={segModalOpen}
-          onOpenChange={setSegModalOpen}
-          onEnrolled={() => {
-            queryClient.invalidateQueries({ queryKey: ["booking-flow-enrollments"] });
-            queryClient.invalidateQueries({ queryKey: ["booking-flow-pending-approvals"] });
-            queryClient.invalidateQueries({ queryKey: ["unenrolled-candidates"] });
-          }}
-        />
       </div>
     </MainLayout>
   );
