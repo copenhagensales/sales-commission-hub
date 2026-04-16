@@ -1,22 +1,41 @@
 
 
-# Plan: Vis ansøgningstekst i godkendelses-kort
+# Plan: Flyt auto-enrollment trigger til `candidates`-tabellen
 
-## Opsummering
-Tilføj et uddrag af kandidatens noter/ansøgningstekst i hvert "afventer godkendelse"-kort, så recruiter kan læse hvad kandidaten har skrevet uden at åbne profilen.
+## Problem
+Triggeren `trg_auto_enroll_application` sidder på `applications`, men webhook'en kun inserter i `candidates`. Derfor sker der ingenting automatisk.
 
-## Ændringer i `src/pages/recruitment/BookingFlow.tsx`
+## Løsning
+Én database-migration der:
 
-### 1. Udvid data-query (linje 66-70)
-Tilføj `notes` til både `candidates` og `applications` select:
+1. Dropper den eksisterende trigger og funktion på `applications`
+2. Opretter ny funktion `auto_enroll_new_candidate()` på `candidates`-tabellen
+3. Opretter trigger `trg_auto_enroll_candidate` AFTER INSERT på `candidates`
+
+```sql
+DROP TRIGGER IF EXISTS trg_auto_enroll_application ON public.applications;
+DROP FUNCTION IF EXISTS public.auto_enroll_new_application();
+
+CREATE OR REPLACE FUNCTION public.auto_enroll_new_candidate()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.booking_flow_enrollments (
+    candidate_id, tier, status, approval_status
+  ) VALUES (
+    NEW.id, 'A', 'pending_approval', 'pending'
+  ) ON CONFLICT DO NOTHING;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public';
+
+CREATE TRIGGER trg_auto_enroll_candidate
+AFTER INSERT ON public.candidates
+FOR EACH ROW EXECUTE FUNCTION public.auto_enroll_new_candidate();
 ```
-candidates!inner(id, first_name, last_name, email, phone, notes)
-applications(id, role, status, notes)
-```
 
-### 2. Vis tekst i godkendelses-kortet (linje 344-355)
-Under kandidatens navn/email, vis et truncated uddrag af ansøgningsteksten (candidates.notes eller applications[0].notes). Max 2-3 linjer med `line-clamp-2` styling i en lille grå tekst.
+## Ingen kodeændringer
+BookingFlow.tsx håndterer allerede `application_id = NULL` korrekt.
 
 ## Fil der ændres
-- `src/pages/recruitment/BookingFlow.tsx`
+- Ny database-migration (SQL)
 
