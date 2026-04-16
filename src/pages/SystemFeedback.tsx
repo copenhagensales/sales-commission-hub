@@ -595,6 +595,228 @@ export default function SystemFeedback() {
   );
 }
 
+// Comment thread component
+function CommentThread({ feedbackId, employeeId, employeeName, isOwner }: { feedbackId: string; employeeId: string | null; employeeName: string; isOwner: boolean }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [message, setMessage] = useState("");
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const { data: comments = [] } = useQuery({
+    queryKey: ["feedback-comments", feedbackId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("system_feedback_comments")
+        .select("*, author:employee_master_data!system_feedback_comments_author_employee_id_fkey(first_name, last_name)")
+        .eq("feedback_id", feedbackId)
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [comments]);
+
+  const sendMutation = useMutation({
+    mutationFn: async () => {
+      if (!message.trim() || !employeeId) return;
+      const { error } = await supabase.from("system_feedback_comments").insert({
+        feedback_id: feedbackId,
+        author_employee_id: employeeId,
+        message: message.trim(),
+        is_admin: isOwner,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setMessage("");
+      queryClient.invalidateQueries({ queryKey: ["feedback-comments", feedbackId] });
+    },
+    onError: () => {
+      toast({ title: "Fejl", description: "Kunne ikke sende besked", variant: "destructive" });
+    },
+  });
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMutation.mutate();
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <MessageCircle className="h-4 w-4 text-muted-foreground" />
+        <p className="text-sm font-medium">Beskedtråd</p>
+      </div>
+
+      <div ref={scrollRef} className="max-h-[200px] overflow-y-auto space-y-2 p-2 rounded-md border border-border bg-muted/20">
+        {comments.length === 0 ? (
+          <p className="text-xs text-muted-foreground text-center py-4">Ingen beskeder endnu</p>
+        ) : (
+          comments.map((c: any) => {
+            const authorName = c.author ? `${c.author.first_name || ""} ${c.author.last_name || ""}`.trim() : "Ukendt";
+            return (
+              <div key={c.id} className={`p-2 rounded-md text-sm ${c.is_admin ? "bg-purple-500/10 border border-purple-500/20 ml-4" : "bg-background border border-border mr-4"}`}>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className={`text-xs font-medium ${c.is_admin ? "text-purple-400" : "text-muted-foreground"}`}>
+                    {authorName} {c.is_admin && "(Admin)"}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {format(new Date(c.created_at), "d. MMM HH:mm", { locale: da })}
+                  </span>
+                </div>
+                <p className="whitespace-pre-wrap">{c.message}</p>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      <div className="flex gap-2">
+        <Textarea
+          value={message}
+          onChange={e => setMessage(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Skriv en besked..."
+          rows={2}
+          className="min-h-[60px]"
+        />
+        <Button
+          size="icon"
+          className="h-[60px] w-10 flex-shrink-0"
+          disabled={!message.trim() || sendMutation.isPending}
+          onClick={() => sendMutation.mutate()}
+        >
+          <Send className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// Feedback detail content component
+function FeedbackDetailContent({
+  feedback, isOwner, employeeId, employeeName, adminNotes, setAdminNotes, newStatus, setNewStatus, commentText, setCommentText, updateMutation, copyForLovable, getCategoryLabel, getPriorityBadge, getStatusBadge
+}: any) {
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle className="flex items-center gap-2">
+          {getCategoryLabel(feedback.category)}
+          <span className="ml-1">{feedback.title}</span>
+        </DialogTitle>
+      </DialogHeader>
+      <div className="space-y-4">
+        <div className="flex flex-wrap gap-2">
+          {getPriorityBadge(feedback.priority)}
+          {getStatusBadge(feedback.status)}
+          {feedback.system_area && <Badge variant="outline">{feedback.system_area}</Badge>}
+        </div>
+
+        {feedback.affected_employee_name && (
+          <div>
+            <p className="text-xs text-muted-foreground">Berørt bruger</p>
+            <p className="text-sm font-medium">{feedback.affected_employee_name}</p>
+          </div>
+        )}
+
+        {feedback.description && (
+          <div>
+            <p className="text-xs text-muted-foreground">Beskrivelse</p>
+            <p className="text-sm whitespace-pre-wrap">{feedback.description}</p>
+          </div>
+        )}
+
+        {feedback.screenshot_url && (
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">Screenshot</p>
+            <img src={feedback.screenshot_url} alt="Screenshot" className="max-w-full rounded-md border border-border" />
+          </div>
+        )}
+
+        <div className="text-xs text-muted-foreground">
+          Indsendt {format(new Date(feedback.created_at), "d. MMMM yyyy 'kl.' HH:mm", { locale: da })}
+          {feedback.submitted_by_employee && ` af ${feedback.submitted_by_employee.first_name} ${feedback.submitted_by_employee.last_name}`}
+        </div>
+
+        {/* Legacy admin_response display */}
+        {feedback.admin_response && (
+          <div className="border border-purple-500/30 bg-purple-500/10 rounded-md p-3">
+            <p className="text-xs font-medium text-purple-400 mb-1">Tidligere besked fra admin</p>
+            <p className="text-sm whitespace-pre-wrap">{feedback.admin_response}</p>
+          </div>
+        )}
+
+        {/* Comment thread */}
+        <div className="border-t border-border pt-4">
+          <CommentThread
+            feedbackId={feedback.id}
+            employeeId={employeeId}
+            employeeName={employeeName}
+            isOwner={isOwner}
+          />
+        </div>
+
+        {/* Needs clarification prompt for non-owners */}
+        {!isOwner && feedback.status === "needs_clarification" && (
+          <div className="border border-purple-500/30 bg-purple-500/10 rounded-md p-3">
+            <p className="text-sm font-medium text-purple-400">⬆️ Admin har bedt om uddybning — skriv et svar i tråden ovenfor</p>
+          </div>
+        )}
+
+        {/* Admin controls */}
+        {isOwner && (
+          <div className="border-t border-border pt-4 space-y-3">
+            <p className="text-sm font-medium">Administration</p>
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Status</label>
+              <Select value={newStatus} onValueChange={setNewStatus}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {STATUSES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Admin-noter (kun synlige for dig)</label>
+              <Textarea value={adminNotes} onChange={e => setAdminNotes(e.target.value)} rows={3} maxLength={2000} />
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                size="sm"
+                onClick={() => updateMutation.mutate({ id: feedback.id, status: newStatus, notes: adminNotes, feedbackTitle: feedback.title, submittedById: feedback.submitted_by })}
+                disabled={updateMutation.isPending}
+              >
+                <CheckCircle2 className="h-4 w-4 mr-1" />
+                Gem
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                className="bg-purple-500/20 text-purple-400 hover:bg-purple-500/30"
+                onClick={() => updateMutation.mutate({ id: feedback.id, status: "needs_clarification", notes: adminNotes, feedbackTitle: feedback.title, submittedById: feedback.submitted_by })}
+                disabled={updateMutation.isPending}
+              >
+                Bed om uddybning
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => copyForLovable(feedback)}>
+                <Copy className="h-4 w-4 mr-1" />
+                Kopiér til Lovable
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
 // Recipients management component (only for owners)
 function RecipientsTab() {
   const { toast } = useToast();
