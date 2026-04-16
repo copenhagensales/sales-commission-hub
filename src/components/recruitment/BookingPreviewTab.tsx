@@ -185,12 +185,6 @@ export function BookingPreviewTab() {
               <p className="text-sm leading-relaxed" style={{ color: "#666" }}>
                 {renderDescription(description)}
               </p>
-              <span
-                className="inline-block rounded-full px-3 py-1 text-xs font-medium"
-                style={{ backgroundColor: CS_GREEN_LIGHT, color: CS_GREEN }}
-              >
-                {roleLabel}
-              </span>
             </div>
 
             <div className="flex items-center justify-center gap-2 text-xs" style={{ color: "#888" }}>
@@ -251,11 +245,6 @@ export function BookingPreviewTab() {
                     <Clock className="h-4 w-4" />
                     Vælg et tidspunkt – {format(selectedDate, "EEEE d. MMM", { locale: da })}
                   </div>
-                  <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-medium"
-                    style={{ backgroundColor: CS_GREEN_LIGHT, color: CS_GREEN }}>
-                    <Clock className="h-3 w-3" />
-                    5–10 min · uforpligtende
-                  </span>
                 </div>
                 {slotsForDate.length === 0 ? (
                   <p className="text-sm text-center py-4" style={{ color: "#999" }}>Ingen ledige tider denne dag.</p>
