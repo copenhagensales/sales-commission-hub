@@ -139,47 +139,74 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Send booking notification emails to configured recipients via Resend
-    const resendApiKey = Deno.env.get("RESEND_API_KEY");
-    if (resendApiKey) {
+    // Send booking notification emails to configured recipients via M365 Graph API
+    const m365TenantId = Deno.env.get("M365_TENANT_ID");
+    const m365ClientId = Deno.env.get("M365_CLIENT_ID");
+    const m365ClientSecret = Deno.env.get("M365_CLIENT_SECRET");
+    const m365SenderEmail = Deno.env.get("M365_SENDER_EMAIL");
+
+    if (m365TenantId && m365ClientId && m365ClientSecret && m365SenderEmail) {
       try {
         const { data: notifRecipients } = await supabase
           .from("booking_notification_recipients")
           .select("email, name")
           .eq("notify_on_booking", true);
 
-        const candidateName = `${candidate.first_name} ${candidate.last_name}`;
-        const dateObj = new Date(date + "T12:00:00");
-        const dayNum = dateObj.getDate();
-        const monthNum = dateObj.getMonth() + 1;
-        const dateShort = `${dayNum}/${monthNum}`;
-
         const recipientEmails = (notifRecipients || []).map(r => r.email);
         if (recipientEmails.length > 0) {
-          const emailRes = await fetch("https://api.resend.com/emails", {
+          const candidateName = `${candidate.first_name} ${candidate.last_name}`;
+          const dateObj = new Date(date + "T12:00:00");
+          const dayNum = dateObj.getDate();
+          const monthNum = dateObj.getMonth() + 1;
+          const dateShort = `${dayNum}/${monthNum}`;
+
+          // Get M365 OAuth token
+          const tokenRes = await fetch(`https://login.microsoftonline.com/${m365TenantId}/oauth2/v2.0/token`, {
             method: "POST",
-            headers: {
-              Authorization: `Bearer ${resendApiKey}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              from: "Copenhagen Sales <noreply@copenhagensales.dk>",
-              to: recipientEmails,
-              subject: `Ny booking: ${candidateName} — ${dateShort} kl. ${startTime}`,
-              html: `<h3>Ny kandidatbooking</h3>
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+              client_id: m365ClientId,
+              client_secret: m365ClientSecret,
+              scope: "https://graph.microsoft.com/.default",
+              grant_type: "client_credentials",
+            }).toString(),
+          });
+          const tokenData = await tokenRes.json();
+
+          if (!tokenRes.ok) {
+            console.error("[public-book-candidate] M365 token error:", tokenData);
+          } else {
+            const sendMailUrl = `https://graph.microsoft.com/v1.0/users/${m365SenderEmail}/sendMail`;
+            const emailRes = await fetch(sendMailUrl, {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${tokenData.access_token}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                message: {
+                  subject: `Ny booking: ${candidateName} — ${dateShort} kl. ${startTime}`,
+                  body: {
+                    contentType: "HTML",
+                    content: `<h3>Ny kandidatbooking</h3>
 <p><strong>Kandidat:</strong> ${candidateName}</p>
 <p><strong>Stilling:</strong> ${role}</p>
 <p><strong>Dato:</strong> ${date}</p>
 <p><strong>Tid:</strong> ${startTime} – ${endTime}</p>
 <p><strong>Telefon:</strong> ${candidate.phone || "Ikke oplyst"}</p>
 <p><strong>Email:</strong> ${candidate.email || "Ikke oplyst"}</p>`,
-            }),
-          });
+                  },
+                  toRecipients: recipientEmails.map(e => ({ emailAddress: { address: e } })),
+                },
+                saveToSentItems: false,
+              }),
+            });
 
-          if (emailRes.ok) {
-            console.log(`[public-book-candidate] Booking email sent to ${recipientEmails.join(", ")} for ${candidateName}`);
-          } else {
-            console.error("[public-book-candidate] Resend email error:", await emailRes.text());
+            if (emailRes.ok) {
+              console.log(`[public-book-candidate] Booking email sent via M365 to ${recipientEmails.join(", ")}`);
+            } else {
+              console.error("[public-book-candidate] M365 email error:", await emailRes.text());
+            }
           }
         } else {
           console.log("[public-book-candidate] No booking notification recipients configured");
@@ -188,7 +215,7 @@ Deno.serve(async (req) => {
         console.error("[public-book-candidate] Email error:", emailErr);
       }
     } else {
-      console.warn("[public-book-candidate] RESEND_API_KEY not set, skipping email notification");
+      console.warn("[public-book-candidate] M365 credentials not set, skipping email notification");
     }
 
     // Update application status
