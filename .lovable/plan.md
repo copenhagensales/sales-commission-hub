@@ -1,43 +1,25 @@
 
 
-# Plan: Send besked tilbage til indberetteren med anmodning om uddybning
+# Fix: Afmelding returnerer rå HTML i stedet for at virke
 
-## Nuværende situation
-- `system_feedback` tabellen har allerede en `admin_response` kolonne (ubrugt)
-- Admin kan ændre status og skrive interne noter, men kan ikke sende en synlig besked tilbage til indberetteren
-- Der er allerede en `notify-feedback-status-change` Edge Function der sender email via M365
+## Problem
+Edge-funktionen `unsubscribe-candidate` er designet til GET-requests med `?id=...` og returnerer HTML. Men frontend'en kalder den via `supabase.functions.invoke()` som sender en POST med JSON body `{ candidateId }`. Funktionen læser `url.searchParams.get('id')` som er `null` fra POST-kaldet, og returnerer fejl-HTML som frontend'en ikke kan bruge.
 
 ## Løsning
-Tilføj et "Bed om uddybning"-felt i admin-dialogen, som gemmer beskeden i `admin_response`, sætter status til `needs_clarification`, og sender en email til indberetteren med spørgsmålet.
+Opdater edge-funktionen til at håndtere begge kald-typer:
+1. **GET med `?id=`** → returner HTML (til direkte link-klik fra SMS/email)
+2. **POST med JSON body** → udfør afmelding og returner JSON (til frontend-kald)
 
 ## Tekniske ændringer
 
-### 1. Tilføj ny status
-I `SystemFeedback.tsx`, tilføj til `STATUSES`:
-```typescript
-{ value: "needs_clarification", label: "Afventer svar", color: "bg-purple-500/20 text-purple-400" }
-```
+### Fil: `supabase/functions/unsubscribe-candidate/index.ts`
+- Tjek `req.method`:
+  - Hvis **GET**: behold nuværende logik (læs `id` fra query params, returner HTML)
+  - Hvis **POST**: læs `candidateId` fra JSON body, kør samme afmeldingslogik, returner `{ success: true }` som JSON
+- Flyt den fælles afmeldingslogik (cancel enrollments, update application, send emails) til en shared funktion
 
-### 2. Udvid admin-dialogen
-I detail-dialogen (linje ~605-636), tilføj:
-- Et tekstfelt "Besked til indberetteren" der gemmer i `admin_response`
-- En "Send & bed om uddybning" knap der sætter status til `needs_clarification`, gemmer `admin_response`, og sender email
-- Vis eksisterende `admin_response` i dialogen hvis den allerede er sat
+### Fil: `src/pages/recruitment/PublicCandidateBooking.tsx`
+- Ingen ændring nødvendig — frontend sender allerede `{ candidateId }` korrekt, den mangler bare et JSON-svar
 
-### 3. Opdater updateMutation
-- Inkluder `admin_response` i `.update()`-kaldet
-- Send `adminResponse` med i notification-data
-
-### 4. Opdater `notify-feedback-status-change` Edge Function
-- Accepter `adminResponse` parameter
-- Når status er `needs_clarification`, brug en anden email-skabelon med beskeden og en opfordring til at svare/kontakte admin
-
-### 5. Vis admin-svar for indberetteren
-- I feedback-listen (for ikke-owners), vis `admin_response` som en synlig besked på den pågældende feedback-post, så indberetteren kan se hvad der bliver spurgt om
-
-## Filer der ændres
-- `src/pages/SystemFeedback.tsx` — ny status, admin_response felt, vis svar
-- `supabase/functions/notify-feedback-status-change/index.ts` — håndter uddybnings-email
-
-Ingen database-migration nødvendig — `admin_response`-kolonnen eksisterer allerede.
+Én fil ændres: edge-funktionen.
 
