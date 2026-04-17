@@ -3624,6 +3624,7 @@ export type Database = {
           id: string
           ip_address: string | null
           passed: boolean
+          quiz_variant: string
           submitted_at: string
           user_agent: string | null
           wrong_question_numbers: number[]
@@ -3636,6 +3637,7 @@ export type Database = {
           id?: string
           ip_address?: string | null
           passed?: boolean
+          quiz_variant?: string
           submitted_at?: string
           user_agent?: string | null
           wrong_question_numbers?: number[]
@@ -3648,6 +3650,7 @@ export type Database = {
           id?: string
           ip_address?: string | null
           passed?: boolean
+          quiz_variant?: string
           submitted_at?: string
           user_agent?: string | null
           wrong_question_numbers?: number[]
@@ -3682,38 +3685,41 @@ export type Database = {
           employee_id: string
           id: string
           passed_at: string
+          quiz_variant: string
         }
         Insert: {
           created_at?: string
           employee_id: string
           id?: string
           passed_at?: string
+          quiz_variant?: string
         }
         Update: {
           created_at?: string
           employee_id?: string
           id?: string
           passed_at?: string
+          quiz_variant?: string
         }
         Relationships: [
           {
             foreignKeyName: "code_of_conduct_completions_employee_id_fkey"
             columns: ["employee_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "employee_basic_info"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "code_of_conduct_completions_employee_id_fkey"
             columns: ["employee_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "employee_master_data"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "code_of_conduct_completions_employee_id_fkey"
             columns: ["employee_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "employee_referral_lookup"
             referencedColumns: ["id"]
           },
@@ -3726,6 +3732,7 @@ export type Database = {
           created_by: string | null
           employee_id: string
           id: string
+          quiz_variant: string
           snooze_count: number
           snoozed_until: string | null
         }
@@ -3735,6 +3742,7 @@ export type Database = {
           created_by?: string | null
           employee_id: string
           id?: string
+          quiz_variant?: string
           snooze_count?: number
           snoozed_until?: string | null
         }
@@ -3744,6 +3752,7 @@ export type Database = {
           created_by?: string | null
           employee_id?: string
           id?: string
+          quiz_variant?: string
           snooze_count?: number
           snoozed_until?: string | null
         }
@@ -14454,10 +14463,9 @@ export type Database = {
         }
         Returns: boolean
       }
-      has_valid_code_of_conduct_completion: {
-        Args: { _user_id?: string }
-        Returns: boolean
-      }
+      has_valid_code_of_conduct_completion:
+        | { Args: { _user_id?: string }; Returns: boolean }
+        | { Args: { _user_id?: string; _variant?: string }; Returns: boolean }
       heal_fm_missing_sale_items: { Args: never; Returns: number }
       is_chat_conversation_member: {
         Args: { _conversation_id: string }

@@ -3,8 +3,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { differenceInDays } from "date-fns";
 
-// All 31 questions with correct answers
-export const CODE_OF_CONDUCT_QUESTIONS = [
+export type CocVariant = "salgskonsulent" | "fieldmarketing";
+
+// All 31 questions for Salgskonsulenter (telefonisk salg)
+export const SALGSKONSULENT_COC_QUESTIONS = [
   {
     id: 1,
     question: "En kunde beder dig om at slette deres nummer fra vores database og siger tydeligt, at de ikke ønsker at blive kontaktet igen. Hvad gør du?",
@@ -278,14 +280,247 @@ export const CODE_OF_CONDUCT_QUESTIONS = [
   },
 ];
 
+// Backwards-compat alias used elsewhere
+export const CODE_OF_CONDUCT_QUESTIONS = SALGSKONSULENT_COC_QUESTIONS;
+
+// Field marketing questions (gadesalg / fysisk kundekontakt)
+export const FIELDMARKETING_COC_QUESTIONS = [
+  {
+    id: 1,
+    question: "Du står på din lokation og en forbipasserende stopper og spørger til vores tilbud. Hvordan starter du samtalen korrekt?",
+    options: [
+      "Jeg præsenterer mig selv med navn, hvilket firma jeg arbejder for, og hvilken kunde jeg står for – inden jeg går videre.",
+      "Jeg går direkte til pitchen, så jeg ikke spilder kundens tid.",
+      "Jeg venter på, at kunden selv spørger, hvem jeg er.",
+    ],
+    correctAnswer: "Jeg præsenterer mig selv med navn, hvilket firma jeg arbejder for, og hvilken kunde jeg står for – inden jeg går videre.",
+  },
+  {
+    id: 2,
+    question: "En kunde siger tydeligt 'nej tak' og går videre. Må du følge efter eller kalde igen for at overbevise dem?",
+    options: [
+      "Ja, ét ekstra forsøg er fair.",
+      "Nej. Et nej er et nej – jeg respekterer det og lader kunden gå.",
+    ],
+    correctAnswer: "Nej. Et nej er et nej – jeg respekterer det og lader kunden gå.",
+  },
+  {
+    id: 3,
+    question: "Du indsamler kundens oplysninger på tablet/papir for at oprette et salg. Hvad er korrekt ift. GDPR?",
+    options: [
+      "Jeg viser kunden, hvilke oplysninger der bliver registreret, og forklarer kort, hvad de bruges til, før de godkender.",
+      "Jeg skriver bare hurtigt – kunden ved godt, det er normalt.",
+      "Jeg tager et billede af deres sygesikringsbevis/kørekort, så det går hurtigere.",
+    ],
+    correctAnswer: "Jeg viser kunden, hvilke oplysninger der bliver registreret, og forklarer kort, hvad de bruges til, før de godkender.",
+  },
+  {
+    id: 4,
+    question: "Må du tage et foto af kundens ID (sygesikringskort, kørekort, pas) med din private telefon for at huske oplysningerne?",
+    options: ["Ja", "Nej"],
+    correctAnswer: "Nej",
+  },
+  {
+    id: 5,
+    question: "Du har papir-tilmeldinger med kundedata fra dagen. Hvad gør du efter shift?",
+    options: [
+      "Tager dem med hjem og afleverer dem ved næste shift.",
+      "Lægger dem i bilen, så de er klar til i morgen.",
+      "Afleverer/uploader dem til kontoret samme dag efter aftalt procedure – ingen kundedata må opbevares privat.",
+    ],
+    correctAnswer: "Afleverer/uploader dem til kontoret samme dag efter aftalt procedure – ingen kundedata må opbevares privat.",
+  },
+  {
+    id: 6,
+    question: "Du møder berusede kunder, kunder der virker forvirrede, eller meget gamle personer, der ikke helt forstår tilbuddet. Må du lave et salg på dem?",
+    options: [
+      "Ja, hvis de skriver under, er det deres eget ansvar.",
+      "Nej. Vi sælger ikke til personer, der ikke er i stand til at træffe en informeret beslutning.",
+    ],
+    correctAnswer: "Nej. Vi sælger ikke til personer, der ikke er i stand til at træffe en informeret beslutning.",
+  },
+  {
+    id: 7,
+    question: "En mindreårig (under 18) viser interesse og vil gerne tegne sig for et abonnement. Hvad gør du?",
+    options: [
+      "Laver salget og noterer at en forælder vil betale.",
+      "Forklarer venligt at de skal være myndige for at indgå aftalen, og laver ikke salget.",
+      "Beder om forældrenes telefonnummer og ringer dem op.",
+    ],
+    correctAnswer: "Forklarer venligt at de skal være myndige for at indgå aftalen, og laver ikke salget.",
+  },
+  {
+    id: 8,
+    question: "Centerlederen i shoppingcentret beder dig flytte din stand, fordi I står for tæt på en indgang. Hvad gør du?",
+    options: [
+      "Jeg ignorerer det – vi har en aftale om lokationen.",
+      "Jeg flytter os med det samme og informerer min leder. Centerlederens anvisninger på lokationen skal altid følges.",
+      "Jeg bliver stående og siger, at jeg lige ringer til min chef.",
+    ],
+    correctAnswer: "Jeg flytter os med det samme og informerer min leder. Centerlederens anvisninger på lokationen skal altid følges.",
+  },
+  {
+    id: 9,
+    question: "Må du blokere indgange, gangarealer eller flugtveje med banner, stand eller dig selv for at få bedre kontakt til forbipasserende?",
+    options: ["Ja", "Nej"],
+    correctAnswer: "Nej",
+  },
+  {
+    id: 10,
+    question: "Du står på din lokation og en kollega tilbyder dig en øl, fordi I har en lang dag. Må du drikke?",
+    options: [
+      "Ja, én øl er ok.",
+      "Nej. På arbejde – uanset om det er på gaden eller i et center – er du firmaets ansigt udadtil. Alkohol er ikke tilladt.",
+    ],
+    correctAnswer: "Nej. På arbejde – uanset om det er på gaden eller i et center – er du firmaets ansigt udadtil. Alkohol er ikke tilladt.",
+  },
+  {
+    id: 11,
+    question: "Hvad er korrekt ift. dit udseende og din adfærd på lokationen?",
+    options: [
+      "Jeg bruger den udleverede uniform/dresscode, holder en professionel tone, undgår at sidde og kigge i mobilen og er aktiv på standen.",
+      "Det er fint at sidde med mobilen, så længe jeg kigger op, når nogen kommer.",
+      "Jeg kan have private samtaler med venner og familie ved standen.",
+    ],
+    correctAnswer: "Jeg bruger den udleverede uniform/dresscode, holder en professionel tone, undgår at sidde og kigge i mobilen og er aktiv på standen.",
+  },
+  {
+    id: 12,
+    question: "En kunde bliver vred eller meget højlydt og generer andre forbipasserende. Hvad gør du?",
+    options: [
+      "Jeg svarer igen i samme tone, så de kan se vi ikke lader os pille ved.",
+      "Jeg forbliver rolig og professionel, afslutter samtalen høfligt og kontakter min leder hvis det eskalerer.",
+      "Jeg ringer 112 med det samme.",
+    ],
+    correctAnswer: "Jeg forbliver rolig og professionel, afslutter samtalen høfligt og kontakter min leder hvis det eskalerer.",
+  },
+  {
+    id: 13,
+    question: "En kunde vil klage over dig eller produktet. Hvad er korrekt?",
+    options: [
+      "Jeg afviser klagen og forklarer at de selv skrev under.",
+      "Jeg lytter, undskylder for oplevelsen, noterer kontaktoplysninger og videregiver klagen til min leder/kontoret samme dag.",
+      "Jeg sletter deres aftale, så de ikke kan klage.",
+    ],
+    correctAnswer: "Jeg lytter, undskylder for oplevelsen, noterer kontaktoplysninger og videregiver klagen til min leder/kontoret samme dag.",
+  },
+  {
+    id: 14,
+    question: "Må du tilbyde rabatter, gratis produkter eller særlige vilkår, som ikke er en del af den officielle kampagne, for at lukke et salg?",
+    options: ["Ja", "Nej"],
+    correctAnswer: "Nej",
+  },
+  {
+    id: 15,
+    question: "Du undlader bevidst at fortælle om bindingsperiode, pris efter intro-tilbud eller andre væsentlige vilkår, fordi du ved at kunden så ikke køber. Er det i orden?",
+    options: [
+      "Ja, det er sælgers ansvar at lukke handlen.",
+      "Nej. Vi skal altid være transparente om alle væsentlige vilkår – ellers er salget ugyldigt og kan koste mig jobbet.",
+    ],
+    correctAnswer: "Nej. Vi skal altid være transparente om alle væsentlige vilkår – ellers er salget ugyldigt og kan koste mig jobbet.",
+  },
+  {
+    id: 16,
+    question: "Hvordan informerer du korrekt en privat kunde om fortrydelsesretten?",
+    options: [
+      "Jeg fortæller kunden at de har 14 dage til at teste produktet og se om de kan lide det.",
+      "Jeg fortæller kunden om deres 14 dages fortrydelsesret/annulleringsret efter forbrugeraftaleloven.",
+    ],
+    correctAnswer: "Jeg fortæller kunden om deres 14 dages fortrydelsesret/annulleringsret efter forbrugeraftaleloven.",
+  },
+  {
+    id: 17,
+    question: "Må du fotografere kunderne på lokationen og lægge billederne på dine egne sociale medier?",
+    options: [
+      "Ja, hvis de smiler til kameraet.",
+      "Nej, ikke uden udtrykkeligt skriftligt samtykke fra hver person der er identificerbar på billedet.",
+    ],
+    correctAnswer: "Nej, ikke uden udtrykkeligt skriftligt samtykke fra hver person der er identificerbar på billedet.",
+  },
+  {
+    id: 18,
+    question: "Må du lave opslag på dine private sociale medier hvor du tilbyder kampagnen direkte til venner/familie og beder dem skrive til dig – uden at det er godkendt af Copenhagen Sales og kunden?",
+    options: ["Ja", "Nej"],
+    correctAnswer: "Nej",
+  },
+  {
+    id: 19,
+    question: "Du opdager efter et salg at du har skrevet en forkert pris eller forkerte vilkår på aftalen. Hvad gør du?",
+    options: [
+      "Ingenting – de opdager det nok ikke.",
+      "Jeg kontakter min leder/kontoret med det samme så vi kan rette op og evt. kontakte kunden.",
+      "Jeg sletter aftalen og opretter en ny.",
+    ],
+    correctAnswer: "Jeg kontakter min leder/kontoret med det samme så vi kan rette op og evt. kontakte kunden.",
+  },
+  {
+    id: 20,
+    question: "Du opdager at en kollega laver fiktive salg, opretter sig selv som kunde, eller tilmelder familie/venner uden deres viden for at hæve provisionen. Hvad gør du?",
+    options: [
+      "Jeg blander mig ikke.",
+      "Jeg taler med kollegaen og lader det være.",
+      "Jeg informerer min leder. Det er svindel og kan medføre bortvisning og politianmeldelse.",
+    ],
+    correctAnswer: "Jeg informerer min leder. Det er svindel og kan medføre bortvisning og politianmeldelse.",
+  },
+  {
+    id: 21,
+    question: "Må du selv oprette et salg på en kunde du 'kender godt vil have det' uden at have talt med dem på lokationen?",
+    options: ["Ja", "Nej"],
+    correctAnswer: "Nej",
+  },
+  {
+    id: 22,
+    question: "Må du kopiere kundens personoplysninger ind i eksterne værktøjer (egne notater, ChatGPT, Google Sheets, WhatsApp osv.) som ikke er godkendt af Copenhagen Sales eller kunden?",
+    options: [
+      "Ja, hvis jeg sletter det bagefter.",
+      "Nej, kundedata må kun behandles i de systemer som Copenhagen Sales og kunden har godkendt.",
+    ],
+    correctAnswer: "Nej, kundedata må kun behandles i de systemer som Copenhagen Sales og kunden har godkendt.",
+  },
+  {
+    id: 23,
+    question: "Du møder på arbejde og er stadig påvirket fra dagen før (træt, sløv, evt. stadig promille). Hvad er korrekt?",
+    options: [
+      "Det er fint, så længe jeg kan stå op.",
+      "Jeg melder mig syg/kontakter min leder. Jeg står ikke ude og repræsenterer firmaet i den tilstand.",
+      "Jeg drikker en energidrik og kører på.",
+    ],
+    correctAnswer: "Jeg melder mig syg/kontakter min leder. Jeg står ikke ude og repræsenterer firmaet i den tilstand.",
+  },
+  {
+    id: 24,
+    question: "Hvad gør du ved shift-afslutning ift. rapportering?",
+    options: [
+      "Jeg går hjem og sender en besked i morgen.",
+      "Jeg afleverer dagsrapport/registreringer som aftalt med min leder samme dag og sikrer at alt kundedata er overgivet korrekt.",
+      "Jeg gemmer rapporten på min telefon til ugen er slut.",
+    ],
+    correctAnswer: "Jeg afleverer dagsrapport/registreringer som aftalt med min leder samme dag og sikrer at alt kundedata er overgivet korrekt.",
+  },
+  {
+    id: 25,
+    question: "Hvad er konsekvensen hvis du bevidst lyver, vildleder eller laver fiktive salg som fieldmarketing-konsulent?",
+    options: [
+      "En advarsel.",
+      "En løftet pegefinger.",
+      "Bortvisning fra Copenhagen Sales – og potentielt politianmeldelse hvis der er tale om svindel.",
+    ],
+    correctAnswer: "Bortvisning fra Copenhagen Sales – og potentielt politianmeldelse hvis der er tale om svindel.",
+  },
+];
+
+export function getQuestionsForVariant(variant: CocVariant) {
+  return variant === "fieldmarketing" ? FIELDMARKETING_COC_QUESTIONS : SALGSKONSULENT_COC_QUESTIONS;
+}
+
 // Check if quiz has expired (every 2 months = 60 days)
 function isQuizExpired(passedAt: string): boolean {
   const passedDate = new Date(passedAt);
   const daysSincePassed = differenceInDays(new Date(), passedDate);
-  return daysSincePassed >= 60; // 2 months
+  return daysSincePassed >= 60;
 }
 
-// Check if employee is within initial 14-day grace period
 function isWithinInitialGracePeriod(employmentStartDate: string | null): boolean {
   if (!employmentStartDate) return false;
   const startDate = new Date(employmentStartDate);
@@ -293,38 +528,28 @@ function isWithinInitialGracePeriod(employmentStartDate: string | null): boolean
   return daysSinceStart < 14;
 }
 
-// Get deadline date (7 days after the 1st of the month when quiz becomes due)
 function getDeadlineDate(passedAt: string | null, employmentStartDate: string | null): Date {
   const now = new Date();
-  
-  // For new employees: 14 days from start + 7 days grace
   if (employmentStartDate) {
     const startDate = new Date(employmentStartDate);
     const daysSinceStart = differenceInDays(now, startDate);
-    
-    // If within initial 14 days, deadline is 21 days from start
     if (daysSinceStart < 14) {
       const deadlineDate = new Date(startDate);
-      deadlineDate.setDate(deadlineDate.getDate() + 21); // 14 + 7 days
+      deadlineDate.setDate(deadlineDate.getDate() + 21);
       return deadlineDate;
     }
   }
-  
   if (passedAt) {
     const expiryDate = new Date(passedAt);
-    expiryDate.setDate(expiryDate.getDate() + 60); // 2 months after last pass
-    expiryDate.setDate(expiryDate.getDate() + 7); // Plus 7 day grace period
+    expiryDate.setDate(expiryDate.getDate() + 60);
+    expiryDate.setDate(expiryDate.getDate() + 7);
     return expiryDate;
   }
-  
-  // Default: 7 days from now
   const deadlineDate = new Date();
   deadlineDate.setDate(deadlineDate.getDate() + 7);
   return deadlineDate;
 }
 
-// Resolve all employee_ids matching this user (auth_user_id OR email match)
-// Handles duplicate employee records to prevent lock-out loops.
 async function resolveEmployeeIds(email: string): Promise<string[]> {
   const lowerEmail = email.toLowerCase();
   const { data, error } = await supabase
@@ -338,22 +563,43 @@ async function resolveEmployeeIds(email: string): Promise<string[]> {
   return (data ?? []).map((e) => e.id);
 }
 
-export function useCodeOfConductCompletion() {
+// Detect variant for current user from job_title
+export function useUserCocVariant() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["user-coc-variant", user?.email],
+    queryFn: async (): Promise<CocVariant> => {
+      if (!user?.email) return "salgskonsulent";
+      const lowerEmail = user.email.toLowerCase();
+      const { data } = await supabase
+        .from("employee_master_data")
+        .select("job_title")
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
+        .eq("is_active", true)
+        .maybeSingle();
+      return data?.job_title === "Fieldmarketing" ? "fieldmarketing" : "salgskonsulent";
+    },
+    enabled: !!user?.email,
+    staleTime: 60000,
+  });
+}
+
+export function useCodeOfConductCompletion(variant: CocVariant = "salgskonsulent") {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ["code-of-conduct-completion", user?.id],
+    queryKey: ["code-of-conduct-completion", user?.id, variant],
     queryFn: async () => {
       if (!user?.email) return null;
 
       const employeeIds = await resolveEmployeeIds(user.email);
       if (employeeIds.length === 0) return null;
 
-      // Get the most recent completion across ALL matching employee records
       const { data, error } = await supabase
         .from("code_of_conduct_completions")
         .select("*")
         .in("employee_id", employeeIds)
+        .eq("quiz_variant", variant)
         .order("passed_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -363,19 +609,17 @@ export function useCodeOfConductCompletion() {
       if (data && isQuizExpired(data.passed_at)) {
         return { ...data, isExpired: true };
       }
-
       return data ? { ...data, isExpired: false } : null;
     },
     enabled: !!user,
   });
 }
 
-// Get the current wrong questions from the latest incomplete attempt
-export function useCodeOfConductCurrentAttempt() {
+export function useCodeOfConductCurrentAttempt(variant: CocVariant = "salgskonsulent") {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ["code-of-conduct-current-attempt", user?.id],
+    queryKey: ["code-of-conduct-current-attempt", user?.id, variant],
     queryFn: async () => {
       if (!user?.email) return null;
 
@@ -390,33 +634,30 @@ export function useCodeOfConductCurrentAttempt() {
         console.error("Error fetching employee:", employeeError);
         return null;
       }
-
       if (!employee) return null;
 
-      // First check if there's a valid (non-expired) completion
       const { data: completion } = await supabase
         .from("code_of_conduct_completions")
         .select("passed_at")
         .eq("employee_id", employee.id)
+        .eq("quiz_variant", variant)
         .maybeSingle();
 
       if (completion && !isQuizExpired(completion.passed_at)) {
-        // Quiz is complete and not expired
         return null;
       }
 
-      // Get the latest attempt for this cycle
       const { data: latestAttempt, error } = await supabase
         .from("code_of_conduct_attempts")
         .select("*")
         .eq("employee_id", employee.id)
+        .eq("quiz_variant", variant)
         .eq("passed", false)
         .order("submitted_at", { ascending: false })
         .limit(1)
         .maybeSingle();
 
       if (error) throw error;
-
       return latestAttempt;
     },
     enabled: !!user,
@@ -425,7 +666,8 @@ export function useCodeOfConductCurrentAttempt() {
 
 interface SubmitCodeOfConductParams {
   answers: Record<number, string>;
-  questionsToAnswer: number[]; // Which question IDs were displayed
+  questionsToAnswer: number[];
+  variant?: CocVariant;
 }
 
 export function useSubmitCodeOfConduct() {
@@ -433,7 +675,7 @@ export function useSubmitCodeOfConduct() {
   const { user } = useAuth();
 
   return useMutation({
-    mutationFn: async ({ answers, questionsToAnswer }: SubmitCodeOfConductParams) => {
+    mutationFn: async ({ answers, questionsToAnswer, variant = "salgskonsulent" }: SubmitCodeOfConductParams) => {
       if (!user?.email) throw new Error("Not authenticated");
 
       const lowerEmail = user.email.toLowerCase();
@@ -446,7 +688,6 @@ export function useSubmitCodeOfConduct() {
       if (employeeError) throw new Error("Error finding employee");
       if (!employee) throw new Error("Employee not found");
 
-      // Get IP address
       let ipAddress = "Unknown";
       try {
         const ipResponse = await fetch("https://api.ipify.org?format=json");
@@ -457,11 +698,11 @@ export function useSubmitCodeOfConduct() {
       }
 
       const userAgent = navigator.userAgent;
+      const questionsForVariant = getQuestionsForVariant(variant);
 
-      // Check which questions were wrong
       const wrongQuestionNumbers: number[] = [];
       for (const questionId of questionsToAnswer) {
-        const question = CODE_OF_CONDUCT_QUESTIONS.find(q => q.id === questionId);
+        const question = questionsForVariant.find(q => q.id === questionId);
         if (question && answers[questionId] !== question.correctAnswer) {
           wrongQuestionNumbers.push(questionId);
         }
@@ -469,17 +710,16 @@ export function useSubmitCodeOfConduct() {
 
       const passed = wrongQuestionNumbers.length === 0;
 
-      // Get current attempt number
       const { data: previousAttempts } = await supabase
         .from("code_of_conduct_attempts")
         .select("attempt_number")
         .eq("employee_id", employee.id)
+        .eq("quiz_variant", variant)
         .order("attempt_number", { ascending: false })
         .limit(1);
 
       const attemptNumber = (previousAttempts?.[0]?.attempt_number || 0) + 1;
 
-      // Save attempt
       const { error: attemptError } = await supabase
         .from("code_of_conduct_attempts")
         .insert({
@@ -490,29 +730,29 @@ export function useSubmitCodeOfConduct() {
           passed,
           ip_address: ipAddress,
           user_agent: userAgent,
-        });
+          quiz_variant: variant,
+        } as any);
 
       if (attemptError) throw attemptError;
 
-      // If all questions correct, update/insert completion
       if (passed) {
         const { error: completionError } = await supabase
           .from("code_of_conduct_completions")
           .upsert({
             employee_id: employee.id,
             passed_at: new Date().toISOString(),
-          }, {
-            onConflict: "employee_id",
+            quiz_variant: variant,
+          } as any, {
+            onConflict: "employee_id,quiz_variant",
           });
 
         if (completionError) throw completionError;
 
-        // Belt-and-suspenders: also acknowledge any open reminder client-side.
-        // (DB trigger does this too, but this avoids a race with refetches.)
         await supabase
           .from("code_of_conduct_reminders")
           .update({ acknowledged_at: new Date().toISOString() })
           .eq("employee_id", employee.id)
+          .eq("quiz_variant", variant)
           .is("acknowledged_at", null);
       }
 
@@ -527,19 +767,17 @@ export function useSubmitCodeOfConduct() {
   });
 }
 
-// Check if user should be locked out due to expired/missing Code of Conduct
-// Note: No lock overlay for Code of Conduct - menu stays visible
-export function useCodeOfConductLock() {
+export function useCodeOfConductLock(variant: CocVariant = "salgskonsulent") {
   const { user } = useAuth();
 
   const { data, isLoading } = useQuery({
-    queryKey: ["code-of-conduct-lock", user?.id],
+    queryKey: ["code-of-conduct-lock", user?.id, variant],
     queryFn: async () => {
       if (!user?.email) return { isLocked: false, daysRemaining: null as number | null, isRequired: false };
 
-      // SAFETY VALVE #1: server-side check via RPC with email-fallback UNION.
-      // If user has a valid completion on ANY matching employee record → never lock.
-      const { data: hasValid } = await supabase.rpc("has_valid_code_of_conduct_completion");
+      const { data: hasValid } = await supabase.rpc("has_valid_code_of_conduct_completion", {
+        _variant: variant,
+      } as any);
       if (hasValid === true) {
         return { isLocked: false, daysRemaining: null as number | null, isRequired: false };
       }
@@ -549,7 +787,6 @@ export function useCodeOfConductLock() {
         return { isLocked: false, daysRemaining: null as number | null, isRequired: false };
       }
 
-      // Read first employee for job_title + employment_start_date metadata
       const { data: employee } = await supabase
         .from("employee_master_data")
         .select("job_title, employment_start_date")
@@ -558,41 +795,39 @@ export function useCodeOfConductLock() {
         .limit(1)
         .maybeSingle();
 
-      if (!employee || employee.job_title !== "Salgskonsulent") {
+      const requiredJobTitle = variant === "fieldmarketing" ? "Fieldmarketing" : "Salgskonsulent";
+      if (!employee || employee.job_title !== requiredJobTitle) {
         return { isLocked: false, daysRemaining: null as number | null, isRequired: false };
       }
 
-      // New employees get 14 days before quiz is required
       if (isWithinInitialGracePeriod(employee.employment_start_date)) {
         const startDate = new Date(employee.employment_start_date!);
         const daysSinceStart = differenceInDays(new Date(), startDate);
         return { isLocked: false, daysRemaining: 14 - daysSinceStart, isRequired: false };
       }
 
-      // Look up the most recent completion across all matching employee records
       const { data: completion } = await supabase
         .from("code_of_conduct_completions")
         .select("passed_at")
         .in("employee_id", employeeIds)
+        .eq("quiz_variant", variant)
         .order("passed_at", { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      // SAFETY VALVE #2: client-side double-check
       if (completion && !isQuizExpired(completion.passed_at)) {
         const daysSincePassed = differenceInDays(new Date(), new Date(completion.passed_at));
         return { isLocked: false, daysRemaining: Math.max(0, 60 - daysSincePassed), isRequired: false };
       }
 
-      // Quiz is required - check deadline
       const deadlineDate = getDeadlineDate(completion?.passed_at || null, employee.employment_start_date);
       const daysRemaining = differenceInDays(deadlineDate, new Date());
 
-      // Check for an active in-app reminder (any matching employee) where snooze has expired
       const { data: reminder } = await supabase
         .from("code_of_conduct_reminders")
         .select("id, snoozed_until, acknowledged_at")
         .in("employee_id", employeeIds)
+        .eq("quiz_variant", variant)
         .is("acknowledged_at", null)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -615,7 +850,6 @@ export function useCodeOfConductLock() {
   };
 }
 
-// Hook to check if user should see the menu item
 export function useIsSalgskonsulent() {
   const { user } = useAuth();
 

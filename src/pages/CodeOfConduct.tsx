@@ -10,8 +10,9 @@ import {
   useCodeOfConductCompletion, 
   useCodeOfConductCurrentAttempt,
   useSubmitCodeOfConduct,
-  CODE_OF_CONDUCT_QUESTIONS,
-  useCodeOfConductLock
+  useCodeOfConductLock,
+  useUserCocVariant,
+  getQuestionsForVariant,
 } from "@/hooks/useCodeOfConduct";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -20,22 +21,26 @@ import { MainLayout } from "@/components/layout/MainLayout";
 
 export default function CodeOfConduct() {
   const { toast } = useToast();
-  const { data: completion, isLoading: completionLoading } = useCodeOfConductCompletion();
-  const { data: currentAttempt, isLoading: attemptLoading } = useCodeOfConductCurrentAttempt();
-  const { daysRemaining, isRequired } = useCodeOfConductLock();
+  const { data: variant = "salgskonsulent", isLoading: variantLoading } = useUserCocVariant();
+  const { data: completion, isLoading: completionLoading } = useCodeOfConductCompletion(variant);
+  const { data: currentAttempt, isLoading: attemptLoading } = useCodeOfConductCurrentAttempt(variant);
+  const { daysRemaining, isRequired } = useCodeOfConductLock(variant);
   const submitQuiz = useSubmitCodeOfConduct();
-  
+
+  const variantLabel = variant === "fieldmarketing" ? "Fieldmarketing" : "Salgskonsulenter";
+  const allQuestions = getQuestionsForVariant(variant);
+
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [showResult, setShowResult] = useState(false);
   const [wrongQuestions, setWrongQuestions] = useState<number[]>([]);
 
   // Determine which questions to show
   const questionsToShow = currentAttempt?.wrong_question_numbers?.length 
-    ? CODE_OF_CONDUCT_QUESTIONS.filter(q => currentAttempt.wrong_question_numbers.includes(q.id))
-    : CODE_OF_CONDUCT_QUESTIONS;
+    ? allQuestions.filter(q => currentAttempt.wrong_question_numbers.includes(q.id))
+    : allQuestions;
 
   const allQuestionsAnswered = questionsToShow.every(q => answers[q.id]);
-  const totalQuestions = CODE_OF_CONDUCT_QUESTIONS.length;
+  const totalQuestions = allQuestions.length;
   const answeredCount = Object.keys(answers).length;
 
   // Reset when attempt changes
@@ -59,6 +64,7 @@ export default function CodeOfConduct() {
       const result = await submitQuiz.mutateAsync({
         answers,
         questionsToAnswer: questionsToShow.map(q => q.id),
+        variant,
       });
 
       if (result.passed) {
@@ -178,7 +184,7 @@ export default function CodeOfConduct() {
                 <h3 className="font-medium mb-3">Følgende spørgsmål var forkerte:</h3>
                 <ul className="space-y-2">
                   {wrongQuestions.map(qNum => {
-                    const question = CODE_OF_CONDUCT_QUESTIONS.find(q => q.id === qNum);
+                    const question = allQuestions.find(q => q.id === qNum);
                     return (
                       <li key={qNum} className="flex items-start gap-2 text-sm">
                         <XCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
@@ -215,7 +221,7 @@ export default function CodeOfConduct() {
             </div>
             <div>
               <h1 className="text-2xl font-bold">Code of Conduct & GDPR</h1>
-              <p className="text-muted-foreground">Salgskonsulenter</p>
+              <p className="text-muted-foreground">{variantLabel}</p>
             </div>
           </div>
 
