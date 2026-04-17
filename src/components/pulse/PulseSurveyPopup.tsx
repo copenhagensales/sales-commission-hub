@@ -22,7 +22,7 @@ export function PulseSurveyPopup() {
   const [open, setOpen] = useState(false);
   const [delayPassed, setDelayPassed] = useState(false);
 
-  const { showMenuItem, activeSurvey, hasCompleted } = useShouldShowPulseSurvey();
+  const { showMenuItem, activeSurvey, hasCompleted, isLoading: completionLoading } = useShouldShowPulseSurvey();
   const { data: dismissalData, isLoading: dismissalLoading } = usePulseSurveyDismissal(activeSurvey?.id);
   const { data: hasDraft, isLoading: draftLoading } = usePulseSurveyHasDraft(activeSurvey?.id);
   const dismissMutation = useDismissPulseSurvey();
@@ -35,22 +35,37 @@ export function PulseSurveyPopup() {
 
   // Determine if popup should show
   useEffect(() => {
-    if (!delayPassed || dismissalLoading || draftLoading) return;
+    // Wait until ALL relevant async checks are settled, including completion
+    if (!delayPassed || completionLoading || dismissalLoading || draftLoading) {
+      setOpen(false);
+      return;
+    }
 
+    // STRICT: only show when we explicitly know the user has NOT completed
     const baseConditions =
       showMenuItem &&
       !!activeSurvey &&
-      !hasCompleted &&
+      hasCompleted === false &&
       dismissalData &&
       !dismissalData.isStaff &&
       !!dismissalData.employeeId;
 
-    // If user has a draft, always show (ignore dismiss)
-    // If no draft, respect dismiss
+    // If user has a draft, always show (ignore dismiss). If no draft, respect dismiss.
     const shouldShow = baseConditions && (hasDraft || !dismissalData?.isDismissed);
 
+    if (activeSurvey) {
+      console.log('[PulseSurveyPopup] state', {
+        surveyId: activeSurvey?.id,
+        hasCompleted,
+        completionLoading,
+        hasDraft,
+        isDismissed: dismissalData?.isDismissed,
+        shouldShow: !!shouldShow,
+      });
+    }
+
     setOpen(!!shouldShow);
-  }, [delayPassed, dismissalLoading, draftLoading, showMenuItem, activeSurvey, hasCompleted, dismissalData, hasDraft]);
+  }, [delayPassed, completionLoading, dismissalLoading, draftLoading, showMenuItem, activeSurvey, hasCompleted, dismissalData, hasDraft]);
 
   const handleAnswerNow = () => {
     setOpen(false);
