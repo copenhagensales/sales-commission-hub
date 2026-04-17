@@ -3719,6 +3719,58 @@ export type Database = {
           },
         ]
       }
+      code_of_conduct_reminders: {
+        Row: {
+          acknowledged_at: string | null
+          created_at: string
+          created_by: string | null
+          employee_id: string
+          id: string
+          snooze_count: number
+          snoozed_until: string | null
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          employee_id: string
+          id?: string
+          snooze_count?: number
+          snoozed_until?: string | null
+        }
+        Update: {
+          acknowledged_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          employee_id?: string
+          id?: string
+          snooze_count?: number
+          snoozed_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "code_of_conduct_reminders_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "code_of_conduct_reminders_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "code_of_conduct_reminders_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cohort_members: {
         Row: {
           agent_email: string | null

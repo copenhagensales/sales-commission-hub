@@ -11,6 +11,7 @@ import { PendingAbsencePopup } from "@/components/absence/PendingAbsencePopup";
 import { SoftphoneWidget } from "@/components/calls/SoftphoneWidget";
 import { LeagueAnnouncementPopup } from "@/components/league/LeagueAnnouncementPopup";
 import { PulseSurveyPopup } from "@/components/pulse/PulseSurveyPopup";
+import { CodeOfConductReminderPopup } from "@/components/code-of-conduct/CodeOfConductReminderPopup";
 import { Menu, PanelLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -122,6 +123,9 @@ export function MainLayout({ children }: MainLayoutProps) {
           
           {/* Pulse survey popup - monthly anonymous survey for non-staff employees */}
           {!isPreviewMode && <PulseSurveyPopup />}
+
+          {/* Code of Conduct reminder popup - shown when admin has sent a reminder */}
+          {!isPreviewMode && <CodeOfConductReminderPopup />}
           
           {/* Softphone Widget */}
           <SoftphoneWidget />

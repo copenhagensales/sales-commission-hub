@@ -6,12 +6,14 @@ import { MfaLockOverlay } from "./MfaLockOverlay";
 import { GoalLockOverlay } from "./GoalLockOverlay";
 import { RejectedContractLockOverlay } from "./RejectedContractLockOverlay";
 import { PulseSurveyLockOverlay } from "./PulseSurveyLockOverlay";
+import { CodeOfConductLockOverlay } from "./CodeOfConductLockOverlay";
 import { usePendingContractLock } from "@/hooks/usePendingContractLock";
 import { useCarQuizLock } from "@/hooks/useCarQuiz";
 import { useMfa } from "@/hooks/useMfa";
 import { useGoalLock } from "@/hooks/useGoalLock";
 import { useRejectedContractLock } from "@/hooks/useRejectedContractLock";
 import { usePulseSurveyLock } from "@/hooks/usePulseSurveyLock";
+import { useCodeOfConductLock } from "@/hooks/useCodeOfConduct";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
 
 interface LockOverlaysProps {
@@ -27,6 +29,7 @@ export function LockOverlays({ children }: LockOverlaysProps) {
   // Pulse survey hard-lock disabled — only the dismissible popup is shown now
   const isPulseSurveyLocked = false;
   const pulseSurveyLoading = false;
+  const { isLocked: isCocLocked, isLoading: cocLoading } = useCodeOfConductLock();
   const { isPreviewMode } = useRolePreview();
   const location = useLocation();
   const [mfaVerified, setMfaVerified] = useState(false);
@@ -50,8 +53,11 @@ export function LockOverlays({ children }: LockOverlaysProps) {
   // Priority 5: Pulse survey lock - after all other locks, skip on /pulse-survey route
   const showPulseSurveyLock = isPulseSurveyLocked && !isPreviewMode && !showContractLock && !showCarQuizLock && !showMfaLock && !showGoalLock && !showRejectedContractLock && location.pathname !== "/pulse-survey";
 
+  // Priority 6: Code of Conduct lock - skip on the test page itself
+  const showCocLock = isCocLocked && !isPreviewMode && !showContractLock && !showCarQuizLock && !showMfaLock && !showGoalLock && !showRejectedContractLock && !showPulseSurveyLock && location.pathname !== "/code-of-conduct";
+
   // Show loading state while checking locks (skip in preview mode)
-  if ((rejectedContractLoading || contractLoading || quizLoading || mfaLoading || goalLoading || pulseSurveyLoading) && !isPreviewMode) {
+  if ((rejectedContractLoading || contractLoading || quizLoading || mfaLoading || goalLoading || pulseSurveyLoading || cocLoading) && !isPreviewMode) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-pulse text-muted-foreground">Indlæser...</div>
@@ -92,6 +98,10 @@ export function LockOverlays({ children }: LockOverlaysProps) {
 
   if (showPulseSurveyLock) {
     return <PulseSurveyLockOverlay />;
+  }
+
+  if (showCocLock) {
+    return <CodeOfConductLockOverlay />;
   }
 
   return <>{children}</>;
