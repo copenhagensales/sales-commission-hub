@@ -14454,6 +14454,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      has_valid_code_of_conduct_completion: {
+        Args: { _user_id?: string }
+        Returns: boolean
+      }
       heal_fm_missing_sale_items: { Args: never; Returns: number }
       is_chat_conversation_member: {
         Args: { _conversation_id: string }
