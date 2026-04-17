@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { format, differenceInDays } from "date-fns";
 import { da } from "date-fns/locale";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { CODE_OF_CONDUCT_QUESTIONS } from "@/hooks/useCodeOfConduct";
+import { SALGSKONSULENT_COC_QUESTIONS, FIELDMARKETING_COC_QUESTIONS, type CocVariant } from "@/hooks/useCodeOfConduct";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
