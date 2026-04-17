@@ -60,23 +60,41 @@ export function CommissionRatesTab() {
     },
   });
 
-  // Fetch ALL products (parents + merged children) for selected client
+  // Fetch products belonging to selected client (children of merge groups too)
   const { data: allProducts = [], isLoading: productsLoading } = useQuery({
     queryKey: ["commission-rates-products", selectedClientId],
     enabled: !!selectedClientId,
     queryFn: async () => {
-      const { data, error } = await supabase
+      // 1. All non-hidden products with their client info
+      const { data: allRaw, error } = await supabase
         .from("products")
         .select("id, name, commission_dkk, revenue_dkk, is_hidden, merged_into_product_id, client_campaign_id, client_campaigns(client_id)")
         .eq("is_hidden", false)
         .order("name");
       if (error) throw error;
-      return data.filter((p: any) => {
+
+      const belongsToClient = (p: any) => {
         const cc = p.client_campaigns;
         if (!cc) return false;
         if (Array.isArray(cc)) return cc.some((c: any) => c.client_id === selectedClientId);
         return cc.client_id === selectedClientId;
-      });
+      };
+
+      // 2. Products directly tied to client
+      const directlyOwned = (allRaw || []).filter(belongsToClient);
+
+      // 3. Parent products of any merged children that belong to client
+      //    (parents may have no client_campaign themselves — they're cross-client merge targets)
+      const parentIdsNeeded = new Set<string>();
+      for (const p of directlyOwned) {
+        if (p.merged_into_product_id) parentIdsNeeded.add(p.merged_into_product_id);
+      }
+      const ownedIds = new Set(directlyOwned.map((p: any) => p.id));
+      const extraParents = (allRaw || []).filter(
+        (p: any) => parentIdsNeeded.has(p.id) && !ownedIds.has(p.id)
+      );
+
+      return [...directlyOwned, ...extraParents];
     },
   });
 
