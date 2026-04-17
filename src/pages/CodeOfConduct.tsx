@@ -64,6 +64,7 @@ export default function CodeOfConduct() {
       const result = await submitQuiz.mutateAsync({
         answers,
         questionsToAnswer: questionsToShow.map(q => q.id),
+        variant,
       });
 
       if (result.passed) {
@@ -220,7 +221,7 @@ export default function CodeOfConduct() {
             </div>
             <div>
               <h1 className="text-2xl font-bold">Code of Conduct & GDPR</h1>
-              <p className="text-muted-foreground">Salgskonsulenter</p>
+              <p className="text-muted-foreground">{variantLabel}</p>
             </div>
           </div>
 
