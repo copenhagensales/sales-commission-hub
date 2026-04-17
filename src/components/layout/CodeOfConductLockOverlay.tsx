@@ -1,10 +1,29 @@
-import { Shield } from "lucide-react";
+import { Shield, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 
 export function CodeOfConductLockOverlay() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  const handleLogout = async () => {
+    queryClient.clear();
+    const keysToRemove = Object.keys(localStorage).filter(key =>
+      key.startsWith('sb-') || key.includes('supabase')
+    );
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.error("Logout error:", e);
+    }
+
+    navigate("/auth");
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-sm">
@@ -31,6 +50,18 @@ export function CodeOfConductLockOverlay() {
           >
             Gå til testen
           </Button>
+          <Button
+            variant="outline"
+            className="w-full"
+            size="lg"
+            onClick={handleLogout}
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Log ud
+          </Button>
+          <p className="text-xs text-muted-foreground text-center">
+            Hvis du allerede har bestået testen og stadig ser denne besked, log ud og ind igen, eller kontakt support.
+          </p>
         </CardContent>
       </Card>
     </div>
