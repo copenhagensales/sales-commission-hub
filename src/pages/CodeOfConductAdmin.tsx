@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { usePermissions } from "@/hooks/usePositionPermissions";
@@ -115,15 +115,29 @@ export default function CodeOfConductAdmin() {
     }
   };
 
-  // Local state for editing - initialized from the hardcoded questions
+  // Local state for editing - initialized from the hardcoded questions for the active variant
   const [questions, setQuestions] = useState<CodeOfConductQuestion[]>(
-    CODE_OF_CONDUCT_QUESTIONS.map(q => ({
+    activeQuestions.map(q => ({
       id: q.id,
       question: q.question,
       options: q.options,
       correctAnswer: q.correctAnswer,
     }))
   );
+
+  // Reset editor state when switching variant
+  useEffect(() => {
+    setQuestions(
+      activeQuestions.map(q => ({
+        id: q.id,
+        question: q.question,
+        options: q.options,
+        correctAnswer: q.correctAnswer,
+      }))
+    );
+    setExpandedQuestions(new Set([1]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [variant]);
 
   const toggleQuestion = (id: number) => {
     const newExpanded = new Set(expandedQuestions);
@@ -151,16 +165,15 @@ export default function CodeOfConductAdmin() {
     enabled: !!user?.email,
   });
 
-  // Fetch all Salgskonsulenter with their Code of Conduct status
+  // Fetch employees for the active variant with their Code of Conduct status
   const { data: employees, isLoading } = useQuery({
-    queryKey: ["code-of-conduct-admin", currentEmployeeId, scopeQuiz],
+    queryKey: ["code-of-conduct-admin", currentEmployeeId, scopeQuiz, variant],
     queryFn: async () => {
-      // Get all Salgskonsulenter
       let query = supabase
         .from("employee_master_data")
         .select("id, first_name, last_name, job_title, manager_id")
         .eq("is_active", true)
-        .eq("job_title", "Salgskonsulent");
+        .eq("job_title", activeJobTitle);
 
       // If scope is not "alt", filter by manager_id (teamleder can only see their team)
       if (scopeQuiz !== "alt" && currentEmployeeId) {
@@ -174,17 +187,19 @@ export default function CodeOfConductAdmin() {
 
       const employeeIds = employeesData.map(e => e.id);
 
-      // Get completions for all employees
+      // Get completions for the active variant
       const { data: completions } = await supabase
         .from("code_of_conduct_completions")
         .select("employee_id, passed_at")
-        .in("employee_id", employeeIds);
+        .in("employee_id", employeeIds)
+        .eq("quiz_variant", variant);
 
-      // Get all attempts for statistics
+      // Get attempts for the active variant
       const { data: attempts } = await supabase
         .from("code_of_conduct_attempts")
         .select("employee_id, passed, wrong_question_numbers")
-        .in("employee_id", employeeIds);
+        .in("employee_id", employeeIds)
+        .eq("quiz_variant", variant);
 
       // Build employee status map
       const completionMap = new Map(
