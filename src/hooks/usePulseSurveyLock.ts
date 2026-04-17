@@ -5,7 +5,15 @@ import { useShouldShowPulseSurvey } from "./usePulseSurvey";
 
 export function usePulseSurveyLock() {
   const { user } = useAuth();
-  const { activeSurvey, hasCompleted, showMenuItem } = useShouldShowPulseSurvey();
+  const { activeSurvey, hasCompleted, isLoading: completionLoading, showMenuItem } = useShouldShowPulseSurvey();
+
+  // Strict gate: only run when we KNOW the user has not completed (=== false), not undefined
+  const enabled =
+    !!activeSurvey?.id &&
+    !!user &&
+    showMenuItem &&
+    !completionLoading &&
+    hasCompleted === false;
 
   const { data, isLoading } = useQuery({
     queryKey: ['pulse-survey-lock', activeSurvey?.id, user?.id],
@@ -30,10 +38,23 @@ export function usePulseSurveyLock() {
 
       return { isLocked };
     },
-    enabled: !!activeSurvey?.id && !!user && showMenuItem && !hasCompleted,
+    enabled,
     staleTime: 0,
+    gcTime: 0,
     refetchOnWindowFocus: true,
   });
+
+  // Hard guard: never report locked while completion is loading or completion is true
+  if (completionLoading || hasCompleted !== false) {
+    if (activeSurvey && user) {
+      console.log('[usePulseSurveyLock] gated', {
+        surveyId: activeSurvey?.id,
+        hasCompleted,
+        completionLoading,
+      });
+    }
+    return { isLocked: false, isLoading: completionLoading };
+  }
 
   return {
     isLocked: data?.isLocked ?? false,
