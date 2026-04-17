@@ -581,15 +581,32 @@ export function useCodeOfConductLock() {
       const now = new Date();
       const daysRemaining = differenceInDays(deadlineDate, now);
 
-      // No lock for Code of Conduct - just mark as required
-      return { isLocked: false, daysRemaining: Math.max(0, daysRemaining), isRequired: true };
+      // Check for an active in-app reminder where the snooze window has expired
+      const { data: reminder } = await supabase
+        .from("code_of_conduct_reminders")
+        .select("id, snoozed_until, acknowledged_at")
+        .eq("employee_id", employee.id)
+        .is("acknowledged_at", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      let reminderLock = false;
+      if (reminder && reminder.snoozed_until) {
+        reminderLock = new Date(reminder.snoozed_until).getTime() <= Date.now();
+      }
+
+      const sevenDayLock = daysRemaining <= 0;
+      const isLocked = sevenDayLock || reminderLock;
+
+      return { isLocked, daysRemaining: Math.max(0, daysRemaining), isRequired: true };
     },
     enabled: !!user,
     refetchInterval: 60000,
   });
 
   return {
-    isLocked: false, // Never lock - menu always visible
+    isLocked: data?.isLocked ?? false,
     daysRemaining: data?.daysRemaining ?? null,
     isRequired: data?.isRequired ?? false,
     isLoading,

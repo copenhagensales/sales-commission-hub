@@ -6,12 +6,14 @@ import { MfaLockOverlay } from "./MfaLockOverlay";
 import { GoalLockOverlay } from "./GoalLockOverlay";
 import { RejectedContractLockOverlay } from "./RejectedContractLockOverlay";
 import { PulseSurveyLockOverlay } from "./PulseSurveyLockOverlay";
+import { CodeOfConductLockOverlay } from "./CodeOfConductLockOverlay";
 import { usePendingContractLock } from "@/hooks/usePendingContractLock";
 import { useCarQuizLock } from "@/hooks/useCarQuiz";
 import { useMfa } from "@/hooks/useMfa";
 import { useGoalLock } from "@/hooks/useGoalLock";
 import { useRejectedContractLock } from "@/hooks/useRejectedContractLock";
 import { usePulseSurveyLock } from "@/hooks/usePulseSurveyLock";
+import { useCodeOfConductLock } from "@/hooks/useCodeOfConduct";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
 
 interface LockOverlaysProps {
