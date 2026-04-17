@@ -291,16 +291,28 @@ export default function CodeOfConductAdmin() {
   return (
     <MainLayout>
       <div className="container mx-auto space-y-6">
-        <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-            <Shield className="h-6 w-6 text-primary" />
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+              <Shield className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold">Code of Conduct Overblik</h1>
+              <p className="text-muted-foreground">
+                {scopeQuiz === "alt" ? "Alle salgskonsulenter" : "Dit team"}
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold">Code of Conduct Overblik</h1>
-            <p className="text-muted-foreground">
-              {scopeQuiz === "alt" ? "Alle salgskonsulenter" : "Dit team"}
-            </p>
-          </div>
+          <Button
+            onClick={handleSendReminder}
+            disabled={isSendingReminder}
+            className="gap-2"
+          >
+            <Send className="h-4 w-4" />
+            {isSendingReminder
+              ? "Sender..."
+              : `Send påmindelse (${stats.notStarted + stats.expired})`}
+          </Button>
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
