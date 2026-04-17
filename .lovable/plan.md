@@ -1,65 +1,62 @@
 
 
-## Analyse: Hvorfor pulsmålingen bliver ved med at dukke op
+## Diagnose af "loop" problemet
 
-### Fundet (data-bevis)
+### Status efter sidste fix
+Den nye `submit-employee-pulse-survey` edge function virker korrekt:
+- 16/4: 6 responses, 6 completions (1:1)
+- 17/4: 1 response, 1 completion (1:1)
+- Ingen duplikat-employees per email
+- `get_current_employee_id()` RLS-funktion bruger samme logik som edge function (auth_user_id først, derefter email)
 
-| Måned | Besvarelser | Completions | Manglende |
-|-------|------------|-------------|-----------|
-| April 2026 | 52 | 50 | **2** |
-| Marts 2026 | 58 | 55 | **3** |
-| Feb 2026 | 37 | 0 | **37** |
-| Jan 2026 | 66 | 0 | **66** |
-| Dec 2025 | 58 | 1 | **57** |
+### Hvor problemet sandsynligvis stadig findes
 
-I alt **103 besvarelser** mangler en completion-record. Det betyder, at brugeren har udfyldt og sendt pulsmålingen, men systemet "glemmer" det og viser den igen næste gang de logger ind.
+Selvom server-siden er korrekt, kan brugere stadig opleve loopet pga. **frontend cache / state-problemer**:
 
-### Hvorfor sker det?
+1. **Cache invalidation utilstrækkelig**: Efter submission invalideres `pulse-survey-completion`, men hooks har ingen `staleTime: 0` eller `refetchOnMount`. Ved navigation kan stale "false" stadig være i cache.
 
-I `useSubmitPulseSurvey` (`src/hooks/usePulseSurvey.ts`) udføres indsendelsen i to separate steps mod databasen fra klienten:
+2. **`useShouldShowPulseSurvey` har ingen retry**: Hvis `useHasCompletedSurvey` rammer en transient netværksfejl returnerer den `false` → popup vises.
 
-1. **INSERT i `pulse_survey_responses`** — anonymt svar (uden employee_id)
-2. **INSERT i `pulse_survey_completions`** — markerer at brugeren har besvaret
+3. **Race condition mellem submission og cache update**: `handleSubmit` viser toast og navigerer, men `useShouldShowPulseSurvey` bruges andre steder (popup, lock, badge) og refetcher måske ikke straks.
 
-To kritiske fejl:
+4. **`PulseSurveyPopup` viser sig på enhver side**: Hvis en bruger lige har svaret men cache ikke er opdateret når de navigerer, dukker popup'en op igen.
 
-**A. Race condition / RLS-fejl ved completion-insert**
-Klient-koden bruger `private_email/work_email` for at finde `employee_id`, men RLS-policyen på `pulse_survey_completions` kræver, at `employee_id = get_current_employee_id()` (som kobler via `auth_user_id`). Hvis email-matchet returnerer en anden employee end den, RLS-funktionen finder via `auth_user_id`, vil insert-et fejle silently for brugeren (toast viser "Tak for din besvarelse" baseret på response 1, men step 2 fejler).
+5. **Manuel deduplication kan fejle**: `useHasCompletedSurvey` bruger `.maybeSingle()` - hvis RLS returnerer 0 rows pga. midlertidig session-issue → returnerer false.
 
-**B. Ingen transactionel sammenhæng**
-Hvis netværket fejler mellem step 1 og step 2 (browser lukker fanen, mister wifi efter response, m.m.), gemmes besvarelsen, men completion'en gør ikke. Resultat: brugeren ser pop-up'en igen ved næste login.
+### Plan
 
-**C. Ingen fallback / healing**
-Der er ingen logik der siger: "Hvis der findes en response for denne survey + bruger, så betragt det som completed." Fordi `pulse_survey_responses` er anonym (ingen `employee_id`), kan man ikke direkte krydsreferere — men `pulse_survey_drafts` slettes først efter step 2, så draft-tabellen kan bruges som indikator (fjernes ved `deleteDraft.mutate()` i `handleSubmit`).
+**1. Server-side defensiv healing**
+Tilføj en RPC `pulse_survey_has_user_completed(survey_id)` der internt bruger `get_current_employee_id()` med samme logik som RLS. Dette eliminerer email-vs-auth_user_id mismatch fuldstændigt fra frontend.
 
-### Løsningsplan
+**2. Opdater alle frontend hooks til at bruge RPC'en**
+Erstat email-baseret employee lookup i:
+- `useHasCompletedSurvey`
+- `usePulseSurveyDismissal`  
+- `usePulseSurveyDraft`
+- `usePulseSurveyHasDraft`
+- `usePulseSurveyLock`
 
-**1. Flyt indsendelse til en edge function (atomisk)**
-Lav en ny edge function `submit-employee-pulse-survey` (med service role) der i én transaktion:
-- Finder employee_id via auth-bruger
-- Inserter response (anonymt med team_id/department)
-- Inserter completion-record
-- Sletter draft
+Alle disse hooks bruger samme problematiske `.or(private_email.ilike,work_email.ilike)` mønster. RPC'en sikrer 100% konsistens med edge function og RLS.
 
-Hvis nogen del fejler → returner fejl, ingen orphaned data.
+**3. Aggressiv cache invalidering**
+Efter submission, kald `queryClient.invalidateQueries()` for ALLE pulse-survey nøgler og tilføj `await queryClient.refetchQueries(['pulse-survey-completion'])` så popup'en med det samme ved at brugeren har svaret.
 
-**2. Migrer client `useSubmitPulseSurvey`**
-Brug `supabase.functions.invoke('submit-employee-pulse-survey', ...)` i stedet for to separate inserts.
+**4. Tilføj `staleTime: 0` og `refetchOnWindowFocus: true` på `useHasCompletedSurvey`**
+Sikrer at hver gang brugeren skifter tab eller side, refetches completion-status.
 
-**3. Healing for de 103 eksisterende manglende completions**
-Migration der: For hvert udkast (`pulse_survey_drafts`) der IKKE eksisterer for en bruger + survey kombination MEN hvor brugeren har en draft der er blevet slettet — kan vi ikke nemt rekonstruere. **Bedre løsning:** Tilføj en `submitted_employee_id` kolonne der KUN bruges til completion-tracking (separat fra anonyme svar) — eller alternativt kør en engangs-migration der inserter completions for surveys der er afsluttede (closed-out måneder), så brugere ikke ser februar/januar igen.
+**5. Heling for de 2 manglende fra 15. april**
+Kør engangs-script der finder de 2 responses uden matching completion (15/4 - før fix) og forsøger at indsætte completion baseret på den nærmeste auth-bruger (eller bare deaktiverer aktiv survey for dem manuelt).
 
-→ Konkret forslag: kør en engangs SQL-migration der for **lukkede måneder** (alle undtagen aktiv) markerer alle medarbejdere som "completed" hvis de tilhørte teamet på det tidspunkt. Eller mere konservativt: deaktiver gamle surveys (`is_active = false`) så `useActivePulseSurvey` ikke længere returnerer dem.
+**6. Diagnostisk logging**
+Tilføj console.log i `useHasCompletedSurvey` og `useShouldShowPulseSurvey` så vi kan se i logs HVILKEN bruger der oplever det og hvad der returneres.
 
-**4. Tilføj retry/healing for fremtiden**
-Ved login: hvis en bruger har en response uden completion (krydsreference via en ny audit-tabel eller `submission_log`), repair'es det. Eller simpler: tilføj en `last_submitted_at` kolonne på en `pulse_survey_user_state` tabel som er den enkelt-kilde-til-sandhed.
+### Tekniske ændringer
 
-### Anbefalet minimal implementation
+- Ny SQL function `public.has_completed_pulse_survey(_survey_id uuid) returns boolean` (SECURITY DEFINER, bruger `get_current_employee_id()`)
+- Refactor af 5 hooks i `src/hooks/usePulseSurvey.ts` + `src/hooks/usePulseSurveyLock.ts` til at bruge denne RPC
+- Cache config i `useHasCompletedSurvey`: `staleTime: 0`, `refetchOnWindowFocus: true`
+- I `useSubmitPulseSurvey.onSuccess`: explicit `refetchQueries` + `setQueryData` for at sætte hasCompleted=true øjeblikkeligt
+- Diagnostisk logging der kan deaktiveres via flag
 
-- **Edge function** `submit-employee-pulse-survey` — atomisk indsendelse (response + completion + draft-slet)
-- **Opdater** `useSubmitPulseSurvey` til at kalde edge functionen
-- **Engangs-fix:** Sæt `is_active = false` på alle surveys ældre end nuværende måned (jan, feb, dec, marts) — så aktive brugere ikke ser dem
-- **Bonus:** Sæt completions for april's 2 manglende baseret på matching draft-historik hvis muligt, ellers lad være
-
-Dette løser både den underliggende race condition fremover og fjerner de gamle "spøgelses-pulsmålinger" for brugere der allerede har besvaret.
+Dette eliminerer enhver mulighed for mismatch mellem hvilken employee der "har besvaret" på server-side vs frontend.
 
