@@ -60,7 +60,7 @@ export function CommissionRatesTab() {
     },
   });
 
-  // Fetch products belonging to selected client (children of merge groups too)
+  // Fetch products belonging to selected client (children of merge groups + cross-client parents)
   const { data: allProducts = [], isLoading: productsLoading } = useQuery({
     queryKey: ["commission-rates-products", selectedClientId],
     enabled: !!selectedClientId,
@@ -83,18 +83,59 @@ export function CommissionRatesTab() {
       // 2. Products directly tied to client
       const directlyOwned = (allRaw || []).filter(belongsToClient);
 
-      // 3. Parent products of any merged children that belong to client
-      //    (parents may have no client_campaign themselves — they're cross-client merge targets)
-      const parentIdsNeeded = new Set<string>();
-      for (const p of directlyOwned) {
-        if (p.merged_into_product_id) parentIdsNeeded.add(p.merged_into_product_id);
-      }
-      const ownedIds = new Set(directlyOwned.map((p: any) => p.id));
-      const extraParents = (allRaw || []).filter(
-        (p: any) => parentIdsNeeded.has(p.id) && !ownedIds.has(p.id)
-      );
+      // 3. Find all client_campaign_ids belonging to this client, then look up
+      //    every product_id that the client's actual sales have been mapped to.
+      //    This catches cross-client parent products (e.g. shared "5G MBB",
+      //    "Fri Tale + 70 GB" parents with no client_campaign_id of their own
+      //    that are nonetheless used by this client's sales).
+      const { data: clientCampaigns } = await supabase
+        .from("client_campaigns")
+        .select("id")
+        .eq("client_id", selectedClientId);
+      const ccIds = (clientCampaigns || []).map((c: any) => c.id);
 
-      return [...directlyOwned, ...extraParents];
+      const soldProductIds = new Set<string>();
+      if (ccIds.length > 0) {
+        // Fetch product_ids referenced by this client's sale_items.
+        // Use an inner-join shape via the relationship to keep this single roundtrip.
+        const { data: soldItems } = await supabase
+          .from("sale_items")
+          .select("product_id, sales!inner(client_campaign_id)")
+          .in("sales.client_campaign_id", ccIds)
+          .not("product_id", "is", null)
+          .limit(10000);
+        for (const row of soldItems || []) {
+          if (row.product_id) soldProductIds.add(row.product_id);
+        }
+      }
+
+      // 4. Build the full set of product ids we want to display:
+      //    direct owns + parents of owned children + parents of any sold product
+      const productById = new Map<string, any>();
+      for (const p of allRaw || []) productById.set(p.id, p);
+
+      const includedIds = new Set<string>(directlyOwned.map((p: any) => p.id));
+
+      // Parents of directly-owned children
+      for (const p of directlyOwned) {
+        if (p.merged_into_product_id) includedIds.add(p.merged_into_product_id);
+      }
+
+      // Sold products + their parents (so we surface the parent row, not the child)
+      for (const pid of soldProductIds) {
+        const prod = productById.get(pid);
+        if (!prod) continue;
+        if (prod.merged_into_product_id) {
+          includedIds.add(prod.merged_into_product_id);
+          includedIds.add(pid); // include child too — used as variant under parent
+        } else {
+          includedIds.add(pid);
+        }
+      }
+
+      return Array.from(includedIds)
+        .map((id) => productById.get(id))
+        .filter(Boolean);
     },
   });
 
