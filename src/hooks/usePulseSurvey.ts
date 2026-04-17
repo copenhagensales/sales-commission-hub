@@ -113,48 +113,18 @@ export function useSubmitPulseSurvey() {
       if (!selectedTeamId) {
         throw new Error('Team selection is required');
       }
-      // Get employee data for completion tracking
-      const lowerEmail = user?.email?.toLowerCase() || '';
-      const { data: employee } = await supabase
-        .from('employee_master_data')
-        .select('id')
-        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
-        .maybeSingle();
 
-      // Get team name for the selected team
-      let teamName: string | null = null;
-      if (selectedTeamId) {
-        const { data: team } = await supabase
-          .from('teams')
-          .select('name')
-          .eq('id', selectedTeamId)
-          .maybeSingle();
-        teamName = team?.name || null;
-      }
-
-      // Insert anonymous response with user-selected team
-      const { error: responseError } = await supabase
-        .from('pulse_survey_responses')
-        .insert({
+      // Atomic submission via edge function (response + completion + draft delete)
+      const { data, error } = await supabase.functions.invoke('submit-employee-pulse-survey', {
+        body: {
           survey_id: surveyId,
-          team_id: selectedTeamId || null,
-          department: teamName,
-          ...response
-        });
+          selected_team_id: selectedTeamId,
+          ...response,
+        },
+      });
 
-      if (responseError) throw responseError;
-
-      // Mark as completed
-      if (employee) {
-        const { error: completionError } = await supabase
-          .from('pulse_survey_completions')
-          .insert({
-            survey_id: surveyId,
-            employee_id: employee.id
-          });
-
-        if (completionError) throw completionError;
-      }
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
       return { success: true };
     },
