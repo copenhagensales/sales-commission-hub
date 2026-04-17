@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import type { CocVariant } from "@/hooks/useCodeOfConduct";
 
 export interface CodeOfConductReminder {
   id: string;
@@ -9,22 +10,23 @@ export interface CodeOfConductReminder {
   snoozed_until: string | null;
   snooze_count: number;
   acknowledged_at: string | null;
+  quiz_variant: CocVariant;
 }
 
 /**
  * Fetches the active (un-acknowledged) reminder for the current user, if any.
- * Also returns whether the snooze window has expired (→ should trigger lock).
  */
-export function useCodeOfConductReminder() {
+export function useCodeOfConductReminder(variant: CocVariant = "salgskonsulent") {
   const { user } = useAuth();
 
   const query = useQuery({
-    queryKey: ["code-of-conduct-reminder", user?.id],
+    queryKey: ["code-of-conduct-reminder", user?.id, variant],
     queryFn: async () => {
       if (!user?.email) return null;
 
-      // Safety valve: if user has a valid completion, never show reminder popup.
-      const { data: hasValid } = await supabase.rpc("has_valid_code_of_conduct_completion");
+      const { data: hasValid } = await supabase.rpc("has_valid_code_of_conduct_completion", {
+        _variant: variant,
+      } as any);
       if (hasValid === true) return null;
 
       const lowerEmail = user.email.toLowerCase();
@@ -40,6 +42,7 @@ export function useCodeOfConductReminder() {
         .from("code_of_conduct_reminders")
         .select("*")
         .in("employee_id", employeeIds)
+        .eq("quiz_variant", variant)
         .is("acknowledged_at", null)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -59,13 +62,10 @@ export function useCodeOfConductReminder() {
   const reminder = query.data;
   const now = Date.now();
 
-  // Should we show the popup right now?
-  // Yes if: reminder exists, not acknowledged, and snooze (if any) has not expired
   const shouldShowPopup = !!reminder && (
     !reminder.snoozed_until || new Date(reminder.snoozed_until).getTime() > now
   );
 
-  // Has the snooze window expired? Then we should lock.
   const snoozeExpired = !!reminder && !!reminder.snoozed_until &&
     new Date(reminder.snoozed_until).getTime() <= now;
 
