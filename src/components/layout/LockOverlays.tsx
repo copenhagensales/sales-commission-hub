@@ -24,7 +24,9 @@ export function LockOverlays({ children }: LockOverlaysProps) {
   const { isLocked: isQuizLocked, isLoading: quizLoading } = useCarQuizLock();
   const { isRequired: isMfaRequired, isVerified: isMfaVerified, isLoading: mfaLoading } = useMfa();
   const { isLocked: isGoalLocked, employeeId, payrollPeriod, isLoading: goalLoading, refetch: refetchGoalLock } = useGoalLock();
-  const { isLocked: isPulseSurveyLocked, isLoading: pulseSurveyLoading } = usePulseSurveyLock();
+  // Pulse survey hard-lock disabled — only the dismissible popup is shown now
+  const isPulseSurveyLocked = false;
+  const pulseSurveyLoading = false;
   const { isPreviewMode } = useRolePreview();
   const location = useLocation();
   const [mfaVerified, setMfaVerified] = useState(false);
