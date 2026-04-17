@@ -13,6 +13,7 @@ import { Users, Zap, Clock, CheckCircle, XCircle, Plus, Loader2, ShieldCheck, Al
 import { formatDistanceToNow } from "date-fns";
 import { da } from "date-fns/locale";
 import { BookingFlowTimeline } from "@/components/recruitment/BookingFlowTimeline";
+import { RecruitmentKpiBar } from "@/components/recruitment/RecruitmentKpiBar";
 import { FlowTemplatesTab } from "@/components/recruitment/FlowTemplatesTab";
 import { BookingSettingsTab } from "@/components/recruitment/BookingSettingsTab";
 import { BookingPreviewTab } from "@/components/recruitment/BookingPreviewTab";
@@ -337,6 +338,9 @@ export default function BookingFlow() {
           </TabsList>
 
           <TabsContent value="dashboard" className="space-y-6">
+
+        {/* KPI Overview */}
+        <RecruitmentKpiBar />
 
         {/* Stats */}
         <div className="grid grid-cols-2 gap-4">
