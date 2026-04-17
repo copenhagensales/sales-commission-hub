@@ -472,7 +472,7 @@ export default function CodeOfConductAdmin() {
                   </div>
                 ) : filteredEmployees.length === 0 ? (
                   <div className="py-12 text-center text-muted-foreground">
-                    Ingen salgskonsulenter fundet
+                    Ingen medarbejdere fundet
                   </div>
                 ) : (
                   <Table>
