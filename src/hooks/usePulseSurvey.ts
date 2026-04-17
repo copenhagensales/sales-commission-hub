@@ -201,33 +201,25 @@ export function usePulseSurveyDismissal(surveyId?: string) {
     queryFn: async () => {
       if (!surveyId) return null;
 
-      const lowerEmail = user?.email?.toLowerCase() || '';
-      const { data: employee } = await supabase
-        .from('employee_master_data')
-        .select('id, is_staff_employee')
-        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
-        .maybeSingle();
+      const { data, error } = await supabase.rpc('get_pulse_survey_dismissal', {
+        _survey_id: surveyId,
+      });
 
-      if (!employee) return { isDismissed: false, isStaff: false, employeeId: null };
+      if (error) {
+        console.warn('[usePulseSurveyDismissal] RPC error:', error);
+        return { isDismissed: false, isStaff: false, employeeId: null, dismissalCount: 0 };
+      }
 
-      const { data } = await supabase
-        .from('pulse_survey_dismissals')
-        .select('dismissed_until, dismissal_count')
-        .eq('survey_id', surveyId)
-        .eq('employee_id', employee.id)
-        .maybeSingle();
-
-      const isDismissed = data ? new Date(data.dismissed_until) > new Date() : false;
-      const dismissalCount = (data as any)?.dismissal_count ?? 0;
-
+      const d = (data ?? {}) as Record<string, any>;
       return {
-        isDismissed,
-        isStaff: employee.is_staff_employee === true,
-        employeeId: employee.id,
-        dismissalCount,
+        isDismissed: !!d.isDismissed,
+        isStaff: !!d.isStaff,
+        employeeId: d.employeeId ?? null,
+        dismissalCount: d.dismissalCount ?? 0,
       };
     },
     enabled: !!surveyId && !!user,
+    staleTime: 0,
   });
 }
 
