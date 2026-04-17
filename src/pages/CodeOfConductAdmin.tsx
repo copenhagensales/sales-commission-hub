@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { usePermissions } from "@/hooks/usePositionPermissions";
@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { format, differenceInDays } from "date-fns";
 import { da } from "date-fns/locale";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { CODE_OF_CONDUCT_QUESTIONS } from "@/hooks/useCodeOfConduct";
+import { SALGSKONSULENT_COC_QUESTIONS, FIELDMARKETING_COC_QUESTIONS, type CocVariant } from "@/hooks/useCodeOfConduct";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -48,6 +48,14 @@ export default function CodeOfConductAdmin() {
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedQuestions, setExpandedQuestions] = useState<Set<number>>(new Set([1]));
   const [isSendingReminder, setIsSendingReminder] = useState(false);
+  const [variant, setVariant] = useState<CocVariant>("salgskonsulent");
+
+  const variantConfig = {
+    salgskonsulent: { label: "Salgskonsulenter", jobTitle: "Salgskonsulent", questions: SALGSKONSULENT_COC_QUESTIONS },
+    fieldmarketing: { label: "Fieldmarketing", jobTitle: "Fieldmarketing", questions: FIELDMARKETING_COC_QUESTIONS },
+  } as const;
+  const activeJobTitle = variantConfig[variant].jobTitle;
+  const activeQuestions = variantConfig[variant].questions;
 
   const handleSendReminder = async () => {
     const recipientCount = stats.notStarted + stats.expired;
@@ -70,17 +78,18 @@ export default function CodeOfConductAdmin() {
         return;
       }
 
-      // Find which already have an unacknowledged reminder, so we don't duplicate
+      // Find which already have an unacknowledged reminder for this variant, so we don't duplicate
       const { data: existing } = await supabase
         .from("code_of_conduct_reminders")
         .select("employee_id")
         .in("employee_id", recipientIds)
+        .eq("quiz_variant", variant)
         .is("acknowledged_at", null);
 
       const existingSet = new Set((existing || []).map((r: any) => r.employee_id));
       const toInsert = recipientIds
         .filter((id) => !existingSet.has(id))
-        .map((id) => ({ employee_id: id, created_by: currentEmployeeId }));
+        .map((id) => ({ employee_id: id, created_by: currentEmployeeId, quiz_variant: variant }));
 
       let insertedCount = 0;
       if (toInsert.length > 0) {
@@ -107,15 +116,29 @@ export default function CodeOfConductAdmin() {
     }
   };
 
-  // Local state for editing - initialized from the hardcoded questions
+  // Local state for editing - initialized from the hardcoded questions for the active variant
   const [questions, setQuestions] = useState<CodeOfConductQuestion[]>(
-    CODE_OF_CONDUCT_QUESTIONS.map(q => ({
+    activeQuestions.map(q => ({
       id: q.id,
       question: q.question,
       options: q.options,
       correctAnswer: q.correctAnswer,
     }))
   );
+
+  // Reset editor state when switching variant
+  useEffect(() => {
+    setQuestions(
+      activeQuestions.map(q => ({
+        id: q.id,
+        question: q.question,
+        options: q.options,
+        correctAnswer: q.correctAnswer,
+      }))
+    );
+    setExpandedQuestions(new Set([1]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [variant]);
 
   const toggleQuestion = (id: number) => {
     const newExpanded = new Set(expandedQuestions);
@@ -143,16 +166,15 @@ export default function CodeOfConductAdmin() {
     enabled: !!user?.email,
   });
 
-  // Fetch all Salgskonsulenter with their Code of Conduct status
+  // Fetch employees for the active variant with their Code of Conduct status
   const { data: employees, isLoading } = useQuery({
-    queryKey: ["code-of-conduct-admin", currentEmployeeId, scopeQuiz],
+    queryKey: ["code-of-conduct-admin", currentEmployeeId, scopeQuiz, variant],
     queryFn: async () => {
-      // Get all Salgskonsulenter
       let query = supabase
         .from("employee_master_data")
         .select("id, first_name, last_name, job_title, manager_id")
         .eq("is_active", true)
-        .eq("job_title", "Salgskonsulent");
+        .eq("job_title", activeJobTitle);
 
       // If scope is not "alt", filter by manager_id (teamleder can only see their team)
       if (scopeQuiz !== "alt" && currentEmployeeId) {
@@ -166,17 +188,19 @@ export default function CodeOfConductAdmin() {
 
       const employeeIds = employeesData.map(e => e.id);
 
-      // Get completions for all employees
+      // Get completions for the active variant
       const { data: completions } = await supabase
         .from("code_of_conduct_completions")
         .select("employee_id, passed_at")
-        .in("employee_id", employeeIds);
+        .in("employee_id", employeeIds)
+        .eq("quiz_variant", variant);
 
-      // Get all attempts for statistics
+      // Get attempts for the active variant
       const { data: attempts } = await supabase
         .from("code_of_conduct_attempts")
         .select("employee_id, passed, wrong_question_numbers")
-        .in("employee_id", employeeIds);
+        .in("employee_id", employeeIds)
+        .eq("quiz_variant", variant);
 
       // Build employee status map
       const completionMap = new Map(
@@ -328,7 +352,7 @@ export default function CodeOfConductAdmin() {
             <div>
               <h1 className="text-2xl font-bold">Code of Conduct Overblik</h1>
               <p className="text-muted-foreground">
-                {scopeQuiz === "alt" ? "Alle salgskonsulenter" : "Dit team"}
+                {variantConfig[variant].label} · {scopeQuiz === "alt" ? "Alle" : "Dit team"}
               </p>
             </div>
           </div>
@@ -343,6 +367,13 @@ export default function CodeOfConductAdmin() {
               : `Send in-app påmindelse (${stats.notStarted + stats.expired})`}
           </Button>
         </div>
+
+        <Tabs value={variant} onValueChange={(v) => setVariant(v as CocVariant)} className="space-y-2">
+          <TabsList>
+            <TabsTrigger value="salgskonsulent">Salgskonsulenter</TabsTrigger>
+            <TabsTrigger value="fieldmarketing">Fieldmarketing</TabsTrigger>
+          </TabsList>
+        </Tabs>
 
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList>
@@ -359,7 +390,7 @@ export default function CodeOfConductAdmin() {
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Salgskonsulenter
+                    {variantConfig[variant].label}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -441,7 +472,7 @@ export default function CodeOfConductAdmin() {
                   </div>
                 ) : filteredEmployees.length === 0 ? (
                   <div className="py-12 text-center text-muted-foreground">
-                    Ingen salgskonsulenter fundet
+                    Ingen medarbejdere fundet
                   </div>
                 ) : (
                   <Table>

@@ -138,27 +138,41 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Get all active Salgskonsulenter
+    // Parse optional body for variant ('salgskonsulent' default, or 'fieldmarketing')
+    let variant: "salgskonsulent" | "fieldmarketing" = "salgskonsulent";
+    try {
+      const body = await req.json().catch(() => null);
+      if (body?.variant === "fieldmarketing" || body?.variant === "salgskonsulent") {
+        variant = body.variant;
+      }
+    } catch (_) {
+      // no body — use default
+    }
+
+    const targetJobTitle = variant === "fieldmarketing" ? "Fieldmarketing" : "Salgskonsulent";
+
+    // Get all active employees for the chosen variant
     const { data: employees, error: empError } = await supabase
       .from("employee_master_data")
       .select("id, first_name, last_name, work_email, private_email")
       .eq("is_active", true)
-      .eq("job_title", "Salgskonsulent");
+      .eq("job_title", targetJobTitle);
 
     if (empError) throw empError;
     if (!employees || employees.length === 0) {
-      return new Response(JSON.stringify({ message: "No employees", sent_count: 0 }), {
+      return new Response(JSON.stringify({ message: "No employees", sent_count: 0, variant }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const employeeIds = employees.map((e: any) => e.id);
 
-    // Get completions
+    // Get completions for this variant
     const { data: completions } = await supabase
       .from("code_of_conduct_completions")
       .select("employee_id, passed_at")
-      .in("employee_id", employeeIds);
+      .in("employee_id", employeeIds)
+      .eq("quiz_variant", variant);
 
     const completionMap = new Map(
       (completions || []).map((c: any) => [c.employee_id, c.passed_at])
