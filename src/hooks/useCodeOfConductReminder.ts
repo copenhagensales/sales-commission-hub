@@ -23,19 +23,23 @@ export function useCodeOfConductReminder() {
     queryFn: async () => {
       if (!user?.email) return null;
 
+      // Safety valve: if user has a valid completion, never show reminder popup.
+      const { data: hasValid } = await supabase.rpc("has_valid_code_of_conduct_completion");
+      if (hasValid === true) return null;
+
       const lowerEmail = user.email.toLowerCase();
-      const { data: employee } = await supabase
+      const { data: employees } = await supabase
         .from("employee_master_data")
         .select("id")
-        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
-        .maybeSingle();
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`);
 
-      if (!employee) return null;
+      const employeeIds = (employees ?? []).map((e) => e.id);
+      if (employeeIds.length === 0) return null;
 
       const { data, error } = await supabase
         .from("code_of_conduct_reminders")
         .select("*")
-        .eq("employee_id", employee.id)
+        .in("employee_id", employeeIds)
         .is("acknowledged_at", null)
         .order("created_at", { ascending: false })
         .limit(1)

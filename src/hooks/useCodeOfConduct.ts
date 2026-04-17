@@ -323,6 +323,21 @@ function getDeadlineDate(passedAt: string | null, employmentStartDate: string | 
   return deadlineDate;
 }
 
+// Resolve all employee_ids matching this user (auth_user_id OR email match)
+// Handles duplicate employee records to prevent lock-out loops.
+async function resolveEmployeeIds(email: string): Promise<string[]> {
+  const lowerEmail = email.toLowerCase();
+  const { data, error } = await supabase
+    .from("employee_master_data")
+    .select("id")
+    .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`);
+  if (error) {
+    console.error("Error resolving employee ids:", error);
+    return [];
+  }
+  return (data ?? []).map((e) => e.id);
+}
+
 export function useCodeOfConductCompletion() {
   const { user } = useAuth();
 
@@ -331,34 +346,24 @@ export function useCodeOfConductCompletion() {
     queryFn: async () => {
       if (!user?.email) return null;
 
-      // Get employee ID from email
-      const lowerEmail = user.email.toLowerCase();
-      const { data: employee, error: employeeError } = await supabase
-        .from("employee_master_data")
-        .select("id, employment_start_date")
-        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
-        .maybeSingle();
+      const employeeIds = await resolveEmployeeIds(user.email);
+      if (employeeIds.length === 0) return null;
 
-      if (employeeError) {
-        console.error("Error fetching employee:", employeeError);
-        return null;
-      }
-
-      if (!employee) return null;
-
+      // Get the most recent completion across ALL matching employee records
       const { data, error } = await supabase
         .from("code_of_conduct_completions")
         .select("*")
-        .eq("employee_id", employee.id)
+        .in("employee_id", employeeIds)
+        .order("passed_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (error) throw error;
-      
-      // If quiz is expired, return null to require retaking
+
       if (data && isQuizExpired(data.passed_at)) {
         return { ...data, isExpired: true };
       }
-      
+
       return data ? { ...data, isExpired: false } : null;
     },
     enabled: !!user,
@@ -501,6 +506,14 @@ export function useSubmitCodeOfConduct() {
           });
 
         if (completionError) throw completionError;
+
+        // Belt-and-suspenders: also acknowledge any open reminder client-side.
+        // (DB trigger does this too, but this avoids a race with refetches.)
+        await supabase
+          .from("code_of_conduct_reminders")
+          .update({ acknowledged_at: new Date().toISOString() })
+          .eq("employee_id", employee.id)
+          .is("acknowledged_at", null);
       }
 
       return { passed, wrongQuestionNumbers };
@@ -509,6 +522,7 @@ export function useSubmitCodeOfConduct() {
       queryClient.invalidateQueries({ queryKey: ["code-of-conduct-completion"] });
       queryClient.invalidateQueries({ queryKey: ["code-of-conduct-current-attempt"] });
       queryClient.invalidateQueries({ queryKey: ["code-of-conduct-lock"] });
+      queryClient.invalidateQueries({ queryKey: ["code-of-conduct-reminder"] });
     },
   });
 }
@@ -523,22 +537,28 @@ export function useCodeOfConductLock() {
     queryFn: async () => {
       if (!user?.email) return { isLocked: false, daysRemaining: null as number | null, isRequired: false };
 
-      const lowerEmail = user.email.toLowerCase();
-      const { data: employee, error: employeeError } = await supabase
-        .from("employee_master_data")
-        .select("id, job_title, employment_start_date")
-        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
-        .maybeSingle();
-
-      if (employeeError) {
-        console.error("Error fetching employee for lock check:", employeeError);
+      // SAFETY VALVE #1: server-side check via RPC with email-fallback UNION.
+      // If user has a valid completion on ANY matching employee record → never lock.
+      const { data: hasValid } = await supabase.rpc("has_valid_code_of_conduct_completion");
+      if (hasValid === true) {
         return { isLocked: false, daysRemaining: null as number | null, isRequired: false };
       }
 
-      if (!employee) return { isLocked: false, daysRemaining: null as number | null, isRequired: false };
+      const employeeIds = await resolveEmployeeIds(user.email);
+      if (employeeIds.length === 0) {
+        return { isLocked: false, daysRemaining: null as number | null, isRequired: false };
+      }
 
-      // Only applies to Salgskonsulent employees
-      if (employee.job_title !== "Salgskonsulent") {
+      // Read first employee for job_title + employment_start_date metadata
+      const { data: employee } = await supabase
+        .from("employee_master_data")
+        .select("job_title, employment_start_date")
+        .in("id", employeeIds)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (!employee || employee.job_title !== "Salgskonsulent") {
         return { isLocked: false, daysRemaining: null as number | null, isRequired: false };
       }
 
@@ -546,60 +566,42 @@ export function useCodeOfConductLock() {
       if (isWithinInitialGracePeriod(employee.employment_start_date)) {
         const startDate = new Date(employee.employment_start_date!);
         const daysSinceStart = differenceInDays(new Date(), startDate);
-        const daysUntilRequired = 14 - daysSinceStart;
-        return { 
-          isLocked: false, 
-          daysRemaining: daysUntilRequired,
-          isRequired: false 
-        };
+        return { isLocked: false, daysRemaining: 14 - daysSinceStart, isRequired: false };
       }
 
-      // Check completion
+      // Look up the most recent completion across all matching employee records
       const { data: completion } = await supabase
         .from("code_of_conduct_completions")
         .select("passed_at")
-        .eq("employee_id", employee.id)
+        .in("employee_id", employeeIds)
+        .order("passed_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
 
-      const hasValidCompletion = completion && !isQuizExpired(completion.passed_at);
-
-      if (hasValidCompletion) {
-        // Calculate days until renewal (2 months = 60 days)
-        const passedDate = new Date(completion.passed_at);
-        const daysSincePassed = differenceInDays(new Date(), passedDate);
-        const daysUntilRenewal = 60 - daysSincePassed;
-        
-        return { 
-          isLocked: false, 
-          daysRemaining: daysUntilRenewal > 0 ? daysUntilRenewal : 0,
-          isRequired: false 
-        };
+      // SAFETY VALVE #2: client-side double-check
+      if (completion && !isQuizExpired(completion.passed_at)) {
+        const daysSincePassed = differenceInDays(new Date(), new Date(completion.passed_at));
+        return { isLocked: false, daysRemaining: Math.max(0, 60 - daysSincePassed), isRequired: false };
       }
 
       // Quiz is required - check deadline
       const deadlineDate = getDeadlineDate(completion?.passed_at || null, employee.employment_start_date);
-      const now = new Date();
-      const daysRemaining = differenceInDays(deadlineDate, now);
+      const daysRemaining = differenceInDays(deadlineDate, new Date());
 
-      // Check for an active in-app reminder where the snooze window has expired
+      // Check for an active in-app reminder (any matching employee) where snooze has expired
       const { data: reminder } = await supabase
         .from("code_of_conduct_reminders")
         .select("id, snoozed_until, acknowledged_at")
-        .eq("employee_id", employee.id)
+        .in("employee_id", employeeIds)
         .is("acknowledged_at", null)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      let reminderLock = false;
-      if (reminder && reminder.snoozed_until) {
-        reminderLock = new Date(reminder.snoozed_until).getTime() <= Date.now();
-      }
-
+      const reminderLock = !!(reminder?.snoozed_until && new Date(reminder.snoozed_until).getTime() <= Date.now());
       const sevenDayLock = daysRemaining <= 0;
-      const isLocked = sevenDayLock || reminderLock;
 
-      return { isLocked, daysRemaining: Math.max(0, daysRemaining), isRequired: true };
+      return { isLocked: sevenDayLock || reminderLock, daysRemaining: Math.max(0, daysRemaining), isRequired: true };
     },
     enabled: !!user,
     refetchInterval: 60000,
