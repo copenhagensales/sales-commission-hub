@@ -48,6 +48,7 @@ export function useActivePulseSurvey() {
 }
 
 // Hook to check if current user has completed the survey
+// Uses RPC `has_completed_pulse_survey` to ensure 100% consistency with edge function & RLS logic
 export function useHasCompletedSurvey(surveyId?: string) {
   const { user } = useAuth();
 
@@ -56,27 +57,23 @@ export function useHasCompletedSurvey(surveyId?: string) {
     queryFn: async () => {
       if (!surveyId) return false;
 
-      // Get current employee ID
-      const lowerEmail = user?.email?.toLowerCase() || '';
-      const { data: employee } = await supabase
-        .from('employee_master_data')
-        .select('id')
-        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
-        .maybeSingle();
+      const { data, error } = await supabase.rpc('has_completed_pulse_survey', {
+        _survey_id: surveyId,
+      });
 
-      if (!employee) return false;
+      if (error) {
+        console.warn('[useHasCompletedSurvey] RPC error:', error);
+        // Fail-safe: if we can't verify, treat as completed to avoid showing the popup in a loop
+        return true;
+      }
 
-      const { data, error } = await supabase
-        .from('pulse_survey_completions')
-        .select('id')
-        .eq('survey_id', surveyId)
-        .eq('employee_id', employee.id)
-        .maybeSingle();
-
-      if (error && error.code !== 'PGRST116') throw error;
+      console.log('[useHasCompletedSurvey] survey:', surveyId, 'completed:', data);
       return !!data;
     },
-    enabled: !!surveyId && !!user
+    enabled: !!surveyId && !!user,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    retry: 2,
   });
 }
 
