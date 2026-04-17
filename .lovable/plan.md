@@ -1,62 +1,66 @@
 
-Brugeren vil ændre Code of Conduct-systemet:
-1. Fjern email-påmindelse → erstat med in-app popup når admin trykker "Send påmindelse"
-2. Popup kan udskydes max 24 timer
-3. Efter 24 timer (eller hvis ikke besvaret) → fuld lås af systemet indtil bestået
-4. Alle spørgsmål skal besvares korrekt for at bestå
-5. Ved fejl: tag kun de forkerte spørgsmål om
+Brugeren vil sikre at Code of Conduct (CoC) systemet ikke ender i samme "loop"-fejl som pulsmålingerne, hvor brugere blev låst ude pga. mismatch mellem completion-data og employee-id'er.
 
-Tjek nuværende state - quiz-logik er allerede sådan at man kun retager forkerte spørgsmål (set i CodeOfConduct.tsx). Lock-overlay eksisterer allerede (CodeOfConductLockOverlay). Skal verificere submit-logik passing-threshold + tilføje reminder-system.
+## Identificerede risici (samme mønster som pulse)
 
-## Plan
+Lad mig liste de konkrete fejlkilder fra pulse og tjekke om CoC har samme:
 
-### 1. Fjern email-baseret påmindelse
-- **`src/pages/CodeOfConductAdmin.tsx`**: Knappen "Send påmindelse" kalder ikke længere edge function. I stedet inserter den reminder-rækker i ny tabel `code_of_conduct_reminders` for hver berettiget medarbejder (manglende eller udløbet).
-- **Edge function `send-code-of-conduct-reminder`**: Beholdes ikke aktivt — slet indhold/lad ligge ubrugt (eller fjern kald).
+### 1. Employee-id mismatch via auth_user_id vs email
+**Pulse-problemet**: `has_completed_pulse_survey` brugte kun `get_current_employee_id()` → hvis bruger havde duplikat employee-record (én med `auth_user_id`, én med email-match), kunne completion ligge på den ene mens RPC kiggede på den anden → "loop".
+**CoC-status**: `useCodeOfConductCompletion` og `useCodeOfConductLock` skal tjekkes — bruger de email-fallback ELLER kun `auth_user_id`? Sandsynligvis kun `auth_user_id` → samme risiko.
 
-### 2. Ny tabel: `code_of_conduct_reminders`
-Kolonner:
-- `id`, `employee_id` (FK), `created_at`, `created_by`
-- `snoozed_until` (timestamptz, nullable) — sat når brugeren udskyder
-- `snooze_count` (int, default 0) — max 1 udskydelse tilladt
-- `acknowledged_at` (timestamptz, nullable) — sat når brugeren går til testen
-- RLS: brugere ser egne, admins kan oprette/se alle
+### 2. Hard-lock uden sikkerhedsventil
+**Pulse-problemet**: Hvis completion-check fejlede stille (RLS, network, race), blev brugeren låst og kunne ikke komme ud. Vi måtte deaktivere hard-locken.
+**CoC-status**: `CodeOfConductLockOverlay` er en hard-lock med kun "Gå til testen"-knap. Hvis completion-record findes på en skygge-employee, kan brugeren tage testen igen og igen uden at låsen forsvinder.
 
-### 3. Reminder-popup (ny komponent)
-- **`src/components/code-of-conduct/CodeOfConductReminderPopup.tsx`**: Vises ved login/navigation hvis brugeren har en aktiv reminder uden completion. Viser knap "Tag testen nu" og "Udskyd 24 timer" (kun synlig hvis `snooze_count = 0`).
-- Hook: **`src/hooks/useCodeOfConductReminder.ts`** — fetcher aktiv reminder for nuværende bruger.
-- Indsættes i `MainLayout` ved siden af eksisterende popups.
+### 3. Completion gemmes på forkert employee_id
+**Pulse-problemet**: Submit-edge-function fandt employee via `auth_user_id` ELLER email — hvis duplikater fandtes, kunne completion ende på "skygge"-employee.
+**CoC-status**: `useSubmitCodeOfConduct` skal tjekkes — hvilken employee_id bruges ved insert i `code_of_conduct_completions`?
 
-### 4. Skærp lock-logik
-- **`src/hooks/useCodeOfConduct.ts`** (`useCodeOfConductLock`): Lock aktiveres nu hvis:
-  - (a) eksisterende 7-dages logik OR
-  - (b) bruger har en reminder hvor `snoozed_until < now()` (eller aldrig snoozet og oprettet for >0 sekunder siden uden acknowledgment) — dvs. udskudt tid er udløbet
-- `CodeOfConductLockOverlay` er allerede i brug via `LockOverlays.tsx` — verificeres.
+### 4. Ingen idempotency / duplikat-completions
+**Pulse-problemet**: Edge function tjekkede idempotency korrekt (efter fix). 
+**CoC-status**: Tjekkes — har submit en idempotency-guard?
 
-### 5. Quiz-logik (verificering)
-Allerede korrekt:
-- `CODE_OF_CONDUCT_QUESTIONS` brugt i `CodeOfConduct.tsx`
-- Submit returnerer `wrongQuestionNumbers` og kræver alle korrekte (`passed = wrongQuestionNumbers.length === 0`) — bekræfter ved at læse `useCodeOfConduct.ts`
-- Næste forsøg viser kun forkerte spørgsmål (allerede implementeret via `currentAttempt.wrong_question_numbers`)
+### 5. Reminder-snooze giver permanent lås
+**Nyt CoC-problem**: Vi tilføjede netop reminder + snooze-baseret lock. Hvis snooze-timestamp er sat og brugeren tager testen, men `acknowledged_at` ikke sættes korrekt → permanent lås selvom test er bestået.
 
-Hvis logikken ikke er 100% (alle korrekte krævet), opdateres `useSubmitCodeOfConduct` så `passed` kun er `true` når 0 forkerte.
+## Plan: hærdning af CoC-systemet
 
-### 6. Admin UI opdatering
-- Knappen i `CodeOfConductAdmin.tsx` skifter tekst: "Send in-app påmindelse til X medarbejdere"
-- Toast: "Påmindelse vist i systemet for X medarbejdere"
-- Ingen email afsendes
+### A. Hærd `has_valid_code_of_conduct_completion` RPC (eller tilsvarende)
+- Opret/opdater RPC der tjekker completion via `auth.uid()` UNION email-matchede employees (samme mønster som `has_completed_pulse_survey`).
+- `useCodeOfConductCompletion` og `useCodeOfConductLock` skifter til denne RPC i stedet for direkte tabel-query.
 
-### Tekniske ændringer
-- **Migration**: Opret tabel `code_of_conduct_reminders` + RLS-policies + index på `(employee_id, acknowledged_at)`
-- **Hook**: Ny `useCodeOfConductReminder` (fetch + snooze + acknowledge mutations)
-- **Komponent**: `CodeOfConductReminderPopup`
-- **Layout**: Tilføj popup i `MainLayout` (eller `LockOverlays`)
-- **Lock-hook**: Udvid `useCodeOfConductLock` med reminder-baseret trigger
-- **Admin-side**: Skift mutation fra edge function-kald til insert i ny tabel
-- **Verificering**: Quiz-pass-tærskel = 100% korrekt
+### B. Lock skal aldrig udløses hvis test ER bestået
+- I `useCodeOfConductLock`: hvis der findes en gyldig (ikke-udløbet) completion via email-fallback → `isLocked: false` UANSET reminder/snooze-state.
+- Acknowledged_at sættes automatisk når en completion oprettes, så reminder ikke hænger fast efter bestået test.
 
-### Forventet effekt
-- Admin trykker "Send påmindelse" → alle berettigede ser popup næste gang de er i appen
-- Brugeren kan udskyde én gang (max 24t)
-- Efter udskydelsen udløber → fuld lås indtil testen er bestået
-- Alle spørgsmål skal være korrekte; forkerte skal retages alene
+### C. Heal eksisterende mismatches
+- Migration: For alle aktive medarbejdere med duplikat-employee-records, sammenflet completion-historik (eller log advarsel hvis manuel oprydning kræves).
+- For brugere med en åben reminder MEN en gyldig completion → auto-sæt `acknowledged_at = now()`.
+
+### D. Submit-flow rettes
+- `useSubmitCodeOfConduct`: brug samme employee-resolution som RPC (auth.uid → email-fallback), så completion altid lander på "korrekt" employee. Idempotency: hvis completion allerede findes i samme periode → skip insert, returner success.
+- Trigger eller logik der auto-acknowledger åbne reminders ved ny completion.
+
+### E. Sikkerhedsventil i overlay
+- `CodeOfConductLockOverlay` får en "log ud / kontakt support"-knap (samme mønster som `PulseSurveyLockOverlay`) så brugeren aldrig er fuldstændig fanget hvis noget går galt.
+
+### F. Diagnostik
+- SQL-tjek for: (1) brugere med åben reminder + gyldig completion, (2) employees med duplikat `auth_user_id`/email, (3) completions uden matchende employee.
+- Tilføj logging i submit-flow så vi kan diagnosticere fremtidige issues hurtigt.
+
+## Tekniske ændringer
+
+- **Migration**: Ny/opdateret RPC `has_valid_code_of_conduct_completion(_user_id uuid)` med email-fallback UNION; heal-script for åbne reminders med eksisterende completions; trigger/logik til auto-acknowledge af reminders ved completion-insert.
+- **`src/hooks/useCodeOfConduct.ts`**: Skift `useCodeOfConductCompletion` og `useCodeOfConductLock` til at bruge ny RPC. Sørg for at `isLocked` aldrig kan være `true` hvis gyldig completion findes.
+- **`src/hooks/useCodeOfConductReminder.ts`**: Tjek completion FØR popup vises — hvis bestået, skjul popup permanent.
+- **`useSubmitCodeOfConduct`**: Robust employee-resolution + idempotency + auto-acknowledge åbne reminders ved succes.
+- **`src/components/layout/CodeOfConductLockOverlay.tsx`**: Tilføj "Log ud"-fallback-knap.
+- **Diagnostisk SQL-kørsel** for at finde nuværende mismatches og heale dem inden den nye logik aktiveres.
+
+## Forventet effekt
+
+- Ingen brugere kan låses ude pga. duplikate employee-records eller skygge-completions
+- Completion bestået → lock og popup forsvinder garanteret (også hvis reminder-snooze er udløbet)
+- Hvis noget alligevel går galt, har brugeren en udvej (log ud)
+- Vi har diagnostik-data så fremtidige fejl kan opdages og fixes proaktivt
