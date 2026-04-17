@@ -8,7 +8,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Shield, CheckCircle2, XCircle, AlertTriangle, Search, Users, FileText, Plus, Trash2, Save, ChevronDown, ChevronUp, GripVertical } from "lucide-react";
+import { Shield, CheckCircle2, XCircle, AlertTriangle, Search, Users, FileText, Plus, Trash2, Save, ChevronDown, ChevronUp, GripVertical, Send } from "lucide-react";
+import { toast } from "sonner";
 import { format, differenceInDays } from "date-fns";
 import { da } from "date-fns/locale";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -46,6 +47,36 @@ export default function CodeOfConductAdmin() {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedQuestions, setExpandedQuestions] = useState<Set<number>>(new Set([1]));
+  const [isSendingReminder, setIsSendingReminder] = useState(false);
+
+  const handleSendReminder = async () => {
+    const recipientCount = stats.notStarted + stats.expired;
+    if (recipientCount === 0) {
+      toast.info("Alle har bestået og er gyldige – ingen at minde om.");
+      return;
+    }
+    if (!confirm(`Send påmindelse til ${recipientCount} medarbejder(e) som ikke har bestået eller hvis test er udløbet?`)) {
+      return;
+    }
+    setIsSendingReminder(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("send-code-of-conduct-reminder");
+      if (error) throw error;
+      if (data?.sent_count > 0) {
+        toast.success(`Påmindelse sendt til ${data.sent_count} medarbejder(e)`);
+      } else {
+        toast.info(data?.message || "Ingen emails sendt");
+      }
+      if (data?.failures?.length) {
+        toast.warning(`${data.failures.length} email(s) kunne ikke sendes`);
+      }
+    } catch (err) {
+      console.error("Send reminder error:", err);
+      toast.error("Kunne ikke sende påmindelser");
+    } finally {
+      setIsSendingReminder(false);
+    }
+  };
 
   // Local state for editing - initialized from the hardcoded questions
   const [questions, setQuestions] = useState<CodeOfConductQuestion[]>(
@@ -260,16 +291,28 @@ export default function CodeOfConductAdmin() {
   return (
     <MainLayout>
       <div className="container mx-auto space-y-6">
-        <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-            <Shield className="h-6 w-6 text-primary" />
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+              <Shield className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold">Code of Conduct Overblik</h1>
+              <p className="text-muted-foreground">
+                {scopeQuiz === "alt" ? "Alle salgskonsulenter" : "Dit team"}
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold">Code of Conduct Overblik</h1>
-            <p className="text-muted-foreground">
-              {scopeQuiz === "alt" ? "Alle salgskonsulenter" : "Dit team"}
-            </p>
-          </div>
+          <Button
+            onClick={handleSendReminder}
+            disabled={isSendingReminder}
+            className="gap-2"
+          >
+            <Send className="h-4 w-4" />
+            {isSendingReminder
+              ? "Sender..."
+              : `Send påmindelse (${stats.notStarted + stats.expired})`}
+          </Button>
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
