@@ -48,6 +48,7 @@ export function useActivePulseSurvey() {
 }
 
 // Hook to check if current user has completed the survey
+// Uses RPC `has_completed_pulse_survey` to ensure 100% consistency with edge function & RLS logic
 export function useHasCompletedSurvey(surveyId?: string) {
   const { user } = useAuth();
 
@@ -56,27 +57,23 @@ export function useHasCompletedSurvey(surveyId?: string) {
     queryFn: async () => {
       if (!surveyId) return false;
 
-      // Get current employee ID
-      const lowerEmail = user?.email?.toLowerCase() || '';
-      const { data: employee } = await supabase
-        .from('employee_master_data')
-        .select('id')
-        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
-        .maybeSingle();
+      const { data, error } = await supabase.rpc('has_completed_pulse_survey', {
+        _survey_id: surveyId,
+      });
 
-      if (!employee) return false;
+      if (error) {
+        console.warn('[useHasCompletedSurvey] RPC error:', error);
+        // Fail-safe: if we can't verify, treat as completed to avoid showing the popup in a loop
+        return true;
+      }
 
-      const { data, error } = await supabase
-        .from('pulse_survey_completions')
-        .select('id')
-        .eq('survey_id', surveyId)
-        .eq('employee_id', employee.id)
-        .maybeSingle();
-
-      if (error && error.code !== 'PGRST116') throw error;
+      console.log('[useHasCompletedSurvey] survey:', surveyId, 'completed:', data);
       return !!data;
     },
-    enabled: !!surveyId && !!user
+    enabled: !!surveyId && !!user,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    retry: 2,
   });
 }
 
@@ -88,7 +85,17 @@ export function useShouldShowPulseSurvey() {
 
   // Only show for "medarbejder" role
   const isEmployee = roleData?.role === 'medarbejder';
-  const showBadge = isEmployee && !!activeSurvey && !hasCompleted;
+  // Only show badge if we are SURE the user hasn't completed (don't show during loading)
+  const showBadge = isEmployee && !!activeSurvey && hasCompleted === false && !completionLoading;
+
+  if (isEmployee && activeSurvey) {
+    console.log('[useShouldShowPulseSurvey]', {
+      surveyId: activeSurvey.id,
+      hasCompleted,
+      completionLoading,
+      showBadge,
+    });
+  }
 
   return {
     showMenuItem: isEmployee,
@@ -126,12 +133,25 @@ export function useSubmitPulseSurvey() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      return { success: true };
+      return { success: true, surveyId };
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pulse-survey-completion'] });
-      queryClient.invalidateQueries({ queryKey: ['pulse-survey-active'] });
-      queryClient.invalidateQueries({ queryKey: ['pulse-survey-lock'] });
+    onSuccess: async (_data, variables) => {
+      // Optimistically mark as completed so popup disappears immediately
+      queryClient.setQueryData(
+        ['pulse-survey-completion', variables.surveyId, user?.id],
+        true
+      );
+      // Invalidate ALL pulse-survey related queries
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['pulse-survey-completion'] }),
+        queryClient.invalidateQueries({ queryKey: ['pulse-survey-active'] }),
+        queryClient.invalidateQueries({ queryKey: ['pulse-survey-lock'] }),
+        queryClient.invalidateQueries({ queryKey: ['pulse-survey-dismissal'] }),
+        queryClient.invalidateQueries({ queryKey: ['pulse-survey-draft'] }),
+        queryClient.invalidateQueries({ queryKey: ['pulse-survey-has-draft'] }),
+      ]);
+      // Force refetch of completion to confirm server state
+      await queryClient.refetchQueries({ queryKey: ['pulse-survey-completion'] });
     }
   });
 }
@@ -181,33 +201,25 @@ export function usePulseSurveyDismissal(surveyId?: string) {
     queryFn: async () => {
       if (!surveyId) return null;
 
-      const lowerEmail = user?.email?.toLowerCase() || '';
-      const { data: employee } = await supabase
-        .from('employee_master_data')
-        .select('id, is_staff_employee')
-        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
-        .maybeSingle();
+      const { data, error } = await supabase.rpc('get_pulse_survey_dismissal', {
+        _survey_id: surveyId,
+      });
 
-      if (!employee) return { isDismissed: false, isStaff: false, employeeId: null };
+      if (error) {
+        console.warn('[usePulseSurveyDismissal] RPC error:', error);
+        return { isDismissed: false, isStaff: false, employeeId: null, dismissalCount: 0 };
+      }
 
-      const { data } = await supabase
-        .from('pulse_survey_dismissals')
-        .select('dismissed_until, dismissal_count')
-        .eq('survey_id', surveyId)
-        .eq('employee_id', employee.id)
-        .maybeSingle();
-
-      const isDismissed = data ? new Date(data.dismissed_until) > new Date() : false;
-      const dismissalCount = (data as any)?.dismissal_count ?? 0;
-
+      const d = (data ?? {}) as Record<string, any>;
       return {
-        isDismissed,
-        isStaff: employee.is_staff_employee === true,
-        employeeId: employee.id,
-        dismissalCount,
+        isDismissed: !!d.isDismissed,
+        isStaff: !!d.isStaff,
+        employeeId: d.employeeId ?? null,
+        dismissalCount: d.dismissalCount ?? 0,
       };
     },
     enabled: !!surveyId && !!user,
+    staleTime: 0,
   });
 }
 
@@ -253,24 +265,16 @@ export function usePulseSurveyDraft(surveyId?: string) {
     queryFn: async () => {
       if (!surveyId) return null;
 
-      const lowerEmail = user?.email?.toLowerCase() || '';
-      const { data: employee } = await supabase
-        .from('employee_master_data')
-        .select('id')
-        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
-        .maybeSingle();
+      const { data, error } = await supabase.rpc('get_pulse_survey_draft', {
+        _survey_id: surveyId,
+      });
 
-      if (!employee) return null;
+      if (error) {
+        console.warn('[usePulseSurveyDraft] RPC error:', error);
+        return null;
+      }
 
-      const { data, error } = await supabase
-        .from('pulse_survey_drafts')
-        .select('draft_data')
-        .eq('survey_id', surveyId)
-        .eq('employee_id', employee.id)
-        .maybeSingle();
-
-      if (error && error.code !== 'PGRST116') throw error;
-      return data?.draft_data as Record<string, unknown> | null;
+      return (data ?? null) as Record<string, unknown> | null;
     },
     enabled: !!surveyId && !!user,
   });
@@ -381,23 +385,16 @@ export function usePulseSurveyHasDraft(surveyId?: string) {
     queryFn: async () => {
       if (!surveyId) return false;
 
-      const lowerEmail = user?.email?.toLowerCase() || '';
-      const { data: employee } = await supabase
-        .from('employee_master_data')
-        .select('id')
-        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
-        .maybeSingle();
+      const { data, error } = await supabase.rpc('get_pulse_survey_draft', {
+        _survey_id: surveyId,
+      });
 
-      if (!employee) return false;
+      if (error) {
+        console.warn('[usePulseSurveyHasDraft] RPC error:', error);
+        return false;
+      }
 
-      const { data } = await supabase
-        .from('pulse_survey_drafts')
-        .select('id')
-        .eq('survey_id', surveyId)
-        .eq('employee_id', employee.id)
-        .maybeSingle();
-
-      return !!data;
+      return data !== null && data !== undefined;
     },
     enabled: !!surveyId && !!user,
   });

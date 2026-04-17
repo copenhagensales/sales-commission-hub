@@ -14219,6 +14219,11 @@ export type Database = {
           sale_date: string
         }[]
       }
+      get_pulse_survey_dismissal: {
+        Args: { _survey_id: string }
+        Returns: Json
+      }
+      get_pulse_survey_draft: { Args: { _survey_id: string }; Returns: Json }
       get_referrer_by_code: {
         Args: { p_referral_code: string }
         Returns: {
@@ -14373,6 +14378,10 @@ export type Database = {
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["system_role"]
+      }
+      has_completed_pulse_survey: {
+        Args: { _survey_id: string }
+        Returns: boolean
       }
       has_edit_permission: {
         Args: { _permission_key: string; _user_id: string }
