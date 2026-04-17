@@ -12467,6 +12467,9 @@ export type Database = {
       }
       system_feedback_comments: {
         Row: {
+          attachment_name: string | null
+          attachment_type: string | null
+          attachment_url: string | null
           author_employee_id: string | null
           created_at: string
           feedback_id: string
@@ -12475,6 +12478,9 @@ export type Database = {
           message: string
         }
         Insert: {
+          attachment_name?: string | null
+          attachment_type?: string | null
+          attachment_url?: string | null
           author_employee_id?: string | null
           created_at?: string
           feedback_id: string
@@ -12483,6 +12489,9 @@ export type Database = {
           message: string
         }
         Update: {
+          attachment_name?: string | null
+          attachment_type?: string | null
+          attachment_url?: string | null
           author_employee_id?: string | null
           created_at?: string
           feedback_id?: string
