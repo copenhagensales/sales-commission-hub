@@ -85,7 +85,17 @@ export function useShouldShowPulseSurvey() {
 
   // Only show for "medarbejder" role
   const isEmployee = roleData?.role === 'medarbejder';
-  const showBadge = isEmployee && !!activeSurvey && !hasCompleted;
+  // Only show badge if we are SURE the user hasn't completed (don't show during loading)
+  const showBadge = isEmployee && !!activeSurvey && hasCompleted === false && !completionLoading;
+
+  if (isEmployee && activeSurvey) {
+    console.log('[useShouldShowPulseSurvey]', {
+      surveyId: activeSurvey.id,
+      hasCompleted,
+      completionLoading,
+      showBadge,
+    });
+  }
 
   return {
     showMenuItem: isEmployee,
