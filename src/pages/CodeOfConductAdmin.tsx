@@ -47,6 +47,36 @@ export default function CodeOfConductAdmin() {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedQuestions, setExpandedQuestions] = useState<Set<number>>(new Set([1]));
+  const [isSendingReminder, setIsSendingReminder] = useState(false);
+
+  const handleSendReminder = async () => {
+    const recipientCount = stats.notStarted + stats.expired;
+    if (recipientCount === 0) {
+      toast.info("Alle har bestået og er gyldige – ingen at minde om.");
+      return;
+    }
+    if (!confirm(`Send påmindelse til ${recipientCount} medarbejder(e) som ikke har bestået eller hvis test er udløbet?`)) {
+      return;
+    }
+    setIsSendingReminder(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("send-code-of-conduct-reminder");
+      if (error) throw error;
+      if (data?.sent_count > 0) {
+        toast.success(`Påmindelse sendt til ${data.sent_count} medarbejder(e)`);
+      } else {
+        toast.info(data?.message || "Ingen emails sendt");
+      }
+      if (data?.failures?.length) {
+        toast.warning(`${data.failures.length} email(s) kunne ikke sendes`);
+      }
+    } catch (err) {
+      console.error("Send reminder error:", err);
+      toast.error("Kunne ikke sende påmindelser");
+    } finally {
+      setIsSendingReminder(false);
+    }
+  };
 
   // Local state for editing - initialized from the hardcoded questions
   const [questions, setQuestions] = useState<CodeOfConductQuestion[]>(
