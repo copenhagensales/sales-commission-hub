@@ -352,7 +352,7 @@ export default function CodeOfConductAdmin() {
             <div>
               <h1 className="text-2xl font-bold">Code of Conduct Overblik</h1>
               <p className="text-muted-foreground">
-                {scopeQuiz === "alt" ? "Alle salgskonsulenter" : "Dit team"}
+                {variantConfig[variant].label} · {scopeQuiz === "alt" ? "Alle" : "Dit team"}
               </p>
             </div>
           </div>
@@ -367,6 +367,13 @@ export default function CodeOfConductAdmin() {
               : `Send in-app påmindelse (${stats.notStarted + stats.expired})`}
           </Button>
         </div>
+
+        <Tabs value={variant} onValueChange={(v) => setVariant(v as CocVariant)} className="space-y-2">
+          <TabsList>
+            <TabsTrigger value="salgskonsulent">Salgskonsulenter</TabsTrigger>
+            <TabsTrigger value="fieldmarketing">Fieldmarketing</TabsTrigger>
+          </TabsList>
+        </Tabs>
 
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList>
@@ -383,7 +390,7 @@ export default function CodeOfConductAdmin() {
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Salgskonsulenter
+                    {variantConfig[variant].label}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
