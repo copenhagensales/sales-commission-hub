@@ -339,8 +339,8 @@ export default function CodeOfConductAdmin() {
           >
             <Send className="h-4 w-4" />
             {isSendingReminder
-              ? "Sender..."
-              : `Send påmindelse (${stats.notStarted + stats.expired})`}
+              ? "Opretter..."
+              : `Send in-app påmindelse (${stats.notStarted + stats.expired})`}
           </Button>
         </div>
 
