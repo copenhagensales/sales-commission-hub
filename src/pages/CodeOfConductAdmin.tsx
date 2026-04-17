@@ -48,6 +48,14 @@ export default function CodeOfConductAdmin() {
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedQuestions, setExpandedQuestions] = useState<Set<number>>(new Set([1]));
   const [isSendingReminder, setIsSendingReminder] = useState(false);
+  const [variant, setVariant] = useState<CocVariant>("salgskonsulent");
+
+  const variantConfig = {
+    salgskonsulent: { label: "Salgskonsulenter", jobTitle: "Salgskonsulent", questions: SALGSKONSULENT_COC_QUESTIONS },
+    fieldmarketing: { label: "Fieldmarketing", jobTitle: "Fieldmarketing", questions: FIELDMARKETING_COC_QUESTIONS },
+  } as const;
+  const activeJobTitle = variantConfig[variant].jobTitle;
+  const activeQuestions = variantConfig[variant].questions;
 
   const handleSendReminder = async () => {
     const recipientCount = stats.notStarted + stats.expired;
