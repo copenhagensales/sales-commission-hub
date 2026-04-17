@@ -183,7 +183,7 @@ export default function CodeOfConduct() {
                 <h3 className="font-medium mb-3">Følgende spørgsmål var forkerte:</h3>
                 <ul className="space-y-2">
                   {wrongQuestions.map(qNum => {
-                    const question = CODE_OF_CONDUCT_QUESTIONS.find(q => q.id === qNum);
+                    const question = allQuestions.find(q => q.id === qNum);
                     return (
                       <li key={qNum} className="flex items-start gap-2 text-sm">
                         <XCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
