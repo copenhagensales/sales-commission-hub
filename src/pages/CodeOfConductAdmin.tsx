@@ -78,17 +78,18 @@ export default function CodeOfConductAdmin() {
         return;
       }
 
-      // Find which already have an unacknowledged reminder, so we don't duplicate
+      // Find which already have an unacknowledged reminder for this variant, so we don't duplicate
       const { data: existing } = await supabase
         .from("code_of_conduct_reminders")
         .select("employee_id")
         .in("employee_id", recipientIds)
+        .eq("quiz_variant", variant)
         .is("acknowledged_at", null);
 
       const existingSet = new Set((existing || []).map((r: any) => r.employee_id));
       const toInsert = recipientIds
         .filter((id) => !existingSet.has(id))
-        .map((id) => ({ employee_id: id, created_by: currentEmployeeId }));
+        .map((id) => ({ employee_id: id, created_by: currentEmployeeId, quiz_variant: variant }));
 
       let insertedCount = 0;
       if (toInsert.length > 0) {
