@@ -55,24 +55,53 @@ export default function CodeOfConductAdmin() {
       toast.info("Alle har bestået og er gyldige – ingen at minde om.");
       return;
     }
-    if (!confirm(`Send påmindelse til ${recipientCount} medarbejder(e) som ikke har bestået eller hvis test er udløbet?`)) {
+    if (!confirm(`Send in-app påmindelse til ${recipientCount} medarbejder(e)?\n\nDe vil se en popup næste gang de er i systemet. De kan udskyde én gang i 24 timer, hvorefter systemet låses indtil testen er bestået.`)) {
       return;
     }
     setIsSendingReminder(true);
     try {
-      const { data, error } = await supabase.functions.invoke("send-code-of-conduct-reminder");
-      if (error) throw error;
-      if (data?.sent_count > 0) {
-        toast.success(`Påmindelse sendt til ${data.sent_count} medarbejder(e)`);
-      } else {
-        toast.info(data?.message || "Ingen emails sendt");
+      // Re-derive recipient employee IDs (those without valid completion)
+      const recipientIds = (employees || [])
+        .filter((e) => !e.completion || e.completion.isExpired)
+        .map((e) => e.id);
+
+      if (recipientIds.length === 0) {
+        toast.info("Ingen modtagere fundet");
+        return;
       }
-      if (data?.failures?.length) {
-        toast.warning(`${data.failures.length} email(s) kunne ikke sendes`);
+
+      // Find which already have an unacknowledged reminder, so we don't duplicate
+      const { data: existing } = await supabase
+        .from("code_of_conduct_reminders")
+        .select("employee_id")
+        .in("employee_id", recipientIds)
+        .is("acknowledged_at", null);
+
+      const existingSet = new Set((existing || []).map((r: any) => r.employee_id));
+      const toInsert = recipientIds
+        .filter((id) => !existingSet.has(id))
+        .map((id) => ({ employee_id: id, created_by: currentEmployeeId }));
+
+      let insertedCount = 0;
+      if (toInsert.length > 0) {
+        const { error } = await supabase
+          .from("code_of_conduct_reminders")
+          .insert(toInsert);
+        if (error) throw error;
+        insertedCount = toInsert.length;
+      }
+
+      const skipped = recipientIds.length - insertedCount;
+      if (insertedCount > 0) {
+        toast.success(
+          `Påmindelse vist i systemet for ${insertedCount} medarbejder(e)${skipped > 0 ? ` (${skipped} havde allerede en aktiv påmindelse)` : ""}`
+        );
+      } else {
+        toast.info("Alle berettigede medarbejdere har allerede en aktiv påmindelse");
       }
     } catch (err) {
       console.error("Send reminder error:", err);
-      toast.error("Kunne ikke sende påmindelser");
+      toast.error("Kunne ikke oprette påmindelser");
     } finally {
       setIsSendingReminder(false);
     }
