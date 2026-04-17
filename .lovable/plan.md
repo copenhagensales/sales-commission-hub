@@ -1,70 +1,49 @@
 
-## Problem identificeret
 
-Skærmbilledet viser kun **6 Eesy TM produkter med 28 regler** — men databasen har faktisk:
-- **6 "synlige" parent-produkter** (korrekt)
-- **11 mergede child-produkter** der ikke vises (korrekt skjult)
-- **84 aktive pricing rules** fordelt på parents (men UI viser kun 28 → der er 56 "manglende")
+## Mål
+Tilføj en KPI-oversigt øverst på `/recruitment/booking-flow` så man straks kan se sundheden i recruitment-flowet.
 
-### Rod-årsager i `CommissionRatesTab.tsx`
+## Undersøgelse nødvendig før implementering
+Jeg skal lige tjekke den eksisterende side og datamodel for at vælge de rigtige KPI'er:
+- `src/pages/recruitment/BookingFlow.tsx` (eller tilsvarende route-komponent) — hvad vises i dag, og hvilke queries findes
+- Tabeller: `booking_flow_enrollments` (status: active/cancelled/completed), `booking_flow_touchpoints` (status: pending/sent/failed), `candidates` (status: applied/interview_scheduled/hired/rejected/ghostet/takket_nej)
+- Memory `recruitment/booking-flow-and-management` (9-trins flow) og `infra/recruitment-flow-automation-cron`
 
-**1. Aggressiv "deduplikering" skjuler legitime regler (linje 137-145)**
-```ts
-const isDuplicate = group.rules.some(
-  (r) => r.commission_dkk === rule.commission_dkk
-      && r.revenue_dkk === rule.revenue_dkk
-      && r.campaignNames.join(",") === campaignNames.join(",")
-);
-```
-DB siger 84 rules → UI viser 28. Den dropper ~56 regler fordi den anser dem som "dubletter" hvis pris+kampagne matcher — men det er forkert: to regler kan have samme tal men forskellige `priority`, `effective_from/to` datoer, conditions eller subsidy-flags. **Produktet "Fri tale + 110" har 41 aktive regler i DB men UI grupperer dem til 17.**
+## Foreslåede KPI'er (kort visning)
 
-**2. Children-produkter respekteres ikke (linje 48-67, 107-124)**
-Tabellen henter ALLE produkter (inkl. mergede children med `merged_into_product_id != null`) og grupperer dem efter `name` - men siden children typisk har varianter af parent-navnet, ender de som separate rækker. Skærmbilledet viser fx 4 separate rækker for varianter af "Fri tale + 150 GB...", "Fri tale + 30 GB..." — disse er **mergede children** der iflg. memory ([Product Composite UI](mem://features/products/composite-management-ui)) skal vises som ét sammensat produkt under deres parent.
+**Række 1 — Flow-aktivitet (nu)**
+1. **Aktive i flow** — `booking_flow_enrollments` hvor `status = 'active'`
+2. **Nye sidste 7 dage** — enrollments oprettet inden for 7 dage
+3. **Gennemført flow** — `status = 'completed'` (alle touchpoints sendt)
+4. **Annulleret** — `status = 'cancelled'` (kandidat ghostet/rejected/takket nej undervejs)
 
-I `MgTest.tsx` filtreres children korrekt fra med `.is("merged_into_product_id", null)` — men `CommissionRatesTab` mangler dette filter. Resultatet:
-- Samme produkt kan vises 2 gange (parent + child med næsten samme navn)
-- Children vises uden regler ("—") fordi rules ligger på parent
-- Forvirrende rækkefølge
+**Række 2 — Kandidat-udfald (sidste 30 dage)**
+5. **Ghostet** — candidates med status `ghostet`
+6. **Takket nej** — status `takket_nej`
+7. **Interview booket** — status `interview_scheduled`
+8. **Hired** — status `hired` (konvertering)
 
-**3. Ingen visning af kampagne-mapping/priority-detaljer**
-Når flere regler dedupes til én, mister man information om hvilke kampagner/priorities der er konfigureret.
+**Række 3 — Touchpoint-sundhed (operationel)**
+9. **Pending touchpoints** — `booking_flow_touchpoints.status = 'pending'` due nu eller før (advarsel hvis cron hænger)
+10. **Failed touchpoints (24t)** — fejlede SMS/email sidste døgn
+11. **Konverteringsrate** — hired / (alle der startede flow sidste 30 dage) i %
 
-**4. Tæller "Regler" matcher ikke virkeligheden**
-Badge viser 17 regler — DB har 41. Brugeren kan ikke stole på tællingen.
+## Layout
+- Genbrug eksisterende `Card`-mønster (som `vagt-flow/Index.tsx` og `Dashboard.tsx`)
+- Grid: 4 kolonner på desktop, 2 på mobil — én række pr. tema (3 rækker total)
+- Hver KPI-card: stort tal, label, lille subtext (fx "vs. forrige 30 dage" eller farvet trend)
+- Loading-skeletons mens queries kører
+- Failed-touchpoints rød hvis > 0; pending gul hvis > 20
 
-### Plan: ret `CommissionRatesTab.tsx`
+## Filer
+- `src/pages/recruitment/BookingFlow.tsx` (eller den faktiske route-fil) — tilføj `<RecruitmentKpiBar />` øverst
+- `src/components/recruitment/RecruitmentKpiBar.tsx` — NY, indeholder alle queries og card-grid
+- Evt. `src/hooks/useRecruitmentKpis.ts` — NY hvis vi vil samle queries i én hook
 
-**A. Filtrer mergede children fra hovedlisten**
-- Tilføj `.is("merged_into_product_id", null)` i product-query (samme mønster som `MgTest.tsx`).
-- Eventuelt: hent children separat og vis dem som "varianter" under parent-rækken (sammensat produkt-visning, jvf. memory).
+## Spørgsmål før implementering
 
-**B. Fjern den ødelæggende deduplikering**
-- Vis ALLE aktive pricing rules som de er.
-- Hvis to regler genuint er identiske kan vi i stedet **gruppere visuelt** efter `priority` + datoer, eller markere `(dublet?)` med advarsel - men aldrig skjule data.
+1. **Hvilke 4-8 KPI'er er vigtigst for dig?** (Hellere færre & vigtige end 11 cards)
+2. **Tidsperiode**: Skal "annulleret/ghostet/takket nej" være sidste 30 dage, indeværende måned, eller "all time"?
+3. **Touchpoint-sundhed**: Skal pending/failed touchpoints med (operationelt overblik for admin), eller kun rene flow/kandidat-tal?
+4. **Konverteringsrate**: Vil du have % hired-rate som en KPI, eller er det fint at se rå tal?
 
-**C. Vis flere rule-detaljer**
-- Tilføj kolonner/badges for: `priority`, `effective_from`, `effective_to`, conditions/tilskud-flag.
-- Vis rule-`name` selv når kampagner findes (så bruger ser "Tilskud" / "Subsidy" osv.).
-
-**D. Korrekt rule-tælling**
-- "Regler"-badge skal vise faktisk antal aktive rules fra DB (samme tal som tooltip i `MgTest.tsx`'s `productRuleCounts`).
-
-**E. Inkludér rules fra mergede children på parent**
-- Hvis child stadig har egne rules (sjældent men muligt), tæl dem under parent for at vise det fulde billede.
-
-### Tekniske ændringer
-
-- **`src/components/mg-test/CommissionRatesTab.tsx`**:
-  - Product-query: tilføj filter `.is("merged_into_product_id", null)`.
-  - Hent også children for visning som varianter under parent (valgfrit men anbefalet).
-  - Pricing-rules query: include `effective_from`, `effective_to`, `conditions`.
-  - Fjern deduplikerings-loop; render alle rules.
-  - Tilføj priority/dato-info i rule-rækken.
-  - Tæl alle rules (også fra child-produkter hvis de har).
-
-### Forventet effekt
-- Eesy TM viser igen alle 84 regler korrekt fordelt
-- Ingen falske dubletter af produktnavne
-- Mergede varianter samlet under deres parent
-- Tællingen "X produkter · Y regler" matcher DB-virkeligheden
-- Brugeren kan se priority, datoer og betingelser pr. regel
