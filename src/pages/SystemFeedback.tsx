@@ -597,6 +597,8 @@ function CommentThread({ feedbackId, employeeId, employeeName, isOwner }: { feed
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [message, setMessage] = useState("");
+  const [attachment, setAttachment] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const { data: comments = [] } = useQuery({
@@ -620,21 +622,44 @@ function CommentThread({ feedbackId, employeeId, employeeName, isOwner }: { feed
 
   const sendMutation = useMutation({
     mutationFn: async () => {
-      if (!message.trim() || !employeeId) return;
+      if ((!message.trim() && !attachment) || !employeeId) return;
+
+      let attachment_url: string | null = null;
+      let attachment_name: string | null = null;
+      let attachment_type: string | null = null;
+
+      if (attachment) {
+        const ext = attachment.name.split(".").pop() || "bin";
+        const path = `comments/${feedbackId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+        const { error: upErr } = await supabase.storage
+          .from("feedback-screenshots")
+          .upload(path, attachment, { contentType: attachment.type || undefined, upsert: false });
+        if (upErr) throw upErr;
+        const { data: pub } = supabase.storage.from("feedback-screenshots").getPublicUrl(path);
+        attachment_url = pub.publicUrl;
+        attachment_name = attachment.name;
+        attachment_type = attachment.type || null;
+      }
+
       const { error } = await supabase.from("system_feedback_comments").insert({
         feedback_id: feedbackId,
         author_employee_id: employeeId,
-        message: message.trim(),
+        message: message.trim() || (attachment_name ? `📎 ${attachment_name}` : ""),
         is_admin: isOwner,
-      });
+        attachment_url,
+        attachment_name,
+        attachment_type,
+      } as any);
       if (error) throw error;
     },
     onSuccess: () => {
       setMessage("");
+      setAttachment(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
       queryClient.invalidateQueries({ queryKey: ["feedback-comments", feedbackId] });
     },
-    onError: () => {
-      toast({ title: "Fejl", description: "Kunne ikke sende besked", variant: "destructive" });
+    onError: (e: any) => {
+      toast({ title: "Fejl", description: e?.message || "Kunne ikke sende besked", variant: "destructive" });
     },
   });
 
@@ -643,6 +668,16 @@ function CommentThread({ feedbackId, employeeId, employeeName, isOwner }: { feed
       e.preventDefault();
       sendMutation.mutate();
     }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: "Filen er for stor", description: "Maks. 10 MB pr. fil", variant: "destructive" });
+      return;
+    }
+    setAttachment(file);
   };
 
   return (
@@ -658,6 +693,7 @@ function CommentThread({ feedbackId, employeeId, employeeName, isOwner }: { feed
         ) : (
           comments.map((c: any) => {
             const authorName = c.author ? `${c.author.first_name || ""} ${c.author.last_name || ""}`.trim() : "Ukendt";
+            const isImage = c.attachment_type?.startsWith("image/");
             return (
               <div key={c.id} className={`p-2 rounded-md text-sm ${c.is_admin ? "bg-purple-500/10 border border-purple-500/20 ml-4" : "bg-background border border-border mr-4"}`}>
                 <div className="flex items-center gap-2 mb-1">
@@ -668,12 +704,49 @@ function CommentThread({ feedbackId, employeeId, employeeName, isOwner }: { feed
                     {format(new Date(c.created_at), "d. MMM HH:mm", { locale: da })}
                   </span>
                 </div>
-                <p className="whitespace-pre-wrap">{c.message}</p>
+                {c.message && <p className="whitespace-pre-wrap">{c.message}</p>}
+                {c.attachment_url && (
+                  <div className="mt-2">
+                    {isImage ? (
+                      <a href={c.attachment_url} target="_blank" rel="noopener noreferrer">
+                        <img src={c.attachment_url} alt={c.attachment_name || "vedhæftning"} className="max-h-48 rounded-md border border-border" />
+                      </a>
+                    ) : (
+                      <a
+                        href={c.attachment_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 text-xs text-primary hover:underline px-2 py-1 rounded-md bg-muted/40 border border-border"
+                      >
+                        <Upload className="h-3 w-3" />
+                        {c.attachment_name || "Vedhæftet fil"}
+                      </a>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })
         )}
       </div>
+
+      {attachment && (
+        <div className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-md border border-border bg-muted/30">
+          <span className="text-xs truncate">📎 {attachment.name} ({(attachment.size / 1024).toFixed(0)} KB)</span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 flex-shrink-0"
+            onClick={() => {
+              setAttachment(null);
+              if (fileInputRef.current) fileInputRef.current.value = "";
+            }}
+          >
+            <X className="h-3 w-3" />
+          </Button>
+        </div>
+      )}
 
       <div className="flex gap-2">
         <Textarea
@@ -684,10 +757,28 @@ function CommentThread({ feedbackId, employeeId, employeeName, isOwner }: { feed
           rows={2}
           className="min-h-[60px]"
         />
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          onChange={handleFileSelect}
+          accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
+        />
+        <Button
+          type="button"
+          size="icon"
+          variant="outline"
+          className="h-[60px] w-10 flex-shrink-0"
+          disabled={sendMutation.isPending}
+          onClick={() => fileInputRef.current?.click()}
+          title="Vedhæft fil"
+        >
+          <Upload className="h-4 w-4" />
+        </Button>
         <Button
           size="icon"
           className="h-[60px] w-10 flex-shrink-0"
-          disabled={!message.trim() || sendMutation.isPending}
+          disabled={(!message.trim() && !attachment) || sendMutation.isPending}
           onClick={() => sendMutation.mutate()}
         >
           <Send className="h-4 w-4" />
