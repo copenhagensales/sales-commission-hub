@@ -385,23 +385,16 @@ export function usePulseSurveyHasDraft(surveyId?: string) {
     queryFn: async () => {
       if (!surveyId) return false;
 
-      const lowerEmail = user?.email?.toLowerCase() || '';
-      const { data: employee } = await supabase
-        .from('employee_master_data')
-        .select('id')
-        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
-        .maybeSingle();
+      const { data, error } = await supabase.rpc('get_pulse_survey_draft', {
+        _survey_id: surveyId,
+      });
 
-      if (!employee) return false;
+      if (error) {
+        console.warn('[usePulseSurveyHasDraft] RPC error:', error);
+        return false;
+      }
 
-      const { data } = await supabase
-        .from('pulse_survey_drafts')
-        .select('id')
-        .eq('survey_id', surveyId)
-        .eq('employee_id', employee.id)
-        .maybeSingle();
-
-      return !!data;
+      return data !== null && data !== undefined;
     },
     enabled: !!surveyId && !!user,
   });
