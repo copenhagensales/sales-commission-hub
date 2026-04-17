@@ -123,12 +123,25 @@ export function useSubmitPulseSurvey() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      return { success: true };
+      return { success: true, surveyId };
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pulse-survey-completion'] });
-      queryClient.invalidateQueries({ queryKey: ['pulse-survey-active'] });
-      queryClient.invalidateQueries({ queryKey: ['pulse-survey-lock'] });
+    onSuccess: async (_data, variables) => {
+      // Optimistically mark as completed so popup disappears immediately
+      queryClient.setQueryData(
+        ['pulse-survey-completion', variables.surveyId, user?.id],
+        true
+      );
+      // Invalidate ALL pulse-survey related queries
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['pulse-survey-completion'] }),
+        queryClient.invalidateQueries({ queryKey: ['pulse-survey-active'] }),
+        queryClient.invalidateQueries({ queryKey: ['pulse-survey-lock'] }),
+        queryClient.invalidateQueries({ queryKey: ['pulse-survey-dismissal'] }),
+        queryClient.invalidateQueries({ queryKey: ['pulse-survey-draft'] }),
+        queryClient.invalidateQueries({ queryKey: ['pulse-survey-has-draft'] }),
+      ]);
+      // Force refetch of completion to confirm server state
+      await queryClient.refetchQueries({ queryKey: ['pulse-survey-completion'] });
     }
   });
 }
