@@ -1544,7 +1544,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             oppIndicesMap.set(key, indices);
           });
 
-          const consolidateOppRowsLocal = (rows: Record<string, unknown>[]): Record<string, unknown> => {
+          const consolidateOppRowsLocal = (rows: Record<string, unknown>[], oppKey?: string): Record<string, unknown> => {
             const totalRow = rows.find(r => {
               const pv = String(r["Produkt"] || r["produkt"] || "").trim();
               return pv.toLowerCase() === "total";
@@ -1553,7 +1553,11 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               const pv = String(r["Produkt"] || r["produkt"] || "").trim();
               return pv.toLowerCase() !== "total" && pv !== "";
             });
-            return { ...totalRow, _product_rows: productRows.length > 0 ? productRows : undefined };
+            // Inject "Kampagne pris" on each sub-row from the campaign price map
+            const isCampaign = oppKey && campaignPriceMap.has(oppKey) ? campaignPriceMap.get(oppKey)! : false;
+            const campaignLabel: "Ja" | "Nej" = isCampaign ? "Ja" : "Nej";
+            const enrichedProductRows = productRows.map(r => ({ ...r, "Kampagne pris": campaignLabel }));
+            return { ...totalRow, _product_rows: enrichedProductRows.length > 0 ? enrichedProductRows : undefined };
           };
 
           const oppSet1c = new Set(oppNumbers.map(o => o.toUpperCase().trim()));
