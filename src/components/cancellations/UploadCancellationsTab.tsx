@@ -2143,7 +2143,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         const saleOpp = extractOpp(sale.raw_payload).toUpperCase().trim();
         if (saleOpp && uploadedRowsByOpp.has(saleOpp)) {
           (indexByOpp.get(saleOpp) || []).forEach(i => matchedIndices.add(i));
-          return consolidateOppRows(uploadedRowsByOpp.get(saleOpp)!);
+          return consolidateOppRows(uploadedRowsByOpp.get(saleOpp)!, saleOpp);
         }
         const salePhone = normalizePhone(sale.customer_phone || "");
         if (salePhone && uploadedRowsByPhone.has(salePhone)) {
@@ -2326,6 +2326,8 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
   const handleReset = () => {
     setFile(null);
+    setCampaignPriceFile(null);
+    setCampaignPriceMap(new Map());
     setParsedData([]);
     setColumns([]);
     setPhoneColumn("__none__");
