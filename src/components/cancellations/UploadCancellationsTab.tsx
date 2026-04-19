@@ -765,37 +765,34 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
   // Parse the campaign price extract: column D (index 3) = OPP, column M (index 12) = CPO correction.
   // Returns Map<oppNumber (UPPER, trimmed), boolean> where true = campaign price (negative correction).
+  // Uses the robust parseExcelFile (ExcelJS → SheetJS fallback) to handle BI exports without default stylesheet.
   const parseCampaignPriceExcel = async (buffer: ArrayBuffer): Promise<Map<string, boolean>> => {
-    const ExcelJS = (await import("exceljs")).default;
-    const wb = new ExcelJS.Workbook();
-    await wb.xlsx.load(buffer);
-    const ws = wb.worksheets[0];
+    const { rows, columns: cols } = await parseExcelFile(buffer);
     const map = new Map<string, boolean>();
-    if (!ws) return map;
+    const oppCol = cols[3];   // Column D
+    const cpoCol = cols[12];  // Column M
+    if (!oppCol || !cpoCol) return map;
 
-    ws.eachRow({ includeEmpty: false }, (row) => {
-      const rawOpp = row.getCell(4).value;
-      const rawCpo = row.getCell(13).value;
-      if (rawOpp === null || rawOpp === undefined || rawOpp === "") return;
+    for (const row of rows) {
+      const rawOpp = row[oppCol];
+      if (rawOpp === null || rawOpp === undefined || rawOpp === "") continue;
       const oppStr = String(rawOpp).toUpperCase().trim();
-      // Skip header row(s): OPPs typically contain digits (e.g. OPP-12345)
-      if (!/\d/.test(oppStr)) return;
+      if (!/\d/.test(oppStr)) continue; // skip headers/junk
 
+      const rawCpo = row[cpoCol];
       let cpo = 0;
-      if (typeof rawCpo === "number") cpo = rawCpo;
-      else if (rawCpo !== null && rawCpo !== undefined && rawCpo !== "") {
-        const parsed = parseFloat(String(rawCpo).replace(/\./g, "").replace(/,/g, ".").replace(/[^0-9.\-]/g, ""));
+      if (typeof rawCpo === "number") {
+        cpo = rawCpo;
+      } else if (rawCpo !== null && rawCpo !== undefined && rawCpo !== "") {
+        const parsed = parseFloat(
+          String(rawCpo).replace(/\./g, "").replace(/,/g, ".").replace(/[^0-9.\-]/g, "")
+        );
         cpo = isNaN(parsed) ? 0 : parsed;
       }
 
       const isCampaign = cpo < 0;
-      // If OPP appears multiple times, ANY negative wins
-      if (map.has(oppStr)) {
-        map.set(oppStr, map.get(oppStr)! || isCampaign);
-      } else {
-        map.set(oppStr, isCampaign);
-      }
-    });
+      map.set(oppStr, (map.get(oppStr) ?? false) || isCampaign);
+    }
     return map;
   };
 
