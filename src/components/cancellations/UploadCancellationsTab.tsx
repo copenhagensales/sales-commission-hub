@@ -1570,7 +1570,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             (oppIndicesMap.get(saleOpp) || []).forEach(i => matchedIndicesLocal.add(i));
 
             const consolidatedRow = oppRowsMap.has(saleOpp)
-              ? consolidateOppRowsLocal(oppRowsMap.get(saleOpp)!)
+              ? consolidateOppRowsLocal(oppRowsMap.get(saleOpp)!, saleOpp)
               : {};
 
             const items = saleItemsMap.get(sale.id) || [];
