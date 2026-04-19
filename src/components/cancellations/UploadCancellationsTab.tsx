@@ -2081,7 +2081,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         }
       });
 
-      const consolidateOppRows = (rows: Record<string, unknown>[]): Record<string, unknown> => {
+      const consolidateOppRows = (rows: Record<string, unknown>[], oppKey?: string): Record<string, unknown> => {
         const totalRow = rows.find(r => {
           const produktVal = String(r["Produkt"] || r["produkt"] || "").trim();
           return produktVal.toLowerCase() === "total";
@@ -2092,9 +2092,14 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           return produktVal.toLowerCase() !== "total" && produktVal !== "";
         });
 
+        // Inject "Kampagne pris" on each sub-row from the campaign price map
+        const isCampaign = oppKey && campaignPriceMap.has(oppKey) ? campaignPriceMap.get(oppKey)! : false;
+        const campaignLabel: "Ja" | "Nej" = isCampaign ? "Ja" : "Nej";
+        const enrichedProductRows = productRows.map(r => ({ ...r, "Kampagne pris": campaignLabel }));
+
         return {
           ...totalRow,
-          _product_rows: productRows.length > 0 ? productRows : undefined,
+          _product_rows: enrichedProductRows.length > 0 ? enrichedProductRows : undefined,
         };
       };
 
