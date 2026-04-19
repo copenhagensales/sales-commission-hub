@@ -2660,47 +2660,133 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                   Denne kunde har ingen gemt opsætning for annulleringsupload. Kontakt en administrator.
                 </p>
               </div>
-            ) : !file ? (
-              <>
-                <div
-                  {...getRootProps()}
-                  className={`border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors
-                    ${isDragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"}`}
-                >
-                  <input {...getInputProps()} />
-                  <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  {isDragActive ? (
-                    <p className="text-lg">Slip filen her...</p>
-                  ) : (
-                    <>
-                      <p className="text-lg mb-2">Træk og slip en Excel-fil her</p>
-                      <p className="text-sm text-muted-foreground">eller klik for at vælge</p>
-                    </>
+            ) : (() => {
+              const tdcWaitingForCampaign = isTdcErhverv && !!file && campaignPriceMap.size === 0;
+              const tdcWaitingForMain = isTdcErhverv && !file && !!campaignPriceFile;
+              const showMainDropzone = !file;
+              const showCampaignDropzone = isTdcErhverv && !campaignPriceFile;
+              const isMatchingNow = !!file && !tdcWaitingForCampaign && (isTdcErhverv ? campaignPriceMap.size > 0 : true);
+
+              if (isMatchingNow) {
+                return (
+                  <div className="flex flex-col items-center justify-center p-12 text-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
+                    <p className="text-sm text-muted-foreground">Matcher {file!.name}...</p>
+                  </div>
+                );
+              }
+
+              return (
+                <>
+                  <div className={isTdcErhverv ? "grid md:grid-cols-2 gap-4" : ""}>
+                    {showMainDropzone && (
+                      <div
+                        {...getRootProps()}
+                        className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors
+                          ${isDragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"}`}
+                      >
+                        <input {...getInputProps()} />
+                        <Upload className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+                        {isTdcErhverv && (
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Hovedfil</p>
+                        )}
+                        {isDragActive ? (
+                          <p className="text-base">Slip filen her...</p>
+                        ) : (
+                          <>
+                            <p className="text-base mb-1">Træk og slip annulleringsfil</p>
+                            <p className="text-xs text-muted-foreground">eller klik for at vælge</p>
+                          </>
+                        )}
+                      </div>
+                    )}
+                    {!showMainDropzone && isTdcErhverv && (
+                      <div className="border-2 border-dashed rounded-lg p-8 text-center border-success/40 bg-success/5">
+                        <FileSpreadsheet className="h-10 w-10 mx-auto mb-3 text-success" />
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Hovedfil</p>
+                        <p className="text-sm font-medium truncate">{file!.name}</p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="mt-2 h-7"
+                          onClick={() => { setFile(null); setParsedData([]); setColumns([]); }}
+                        >
+                          <X className="h-3.5 w-3.5 mr-1" /> Skift fil
+                        </Button>
+                      </div>
+                    )}
+
+                    {showCampaignDropzone && (
+                      <div
+                        {...getCampaignRootProps()}
+                        className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors
+                          ${isCampaignDragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"}`}
+                      >
+                        <input {...getCampaignInputProps()} />
+                        <Upload className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Kampagnepris-udtræk</p>
+                        {isCampaignDragActive ? (
+                          <p className="text-base">Slip filen her...</p>
+                        ) : (
+                          <>
+                            <p className="text-base mb-1">Træk og slip kampagne-Excel</p>
+                            <p className="text-xs text-muted-foreground">Kolonne D = OPP, kolonne M = CPO-rettelse</p>
+                          </>
+                        )}
+                      </div>
+                    )}
+                    {!showCampaignDropzone && isTdcErhverv && (
+                      <div className="border-2 border-dashed rounded-lg p-8 text-center border-success/40 bg-success/5">
+                        <FileSpreadsheet className="h-10 w-10 mx-auto mb-3 text-success" />
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Kampagnepris-udtræk</p>
+                        <p className="text-sm font-medium truncate">{campaignPriceFile!.name}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {campaignPriceMap.size} OPP · {Array.from(campaignPriceMap.values()).filter(Boolean).length} m. kampagnepris
+                        </p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="mt-2 h-7"
+                          onClick={() => { setCampaignPriceFile(null); setCampaignPriceMap(new Map()); }}
+                        >
+                          <X className="h-3.5 w-3.5 mr-1" /> Skift fil
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  {tdcWaitingForCampaign && (
+                    <div className="flex items-center gap-2 text-sm text-warning bg-warning/10 rounded-md px-3 py-2">
+                      <AlertCircle className="h-4 w-4" />
+                      <span>Upload kampagnepris-udtræk for at fortsætte matchingen.</span>
+                    </div>
                   )}
-                </div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
-                  <Settings className="h-4 w-4" />
-                  <span>Opsætning: <strong>{(clientConfigs.find(c => c.is_default) || clientConfigs[0])?.name}</strong></span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="ml-auto h-7 px-2"
-                    onClick={() => setShowEditConfig(true)}
-                  >
-                    <Pencil className="h-3.5 w-3.5 mr-1" />
-                    Rediger
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <div className="flex flex-col items-center justify-center p-12 text-center">
-                <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
-                <p className="text-sm text-muted-foreground">Matcher {file.name}...</p>
-              </div>
-            )}
+                  {tdcWaitingForMain && (
+                    <div className="flex items-center gap-2 text-sm text-warning bg-warning/10 rounded-md px-3 py-2">
+                      <AlertCircle className="h-4 w-4" />
+                      <span>Upload hovedfilen for at fortsætte matchingen.</span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
+                    <Settings className="h-4 w-4" />
+                    <span>Opsætning: <strong>{(clientConfigs.find(c => c.is_default) || clientConfigs[0])?.name}</strong></span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="ml-auto h-7 px-2"
+                      onClick={() => setShowEditConfig(true)}
+                    >
+                      <Pencil className="h-3.5 w-3.5 mr-1" />
+                      Rediger
+                    </Button>
+                  </div>
+                </>
+              );
+            })()}
 
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => { setFile(null); setParsedData([]); setColumns([]); setStep("type"); }}>
+              <Button variant="outline" onClick={() => { setFile(null); setCampaignPriceFile(null); setCampaignPriceMap(new Map()); setParsedData([]); setColumns([]); setStep("type"); }}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Tilbage
               </Button>
