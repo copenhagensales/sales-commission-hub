@@ -763,6 +763,69 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     enabled: !!user?.email,
   });
 
+  // Parse the campaign price extract: column D (index 3) = OPP, column M (index 12) = CPO correction.
+  // Returns Map<oppNumber (UPPER, trimmed), boolean> where true = campaign price (negative correction).
+  const parseCampaignPriceExcel = async (buffer: ArrayBuffer): Promise<Map<string, boolean>> => {
+    const ExcelJS = (await import("exceljs")).default;
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buffer);
+    const ws = wb.worksheets[0];
+    const map = new Map<string, boolean>();
+    if (!ws) return map;
+
+    ws.eachRow({ includeEmpty: false }, (row) => {
+      const rawOpp = row.getCell(4).value;
+      const rawCpo = row.getCell(13).value;
+      if (rawOpp === null || rawOpp === undefined || rawOpp === "") return;
+      const oppStr = String(rawOpp).toUpperCase().trim();
+      // Skip header row(s): OPPs typically contain digits (e.g. OPP-12345)
+      if (!/\d/.test(oppStr)) return;
+
+      let cpo = 0;
+      if (typeof rawCpo === "number") cpo = rawCpo;
+      else if (rawCpo !== null && rawCpo !== undefined && rawCpo !== "") {
+        const parsed = parseFloat(String(rawCpo).replace(/\./g, "").replace(/,/g, ".").replace(/[^0-9.\-]/g, ""));
+        cpo = isNaN(parsed) ? 0 : parsed;
+      }
+
+      const isCampaign = cpo < 0;
+      // If OPP appears multiple times, ANY negative wins
+      if (map.has(oppStr)) {
+        map.set(oppStr, map.get(oppStr)! || isCampaign);
+      } else {
+        map.set(oppStr, isCampaign);
+      }
+    });
+    return map;
+  };
+
+  const onCampaignDrop = useCallback((acceptedFiles: File[]) => {
+    const uploadedFile = acceptedFiles[0];
+    if (!uploadedFile) return;
+    setCampaignPriceFile(uploadedFile);
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const buffer = e.target?.result as ArrayBuffer;
+        const map = await parseCampaignPriceExcel(buffer);
+        setCampaignPriceMap(map);
+        const campaignCount = Array.from(map.values()).filter(Boolean).length;
+        toast({
+          title: "Kampagnepris-udtræk indlæst",
+          description: `${map.size} OPP-numre fundet (${campaignCount} med kampagnepris).`,
+        });
+      } catch (error) {
+        toast({
+          title: "Fejl ved læsning af kampagne-fil",
+          description: "Kunne ikke læse Excel-filen. Kontroller formatet.",
+          variant: "destructive",
+        });
+      }
+    };
+    reader.readAsArrayBuffer(uploadedFile);
+  }, []);
+
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const uploadedFile = acceptedFiles[0];
     if (!uploadedFile) return;
@@ -787,13 +850,16 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         setColumns(cols);
         setParsedData(jsonData.map((row, idx) => ({ originalRow: row, originalIndex: idx })));
 
-        // Check if a default config exists – if so, auto-match
+        // Auto-match if a default config exists.
+        // For TDC Erhverv: hold off until campaign-price file is also loaded.
         const defaultConfig = clientConfigs.find(c => c.is_default) || (clientConfigs.length > 0 ? clientConfigs[0] : null);
         if (defaultConfig) {
           applyConfig(defaultConfig);
           setSelectedConfigId(defaultConfig.id);
           setAppliedConfigName(defaultConfig.name);
-          autoMatchPending.current = true;
+          if (!isTdcErhverv || campaignPriceMap.size > 0) {
+            autoMatchPending.current = true;
+          }
         }
 
         toast({
@@ -809,7 +875,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       }
     };
     reader.readAsArrayBuffer(uploadedFile);
-  }, [clientConfigs]);
+  }, [clientConfigs, isTdcErhverv, campaignPriceMap]);
 
   // Auto-match when file is parsed and a default config was applied
   useEffect(() => {
@@ -819,8 +885,30 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     }
   }, [parsedData]);
 
+  // For TDC Erhverv: when campaign file arrives AFTER main file, trigger match
+  useEffect(() => {
+    if (isTdcErhverv && file && parsedData.length > 0 && campaignPriceMap.size > 0) {
+      autoMatchPending.current = true;
+      handleMatch();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [campaignPriceMap]);
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
+    accept: {
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+      "application/vnd.ms-excel": [".xls"],
+    },
+    maxFiles: 1,
+  });
+
+  const {
+    getRootProps: getCampaignRootProps,
+    getInputProps: getCampaignInputProps,
+    isDragActive: isCampaignDragActive,
+  } = useDropzone({
+    onDrop: onCampaignDrop,
     accept: {
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
       "application/vnd.ms-excel": [".xls"],
