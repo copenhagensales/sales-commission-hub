@@ -806,6 +806,16 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       try {
         const buffer = e.target?.result as ArrayBuffer;
         const map = await parseCampaignPriceExcel(buffer);
+        if (map.size === 0) {
+          setCampaignPriceFile(null);
+          setCampaignPriceMap(new Map());
+          toast({
+            title: "Ingen OPP-numre fundet",
+            description: "Tjek at filen indeholder OPP-numre i kolonne D og CPO-rettelser i kolonne M.",
+            variant: "destructive",
+          });
+          return;
+        }
         setCampaignPriceMap(map);
         const campaignCount = Array.from(map.values()).filter(Boolean).length;
         toast({
@@ -813,6 +823,9 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           description: `${map.size} OPP-numre fundet (${campaignCount} med kampagnepris).`,
         });
       } catch (error) {
+        console.error("Campaign price parse error:", error);
+        setCampaignPriceFile(null);
+        setCampaignPriceMap(new Map());
         toast({
           title: "Fejl ved læsning af kampagne-fil",
           description: "Kunne ikke læse Excel-filen. Kontroller formatet.",
