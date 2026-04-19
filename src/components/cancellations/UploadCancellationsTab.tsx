@@ -563,6 +563,9 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const [file, setFile] = useState<File | null>(null);
+  const [campaignPriceFile, setCampaignPriceFile] = useState<File | null>(null);
+  const [campaignPriceMap, setCampaignPriceMap] = useState<Map<string, boolean>>(new Map());
+  const isTdcErhverv = selectedClientId === CLIENT_IDS["TDC Erhverv"];
   const [parsedData, setParsedData] = useState<ParsedRow[]>([]);
   const [columns, setColumns] = useState<string[]>([]);
   const [phoneColumn, setPhoneColumn] = useState<string>("__none__");
@@ -760,6 +763,69 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     enabled: !!user?.email,
   });
 
+  // Parse the campaign price extract: column D (index 3) = OPP, column M (index 12) = CPO correction.
+  // Returns Map<oppNumber (UPPER, trimmed), boolean> where true = campaign price (negative correction).
+  const parseCampaignPriceExcel = async (buffer: ArrayBuffer): Promise<Map<string, boolean>> => {
+    const ExcelJS = (await import("exceljs")).default;
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buffer);
+    const ws = wb.worksheets[0];
+    const map = new Map<string, boolean>();
+    if (!ws) return map;
+
+    ws.eachRow({ includeEmpty: false }, (row) => {
+      const rawOpp = row.getCell(4).value;
+      const rawCpo = row.getCell(13).value;
+      if (rawOpp === null || rawOpp === undefined || rawOpp === "") return;
+      const oppStr = String(rawOpp).toUpperCase().trim();
+      // Skip header row(s): OPPs typically contain digits (e.g. OPP-12345)
+      if (!/\d/.test(oppStr)) return;
+
+      let cpo = 0;
+      if (typeof rawCpo === "number") cpo = rawCpo;
+      else if (rawCpo !== null && rawCpo !== undefined && rawCpo !== "") {
+        const parsed = parseFloat(String(rawCpo).replace(/\./g, "").replace(/,/g, ".").replace(/[^0-9.\-]/g, ""));
+        cpo = isNaN(parsed) ? 0 : parsed;
+      }
+
+      const isCampaign = cpo < 0;
+      // If OPP appears multiple times, ANY negative wins
+      if (map.has(oppStr)) {
+        map.set(oppStr, map.get(oppStr)! || isCampaign);
+      } else {
+        map.set(oppStr, isCampaign);
+      }
+    });
+    return map;
+  };
+
+  const onCampaignDrop = useCallback((acceptedFiles: File[]) => {
+    const uploadedFile = acceptedFiles[0];
+    if (!uploadedFile) return;
+    setCampaignPriceFile(uploadedFile);
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const buffer = e.target?.result as ArrayBuffer;
+        const map = await parseCampaignPriceExcel(buffer);
+        setCampaignPriceMap(map);
+        const campaignCount = Array.from(map.values()).filter(Boolean).length;
+        toast({
+          title: "Kampagnepris-udtræk indlæst",
+          description: `${map.size} OPP-numre fundet (${campaignCount} med kampagnepris).`,
+        });
+      } catch (error) {
+        toast({
+          title: "Fejl ved læsning af kampagne-fil",
+          description: "Kunne ikke læse Excel-filen. Kontroller formatet.",
+          variant: "destructive",
+        });
+      }
+    };
+    reader.readAsArrayBuffer(uploadedFile);
+  }, []);
+
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const uploadedFile = acceptedFiles[0];
     if (!uploadedFile) return;
@@ -784,13 +850,16 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         setColumns(cols);
         setParsedData(jsonData.map((row, idx) => ({ originalRow: row, originalIndex: idx })));
 
-        // Check if a default config exists – if so, auto-match
+        // Auto-match if a default config exists.
+        // For TDC Erhverv: hold off until campaign-price file is also loaded.
         const defaultConfig = clientConfigs.find(c => c.is_default) || (clientConfigs.length > 0 ? clientConfigs[0] : null);
         if (defaultConfig) {
           applyConfig(defaultConfig);
           setSelectedConfigId(defaultConfig.id);
           setAppliedConfigName(defaultConfig.name);
-          autoMatchPending.current = true;
+          if (!isTdcErhverv || campaignPriceMap.size > 0) {
+            autoMatchPending.current = true;
+          }
         }
 
         toast({
@@ -806,7 +875,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       }
     };
     reader.readAsArrayBuffer(uploadedFile);
-  }, [clientConfigs]);
+  }, [clientConfigs, isTdcErhverv, campaignPriceMap]);
 
   // Auto-match when file is parsed and a default config was applied
   useEffect(() => {
@@ -816,8 +885,30 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     }
   }, [parsedData]);
 
+  // For TDC Erhverv: when campaign file arrives AFTER main file, trigger match
+  useEffect(() => {
+    if (isTdcErhverv && file && parsedData.length > 0 && campaignPriceMap.size > 0) {
+      autoMatchPending.current = true;
+      handleMatch();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [campaignPriceMap]);
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
+    accept: {
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+      "application/vnd.ms-excel": [".xls"],
+    },
+    maxFiles: 1,
+  });
+
+  const {
+    getRootProps: getCampaignRootProps,
+    getInputProps: getCampaignInputProps,
+    isDragActive: isCampaignDragActive,
+  } = useDropzone({
+    onDrop: onCampaignDrop,
     accept: {
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
       "application/vnd.ms-excel": [".xls"],
@@ -1453,7 +1544,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             oppIndicesMap.set(key, indices);
           });
 
-          const consolidateOppRowsLocal = (rows: Record<string, unknown>[]): Record<string, unknown> => {
+          const consolidateOppRowsLocal = (rows: Record<string, unknown>[], oppKey?: string): Record<string, unknown> => {
             const totalRow = rows.find(r => {
               const pv = String(r["Produkt"] || r["produkt"] || "").trim();
               return pv.toLowerCase() === "total";
@@ -1462,7 +1553,11 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               const pv = String(r["Produkt"] || r["produkt"] || "").trim();
               return pv.toLowerCase() !== "total" && pv !== "";
             });
-            return { ...totalRow, _product_rows: productRows.length > 0 ? productRows : undefined };
+            // Inject "Kampagne pris" on each sub-row from the campaign price map
+            const isCampaign = oppKey && campaignPriceMap.has(oppKey) ? campaignPriceMap.get(oppKey)! : false;
+            const campaignLabel: "Ja" | "Nej" = isCampaign ? "Ja" : "Nej";
+            const enrichedProductRows = productRows.map(r => ({ ...r, "Kampagne pris": campaignLabel }));
+            return { ...totalRow, _product_rows: enrichedProductRows.length > 0 ? enrichedProductRows : undefined };
           };
 
           const oppSet1c = new Set(oppNumbers.map(o => o.toUpperCase().trim()));
@@ -1475,7 +1570,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             (oppIndicesMap.get(saleOpp) || []).forEach(i => matchedIndicesLocal.add(i));
 
             const consolidatedRow = oppRowsMap.has(saleOpp)
-              ? consolidateOppRowsLocal(oppRowsMap.get(saleOpp)!)
+              ? consolidateOppRowsLocal(oppRowsMap.get(saleOpp)!, saleOpp)
               : {};
 
             const items = saleItemsMap.get(sale.id) || [];
@@ -1986,7 +2081,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         }
       });
 
-      const consolidateOppRows = (rows: Record<string, unknown>[]): Record<string, unknown> => {
+      const consolidateOppRows = (rows: Record<string, unknown>[], oppKey?: string): Record<string, unknown> => {
         const totalRow = rows.find(r => {
           const produktVal = String(r["Produkt"] || r["produkt"] || "").trim();
           return produktVal.toLowerCase() === "total";
@@ -1997,9 +2092,14 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           return produktVal.toLowerCase() !== "total" && produktVal !== "";
         });
 
+        // Inject "Kampagne pris" on each sub-row from the campaign price map
+        const isCampaign = oppKey && campaignPriceMap.has(oppKey) ? campaignPriceMap.get(oppKey)! : false;
+        const campaignLabel: "Ja" | "Nej" = isCampaign ? "Ja" : "Nej";
+        const enrichedProductRows = productRows.map(r => ({ ...r, "Kampagne pris": campaignLabel }));
+
         return {
           ...totalRow,
-          _product_rows: productRows.length > 0 ? productRows : undefined,
+          _product_rows: enrichedProductRows.length > 0 ? enrichedProductRows : undefined,
         };
       };
 
@@ -2043,7 +2143,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         const saleOpp = extractOpp(sale.raw_payload).toUpperCase().trim();
         if (saleOpp && uploadedRowsByOpp.has(saleOpp)) {
           (indexByOpp.get(saleOpp) || []).forEach(i => matchedIndices.add(i));
-          return consolidateOppRows(uploadedRowsByOpp.get(saleOpp)!);
+          return consolidateOppRows(uploadedRowsByOpp.get(saleOpp)!, saleOpp);
         }
         const salePhone = normalizePhone(sale.customer_phone || "");
         if (salePhone && uploadedRowsByPhone.has(salePhone)) {
@@ -2226,6 +2326,8 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
 
   const handleReset = () => {
     setFile(null);
+    setCampaignPriceFile(null);
+    setCampaignPriceMap(new Map());
     setParsedData([]);
     setColumns([]);
     setPhoneColumn("__none__");
@@ -2558,47 +2660,133 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                   Denne kunde har ingen gemt opsætning for annulleringsupload. Kontakt en administrator.
                 </p>
               </div>
-            ) : !file ? (
-              <>
-                <div
-                  {...getRootProps()}
-                  className={`border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors
-                    ${isDragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"}`}
-                >
-                  <input {...getInputProps()} />
-                  <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  {isDragActive ? (
-                    <p className="text-lg">Slip filen her...</p>
-                  ) : (
-                    <>
-                      <p className="text-lg mb-2">Træk og slip en Excel-fil her</p>
-                      <p className="text-sm text-muted-foreground">eller klik for at vælge</p>
-                    </>
+            ) : (() => {
+              const tdcWaitingForCampaign = isTdcErhverv && !!file && campaignPriceMap.size === 0;
+              const tdcWaitingForMain = isTdcErhverv && !file && !!campaignPriceFile;
+              const showMainDropzone = !file;
+              const showCampaignDropzone = isTdcErhverv && !campaignPriceFile;
+              const isMatchingNow = !!file && !tdcWaitingForCampaign && (isTdcErhverv ? campaignPriceMap.size > 0 : true);
+
+              if (isMatchingNow) {
+                return (
+                  <div className="flex flex-col items-center justify-center p-12 text-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
+                    <p className="text-sm text-muted-foreground">Matcher {file!.name}...</p>
+                  </div>
+                );
+              }
+
+              return (
+                <>
+                  <div className={isTdcErhverv ? "grid md:grid-cols-2 gap-4" : ""}>
+                    {showMainDropzone && (
+                      <div
+                        {...getRootProps()}
+                        className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors
+                          ${isDragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"}`}
+                      >
+                        <input {...getInputProps()} />
+                        <Upload className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+                        {isTdcErhverv && (
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Hovedfil</p>
+                        )}
+                        {isDragActive ? (
+                          <p className="text-base">Slip filen her...</p>
+                        ) : (
+                          <>
+                            <p className="text-base mb-1">Træk og slip annulleringsfil</p>
+                            <p className="text-xs text-muted-foreground">eller klik for at vælge</p>
+                          </>
+                        )}
+                      </div>
+                    )}
+                    {!showMainDropzone && isTdcErhverv && (
+                      <div className="border-2 border-dashed rounded-lg p-8 text-center border-success/40 bg-success/5">
+                        <FileSpreadsheet className="h-10 w-10 mx-auto mb-3 text-success" />
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Hovedfil</p>
+                        <p className="text-sm font-medium truncate">{file!.name}</p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="mt-2 h-7"
+                          onClick={() => { setFile(null); setParsedData([]); setColumns([]); }}
+                        >
+                          <X className="h-3.5 w-3.5 mr-1" /> Skift fil
+                        </Button>
+                      </div>
+                    )}
+
+                    {showCampaignDropzone && (
+                      <div
+                        {...getCampaignRootProps()}
+                        className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors
+                          ${isCampaignDragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"}`}
+                      >
+                        <input {...getCampaignInputProps()} />
+                        <Upload className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Kampagnepris-udtræk</p>
+                        {isCampaignDragActive ? (
+                          <p className="text-base">Slip filen her...</p>
+                        ) : (
+                          <>
+                            <p className="text-base mb-1">Træk og slip kampagne-Excel</p>
+                            <p className="text-xs text-muted-foreground">Kolonne D = OPP, kolonne M = CPO-rettelse</p>
+                          </>
+                        )}
+                      </div>
+                    )}
+                    {!showCampaignDropzone && isTdcErhverv && (
+                      <div className="border-2 border-dashed rounded-lg p-8 text-center border-success/40 bg-success/5">
+                        <FileSpreadsheet className="h-10 w-10 mx-auto mb-3 text-success" />
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Kampagnepris-udtræk</p>
+                        <p className="text-sm font-medium truncate">{campaignPriceFile!.name}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {campaignPriceMap.size} OPP · {Array.from(campaignPriceMap.values()).filter(Boolean).length} m. kampagnepris
+                        </p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="mt-2 h-7"
+                          onClick={() => { setCampaignPriceFile(null); setCampaignPriceMap(new Map()); }}
+                        >
+                          <X className="h-3.5 w-3.5 mr-1" /> Skift fil
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  {tdcWaitingForCampaign && (
+                    <div className="flex items-center gap-2 text-sm text-warning bg-warning/10 rounded-md px-3 py-2">
+                      <AlertCircle className="h-4 w-4" />
+                      <span>Upload kampagnepris-udtræk for at fortsætte matchingen.</span>
+                    </div>
                   )}
-                </div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
-                  <Settings className="h-4 w-4" />
-                  <span>Opsætning: <strong>{(clientConfigs.find(c => c.is_default) || clientConfigs[0])?.name}</strong></span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="ml-auto h-7 px-2"
-                    onClick={() => setShowEditConfig(true)}
-                  >
-                    <Pencil className="h-3.5 w-3.5 mr-1" />
-                    Rediger
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <div className="flex flex-col items-center justify-center p-12 text-center">
-                <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
-                <p className="text-sm text-muted-foreground">Matcher {file.name}...</p>
-              </div>
-            )}
+                  {tdcWaitingForMain && (
+                    <div className="flex items-center gap-2 text-sm text-warning bg-warning/10 rounded-md px-3 py-2">
+                      <AlertCircle className="h-4 w-4" />
+                      <span>Upload hovedfilen for at fortsætte matchingen.</span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
+                    <Settings className="h-4 w-4" />
+                    <span>Opsætning: <strong>{(clientConfigs.find(c => c.is_default) || clientConfigs[0])?.name}</strong></span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="ml-auto h-7 px-2"
+                      onClick={() => setShowEditConfig(true)}
+                    >
+                      <Pencil className="h-3.5 w-3.5 mr-1" />
+                      Rediger
+                    </Button>
+                  </div>
+                </>
+              );
+            })()}
 
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => { setFile(null); setParsedData([]); setColumns([]); setStep("type"); }}>
+              <Button variant="outline" onClick={() => { setFile(null); setCampaignPriceFile(null); setCampaignPriceMap(new Map()); setParsedData([]); setColumns([]); setStep("type"); }}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Tilbage
               </Button>
