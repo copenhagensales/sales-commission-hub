@@ -1,49 +1,55 @@
 
 
 ## Mål
-Tilføj en KPI-oversigt øverst på `/recruitment/booking-flow` så man straks kan se sundheden i recruitment-flowet.
+Tilføj understøttelse af et **andet** Excel-ark (kampagnepris-udtræk) ved upload på TDC Erhverv, så systemet automatisk kan beregne om hvert OPP-nummer er solgt med kampagnepris. Resultatet bruges som **"Kampagne pris" condition** ved produkt-matching — på linje med hvordan vi i dag aflæser produktrækkerne fra hovedfilen.
 
-## Undersøgelse nødvendig før implementering
-Jeg skal lige tjekke den eksisterende side og datamodel for at vælge de rigtige KPI'er:
-- `src/pages/recruitment/BookingFlow.tsx` (eller tilsvarende route-komponent) — hvad vises i dag, og hvilke queries findes
-- Tabeller: `booking_flow_enrollments` (status: active/cancelled/completed), `booking_flow_touchpoints` (status: pending/sent/failed), `candidates` (status: applied/interview_scheduled/hired/rejected/ghostet/takket_nej)
-- Memory `recruitment/booking-flow-and-management` (9-trins flow) og `infra/recruitment-flow-automation-cron`
+## Reglen (fra brugeren)
+For hvert OPP-nummer i kampagne-udtrækket:
+- **Kolonne D** = OPP-nummer
+- **Kolonne M** = CPO-rettelse
+  - Negativt beløb (< 0) → solgt **med kampagnepris** → `Kampagne pris = "Ja"` (eller `true`)
+  - 0 eller positivt beløb → **ikke** kampagnepris → `Kampagne pris = "Nej"` (eller `false`)
 
-## Foreslåede KPI'er (kort visning)
+Hvis et OPP findes i hovedfilen men ikke i kampagne-arket → behandles som "ikke kampagnepris".
 
-**Række 1 — Flow-aktivitet (nu)**
-1. **Aktive i flow** — `booking_flow_enrollments` hvor `status = 'active'`
-2. **Nye sidste 7 dage** — enrollments oprettet inden for 7 dage
-3. **Gennemført flow** — `status = 'completed'` (alle touchpoints sendt)
-4. **Annulleret** — `status = 'cancelled'` (kandidat ghostet/rejected/takket nej undervejs)
+## UI-flow på Upload-fanen (TDC Erhverv)
+Når kunden er TDC Erhverv vises der nu **to drop-zones** (eller én drop-zone der accepterer to filer i én operation):
 
-**Række 2 — Kandidat-udfald (sidste 30 dage)**
-5. **Ghostet** — candidates med status `ghostet`
-6. **Takket nej** — status `takket_nej`
-7. **Interview booket** — status `interview_scheduled`
-8. **Hired** — status `hired` (konvertering)
+1. **Hovedfil** (eksisterende) — annulleringslisten med OPP/produktrækker
+2. **Kampagnepris-udtræk** (NYT) — separat .xlsx med kolonne D + M
 
-**Række 3 — Touchpoint-sundhed (operationel)**
-9. **Pending touchpoints** — `booking_flow_touchpoints.status = 'pending'` due nu eller før (advarsel hvis cron hænger)
-10. **Failed touchpoints (24t)** — fejlede SMS/email sidste døgn
-11. **Konverteringsrate** — hired / (alle der startede flow sidste 30 dage) i %
+Begge filer kræves før "Match"-knappen aktiveres. Lille statusindikator viser hvor mange OPP-numre der blev fundet i kampagne-udtrækket og hvor mange der er kampagnepris.
 
-## Layout
-- Genbrug eksisterende `Card`-mønster (som `vagt-flow/Index.tsx` og `Dashboard.tsx`)
-- Grid: 4 kolonner på desktop, 2 på mobil — én række pr. tema (3 rækker total)
-- Hver KPI-card: stort tal, label, lille subtext (fx "vs. forrige 30 dage" eller farvet trend)
-- Loading-skeletons mens queries kører
-- Failed-touchpoints rød hvis > 0; pending gul hvis > 20
+## Datamodel & flow
+1. Parser kampagne-arket med eksisterende `parseExcelFile` — læser kolonne D (OPP) og M (CPO-rettelse) uanset header-navne (positionsbaseret, da brugeren refererer til kolonne-bogstaver).
+2. Bygger en `Map<oppNumber, boolean>` (`true` = kampagnepris).
+3. Ved consolidation af hovedfilens OPP-rækker (`consolidateOppRowsLocal` / `consolidateOppRows` i `UploadCancellationsTab.tsx`) berigedes hver `_product_rows` sub-row med et nyt felt `Kampagne pris: "Ja" | "Nej"` baseret på map-opslag.
+4. Eksisterende `findMatchingProductId` / `evaluateConditions` virker uændret — de aflæser allerede `Kampagne pris`-kolonnen i sub-rækken (jf. `SellerMappingTab.tsx` linje 175 + 179).
 
-## Filer
-- `src/pages/recruitment/BookingFlow.tsx` (eller den faktiske route-fil) — tilføj `<RecruitmentKpiBar />` øverst
-- `src/components/recruitment/RecruitmentKpiBar.tsx` — NY, indeholder alle queries og card-grid
-- Evt. `src/hooks/useRecruitmentKpis.ts` — NY hvis vi vil samle queries i én hook
+## Filer der ændres
 
-## Spørgsmål før implementering
+| Fil | Ændring |
+|-----|---------|
+| `src/components/cancellations/UploadCancellationsTab.tsx` | Ny state `campaignPriceFile` + `campaignPriceMap`. Ny dropzone (vises kun for TDC). Parse-funktion `parseCampaignPriceExcel` (læser kolonne D & M positionelt). I begge `consolidateOppRows`-instanser (linje ~1456 og ~1989): inject `Kampagne pris` på hver sub-row før condition-matching. |
+| `src/components/cancellations/ApprovalQueueTab.tsx` | (Valgfrit) Vis "Kampagne pris: Ja/Nej" i den strukturerede TDC-render så admin kan se hvad der blev udledt. Allerede understøttet — kommer gratis. |
 
-1. **Hvilke 4-8 KPI'er er vigtigst for dig?** (Hellere færre & vigtige end 11 cards)
-2. **Tidsperiode**: Skal "annulleret/ghostet/takket nej" være sidste 30 dage, indeværende måned, eller "all time"?
-3. **Touchpoint-sundhed**: Skal pending/failed touchpoints med (operationelt overblik for admin), eller kun rene flow/kandidat-tal?
-4. **Konverteringsrate**: Vil du have % hired-rate som en KPI, eller er det fint at se rå tal?
+## Edge cases
+- Kampagne-udtrækket har potentielt header-rækker → vi springer rækker over hvor kolonne D ikke ligner et OPP (numerisk/alfanumerisk kontrol)
+- Tomme M-celler → behandles som 0 → ikke kampagnepris
+- Samme OPP forekommer flere gange → tag MIN(M)-værdi (hvis nogen er negativ → kampagnepris)
+- Kampagne-fil uploadet uden hovedfil → fejlmeddelelse
+- Ikke-TDC kunder → kampagne-dropzone vises ikke
+
+## Eksempel-output for en row
+Før (kun hovedfil):
+```
+{ Produkt: "5G Internet", "TT trin": "3", _product_rows: [...] }
+```
+Efter (med kampagne-fil):
+```
+{ Produkt: "5G Internet", "TT trin": "3", _product_rows: [
+    { Produkt: "5G Internet", "TT trin": "3", "Kampagne pris": "Ja" }
+]}
+```
+→ matcher nu produkt-mapping reglen "Kampagne pris = Ja"
 
