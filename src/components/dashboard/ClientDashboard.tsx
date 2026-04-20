@@ -60,35 +60,47 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
   const useLiveMode = config.features?.liveMode === true;
 
   // Determine scope
-  const scopeType = config.teamId ? "team" : "client";
+  const aggregateClientIds = config.features?.aggregateClientIds;
+  const isAggregated = !!(aggregateClientIds && aggregateClientIds.length > 0);
+  const scopeType = isAggregated ? "team" : (config.teamId ? "team" : "client");
   const scopeId = config.teamId || config.clientId || null;
 
   // Should we use cached data or live?
   const useCached = !useLiveMode || canUseCachedKpis(selectedPeriod.type);
 
-  // ========== CACHED KPIs ==========
+  // ========== CACHED KPIs (single client) ==========
   const { data: cachedKpis, isLoading: kpisLoading } = useClientDashboardKpis(
     scopeType === "client" ? scopeId : null,
     ["sales_count", "total_commission", "total_revenue", "total_hours"],
   );
 
-  // ========== CACHED LEADERBOARDS ==========
-  const {
-    sellersToday: cachedSellersToday,
-    sellersWeek: cachedSellersWeek,
-    sellersPayroll: cachedSellersPayroll,
-    isLoading: leaderboardsLoading,
-  } = useCachedLeaderboards(
-    { type: scopeType as "client" | "team", id: scopeId },
-    { enabled: useCached, limit: 30 }
+  // ========== AGGREGATED KPIs (multi-client, e.g. United) ==========
+  const { data: aggregatedKpis, isLoading: aggKpisLoading } = useAggregatedClientKpis(
+    isAggregated ? aggregateClientIds : undefined
   );
+
+  // ========== CACHED LEADERBOARDS ==========
+  const singleScopeLeaderboards = useCachedLeaderboards(
+    { type: scopeType as "client" | "team", id: scopeId },
+    { enabled: useCached && !isAggregated, limit: 30 }
+  );
+
+  const aggregatedLeaderboards = useAggregatedClientLeaderboards(
+    isAggregated ? aggregateClientIds : undefined,
+    { enabled: useCached && isAggregated, limit: 30 }
+  );
+
+  const cachedSellersToday = isAggregated ? aggregatedLeaderboards.sellersToday : singleScopeLeaderboards.sellersToday;
+  const cachedSellersWeek = isAggregated ? aggregatedLeaderboards.sellersWeek : singleScopeLeaderboards.sellersWeek;
+  const cachedSellersPayroll = isAggregated ? aggregatedLeaderboards.sellersPayroll : singleScopeLeaderboards.sellersPayroll;
+  const leaderboardsLoading = isAggregated ? aggregatedLeaderboards.isLoading : singleScopeLeaderboards.isLoading;
 
   // ========== LIVE DATA (optional, for custom periods) ==========
   const { data: liveData, isLoading: liveLoading } = useSalesAggregatesExtended({
     periodStart: selectedPeriod.from,
     periodEnd: selectedPeriod.to,
     clientId: scopeType === "client" ? (scopeId || undefined) : undefined,
-    teamId: scopeType === "team" ? (scopeId || undefined) : undefined,
+    teamId: scopeType === "team" && !isAggregated ? (scopeId || undefined) : undefined,
     groupBy: ['employee'],
     enabled: useLiveMode && !useCached,
   });
