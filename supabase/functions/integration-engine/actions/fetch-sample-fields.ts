@@ -1,6 +1,6 @@
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { getAdapter } from "../adapters/registry.ts"
-import type { LogFn } from "../utils/index.ts"
+type LogFn = (type: "INFO" | "ERROR" | "WARN", msg: string, data?: unknown) => void
 
 interface SampleField {
   fieldId: string
