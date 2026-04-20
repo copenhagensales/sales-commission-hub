@@ -17,6 +17,37 @@ export class AdversusAdapter implements DialerAdapter {
   // API metrics tracking
   private _metrics: ApiMetrics = { apiCalls: 0, rateLimitHits: 0, retries: 0 };
 
+  // Eesy TM client_campaign_id - sales for this client must be filtered to state='success' only.
+  // Other Adversus clients are unaffected.
+  private static readonly EESY_TM_CLIENT_CAMPAIGN_ID = "d031126c-aec0-4b80-bbe2-bbc31c4f04ba";
+
+  /**
+   * Filter Eesy TM sales to keep only state='success'.
+   * In-progress and cancelled sales are dropped at ingestion to prevent dashboard pollution.
+   * Other Adversus clients pass through unchanged.
+   */
+  private filterEesyTmStateSuccess(rawSales: any[], campaignConfigMap: Map<string, CampaignMappingConfig>): any[] {
+    let kept = 0;
+    let dropped = 0;
+    const filtered = rawSales.filter((s: any) => {
+      const campaignId = s.campaignId ? String(s.campaignId) : undefined;
+      const mapping = campaignId ? campaignConfigMap.get(campaignId) : undefined;
+      const isEesyTm = mapping?.clientCampaignId === AdversusAdapter.EESY_TM_CLIENT_CAMPAIGN_ID;
+      if (!isEesyTm) return true;
+      const state = String(s.state || "").toLowerCase();
+      if (state === "success") {
+        kept++;
+        return true;
+      }
+      dropped++;
+      return false;
+    });
+    if (kept + dropped > 0) {
+      console.log(`[Adversus] Eesy TM state filter: ${kept + dropped} -> ${kept} (dropped ${dropped} non-success)`);
+    }
+    return filtered;
+  }
+
   // Burst-throttling: minimum 500ms between API calls
   private lastRequestTime = 0;
   private throttleMs = 500;
@@ -212,7 +243,10 @@ export class AdversusAdapter implements DialerAdapter {
 
     // Sort newest first so we always prioritize recent sales
     rawSales.sort((a: any, b: any) => new Date(b.closedTime || b.created).getTime() - new Date(a.closedTime || a.created).getTime());
-    
+
+    // Eesy TM-only filter: drop non-success state at ingestion
+    rawSales = this.filterEesyTmStateSuccess(rawSales, campaignConfigMap);
+
     // Pre-enrichment limit: slice BEFORE buildLeadDataMap to save API calls
     // NOTE: maxRecords is now set higher (60) to ensure today's sales are included
     if (maxRecords && rawSales.length > maxRecords) {
@@ -399,6 +433,9 @@ export class AdversusAdapter implements DialerAdapter {
       rawSales = rawSales.filter((s: any) => s.campaignId && campaignIds.includes(String(s.campaignId)));
       console.log(`[Adversus] Pre-enrichment campaign filter: ${before} -> ${rawSales.length} sales (campaigns: ${campaignIds.join(",")})`);
     }
+
+    // Eesy TM-only filter: drop non-success state at ingestion
+    rawSales = this.filterEesyTmStateSuccess(rawSales, campaignConfigMap);
 
     // Pre-enrichment limit – SKIP if uncapped
     if (!uncapped && maxRecords && rawSales.length > maxRecords) {
