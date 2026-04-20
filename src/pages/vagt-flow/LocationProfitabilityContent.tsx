@@ -502,14 +502,14 @@ export default function LocationProfitabilityContent() {
   const dietByLocationDate = useMemo(() => {
     const map = new Map<string, number>();
     for (const d of dietData || []) {
-      const locId = bookingToLocation.get(d.booking_id);
-      if (locId) {
-        const key = `${locId}|${d.date}`;
-        map.set(key, (map.get(key) || 0) + (d.amount || 0));
+      const key = bookingToLocationClient.get(d.booking_id);
+      if (key) {
+        const dateKey = `${key}|${d.date}`;
+        map.set(dateKey, (map.get(dateKey) || 0) + (d.amount || 0));
       }
     }
     return map;
-  }, [dietData, bookingToLocation]);
+  }, [dietData, bookingToLocationClient]);
 
   // Render location rows (reusable for grouped sections)
   const renderLocationRows = (locations: typeof locationData) =>
