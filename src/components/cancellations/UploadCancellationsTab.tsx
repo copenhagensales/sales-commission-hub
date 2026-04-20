@@ -564,7 +564,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
   const { user } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [campaignPriceFile, setCampaignPriceFile] = useState<File | null>(null);
-  const [campaignPriceMap, setCampaignPriceMap] = useState<Map<string, boolean>>(new Map());
+  const [campaignPriceMap, setCampaignPriceMap] = useState<Map<string, { isCampaign: boolean; cpoAdjustment: number }>>(new Map());
   const isTdcErhverv = selectedClientId === CLIENT_IDS["TDC Erhverv"];
   const [parsedData, setParsedData] = useState<ParsedRow[]>([]);
   const [columns, setColumns] = useState<string[]>([]);
@@ -763,12 +763,46 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     enabled: !!user?.email,
   });
 
+  // Apply a (negative) CPO adjustment from the campaign-price file to the Total row of the main file.
+  // Locates a CPO-like field case-insensitively, parses the numeric value robustly, adds the adjustment,
+  // and writes the result back. Preserves original under _original_cpo for debug. No-op when adjustment >= 0.
+  const applyCpoAdjustment = (
+    totalRow: Record<string, unknown>,
+    adjustment: number
+  ): Record<string, unknown> => {
+    if (!totalRow || adjustment >= 0) return totalRow;
+    const cpoKey = Object.keys(totalRow).find(k => /\bcpo\b/i.test(k));
+    if (!cpoKey) {
+      console.warn("[campaign-cpo] No CPO field found on total row; skipping adjustment", { adjustment });
+      return totalRow;
+    }
+    const raw = totalRow[cpoKey];
+    let current = 0;
+    if (typeof raw === "number") {
+      current = raw;
+    } else if (raw !== null && raw !== undefined && raw !== "") {
+      const parsed = parseFloat(
+        String(raw).replace(/\./g, "").replace(/,/g, ".").replace(/[^0-9.\-]/g, "")
+      );
+      if (isNaN(parsed)) {
+        console.warn("[campaign-cpo] Non-numeric CPO; skipping adjustment", { cpoKey, raw });
+        return totalRow;
+      }
+      current = parsed;
+    }
+    const adjusted = current + adjustment; // adjustment is negative → reduces CPO
+    return { ...totalRow, [cpoKey]: adjusted, _original_cpo: current };
+  };
+
   // Parse the campaign price extract: column D (index 3) = OPP, column M (index 12) = CPO correction.
-  // Returns Map<oppNumber (UPPER, trimmed), boolean> where true = campaign price (negative correction).
+  // Returns Map<oppNumber, { isCampaign, cpoAdjustment }> where cpoAdjustment is the (negative) M value
+  // that should be added to the main file's CPO. Positive/zero M → no adjustment.
   // Uses the robust parseExcelFile (ExcelJS → SheetJS fallback) to handle BI exports without default stylesheet.
-  const parseCampaignPriceExcel = async (buffer: ArrayBuffer): Promise<Map<string, boolean>> => {
+  const parseCampaignPriceExcel = async (
+    buffer: ArrayBuffer
+  ): Promise<Map<string, { isCampaign: boolean; cpoAdjustment: number }>> => {
     const { rows, columns: cols } = await parseExcelFile(buffer);
-    const map = new Map<string, boolean>();
+    const map = new Map<string, { isCampaign: boolean; cpoAdjustment: number }>();
     const oppCol = cols[3];   // Column D
     const cpoCol = cols[12];  // Column M
     if (!oppCol || !cpoCol) return map;
@@ -791,7 +825,17 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       }
 
       const isCampaign = cpo < 0;
-      map.set(oppStr, (map.get(oppStr) ?? false) || isCampaign);
+      const adjustment = cpo < 0 ? cpo : 0;
+      const existing = map.get(oppStr);
+      if (existing) {
+        // Aggregate duplicates: keep most-negative adjustment (MIN)
+        map.set(oppStr, {
+          isCampaign: existing.isCampaign || isCampaign,
+          cpoAdjustment: Math.min(existing.cpoAdjustment, adjustment),
+        });
+      } else {
+        map.set(oppStr, { isCampaign, cpoAdjustment: adjustment });
+      }
     }
     return map;
   };
@@ -817,10 +861,12 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           return;
         }
         setCampaignPriceMap(map);
-        const campaignCount = Array.from(map.values()).filter(Boolean).length;
+        const entries = Array.from(map.values());
+        const campaignCount = entries.filter(e => e.isCampaign).length;
+        const totalAdjustment = entries.reduce((sum, e) => sum + e.cpoAdjustment, 0);
         toast({
           title: "Kampagnepris-udtræk indlæst",
-          description: `${map.size} OPP-numre fundet (${campaignCount} med kampagnepris).`,
+          description: `${map.size} OPP-numre fundet (${campaignCount} med kampagnepris, justering: ${totalAdjustment.toLocaleString("da-DK")} kr.).`,
         });
       } catch (error) {
         console.error("Campaign price parse error:", error);
@@ -1563,11 +1609,12 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               const pv = String(r["Produkt"] || r["produkt"] || "").trim();
               return pv.toLowerCase() !== "total" && pv !== "";
             });
-            // Inject "Kampagne pris" on each sub-row from the campaign price map
-            const isCampaign = oppKey && campaignPriceMap.has(oppKey) ? campaignPriceMap.get(oppKey)! : false;
+            const campaignEntry = oppKey ? campaignPriceMap.get(oppKey) : undefined;
+            const isCampaign = campaignEntry?.isCampaign ?? false;
             const campaignLabel: "Ja" | "Nej" = isCampaign ? "Ja" : "Nej";
             const enrichedProductRows = productRows.map(r => ({ ...r, "Kampagne pris": campaignLabel }));
-            return { ...totalRow, _product_rows: enrichedProductRows.length > 0 ? enrichedProductRows : undefined };
+            const adjustedTotal = applyCpoAdjustment(totalRow, campaignEntry?.cpoAdjustment ?? 0);
+            return { ...adjustedTotal, _product_rows: enrichedProductRows.length > 0 ? enrichedProductRows : undefined };
           };
 
           const oppSet1c = new Set(oppNumbers.map(o => o.toUpperCase().trim()));
@@ -2102,13 +2149,14 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           return produktVal.toLowerCase() !== "total" && produktVal !== "";
         });
 
-        // Inject "Kampagne pris" on each sub-row from the campaign price map
-        const isCampaign = oppKey && campaignPriceMap.has(oppKey) ? campaignPriceMap.get(oppKey)! : false;
+        const campaignEntry = oppKey ? campaignPriceMap.get(oppKey) : undefined;
+        const isCampaign = campaignEntry?.isCampaign ?? false;
         const campaignLabel: "Ja" | "Nej" = isCampaign ? "Ja" : "Nej";
         const enrichedProductRows = productRows.map(r => ({ ...r, "Kampagne pris": campaignLabel }));
+        const adjustedTotal = applyCpoAdjustment(totalRow, campaignEntry?.cpoAdjustment ?? 0);
 
         return {
-          ...totalRow,
+          ...adjustedTotal,
           _product_rows: enrichedProductRows.length > 0 ? enrichedProductRows : undefined,
         };
       };
@@ -2751,7 +2799,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                         <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Kampagnepris-udtræk</p>
                         <p className="text-sm font-medium truncate">{campaignPriceFile!.name}</p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {campaignPriceMap.size} OPP · {Array.from(campaignPriceMap.values()).filter(Boolean).length} m. kampagnepris
+                          {campaignPriceMap.size} OPP · {Array.from(campaignPriceMap.values()).filter(e => e.isCampaign).length} m. kampagnepris · Σ justering: {Array.from(campaignPriceMap.values()).reduce((s, e) => s + e.cpoAdjustment, 0).toLocaleString("da-DK")} kr.
                         </p>
                         <Button
                           variant="ghost"
