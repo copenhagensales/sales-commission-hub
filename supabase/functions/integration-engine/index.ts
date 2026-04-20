@@ -1,13 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { IngestionEngine } from "./core.ts";
-import { fetchSampleFields } from "./actions/fetch-sample-fields.ts";
-import { repairHistory } from "./actions/repair-history.ts";
-import { syncIntegration } from "./actions/sync-integration.ts";
 import { makeLogger } from "./utils/index.ts";
-import { smartBackfill } from "./actions/smart-backfill.ts";
-import { safeBackfill } from "./actions/safe-backfill.ts";
-import { providerSync } from "./actions/provider-sync.ts";
 
 // Declare EdgeRuntime for background tasks
 declare const EdgeRuntime: { waitUntil: (promise: Promise<unknown>) => void };
@@ -17,7 +10,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Helper to create Supabase client
 function getSupabase() {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -31,23 +23,35 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { source, action, actions, days = 3, campaignId, integration_id, integrationId, background = false, from, to, maxRecords, datasets, campaignIds, uncapped } = body;
-    
-    // Balanced limit: 50 records per sync to handle backlog while preventing CPU timeout
-    const effectiveMaxRecords = maxRecords ?? 200;
+    const {
+      source,
+      action,
+      actions,
+      days = 3,
+      campaignId,
+      integration_id,
+      integrationId,
+      background = false,
+      from,
+      to,
+      maxRecords,
+      datasets,
+      campaignIds,
+      uncapped,
+    } = body;
 
+    const effectiveMaxRecords = maxRecords ?? 200;
     const supabase = getSupabase();
 
-    // Handle check-rate-limits action (Enreach diagnostics)
     if (action === "check-rate-limits") {
       const effectiveIntegrationId = integrationId || integration_id;
       if (!effectiveIntegrationId) {
         return new Response(JSON.stringify({ success: false, error: "integration_id is required for check-rate-limits" }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      // Get integration credentials
       const { data: integration, error: intError } = await supabase
         .from("dialer_integrations")
         .select("*")
@@ -56,21 +60,23 @@ serve(async (req) => {
 
       if (intError || !integration) {
         return new Response(JSON.stringify({ success: false, error: `Integration not found: ${effectiveIntegrationId}` }), {
-          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
       if (integration.provider !== "enreach") {
         return new Response(JSON.stringify({ success: false, error: "check-rate-limits is only supported for Enreach integrations" }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      // Decrypt credentials
       const encryptionKey = Deno.env.get("DB_ENCRYPTION_KEY");
       if (!encryptionKey) {
         return new Response(JSON.stringify({ success: false, error: "DB_ENCRYPTION_KEY not configured" }), {
-          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
@@ -81,7 +87,8 @@ serve(async (req) => {
 
       if (!credData) {
         return new Response(JSON.stringify({ success: false, error: "Could not decrypt credentials" }), {
-          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
@@ -98,16 +105,15 @@ serve(async (req) => {
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Handle fetch-sample-fields action
     if (action === "fetch-sample-fields") {
-      // Support both integrationId (from frontend) and integration_id
       const effectiveIntegrationId = integrationId || integration_id;
+      const { fetchSampleFields } = await import("./actions/fetch-sample-fields.ts");
       const result = await fetchSampleFields(supabase, effectiveIntegrationId, log);
       return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Handle repair-history action
     if (action === "repair-history") {
+      const { repairHistory } = await import("./actions/repair-history.ts");
       if (background) {
         EdgeRuntime.waitUntil(repairHistory(supabase, days || 90, integration_id));
         return new Response(
@@ -134,7 +140,6 @@ serve(async (req) => {
       );
     }
 
-    // Handle smart backfill action
     if (action === "backfill") {
       const effectiveIntegrationId = integrationId || integration_id;
       if (!effectiveIntegrationId) {
@@ -144,6 +149,7 @@ serve(async (req) => {
         });
       }
 
+      const { smartBackfill } = await import("./actions/smart-backfill.ts");
       if (background) {
         EdgeRuntime.waitUntil(smartBackfill(supabase, effectiveIntegrationId, log));
         return new Response(JSON.stringify({
@@ -160,7 +166,6 @@ serve(async (req) => {
       });
     }
 
-    // Handle provider-sync action (consolidated provider-level sync)
     if (action === "provider-sync") {
       if (!source) {
         return new Response(JSON.stringify({ success: false, error: "source (provider) is required for provider-sync" }), {
@@ -169,6 +174,7 @@ serve(async (req) => {
         });
       }
 
+      const { providerSync } = await import("./actions/provider-sync.ts");
       if (background) {
         EdgeRuntime.waitUntil(providerSync(supabase, source, log));
         return new Response(JSON.stringify({
@@ -186,7 +192,6 @@ serve(async (req) => {
       });
     }
 
-    // Handle safe-backfill action (budget-aware, provider-level)
     if (action === "safe-backfill") {
       const effectiveIntegrationId = integrationId || integration_id;
       if (!effectiveIntegrationId || !from || !to) {
@@ -197,6 +202,7 @@ serve(async (req) => {
       }
 
       const params = { integrationId: effectiveIntegrationId, from, to, maxRecordsPerDay: maxRecords || 600, datasets, campaignIds, uncapped };
+      const { safeBackfill } = await import("./actions/safe-backfill.ts");
 
       if (background) {
         EdgeRuntime.waitUntil(safeBackfill(supabase, params, log));
@@ -214,12 +220,15 @@ serve(async (req) => {
       });
     }
 
-    // Initialize engine and fetch campaign mappings
+    const [{ IngestionEngine }, { syncIntegration }] = await Promise.all([
+      import("./core.ts"),
+      import("./actions/sync-integration.ts"),
+    ]);
+
     const engine = new IngestionEngine();
     const campaignMappings = await engine.getCampaignMappings();
     log("INFO", `Loaded ${campaignMappings.length} campaign mappings for reference extraction`);
 
-    // Build query for integrations
     let query = supabase
       .from("dialer_integrations")
       .select("*")
@@ -248,10 +257,9 @@ serve(async (req) => {
       );
     }
 
-    // Background processing mode - run in background and return immediately
     if (background) {
       log("INFO", `Starting background sync for ${integrations.length} integration(s)`);
-      
+
       const backgroundProcess = async () => {
         try {
           for (const integration of integrations) {
@@ -271,9 +279,9 @@ serve(async (req) => {
           log("ERROR", `Background sync failed: ${err instanceof Error ? err.message : String(err)}`);
         }
       };
-      
+
       EdgeRuntime.waitUntil(backgroundProcess());
-      
+
       return new Response(JSON.stringify({
         success: true,
         background: true,
@@ -284,7 +292,6 @@ serve(async (req) => {
       });
     }
 
-    // Foreground processing - process one at a time to reduce CPU pressure
     const results: any[] = [];
     for (const integration of integrations) {
       const result = await syncIntegration(supabase, integration, engine, campaignMappings, {
@@ -300,7 +307,6 @@ serve(async (req) => {
       results.push(result);
     }
 
-    // Calculate aggregate stats
     const totalCreated = results.reduce((acc, r) => {
       if (r.status === "success" && r.data?.sales && typeof r.data.sales === "object") {
         const salesData = r.data.sales as { processed?: number };
