@@ -486,8 +486,8 @@ function BillingOverviewTab() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {Object.values(bookingsByLocation || {}).map((loc: any) => (
-                  <TableRow key={loc.location?.id}>
+                {Object.entries(bookingsByLocation || {}).map(([groupKey, loc]: [string, any]) => (
+                  <TableRow key={groupKey}>
                     <TableCell>
                       <div>
                         <p className="font-medium">{loc.location?.name}</p>
