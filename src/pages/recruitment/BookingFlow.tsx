@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Users, Zap, Clock, CheckCircle, XCircle, Plus, Loader2, ShieldCheck, AlertTriangle, FileText, CalendarDays, Eye, PhoneCall, Bell, Layout } from "lucide-react";
+import { Users, Zap, Clock, CheckCircle, XCircle, Plus, Loader2, ShieldCheck, AlertTriangle, FileText, CalendarDays, Eye, PhoneCall, Bell, Layout, BarChart3 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import { da } from "date-fns/locale";
 import { BookingFlowTimeline } from "@/components/recruitment/BookingFlowTimeline";
@@ -299,10 +300,18 @@ export default function BookingFlow() {
               Automatiseret outreach med manuel godkendelse
             </p>
           </div>
-          <Button onClick={() => setAddCandidateOpen(true)} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Tilføj kandidat
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="outline" className="gap-2">
+              <Link to="/recruitment/booking-flow/engagement">
+                <BarChart3 className="h-4 w-4" />
+                Engagement-rapport
+              </Link>
+            </Button>
+            <Button onClick={() => setAddCandidateOpen(true)} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Tilføj kandidat
+            </Button>
+          </div>
         </div>
 
         <Tabs defaultValue="dashboard" className="space-y-6">

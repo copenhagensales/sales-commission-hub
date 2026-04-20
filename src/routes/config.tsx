@@ -345,6 +345,12 @@ export const routes: RouteConfig[] = [
     positionPermission: "menu_candidates",
   },
   {
+    path: "/recruitment/booking-flow/engagement",
+    component: BookingFlowEngagement,
+    access: "role",
+    positionPermission: "menu_candidates",
+  },
+  {
     path: "/recruitment/referrals",
     component: Referrals,
     access: "role",
