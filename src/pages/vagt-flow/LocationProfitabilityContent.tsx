@@ -337,7 +337,7 @@ export default function LocationProfitabilityContent() {
     return map;
   }, [dietCostByBooking, bookingToLocationClient]);
 
-  // Build location profitability data
+  // Build location profitability data — split by (location, client)
   const locationData = useMemo(() => {
     if (!bookings || !salesData) return [];
 
@@ -347,20 +347,26 @@ export default function LocationProfitabilityContent() {
       placementsByLocation.get(p.location_id)!.push(p);
     }
 
-    const locationMap = new Map<string, LocationSalesData>();
+    // Per (locId__clientId) row
+    const locationMap = new Map<string, LocationSalesData & { clientId: string }>();
+    // Per locId → list of (clientId, bookedDays) for sale attribution
+    const clientsByLocation = new Map<string, Array<{ clientId: string; bookedDays: number[] }>>();
 
     for (const booking of bookings) {
       const loc = booking.location as any;
       const client = (booking as any).client as any;
       const clientName = client?.name || "Ukendt";
+      const clientId = (booking as any).client_id || "no-client";
       const locId = booking.location_id;
+      const key = `${locId}__${clientId}`;
       const locPlacements = placementsByLocation.get(locId) || [];
       const selectedPlacement = locPlacements.find(p => p.id === booking.placement_id);
       const effectiveRate = booking.daily_rate_override ?? selectedPlacement?.daily_rate ?? loc?.daily_rate ?? 0;
 
-      if (!locationMap.has(locId)) {
-        locationMap.set(locId, {
+      if (!locationMap.has(key)) {
+        locationMap.set(key, {
           locationId: locId,
+          clientId,
           locationName: loc?.name || "Ukendt",
           clientName,
           dailyRate: effectiveRate,
@@ -371,26 +377,37 @@ export default function LocationProfitabilityContent() {
           bookings: [{ id: booking.id, placementId: booking.placement_id, dailyRateOverride: booking.daily_rate_override }],
         });
       } else {
-        const existing = locationMap.get(locId)!;
+        const existing = locationMap.get(key)!;
         const mergedDays = new Set([...existing.bookedDays, ...(booking.booked_days || [])]);
         existing.bookedDays = Array.from(mergedDays);
         existing.bookings.push({ id: booking.id, placementId: booking.placement_id, dailyRateOverride: booking.daily_rate_override });
         if (booking.daily_rate_override) existing.dailyRate = booking.daily_rate_override;
         if (booking.placement_id) existing.selectedPlacementId = booking.placement_id;
-        // Keep the client name from the first booking
+      }
+
+      if (!clientsByLocation.has(locId)) clientsByLocation.set(locId, []);
+      const list = clientsByLocation.get(locId)!;
+      const entry = list.find(e => e.clientId === clientId);
+      if (entry) {
+        entry.bookedDays = Array.from(new Set([...entry.bookedDays, ...(booking.booked_days || [])]));
+      } else {
+        list.push({ clientId, bookedDays: [...(booking.booked_days || [])] });
       }
     }
 
-    // Map sales to locations
+    // Map sales to (location, client) — attribute based on which client has the booked day
     for (const sale of salesData) {
       const payload = sale.raw_payload as any;
       const locId = payload?.fm_location_id;
       if (!locId) continue;
 
-      const saleDate = format(new Date(sale.sale_datetime), "yyyy-MM-dd");
+      const saleDateObj = new Date(sale.sale_datetime);
+      const saleDate = format(saleDateObj, "yyyy-MM-dd");
+      const jsDay = saleDateObj.getDay();
+      const dayNum = jsDay === 0 ? 6 : jsDay - 1;
+
       const items = (sale as any).sale_items || [];
       let commission = 0, revenue = 0, salesCount = 0;
-
       for (const item of items) {
         const countsAsSale = item.products?.counts_as_sale !== false;
         commission += item.mapped_commission || 0;
@@ -398,14 +415,27 @@ export default function LocationProfitabilityContent() {
         if (countsAsSale) salesCount += item.quantity || 1;
       }
 
-      if (!locationMap.has(locId)) {
-        locationMap.set(locId, {
-          locationId: locId, locationName: "Ukendt lokation", clientName: "Ukendt", dailyRate: 0,
+      // Determine which client this sale belongs to
+      const clientList = clientsByLocation.get(locId) || [];
+      let targetClientId: string | null = null;
+      if (clientList.length === 1) {
+        targetClientId = clientList[0].clientId;
+      } else if (clientList.length > 1) {
+        const matching = clientList.find(c => c.bookedDays.includes(dayNum));
+        targetClientId = matching ? matching.clientId : clientList[0].clientId;
+      }
+
+      const key = targetClientId ? `${locId}__${targetClientId}` : `${locId}__no-client`;
+
+      if (!locationMap.has(key)) {
+        locationMap.set(key, {
+          locationId: locId, clientId: targetClientId || "no-client",
+          locationName: "Ukendt lokation", clientName: "Ukendt", dailyRate: 0,
           bookedDays: [], dailyBreakdown: {}, placements: [], selectedPlacementId: null, bookings: [],
         });
       }
 
-      const l = locationMap.get(locId)!;
+      const l = locationMap.get(key)!;
       if (!l.dailyBreakdown[saleDate]) l.dailyBreakdown[saleDate] = { sales: 0, commission: 0, revenue: 0 };
       l.dailyBreakdown[saleDate].sales += salesCount;
       l.dailyBreakdown[saleDate].commission += commission;
@@ -414,16 +444,17 @@ export default function LocationProfitabilityContent() {
 
     return Array.from(locationMap.values())
       .map((loc) => {
+        const key = `${loc.locationId}__${loc.clientId}`;
         const totalRevenue = Object.values(loc.dailyBreakdown).reduce((s, d) => s + d.revenue, 0);
         const totalCommission = Object.values(loc.dailyBreakdown).reduce((s, d) => s + d.commission, 0);
         const totalSales = Object.values(loc.dailyBreakdown).reduce((s, d) => s + d.sales, 0);
         const sellerCost = totalCommission * (1 + VACATION_PAY_RATES.SELLER);
         const locationCost = loc.dailyRate * loc.bookedDays.length;
-        const hotelCost = hotelCostByLocation.get(loc.locationId) || 0;
-        const dietCost = dietCostByLocation.get(loc.locationId) || 0;
+        const hotelCost = hotelCostByLocation.get(key) || 0;
+        const dietCost = dietCostByLocation.get(key) || 0;
         const db = totalRevenue - sellerCost - locationCost - hotelCost - dietCost;
         const dbPerDay = loc.bookedDays.length > 0 ? db / loc.bookedDays.length : 0;
-        return { ...loc, totalRevenue, totalCommission, totalSales, sellerCost, locationCost, hotelCost, dietCost, db, dbPerDay };
+        return { ...loc, rowKey: key, totalRevenue, totalCommission, totalSales, sellerCost, locationCost, hotelCost, dietCost, db, dbPerDay };
       })
       .sort((a, b) => b.db - a.db);
   }, [bookings, salesData, placements, hotelCostByLocation, dietCostByLocation]);
