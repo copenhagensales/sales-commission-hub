@@ -1,53 +1,41 @@
 
 
 ## Mål
-Når kampagnepris-udtrækket uploades for TDC Erhverv, skal CPO-rettelsen i kolonne M fratrækkes den CPO der registreres på det tilsvarende OPP-nummer fra hovedfilen — men kun når M er negativ.
+På Godkendelseskø-fanen for TDC Erhverv: vis "Kampagne pris: Ja/Nej" under "Uploadet data" (sammen med CPO Total og TT trin), men **kun** når et af de uploadede produkter er "5G Fri" (fx `ERHVERV 5G FRI<500/100`).
 
-## Regel
-- For hvert OPP fra kampagne-arket:
-  - `M < 0` → ny CPO = oprindelig CPO **+ M** (M er negativ, så CPO reduceres med |M|, fx -600 → CPO bliver 600 lavere)
-  - `M >= 0` → ingen ændring
-- Gælder kun TDC Erhverv (samme guard som eksisterende kampagne-flow).
+## Aktuel situation
+- `buildTdcUploadedStructured` (linje 276-294 i `ApprovalQueueTab.tsx`) prøver at læse `uploadedData["Kampagne pris"]` — men feltet ligger faktisk på `_product_rows` sub-rows (sat i `UploadCancellationsTab.tsx` linje 1615/2155), ikke på top-level. Derfor er feltet altid tomt og vises aldrig.
+- Render-koden (linje 1329) er der allerede; den behøver bare korrekt data + en 5G Fri-betingelse.
 
-## Undersøgelse jeg skal lave før implementering
-Jeg skal lokalisere præcis hvor CPO på en TDC-annullering kommer fra i `UploadCancellationsTab.tsx`:
-- Total-rækkens CPO-felt (sandsynligt navn: `CPO`, `CPO total`, `Provision`, eller lign. — skal verificeres ved at læse `consolidateOppRows` + Total-rækkens kolonner)
-- Hvor den endeligt persistereres / vises før godkendelse (PASS-flow + payload til `cancellation_*`-tabel)
+## Ændring (én fil)
 
-## Ændringer (kun én fil)
+**`src/components/cancellations/ApprovalQueueTab.tsx`** — `buildTdcUploadedStructured` (linje 276-294):
 
-**`src/components/cancellations/UploadCancellationsTab.tsx`**
+1. Læs `Kampagne pris` fra første sub-row i `_product_rows` (case-insensitive) i stedet for top-level.
+2. Tjek om noget produktnavn matcher "5G Fri" (case-insensitive regex `/5G\s*FRI/i` — fanger både `ERHVERV 5G FRI<500/100` og `5G Fri 1000/1000`).
+3. Sæt `kampagnePris` til tom streng hvis ikke 5G Fri → eksisterende render (`structured.kampagnePris !== ""`) skjuler badget automatisk.
 
-1. **Udvid `campaignPriceMap`** fra `Map<string, boolean>` til `Map<string, { isCampaign: boolean; cpoAdjustment: number }>` (eller en parallel `Map<string, number>` med rå M-værdien).
-   - Behold rule: kun negative M registreres som adjustment; positive/nul → 0.
-   - Ved duplikerede OPP'er: tag den mest negative (laveste) M.
+```ts
+// Læs Kampagne pris fra første sub-row
+let kampagnePris = "";
+if (productRows && productRows.length > 0) {
+  const first = productRows[0];
+  const key = Object.keys(first).find(k => k.toLowerCase() === "kampagne pris");
+  if (key) kampagnePris = String(first[key] ?? "").trim();
+}
 
-2. **I `consolidateOppRows` / `consolidateOppRowsLocal`** (TDC-grenen):
-   - Find Total-rækkens CPO-felt (case-insensitive lookup, samme mønster som eksisterende kode).
-   - Hvis OPP findes i map'et og `cpoAdjustment < 0`:
-     - `nyCPO = oprindeligCPO + cpoAdjustment` (parse robust: håndter tom streng, komma som decimal, currency-tegn)
-     - Skriv tilbage på Total-rækken som number (eller behold original formatering)
-   - Bevar oprindelig værdi i et debug-felt `_original_cpo` til verificering i UI/logs.
-   - Eksisterende `Kampagne pris: "Ja"/"Nej"` injection på sub-rows bibeholdes uændret.
-
-3. **UI-statuslinje** under campaign-dropzone:
-   - Udvid eksisterende "X OPP · Y m. kampagnepris" med "· Σ justering: -Z kr." så brugeren kan se total CPO-reduktion før Match.
-
-## Edge cases
-- OPP findes i kampagne-fil men ikke i hovedfil → ignoreres (intet at justere).
-- OPP findes i hovedfil men ikke i kampagne-fil → ingen ændring (samme som i dag).
-- Total-række mangler CPO-felt eller er ikke-numerisk → log warning, ingen ændring.
-- Samme OPP flere gange i kampagne-fil med forskellige M → brug MIN (mest negativ).
-- Hvis brugeren genuploader hovedfil efter kampagne-fil → re-kør consolidation med eksisterende map.
+// Vis kun hvis et produkt er 5G Fri
+const has5gFri = products.some(p => /5G\s*FRI/i.test(p.name));
+if (!has5gFri) kampagnePris = "";
+```
 
 ## Hvad jeg IKKE rører
-- `evaluateConditions` / `findMatchingProductId` — uberørt; produkt-matching kører fortsat på `Kampagne pris: "Ja"/"Nej"` på sub-rows.
-- Andre kunder end TDC Erhverv.
-- `cancellation_product_mappings` og admin-UI.
+- `UploadCancellationsTab.tsx` — enrichment fungerer allerede.
+- Andre kunder — guarden `clientId === TDC_ERHVERV_CLIENT_ID` i render-laget er uændret.
+- CPO Total / TT trin-rendering.
 
 ## Verificering
-- Upload eksempel-fil: OPP-1058032 (M = -600) → CPO på den tilsvarende Total-række skal være 600 lavere end før.
-- OPP-1057494 (M = 0) → uændret.
-- OPP-1059175 (M = +200) → uændret.
-- Tjek `ApprovalQueueTab` viser den justerede CPO.
+- OPP med `ERHVERV 5G FRI<500/100` + kampagne i map → "Kampagne pris: Ja" vises.
+- OPP med `MOBIL PROFESSIONEL 100GB` (ingen 5G Fri) → ingen Kampagne pris-badge (selvom value findes).
+- OPP med 5G Fri men ikke i kampagne-map → "Kampagne pris: Nej" vises.
 
