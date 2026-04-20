@@ -44,7 +44,7 @@ type Click = {
 };
 
 type CommLog = {
-  candidate_id: string | null;
+  phone_number: string | null;
   direction: string;
   type: string;
   created_at: string;
@@ -53,6 +53,7 @@ type CommLog = {
 type Candidate = {
   id: string;
   status: string | null;
+  phone: string | null;
 };
 
 const formatPct = (numerator: number, denominator: number) =>
@@ -127,15 +128,37 @@ export default function BookingFlowEngagement() {
     },
   });
 
-  // Inbound SMS replies
+  // Candidate statuses + phones
+  const { data: candidates = [] } = useQuery({
+    queryKey: ["bfe-candidates", candidateIds.join(",")],
+    enabled: candidateIds.length > 0,
+    queryFn: async (): Promise<Candidate[]> => {
+      const { data, error } = await supabase
+        .from("candidates")
+        .select("id, status, phone")
+        .in("id", candidateIds);
+      if (error) throw error;
+      return (data ?? []) as Candidate[];
+    },
+  });
+
+  // Normalize phone (digits only, last 8) for matching
+  const normalizePhone = (p?: string | null) => (p ? p.replace(/\D/g, "").slice(-8) : "");
+  const phoneToCandidate = new Map<string, string>();
+  candidates.forEach((c) => {
+    const n = normalizePhone(c.phone);
+    if (n) phoneToCandidate.set(n, c.id);
+  });
+  const candidatePhones = Array.from(phoneToCandidate.keys());
+
+  // Inbound SMS replies — matched via phone number
   const { data: smsReplies = [] } = useQuery({
     queryKey: ["bfe-sms-replies", candidateIds.join(","), from, to],
-    enabled: candidateIds.length > 0,
+    enabled: candidatePhones.length > 0,
     queryFn: async (): Promise<CommLog[]> => {
       const { data, error } = await supabase
         .from("communication_logs")
-        .select("candidate_id, direction, type, created_at")
-        .in("candidate_id", candidateIds)
+        .select("phone_number, direction, type, created_at")
         .eq("direction", "inbound")
         .eq("type", "sms")
         .gte("created_at", fromIso)
@@ -145,19 +168,6 @@ export default function BookingFlowEngagement() {
     },
   });
 
-  // Candidate statuses
-  const { data: candidates = [] } = useQuery({
-    queryKey: ["bfe-candidates", candidateIds.join(",")],
-    enabled: candidateIds.length > 0,
-    queryFn: async (): Promise<Candidate[]> => {
-      const { data, error } = await supabase
-        .from("candidates")
-        .select("id, status")
-        .in("id", candidateIds);
-      if (error) throw error;
-      return (data ?? []) as Candidate[];
-    },
-  });
 
   // ---------- Aggregations ----------
   const sentTouchpoints = touchpoints.filter((t) => t.status === "sent");
