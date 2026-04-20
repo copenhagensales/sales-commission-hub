@@ -1,6 +1,6 @@
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { getAdapter } from "../adapters/registry.ts"
-import { LogFn } from "../utils/index.ts"
+type LogFn = (type: "INFO" | "ERROR" | "WARN", msg: string, data?: unknown) => void
 
 interface SampleField {
   fieldId: string
@@ -57,7 +57,7 @@ export async function fetchSampleFields(
 
   try {
     // Get the adapter for this integration
-    const adapter = getAdapter(
+    const adapter = await getAdapter(
       integration.provider,
       credentials,
       integration.name,

@@ -1,9 +1,14 @@
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { IngestionEngine } from "../core.ts";
 import { getAdapter } from "../adapters/registry.ts";
-import { saveDebugLog, createDebugLogEntry, getSyncState, upsertSyncState, recordSyncError, checkCircuitBreaker, recordCircuitBreakerFailure, resetCircuitBreaker, checkProviderQuota, TimeoutGuard, enqueueFailed } from "../utils/index.ts";
-import { CampaignMappingConfig } from "../types.ts";
+import { saveDebugLog, createDebugLogEntry } from "../utils/debug-log.ts";
+import { getSyncState, upsertSyncState, recordSyncError } from "../utils/sync-state.ts";
+import { checkCircuitBreaker, recordCircuitBreakerFailure, resetCircuitBreaker } from "../utils/circuit-breaker.ts";
+import { checkProviderQuota } from "../utils/quota-gate.ts";
+import { TimeoutGuard } from "../utils/timeout-guard.ts";
+import { enqueueFailed } from "../utils/dlq.ts";
 import { acquireRunLock, releaseRunLock, generateRunId } from "../utils/run-lock.ts";
+import { CampaignMappingConfig } from "../types.ts";
 
 /**
  * Check if current time is within Danish working hours (08:00-21:00 Europe/Copenhagen)
@@ -193,7 +198,7 @@ export async function syncIntegration(
       p_encryption_key: encryptionKey,
     });
 
-    adapter = getAdapter(
+    adapter = await getAdapter(
       source || integration.provider,
       credentials,
       integration.name,

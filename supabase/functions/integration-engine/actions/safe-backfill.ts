@@ -171,7 +171,7 @@ export async function safeBackfill(
     p_encryption_key: encryptionKey,
   });
 
-  const adapter = getAdapter(
+  const adapter = await getAdapter(
     provider,
     credentials,
     integration.name,
