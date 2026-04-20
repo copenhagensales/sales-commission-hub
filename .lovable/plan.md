@@ -1,37 +1,70 @@
 
 
-## Problem
+## Booking-flow engagement rapport
 
-United-dashboardet viser stadig 0. Min forrige fix tilføjede `aggregateClientIds`-logik, men den nye `useAggregatedClientKpis` hook bliver **aldrig kaldt** med rigtige client IDs. Network-loggen viser kun den gamle `UnitedClientBreakdown`-query (kun `sales_count`) — ikke vores nye hook der ville hente `sales_count + total_commission + total_hours` med `.in("kpi_slug", [...])`.
+### Problem
 
-### Sandsynlig årsag
+Vi kan rapportere på 3 ud af 4 ønskede metrics ud af boksen, men **link-klik tracker vi ikke i dag**. `short_links`-tabellen har kun `code`, `target_url`, `candidate_id`, `link_type`, `created_at` — ingen klik-tæller. Redirect-funktionen (`/r/:code`) fetcher bare `target_url` og sender brugeren videre uden at logge noget.
 
-`UnitedDashboard.tsx` har **to separate queries** der henter teamet og dets klienter:
-1. `united-team-with-clients` → bruges af `<ClientDashboard>` via `aggregateClientIds`
-2. `united-team-clients` → bruges af `<UnitedClientBreakdown>`
+For at få den fulde rapport skal vi først tilføje klik-tracking, derefter bygge selve rapporten.
 
-Den første query fyres aldrig (eller dens data når aldrig frem) — derfor er `aggregateClientIds = undefined` i `ClientDashboard`, hvilket gør `isAggregated = false`, og dashboardet falder tilbage til den tomme team-cache (`scopeType="team", scopeId=teamId`) → 0.
+### Plan
 
-## Løsning
+**1. Tilføj klik-tracking på short links** (migration)
+- Tilføj kolonner til `short_links`: `click_count INTEGER DEFAULT 0`, `first_clicked_at TIMESTAMPTZ`, `last_clicked_at TIMESTAMPTZ`.
+- Opret tabel `short_link_clicks` (id, short_link_id, candidate_id, clicked_at, user_agent, ip_hash) for detaljerede events (så vi kan beregne unikke klik pr. kandidat).
+- RLS: public insert (logges fra redirect), authenticated read.
 
-**1. Konsolidér til én query** for United team + klient-IDs, og brug samme cache-key i både `UnitedDashboard` og `UnitedClientBreakdown`. Dette eliminerer race-conditions og sikrer at `aggregateClientIds` altid er populeret når `<ClientDashboard>` renderes.
+**2. Log klik i redirect-flow**
+- Opdatér edge-funktionen `supabase/functions/r/index.ts` til at:
+  - Indsætte en row i `short_link_clicks`
+  - Inkrementere `click_count` og opdatere `last_clicked_at` på `short_links` (og sætte `first_clicked_at` første gang)
+- Opdatér `src/pages/ShortLinkRedirect.tsx` på samme måde (fallback når brugeren rammer SPA-routen direkte).
+- Fire-and-forget: redirect må ikke blokere på logging.
 
-**2. Fjern `teamId`** fra `<ClientDashboard>` config når vi er i aggregeret mode, så `scopeId` ikke peger på et tomt team-cache. `isAggregated` skal være eneste signal.
+**3. Byg rapport-side: `/recruitment/booking-flow/engagement`**
+Ny route + side `BookingFlowEngagement.tsx` med periode-filter (default: sidste 30 dage) og 3 sektioner:
 
-**3. Tilføj defensiv logging** i `useAggregatedClientKpis` (kort stub: `console.log("[aggregated-kpis] running with N ids")`) så vi kan verificere via console at hooken faktisk fyrer efter fix.
+**A. Funnel (top-tal):**
+| Metric | Kilde |
+|---|---|
+| Kandidater i flow | `booking_flow_enrollments` (alle statuser) |
+| Touchpoints sendt | `booking_flow_touchpoints` status=sent |
+| Unikke kandidater der åbnede et booking-link | `short_link_clicks` join `short_links` (link_type='booking') |
+| Kandidater der svarede på SMS | distinct candidates m. `communication_logs` direction='inbound', type='sms' |
+| Selvbookede interviews | `booking_flow_enrollments` cancelled_reason ILIKE 'kandidat selv%' eller candidates.status='interview_scheduled' inden for flow-periode |
+| Ghosted | candidates.status='ghostet' |
+| Takket nej | candidates.status='takket_nej' |
+| Afmeldt (unsubscribe-link) | `short_link_clicks` join `short_links` (link_type='unsubscribe') |
 
-**4. Verificér i console + network** efter genindlæsning:
-   - Network: nyt request med `kpi_slug=in.(sales_count,total_commission,total_hours)` for de 8 client IDs
-   - Network: `kpi_leaderboard_cache?scope_type=eq.client&scope_id=in.(...)` requests
-   - Console log fra hooken
-   - UI: KPI-tal > 0 og leaderboards populeret
+Hver række viser absolut antal + konverteringsrate ift. "Touchpoints sendt".
+
+**B. Per-touchpoint breakdown** (tabel)
+Grupperet på `template_key`:
+- Sendt | SMS-svar inden for 48t | Booking-link åbnet inden for 48t | Bookede inden for 48t | Failed
+- Hjælper med at se hvilke beskeder der virker bedst.
+
+**C. Per-tier breakdown** (tabel)
+A/B/C-segment × samme kolonner. Viser om vores segmentering rammer de rigtige.
+
+**4. Tilføj link i sidebar/booking-flow page**
+Knap "Engagement-rapport" på `/recruitment/booking-flow` der linker til den nye side.
 
 ### Hvad jeg IKKE rører
-- `UnitedClientBreakdown` (virker fint, viser allerede tal)
-- Cache-jobs eller team-scope cache-population
-- Andre dashboards
+- Booking-flow templates / cron / send-logik
+- Eksisterende `/recruitment/booking-flow` UI (kun ny knap)
+- KPI-bar ovenfor (`RecruitmentKpiBar`) — den fortsætter uafhængigt
 
-### Filer der ændres
-- `src/pages/UnitedDashboard.tsx` (konsolidér query, drop `teamId` ved aggregering)
-- `src/hooks/useAggregatedClientCache.ts` (tilføj debug-log)
+### Filer
+- Ny migration: `short_links` kolonner + `short_link_clicks` tabel + RLS
+- `supabase/functions/r/index.ts` (log klik)
+- `src/pages/ShortLinkRedirect.tsx` (log klik)
+- Ny: `src/pages/recruitment/BookingFlowEngagement.tsx`
+- `src/routes/pages.ts` + `src/routes/config.tsx` (route)
+- `src/pages/recruitment/BookingFlow.tsx` (knap til rapport — find rigtige filnavn under exploration)
+
+### Verificering
+- Klik et booking-shortlink → row i `short_link_clicks`, `click_count` stiger
+- Åbn `/recruitment/booking-flow/engagement` → tal matcher SQL-tjek manuelt for sidste 30 dage
+- Periode-filter ændrer alle tre sektioner
 
