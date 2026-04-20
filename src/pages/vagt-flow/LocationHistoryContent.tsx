@@ -671,7 +671,7 @@ export default function LocationHistoryContent() {
             </TableCell>
           </TableRow>
           {isExpanded && loc.weeklyBreakdown.map(wb => (
-            <TableRow key={`${loc.locationId}-${wb.year}-${wb.week}`} className="bg-muted/30">
+            <TableRow key={`${loc.groupKey}-${wb.year}-${wb.week}`} className="bg-muted/30">
               <TableCell className="pl-12 text-muted-foreground text-sm">
                 Uge {wb.week}, {wb.year}
               </TableCell>
