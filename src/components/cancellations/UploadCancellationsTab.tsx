@@ -2799,7 +2799,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                         <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Kampagnepris-udtræk</p>
                         <p className="text-sm font-medium truncate">{campaignPriceFile!.name}</p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {campaignPriceMap.size} OPP · {Array.from(campaignPriceMap.values()).filter(Boolean).length} m. kampagnepris
+                          {campaignPriceMap.size} OPP · {Array.from(campaignPriceMap.values()).filter(e => e.isCampaign).length} m. kampagnepris · Σ justering: {Array.from(campaignPriceMap.values()).reduce((s, e) => s + e.cpoAdjustment, 0).toLocaleString("da-DK")} kr.
                         </p>
                         <Button
                           variant="ghost"
