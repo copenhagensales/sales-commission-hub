@@ -193,7 +193,7 @@ export async function syncIntegration(
       p_encryption_key: encryptionKey,
     });
 
-    adapter = getAdapter(
+    adapter = await getAdapter(
       source || integration.provider,
       credentials,
       integration.name,

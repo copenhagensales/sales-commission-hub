@@ -57,7 +57,7 @@ export async function fetchSampleFields(
 
   try {
     // Get the adapter for this integration
-    const adapter = getAdapter(
+    const adapter = await getAdapter(
       integration.provider,
       credentials,
       integration.name,

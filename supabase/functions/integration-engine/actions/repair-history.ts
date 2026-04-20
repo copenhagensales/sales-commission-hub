@@ -40,7 +40,7 @@ export async function repairHistory(
         p_integration_id: integration.id,
         p_encryption_key: encryptionKey,
       })
-      const adapter = getAdapter(
+      const adapter = await getAdapter(
         integration.provider,
         credentials,
         integration.name,
