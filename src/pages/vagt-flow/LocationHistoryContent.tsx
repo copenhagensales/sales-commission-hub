@@ -121,6 +121,7 @@ function getPresetRange(key: PresetKey): { from: Date; to: Date } {
 // ── Aggregated row type ──
 interface AggregatedLocation {
   locationId: string;
+  groupKey: string;
   locationName: string;
   locationType: string;
   clientName: string;
