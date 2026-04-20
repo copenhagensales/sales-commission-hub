@@ -192,7 +192,13 @@ export default function BookingFlowEngagement() {
     if (link.link_type === "unsubscribe") unsubscribeClickedCandidates.add(link.candidate_id);
   });
 
-  const repliedCandidates = new Set(smsReplies.map((r) => r.candidate_id).filter(Boolean) as string[]);
+  const replyToCandidate = (r: CommLog) => {
+    const n = normalizePhone(r.phone_number);
+    return n ? phoneToCandidate.get(n) ?? null : null;
+  };
+  const repliedCandidates = new Set(
+    smsReplies.map(replyToCandidate).filter((v): v is string => Boolean(v))
+  );
 
   const candidateStatus = new Map(candidates.map((c) => [c.id, c.status]));
   const ghosted = candidateIds.filter((id) => candidateStatus.get(id) === "ghostet").length;
@@ -228,10 +234,11 @@ export default function BookingFlowEngagement() {
   const enrollmentToCandidate = new Map(enrollments.map((e) => [e.id, e.candidate_id]));
   const repliesByCandidate = new Map<string, Date[]>();
   smsReplies.forEach((r) => {
-    if (!r.candidate_id) return;
-    const arr = repliesByCandidate.get(r.candidate_id) ?? [];
+    const cid = replyToCandidate(r);
+    if (!cid) return;
+    const arr = repliesByCandidate.get(cid) ?? [];
     arr.push(parseISO(r.created_at));
-    repliesByCandidate.set(r.candidate_id, arr);
+    repliesByCandidate.set(cid, arr);
   });
   const clicksByCandidate = new Map<string, { type: string | null; at: Date }[]>();
   clicks.forEach((c) => {
