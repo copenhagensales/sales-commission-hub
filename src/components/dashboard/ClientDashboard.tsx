@@ -158,23 +158,31 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
       .sort((a, b) => b.commission - a.commission);
   }, [liveData, employeeData]);
 
-  const isLoading = useCached ? (kpisLoading || leaderboardsLoading) : liveLoading;
+  const isLoading = useCached ? (kpisLoading || leaderboardsLoading || aggKpisLoading) : liveLoading;
 
   const periodLabel = `${format(payrollPeriod.start, "d. MMM", { locale: da })} - ${format(payrollPeriod.end, "d. MMM", { locale: da })}`;
 
   // ========== KPI VALUES ==========
-  // For team-scoped dashboards, derive totals from leaderboard
-  const salesToday = scopeType === "team"
+  // Priority: aggregated (multi-client) > team (leaderboard sum) > client (cached KPIs)
+  const salesToday = isAggregated
+    ? (aggregatedKpis?.today.sales_count ?? 0)
+    : scopeType === "team"
     ? cachedSellersToday.reduce((s, e) => s + e.salesCount, 0)
     : getKpiValue(cachedKpis?.today?.sales_count, 0);
-  const salesWeek = scopeType === "team"
+  const salesWeek = isAggregated
+    ? (aggregatedKpis?.this_week.sales_count ?? 0)
+    : scopeType === "team"
     ? cachedSellersWeek.reduce((s, e) => s + e.salesCount, 0)
     : getKpiValue(cachedKpis?.this_week?.sales_count, 0);
   const salesMonth = getKpiValue(cachedKpis?.this_month?.sales_count, 0);
-  const salesPayroll = scopeType === "team"
+  const salesPayroll = isAggregated
+    ? (aggregatedKpis?.payroll_period.sales_count ?? 0)
+    : scopeType === "team"
     ? cachedSellersPayroll.reduce((s, e) => s + e.salesCount, 0)
     : getKpiValue(cachedKpis?.payroll_period?.sales_count, 0);
-  const payrollHours = getKpiValue(cachedKpis?.payroll_period?.total_hours, 0);
+  const payrollHours = isAggregated
+    ? (aggregatedKpis?.payroll_period.total_hours ?? 0)
+    : getKpiValue(cachedKpis?.payroll_period?.total_hours, 0);
   const payrollSalesPerHour = payrollHours > 0 ? salesPayroll / payrollHours : 0;
 
   // Cross-sales sums
