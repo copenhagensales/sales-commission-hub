@@ -514,71 +514,20 @@ export default function LocationProfitabilityContent() {
   // Render location rows (reusable for grouped sections)
   const renderLocationRows = (locations: typeof locationData) =>
     locations.map((loc) => {
-      const isExpanded = expandedLocations.has(loc.locationId);
+      const rowKey = (loc as any).rowKey as string;
+      const isExpanded = expandedLocations.has(rowKey);
       const hasPlacements = loc.placements.length > 0;
       const selectedPlacement = loc.placements.find(p => p.id === loc.selectedPlacementId);
 
       return (
         <>
           <TableRow
-            key={loc.locationId}
+            key={rowKey}
             className="cursor-pointer hover:bg-muted/50"
-            onClick={() => toggleExpand(loc.locationId)}
+            onClick={() => toggleExpand(rowKey)}
           >
-            <TableCell className="pl-6 font-medium">
-              <div className="flex items-center gap-2">
-                {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                {loc.locationName}
-                <TeamBadge clientName={loc.clientName} />
-              </div>
-            </TableCell>
-            <TableCell onClick={(e) => e.stopPropagation()}>
-              {hasPlacements ? (
-                <Select
-                  value={loc.selectedPlacementId || ""}
-                  onValueChange={(val) => handlePlacementChange(loc, val)}
-                >
-                  <SelectTrigger className="h-8 w-[140px] text-xs">
-                    <SelectValue placeholder="Vælg placering" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {loc.placements.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name} ({formatKr(p.daily_rate)}/dag)
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <span className="text-xs text-muted-foreground">–</span>
-              )}
-            </TableCell>
-            <TableCell className="text-right">{loc.bookedDays.length}</TableCell>
-            <TableCell className="text-right">{loc.totalSales}</TableCell>
-            <TableCell className="text-right">{formatKr(loc.totalRevenue)}</TableCell>
-            <TableCell className="text-right">{formatKr(loc.sellerCost)}</TableCell>
-            <TableCell className="text-right">{formatKr(loc.locationCost)}</TableCell>
-            <TableCell className="text-right">{formatKr(loc.hotelCost)}</TableCell>
-            <TableCell className="text-right">{formatKr(loc.dietCost)}</TableCell>
-            <TableCell className={`text-right font-semibold ${loc.db >= 0 ? "text-emerald-600" : "text-destructive"}`}>
-              {formatKr(loc.db)}
-            </TableCell>
-            <TableCell className={`text-right pr-6 ${loc.dbPerDay >= 0 ? "text-emerald-600" : "text-destructive"}`}>
-              {formatKr(loc.dbPerDay)}
-            </TableCell>
-          </TableRow>
-          {isExpanded && weekDates.map((date) => {
-            const dateStr = format(date, "yyyy-MM-dd");
-            const jsDay = date.getDay();
-            const dayNum = jsDay === 0 ? 6 : jsDay - 1;
-            const isBooked = loc.bookedDays.includes(dayNum);
-            const day = loc.dailyBreakdown[dateStr];
-            const dayRevenue = day?.revenue || 0;
-            const dayCommission = day?.commission || 0;
-            const daySellerCost = dayCommission * (1 + VACATION_PAY_RATES.SELLER);
-            const dayLocCost = isBooked ? loc.dailyRate : 0;
-            const dayDietCost = dietByLocationDate.get(`${loc.locationId}|${dateStr}`) || 0;
-            const hotelDays = hotelBookedDaysByLocation.get(loc.locationId) || [];
+            const dayDietCost = dietByLocationDate.get(`${rowKey}|${dateStr}`) || 0;
+            const hotelDays = hotelBookedDaysByLocation.get(rowKey) || [];
             const isHotelDay = hotelDays.includes(dayNum);
             const dayHotelCost = isHotelDay && hotelDays.length > 0 ? (loc.hotelCost / hotelDays.length) : 0;
             const dayDB = dayRevenue - daySellerCost - dayLocCost - dayHotelCost - dayDietCost;
