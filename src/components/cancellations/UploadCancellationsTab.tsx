@@ -764,11 +764,14 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
   });
 
   // Parse the campaign price extract: column D (index 3) = OPP, column M (index 12) = CPO correction.
-  // Returns Map<oppNumber (UPPER, trimmed), boolean> where true = campaign price (negative correction).
+  // Returns Map<oppNumber, { isCampaign, cpoAdjustment }> where cpoAdjustment is the (negative) M value
+  // that should be added to the main file's CPO. Positive/zero M → no adjustment.
   // Uses the robust parseExcelFile (ExcelJS → SheetJS fallback) to handle BI exports without default stylesheet.
-  const parseCampaignPriceExcel = async (buffer: ArrayBuffer): Promise<Map<string, boolean>> => {
+  const parseCampaignPriceExcel = async (
+    buffer: ArrayBuffer
+  ): Promise<Map<string, { isCampaign: boolean; cpoAdjustment: number }>> => {
     const { rows, columns: cols } = await parseExcelFile(buffer);
-    const map = new Map<string, boolean>();
+    const map = new Map<string, { isCampaign: boolean; cpoAdjustment: number }>();
     const oppCol = cols[3];   // Column D
     const cpoCol = cols[12];  // Column M
     if (!oppCol || !cpoCol) return map;
@@ -791,7 +794,17 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
       }
 
       const isCampaign = cpo < 0;
-      map.set(oppStr, (map.get(oppStr) ?? false) || isCampaign);
+      const adjustment = cpo < 0 ? cpo : 0;
+      const existing = map.get(oppStr);
+      if (existing) {
+        // Aggregate duplicates: keep most-negative adjustment (MIN)
+        map.set(oppStr, {
+          isCampaign: existing.isCampaign || isCampaign,
+          cpoAdjustment: Math.min(existing.cpoAdjustment, adjustment),
+        });
+      } else {
+        map.set(oppStr, { isCampaign, cpoAdjustment: adjustment });
+      }
     }
     return map;
   };
@@ -817,10 +830,12 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           return;
         }
         setCampaignPriceMap(map);
-        const campaignCount = Array.from(map.values()).filter(Boolean).length;
+        const entries = Array.from(map.values());
+        const campaignCount = entries.filter(e => e.isCampaign).length;
+        const totalAdjustment = entries.reduce((sum, e) => sum + e.cpoAdjustment, 0);
         toast({
           title: "Kampagnepris-udtræk indlæst",
-          description: `${map.size} OPP-numre fundet (${campaignCount} med kampagnepris).`,
+          description: `${map.size} OPP-numre fundet (${campaignCount} med kampagnepris, justering: ${totalAdjustment.toLocaleString("da-DK")} kr.).`,
         });
       } catch (error) {
         console.error("Campaign price parse error:", error);
