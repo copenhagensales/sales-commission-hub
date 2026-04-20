@@ -452,7 +452,7 @@ export default function LocationHistoryContent() {
     }
 
     // Build aggregated rows
-    return Array.from(locAgg.entries()).map(([locId, entry]) => {
+    return Array.from(locAgg.entries()).map(([groupKey, entry]) => {
       let totalRevenue = 0, totalCommission = 0, totalSales = 0, totalDays = 0;
       let totalLocCost = 0, totalHotelCost = 0, totalDietCost = 0;
 
@@ -480,7 +480,8 @@ export default function LocationHistoryContent() {
       const salesPerDay = totalDays > 0 ? totalSales / totalDays : 0;
 
       return {
-        locationId: locId,
+        locationId: entry.locationId,
+        groupKey,
         locationName: entry.locationName,
         locationType: entry.locationType,
         clientName: entry.clientName,
