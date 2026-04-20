@@ -289,7 +289,21 @@ function buildTdcUploadedStructured(
   }
   const cpoTotal = uploadedData["CPO Total"] != null ? String(uploadedData["CPO Total"]).trim() : "";
   const ttTrin = uploadedData["TT trin"] != null ? String(uploadedData["TT trin"]).trim() : "";
-  const kampagnePris = uploadedData["Kampagne pris"] != null ? String(uploadedData["Kampagne pris"]).trim() : "";
+
+  // Læs Kampagne pris fra første sub-row (case-insensitive); top-level fallback
+  let kampagnePris = "";
+  if (productRows && productRows.length > 0) {
+    const first = productRows[0];
+    const key = Object.keys(first).find((k) => k.toLowerCase() === "kampagne pris");
+    if (key) kampagnePris = String(first[key] ?? "").trim();
+  }
+  if (!kampagnePris && uploadedData["Kampagne pris"] != null) {
+    kampagnePris = String(uploadedData["Kampagne pris"]).trim();
+  }
+  // Vis kun hvis et produkt er 5G Fri
+  const has5gFri = products.some((p) => /5G\s*FRI/i.test(p.name));
+  if (!has5gFri) kampagnePris = "";
+
   return products.length > 0 || cpoTotal || ttTrin || kampagnePris ? { products, cpoTotal, ttTrin, kampagnePris } : null;
 }
 
