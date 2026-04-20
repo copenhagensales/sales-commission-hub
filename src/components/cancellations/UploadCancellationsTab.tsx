@@ -564,7 +564,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
   const { user } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [campaignPriceFile, setCampaignPriceFile] = useState<File | null>(null);
-  const [campaignPriceMap, setCampaignPriceMap] = useState<Map<string, boolean>>(new Map());
+  const [campaignPriceMap, setCampaignPriceMap] = useState<Map<string, { isCampaign: boolean; cpoAdjustment: number }>>(new Map());
   const isTdcErhverv = selectedClientId === CLIENT_IDS["TDC Erhverv"];
   const [parsedData, setParsedData] = useState<ParsedRow[]>([]);
   const [columns, setColumns] = useState<string[]>([]);
