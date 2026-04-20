@@ -288,6 +288,16 @@ export default function LocationProfitabilityContent() {
     return map;
   }, [dietData]);
 
+  // Map booking → composite key (locId__clientId) for per-client splitting
+  const bookingToLocationClient = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const b of bookings || []) {
+      const cid = (b as any).client_id || "no-client";
+      map.set(b.id, `${b.location_id}__${cid}`);
+    }
+    return map;
+  }, [bookings]);
+
   const bookingToLocation = useMemo(() => {
     const map = new Map<string, string>();
     for (const b of bookings || []) {
@@ -299,33 +309,33 @@ export default function LocationProfitabilityContent() {
   const hotelCostByLocation = useMemo(() => {
     const map = new Map<string, number>();
     for (const [bid, cost] of hotelCostByBooking) {
-      const locId = bookingToLocation.get(bid);
-      if (locId) map.set(locId, (map.get(locId) || 0) + cost);
+      const key = bookingToLocationClient.get(bid);
+      if (key) map.set(key, (map.get(key) || 0) + cost);
     }
     return map;
-  }, [hotelCostByBooking, bookingToLocation]);
+  }, [hotelCostByBooking, bookingToLocationClient]);
 
   const hotelBookedDaysByLocation = useMemo(() => {
     const map = new Map<string, number[]>();
     for (const [bid, days] of hotelBookedDaysByBooking) {
-      const locId = bookingToLocation.get(bid);
-      if (locId) {
-        const existing = map.get(locId) || [];
+      const key = bookingToLocationClient.get(bid);
+      if (key) {
+        const existing = map.get(key) || [];
         const merged = Array.from(new Set([...existing, ...days])).sort();
-        map.set(locId, merged);
+        map.set(key, merged);
       }
     }
     return map;
-  }, [hotelBookedDaysByBooking, bookingToLocation]);
+  }, [hotelBookedDaysByBooking, bookingToLocationClient]);
 
   const dietCostByLocation = useMemo(() => {
     const map = new Map<string, number>();
     for (const [bid, cost] of dietCostByBooking) {
-      const locId = bookingToLocation.get(bid);
-      if (locId) map.set(locId, (map.get(locId) || 0) + cost);
+      const key = bookingToLocationClient.get(bid);
+      if (key) map.set(key, (map.get(key) || 0) + cost);
     }
     return map;
-  }, [dietCostByBooking, bookingToLocation]);
+  }, [dietCostByBooking, bookingToLocationClient]);
 
   // Build location profitability data
   const locationData = useMemo(() => {
