@@ -1,57 +1,53 @@
 
 
-## Problem
-`parseCampaignPriceExcel` bruger `ExcelJS` direkte (`wb.xlsx.load`). Filen fra TDC's BI-eksport mangler default-stylesheet (Python warner: *"Workbook contains no default style"*) — ExcelJS smider en exception på den slags, hvilket trigger fejl-toasten *"Kunne ikke læse Excel-filen. Kontroller formatet."*.
+## Mål
+Når kampagnepris-udtrækket uploades for TDC Erhverv, skal CPO-rettelsen i kolonne M fratrækkes den CPO der registreres på det tilsvarende OPP-nummer fra hovedfilen — men kun når M er negativ.
 
-UI viser samtidig "0 OPP · 0 m. kampagnepris" fordi state'en blev sat før parsing fejlede (filnavnet vises uanset hvad).
+## Regel
+- For hvert OPP fra kampagne-arket:
+  - `M < 0` → ny CPO = oprindelig CPO **+ M** (M er negativ, så CPO reduceres med |M|, fx -600 → CPO bliver 600 lavere)
+  - `M >= 0` → ingen ændring
+- Gælder kun TDC Erhverv (samme guard som eksisterende kampagne-flow).
 
-Filen er ellers fin:
-- Sheet "Export", 253 rækker
-- **Kolonne D = `OPPnr`** (fx `OPP-1057494`) ✅
-- **Kolonne M = `Difference`** (numerisk, negativ = kampagnepris, fx `-600`) ✅
+## Undersøgelse jeg skal lave før implementering
+Jeg skal lokalisere præcis hvor CPO på en TDC-annullering kommer fra i `UploadCancellationsTab.tsx`:
+- Total-rækkens CPO-felt (sandsynligt navn: `CPO`, `CPO total`, `Provision`, eller lign. — skal verificeres ved at læse `consolidateOppRows` + Total-rækkens kolonner)
+- Hvor den endeligt persistereres / vises før godkendelse (PASS-flow + payload til `cancellation_*`-tabel)
 
-Filen indeholder massevis af gyldige OPP-numre med både kampagne (`-600`) og listepris (`0` / `+200`).
+## Ændringer (kun én fil)
 
-## Løsning
-Genbrug projektets robuste parser `parseExcelFile` fra `src/utils/excel.ts` — den prøver ExcelJS først og falder tilbage til SheetJS ved fejl (præcis denne situation). Vi læser så positionelt på kolonne D + M via rækkerne den returnerer.
+**`src/components/cancellations/UploadCancellationsTab.tsx`**
 
-## Ændring (én fil)
+1. **Udvid `campaignPriceMap`** fra `Map<string, boolean>` til `Map<string, { isCampaign: boolean; cpoAdjustment: number }>` (eller en parallel `Map<string, number>` med rå M-værdien).
+   - Behold rule: kun negative M registreres som adjustment; positive/nul → 0.
+   - Ved duplikerede OPP'er: tag den mest negative (laveste) M.
 
-**`src/components/cancellations/UploadCancellationsTab.tsx`** — `parseCampaignPriceExcel` (linje 768-800) refaktoreres:
+2. **I `consolidateOppRows` / `consolidateOppRowsLocal`** (TDC-grenen):
+   - Find Total-rækkens CPO-felt (case-insensitive lookup, samme mønster som eksisterende kode).
+   - Hvis OPP findes i map'et og `cpoAdjustment < 0`:
+     - `nyCPO = oprindeligCPO + cpoAdjustment` (parse robust: håndter tom streng, komma som decimal, currency-tegn)
+     - Skriv tilbage på Total-rækken som number (eller behold original formatering)
+   - Bevar oprindelig værdi i et debug-felt `_original_cpo` til verificering i UI/logs.
+   - Eksisterende `Kampagne pris: "Ja"/"Nej"` injection på sub-rows bibeholdes uændret.
 
-```ts
-const parseCampaignPriceExcel = async (buffer: ArrayBuffer): Promise<Map<string, boolean>> => {
-  const { rows, columns } = await parseExcelFile(buffer); // robust ExcelJS→SheetJS fallback
-  const map = new Map<string, boolean>();
-  // Kolonne D = index 3, kolonne M = index 12 (positionelt via columns[])
-  const oppCol = columns[3];
-  const cpoCol = columns[12];
-  if (!oppCol || !cpoCol) return map;
+3. **UI-statuslinje** under campaign-dropzone:
+   - Udvid eksisterende "X OPP · Y m. kampagnepris" med "· Σ justering: -Z kr." så brugeren kan se total CPO-reduktion før Match.
 
-  for (const row of rows) {
-    const rawOpp = row[oppCol];
-    if (rawOpp == null || rawOpp === "") continue;
-    const oppStr = String(rawOpp).toUpperCase().trim();
-    if (!/\d/.test(oppStr)) continue; // skip headers/junk
+## Edge cases
+- OPP findes i kampagne-fil men ikke i hovedfil → ignoreres (intet at justere).
+- OPP findes i hovedfil men ikke i kampagne-fil → ingen ændring (samme som i dag).
+- Total-række mangler CPO-felt eller er ikke-numerisk → log warning, ingen ændring.
+- Samme OPP flere gange i kampagne-fil med forskellige M → brug MIN (mest negativ).
+- Hvis brugeren genuploader hovedfil efter kampagne-fil → re-kør consolidation med eksisterende map.
 
-    const rawCpo = row[cpoCol];
-    let cpo = 0;
-    if (typeof rawCpo === "number") cpo = rawCpo;
-    else if (rawCpo != null && rawCpo !== "") {
-      const parsed = parseFloat(String(rawCpo).replace(/\./g, "").replace(/,/g, ".").replace(/[^0-9.\-]/g, ""));
-      cpo = isNaN(parsed) ? 0 : parsed;
-    }
-    const isCampaign = cpo < 0;
-    map.set(oppStr, (map.get(oppStr) ?? false) || isCampaign);
-  }
-  return map;
-};
-```
+## Hvad jeg IKKE rører
+- `evaluateConditions` / `findMatchingProductId` — uberørt; produkt-matching kører fortsat på `Kampagne pris: "Ja"/"Nej"` på sub-rows.
+- Andre kunder end TDC Erhverv.
+- `cancellation_product_mappings` og admin-UI.
 
-Og forbedring af error-handling i `onCampaignDrop`: nulstil `campaignPriceFile` hvis parse fejler, så brugeren ikke ser et grønt "fil uploaded"-card sammen med en rød fejl-toast.
-
-## Bekræftet via inspektion af din fil
-- 253 datarækker, header i række 1
-- Eksempler der ville give kampagnepris: `OPP-1058032` (-600), `OPP-1058892` (-600), `OPP-1058294` (-600)
-- Eksempler uden: `OPP-1057494` (0), `OPP-1059175` (+200)
+## Verificering
+- Upload eksempel-fil: OPP-1058032 (M = -600) → CPO på den tilsvarende Total-række skal være 600 lavere end før.
+- OPP-1057494 (M = 0) → uændret.
+- OPP-1059175 (M = +200) → uændret.
+- Tjek `ApprovalQueueTab` viser den justerede CPO.
 
