@@ -20,6 +20,7 @@ export function useAggregatedClientKpis(clientIds: string[] | undefined) {
   return useQuery({
     queryKey: ["aggregated-client-kpis", [...(clientIds || [])].sort()],
     queryFn: async (): Promise<AggregatedKpis> => {
+      console.log("[aggregated-kpis] running with", clientIds?.length ?? 0, "client ids");
       const result: AggregatedKpis = {
         today: { ...EMPTY_BUCKET },
         this_week: { ...EMPTY_BUCKET },

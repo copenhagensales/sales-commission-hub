@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { da } from "date-fns/locale";
 import { TrendingUp, Package } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/utils/supabasePagination";
@@ -19,32 +18,37 @@ const getClientColor = (index: number) => {
   return colors[index % colors.length];
 };
 
-function UnitedClientBreakdown() {
-  const tvMode = isTvMode();
-  const payrollPeriod = useMemo(() => calculatePayrollPeriod(), []);
-
-  const { data: teamClients } = useQuery({
-    queryKey: ["united-team-clients"],
+// Single source of truth for United team + its clients
+function useUnitedTeamClients() {
+  return useQuery({
+    queryKey: ["united-team-with-clients"],
     queryFn: async () => {
       const { data: team } = await supabase
         .from("teams")
         .select("id")
         .ilike("name", "%united%")
         .maybeSingle();
-      if (!team) return [];
-      const { data: clients } = await supabase
+      if (!team) return { teamId: undefined as string | undefined, clients: [] as Array<{ id: string; name: string; logo_url: string | null }> };
+      const { data: tc } = await supabase
         .from("team_clients")
         .select(`client_id, clients (id, name, logo_url)`)
         .eq("team_id", team.id);
-      return (clients || []).map((tc: any) => tc.clients).filter(Boolean);
+      const clients = (tc || []).map((row: any) => row.clients).filter(Boolean);
+      return { teamId: team.id as string, clients };
     },
+    staleTime: 5 * 60 * 1000,
   });
+}
+
+function UnitedClientBreakdown({ clients }: { clients: Array<{ id: string; name: string }> }) {
+  const tvMode = isTvMode();
+  const payrollPeriod = useMemo(() => calculatePayrollPeriod(), []);
 
   const { data: clientSalesData } = useQuery({
-    queryKey: ["united-client-sales-cached", teamClients?.map((c: any) => c.id)],
+    queryKey: ["united-client-sales-cached", clients.map((c) => c.id)],
     queryFn: async () => {
-      if (!teamClients || teamClients.length === 0) return [];
-      const clientIds = teamClients.map((c: any) => c.id);
+      if (clients.length === 0) return [];
+      const clientIds = clients.map((c) => c.id);
       const { data } = await supabase
         .from("kpi_cached_values")
         .select("period_type, scope_id, value")
@@ -63,7 +67,7 @@ function UnitedClientBreakdown() {
         else if (row.period_type === "payroll_period") entry.payroll = row.value;
       }
 
-      return teamClients.map((client: any) => {
+      return clients.map((client) => {
         const cached = clientMap.get(client.id);
         return {
           clientId: client.id, clientName: client.name,
@@ -71,16 +75,16 @@ function UnitedClientBreakdown() {
         };
       }).sort((a, b) => b.salesMonth - a.salesMonth);
     },
-    enabled: !!teamClients && teamClients.length > 0,
+    enabled: clients.length > 0,
     staleTime: 30000, refetchInterval: 60000,
   });
 
   const { data: clientHoursMap } = useQuery({
-    queryKey: ["united-client-hours-v2", teamClients?.map((c: any) => c.id), payrollPeriod.start.toISOString()],
+    queryKey: ["united-client-hours-v2", clients.map((c) => c.id), payrollPeriod.start.toISOString()],
     queryFn: async () => {
-      if (!teamClients || teamClients.length === 0) return new Map<string, number>();
+      if (clients.length === 0) return new Map<string, number>();
       const hoursMap = new Map<string, number>();
-      await Promise.all(teamClients.map(async (client: any) => {
+      await Promise.all(clients.map(async (client) => {
         const { data: campaigns } = await supabase.from("client_campaigns").select("id").eq("client_id", client.id);
         if (!campaigns || campaigns.length === 0) { hoursMap.set(client.id, 0); return; }
         const sales = await fetchAllRows<any>("sales", "agent_email", (q) =>
@@ -116,7 +120,7 @@ function UnitedClientBreakdown() {
       }));
       return hoursMap;
     },
-    enabled: !!teamClients && teamClients.length > 0,
+    enabled: clients.length > 0,
   });
 
   if (tvMode || !clientSalesData || clientSalesData.length === 0) return null;
@@ -173,32 +177,20 @@ function UnitedClientBreakdown() {
 }
 
 export default function UnitedDashboard() {
-  const { data: unitedTeam } = useQuery({
-    queryKey: ["united-team-with-clients"],
-    queryFn: async () => {
-      const { data: team } = await supabase
-        .from("teams").select("id").ilike("name", "%united%").maybeSingle();
-      if (!team) return { id: undefined as string | undefined, clientIds: [] as string[] };
-      const { data: tc } = await supabase
-        .from("team_clients")
-        .select("client_id")
-        .eq("team_id", team.id);
-      const clientIds = (tc || []).map((x: any) => x.client_id).filter(Boolean);
-      return { id: team.id as string, clientIds };
-    },
-  });
+  const { data: united } = useUnitedTeamClients();
+  const clientIds = united?.clients.map((c) => c.id) || [];
 
   return (
     <ClientDashboard
       config={{
         slug: "united",
-        teamId: unitedTeam?.id,
+        // Intentionally NO teamId — we aggregate via aggregateClientIds
         title: "United – Overblik",
         features: {
           showMonth: false,
-          aggregateClientIds: unitedTeam?.clientIds,
+          aggregateClientIds: clientIds.length > 0 ? clientIds : undefined,
         },
-        extraContent: <UnitedClientBreakdown />,
+        extraContent: <UnitedClientBreakdown clients={united?.clients || []} />,
       }}
     />
   );
