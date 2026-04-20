@@ -156,6 +156,8 @@ function BillingOverviewTab() {
 
   const bookingsByLocation = filteredBookings?.reduce((acc: any, booking: any) => {
     const locationId = booking.location_id;
+    const clientId = booking.client_id || "no-client";
+    const groupKey = `${locationId}__${clientId}`;
     let bookingTotal: number;
     let dailyRate: number;
     const days = countBookedDays(booking);
@@ -168,8 +170,8 @@ function BillingOverviewTab() {
       bookingTotal = dailyRate * days;
     }
 
-    if (!acc[locationId]) {
-      acc[locationId] = {
+    if (!acc[groupKey]) {
+      acc[groupKey] = {
         location: booking.location,
         client: booking.clients,
         bookings: [],
@@ -183,21 +185,21 @@ function BillingOverviewTab() {
       };
     }
 
-    acc[locationId].bookings.push(booking);
-    acc[locationId].totalDays += days;
-    acc[locationId].totalAmount += bookingTotal;
+    acc[groupKey].bookings.push(booking);
+    acc[groupKey].totalDays += days;
+    acc[groupKey].totalAmount += bookingTotal;
 
     // Merge weekdays
     const bWeeks = getBookedWeekdays(booking);
     bWeeks.forEach((days_set, week) => {
-      if (!acc[locationId].weekdaysByWeek.has(week)) {
-        acc[locationId].weekdaysByWeek.set(week, new Set<number>());
+      if (!acc[groupKey].weekdaysByWeek.has(week)) {
+        acc[groupKey].weekdaysByWeek.set(week, new Set<number>());
       }
-      days_set.forEach((d: number) => acc[locationId].weekdaysByWeek.get(week)!.add(d));
+      days_set.forEach((d: number) => acc[groupKey].weekdaysByWeek.get(week)!.add(d));
     });
 
-    if (booking.start_date < acc[locationId].minDate) acc[locationId].minDate = booking.start_date;
-    if (booking.end_date > acc[locationId].maxDate) acc[locationId].maxDate = booking.end_date;
+    if (booking.start_date < acc[groupKey].minDate) acc[groupKey].minDate = booking.start_date;
+    if (booking.end_date > acc[groupKey].maxDate) acc[groupKey].maxDate = booking.end_date;
 
     return acc;
   }, {});
