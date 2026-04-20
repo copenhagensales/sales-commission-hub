@@ -15,6 +15,7 @@ import { getDisplayName } from "@/utils/formatting";
 import { useSalesAggregatesExtended } from "@/hooks/useSalesAggregatesExtended";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAggregatedClientKpis, useAggregatedClientLeaderboards } from "@/hooks/useAggregatedClientCache";
 
 export interface ClientDashboardConfig {
   slug: string;
@@ -32,6 +33,12 @@ export interface ClientDashboardConfig {
     crossSales?: boolean;
     /** Enable live-mode fallback for custom periods (default: false) */
     liveMode?: boolean;
+    /**
+     * If set, dashboard aggregates KPI + leaderboard cache across these client IDs
+     * instead of querying a (non-existent) team-scoped cache.
+     * Used by United dashboard.
+     */
+    aggregateClientIds?: string[];
   };
   /** Extra content rendered between KPIs and leaderboards (e.g. client breakdown) */
   extraContent?: React.ReactNode;
