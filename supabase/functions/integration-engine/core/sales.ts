@@ -328,7 +328,13 @@ function prepareSaleItems(
   const campaignMappingId = sale.campaignId ? campaignMappingsMap.get(sale.campaignId) : null;
 
   for (const p of sale.products) {
+    // Multi-layer mapping lookup — single source of truth across all dialers/clients.
+    // Some legacy mappings store the product TITLE in the adversus_external_id column
+    // (instead of a numeric ID), so we must try multiple keys before giving up.
     let productId = productMapByExtId.get(p.externalId)
+    // Fallback A: title stored as key in adversus_external_id column
+    if (!productId && p.name) productId = productMapByExtId.get(p.name)
+    // Fallback B: product with exact same name in products table
     if (!productId && p.name) {
       const prod = productMapByName.get(p.name.toLowerCase())
       if (prod) productId = prod.id
