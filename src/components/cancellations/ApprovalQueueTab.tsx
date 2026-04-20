@@ -304,7 +304,22 @@ function buildTdcUploadedStructured(
   const has5gFri = products.some((p) => /5G\s*FRI/i.test(p.name));
   if (!has5gFri) kampagnePris = "";
 
-  return products.length > 0 || cpoTotal || ttTrin || kampagnePris ? { products, cpoTotal, ttTrin, kampagnePris } : null;
+  // Konsolidér identiske produkter (TDC viser samme produkt som flere ×1 rows)
+  const consolidated = new Map<string, { name: string; quantity: number }>();
+  for (const p of products) {
+    const key = p.name.trim().toLowerCase();
+    const existing = consolidated.get(key);
+    if (existing) {
+      existing.quantity += p.quantity;
+    } else {
+      consolidated.set(key, { name: p.name, quantity: p.quantity });
+    }
+  }
+  const groupedProducts = Array.from(consolidated.values());
+
+  return groupedProducts.length > 0 || cpoTotal || ttTrin || kampagnePris
+    ? { products: groupedProducts, cpoTotal, ttTrin, kampagnePris }
+    : null;
 }
 
 function buildUploadedPreview(
