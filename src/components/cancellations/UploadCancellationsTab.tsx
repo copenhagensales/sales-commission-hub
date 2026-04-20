@@ -763,6 +763,37 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     enabled: !!user?.email,
   });
 
+  // Apply a (negative) CPO adjustment from the campaign-price file to the Total row of the main file.
+  // Locates a CPO-like field case-insensitively, parses the numeric value robustly, adds the adjustment,
+  // and writes the result back. Preserves original under _original_cpo for debug. No-op when adjustment >= 0.
+  const applyCpoAdjustment = (
+    totalRow: Record<string, unknown>,
+    adjustment: number
+  ): Record<string, unknown> => {
+    if (!totalRow || adjustment >= 0) return totalRow;
+    const cpoKey = Object.keys(totalRow).find(k => /\bcpo\b/i.test(k));
+    if (!cpoKey) {
+      console.warn("[campaign-cpo] No CPO field found on total row; skipping adjustment", { adjustment });
+      return totalRow;
+    }
+    const raw = totalRow[cpoKey];
+    let current = 0;
+    if (typeof raw === "number") {
+      current = raw;
+    } else if (raw !== null && raw !== undefined && raw !== "") {
+      const parsed = parseFloat(
+        String(raw).replace(/\./g, "").replace(/,/g, ".").replace(/[^0-9.\-]/g, "")
+      );
+      if (isNaN(parsed)) {
+        console.warn("[campaign-cpo] Non-numeric CPO; skipping adjustment", { cpoKey, raw });
+        return totalRow;
+      }
+      current = parsed;
+    }
+    const adjusted = current + adjustment; // adjustment is negative → reduces CPO
+    return { ...totalRow, [cpoKey]: adjusted, _original_cpo: current };
+  };
+
   // Parse the campaign price extract: column D (index 3) = OPP, column M (index 12) = CPO correction.
   // Returns Map<oppNumber, { isCampaign, cpoAdjustment }> where cpoAdjustment is the (negative) M value
   // that should be added to the main file's CPO. Positive/zero M → no adjustment.
