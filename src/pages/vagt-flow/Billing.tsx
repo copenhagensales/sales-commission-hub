@@ -211,7 +211,9 @@ function BillingOverviewTab() {
   const totalAmount: number = (Object.values(bookingsByLocation || {}) as any[]).reduce(
     (sum: number, loc: any) => sum + (loc.totalAmount || 0), 0
   );
-  const uniqueLocations = Object.keys(bookingsByLocation || {}).length;
+  const uniqueLocations = new Set(
+    (Object.values(bookingsByLocation || {}) as any[]).map((l: any) => l.location?.id).filter(Boolean)
+  ).size;
 
   // Calculate netto amount using discount rules per location type
   const nettoAmount = (() => {
