@@ -1578,11 +1578,12 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               const pv = String(r["Produkt"] || r["produkt"] || "").trim();
               return pv.toLowerCase() !== "total" && pv !== "";
             });
-            // Inject "Kampagne pris" on each sub-row from the campaign price map
-            const isCampaign = oppKey && campaignPriceMap.has(oppKey) ? campaignPriceMap.get(oppKey)! : false;
+            const campaignEntry = oppKey ? campaignPriceMap.get(oppKey) : undefined;
+            const isCampaign = campaignEntry?.isCampaign ?? false;
             const campaignLabel: "Ja" | "Nej" = isCampaign ? "Ja" : "Nej";
             const enrichedProductRows = productRows.map(r => ({ ...r, "Kampagne pris": campaignLabel }));
-            return { ...totalRow, _product_rows: enrichedProductRows.length > 0 ? enrichedProductRows : undefined };
+            const adjustedTotal = applyCpoAdjustment(totalRow, campaignEntry?.cpoAdjustment ?? 0);
+            return { ...adjustedTotal, _product_rows: enrichedProductRows.length > 0 ? enrichedProductRows : undefined };
           };
 
           const oppSet1c = new Set(oppNumbers.map(o => o.toUpperCase().trim()));
@@ -2117,13 +2118,14 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           return produktVal.toLowerCase() !== "total" && produktVal !== "";
         });
 
-        // Inject "Kampagne pris" on each sub-row from the campaign price map
-        const isCampaign = oppKey && campaignPriceMap.has(oppKey) ? campaignPriceMap.get(oppKey)! : false;
+        const campaignEntry = oppKey ? campaignPriceMap.get(oppKey) : undefined;
+        const isCampaign = campaignEntry?.isCampaign ?? false;
         const campaignLabel: "Ja" | "Nej" = isCampaign ? "Ja" : "Nej";
         const enrichedProductRows = productRows.map(r => ({ ...r, "Kampagne pris": campaignLabel }));
+        const adjustedTotal = applyCpoAdjustment(totalRow, campaignEntry?.cpoAdjustment ?? 0);
 
         return {
-          ...totalRow,
+          ...adjustedTotal,
           _product_rows: enrichedProductRows.length > 0 ? enrichedProductRows : undefined,
         };
       };
