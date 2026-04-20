@@ -173,12 +173,18 @@ function UnitedClientBreakdown() {
 }
 
 export default function UnitedDashboard() {
-  const { data: unitedTeamId } = useQuery({
-    queryKey: ["united-team-id"],
+  const { data: unitedTeam } = useQuery({
+    queryKey: ["united-team-with-clients"],
     queryFn: async () => {
       const { data: team } = await supabase
         .from("teams").select("id").ilike("name", "%united%").maybeSingle();
-      return team?.id || undefined;
+      if (!team) return { id: undefined as string | undefined, clientIds: [] as string[] };
+      const { data: tc } = await supabase
+        .from("team_clients")
+        .select("client_id")
+        .eq("team_id", team.id);
+      const clientIds = (tc || []).map((x: any) => x.client_id).filter(Boolean);
+      return { id: team.id as string, clientIds };
     },
   });
 
@@ -186,10 +192,11 @@ export default function UnitedDashboard() {
     <ClientDashboard
       config={{
         slug: "united",
-        teamId: unitedTeamId,
+        teamId: unitedTeam?.id,
         title: "United – Overblik",
         features: {
           showMonth: false,
+          aggregateClientIds: unitedTeam?.clientIds,
         },
         extraContent: <UnitedClientBreakdown />,
       }}

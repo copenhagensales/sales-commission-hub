@@ -15,6 +15,7 @@ import { getDisplayName } from "@/utils/formatting";
 import { useSalesAggregatesExtended } from "@/hooks/useSalesAggregatesExtended";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAggregatedClientKpis, useAggregatedClientLeaderboards } from "@/hooks/useAggregatedClientCache";
 
 export interface ClientDashboardConfig {
   slug: string;
@@ -32,6 +33,12 @@ export interface ClientDashboardConfig {
     crossSales?: boolean;
     /** Enable live-mode fallback for custom periods (default: false) */
     liveMode?: boolean;
+    /**
+     * If set, dashboard aggregates KPI + leaderboard cache across these client IDs
+     * instead of querying a (non-existent) team-scoped cache.
+     * Used by United dashboard.
+     */
+    aggregateClientIds?: string[];
   };
   /** Extra content rendered between KPIs and leaderboards (e.g. client breakdown) */
   extraContent?: React.ReactNode;
@@ -53,35 +60,47 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
   const useLiveMode = config.features?.liveMode === true;
 
   // Determine scope
-  const scopeType = config.teamId ? "team" : "client";
+  const aggregateClientIds = config.features?.aggregateClientIds;
+  const isAggregated = !!(aggregateClientIds && aggregateClientIds.length > 0);
+  const scopeType = isAggregated ? "team" : (config.teamId ? "team" : "client");
   const scopeId = config.teamId || config.clientId || null;
 
   // Should we use cached data or live?
   const useCached = !useLiveMode || canUseCachedKpis(selectedPeriod.type);
 
-  // ========== CACHED KPIs ==========
+  // ========== CACHED KPIs (single client) ==========
   const { data: cachedKpis, isLoading: kpisLoading } = useClientDashboardKpis(
     scopeType === "client" ? scopeId : null,
     ["sales_count", "total_commission", "total_revenue", "total_hours"],
   );
 
-  // ========== CACHED LEADERBOARDS ==========
-  const {
-    sellersToday: cachedSellersToday,
-    sellersWeek: cachedSellersWeek,
-    sellersPayroll: cachedSellersPayroll,
-    isLoading: leaderboardsLoading,
-  } = useCachedLeaderboards(
-    { type: scopeType as "client" | "team", id: scopeId },
-    { enabled: useCached, limit: 30 }
+  // ========== AGGREGATED KPIs (multi-client, e.g. United) ==========
+  const { data: aggregatedKpis, isLoading: aggKpisLoading } = useAggregatedClientKpis(
+    isAggregated ? aggregateClientIds : undefined
   );
+
+  // ========== CACHED LEADERBOARDS ==========
+  const singleScopeLeaderboards = useCachedLeaderboards(
+    { type: scopeType as "client" | "team", id: scopeId },
+    { enabled: useCached && !isAggregated, limit: 30 }
+  );
+
+  const aggregatedLeaderboards = useAggregatedClientLeaderboards(
+    isAggregated ? aggregateClientIds : undefined,
+    { enabled: useCached && isAggregated, limit: 30 }
+  );
+
+  const cachedSellersToday = isAggregated ? aggregatedLeaderboards.sellersToday : singleScopeLeaderboards.sellersToday;
+  const cachedSellersWeek = isAggregated ? aggregatedLeaderboards.sellersWeek : singleScopeLeaderboards.sellersWeek;
+  const cachedSellersPayroll = isAggregated ? aggregatedLeaderboards.sellersPayroll : singleScopeLeaderboards.sellersPayroll;
+  const leaderboardsLoading = isAggregated ? aggregatedLeaderboards.isLoading : singleScopeLeaderboards.isLoading;
 
   // ========== LIVE DATA (optional, for custom periods) ==========
   const { data: liveData, isLoading: liveLoading } = useSalesAggregatesExtended({
     periodStart: selectedPeriod.from,
     periodEnd: selectedPeriod.to,
     clientId: scopeType === "client" ? (scopeId || undefined) : undefined,
-    teamId: scopeType === "team" ? (scopeId || undefined) : undefined,
+    teamId: scopeType === "team" && !isAggregated ? (scopeId || undefined) : undefined,
     groupBy: ['employee'],
     enabled: useLiveMode && !useCached,
   });
@@ -139,23 +158,31 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
       .sort((a, b) => b.commission - a.commission);
   }, [liveData, employeeData]);
 
-  const isLoading = useCached ? (kpisLoading || leaderboardsLoading) : liveLoading;
+  const isLoading = useCached ? (kpisLoading || leaderboardsLoading || aggKpisLoading) : liveLoading;
 
   const periodLabel = `${format(payrollPeriod.start, "d. MMM", { locale: da })} - ${format(payrollPeriod.end, "d. MMM", { locale: da })}`;
 
   // ========== KPI VALUES ==========
-  // For team-scoped dashboards, derive totals from leaderboard
-  const salesToday = scopeType === "team"
+  // Priority: aggregated (multi-client) > team (leaderboard sum) > client (cached KPIs)
+  const salesToday = isAggregated
+    ? (aggregatedKpis?.today.sales_count ?? 0)
+    : scopeType === "team"
     ? cachedSellersToday.reduce((s, e) => s + e.salesCount, 0)
     : getKpiValue(cachedKpis?.today?.sales_count, 0);
-  const salesWeek = scopeType === "team"
+  const salesWeek = isAggregated
+    ? (aggregatedKpis?.this_week.sales_count ?? 0)
+    : scopeType === "team"
     ? cachedSellersWeek.reduce((s, e) => s + e.salesCount, 0)
     : getKpiValue(cachedKpis?.this_week?.sales_count, 0);
   const salesMonth = getKpiValue(cachedKpis?.this_month?.sales_count, 0);
-  const salesPayroll = scopeType === "team"
+  const salesPayroll = isAggregated
+    ? (aggregatedKpis?.payroll_period.sales_count ?? 0)
+    : scopeType === "team"
     ? cachedSellersPayroll.reduce((s, e) => s + e.salesCount, 0)
     : getKpiValue(cachedKpis?.payroll_period?.sales_count, 0);
-  const payrollHours = getKpiValue(cachedKpis?.payroll_period?.total_hours, 0);
+  const payrollHours = isAggregated
+    ? (aggregatedKpis?.payroll_period.total_hours ?? 0)
+    : getKpiValue(cachedKpis?.payroll_period?.total_hours, 0);
   const payrollSalesPerHour = payrollHours > 0 ? salesPayroll / payrollHours : 0;
 
   // Cross-sales sums
