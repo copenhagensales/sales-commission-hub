@@ -288,6 +288,16 @@ export default function LocationProfitabilityContent() {
     return map;
   }, [dietData]);
 
+  // Map booking → composite key (locId__clientId) for per-client splitting
+  const bookingToLocationClient = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const b of bookings || []) {
+      const cid = (b as any).client_id || "no-client";
+      map.set(b.id, `${b.location_id}__${cid}`);
+    }
+    return map;
+  }, [bookings]);
+
   const bookingToLocation = useMemo(() => {
     const map = new Map<string, string>();
     for (const b of bookings || []) {
@@ -299,35 +309,35 @@ export default function LocationProfitabilityContent() {
   const hotelCostByLocation = useMemo(() => {
     const map = new Map<string, number>();
     for (const [bid, cost] of hotelCostByBooking) {
-      const locId = bookingToLocation.get(bid);
-      if (locId) map.set(locId, (map.get(locId) || 0) + cost);
+      const key = bookingToLocationClient.get(bid);
+      if (key) map.set(key, (map.get(key) || 0) + cost);
     }
     return map;
-  }, [hotelCostByBooking, bookingToLocation]);
+  }, [hotelCostByBooking, bookingToLocationClient]);
 
   const hotelBookedDaysByLocation = useMemo(() => {
     const map = new Map<string, number[]>();
     for (const [bid, days] of hotelBookedDaysByBooking) {
-      const locId = bookingToLocation.get(bid);
-      if (locId) {
-        const existing = map.get(locId) || [];
+      const key = bookingToLocationClient.get(bid);
+      if (key) {
+        const existing = map.get(key) || [];
         const merged = Array.from(new Set([...existing, ...days])).sort();
-        map.set(locId, merged);
+        map.set(key, merged);
       }
     }
     return map;
-  }, [hotelBookedDaysByBooking, bookingToLocation]);
+  }, [hotelBookedDaysByBooking, bookingToLocationClient]);
 
   const dietCostByLocation = useMemo(() => {
     const map = new Map<string, number>();
     for (const [bid, cost] of dietCostByBooking) {
-      const locId = bookingToLocation.get(bid);
-      if (locId) map.set(locId, (map.get(locId) || 0) + cost);
+      const key = bookingToLocationClient.get(bid);
+      if (key) map.set(key, (map.get(key) || 0) + cost);
     }
     return map;
-  }, [dietCostByBooking, bookingToLocation]);
+  }, [dietCostByBooking, bookingToLocationClient]);
 
-  // Build location profitability data
+  // Build location profitability data — split by (location, client)
   const locationData = useMemo(() => {
     if (!bookings || !salesData) return [];
 
@@ -337,20 +347,26 @@ export default function LocationProfitabilityContent() {
       placementsByLocation.get(p.location_id)!.push(p);
     }
 
-    const locationMap = new Map<string, LocationSalesData>();
+    // Per (locId__clientId) row
+    const locationMap = new Map<string, LocationSalesData & { clientId: string }>();
+    // Per locId → list of (clientId, bookedDays) for sale attribution
+    const clientsByLocation = new Map<string, Array<{ clientId: string; bookedDays: number[] }>>();
 
     for (const booking of bookings) {
       const loc = booking.location as any;
       const client = (booking as any).client as any;
       const clientName = client?.name || "Ukendt";
+      const clientId = (booking as any).client_id || "no-client";
       const locId = booking.location_id;
+      const key = `${locId}__${clientId}`;
       const locPlacements = placementsByLocation.get(locId) || [];
       const selectedPlacement = locPlacements.find(p => p.id === booking.placement_id);
       const effectiveRate = booking.daily_rate_override ?? selectedPlacement?.daily_rate ?? loc?.daily_rate ?? 0;
 
-      if (!locationMap.has(locId)) {
-        locationMap.set(locId, {
+      if (!locationMap.has(key)) {
+        locationMap.set(key, {
           locationId: locId,
+          clientId,
           locationName: loc?.name || "Ukendt",
           clientName,
           dailyRate: effectiveRate,
@@ -361,26 +377,37 @@ export default function LocationProfitabilityContent() {
           bookings: [{ id: booking.id, placementId: booking.placement_id, dailyRateOverride: booking.daily_rate_override }],
         });
       } else {
-        const existing = locationMap.get(locId)!;
+        const existing = locationMap.get(key)!;
         const mergedDays = new Set([...existing.bookedDays, ...(booking.booked_days || [])]);
         existing.bookedDays = Array.from(mergedDays);
         existing.bookings.push({ id: booking.id, placementId: booking.placement_id, dailyRateOverride: booking.daily_rate_override });
         if (booking.daily_rate_override) existing.dailyRate = booking.daily_rate_override;
         if (booking.placement_id) existing.selectedPlacementId = booking.placement_id;
-        // Keep the client name from the first booking
+      }
+
+      if (!clientsByLocation.has(locId)) clientsByLocation.set(locId, []);
+      const list = clientsByLocation.get(locId)!;
+      const entry = list.find(e => e.clientId === clientId);
+      if (entry) {
+        entry.bookedDays = Array.from(new Set([...entry.bookedDays, ...(booking.booked_days || [])]));
+      } else {
+        list.push({ clientId, bookedDays: [...(booking.booked_days || [])] });
       }
     }
 
-    // Map sales to locations
+    // Map sales to (location, client) — attribute based on which client has the booked day
     for (const sale of salesData) {
       const payload = sale.raw_payload as any;
       const locId = payload?.fm_location_id;
       if (!locId) continue;
 
-      const saleDate = format(new Date(sale.sale_datetime), "yyyy-MM-dd");
+      const saleDateObj = new Date(sale.sale_datetime);
+      const saleDate = format(saleDateObj, "yyyy-MM-dd");
+      const jsDay = saleDateObj.getDay();
+      const dayNum = jsDay === 0 ? 6 : jsDay - 1;
+
       const items = (sale as any).sale_items || [];
       let commission = 0, revenue = 0, salesCount = 0;
-
       for (const item of items) {
         const countsAsSale = item.products?.counts_as_sale !== false;
         commission += item.mapped_commission || 0;
@@ -388,14 +415,27 @@ export default function LocationProfitabilityContent() {
         if (countsAsSale) salesCount += item.quantity || 1;
       }
 
-      if (!locationMap.has(locId)) {
-        locationMap.set(locId, {
-          locationId: locId, locationName: "Ukendt lokation", clientName: "Ukendt", dailyRate: 0,
+      // Determine which client this sale belongs to
+      const clientList = clientsByLocation.get(locId) || [];
+      let targetClientId: string | null = null;
+      if (clientList.length === 1) {
+        targetClientId = clientList[0].clientId;
+      } else if (clientList.length > 1) {
+        const matching = clientList.find(c => c.bookedDays.includes(dayNum));
+        targetClientId = matching ? matching.clientId : clientList[0].clientId;
+      }
+
+      const key = targetClientId ? `${locId}__${targetClientId}` : `${locId}__no-client`;
+
+      if (!locationMap.has(key)) {
+        locationMap.set(key, {
+          locationId: locId, clientId: targetClientId || "no-client",
+          locationName: "Ukendt lokation", clientName: "Ukendt", dailyRate: 0,
           bookedDays: [], dailyBreakdown: {}, placements: [], selectedPlacementId: null, bookings: [],
         });
       }
 
-      const l = locationMap.get(locId)!;
+      const l = locationMap.get(key)!;
       if (!l.dailyBreakdown[saleDate]) l.dailyBreakdown[saleDate] = { sales: 0, commission: 0, revenue: 0 };
       l.dailyBreakdown[saleDate].sales += salesCount;
       l.dailyBreakdown[saleDate].commission += commission;
@@ -404,16 +444,17 @@ export default function LocationProfitabilityContent() {
 
     return Array.from(locationMap.values())
       .map((loc) => {
+        const key = `${loc.locationId}__${loc.clientId}`;
         const totalRevenue = Object.values(loc.dailyBreakdown).reduce((s, d) => s + d.revenue, 0);
         const totalCommission = Object.values(loc.dailyBreakdown).reduce((s, d) => s + d.commission, 0);
         const totalSales = Object.values(loc.dailyBreakdown).reduce((s, d) => s + d.sales, 0);
         const sellerCost = totalCommission * (1 + VACATION_PAY_RATES.SELLER);
         const locationCost = loc.dailyRate * loc.bookedDays.length;
-        const hotelCost = hotelCostByLocation.get(loc.locationId) || 0;
-        const dietCost = dietCostByLocation.get(loc.locationId) || 0;
+        const hotelCost = hotelCostByLocation.get(key) || 0;
+        const dietCost = dietCostByLocation.get(key) || 0;
         const db = totalRevenue - sellerCost - locationCost - hotelCost - dietCost;
         const dbPerDay = loc.bookedDays.length > 0 ? db / loc.bookedDays.length : 0;
-        return { ...loc, totalRevenue, totalCommission, totalSales, sellerCost, locationCost, hotelCost, dietCost, db, dbPerDay };
+        return { ...loc, rowKey: key, totalRevenue, totalCommission, totalSales, sellerCost, locationCost, hotelCost, dietCost, db, dbPerDay };
       })
       .sort((a, b) => b.db - a.db);
   }, [bookings, salesData, placements, hotelCostByLocation, dietCostByLocation]);
@@ -461,28 +502,29 @@ export default function LocationProfitabilityContent() {
   const dietByLocationDate = useMemo(() => {
     const map = new Map<string, number>();
     for (const d of dietData || []) {
-      const locId = bookingToLocation.get(d.booking_id);
-      if (locId) {
-        const key = `${locId}|${d.date}`;
-        map.set(key, (map.get(key) || 0) + (d.amount || 0));
+      const key = bookingToLocationClient.get(d.booking_id);
+      if (key) {
+        const dateKey = `${key}|${d.date}`;
+        map.set(dateKey, (map.get(dateKey) || 0) + (d.amount || 0));
       }
     }
     return map;
-  }, [dietData, bookingToLocation]);
+  }, [dietData, bookingToLocationClient]);
 
   // Render location rows (reusable for grouped sections)
   const renderLocationRows = (locations: typeof locationData) =>
     locations.map((loc) => {
-      const isExpanded = expandedLocations.has(loc.locationId);
+      const rowKey = (loc as any).rowKey as string;
+      const isExpanded = expandedLocations.has(rowKey);
       const hasPlacements = loc.placements.length > 0;
       const selectedPlacement = loc.placements.find(p => p.id === loc.selectedPlacementId);
 
       return (
         <>
           <TableRow
-            key={loc.locationId}
+            key={rowKey}
             className="cursor-pointer hover:bg-muted/50"
-            onClick={() => toggleExpand(loc.locationId)}
+            onClick={() => toggleExpand(rowKey)}
           >
             <TableCell className="pl-6 font-medium">
               <div className="flex items-center gap-2">
@@ -536,14 +578,14 @@ export default function LocationProfitabilityContent() {
             const dayCommission = day?.commission || 0;
             const daySellerCost = dayCommission * (1 + VACATION_PAY_RATES.SELLER);
             const dayLocCost = isBooked ? loc.dailyRate : 0;
-            const dayDietCost = dietByLocationDate.get(`${loc.locationId}|${dateStr}`) || 0;
-            const hotelDays = hotelBookedDaysByLocation.get(loc.locationId) || [];
+            const dayDietCost = dietByLocationDate.get(`${rowKey}|${dateStr}`) || 0;
+            const hotelDays = hotelBookedDaysByLocation.get(rowKey) || [];
             const isHotelDay = hotelDays.includes(dayNum);
             const dayHotelCost = isHotelDay && hotelDays.length > 0 ? (loc.hotelCost / hotelDays.length) : 0;
             const dayDB = dayRevenue - daySellerCost - dayLocCost - dayHotelCost - dayDietCost;
 
             return (
-              <TableRow key={`${loc.locationId}-${dateStr}`} className="bg-muted/30">
+              <TableRow key={`${rowKey}-${dateStr}`} className="bg-muted/30">
                 <TableCell className="pl-12 text-muted-foreground text-sm">
                   {format(date, "EEEE d/M", { locale: da })}
                   {!isBooked && <span className="ml-2 text-xs opacity-50">(ikke booket)</span>}
