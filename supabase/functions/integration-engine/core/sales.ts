@@ -328,7 +328,13 @@ function prepareSaleItems(
   const campaignMappingId = sale.campaignId ? campaignMappingsMap.get(sale.campaignId) : null;
 
   for (const p of sale.products) {
+    // Multi-layer mapping lookup — single source of truth across all dialers/clients.
+    // Some legacy mappings store the product TITLE in the adversus_external_id column
+    // (instead of a numeric ID), so we must try multiple keys before giving up.
     let productId = productMapByExtId.get(p.externalId)
+    // Fallback A: title stored as key in adversus_external_id column
+    if (!productId && p.name) productId = productMapByExtId.get(p.name)
+    // Fallback B: product with exact same name in products table
     if (!productId && p.name) {
       const prod = productMapByName.get(p.name.toLowerCase())
       if (prod) productId = prod.id
@@ -705,7 +711,14 @@ export async function processSales(
   }
 
   const productMapByName = new Map(dbProducts?.map((p: any) => [p.name.toLowerCase(), p]))
-  const productMapByExtId = new Map(dbMappings?.map((m: any) => [m.adversus_external_id, m.product_id]))
+  // Build productMapByExtId from BOTH adversus_external_id and adversus_product_title
+  // — single source of truth that works regardless of how legacy mappings were keyed.
+  const productMapByExtId = new Map<string, string>()
+  for (const m of (dbMappings || []) as any[]) {
+    if (!m.product_id) continue
+    if (m.adversus_external_id) productMapByExtId.set(m.adversus_external_id, m.product_id)
+    if (m.adversus_product_title) productMapByExtId.set(m.adversus_product_title, m.product_id)
+  }
   
   // Build pricing rules map: product_id -> array of rules
   const pricingRulesMap = new Map<string, PricingRule[]>();
