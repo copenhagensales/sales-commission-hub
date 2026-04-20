@@ -434,7 +434,10 @@ export class AdversusAdapter implements DialerAdapter {
       console.log(`[Adversus] Pre-enrichment campaign filter: ${before} -> ${rawSales.length} sales (campaigns: ${campaignIds.join(",")})`);
     }
 
-    // Pre-enrichment limit – SKIP if uncapped
+    // Eesy TM-only filter: drop non-success state at ingestion
+    rawSales = this.filterEesyTmStateSuccess(rawSales, campaignConfigMap);
+
+
     if (!uncapped && maxRecords && rawSales.length > maxRecords) {
       rawSales.sort((a: any, b: any) => new Date(b.closedTime || b.created).getTime() - new Date(a.closedTime || a.created).getTime());
       rawSales = rawSales.slice(0, maxRecords);
