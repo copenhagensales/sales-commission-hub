@@ -243,7 +243,10 @@ export class AdversusAdapter implements DialerAdapter {
 
     // Sort newest first so we always prioritize recent sales
     rawSales.sort((a: any, b: any) => new Date(b.closedTime || b.created).getTime() - new Date(a.closedTime || a.created).getTime());
-    
+
+    // Eesy TM-only filter: drop non-success state at ingestion
+    rawSales = this.filterEesyTmStateSuccess(rawSales, campaignConfigMap);
+
     // Pre-enrichment limit: slice BEFORE buildLeadDataMap to save API calls
     // NOTE: maxRecords is now set higher (60) to ensure today's sales are included
     if (maxRecords && rawSales.length > maxRecords) {
