@@ -1,48 +1,37 @@
 
 
-## Problem
+Brugeren vil have et fuldt overblik over `in-progress` / `cancelled` / `success` status på tværs af ALLE Adversus-integrationer (ikke kun Eesy TM), parallelt med den analyse vi lavede for Eesy TM. "Yes kun undersøg" = ingen kode-ændringer, kun en rapport.
 
-Runde 4 sluttede **2026-04-20 00:00** men er stadig markeret `active`. Runde 5 er aldrig blevet oprettet.
+## Hvad jeg vil undersøge
 
-**Årsag**: Edge-funktionen `league-process-round` (som lukker udløbne runder, beregner point/op-/nedrykninger, og opretter næste runde) findes og virker — men der er **INTET cron-job** der kalder den automatisk.
+1. **Inventory**: Hvilke Adversus-integrationer er aktive? (`dialer_integrations` hvor `provider = 'adversus'`)
+2. **Per integration, ALL TIME**, optælling af salg fordelt på status:
+   - `success` (eller `leadClosedSuccess`)
+   - `in-progress` / `inProgress` / `pending`
+   - `cancelled` / annulleret
+   - Andre statusser
+3. **Krydstjek mod `validation_status`**: Hvor mange `in-progress` salg er IKKE rejected (vises altså forkert i rapporter/dashboards)?
+4. **Sammenlignings-tabel** i samme format som Eesy TM-tabellen brugeren viste:
+   ```
+   State | Antal | Første | Seneste | Allerede rejected | Vises forkert?
+   ```
+5. **Bonus**: Samme kort overblik for Enreach-integrationer for konsistenstjek (én sandhed på tværs af dialers).
 
-Det eneste cron-job for ligaen er `league-standings-refresh` (hver 15. min) som kun opdaterer kvalifikations-standings, ikke runde-processering.
+## Hvor data kommer fra
 
-## Plan
+- `sales` tabel: `dialer_integration_id`, `sale_datetime`, `validation_status`, `raw_payload->campaign_status` / `raw_payload->status`
+- `dialer_integrations`: navn + provider for at gruppere pænt
+- Læs `client-sales-overview` edge function for at se HVOR i UI/rapporter `in-progress` evt. tælles forkert med
 
-### 1. Manuel kørsel for at få runde 5 i gang NU
-Kald `league-process-round` én gang via curl for at:
-- Lukke runde 4 (status `active` → `completed`)
-- Beregne point, op-/nedrykninger, playoff for runde 4
-- Persistere `league_round_standings`
-- Oprette runde 5 (7 dages varighed, status `active`)
+## Hvad jeg leverer (ren rapport, ingen kode)
 
-### 2. Tilføj cron-job så det aldrig sker igen
-SQL-migration der opretter pg_cron job:
+- Tabel pr. Adversus-klient (Eesy TM, Lovablecph/TDC Erhverv, evt. andre)
+- Total: hvor mange `in-progress` på tværs af systemet er IKKE markeret rejected
+- Liste over hvilke rapporter/dashboards der filtrerer korrekt vs. forkert (kort kode-audit af `sales.ts`, `client-sales-overview`, dashboards)
+- Anbefaling (men ingen ændring): hvor fix skal landes hvis vi vil have "én sandhed"
 
-```sql
-SELECT cron.schedule(
-  'league-process-round-hourly',
-  '5 * * * *',  -- hver time kl. xx:05
-  $$
-  SELECT net.http_post(
-    url := 'https://jwlimmeijpfmaksvmuru.supabase.co/functions/v1/league-process-round',
-    headers := '{"Content-Type":"application/json","Authorization":"Bearer <anon>"}'::jsonb,
-    body := '{}'::jsonb
-  );
-  $$
-);
-```
-
-Hver time tjekker den om en runde er udløbet. Funktionen er idempotent — returnerer "No expired rounds" hvis intet skal ske.
-
-### 3. Verificering
-- Kør `SELECT * FROM league_rounds ORDER BY round_number DESC` → bekræft runde 4 = `completed`, runde 5 = `active`
-- Tjek `/commission-league` UI → øverst skal vise "RUNDE 5 (i gang)"
-- Tjek at top 3 fra runde 4 fryses i historik
-
-### Hvad jeg IKKE rører
-- `league-process-round` koden (virker som den skal)
-- `league-calculate-standings` cron (virker som det skal)
-- Sæson-konfiguration (6 multiplikatorer = 6 runder, korrekt)
+## Hvad jeg IKKE gør
+- Ingen kodeændringer
+- Ingen migrations
+- Ingen data-opdateringer (rejected/cancelled flags rører jeg ikke)
 
