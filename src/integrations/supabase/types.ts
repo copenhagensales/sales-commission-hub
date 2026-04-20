@@ -11871,28 +11871,72 @@ export type Database = {
         }
         Relationships: []
       }
+      short_link_clicks: {
+        Row: {
+          candidate_id: string | null
+          clicked_at: string
+          id: string
+          ip_hash: string | null
+          short_link_id: string
+          user_agent: string | null
+        }
+        Insert: {
+          candidate_id?: string | null
+          clicked_at?: string
+          id?: string
+          ip_hash?: string | null
+          short_link_id: string
+          user_agent?: string | null
+        }
+        Update: {
+          candidate_id?: string | null
+          clicked_at?: string
+          id?: string
+          ip_hash?: string | null
+          short_link_id?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "short_link_clicks_short_link_id_fkey"
+            columns: ["short_link_id"]
+            isOneToOne: false
+            referencedRelation: "short_links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       short_links: {
         Row: {
           candidate_id: string | null
+          click_count: number
           code: string
           created_at: string
+          first_clicked_at: string | null
           id: string
+          last_clicked_at: string | null
           link_type: string | null
           target_url: string
         }
         Insert: {
           candidate_id?: string | null
+          click_count?: number
           code: string
           created_at?: string
+          first_clicked_at?: string | null
           id?: string
+          last_clicked_at?: string | null
           link_type?: string | null
           target_url: string
         }
         Update: {
           candidate_id?: string | null
+          click_count?: number
           code?: string
           created_at?: string
+          first_clicked_at?: string | null
           id?: string
+          last_clicked_at?: string | null
           link_type?: string | null
           target_url?: string
         }

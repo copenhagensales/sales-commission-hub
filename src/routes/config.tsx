@@ -60,6 +60,7 @@ import {
   UpcomingInterviews,
   UpcomingHires,
   BookingFlow,
+  BookingFlowEngagement,
   PublicCandidateBooking,
   Some,
   TimeStamp,
@@ -341,6 +342,12 @@ export const routes: RouteConfig[] = [
   {
     path: "/recruitment/booking-flow",
     component: BookingFlow,
+    access: "role",
+    positionPermission: "menu_candidates",
+  },
+  {
+    path: "/recruitment/booking-flow/engagement",
+    component: BookingFlowEngagement,
     access: "role",
     positionPermission: "menu_candidates",
   },

@@ -74,6 +74,7 @@ export const Winback = lazyPage(() => import("@/pages/recruitment/Winback"));
 export const UpcomingInterviews = lazyPage(() => import("@/pages/recruitment/UpcomingInterviews"));
 export const UpcomingHires = lazyPage(() => import("@/pages/recruitment/UpcomingHires"));
 export const BookingFlow = lazyPage(() => import("@/pages/recruitment/BookingFlow"));
+export const BookingFlowEngagement = lazyPage(() => import("@/pages/recruitment/BookingFlowEngagement"));
 export const PublicCandidateBooking = lazyPage(() => import("@/pages/recruitment/PublicCandidateBooking"));
 export const PublicUnsubscribe = lazyPage(() => import("@/pages/recruitment/PublicUnsubscribe"));
 
