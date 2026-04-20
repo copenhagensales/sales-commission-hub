@@ -3,7 +3,7 @@ import { IngestionEngine } from "../core.ts";
 import { syncIntegration } from "./sync-integration.ts";
 import { CampaignMappingConfig } from "../types.ts";
 import { checkProviderQuota } from "../utils/quota-gate.ts";
-import type { LogFn } from "../utils/index.ts";
+type LogFn = (type: "INFO" | "ERROR" | "WARN", msg: string, data?: unknown) => void;
 
 /**
  * Provider-level budget limits (calls per hour)

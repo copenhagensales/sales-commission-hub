@@ -1,6 +1,6 @@
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { getAdapter } from "../adapters/registry.ts"
-import { LogFn } from "../utils/index.ts"
+import type { LogFn } from "../utils/index.ts"
 
 interface SampleField {
   fieldId: string

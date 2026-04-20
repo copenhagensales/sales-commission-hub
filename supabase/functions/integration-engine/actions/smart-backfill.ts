@@ -9,7 +9,7 @@
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { IngestionEngine } from "../core.ts";
 import { getAdapter } from "../adapters/registry.ts";
-import { getSyncState, upsertSyncState } from "../utils/index.ts";
+import { getSyncState, upsertSyncState } from "../utils/sync-state.ts";
 import { CampaignMappingConfig } from "../types.ts";
 
 const DEFAULT_START_DATE = "2026-01-15";
