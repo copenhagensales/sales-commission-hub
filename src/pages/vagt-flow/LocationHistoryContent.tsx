@@ -639,13 +639,13 @@ export default function LocationHistoryContent() {
   // ── Render helpers ──
   const renderLocationRows = (locations: AggregatedLocation[]) =>
     locations.map(loc => {
-      const isExpanded = expandedLocations.has(loc.locationId);
+      const isExpanded = expandedLocations.has(loc.groupKey);
       return (
         <> 
           <TableRow
-            key={loc.locationId}
+            key={loc.groupKey}
             className="cursor-pointer hover:bg-muted/50"
-            onClick={() => toggleExpand(loc.locationId)}
+            onClick={() => toggleExpand(loc.groupKey)}
           >
             <TableCell className="pl-6 font-medium">
               <div className="flex items-center gap-2">
