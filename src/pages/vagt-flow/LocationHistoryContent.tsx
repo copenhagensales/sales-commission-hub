@@ -340,15 +340,16 @@ export default function LocationHistoryContent() {
     }
 
     const locAgg = new Map<string, {
+      locationId: string;
       locationName: string; locationType: string; clientName: string;
       weeks: Map<string, WeekBucket>;
     }>();
 
-    const ensureLoc = (locId: string, name: string, type: string, client: string) => {
-      if (!locAgg.has(locId)) {
-        locAgg.set(locId, { locationName: name, locationType: type, clientName: client, weeks: new Map() });
+    const ensureLoc = (groupKey: string, locId: string, name: string, type: string, client: string) => {
+      if (!locAgg.has(groupKey)) {
+        locAgg.set(groupKey, { locationId: locId, locationName: name, locationType: type, clientName: client, weeks: new Map() });
       }
-      return locAgg.get(locId)!;
+      return locAgg.get(groupKey)!;
     };
 
     const ensureWeek = (weeks: Map<string, WeekBucket>, w: number, y: number) => {
@@ -357,11 +358,24 @@ export default function LocationHistoryContent() {
       return weeks.get(key)!;
     };
 
+    // Build (locId -> set of clientIds) and (bookingId -> groupKey) maps for sales attribution
+    const clientsByLocation = new Map<string, Set<string>>();
+    const bookingToGroupKey = new Map<string, string>();
+    for (const b of bookings) {
+      const cid = (b as any).client_id || "no-client";
+      const gk = `${b.location_id}__${cid}`;
+      bookingToGroupKey.set(b.id, gk);
+      if (!clientsByLocation.has(b.location_id)) clientsByLocation.set(b.location_id, new Set());
+      clientsByLocation.get(b.location_id)!.add(cid);
+    }
+
     // Process bookings
     for (const b of bookings) {
       const loc = b.location as any;
       const client = (b as any).client as any;
-      const locEntry = ensureLoc(b.location_id, loc?.name || "Ukendt", loc?.type?.trim() || "Ukendt", client?.name || "Ukendt");
+      const cid = (b as any).client_id || "no-client";
+      const groupKey = `${b.location_id}__${cid}`;
+      const locEntry = ensureLoc(groupKey, b.location_id, loc?.name || "Ukendt", loc?.type?.trim() || "Ukendt", client?.name || "Ukendt");
       const wb = ensureWeek(locEntry.weeks, b.week_number, b.year);
 
       const selectedPlacement = b.placement_id ? placementMap.get(b.placement_id) : null;
@@ -373,21 +387,59 @@ export default function LocationHistoryContent() {
       wb.dietCost += dietCostByBooking.get(b.id) || 0;
     }
 
-    // Process sales
+    // Process sales — attribute to (location, client) using booking match
     for (const sale of salesData) {
       const payload = sale.raw_payload as any;
       const locId = payload?.fm_location_id;
       if (!locId) continue;
 
       const dt = new Date(sale.sale_datetime);
-      // Determine ISO week/year — simplistic approach using the booking data
-      // Find the booking for this location that contains this date
-      const matchingBooking = (bookings || []).find(b => b.location_id === locId && sale.sale_datetime >= b.start_date + "T00:00:00" && sale.sale_datetime <= b.end_date + "T23:59:59");
-      const w = matchingBooking?.week_number || getISOWeek(dt);
-      const y = matchingBooking?.year || dt.getFullYear();
+      // Find a booking covering this date for this location
+      const matchingBookings = (bookings || []).filter(b =>
+        b.location_id === locId &&
+        sale.sale_datetime >= b.start_date + "T00:00:00" &&
+        sale.sale_datetime <= b.end_date + "T23:59:59"
+      );
 
-      const fallback = missingLocMap.get(locId);
-      const locEntry = ensureLoc(locId, locAgg.get(locId)?.locationName || fallback?.name || "Ukendt lokation", locAgg.get(locId)?.locationType || fallback?.type || "Ukendt", locAgg.get(locId)?.clientName || fallback?.clientName || "Ukendt");
+      // Pick best match: if booked_days exists, prefer the booking whose booked_days contains this weekday
+      const isoDay = dt.getDay() === 0 ? 6 : dt.getDay() - 1;
+      let chosen = matchingBookings.find(b => {
+        const bd = (b as any).booked_days as number[] | null;
+        return bd && bd.includes(isoDay);
+      }) || matchingBookings[0];
+
+      const w = chosen?.week_number || getISOWeek(dt);
+      const y = chosen?.year || dt.getFullYear();
+
+      let groupKey: string;
+      let clientName: string;
+      let locationName: string;
+      let locationType: string;
+
+      if (chosen) {
+        const cid = (chosen as any).client_id || "no-client";
+        groupKey = `${locId}__${cid}`;
+        const loc = (chosen as any).location;
+        clientName = (chosen as any).client?.name || "Ukendt";
+        locationName = loc?.name || "Ukendt";
+        locationType = loc?.type?.trim() || "Ukendt";
+      } else {
+        // No booking covers this sale — fall back to missing-loc map (single client)
+        const fallback = missingLocMap.get(locId);
+        groupKey = `${locId}__no-client`;
+        clientName = fallback?.clientName || "Ukendt";
+        locationName = fallback?.name || "Ukendt lokation";
+        locationType = fallback?.type || "Ukendt";
+      }
+
+      const existing = locAgg.get(groupKey);
+      const locEntry = ensureLoc(
+        groupKey,
+        locId,
+        existing?.locationName || locationName,
+        existing?.locationType || locationType,
+        existing?.clientName || clientName,
+      );
       const wb = ensureWeek(locEntry.weeks, w, y);
 
       const items = (sale as any).sale_items || [];
