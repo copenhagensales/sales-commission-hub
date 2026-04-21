@@ -434,6 +434,212 @@ serve(async (req) => {
     }
     await sleep(200);
 
+    // ============= CPH SELLER HUNT (H1-H6) v2 =============
+    console.log("[Probe] → CPH SELLER HUNT START");
+    const CPH_DOMAINS = ["@copenhagensales.dk", "@cph-sales.dk", "@cph-relatel.dk", "@cphsales.dk"];
+    const cphSellerHunt: Record<string, unknown> = {};
+    let allUsers: Array<Record<string, unknown>> = [];
+
+    // Re-fetch full /users (testB only kept aggregate). We need raw list for H1, H3, H6.
+    try {
+      const respUsers = await fetch(`${baseUrl}/users?Limit=2000`, {
+        headers: { Authorization: authHeader, Accept: "application/json" },
+      });
+      if (respUsers.ok) {
+        allUsers = await respUsers.json() as Array<Record<string, unknown>>;
+      }
+    } catch (_) { /* ignore */ }
+    await sleep(150);
+
+    // ---------- H1: CPH-emails in Enreach /users ----------
+    const cphUsers = allUsers.filter((u) => {
+      const e = ((u.email as string) || "").toLowerCase();
+      return CPH_DOMAINS.some((d) => e.endsWith(d));
+    }).map((u) => ({
+      name: (u.name as string) || (u.userName as string) || null,
+      email: u.email as string,
+      orgCode: (u.orgCode as string) || null,
+      isActive: (u.isActive as boolean) ?? null,
+      lastActive: (u.lastActiveTime as string) || (u.lastLoginTime as string) || null,
+      uniqueId: (u.uniqueId as string) || (u.id as string) || null,
+    }));
+    cphSellerHunt.H1_cphUsersInEnreach = {
+      count: cphUsers.length,
+      users: cphUsers,
+      note: cphUsers.length > 0
+        ? `✅ Fandt ${cphUsers.length} CPH-bruger(e) i Enreach`
+        : "❌ Ingen brugere med CPH-email findes i Alka's Enreach-tenant",
+    };
+
+    // ---------- H2: firstProcessedByUser scan over 7 days ----------
+    try {
+      const urlH2 = `${baseUrl}/simpleleads?${projectFilter}&ModifiedFrom=${sevenDaysAgo}&AllClosedStatuses=true&Include=lastModifiedByUser,firstProcessedByUser&Limit=500`;
+      console.log(`[Probe] → H2: ${urlH2}`);
+      const respH2 = await fetch(urlH2, { headers: { Authorization: authHeader, Accept: "application/json" } });
+      if (respH2.ok) {
+        const leadsH2 = await respH2.json() as Array<Record<string, unknown>>;
+        const firstDomains = new Map<string, number>();
+        const firstAgents = new Map<string, { email: string; orgCode: string; count: number }>();
+        let cphFirstProcessed = 0;
+        for (const l of leadsH2) {
+          const u = l.firstProcessedByUser as Record<string, unknown> | undefined;
+          const email = ((u?.email as string) || "").toLowerCase();
+          const orgCode = (u?.orgCode as string) || "(none)";
+          const domain = email.includes("@") ? "@" + email.split("@")[1] : "(none)";
+          firstDomains.set(domain, (firstDomains.get(domain) ?? 0) + 1);
+          const key = email || orgCode;
+          const ag = firstAgents.get(key) ?? { email, orgCode, count: 0 };
+          ag.count++;
+          firstAgents.set(key, ag);
+          if (CPH_DOMAINS.some((d) => email.endsWith(d))) cphFirstProcessed++;
+        }
+        cphSellerHunt.H2_firstProcessedDomains = {
+          totalLeadsScanned: leadsH2.length,
+          domainCounts: Object.fromEntries(
+            Array.from(firstDomains.entries()).sort((a, b) => b[1] - a[1])
+          ),
+          cphLeadsViaFirstProcessed: cphFirstProcessed,
+          top20Agents: Array.from(firstAgents.values())
+            .sort((a, b) => b.count - a.count).slice(0, 20),
+          note: cphFirstProcessed > 0
+            ? `🎯 ${cphFirstProcessed} leads har CPH-sælger som firstProcessedByUser → SKIFT prioritet i adapter`
+            : "❌ Ingen CPH-emails fundet i firstProcessedByUser heller",
+        };
+      } else {
+        cphSellerHunt.H2_firstProcessedDomains = { error: `Status ${respH2.status}`, body: (await respH2.text()).slice(0, 300) };
+      }
+    } catch (e) {
+      cphSellerHunt.H2_firstProcessedDomains = { error: (e as Error).message };
+    }
+    await sleep(200);
+
+    // ---------- H3: Cross-reference Enreach user names against employee_master_data ----------
+    try {
+      const { data: cphEmps } = await supabase
+        .from("employee_master_data")
+        .select("first_name, last_name, work_email")
+        .or(CPH_DOMAINS.map((d) => `work_email.ilike.%${d}`).join(","));
+
+      const empMap = new Map<string, { workEmail: string; fullName: string }>();
+      for (const e of (cphEmps || [])) {
+        const fullName = `${(e as { first_name?: string }).first_name ?? ""} ${(e as { last_name?: string }).last_name ?? ""}`.trim().toLowerCase();
+        if (fullName) empMap.set(fullName, { workEmail: (e as { work_email: string }).work_email, fullName });
+      }
+
+      const matches: Array<Record<string, unknown>> = [];
+      for (const u of allUsers) {
+        const enreachName = (((u.name as string) || (u.userName as string) || "")).trim().toLowerCase();
+        if (!enreachName) continue;
+        const hit = empMap.get(enreachName);
+        if (hit) {
+          matches.push({
+            enreachName: u.name || u.userName,
+            enreachEmail: u.email,
+            enreachOrgCode: u.orgCode,
+            cphWorkEmail: hit.workEmail,
+          });
+        }
+      }
+      cphSellerHunt.H3_nameMatchedToCphEmployees = {
+        cphEmployeesInDb: empMap.size,
+        enreachUsersScanned: allUsers.length,
+        matches,
+        matchCount: matches.length,
+        note: matches.length > 0
+          ? `🎯 ${matches.length} Enreach-bruger(e) navnematcher CPH-medarbejder → tilføj alias-mapping`
+          : "❌ Ingen navne-overlap mellem Enreach-brugere og CPH employee_master_data",
+      };
+    } catch (e) {
+      cphSellerHunt.H3_nameMatchedToCphEmployees = { error: (e as Error).message };
+    }
+
+    // ---------- H4: ALL user-related fields in lead payload ----------
+    try {
+      const urlH4 = `${baseUrl}/leads?${projectFilter}&ModifiedFrom=${sevenDaysAgo}&Include=lastModifiedByUser,firstProcessedByUser,createdByUser,assignedToUser,closedByUser,uploadedByUser,reservedByUser&Limit=3`;
+      console.log(`[Probe] → H4: ${urlH4}`);
+      const respH4 = await fetch(urlH4, { headers: { Authorization: authHeader, Accept: "application/json" } });
+      if (respH4.ok) {
+        const leadsH4 = await respH4.json() as Array<Record<string, unknown>>;
+        const userFields = new Set<string>();
+        const populated: Record<string, { email: string | null; orgCode: string | null }> = {};
+        for (const l of leadsH4) {
+          for (const k of Object.keys(l)) {
+            if (k.toLowerCase().includes("user") || k.toLowerCase().includes("agent")) {
+              userFields.add(k);
+              const v = l[k] as Record<string, unknown> | undefined;
+              if (v && typeof v === "object" && !populated[k]) {
+                populated[k] = {
+                  email: (v.email as string) || null,
+                  orgCode: (v.orgCode as string) || null,
+                };
+              }
+            }
+          }
+        }
+        cphSellerHunt.H4_allUserFieldsInLead = {
+          status: respH4.status,
+          leadsInspected: leadsH4.length,
+          userRelatedFields: Array.from(userFields),
+          populatedSample: populated,
+          allTopLevelKeys: leadsH4[0] ? Object.keys(leadsH4[0]) : [],
+        };
+      } else {
+        cphSellerHunt.H4_allUserFieldsInLead = { error: `Status ${respH4.status}`, body: (await respH4.text()).slice(0, 300) };
+      }
+    } catch (e) {
+      cphSellerHunt.H4_allUserFieldsInLead = { error: (e as Error).message };
+    }
+    await sleep(200);
+
+    // ---------- H5: DB scan for CPH agent_email across ALL Enreach integrations ----------
+    try {
+      const since = new Date(Date.now() - 7 * 86400000).toISOString();
+      const { data: dbSales, error: salesErr } = await supabase
+        .from("sales")
+        .select("id, agent_email, dialer_name, integration_id, sale_date")
+        .ilike("agent_email", "%copenhagensales%")
+        .gte("sale_date", since)
+        .limit(50);
+      cphSellerHunt.H5_existingSalesInDb = {
+        error: salesErr?.message || null,
+        count: dbSales?.length ?? 0,
+        samples: (dbSales || []).slice(0, 10),
+        note: (dbSales?.length ?? 0) > 0
+          ? `🎯 Salg findes faktisk i DB med CPH-email — kommer fra anden kanal/integration`
+          : "❌ Ingen sales i DB med @copenhagensales.dk de sidste 7 dage på TVÆRS af alle integrationer",
+      };
+    } catch (e) {
+      cphSellerHunt.H5_existingSalesInDb = { error: (e as Error).message };
+    }
+
+    // ---------- H6: Top 50 unique email domains in Enreach /users ----------
+    {
+      const dc = new Map<string, number>();
+      for (const u of allUsers) {
+        const e = ((u.email as string) || "").toLowerCase();
+        const d = e.includes("@") ? "@" + e.split("@")[1] : "(none)";
+        dc.set(d, (dc.get(d) ?? 0) + 1);
+      }
+      cphSellerHunt.H6_topDomainsInEnreach = {
+        totalUsers: allUsers.length,
+        domains: Object.fromEntries(
+          Array.from(dc.entries()).sort((a, b) => b[1] - a[1]).slice(0, 50)
+        ),
+      };
+    }
+
+    // ---------- Hunt recommendation ----------
+    const h1 = cphSellerHunt.H1_cphUsersInEnreach as { count?: number };
+    const h2 = cphSellerHunt.H2_firstProcessedDomains as { cphLeadsViaFirstProcessed?: number };
+    const h3 = cphSellerHunt.H3_nameMatchedToCphEmployees as { matchCount?: number };
+    const h5 = cphSellerHunt.H5_existingSalesInDb as { count?: number };
+    let huntRec = "🤷 CPH-sælgeren findes IKKE i nogen kilde. Bekræft med klient om sælger faktisk arbejder på Alka i Enreach.";
+    if ((h5?.count ?? 0) > 0) huntRec = "🎯 Salgene EKSISTERER i DB under en anden integration — undersøg integration_id i H5.samples";
+    else if ((h1?.count ?? 0) > 0) huntRec = "🎯 CPH-bruger findes i Enreach /users — tilføj orgCode→CPH-email mapping i adapter";
+    else if ((h2?.cphLeadsViaFirstProcessed ?? 0) > 0) huntRec = "🎯 CPH-sælger er firstProcessedByUser — skift attribution-prioritet i EnreachAdapter";
+    else if ((h3?.matchCount ?? 0) > 0) huntRec = "🎯 Navne matcher mellem Enreach og CPH employee_master_data — tilføj alias-mapping (Enreach orgCode → CPH work_email)";
+    cphSellerHunt.recommendation = huntRec;
+
     // ---------- Recommendation ----------
     const a = agentDiagnosis.testA_includeOnSimpleleads as { worked?: boolean } | undefined;
     const b = agentDiagnosis.testB_orgCodeToUserMap as { matchedInUsers?: number; auditOrgCodesChecked?: number } | undefined;
@@ -582,6 +788,7 @@ serve(async (req) => {
       recommendations,
       agentAudit,
       agentDiagnosis,
+      cphSellerHunt,
       endpoints,
     };
 
