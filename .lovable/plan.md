@@ -1,26 +1,28 @@
 
-## Tilføj "Engelsk opsummering"-valg på TDC Opsummering
+
+## Erstat "Engelsk opsummering" radio med toggle switch (kun internt)
 
 ### Ændring
-I `src/pages/TdcOpsummering.tsx` (og tilsvarende `TdcOpsummeringPublic.tsx` for konsistens):
+Kun i `src/pages/TdcOpsummering.tsx` (intern version — `TdcOpsummeringPublic.tsx` røres IKKE):
 
-1. Udvid `SummaryVariant`-typen med `"engelsk"`:
-   ```
-   type SummaryVariant = "standard" | "pilot" | "5g-fri" | "engelsk";
-   ```
-
-2. Tilføj en fjerde `RadioGroupItem` ved siden af "Kun 5g Fri Salg":
-   - Værdi: `engelsk`
-   - Label: "Engelsk opsummering"
+1. **Fjern** den fjerde `RadioGroupItem` for `"engelsk"` fra `RadioGroup`-blokken.
+2. **Fjern** `"engelsk"` fra `SummaryVariant`-typen (tilbage til `"standard" | "pilot" | "5g-fri"`).
+3. **Tilføj** ny separat state: `const [isEnglish, setIsEnglish] = useState(false)`.
+4. **Tilføj** en `Switch`-komponent (fra `@/components/ui/switch`) placeret ved siden af RadioGroup'en med label "English" til højre for switchen.
+   - Default: slået fra → dansk (ingen label-indikation, da dansk er standard).
+   - Slået til → engelsk.
 
 ### Adfærd
-- Valget kan vælges visuelt, men ændrer **ikke** den genererede tekst endnu.
-- Den eksisterende generator-logik (`summaryLines` useMemo) rører jeg ikke — `engelsk`-valget falder igennem til standard-flowet indtil oversættelser leveres.
-- Validerings-bannerlogik (`showWarningBanner`) bevares uændret.
+- Toggle er rent visuel for nu — `summaryLines`-genereringslogikken røres ikke.
+- Når oversættelser leveres senere, bruges `isEnglish`-flag til at vælge dansk/engelsk tekstvariant parallelt med `summaryVariant`.
+- Toggle fungerer uafhængigt af radio-valget (dvs. man kan have fx "Pilot" + engelsk).
 
-### Senere (når oversættelser modtages)
-Tilføj `const isEngelsk = summaryVariant === "engelsk"` og en parallel tekstblok i `summaryLines`-genereringen — klar til drop-in.
+### Layout
+Switch + "English"-label placeres i samme række som RadioGroup'en, adskilt visuelt med `border-l` divider eller `gap`, så det er tydeligt at det er to uafhængige valg.
 
 ### Filer berørt
-- `src/pages/TdcOpsummering.tsx` (primær)
-- `src/pages/TdcOpsummeringPublic.tsx` (samme tilføjelse for paritet)
+- `src/pages/TdcOpsummering.tsx` (kun denne)
+
+### Eksplicit IKKE berørt
+- `src/pages/TdcOpsummeringPublic.tsx` — paritet brydes midlertidigt med vilje. Kan synkroniseres senere når oversættelser er klar.
+
