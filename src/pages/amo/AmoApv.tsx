@@ -2,7 +2,7 @@ import { useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Shield, Plus, Pencil, Trash2, AlertTriangle, FileText } from "lucide-react";
+import { Shield, Plus, Pencil, Trash2, AlertTriangle, FileText, Copy } from "lucide-react";
 import { format, differenceInDays, addYears } from "date-fns";
 import { da } from "date-fns/locale";
 import { cn } from "@/lib/utils";
