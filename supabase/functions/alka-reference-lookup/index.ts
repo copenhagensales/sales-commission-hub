@@ -164,11 +164,10 @@ Deno.serve(async (req) => {
       totalLeadsScanned: totalScanned,
       windowsScanned: windows.length,
       matchesFound: matches.length,
+      rawTextHits: rawHits,
       matches,
+      allDataFieldNames: Array.from(allDataFieldNames).sort(),
       sampleLeadKeys: firstSampleLead ? Object.keys(firstSampleLead) : [],
-      sampleLeadMasterData: firstSampleLead?.masterData || null,
-      sampleLeadContact: firstSampleLead?.contact || null,
-      sampleLeadAnswersFirst5: Array.isArray(firstSampleLead?.answers) ? firstSampleLead.answers.slice(0, 5) : null,
       sampleLeadData: firstSampleLead?.data || null,
     });
   } catch (e) {
