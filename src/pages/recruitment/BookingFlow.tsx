@@ -57,7 +57,8 @@ export default function BookingFlow() {
         .select(`
           *,
           candidates!inner(id, first_name, last_name, email, phone),
-          applications(id, role, status)
+          applications(id, role, status),
+          booking_flow_touchpoints(id, status, template_key)
         `)
         .order("enrolled_at", { ascending: false });
 
@@ -252,6 +253,24 @@ export default function BookingFlow() {
 
       const { error: tpErr } = await supabase.from("booking_flow_touchpoints").insert(touchpoints);
       if (tpErr) throw tpErr;
+
+      // Safety net: verify touchpoints were actually created
+      const { count } = await supabase
+        .from("booking_flow_touchpoints")
+        .select("id", { count: "exact", head: true })
+        .eq("enrollment_id", enrollmentId);
+
+      if (!count || count === 0) {
+        await supabase
+          .from("booking_flow_enrollments")
+          .update({
+            status: "cancelled",
+            cancelled_at: new Date().toISOString(),
+            cancelled_reason: "Ingen touchpoints kunne genereres",
+          })
+          .eq("id", enrollmentId);
+        throw new Error("Touchpoints blev ikke oprettet — flow markeret som fejlet");
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["booking-flow-enrollments"] });
@@ -279,6 +298,22 @@ export default function BookingFlow() {
       queryClient.invalidateQueries({ queryKey: ["booking-flow-enrollments"] });
       queryClient.invalidateQueries({ queryKey: ["booking-flow-pending-approvals"] });
       toast.success("Kandidat afvist");
+    },
+    onError: (err: any) => toast.error("Fejl: " + err.message),
+  });
+
+  // Regenerate touchpoints for stuck enrollments
+  const regenerateMutation = useMutation({
+    mutationFn: async (enrollmentId: string) => {
+      const { error } = await supabase.functions.invoke("regenerate-flow-touchpoints", {
+        body: { enrollment_id: enrollmentId },
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["booking-flow-enrollments"] });
+      queryClient.invalidateQueries({ queryKey: ["booking-flow-touchpoints"] });
+      toast.success("Touchpoints regenereret");
     },
     onError: (err: any) => toast.error("Fejl: " + err.message),
   });
