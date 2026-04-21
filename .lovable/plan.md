@@ -1,57 +1,30 @@
 
-## Fix den vedvarende `"ordinary"`-fejl på AMO-møder
 
-### Hvad problemet er
-Koden i `src/pages/amo/AmoMeetings.tsx` ser allerede rigtig ud, men previewet sender stadig `meeting_type: "ordinary"` i POST-body. Det betyder, at fejlen nu er et runtime/state-problem: enten lever en gammel værdi videre i formular-state, eller også er der et sted i flowet hvor legacy-værdier ikke bliver normaliseret før save.
+## Tilføj altid-synlig "Dashboards"-knap på desktop
 
-### Hvad der skal bygges
-Gør `AmoMeetings` robust mod både gamle og nye værdier, så den aldrig kan sende en ugyldig enum til databasen.
+### Problemet
+Når Jacob (og andre med dashboard-adgang) kollapser sidebaren på PC, forsvinder "Dashboards"-knappen helt, fordi den lever inde i `AppSidebar`. På mobil ligger den i den faste topbar og er derfor altid synlig.
 
-### Implementering
+### Løsningen
+Tilføj `EnvironmentSwitcher` til den eksisterende kollapsede topbar-zone i `MainLayout.tsx`, lige ved siden af `PanelLeft`-udfoldknappen. Komponenten skjuler sig selv hvis brugeren ikke har dashboard-adgang, så ingen ekstra checks er nødvendige.
 
-1. **Indfør én central normalizer i `src/pages/amo/AmoMeetings.tsx`**
-   Lav en helper som mapper:
-   - `ordinary` → `amo_meeting`
-   - `annual` → `annual_discussion`
-   - gyldige enum-værdier beholdes som de er
+### Implementering i `src/components/layout/MainLayout.tsx`
 
-2. **Brug normalizeren alle steder hvor `meeting_type` kan komme ind i state**
-   Opdater:
-   - `emptyForm`
-   - `openNew()`
-   - `openEdit(m)` så gamle rækker/legacy-data også vises korrekt
-   - `Select` `onValueChange` så state altid holdes på DB-kompatible værdier
+Den nuværende kollapsede knap (linje 69-78) står alene i `top-4 left-4`. Jeg ændrer det til en lille flex-container på samme position der indeholder:
+1. Den eksisterende `PanelLeft`-knap (udfold sidebar)
+2. En ny `<EnvironmentSwitcher compact />` til højre for den
 
-3. **Normalizér igen lige før save**
-   I `save.mutationFn` skal payload altid bygges med:
-   - `meeting_type: normalizeMeetingType(f.meeting_type)`
-   
-   Det er det vigtigste sikkerhedsnet, fordi det også fanger stale preview-state og gamle formularværdier.
-
-4. **Gør type-definitionen strammere**
-   Erstat løse `string`-værdier med en smallere union/type for de tilladte meeting-typer plus legacy-inputs, så samme fejl ikke kan snige sig tilbage senere.
-
-5. **Saml option-data ét sted**
-   Definér møde-typer som én fælles konstantliste og brug den både til:
-   - labels
-   - select-items
-   - normalisering
-   
-   Så UI og databaseværdier ikke kan drive fra hinanden igen.
-
-6. **Bedre fejlbesked ved ukendt værdi**
-   Hvis der mod forventning kommer en ukendt type, vis en pæn fejl i UI i stedet for at sende rå ugyldig enum til databasen.
-
-### Filer der berøres
-- `src/pages/amo/AmoMeetings.tsx`
+Begge sidder samlet i top-venstre hjørnet, kun synlige på desktop når `isCollapsed === true`. Knappen ligger ved siden af — ikke ovenpå — den sammenklappede menu, så de ikke overlapper.
 
 ### Hvad jeg ikke rører
-- Database-enum’en `amo_meeting_type`
-- Andre AMO-sider
-- Eksisterende mødedata i databasen
+- `AppSidebar` (den udfoldede placering forbliver uændret)
+- `DashboardSidebar` / dashboard-layoutet
+- Mobil-headeren
+- Permissions / `useAccessibleDashboards`
 
 ### Verificering
-- Nyt møde med “Ordinært” gemmer som `amo_meeting`
-- Nyt møde med “Årligt møde” gemmer som `annual_discussion`
-- Redigering af gamle/legacy-records med `ordinary` eller `annual` kan gemmes uden fejl
-- Network request viser aldrig længere `meeting_type: "ordinary"`
+- Jacob på PC med kollapset sidebar → ser både udfold-knap og "Dashboards"-knap øverst til venstre
+- Bruger uden dashboard-adgang → ser kun udfold-knappen (EnvironmentSwitcher returnerer `null`)
+- Udfoldet sidebar → uændret, knap ligger som før inde i sidebaren
+- Mobil → uændret
+
