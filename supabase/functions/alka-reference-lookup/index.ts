@@ -75,15 +75,42 @@ Deno.serve(async (req) => {
 
     let totalScanned = 0;
     let firstSampleLead: any = null;
+    const allDataFieldNames = new Set<string>();
+    const rawHits: { window: string; ref: string; snippet: string }[] = [];
+
     for (const w of windows) {
-      const ep = `${baseUrl}/simpleleads?Projects=*&ModifiedFrom=${w.from}&ModifiedTo=${w.to}&AllClosedStatuses=true&Status=success&take=2000`;
+      const ep = `${baseUrl}/simpleleads?Projects=*&ModifiedFrom=${w.from}&ModifiedTo=${w.to}&AllClosedStatuses=true&take=2000`;
       const r = await fetch(ep, { headers });
-      const j = await r.json().catch(() => []);
+      const rawText = await r.text();
+
+      // Raw text scan FIRST (before JSON parse) to catch numbers no matter where they are
+      for (const { raw, norm } of refNorms) {
+        if (!norm) continue;
+        // Try a few format variants in raw text
+        const variants = [raw, `+45${norm}`, `45${norm}`, norm];
+        for (const v of variants) {
+          const idx = rawText.indexOf(v);
+          if (idx >= 0) {
+            rawHits.push({
+              window: `${w.from}..${w.to}`,
+              ref: raw,
+              snippet: rawText.substring(Math.max(0, idx - 200), Math.min(rawText.length, idx + 300)),
+            });
+            break;
+          }
+        }
+      }
+
+      let j: any;
+      try { j = JSON.parse(rawText); } catch { j = []; }
       const arr: any[] = Array.isArray(j) ? j : (j.Results || j.results || j.Leads || []);
       totalScanned += arr.length;
       if (!firstSampleLead && arr.length > 0) firstSampleLead = arr[0];
 
       for (const lead of arr) {
+        if (lead?.data && typeof lead.data === "object") {
+          for (const k of Object.keys(lead.data)) allDataFieldNames.add(k);
+        }
         // Build a normalised digit-blob from all string values in the lead
         const digitBlob = JSON.stringify(lead).replace(/[^0-9]/g, "");
         let matched = "";
