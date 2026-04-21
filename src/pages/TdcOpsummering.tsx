@@ -449,10 +449,6 @@ export default function TdcOpsummering() {
 
                 <Separator />
 
-                {/* Binding */}
-
-                <Separator />
-
                 {/* Startup - only shown in standard mode when existing/mixed */}
                 {!isPilot && (numberChoice === "existing" || numberChoice === "mixed") && (
                   <div className="space-y-3">
