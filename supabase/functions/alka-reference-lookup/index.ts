@@ -97,14 +97,18 @@ Deno.serve(async (req) => {
         const from = isoDaysAgo(offset + 3);
         const to = isoDaysAgo(offset);
 
+        const projectName = projectsList[0]?.name || projectsList[0]?.Name || "Alka - Mødebooking";
+        const projectEnc = encodeURIComponent(projectName);
+        const campIds = matchedCampaigns.map((c: any) => c.uniqueId || c.id || c.Id).filter(Boolean);
+
         // Try multiple endpoint strategies
         const eps: { ep: string; tag: string }[] = [
-          { ep: `${baseUrl}/simpleleads?Projects=*&ModifiedFrom=${from}&ModifiedTo=${to}&AllClosedStatuses=true&take=2000`, tag: "simpleleads-Projects=*" },
-          { ep: `${baseUrl}/leads?Projects=*&ModifiedFrom=${from}&ModifiedTo=${to}&AllClosedStatuses=true&IncludeAnswers=true&take=2000`, tag: "leads-Projects=*" },
+          { ep: `${baseUrl}/simpleleads?Projects=${projectEnc}&ModifiedFrom=${from}&ModifiedTo=${to}&AllClosedStatuses=true&take=2000`, tag: `simpleleads-Project=${projectName}` },
+          { ep: `${baseUrl}/leads?Projects=${projectEnc}&ModifiedFrom=${from}&ModifiedTo=${to}&AllClosedStatuses=true&IncludeAnswers=true&take=2000`, tag: `leads-Project=${projectName}` },
         ];
-        if (campaignIds.length > 0) {
-          eps.push({ ep: `${baseUrl}/simpleleads?Campaigns=${campaignIds.join(",")}&ModifiedFrom=${from}&ModifiedTo=${to}&AllClosedStatuses=true&take=500`, tag: `simpleleads-Campaigns=${campaignIds.join(",")}` });
-          eps.push({ ep: `${baseUrl}/leads?Campaigns=${campaignIds.join(",")}&ModifiedFrom=${from}&ModifiedTo=${to}&AllClosedStatuses=true&IncludeAnswers=true&take=500`, tag: `leads-Campaigns=${campaignIds.join(",")}` });
+        if (campIds.length > 0) {
+          eps.push({ ep: `${baseUrl}/simpleleads?Projects=${projectEnc}&Campaigns=${campIds.join(",")}&ModifiedFrom=${from}&ModifiedTo=${to}&AllClosedStatuses=true&take=500`, tag: `simpleleads-Campaigns=${campIds.join(",")}` });
+          eps.push({ ep: `${baseUrl}/leads?Projects=${projectEnc}&Campaigns=${campIds.join(",")}&ModifiedFrom=${from}&ModifiedTo=${to}&AllClosedStatuses=true&IncludeAnswers=true&take=500`, tag: `leads-Campaigns=${campIds.join(",")}` });
         }
 
         for (const { ep, tag } of eps) {
