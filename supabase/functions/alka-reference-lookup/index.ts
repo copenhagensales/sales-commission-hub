@@ -1,9 +1,9 @@
 /**
- * Alka Reference Lookup
+ * Alka Reference Lookup / Sample Dump
  *
- * Søger efter specifikke permission/police-numre i Alka /simpleleads payloads
- * over et bredt tidsvindue og returnerer den fulde rå payload + alle felter
- * vi ville kunne udtrække ved import.
+ * Mode 1 (default): Søger efter referencer i Alka /simpleleads
+ * Mode 2 (sampleCampaign): Henter ét enkelt success-salg fra angivet kampagne
+ *                          og dumper ALT vi kan trække ud (lead + users + closure data)
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -19,10 +19,8 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const refs: string[] = (body.references || [
-      "22799970", "23301572", "28558184", "42327696"
-    ]).map((r: string) => String(r).trim());
-    const days: number = body.days || 60;
+    const sampleCampaign: string | null = body.sampleCampaign || null;
+    const days: number = body.days || 14;
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -57,119 +55,138 @@ Deno.serve(async (req) => {
     const usersRes = await fetch(`${baseUrl}/users?Limit=2000`, { headers });
     const usersJson = await usersRes.json().catch(() => []);
     const usersArr: any[] = Array.isArray(usersJson) ? usersJson : (usersJson.Results || usersJson.results || []);
-    const orgCodeMap = new Map<string, { email: string; name: string }>();
+    const orgCodeMap = new Map<string, any>();
     for (const u of usersArr) {
-      if (u.orgCode && u.email) orgCodeMap.set(u.orgCode, { email: u.email, name: u.name || u.username || "" });
+      if (u.orgCode) orgCodeMap.set(u.orgCode, u);
     }
 
-    // Normalise refs (strip +45 / 45 prefix, spaces, dashes)
-    const normalize = (s: string) => String(s || "").replace(/[^0-9]/g, "").replace(/^45(?=\d{8}$)/, "");
-    const refNorms = refs.map(r => ({ raw: r, norm: normalize(r) }));
+    // ---------------- SAMPLE MODE ----------------
+    if (sampleCampaign) {
+      // Discover all available campaigns first
+      let campaignsList: any[] = [];
+      try {
+        const cRes = await fetch(`${baseUrl}/campaigns?Limit=500`, { headers });
+        const cJson = await cRes.json().catch(() => []);
+        campaignsList = Array.isArray(cJson) ? cJson : (cJson.Results || cJson.results || []);
+      } catch { /* ignore */ }
 
-    // Walk windows of 3 days back to `days` ago, fetch all leads, scan
-    const matches: any[] = [];
-    const windows: { from: string; to: string }[] = [];
-    for (let offset = 0; offset < days; offset += 3) {
-      windows.push({ from: isoDaysAgo(offset + 3), to: isoDaysAgo(offset) });
-    }
+      const matchedCampaigns = campaignsList.filter((c: any) => {
+        const name = String(c.name || c.Name || "").toLowerCase();
+        return name.includes(sampleCampaign.toLowerCase());
+      });
 
-    let totalScanned = 0;
-    let firstSampleLead: any = null;
-    const allDataFieldNames = new Set<string>();
-    const rawHits: { window: string; ref: string; snippet: string }[] = [];
+      // Walk windows from today and back, find first success lead in matching campaign
+      let sampleLead: any = null;
+      let scannedTotal = 0;
+      let usedWindow: any = null;
+      let usedCampaignFilter: string | null = null;
 
-    for (const w of windows) {
-      const ep = `${baseUrl}/simpleleads?Projects=*&ModifiedFrom=${w.from}&ModifiedTo=${w.to}&AllClosedStatuses=true&take=2000`;
-      const r = await fetch(ep, { headers });
-      const rawText = await r.text();
+      // Try each matching campaign id; if none, scan all and filter by name
+      const campaignIds = matchedCampaigns.map((c: any) => c.id || c.Id).filter(Boolean);
 
-      // Raw text scan FIRST (before JSON parse) to catch numbers no matter where they are
-      for (const { raw, norm } of refNorms) {
-        if (!norm) continue;
-        // Try a few format variants in raw text
-        const variants = [raw, `+45${norm}`, `45${norm}`, norm];
-        for (const v of variants) {
-          const idx = rawText.indexOf(v);
-          if (idx >= 0) {
-            rawHits.push({
-              window: `${w.from}..${w.to}`,
-              ref: raw,
-              snippet: rawText.substring(Math.max(0, idx - 200), Math.min(rawText.length, idx + 300)),
-            });
+      for (let offset = 0; offset < days && !sampleLead; offset += 3) {
+        const from = isoDaysAgo(offset + 3);
+        const to = isoDaysAgo(offset);
+
+        // Try with campaign filter if we have ids
+        const eps: { ep: string; tag: string }[] = [];
+        if (campaignIds.length > 0) {
+          eps.push({
+            ep: `${baseUrl}/simpleleads?Projects=*&Campaigns=${campaignIds.join(",")}&ModifiedFrom=${from}&ModifiedTo=${to}&AllClosedStatuses=true&take=500`,
+            tag: `campaigns=${campaignIds.join(",")}`,
+          });
+        }
+        // Always also try without campaign filter and match by name
+        eps.push({
+          ep: `${baseUrl}/simpleleads?Projects=*&ModifiedFrom=${from}&ModifiedTo=${to}&AllClosedStatuses=true&take=2000`,
+          tag: `name-match:${sampleCampaign}`,
+        });
+
+        for (const { ep, tag } of eps) {
+          if (sampleLead) break;
+          const r = await fetch(ep, { headers });
+          const j = await r.json().catch(() => []);
+          const arr: any[] = Array.isArray(j) ? j : (j.Results || j.results || j.Leads || []);
+          scannedTotal += arr.length;
+
+          for (const lead of arr) {
+            const status = String(lead.status || lead.Status || "").toLowerCase();
+            const closure = String(lead.closure || lead.Closure || "").toLowerCase();
+            // success / sale criteria
+            const isSuccess = status === "success" || closure.includes("salg") || closure.includes("success") || closure.includes("sale");
+            if (!isSuccess) continue;
+
+            const campObj = lead.campaign || {};
+            const campName = String(campObj.name || campObj.Name || lead.campaignName || "").toLowerCase();
+            if (campaignIds.length === 0 && !campName.includes(sampleCampaign.toLowerCase())) continue;
+
+            sampleLead = lead;
+            usedWindow = { from, to };
+            usedCampaignFilter = tag;
             break;
           }
         }
       }
 
-      let j: any;
-      try { j = JSON.parse(rawText); } catch { j = []; }
-      const arr: any[] = Array.isArray(j) ? j : (j.Results || j.results || j.Leads || []);
-      totalScanned += arr.length;
-      if (!firstSampleLead && arr.length > 0) firstSampleLead = arr[0];
-
-      for (const lead of arr) {
-        if (lead?.data && typeof lead.data === "object") {
-          for (const k of Object.keys(lead.data)) allDataFieldNames.add(k);
-        }
-        // Build a normalised digit-blob from all string values in the lead
-        const digitBlob = JSON.stringify(lead).replace(/[^0-9]/g, "");
-        let matched = "";
-        for (const { raw, norm } of refNorms) {
-          if (!norm) continue;
-          if (digitBlob.includes(norm)) { matched = raw; break; }
-        }
-        if (!matched) continue;
-
-        const fpu = lead.firstProcessedByUser || lead.FirstProcessedByUser;
-        const lmu = lead.lastModifiedByUser || lead.LastModifiedByUser;
-        const fOrg = fpu?.orgCode;
-        const lOrg = lmu?.orgCode;
-        const fEmailResolved = (fpu?.email && fpu.email.includes("@")) ? fpu.email : (orgCodeMap.get(fOrg || "")?.email || null);
-        const lEmailResolved = (lmu?.email && lmu.email.includes("@")) ? lmu.email : (orgCodeMap.get(lOrg || "")?.email || null);
-
-        matches.push({
-          matchedReference: matched,
-          window: w,
-          extracted: {
-            uniqueId: lead.uniqueId || lead.UniqueId,
-            campaignId: lead.campaignId,
-            campaignName: lead.campaignName,
-            closure: lead.closure || lead.Closure,
-            createdTime: lead.createdTime,
-            lastModifiedTime: lead.lastModifiedTime,
-            customerName: lead.masterData?.name || lead.contact?.name,
-            phone: lead.masterData?.phone || lead.contact?.phone,
-            email: lead.masterData?.email || lead.contact?.email,
-            address: lead.masterData?.address,
-            zipCode: lead.masterData?.zipCode,
-            city: lead.masterData?.city,
-            firstProcessedByUser: { orgCode: fOrg, email: fpu?.email, resolvedEmail: fEmailResolved },
-            lastModifiedByUser: { orgCode: lOrg, email: lmu?.email, resolvedEmail: lEmailResolved },
-            externalRef: lead.externalRef,
-            note: lead.note,
-            products: lead.products || lead.Products,
-            answersCount: Array.isArray(lead.answers) ? lead.answers.length : 0,
-            answersSample: Array.isArray(lead.answers) ? lead.answers.slice(0, 30) : null,
-          },
-          fullPayloadKeys: Object.keys(lead),
-          fullPayload: lead,
+      if (!sampleLead) {
+        return json({
+          mode: "sample",
+          requestedCampaign: sampleCampaign,
+          matchingCampaignsFound: matchedCampaigns.map((c: any) => ({ id: c.id || c.Id, name: c.name || c.Name })),
+          totalCampaignsAvailable: campaignsList.length,
+          allCampaignNames: campaignsList.map((c: any) => c.name || c.Name).filter(Boolean).sort(),
+          scannedLeads: scannedTotal,
+          windowDays: days,
+          error: "No success lead found for that campaign in the given window",
         });
       }
+
+      // Try to fetch the full /leads/{id} endpoint for richer data
+      const leadId = sampleLead.uniqueId || sampleLead.UniqueId;
+      let fullLead: any = null;
+      try {
+        const fRes = await fetch(`${baseUrl}/leads/${leadId}`, { headers });
+        if (fRes.ok) fullLead = await fRes.json();
+      } catch { /* ignore */ }
+
+      // Resolve user emails
+      const fpu = sampleLead.firstProcessedByUser || sampleLead.FirstProcessedByUser || {};
+      const lmu = sampleLead.lastModifiedByUser || sampleLead.LastModifiedByUser || {};
+      const ubu = sampleLead.uploadedByUser || sampleLead.UploadedByUser || {};
+      const fpuFull = orgCodeMap.get(fpu.orgCode);
+      const lmuFull = orgCodeMap.get(lmu.orgCode);
+
+      return json({
+        mode: "sample",
+        requestedCampaign: sampleCampaign,
+        usedWindow,
+        usedCampaignFilter,
+        scannedLeads: scannedTotal,
+        matchingCampaignsFound: matchedCampaigns.map((c: any) => ({ id: c.id || c.Id, name: c.name || c.Name })),
+        leadId,
+        extracted: {
+          uniqueId: leadId,
+          campaign: sampleLead.campaign,
+          status: sampleLead.status,
+          closure: sampleLead.closure,
+          closureData: sampleLead.closureData,
+          firstProcessedTime: sampleLead.firstProcessedTime,
+          lastModifiedTime: sampleLead.lastModifiedTime,
+          uploadTime: sampleLead.uploadTime,
+          ownerOrgUnit: sampleLead.ownerOrgUnit,
+          firstProcessedByUser: { ...fpu, resolved: fpuFull || null },
+          lastModifiedByUser: { ...lmu, resolved: lmuFull || null },
+          uploadedByUser: ubu,
+          dataFields: sampleLead.data || null,
+        },
+        rawSimpleLead: sampleLead,
+        rawSimpleLeadKeys: Object.keys(sampleLead),
+        fullLeadEndpoint: fullLead,
+        fullLeadKeys: fullLead ? Object.keys(fullLead) : null,
+      });
     }
 
-    return json({
-      searched: refs,
-      searchedNormalised: refNorms,
-      windowDays: days,
-      totalLeadsScanned: totalScanned,
-      windowsScanned: windows.length,
-      matchesFound: matches.length,
-      rawTextHits: rawHits,
-      matches,
-      allDataFieldNames: Array.from(allDataFieldNames).sort(),
-      sampleLeadKeys: firstSampleLead ? Object.keys(firstSampleLead) : [],
-      sampleLeadData: firstSampleLead?.data || null,
-    });
+    return json({ error: "Pass {sampleCampaign: 'permission'} to get a sample dump" });
   } catch (e) {
     return json({ error: String(e), stack: (e as Error).stack }, 500);
   }
