@@ -24,7 +24,7 @@ import {
 import { Plus, Pencil, Trash2, AlertCircle, Loader2, History, CheckCircle, XCircle, CalendarIcon, AlertTriangle, Clock, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { PricingRuleEditor } from "./PricingRuleEditor";
-import { useRematchPricingRules } from "@/hooks/useRematchPricingRules";
+import { useMgTestMutationSync } from "@/hooks/useMgTestMutationSync";
 
 interface ProductPricingRulesDialogProps {
   open: boolean;
