@@ -231,10 +231,11 @@ export function PricingRuleEditor({
     mutationFn: async () => {
       // Convert conditions to JSON-compatible format for Supabase
       const conditionsJson = JSON.parse(JSON.stringify(conditions));
-      
+
       const ruleData = {
         product_id: productId,
         campaign_mapping_ids: selectedCampaignIds.length > 0 ? selectedCampaignIds : null,
+        campaign_match_mode: selectedCampaignIds.length > 0 ? campaignMatchMode : "include",
         conditions: conditionsJson,
         commission_dkk: parseFloat(commission) || 0,
         revenue_dkk: parseFloat(revenue) || 0,
@@ -242,95 +243,73 @@ export function PricingRuleEditor({
         name: name || null,
         is_active: isActive,
         allows_immediate_payment: allowsImmediatePayment,
-        immediate_payment_commission_dkk: allowsImmediatePayment && immediatePaymentCommission 
-          ? parseFloat(immediatePaymentCommission) 
+        immediate_payment_commission_dkk: allowsImmediatePayment && immediatePaymentCommission
+          ? parseFloat(immediatePaymentCommission)
           : null,
-        immediate_payment_revenue_dkk: allowsImmediatePayment && immediatePaymentRevenue 
-          ? parseFloat(immediatePaymentRevenue) 
+        immediate_payment_revenue_dkk: allowsImmediatePayment && immediatePaymentRevenue
+          ? parseFloat(immediatePaymentRevenue)
           : null,
         effective_from: format(effectiveFrom, "yyyy-MM-dd"),
         effective_to: hasEndDate && effectiveTo ? format(effectiveTo, "yyyy-MM-dd") : null,
         use_rule_name_as_display: useRuleNameAsDisplay,
       };
 
+      const historyBase = {
+        name: ruleData.name,
+        commission_dkk: ruleData.commission_dkk,
+        revenue_dkk: ruleData.revenue_dkk,
+        conditions: ruleData.conditions,
+        campaign_mapping_ids: ruleData.campaign_mapping_ids,
+        campaign_match_mode: ruleData.campaign_match_mode,
+        effective_from: ruleData.effective_from,
+        effective_to: ruleData.effective_to,
+        priority: ruleData.priority,
+        is_active: ruleData.is_active,
+        allows_immediate_payment: ruleData.allows_immediate_payment,
+        immediate_payment_commission_dkk: ruleData.immediate_payment_commission_dkk,
+        immediate_payment_revenue_dkk: ruleData.immediate_payment_revenue_dkk,
+        use_rule_name_as_display: ruleData.use_rule_name_as_display,
+      };
+
       if (existingRule) {
-        // Update existing rule
         const { error } = await supabase
           .from("product_pricing_rules")
           .update(ruleData)
           .eq("id", existingRule.id);
-
         if (error) throw error;
-        
-        // Log to history
+
         await supabase.from("pricing_rule_history").insert({
+          ...historyBase,
           pricing_rule_id: existingRule.id,
-          name: ruleData.name,
-          commission_dkk: ruleData.commission_dkk,
-          revenue_dkk: ruleData.revenue_dkk,
-          conditions: ruleData.conditions,
-          campaign_mapping_ids: ruleData.campaign_mapping_ids,
-          effective_from: ruleData.effective_from,
-          effective_to: ruleData.effective_to,
-          priority: ruleData.priority,
-          is_active: ruleData.is_active,
-          allows_immediate_payment: ruleData.allows_immediate_payment,
-          immediate_payment_commission_dkk: ruleData.immediate_payment_commission_dkk,
-          immediate_payment_revenue_dkk: ruleData.immediate_payment_revenue_dkk,
-          use_rule_name_as_display: ruleData.use_rule_name_as_display,
-          change_type: 'update'
+          change_type: "update",
         });
       } else {
-        // Create new rule
         const { data, error } = await supabase
           .from("product_pricing_rules")
           .insert(ruleData)
           .select("id")
           .single();
-
         if (error) throw error;
-        
-        // Log to history
+
         await supabase.from("pricing_rule_history").insert({
+          ...historyBase,
           pricing_rule_id: data.id,
-          name: ruleData.name,
-          commission_dkk: ruleData.commission_dkk,
-          revenue_dkk: ruleData.revenue_dkk,
-          conditions: ruleData.conditions,
-          campaign_mapping_ids: ruleData.campaign_mapping_ids,
-          effective_from: ruleData.effective_from,
-          effective_to: ruleData.effective_to,
-          priority: ruleData.priority,
-          is_active: ruleData.is_active,
-          allows_immediate_payment: ruleData.allows_immediate_payment,
-          immediate_payment_commission_dkk: ruleData.immediate_payment_commission_dkk,
-          immediate_payment_revenue_dkk: ruleData.immediate_payment_revenue_dkk,
-          use_rule_name_as_display: ruleData.use_rule_name_as_display,
-          change_type: 'create'
+          change_type: "create",
         });
       }
     },
     onSuccess: () => {
       toast.success(existingRule ? "Regel opdateret" : "Regel oprettet");
       onSave();
-      
-      // Fire-and-forget rematch in background
-      toast.info("Opdaterer salg i baggrunden...");
-      rematchMutation.mutate(
-        { productId },
-        {
-          onSuccess: (result) => {
-            if (result.stats.updated > 0) {
-              toast.success(`✓ ${result.stats.updated} salg opdateret med nye prisregler`);
-            } else {
-              toast.info("Ingen salg blev opdateret");
-            }
-          },
-          onError: () => {
-            toast.error("Baggrundsopdatering fejlede — prøv rematch manuelt");
-          },
-        }
-      );
+
+      // Run rematch from this rule's effective_from + invalidate everything via central hook
+      sync({
+        invalidate: ["pricing", "products", "sales", "kpi"],
+        rematch: true,
+        productId,
+        effectiveFromDate: format(effectiveFrom, "yyyy-MM-dd"),
+        label: "prisregel",
+      });
     },
     onError: (error) => {
       toast.error("Kunne ikke gemme regel: " + error.message);
