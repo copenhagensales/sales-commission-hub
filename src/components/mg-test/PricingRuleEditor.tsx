@@ -200,9 +200,9 @@ export function PricingRuleEditor({
     existingRule?.use_rule_name_as_display ?? false
   );
   const [isRematching, setIsRematching] = useState(false);
-  
-  // Rematch hook
-  const rematchMutation = useRematchPricingRules();
+
+  // Centralized post-mutation sync (invalidation + rematch + KPI + realtime)
+  const { sync } = useMgTestMutationSync();
 
   // Get available condition keys (not already used) - include numeric keys
   const usedKeys = Object.keys(conditions);
