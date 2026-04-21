@@ -132,11 +132,16 @@ Deno.serve(async (req) => {
 
     return json({
       searched: refs,
+      searchedNormalised: refNorms,
       windowDays: days,
       totalLeadsScanned: totalScanned,
       windowsScanned: windows.length,
       matchesFound: matches.length,
       matches,
+      sampleLeadKeys: firstSampleLead ? Object.keys(firstSampleLead) : [],
+      sampleLeadMasterData: firstSampleLead?.masterData || null,
+      sampleLeadContact: firstSampleLead?.contact || null,
+      sampleLeadAnswersFirst5: Array.isArray(firstSampleLead?.answers) ? firstSampleLead.answers.slice(0, 5) : null,
     });
   } catch (e) {
     return json({ error: String(e), stack: (e as Error).stack }, 500);
