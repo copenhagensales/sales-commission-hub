@@ -152,9 +152,9 @@ Deno.serve(async (req) => {
           requestedCampaign: sampleCampaign,
           matchingCampaignsFound: matchedCampaigns.map((c: any) => ({ id: c.id || c.Id, name: c.name || c.Name })),
           totalCampaignsAvailable: campaignsList.length,
-          allCampaignNames: campaignsList.map((c: any) => c.name || c.Name).filter(Boolean).sort(),
           scannedLeads: scannedTotal,
           windowDays: days,
+          closuresSeenInMatchingCampaigns: Array.from(closuresSeen.entries()).map(([k, v]) => ({ statusAndClosure: k, count: v })),
           error: "No success lead found for that campaign in the given window",
         });
       }
