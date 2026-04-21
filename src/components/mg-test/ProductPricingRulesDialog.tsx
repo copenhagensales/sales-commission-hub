@@ -24,7 +24,7 @@ import {
 import { Plus, Pencil, Trash2, AlertCircle, Loader2, History, CheckCircle, XCircle, CalendarIcon, AlertTriangle, Clock, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { PricingRuleEditor } from "./PricingRuleEditor";
-import { useRematchPricingRules } from "@/hooks/useRematchPricingRules";
+import { useMgTestMutationSync } from "@/hooks/useMgTestMutationSync";
 
 interface ProductPricingRulesDialogProps {
   open: boolean;
@@ -43,6 +43,7 @@ interface PricingRule {
   id: string;
   product_id: string;
   campaign_mapping_ids: string[] | null;
+  campaign_match_mode?: "include" | "exclude" | null;
   conditions: Record<string, string>;
   commission_dkk: number;
   revenue_dkk: number;
@@ -88,8 +89,8 @@ export function ProductPricingRulesDialog({
   const [effectiveDate, setEffectiveDate] = useState<Date>(new Date());
   const [isRematching, setIsRematching] = useState(false);
 
-  // Rematch hook for automatic price updates
-  const rematchMutation = useRematchPricingRules();
+  // Centralized post-mutation sync (invalidation + rematch + KPI + realtime)
+  const { sync } = useMgTestMutationSync();
 
   // Local state for editable base values
   const [localCommission, setLocalCommission] = useState(String(baseCommission));
@@ -180,9 +181,7 @@ export function ProductPricingRulesDialog({
     },
     onSuccess: () => {
       toast.success("Basis-priser opdateret");
-      queryClient.invalidateQueries({ queryKey: ["mg-aggregated-products"] });
-      queryClient.invalidateQueries({ queryKey: ["mg-manual-products"] });
-      queryClient.invalidateQueries({ queryKey: ["products"] });
+      sync({ invalidate: ["products", "sales", "kpi"], label: "basispris" });
       onBaseValuesChange?.();
     },
     onError: (error) => {
@@ -202,9 +201,7 @@ export function ProductPricingRulesDialog({
     },
     onSuccess: () => {
       toast.success("Indstillinger opdateret");
-      queryClient.invalidateQueries({ queryKey: ["mg-aggregated-products"] });
-      queryClient.invalidateQueries({ queryKey: ["mg-manual-products"] });
-      queryClient.invalidateQueries({ queryKey: ["products"] });
+      sync({ invalidate: ["products", "kpi"], label: "tæller-status" });
       onBaseValuesChange?.();
     },
     onError: (error) => {
@@ -223,8 +220,13 @@ export function ProductPricingRulesDialog({
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["product-pricing-rules", productId] });
       toast.success("Regel slettet");
+      sync({
+        invalidate: ["pricing", "products", "sales", "kpi"],
+        rematch: true,
+        productId,
+        label: "regel-sletning",
+      });
     },
     onError: (error) => {
       toast.error("Kunne ikke slette regel: " + error.message);
@@ -272,24 +274,15 @@ export function ProductPricingRulesDialog({
           applied_at: new Date().toISOString()
         });
         
-        // Fire-and-forget rematch in background
-        toast.info("Opdaterer salg i baggrunden...");
-        rematchMutation.mutate(
-          { productId },
-          {
-            onSuccess: (result) => {
-              if (result.stats.updated > 0) {
-                toast.success(`✓ ${result.stats.updated} salg opdateret med nye priser`);
-              } else {
-                toast.info("Ingen salg blev opdateret");
-              }
-            },
-            onError: () => {
-              toast.error("Baggrundsopdatering fejlede — prøv rematch manuelt");
-            },
-          }
-        );
-        
+        // Background rematch + KPI refresh + realtime broadcast via central hook
+        sync({
+          invalidate: ["pricing", "products", "sales", "kpi"],
+          rematch: true,
+          productId,
+          effectiveFromDate: format(effectiveDate, "yyyy-MM-dd"),
+          label: "basispris",
+        });
+
         if (isRetroactive) {
           toast.warning("Prisændring gemt med retroaktiv dato");
         }
@@ -610,7 +603,15 @@ export function ProductPricingRulesDialog({
                           </div>
 
                           <div className="text-xs text-muted-foreground mb-1">
-                            Kampagner: {getCampaignNames(rule.campaign_mapping_ids)}
+                            {(() => {
+                              const ids = rule.campaign_mapping_ids;
+                              const mode = rule.campaign_match_mode === "exclude" ? "exclude" : "include";
+                              if (!ids || ids.length === 0) return "Kampagner: Alle";
+                              const names = getCampaignNames(ids);
+                              return mode === "exclude"
+                                ? `Alle undtagen: ${names}`
+                                : `Kampagner: ${names}`;
+                            })()}
                           </div>
 
                           <div className="bg-muted/50 rounded p-2 text-sm mb-2">

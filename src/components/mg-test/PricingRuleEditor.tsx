@@ -29,7 +29,8 @@ import {
 } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
-import { useRematchPricingRules } from "@/hooks/useRematchPricingRules";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { useMgTestMutationSync } from "@/hooks/useMgTestMutationSync";
 
 // Available condition keys and their possible values
 const CONDITION_OPTIONS: Record<string, string[]> = {
@@ -78,6 +79,7 @@ interface PricingRule {
   id: string;
   product_id: string;
   campaign_mapping_ids: string[] | null;
+  campaign_match_mode?: "include" | "exclude" | null;
   conditions: Record<string, string | NumericConditionValue>;
   commission_dkk: number;
   revenue_dkk: number;
@@ -162,6 +164,9 @@ export function PricingRuleEditor({
   const [selectedCampaignIds, setSelectedCampaignIds] = useState<string[]>(
     existingRule?.campaign_mapping_ids || []
   );
+  const [campaignMatchMode, setCampaignMatchMode] = useState<"include" | "exclude">(
+    existingRule?.campaign_match_mode === "exclude" ? "exclude" : "include"
+  );
   const [campaignsOpen, setCampaignsOpen] = useState(false);
   const [conditions, setConditions] = useState<Record<string, string | NumericConditionValue>>(
     existingRule?.conditions || {}
@@ -195,9 +200,9 @@ export function PricingRuleEditor({
     existingRule?.use_rule_name_as_display ?? false
   );
   const [isRematching, setIsRematching] = useState(false);
-  
-  // Rematch hook
-  const rematchMutation = useRematchPricingRules();
+
+  // Centralized post-mutation sync (invalidation + rematch + KPI + realtime)
+  const { sync } = useMgTestMutationSync();
 
   // Get available condition keys (not already used) - include numeric keys
   const usedKeys = Object.keys(conditions);
@@ -226,10 +231,11 @@ export function PricingRuleEditor({
     mutationFn: async () => {
       // Convert conditions to JSON-compatible format for Supabase
       const conditionsJson = JSON.parse(JSON.stringify(conditions));
-      
+
       const ruleData = {
         product_id: productId,
         campaign_mapping_ids: selectedCampaignIds.length > 0 ? selectedCampaignIds : null,
+        campaign_match_mode: selectedCampaignIds.length > 0 ? campaignMatchMode : "include",
         conditions: conditionsJson,
         commission_dkk: parseFloat(commission) || 0,
         revenue_dkk: parseFloat(revenue) || 0,
@@ -237,95 +243,73 @@ export function PricingRuleEditor({
         name: name || null,
         is_active: isActive,
         allows_immediate_payment: allowsImmediatePayment,
-        immediate_payment_commission_dkk: allowsImmediatePayment && immediatePaymentCommission 
-          ? parseFloat(immediatePaymentCommission) 
+        immediate_payment_commission_dkk: allowsImmediatePayment && immediatePaymentCommission
+          ? parseFloat(immediatePaymentCommission)
           : null,
-        immediate_payment_revenue_dkk: allowsImmediatePayment && immediatePaymentRevenue 
-          ? parseFloat(immediatePaymentRevenue) 
+        immediate_payment_revenue_dkk: allowsImmediatePayment && immediatePaymentRevenue
+          ? parseFloat(immediatePaymentRevenue)
           : null,
         effective_from: format(effectiveFrom, "yyyy-MM-dd"),
         effective_to: hasEndDate && effectiveTo ? format(effectiveTo, "yyyy-MM-dd") : null,
         use_rule_name_as_display: useRuleNameAsDisplay,
       };
 
+      const historyBase = {
+        name: ruleData.name,
+        commission_dkk: ruleData.commission_dkk,
+        revenue_dkk: ruleData.revenue_dkk,
+        conditions: ruleData.conditions,
+        campaign_mapping_ids: ruleData.campaign_mapping_ids,
+        campaign_match_mode: ruleData.campaign_match_mode,
+        effective_from: ruleData.effective_from,
+        effective_to: ruleData.effective_to,
+        priority: ruleData.priority,
+        is_active: ruleData.is_active,
+        allows_immediate_payment: ruleData.allows_immediate_payment,
+        immediate_payment_commission_dkk: ruleData.immediate_payment_commission_dkk,
+        immediate_payment_revenue_dkk: ruleData.immediate_payment_revenue_dkk,
+        use_rule_name_as_display: ruleData.use_rule_name_as_display,
+      };
+
       if (existingRule) {
-        // Update existing rule
         const { error } = await supabase
           .from("product_pricing_rules")
           .update(ruleData)
           .eq("id", existingRule.id);
-
         if (error) throw error;
-        
-        // Log to history
+
         await supabase.from("pricing_rule_history").insert({
+          ...historyBase,
           pricing_rule_id: existingRule.id,
-          name: ruleData.name,
-          commission_dkk: ruleData.commission_dkk,
-          revenue_dkk: ruleData.revenue_dkk,
-          conditions: ruleData.conditions,
-          campaign_mapping_ids: ruleData.campaign_mapping_ids,
-          effective_from: ruleData.effective_from,
-          effective_to: ruleData.effective_to,
-          priority: ruleData.priority,
-          is_active: ruleData.is_active,
-          allows_immediate_payment: ruleData.allows_immediate_payment,
-          immediate_payment_commission_dkk: ruleData.immediate_payment_commission_dkk,
-          immediate_payment_revenue_dkk: ruleData.immediate_payment_revenue_dkk,
-          use_rule_name_as_display: ruleData.use_rule_name_as_display,
-          change_type: 'update'
+          change_type: "update",
         });
       } else {
-        // Create new rule
         const { data, error } = await supabase
           .from("product_pricing_rules")
           .insert(ruleData)
           .select("id")
           .single();
-
         if (error) throw error;
-        
-        // Log to history
+
         await supabase.from("pricing_rule_history").insert({
+          ...historyBase,
           pricing_rule_id: data.id,
-          name: ruleData.name,
-          commission_dkk: ruleData.commission_dkk,
-          revenue_dkk: ruleData.revenue_dkk,
-          conditions: ruleData.conditions,
-          campaign_mapping_ids: ruleData.campaign_mapping_ids,
-          effective_from: ruleData.effective_from,
-          effective_to: ruleData.effective_to,
-          priority: ruleData.priority,
-          is_active: ruleData.is_active,
-          allows_immediate_payment: ruleData.allows_immediate_payment,
-          immediate_payment_commission_dkk: ruleData.immediate_payment_commission_dkk,
-          immediate_payment_revenue_dkk: ruleData.immediate_payment_revenue_dkk,
-          use_rule_name_as_display: ruleData.use_rule_name_as_display,
-          change_type: 'create'
+          change_type: "create",
         });
       }
     },
     onSuccess: () => {
       toast.success(existingRule ? "Regel opdateret" : "Regel oprettet");
       onSave();
-      
-      // Fire-and-forget rematch in background
-      toast.info("Opdaterer salg i baggrunden...");
-      rematchMutation.mutate(
-        { productId },
-        {
-          onSuccess: (result) => {
-            if (result.stats.updated > 0) {
-              toast.success(`✓ ${result.stats.updated} salg opdateret med nye prisregler`);
-            } else {
-              toast.info("Ingen salg blev opdateret");
-            }
-          },
-          onError: () => {
-            toast.error("Baggrundsopdatering fejlede — prøv rematch manuelt");
-          },
-        }
-      );
+
+      // Run rematch from this rule's effective_from + invalidate everything via central hook
+      sync({
+        invalidate: ["pricing", "products", "sales", "kpi"],
+        rematch: true,
+        productId,
+        effectiveFromDate: format(effectiveFrom, "yyyy-MM-dd"),
+        label: "prisregel",
+      });
     },
     onError: (error) => {
       toast.error("Kunne ikke gemme regel: " + error.message);
@@ -516,6 +500,39 @@ export function PricingRuleEditor({
         <p className="text-xs text-muted-foreground">
           Vælg ingen for at reglen gælder alle kampagner
         </p>
+
+        {/* Include / Exclude toggle — only meaningful when at least 1 campaign is selected */}
+        {selectedCampaignIds.length > 0 && (
+          <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
+            <Label className="text-sm">Hvordan skal de valgte kampagner bruges?</Label>
+            <RadioGroup
+              value={campaignMatchMode}
+              onValueChange={(v) => setCampaignMatchMode(v === "exclude" ? "exclude" : "include")}
+              className="flex flex-col gap-2"
+            >
+              <div className="flex items-start gap-2">
+                <RadioGroupItem value="include" id="cmm-include" className="mt-0.5" />
+                <Label htmlFor="cmm-include" className="font-normal cursor-pointer leading-snug">
+                  <span className="font-medium">Kun for valgte kampagner</span>
+                  <br />
+                  <span className="text-xs text-muted-foreground">
+                    Reglen matcher salg fra de {selectedCampaignIds.length} valgte kampagner.
+                  </span>
+                </Label>
+              </div>
+              <div className="flex items-start gap-2">
+                <RadioGroupItem value="exclude" id="cmm-exclude" className="mt-0.5" />
+                <Label htmlFor="cmm-exclude" className="font-normal cursor-pointer leading-snug">
+                  <span className="font-medium">For alle kampagner UNDTAGEN valgte</span>
+                  <br />
+                  <span className="text-xs text-muted-foreground">
+                    Reglen matcher salg fra alle andre kampagner end de {selectedCampaignIds.length} valgte.
+                  </span>
+                </Label>
+              </div>
+            </RadioGroup>
+          </div>
+        )}
       </div>
 
       {/* Conditions */}
