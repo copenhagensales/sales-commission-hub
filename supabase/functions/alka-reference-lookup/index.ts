@@ -161,12 +161,15 @@ Deno.serve(async (req) => {
         return json({
           mode: "sample",
           requestedCampaign: sampleCampaign,
-          matchingCampaignsFound: matchedCampaigns.map((c: any) => ({ id: c.id || c.Id, name: c.name || c.Name })),
+          matchingCampaignsFound: matchedCampaigns.map((c: any) => ({ id: c.id || c.Id, name: c.name || c.Name, raw: c })),
           totalCampaignsAvailable: campaignsList.length,
+          totalProjectsAvailable: projectsList.length,
+          projectsList: projectsList.map((p: any) => ({ id: p.id || p.Id, name: p.name || p.Name })),
           scannedLeads: scannedTotal,
           windowDays: days,
           closuresSeenInMatchingCampaigns: Array.from(closuresSeen.entries()).map(([k, v]) => ({ statusAndClosure: k, count: v })),
-          error: "No success lead found for that campaign in the given window",
+          allCampaignNamesInScannedLeads: Array.from(campaignNamesSeen.entries()).map(([n, c]) => ({ name: n, count: c })).sort((a, b) => b.count - a.count),
+          error: "No lead found for that campaign in the given window",
         });
       }
 
