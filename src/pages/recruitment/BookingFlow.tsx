@@ -218,6 +218,7 @@ export default function BookingFlow() {
         .update({
           status: "active",
           approval_status: "approved",
+          approved_at: new Date().toISOString(),
         })
         .eq("id", enrollmentId);
       if (updateErr) throw updateErr;
@@ -527,7 +528,7 @@ export default function BookingFlow() {
                           Dag {enrollment.current_day}
                         </span>
                         <span className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(new Date(enrollment.enrolled_at), { addSuffix: true, locale: da })}
+                          {formatDistanceToNow(new Date((enrollment as any).approved_at ?? enrollment.enrolled_at), { addSuffix: true, locale: da })}
                         </span>
                         {enrollment.status === "active" && (
                           <Button
