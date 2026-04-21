@@ -1,66 +1,74 @@
 
 
-## Hvorfor Jacob ikke ser dashboard-knappen
+## Del "Annulleret" op i to: vi annullerede vs. kandidat trak sig tilbage
 
-### Faktatjek for Jacob (fra DB lige nu)
+### Hvad jeg fandt
 
-- **Bruger:** Jacob Lykke Nielson, position `Salgskonsulent`, `system_role_key = medarbejder`, aktiv, har `auth_user_id` ✅
-- **Team:** Medlem af **Relatel** (ikke leader, ikke assistent)
-- **Rolle-permissions:** `medarbejder` har `can_view: true` på 8 dashboards (commission-league, cs-top-20, eesy-tm, fieldmarketing, powerdag, relatel, tdc-erhverv, united) + `menu_dashboards: true`
-- **Team-permissions for Relatel:** `cs-top-20: all` + `relatel: all` → Jacob får adgang som menigt medlem til DISSE to uanset rolle
-- Plus 5 `team_leader`/`leadership`-permissions han IKKE rammes af (han er menigt medlem)
+På `/recruitment/booking-flow` er der ét samlet filter "Annullerede" i status-dropdownen. I databasen skelner vi allerede mellem hvem der annullerede via `cancelled_reason`-feltet på `booking_flow_enrollments`:
 
-**På papiret skal Jacobs `accessibleDashboards.length` være mindst 8 (rolle) — eller 2 (team-fallback alene). Knappen burde være der.**
+**Vi (recruiter/system) annullerede:**
+- `Afvist af recruiter` — knap "Afvis" på pending approval
+- `Manuelt annulleret` — XCircle-knap på aktive flows
+- `Kandidat status ændret til: …` — auto-cancellation når application-status ændrer sig (process-booking-flow edge function)
 
-### Hvorfor knappen alligevel kan mangle
+**Kandidat trak sig selv:**
+- `Kandidat afmeldte sig via link` — unsubscribe-link i email/SMS
+- `Kandidat svarede på SMS` — STOP/svar via SMS
+- (Bemærk: `Kandidat bookede selv en tid` er status `completed`, ikke cancelled — uændret)
 
-`EnvironmentSwitcher` rendres KUN hvis både `canAccessDashboards && canAccessMainSystem` er sande (`EnvironmentSwitcher.tsx` linje 17-19). `canAccessDashboards = accessibleDashboards.length > 0` (`AppModeContext.tsx` linje 28). Hvis `useAccessibleDashboards` returnerer en tom liste én gang, gemmer den 0 i 30 sekunders cache → ingen knap.
+### Ændringer
 
-To race conditions kan give tom liste for Jacob:
+**1. `src/pages/recruitment/BookingFlow.tsx`**
 
-**1. `rolePermissions` undefined ved første kald**  
-`useAccessibleDashboards` (linje 233) bruger `rolePermissions` fra `usePagePermissions()` til rolle-fallback, men:
-- `rolePermissions` er IKKE i `queryKey` (linje 172)
-- `rolePermissions` er IKKE i `enabled` (linje 276 har kun `!!user && isReady`)
+a) Erstat dropdown-option "Annullerede" med to:
+   - `cancelled_by_us` → "Vi annullerede"
+   - `cancelled_by_candidate` → "Kandidat trak sig"
 
-Hvis `usePagePermissions` (paginerer via `fetchAllRows`) ikke er færdig når `useAccessibleDashboards` kører første gang, springes rolle-checket over → Jacob er afhængig af team-permissions alene.
+b) I enrollments-queryen: når filter er en af de to nye værdier, filtrer på `status = 'cancelled'` PLUS `cancelled_reason` matcher den rette gruppe (brug `.in()` med arrayet af reasons for hver gruppe).
 
-**2. `team_dashboard_permissions`-query returnerer tom**  
-Samme query (linje 216-218) henter ALLE team-permissions uden filtre — hvis den første gang får 0 rækker (RLS, netværk, race), falder Jacob til 0 dashboards.
+c) Udvid `statusConfig` med to virtuelle statuser så badges på listen viser den korrekte etiket og farve:
+   - `cancelled_by_us`: rød "Vi annullerede" (XCircle)
+   - `cancelled_by_candidate`: grå/orange "Kandidat trak sig" (UserMinus-ikon)
 
-Resultat caches i 30 sek → Jacob ser intet, refresher, ser intet, frustration.
+d) Når badge rendes pr. enrollment: hvis `status === 'cancelled'`, beregn hvilken af de to grupper rækken hører til ud fra `cancelled_reason` og vis det rigtige badge — ikke det generelle "Annulleret".
 
-**3. Jacobs rolle resolver ikke til `medarbejder`** (mindre sandsynligt)  
-Hvis `useUnifiedPermissions().role` ikke kan resolve fra `position_id → job_positions.system_role_key` ved race, sammenligningen `p.role_key === role` fejler stille på linje 235 selv når `rolePermissions` ER loaded.
+**2. `src/components/recruitment/RecruitmentKpiBar.tsx`**
 
-### Fix
+Split KPI-kortet "Annulleret" i to mindre kort (eller én kort med to tal) så ledelsen kan se forskellen på hvad vi afviser vs. hvad kandidaten selv frafalder. Brug samme `.in()`-mønster på `cancelled_reason`.
 
-**A. Gør `useAccessibleDashboards` race-safe (kerneårsag)**  
-I `src/hooks/useTeamDashboardPermissions.ts`:
-- Tilføj `rolePermissions` og `role` til `enabled`: `!!user && isReady && !!rolePermissions && !!role`
-- Tilføj dem til `queryKey`: `["accessible-dashboards", user?.id, isOwner, role, rolePermissions?.length]`
-- Cast tom liste til "vent endnu" i stedet for at cache 0 i 30 sek: drop `staleTime` til 0 mens `rolePermissions` lige er ankommet, eller invalider når de skifter
+### Reason-grupperne (én kilde)
 
-**B. Fjern hard-cache når listen er tom**  
-Hvis `accessibleDashboards` returnerer `[]`, sæt `staleTime: 0` (kun ved tom liste) så vi ikke fastholder 0 i 30 sek mens permissions ankommer.
+Jeg samler arrayet ét sted i `BookingFlow.tsx` (top of file) så det er nemt at vedligeholde:
 
-**C. Diagnostisk console.log**  
-Log `[useAccessibleDashboards] role=X, rolePermissions=N, teamPerms=M, accessible=K` så vi fremover kan se for konkrete brugere hvor det går galt.
+```ts
+const REASONS_BY_US = [
+  "Afvist af recruiter",
+  "Manuelt annulleret",
+];
+const REASON_PREFIX_BY_US = "Kandidat status ændret til:"; // bruges som startsWith-match
+const REASONS_BY_CANDIDATE = [
+  "Kandidat afmeldte sig via link",
+  "Kandidat svarede på SMS",
+];
+```
 
-**D. (Valgfri) Fallback-knap**  
-Hvis brugeren har `menu_dashboards: true` på rolle-niveau (Jacob HAR det), vis `EnvironmentSwitcher` selv hvis `accessibleDashboards.length === 0` ved første render — landingen `/dashboards` viser så en tom liste i stedet for at knappen forsvinder helt. Det er mere brugervenligt end "knappen er væk".
+For `Kandidat status ændret til: …`-rækker: behandles som "Vi annullerede" (system/recruiter-handling).
 
-### Filer
-- `src/hooks/useTeamDashboardPermissions.ts` — fix race + log
-- (Valgfri) `src/components/layout/EnvironmentSwitcher.tsx` eller `AppModeContext.tsx` — gate knap på `menu_dashboards`-rolle-permission i stedet for kun `accessibleDashboards.length > 0`
-
-### Verificering
-- Jacob refresher `/home` 5+ gange → knap vises konsistent
-- Console for Jacob: `role=medarbejder, rolePermissions=~120, accessible=8+`
-- Klik knap → lander på `/dashboards` med 8+ kort
+For ukendte/manglende `cancelled_reason`: defaulter til "Vi annullerede" (sikker fallback).
 
 ### Hvad jeg IKKE rør
-- Database-permissions (Jacobs adgang er korrekt på papir)
-- RLS, role_page_permissions
-- AppSidebar (ingen ny "Dashboards"-menu — kun race-fix)
+
+- Database-skema (`cancelled_reason`-feltet eksisterer allerede og bruges korrekt af alle 4 edge functions)
+- Edge functions (`unsubscribe-candidate`, `receive-sms`, `process-booking-flow`, `public-book-candidate`)
+- Status-logik selv (`status = 'cancelled'` forbliver én værdi i DB — vi splitter kun visningen via `cancelled_reason`)
+- Andre faner (Samtaler, Templates osv.)
+- `BookingFlowEngagement.tsx` (har allerede sin egen "self-booked"-logik)
+
+### Verificering
+
+- Filter dropdown viser nu "Vi annullerede" og "Kandidat trak sig" i stedet for "Annullerede"
+- Vælg "Vi annullerede" → ser de 14 nuværende rækker (13 afvist + 1 manuelt)
+- Vælg "Kandidat trak sig" → ser fremtidige unsubscribe/SMS-respons rækker
+- Hver række i listen viser det rigtige badge baseret på `cancelled_reason`
+- KPI-baren viser to separate tal i stedet for ét samlet "Annulleret"
 
