@@ -1,61 +1,53 @@
 
 
-## Fix Alka-attribution + verificér payload-komplethed før fuld backfill
+## Tilføj telefon-søgning til Alka-lookup
 
-### Scope
-**KUN Alka-integrationen** (`48d8bd23-df14-41fe-b000-abb8a4d6cd1d`). Alle andre Enreach-integrationer (Tryg, Eesy, ASE) rører jeg ikke.
+### Hvad der mangler
+`alka-reference-lookup` edge funktionen understøtter kun `sampleCampaign` mode (henter ét tilfældigt salg fra en kampagne). Den har ikke logik til at søge efter specifikke telefonnumre på tværs af ALLE Alka-kampagner — derfor får jeg "Pass {sampleCampaign}" tilbage.
 
-### Diagnose
-- Alka-leads har `lastModifiedByUser.orgCode` pegende på Tryg (de overtager efter CPH har solgt)
-- Den oprindelige CPH-sælger ligger i `firstProcessedByUser.orgCode`
-- Whitelist-filteret kører på rå felter før orgCode→email mapping → 0 CPH-salg matcher
+### Hvad jeg bygger
 
-### Plan
+**Udvid `alka-reference-lookup/index.ts` med en ny `phones` mode:**
 
-**Step 1 — Alka-specifik attribution-fix i EnreachAdapter**  
-Tilføj en config-flag `prioritizeFirstProcessedUser: true` på Alka-integrationens `config` JSONB. I `EnreachAdapter.ts`: hvis flaget er sat, ændres attribution-rækkefølgen til:
-1. `firstProcessedByUser.orgCode` → orgCode→email map → hvis CPH-domæne, brug den
-2. `lastModifiedByUser.orgCode` → samme opslag
-3. Eksisterende email-fallbacks
+Når request body indeholder `{phones: ["22799970", ...], days: 10}`:
 
-Andre integrationer kører uændret videre da flaget er false/undefined.
+1. **Normalisér numre** — strip `+45`, mellemrum, bindestreger → kerne 8-cifret
+2. **Hent ALLE Alka-projekter** (ikke kun "Alka - Mødebooking"), da Permission/Police kan ligge under andre projekter
+3. **Iterér dag for dag** (i dag → 10 dage tilbage) gennem `/simpleleads` for hvert projekt
+4. **For hver lead** scan alle felter rekursivt (`data.*`, `cusTELEFONNR_MOBIL`, `cusTELEFONNR_FASTNET`, `phone`, `mobile`, m.fl.) — match både med og uden `+45` præfiks
+5. **Når match findes**: hent også `/leads/{id}` for fuld payload, og returnér:
+   - Lead-ID + projekt + kampagne-navn
+   - Telefonnummer der matchede + hvilket felt
+   - Status, closure, closureData
+   - Kunde-info (navn, adresse, forbund)
+   - `firstProcessedByUser` + `lastModifiedByUser` (rå orgCode + resolveret email/navn fra users-map)
+   - Sale-tidsstempler
+   - Hele rå payload
 
-**Step 2 — Flyt whitelist-filter til efter attribution (kun Alka)**  
-For Alka: fjern `dataFilters.allowedDomains` på adapter-niveau, og lad core-laget filtrere på den *resolverede* `agentEmail` efter step 1. Andre integrationer beholder deres nuværende filter-opførsel.
+6. **Returnér struktureret resultat** pr. søgt nummer:
+   ```json
+   {
+     "matches": {
+       "22799970": { found: true, lead: {...} },
+       "23301572": { found: false, scannedDays: 10, scannedLeads: 12500 }
+     }
+   }
+   ```
 
-**Step 3 — Probe: hent 1 dag (i går) for Alka**  
-Kør `safe-backfill` for kun gårsdagen, log per lead: rå orgCodes + resolveret `agentEmail` + om den passerer whitelist. Forventning: > 0 salg attribueret til `@copenhagensales.dk`.
+### Hvorfor de tidligere søgninger fejlede
 
-**Step 4 — Inspicér 5 emne-payloads (NYT)**  
-Når probe returnerer salg: hent rå JSON-payload for 5 vilkårlige Alka-salg (fra `sales.raw_payload` eller direkte fra adapter-debug-log). Vis dig:
-- Kunde-info (navn, telefon, adresse)
-- Produkter + priser
-- Kampagne-ID + mapping
-- Agent-attribution (rå orgCode + resolveret email)
-- Timestamps
-- Eventuelle felter der ser tomme eller forkerte ud
+Den oprindelige `alka-attribution-probe` brugte kun ét projekt (`Alka - Mødebooking`) og scannede kun success-leads i specifikke kampagner. De 4 numre kan ligge i:
+- Andre projekter (fx ren Permission/Police-konvertering)
+- Leads der ikke har status "success" i dialeren (fordi salget afsluttes uden for telefonen)
 
-Du verificérer at ALT relevant data er med før vi kører fuld backfill.
+Den nye mode scanner ALLE projekter og ALLE leads (ikke kun success), så vi finder dem uanset hvor de ligger.
 
-**Step 5 — Fuld 45-dages backfill (kun efter din OK på step 4)**  
-Når du har bekræftet at de 5 sample-salg ser korrekte ud:
-- Pause Alka (`is_active=false`)
-- Kør `safe-backfill` i 5-dages chunks fra dag-45 → i dag (9 chunks)
-- `datasets=["sales"]`, `uncapped=true`, `background=true` per chunk
-- Vent på hver chunk's `integration_logs`-entry før næste startes (undgår timeout)
-- Genaktivér Alka når alle chunks er færdige
+### Efter implementering
+
+Jeg deployer funktionen og kører den med dine 4 numre med det samme. Hvis numrene findes nogen steder i Alka denne uge, får du fuld data tilbage. Hvis stadig 0 matches, har vi bevis for at numrene ikke ligger i `cphsales` HeroBase-konto, og må undersøge en anden konto/integration.
 
 ### Hvad jeg IKKE rører
-- Tryg, Eesy, ASE, Adversus integrationer
-- `EnreachAdapter`'s default attribution-logik (kun bag flag)
-- DB schema, RLS, core ingestion-pipeline
-- Whitelist-konfig for andre integrationer
-
-### Næste skridt efter approval
-1. Tilføj `prioritizeFirstProcessedUser: true` til Alka's `config`
-2. Implementér flag-styret attribution-prioritet i `EnreachAdapter.ts`
-3. Kør 1-dags probe → vis antal CPH-salg
-4. Hent 5 sample-payloads → vis dig fuld JSON
-5. **Vent på din OK**
-6. Kør 45-dages chunked backfill + genaktivér
+- `sampleCampaign` mode (eksisterende logik bevares)
+- Andre integrationer
+- Database, RLS, frontend
 
