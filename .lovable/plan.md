@@ -1,55 +1,59 @@
 
 
-## Diagnose: Hvorfor agent-emailen er tom på Alka-leads (kun Alka API)
+## Diagnose: Find CPH-sælgeren på Alka — udtøm alle muligheder
 
-### Nuværende viden
-- 18.574 Alka-leads tjekket via `/simpleleads` → **0 har email på `lastModifiedByUser`**
-- Agent identificeres kun via `orgCode` (fx `T02OLJE`, `T01CSIM`)
-- `/users` (587 brugere) indeholder emails (`@tryg.dk` m.fl.) — data findes, men leveres ikke inline med leads
-- Vi kalder `/simpleleads` UDEN `Include`-parameter (ASE bruger `Include` på `/leads`-endpointet)
+### Kontekst
+- 178 success-leads i går på Alka — alle attribueret til `@tryg.dk` via `lastModifiedByUser`
+- Du bekræfter at en `@copenhagensales.dk` sælger sidder på opgaven
+- Vi har KUN tjekket `lastModifiedByUser` indtil nu
+- Adapter-koden har 3 fallback-lag: `firstProcessedByUser.email` → `lastModifiedByUser.email` → `orgCode→email`-map
 
-### Mål for denne fase
-Bekræft hvilken af 3 årsager der reelt blokerer email-attribution — så Fase 2's design bliver korrekt første gang. **Kun Alka API kaldes**, ingen andre integrationer røres.
+### Hypoteser der skal testes (alle ad gangen, kun Alka API + DB read)
 
-### Tjek der tilføjes til probe (Alka-only)
+**H1: CPH-sælger findes som Enreach-bruger med CPH-email**  
+→ Søg `/users` for alle 3 CPH-domæner
 
-**Fil:** `supabase/functions/probe-enreach-integration/index.ts` (kører kun mod `integration_id=48d8bd23-...`)
+**H2: CPH-sælger er `firstProcessedByUser` (ikke `lastModified`)**  
+→ Scan `firstProcessedByUser` på sidste 7 dage
 
-**Tjek A — `Include` på `/simpleleads`**  
-Kald `/simpleleads?Projects=*&ModifiedFrom=...&Include=lastModifiedByUser,firstProcessedByUser&Limit=10` mod Alka. Sammenlign payload med baseline-kald uden `Include`. Rapportér: er `email`-feltet nu udfyldt?
+**H3: CPH-sælger har en `@tryg.dk` alias-email i Enreach, men findes i vores `employee_master_data` med CPH-email**  
+→ Krydsreferér alle 587 Enreach-brugeres navne mod `employee_master_data.first_name + last_name` hvor `work_email` ender på CPH-domæne
 
-**Tjek B — Krydsreferér orgCode mod `/users`**  
-Hent `/users` (Alka credentials, 587 brugere), byg map `orgCode → { email, name }`. For de 86 unikke orgCodes vi så i lead-auditten: hvor mange kan slås op? Hvilke email-domæner dominerer?
+**H4: CPH-sælger findes via et andet brugerfelt (`createdByUser`, `assignedToUser`, etc.)**  
+→ Inspicér ALLE user-relaterede felter i en sample lead-payload med `Include=*` eller bredere
 
-**Tjek C — `/leads/{uniqueId}` på et enkelt Alka-lead**  
-`/leads` (liste) gav 500 globalt, men detalje-endpointet er muligvis åbent. Prøv på 1 konkret Alka `uniqueId` med `Include=lastModifiedByUser,firstProcessedByUser` for at se om enkelt-payload har user-info.
+**H5: Salgene findes faktisk i DB, men under et andet integration_id (Tryg's egen)**  
+→ Query `sales` for sidste 7 dage hvor `agent_email LIKE '%copenhagensales%'` på TVÆRS af alle Enreach-integrationer
 
-### Output-format
+**H6: CPH-sælgeren bruger en helt 3. email-domain vi ikke har whitelistet endnu**  
+→ List top 50 unikke email-domæner blandt alle 587 Enreach-brugere
 
-Rapporten skal give entydigt svar:
+### Implementering
+
+**Fil:** `supabase/functions/probe-enreach-integration/index.ts` (udvides med 6 tjek)
+
+Probe kører kun mod Alka credentials (`integration_id=48d8bd23-...`), maks ~15 ekstra API-kald.
+
+### Output-rapport
 
 ```
-agentDiagnosis: {
-  testA_includeOnSimpleleads: { worked: true/false, sampleEmail: "..." },
-  testB_orgCodeToUserMap: { 
-    totalOrgCodes: 86, 
-    matchedInUsers: <n>, 
-    topDomains: { "@tryg.dk": <n>, ... } 
-  },
-  testC_leadsDetail: { worked: true/false, sampleEmail: "..." },
-  recommendation: "Brug Include på /simpleleads" | "Pre-fetch /users og byg orgCode-map" | "Kombinér"
+fullDiagnosis: {
+  H1_cphUsersInEnreach: [{name,email,orgCode,isActive,lastActive}],
+  H2_firstProcessedDomains: { "@tryg.dk":N, "@copenhagensales.dk":N, ...},
+  H3_nameMatchedToCphEmployees: [{enreachName, enreachEmail, cphWorkEmail}],
+  H4_allUserFieldsInLead: ["lastModifiedByUser","firstProcessedByUser",...],
+  H5_existingSalesInDb: { count, sampleAgentEmails:[...] },
+  H6_topDomainsInEnreach: { "@tryg.dk":520, "@alka.dk":40, ...},
+  recommendation: "..."
 }
 ```
 
-### Filer der berøres
-- `supabase/functions/probe-enreach-integration/index.ts` (udvid med 3 tjek)
-
 ### Hvad jeg IKKE rører
 - Andre integrationer (Tryg, Eesy, ASE, Adversus) — probe kalder kun Alka credentials
-- `EnreachAdapter`, sync-logik, calls-sync, andre edge functions
-- Database (ren read-only diagnose)
-- Rate limit: probe bruger <20 nye kald, deles med Alka's egen kvote
+- `EnreachAdapter`, sync-logik, calls-sync
+- Database write (kun SELECT på `sales` + `employee_master_data`)
+- Whitelist-config (allerede sat til kun `@copenhagensales.dk` via tidligere migration)
 
 ### Næste skridt
-Kør probe → læs rapport → vælg endeligt Fase 2-design (Include-parameter VS user-pre-fetch VS hybrid).
+Kør probe → få entydigt svar på hvor CPH-sælgeren skjuler sig → vælg targeted fix (justér attribution-prioritet, tilføj alias-mapping, eller bekræft at salget skal komme via anden kanal).
 
