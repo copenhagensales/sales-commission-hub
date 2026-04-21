@@ -43,6 +43,7 @@ interface PricingRule {
   id: string;
   product_id: string;
   campaign_mapping_ids: string[] | null;
+  campaign_match_mode?: "include" | "exclude" | null;
   conditions: Record<string, string>;
   commission_dkk: number;
   revenue_dkk: number;
