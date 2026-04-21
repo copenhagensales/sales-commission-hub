@@ -281,6 +281,175 @@ serve(async (req) => {
     }
     await sleep(200);
 
+    // 4c. AGENT DIAGNOSIS — confirm WHY lastModifiedByUser.email is empty
+    // Test A: /simpleleads WITH Include=lastModifiedByUser,firstProcessedByUser
+    // Test B: cross-reference orgCodes from audit against /users (build orgCode→email map)
+    // Test C: /leads/{uniqueId} detail with Include (single-lead path)
+    const agentDiagnosis: Record<string, unknown> = {};
+
+    // ---------- Test A ----------
+    try {
+      const urlA = `${baseUrl}/simpleleads?${projectFilter}&ModifiedFrom=${sevenDaysAgo}&AllClosedStatuses=true&Include=lastModifiedByUser,firstProcessedByUser&Limit=10`;
+      console.log(`[Probe] → testA: ${urlA}`);
+      const respA = await fetch(urlA, { headers: { Authorization: authHeader, Accept: "application/json" } });
+      if (respA.ok) {
+        const leadsA = await respA.json() as Array<Record<string, unknown>>;
+        const withEmail = leadsA.filter((l) => {
+          const u = l.lastModifiedByUser as Record<string, unknown> | undefined;
+          return !!(u?.email);
+        });
+        const sample = withEmail[0]?.lastModifiedByUser as Record<string, unknown> | undefined;
+        agentDiagnosis.testA_includeOnSimpleleads = {
+          worked: withEmail.length > 0,
+          status: respA.status,
+          totalLeads: leadsA.length,
+          leadsWithEmail: withEmail.length,
+          sampleEmail: (sample?.email as string) || null,
+          sampleOrgCode: (sample?.orgCode as string) || null,
+          sampleUserKeys: leadsA[0]?.lastModifiedByUser
+            ? Object.keys(leadsA[0].lastModifiedByUser as Record<string, unknown>)
+            : [],
+          note: withEmail.length > 0
+            ? "✅ Include-parameter virker → 5-linjers fix i adapter"
+            : "❌ Include ændrede ikke noget — email mangler stadig",
+        };
+      } else {
+        agentDiagnosis.testA_includeOnSimpleleads = {
+          worked: false,
+          status: respA.status,
+          error: (await respA.text()).slice(0, 300),
+        };
+      }
+    } catch (e) {
+      agentDiagnosis.testA_includeOnSimpleleads = { worked: false, error: (e as Error).message };
+    }
+    await sleep(200);
+
+    // ---------- Test B ----------
+    try {
+      console.log(`[Probe] → testB: fetching /users (full list)`);
+      const respB = await fetch(`${baseUrl}/users?Limit=1000`, {
+        headers: { Authorization: authHeader, Accept: "application/json" },
+      });
+      if (respB.ok) {
+        const users = await respB.json() as Array<Record<string, unknown>>;
+        // Build orgCode → user map
+        const orgCodeMap = new Map<string, { email: string; name: string; domain: string }>();
+        const userIdMap = new Map<string, { email: string; name: string; orgCode: string }>();
+        const domainCounts = new Map<string, number>();
+        for (const u of users) {
+          const orgCode = (u.orgCode as string) || "";
+          const email = (u.email as string) || "";
+          const name = (u.name as string) || (u.userName as string) || "";
+          const userId = (u.uniqueId as string) || (u.id as string) || "";
+          const domain = email.includes("@") ? "@" + email.split("@")[1].toLowerCase() : "(none)";
+          if (orgCode) orgCodeMap.set(orgCode, { email, name, domain });
+          if (userId) userIdMap.set(userId, { email, name, orgCode });
+          if (email) domainCounts.set(domain, (domainCounts.get(domain) ?? 0) + 1);
+        }
+
+        // Cross-reference against orgCodes seen in agentAudit
+        const auditTop = (agentAudit as { top10OrgCodes?: Array<{ orgCode: string; count: number }> })?.top10OrgCodes ?? [];
+        const auditOrgCodes = auditTop.map((t) => t.orgCode).filter((c) => c && c !== "(none)");
+        const matched = auditOrgCodes
+          .map((oc) => ({ orgCode: oc, lookup: orgCodeMap.get(oc) ?? null }))
+          .filter((m) => m.lookup !== null);
+
+        const topDomains = Array.from(domainCounts.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 10)
+          .reduce((acc, [d, c]) => { acc[d] = c; return acc; }, {} as Record<string, number>);
+
+        agentDiagnosis.testB_orgCodeToUserMap = {
+          totalUsersInTenant: users.length,
+          uniqueOrgCodesInUsers: orgCodeMap.size,
+          userIdMapSize: userIdMap.size,
+          auditOrgCodesChecked: auditOrgCodes.length,
+          matchedInUsers: matched.length,
+          matchSamples: matched.slice(0, 5).map((m) => ({
+            orgCode: m.orgCode,
+            email: m.lookup!.email,
+            name: m.lookup!.name,
+            domain: m.lookup!.domain,
+          })),
+          topDomains,
+          userObjectKeys: users[0] ? Object.keys(users[0]) : [],
+          note: matched.length === auditOrgCodes.length && auditOrgCodes.length > 0
+            ? "✅ ALLE audit-orgCodes findes i /users → pre-fetch user-map er en valid løsning"
+            : matched.length > 0
+              ? `⚠️ ${matched.length}/${auditOrgCodes.length} audit-orgCodes findes i /users — delvis dækning`
+              : "❌ Ingen audit-orgCodes matchede /users — orgCode er ikke en pålidelig nøgle",
+        };
+      } else {
+        agentDiagnosis.testB_orgCodeToUserMap = {
+          worked: false,
+          status: respB.status,
+          error: (await respB.text()).slice(0, 300),
+        };
+      }
+    } catch (e) {
+      agentDiagnosis.testB_orgCodeToUserMap = { worked: false, error: (e as Error).message };
+    }
+    await sleep(200);
+
+    // ---------- Test C ----------
+    try {
+      // Get a uniqueId from the baseline simpleLeads sample
+      const simpleSampleC = simpleLeads.sample as Record<string, unknown> | undefined;
+      const detailUniqueId = (simpleSampleC?.uniqueId as string) || null;
+      if (detailUniqueId) {
+        const urlC = `${baseUrl}/leads/${detailUniqueId}?Include=lastModifiedByUser,firstProcessedByUser`;
+        console.log(`[Probe] → testC: ${urlC}`);
+        const respC = await fetch(urlC, { headers: { Authorization: authHeader, Accept: "application/json" } });
+        if (respC.ok) {
+          const lead = await respC.json() as Record<string, unknown>;
+          const lastUser = lead.lastModifiedByUser as Record<string, unknown> | undefined;
+          const firstUser = lead.firstProcessedByUser as Record<string, unknown> | undefined;
+          agentDiagnosis.testC_leadsDetail = {
+            worked: !!(lastUser?.email || firstUser?.email),
+            status: respC.status,
+            uniqueIdProbed: detailUniqueId,
+            lastModifiedEmail: (lastUser?.email as string) || null,
+            lastModifiedOrgCode: (lastUser?.orgCode as string) || null,
+            firstProcessedEmail: (firstUser?.email as string) || null,
+            firstProcessedOrgCode: (firstUser?.orgCode as string) || null,
+            userObjectKeys: lastUser ? Object.keys(lastUser) : [],
+            note: (lastUser?.email || firstUser?.email)
+              ? "✅ /leads/{id} detail returnerer email → fallback ved sync er muligt"
+              : "❌ Selv detail-endpointet har tom email — data leveres slet ikke til denne API-bruger",
+          };
+        } else {
+          agentDiagnosis.testC_leadsDetail = {
+            worked: false,
+            status: respC.status,
+            uniqueIdProbed: detailUniqueId,
+            error: (await respC.text()).slice(0, 300),
+          };
+        }
+      } else {
+        agentDiagnosis.testC_leadsDetail = { worked: false, skipped: "No uniqueId from simpleLeads sample" };
+      }
+    } catch (e) {
+      agentDiagnosis.testC_leadsDetail = { worked: false, error: (e as Error).message };
+    }
+    await sleep(200);
+
+    // ---------- Recommendation ----------
+    const a = agentDiagnosis.testA_includeOnSimpleleads as { worked?: boolean } | undefined;
+    const b = agentDiagnosis.testB_orgCodeToUserMap as { matchedInUsers?: number; auditOrgCodesChecked?: number } | undefined;
+    const c = agentDiagnosis.testC_leadsDetail as { worked?: boolean } | undefined;
+    let recommendation = "Ingen entydig løsning fundet — manuel inspektion påkrævet";
+    if (a?.worked) {
+      recommendation = "Brug Include=lastModifiedByUser,firstProcessedByUser på /simpleleads (mindst invasiv)";
+    } else if (b?.matchedInUsers && b.auditOrgCodesChecked && b.matchedInUsers === b.auditOrgCodesChecked) {
+      recommendation = "Pre-fetch /users og byg orgCode→email map ved hver sync";
+    } else if (c?.worked) {
+      recommendation = "Pr-lead detail-fetch (dyrest, men muligt fallback)";
+    } else if ((b?.matchedInUsers ?? 0) > 0) {
+      recommendation = "Kombinér: brug orgCode-map fra /users som primær + accepter delvis dækning";
+    }
+    agentDiagnosis.recommendation = recommendation;
+
     // 5. RICH /leads with broad Include + Projects=*
     const richInclude = "data,campaign,lastModifiedByUser,firstProcessedByUser,closureData,questions,answers,attempts,history,orgUnit,uploadedByUser";
     const richLeads = await probe(
