@@ -101,6 +101,7 @@ interface PricingRule {
   priority: number;
   is_active: boolean;
   campaign_mapping_ids?: string[] | null;
+  campaign_match_mode?: "include" | "exclude" | null;
   allows_immediate_payment?: boolean | null;
   effective_from?: string | null;
   effective_to?: string | null;
@@ -234,9 +235,18 @@ function matchPricingRule(
       }
     }
 
-    const hasCampaignRestriction = rule.campaign_mapping_ids && rule.campaign_mapping_ids.length > 0;
-    const campaignMatches =
-      hasCampaignRestriction && campaignMappingId && rule.campaign_mapping_ids!.includes(campaignMappingId);
+    const ids = rule.campaign_mapping_ids || null;
+    const mode = rule.campaign_match_mode === "exclude" ? "exclude" : "include";
+    const hasCampaignRestriction = !!ids && ids.length > 0;
+    let campaignMatches = false;
+    if (!hasCampaignRestriction) {
+      campaignMatches = true; // universal
+    } else if (mode === "include") {
+      campaignMatches = !!campaignMappingId && ids!.includes(campaignMappingId);
+    } else {
+      // exclude: match all EXCEPT listed; if no campaign info, treat as match
+      campaignMatches = !campaignMappingId || !ids!.includes(campaignMappingId);
+    }
 
     // Check campaign restriction if rule has campaign_mapping_ids
     if (hasCampaignRestriction && !campaignMatches) {
@@ -510,7 +520,7 @@ serve(async (req) => {
     // Fetch all active pricing rules (include effective dates and immediate payment rates)
     const { data: pricingRules, error: rulesError } = await supabase
       .from("product_pricing_rules")
-      .select("id, product_id, name, conditions, commission_dkk, revenue_dkk, priority, is_active, campaign_mapping_ids, allows_immediate_payment, effective_from, effective_to, immediate_payment_commission_dkk, immediate_payment_revenue_dkk, use_rule_name_as_display")
+      .select("id, product_id, name, conditions, commission_dkk, revenue_dkk, priority, is_active, campaign_mapping_ids, campaign_match_mode, allows_immediate_payment, effective_from, effective_to, immediate_payment_commission_dkk, immediate_payment_revenue_dkk, use_rule_name_as_display")
       .eq("is_active", true);
 
     if (rulesError) {

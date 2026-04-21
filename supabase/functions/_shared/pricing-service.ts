@@ -61,6 +61,8 @@ export async function getFmPricingMap(
   console.log(`[PricingService] Loaded ${map.size} products with base prices`);
 
   // 2. Override with active pricing rules (higher priority)
+  // For FM (no campaign context here), only universal rules or "exclude" rules
+  // (where the empty/null campaign id is NOT in the excluded list) apply.
   const { data: rules, error: rulesError } = await supabase
     .from("product_pricing_rules")
     .select(`
@@ -68,7 +70,9 @@ export async function getFmPricingMap(
       product:products!inner(name),
       commission_dkk,
       revenue_dkk,
-      priority
+      priority,
+      campaign_mapping_ids,
+      campaign_match_mode
     `)
     .eq("is_active", true)
     .order("priority", { ascending: false, nullsFirst: true });
@@ -83,17 +87,21 @@ export async function getFmPricingMap(
   for (const rule of (rules || [])) {
     const productData = rule.product as any;
     const name = productData?.name?.toLowerCase();
-    
-    if (name && !rulesApplied.has(name)) {
-      // Only apply the first (highest priority) rule for each product
-      map.set(name, {
-        commission: rule.commission_dkk || 0,
-        revenue: rule.revenue_dkk || 0,
-        source: 'pricing_rule',
-        ruleId: rule.id,
-      });
-      rulesApplied.add(name);
-    }
+    if (!name || rulesApplied.has(name)) continue;
+
+    const ids = rule.campaign_mapping_ids as string[] | null;
+    const mode = rule.campaign_match_mode === "exclude" ? "exclude" : "include";
+    const hasRestriction = !!ids && ids.length > 0;
+    // No campaign context here → include rules with restriction skip; exclude rules apply.
+    if (hasRestriction && mode === "include") continue;
+
+    map.set(name, {
+      commission: rule.commission_dkk || 0,
+      revenue: rule.revenue_dkk || 0,
+      source: 'pricing_rule',
+      ruleId: rule.id,
+    });
+    rulesApplied.add(name);
   }
 
   console.log(`[PricingService] Applied ${rulesApplied.size} pricing rules (overriding base prices)`);
