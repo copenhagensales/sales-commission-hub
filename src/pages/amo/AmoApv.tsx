@@ -271,8 +271,9 @@ export default function AmoApv() {
                       "h-3 w-3 rounded-full",
                       status === "green" ? "bg-emerald-500" : status === "yellow" ? "bg-yellow-500" : "bg-red-500"
                     )} />
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openCopy(a)} title="Kopiér som ny APV">
-                      <Copy className="h-3 w-3" />
+                    <Button variant="outline" size="sm" className="h-8 gap-1 px-2" onClick={() => openCopy(a)}>
+                      <Copy className="h-3.5 w-3.5" />
+                      <span>Kopiér</span>
                     </Button>
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(a)}>
                       <Pencil className="h-3 w-3" />
