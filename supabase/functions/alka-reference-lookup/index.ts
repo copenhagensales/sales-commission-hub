@@ -62,27 +62,34 @@ Deno.serve(async (req) => {
       if (u.orgCode && u.email) orgCodeMap.set(u.orgCode, { email: u.email, name: u.name || u.username || "" });
     }
 
-    // Walk windows of 5 days back to `days` ago, fetch all leads, scan
+    // Normalise refs (strip +45 / 45 prefix, spaces, dashes)
+    const normalize = (s: string) => String(s || "").replace(/[^0-9]/g, "").replace(/^45(?=\d{8}$)/, "");
+    const refNorms = refs.map(r => ({ raw: r, norm: normalize(r) }));
+
+    // Walk windows of 3 days back to `days` ago, fetch all leads, scan
     const matches: any[] = [];
-    const refSet = new Set(refs);
     const windows: { from: string; to: string }[] = [];
-    for (let offset = 0; offset < days; offset += 5) {
-      windows.push({ from: isoDaysAgo(offset + 5), to: isoDaysAgo(offset) });
+    for (let offset = 0; offset < days; offset += 3) {
+      windows.push({ from: isoDaysAgo(offset + 3), to: isoDaysAgo(offset) });
     }
 
     let totalScanned = 0;
+    let firstSampleLead: any = null;
     for (const w of windows) {
       const ep = `${baseUrl}/simpleleads?Projects=*&ModifiedFrom=${w.from}&ModifiedTo=${w.to}&AllClosedStatuses=true&take=2000`;
       const r = await fetch(ep, { headers });
       const j = await r.json().catch(() => []);
       const arr: any[] = Array.isArray(j) ? j : (j.Results || j.results || j.Leads || []);
       totalScanned += arr.length;
+      if (!firstSampleLead && arr.length > 0) firstSampleLead = arr[0];
 
       for (const lead of arr) {
-        const blob = JSON.stringify(lead);
+        // Build a normalised digit-blob from all string values in the lead
+        const digitBlob = JSON.stringify(lead).replace(/[^0-9]/g, "");
         let matched = "";
-        for (const ref of refSet) {
-          if (blob.includes(ref)) { matched = ref; break; }
+        for (const { raw, norm } of refNorms) {
+          if (!norm) continue;
+          if (digitBlob.includes(norm)) { matched = raw; break; }
         }
         if (!matched) continue;
 
