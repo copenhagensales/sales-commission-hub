@@ -61,6 +61,18 @@ export interface ProductExtractionConfig {
 // Full dialer integration config stored in JSONB
 export interface DialerIntegrationConfig {
   productExtraction?: ProductExtractionConfig;
+  /**
+   * Per-integration whitelist of agent email domains (e.g. ["@tryg.dk", "@alka.dk"]).
+   * When undefined → adapter falls back to the hardcoded copenhagensales whitelist
+   * (preserves existing behaviour for Tryg/Eesy/ASE/Adversus).
+   */
+  allowedAgentEmailDomains?: string[];
+  /**
+   * When true, the Enreach adapter pre-fetches /users at the start of each sync
+   * and builds an orgCode → email map. Used for tenants where lead payloads only
+   * contain orgCode (no email), e.g. Alka. Default: false (no extra API call).
+   */
+  enableUserPreFetch?: boolean;
 }
 
 // Reference extraction config stored in DB - flexible for any adapter
