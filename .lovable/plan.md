@@ -1,40 +1,51 @@
 
 
-## Tæl tid fra godkendelse, ikke fra ansøgning
+## Hvorfor "Dag 0 · 4 dage siden" for Sebastian?
 
-### Problemet
+### Hvad de to tal betyder lige nu
 
-På `/recruitment/booking-flow`-listen viser hver kandidat fx "for 3 dage siden". Det tal er `enrolled_at`, som sættes da kandidaten blev oprettet i flow (typisk samtidig med ansøgning/segmentering). For Tier B/C-kandidater der venter i "pending approval" betyder det, at uret tikker mens de ligger i kø — ikke fra det øjeblik recruiter trykkede "Godkend" og flowet faktisk startede.
+På listen vises pr. kandidat to forskellige tidsmål side om side:
 
-For Tier A (auto-approved) er `enrolled_at` = godkendelsestidspunktet, så for dem er der intet problem.
+- **"Dag X"** = `enrollment.current_day` — hvor langt i flow-skemaet kandidaten er nået. Den tæller op hver gang `process-booking-flow`-cron'en (kører hvert 5. min) sender en touchpoint og skubber `current_day` videre.
+- **"X dage siden"** = `formatDistanceToNow(approved_at ?? enrolled_at)` — hvor lang tid siden kandidaten blev godkendt (efter sidste ændring vi lavede).
 
-### Løsning
+### Hvorfor de er ude af sync for Sebastian
 
-Tilføj `approved_at` (timestamp) til `booking_flow_enrollments` og brug den som visningstid i listen. Falder tilbage til `enrolled_at` for gamle rækker uden `approved_at`.
+"Dag 0" + "4 dage siden" betyder at Sebastian blev godkendt for 4 dage siden, men ingen touchpoint er afsendt endnu — derfor er `current_day` stadig 0. Mulige årsager:
 
-**1. DB-migration**
-- Ny kolonne: `booking_flow_enrollments.approved_at timestamptz NULL`
-- Backfill:
-  - For eksisterende rækker hvor `approval_status = 'auto_approved'` → sæt `approved_at = enrolled_at` (ingen ventetid)
-  - For eksisterende `approval_status = 'approved'` rækker → sæt `approved_at = updated_at` (bedste tilgængelige proxy for hvornår de blev godkendt)
-  - Lad `pending_approval`-rækker have `approved_at = NULL` (de er ikke godkendt endnu)
+1. **Hans flow har Dag 0 som første touchpoint, men det er aldrig blevet sendt** — fejlet (status `failed`), springet over (`skipped`), eller cron'en har ikke kunnet sende (manglende email/telefon, template uden indhold, edge function-fejl).
+2. **Flow-templaten har slet ingen Dag 0-touchpoint** — første touchpoint ligger fx Dag 5, så `current_day` rykker først når den dag rammes.
+3. **Timeline-dialogen viste "Ingen touchpoints fundet"** (ses i din session) → der er overhovedet ikke planlagt touchpoints for hans enrollment. Det er anomalien — enrollment blev oprettet, men `booking_flow_touchpoints`-rækker blev aldrig genereret (typisk en bug i `auto-segment-candidate` eller approval-flow hvis template-id mangler).
 
-**2. `src/pages/recruitment/BookingFlow.tsx`**
-- I `approveMutation` (linje 216-222): tilføj `approved_at: new Date().toISOString()` til update-objektet, så fremtidige godkendelser registrerer tidspunktet
-- I `auto-segment-candidate` edge function (linje ~289 hvor enrollment oprettes): når Tier A auto-approves, sæt `approved_at = now()` direkte i insert
-- I listen (linje 530): erstat `enrollment.enrolled_at` med `enrollment.approved_at ?? enrollment.enrolled_at` så vi viser godkendelsestid når det findes, ellers fallback
+Den tredje er sandsynligvis hvad der sker her: enrollment eksisterer, klokken tikker (4 dage), men der er nul touchpoints → flowet kører reelt ikke.
 
-**3. Pending approval-sektion (uændret visning)**
-Pending approval-listen (linje 91-93) viser i forvejen kandidater der venter — for dem giver "tid siden ansøgning" stadig mening (det er ventetid for recruiter). Den ændrer jeg ikke.
+### Plan for at fikse det
+
+**1. Diagnose først (hurtig DB-check)**
+Tjek for Sebastians enrollment:
+- `booking_flow_touchpoints` count for hans `enrollment_id` → er det 0?
+- Hvilken `flow_template_id` peger enrollment på, og har den `booking_flow_steps`?
+- Er der noget i `integration_logs` / edge function-logs omkring godkendelses-tidspunktet?
+
+**2. Fix touchpoint-generering ved approval**
+I `BookingFlow.tsx` `approveMutation` og i `auto-segment-candidate` edge function: efter `approved_at` sættes, skal touchpoints genereres fra `booking_flow_steps` (hvis de mangler). Tilføj sikkerhedsnet:
+- Efter approval/auto-approval: query antal touchpoints for enrollment
+- Hvis 0 → kald en ny shared helper `generateTouchpointsForEnrollment(enrollment_id)` som læser steps fra template og inserter scheduled rækker fra `approved_at + step.day`
+- Hvis steps-array er tomt → log warning og marker enrollment som `failed` med en cancelled_reason så listen ikke bare står og tikker
+
+**3. UI: vis tydeligt når flow er "tomt"**
+I listen tilføj en lille rød indikator hvis `enrollment.status === 'active'` og enrollment har 0 touchpoints (eller `current_day === 0` og `approved_at` er > 1 dag gammel). Tekst: "⚠️ Ingen touchpoints planlagt".
+
+**4. Backfill for eksisterende stuck enrollments**
+Engangs-migration eller knap i UI ("Regenerér touchpoints") for aktive enrollments uden touchpoints, så Sebastian + andre stuck kandidater faktisk kommer i gang.
 
 ### Hvad jeg IKKE rør
-- `enrolled_at`-kolonnen (bevares som "oprettet i flow")
-- Touchpoint-scheduling (køres fra `now()` ved godkendelse — allerede korrekt)
-- KPI-bar, timeline-dialog, andre faner
-- Logik for pending_approval-listen
+- Selve `process-booking-flow`-cron'en (den er fin — der er bare ikke noget at sende)
+- Template-systemet og steps-redigering
+- Approval/cancellation-logik i øvrigt
 
 ### Verificering
-- Godkend en pending kandidat → tiden i listen viser "for få sekunder siden", ikke "for X dage siden"
-- Eksisterende auto-approved Tier A-kandidater viser uændret tid (backfill = enrolled_at)
-- Eksisterende approved Tier B/C viser approximativt godkendelsestid (backfill = updated_at)
+- Sebastians enrollment får genereret touchpoints, første sendes inden for 5 min, "Dag 0" rykker til "Dag X" når næste touchpoint sendes
+- Nye approvals genererer altid touchpoints (eller fejler højt med cancelled_reason)
+- Stuck enrollments markeres synligt i UI
 
