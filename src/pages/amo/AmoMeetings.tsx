@@ -146,7 +146,7 @@ export default function AmoMeetings() {
   const openEdit = (m: any) => {
     setEditing(m);
     setForm({
-      meeting_type: m.meeting_type,
+      meeting_type: normalizeMeetingType(m.meeting_type),
       planned_date: m.planned_date?.split("T")[0] || "",
       actual_date: m.actual_date?.split("T")[0] || "",
       agenda: m.agenda || "",
