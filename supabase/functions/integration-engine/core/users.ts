@@ -2,10 +2,10 @@ import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { StandardUser } from "../types.ts"
 
 /**
- * List of VALID email domains that SHOULD be synced.
- * Only employees with these domains will have their data stored.
+ * Default whitelist of email domains that SHOULD be synced when no
+ * per-integration override is provided (preserves existing behaviour).
  */
-const VALID_EMAIL_DOMAINS = [
+const DEFAULT_VALID_EMAIL_DOMAINS = [
   "@copenhagensales.dk",
   "@cph-relatel.dk",
   "@cph-sales.dk",
@@ -23,17 +23,20 @@ const EXCLUDED_EMAIL_PATTERNS = [
   /^agent-\d+@adversus\.local$/i,
 ];
 
-function isValidSyncEmail(email: string | null | undefined): boolean {
+function isValidSyncEmail(email: string | null | undefined, allowedDomains?: string[]): boolean {
   if (!email) return false;
   const emailLower = email.toLowerCase();
-  
+
   if (WHITELISTED_EMAILS.includes(emailLower)) return true;
-  
+
   if (EXCLUDED_EMAIL_PATTERNS.some(pattern => pattern.test(emailLower))) {
     return false;
   }
-  
-  return VALID_EMAIL_DOMAINS.some(domain => emailLower.endsWith(domain));
+
+  const domains = allowedDomains && allowedDomains.length > 0
+    ? allowedDomains
+    : DEFAULT_VALID_EMAIL_DOMAINS;
+  return domains.some(domain => emailLower.endsWith(domain.toLowerCase()));
 }
 
 /**
@@ -71,7 +74,8 @@ export async function processUsers(
   supabase: SupabaseClient,
   users: StandardUser[],
   log: (type: "INFO" | "ERROR" | "WARN", msg: string, data?: unknown) => void,
-  source: "adversus" | "enreach" = "adversus"
+  source: "adversus" | "enreach" = "adversus",
+  allowedDomains?: string[]
 ) {
   if (users.length === 0) return { processed: 0, errors: 0, skipped: 0 }
   log("INFO", `Processing ${users.length} users from ${source}...`)
@@ -83,7 +87,7 @@ export async function processUsers(
   for (const user of users) {
     try {
       // Skip users with invalid email domains (whitelist approach)
-      if (!isValidSyncEmail(user.email)) {
+      if (!isValidSyncEmail(user.email, allowedDomains)) {
         log("INFO", `Skipping invalid sync email: ${user.email}`)
         skipped++
         continue

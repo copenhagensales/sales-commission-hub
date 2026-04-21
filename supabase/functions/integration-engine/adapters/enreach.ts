@@ -38,6 +38,56 @@ export class EnreachAdapter implements DialerAdapter {
   private callsOrgCodes: string[] | null;
   private _metrics: ApiMetrics = { apiCalls: 0, rateLimitHits: 0, retries: 0 };
 
+  // orgCode → { email, name } cache populated on demand from /users
+  // when config.enableUserPreFetch === true (currently only Alka).
+  private userOrgCodeMap: Map<string, { email: string; name: string }> | null = null;
+  private userMapFetched = false;
+
+  // Default whitelist (preserves existing behaviour for Tryg/Eesy/ASE/Adversus/Relatel/Lovablecph).
+  private static readonly DEFAULT_AGENT_DOMAINS = ["@copenhagensales.dk", "@cph-relatel.dk", "@cph-sales.dk"];
+  private static readonly WHITELISTED_EMAILS = ["kongtelling@gmail.com", "rasmusventura700@gmail.com"];
+
+  private getAllowedDomains(): string[] {
+    const override = this.config?.allowedAgentEmailDomains;
+    return override && override.length > 0 ? override.map(d => d.toLowerCase()) : EnreachAdapter.DEFAULT_AGENT_DOMAINS;
+  }
+
+  private isValidSyncEmail(email: string | null | undefined): boolean {
+    if (!email) return false;
+    const emailLower = email.toLowerCase();
+    if (EnreachAdapter.WHITELISTED_EMAILS.includes(emailLower)) return true;
+    return this.getAllowedDomains().some(domain => emailLower.endsWith(domain));
+  }
+
+  /**
+   * Pre-fetch /users to build orgCode → email map.
+   * Only runs when config.enableUserPreFetch === true (Alka).
+   * Cached for the lifetime of the adapter instance (one sync run).
+   */
+  private async ensureUserOrgCodeMap(): Promise<void> {
+    if (this.userMapFetched) return;
+    this.userMapFetched = true;
+    if (!this.config?.enableUserPreFetch) return;
+
+    try {
+      console.log(`[EnreachAdapter] enableUserPreFetch=true → pre-fetching /users for orgCode→email map`);
+      const data = await this.get(`/users?Limit=2000`) as unknown;
+      const users = Array.isArray(data) ? data as Array<Record<string, unknown>> : [];
+      const map = new Map<string, { email: string; name: string }>();
+      for (const u of users) {
+        const orgCode = (u.orgCode as string) || "";
+        const email = (u.email as string) || "";
+        const name = (u.name as string) || (u.username as string) || "";
+        if (orgCode && email) map.set(orgCode, { email, name });
+      }
+      this.userOrgCodeMap = map;
+      console.log(`[EnreachAdapter] User pre-fetch complete: ${map.size} orgCode→email mappings`);
+    } catch (e) {
+      console.error(`[EnreachAdapter] User pre-fetch failed:`, e);
+      this.userOrgCodeMap = new Map();
+    }
+  }
+
   getMetrics(): ApiMetrics { return { ...this._metrics }; }
   resetMetrics(): void { this._metrics = { apiCalls: 0, rateLimitHits: 0, retries: 0 }; }
 
@@ -384,6 +434,9 @@ export class EnreachAdapter implements DialerAdapter {
 
   async fetchSales(days: number, campaignMappings?: CampaignMappingConfig[]): Promise<StandardSale[]> {
     try {
+      // Pre-fetch /users → orgCode map when enabled (Alka). No-op for other tenants.
+      await this.ensureUserOrgCodeMap();
+
       // IMPORTANTE: Limitar días para evitar OOM. Máximo 7 días por llamada.
       const effectiveDays = Math.min(days, 7);
       if (days > 7) {
@@ -499,18 +552,9 @@ export class EnreachAdapter implements DialerAdapter {
         // Map leads to sales, then filter by valid email
         const mappedSales = filtered.map((lead) => this.mapLeadToSale(lead, mappingLookup));
         
-        // Filter out sales with invalid/missing email using whitelist
-        const VALID_EMAIL_DOMAINS = ["@copenhagensales.dk", "@cph-relatel.dk", "@cph-sales.dk"];
-        const WHITELISTED_EMAILS = ["kongtelling@gmail.com", "rasmusventura700@gmail.com"];
-        const isValidSyncEmail = (email: string | null | undefined): boolean => {
-          if (!email) return false;
-          const emailLower = email.toLowerCase();
-          if (WHITELISTED_EMAILS.includes(emailLower)) return true;
-          return VALID_EMAIL_DOMAINS.some(domain => emailLower.endsWith(domain));
-        };
-        
+        // Filter out sales with invalid/missing email using whitelist (per-integration override)
         const validSales = mappedSales.filter(sale => {
-          if (!isValidSyncEmail(sale.agentEmail)) {
+          if (!this.isValidSyncEmail(sale.agentEmail)) {
             const externalId = sale.externalId;
             if (externalId) {
               skipReasonMap.set(externalId, `invalid_email:${sale.agentEmail || 'empty'}`);
@@ -564,6 +608,9 @@ export class EnreachAdapter implements DialerAdapter {
     campaignMappings?: CampaignMappingConfig[],
   ): Promise<StandardSale[]> {
     try {
+      // Pre-fetch /users → orgCode map when enabled (Alka). No-op for other tenants.
+      await this.ensureUserOrgCodeMap();
+
       const fromStr = range.from.split("T")[0];
       // Bump toStr by +1 day because HeroBase treats ModifiedTo as exclusive
       const toDate = new Date(range.to);
@@ -648,17 +695,8 @@ export class EnreachAdapter implements DialerAdapter {
         // Map leads to sales, then filter by valid email
         const mappedSales = filtered.map((lead) => this.mapLeadToSale(lead, mappingLookup));
         
-        const VALID_EMAIL_DOMAINS = ["@copenhagensales.dk", "@cph-relatel.dk", "@cph-sales.dk"];
-        const WHITELISTED_EMAILS = ["kongtelling@gmail.com", "rasmusventura700@gmail.com"];
-        const isValidSyncEmail = (email: string | null | undefined): boolean => {
-          if (!email) return false;
-          const emailLower = email.toLowerCase();
-          if (WHITELISTED_EMAILS.includes(emailLower)) return true;
-          return VALID_EMAIL_DOMAINS.some(domain => emailLower.endsWith(domain));
-        };
-        
         const validSales = mappedSales.filter(sale => {
-          if (!isValidSyncEmail(sale.agentEmail)) {
+          if (!this.isValidSyncEmail(sale.agentEmail)) {
             const externalId = sale.externalId;
             if (externalId) {
               skipReasonMap.set(externalId, `invalid_email:${sale.agentEmail || 'empty'}`);
@@ -736,21 +774,35 @@ export class EnreachAdapter implements DialerAdapter {
     const lastModifiedByUser = (lead.lastModifiedByUser || lead.LastModifiedByUser) as
       | Record<string, unknown>
       | undefined;
-    // Smart agent-email: validate against known domains to avoid "Bloomreach_API" etc.
-    const VALID_AGENT_DOMAINS = ["@copenhagensales.dk", "@cph-relatel.dk", "@cph-sales.dk"];
-    const isValidAgentEmail = (email: string | undefined): boolean => {
-      if (!email) return false;
-      return VALID_AGENT_DOMAINS.some(d => email.toLowerCase().endsWith(d));
-    };
+
+    // Pick the orgCode (HeroBase identifier) from first/last user
     const firstOrgCode = firstProcessedByUser?.orgCode as string | undefined;
     const lastOrgCode = lastModifiedByUser?.orgCode as string | undefined;
+    const firstEmailRaw = firstProcessedByUser?.email as string | undefined;
+    const lastEmailRaw = lastModifiedByUser?.email as string | undefined;
+
+    // 1) Direct email from payload (existing path for ASE/Tryg/Eesy)
+    // 2) orgCode-map enrichment (Alka path — orgCode like "T02OLJE" → "o.jensen@tryg.dk")
+    // 3) Fallback: orgCode itself (preserves legacy behaviour for tenants where orgCode IS an email)
+    const enrichEmail = (orgCode: string | undefined, fallbackEmail: string | undefined): string => {
+      if (fallbackEmail && fallbackEmail.includes("@")) return fallbackEmail;
+      if (orgCode && this.userOrgCodeMap?.has(orgCode)) {
+        return this.userOrgCodeMap.get(orgCode)!.email;
+      }
+      return orgCode || "";
+    };
+
+    const firstResolved = enrichEmail(firstOrgCode, firstEmailRaw);
+    const lastResolved = enrichEmail(lastOrgCode, lastEmailRaw);
+
+    // Prefer the resolved email that matches the per-integration whitelist
     let agentOrgCode = "";
-    if (isValidAgentEmail(firstOrgCode)) {
-      agentOrgCode = firstOrgCode!;
-    } else if (isValidAgentEmail(lastOrgCode)) {
-      agentOrgCode = lastOrgCode!;
+    if (this.isValidSyncEmail(firstResolved)) {
+      agentOrgCode = firstResolved;
+    } else if (this.isValidSyncEmail(lastResolved)) {
+      agentOrgCode = lastResolved;
     } else {
-      agentOrgCode = firstOrgCode || lastOrgCode || "";
+      agentOrgCode = firstResolved || lastResolved || "";
     }
 
     let agentName = this.getStr(firstProcessedByUser, ["name", "Name", "fullName"]);

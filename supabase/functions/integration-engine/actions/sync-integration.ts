@@ -228,7 +228,8 @@ export async function syncIntegration(
       try {
         const users = await adapter.fetchUsers();
         const dialerSource = (source || integration.provider) === "enreach" ? "enreach" : "adversus";
-        runResults["users"] = await engine.processUsers(users, dialerSource);
+        const allowedDomains = (integration.config as { allowedAgentEmailDomains?: string[] } | null)?.allowedAgentEmailDomains;
+        runResults["users"] = await engine.processUsers(users, dialerSource, allowedDomains);
         actionsExecuted.push("users");
       } catch (e) {
         log("WARN", `User sync failed for ${integration.name}: ${(e as Error).message}`);
