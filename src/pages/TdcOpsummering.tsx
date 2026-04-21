@@ -9,7 +9,6 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -31,7 +30,7 @@ interface SummaryLine {
 type MbbType = "mobilevoice" | "datadelingskort" | null;
 type NumberChoice = "existing" | "mixed" | "new";
 type StartupChoice = "asap" | "specific";
-type SummaryVariant = "standard" | "pilot" | "5g-fri" | "engelsk";
+type SummaryVariant = "standard" | "pilot" | "5g-fri";
 
 export default function TdcOpsummering() {
   const { toast } = useToast();
@@ -41,6 +40,7 @@ export default function TdcOpsummering() {
 
   // Summary variant toggle
   const [summaryVariant, setSummaryVariant] = useState<SummaryVariant>("standard");
+  const [isEnglish, setIsEnglish] = useState(false);
   const isPilot = summaryVariant === "pilot";
   const kun5gFriSalg = summaryVariant === "5g-fri";
 
@@ -291,28 +291,34 @@ export default function TdcOpsummering() {
                 <CardTitle className="text-lg">Opsummeringstype</CardTitle>
               </CardHeader>
               <CardContent>
-                <RadioGroup
-                  value={summaryVariant}
-                  onValueChange={(val) => setSummaryVariant(val as SummaryVariant)}
-                  className="flex gap-4 flex-wrap"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="standard" id="variant-standard" />
-                    <Label htmlFor="variant-standard" className="font-normal cursor-pointer">Standard opsummering</Label>
+                <div className="flex flex-wrap items-center gap-4">
+                  <RadioGroup
+                    value={summaryVariant}
+                    onValueChange={(val) => setSummaryVariant(val as SummaryVariant)}
+                    className="flex gap-4 flex-wrap"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="standard" id="variant-standard" />
+                      <Label htmlFor="variant-standard" className="font-normal cursor-pointer">Standard opsummering</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="pilot" id="variant-pilot" />
+                      <Label htmlFor="variant-pilot" className="font-normal cursor-pointer">Pilot opsummering</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="5g-fri" id="variant-5g-fri" />
+                      <Label htmlFor="variant-5g-fri" className="font-normal cursor-pointer">Kun 5g Fri Salg</Label>
+                    </div>
+                  </RadioGroup>
+                  <div className="flex items-center space-x-2 pl-4 border-l border-border">
+                    <Switch
+                      id="variant-english"
+                      checked={isEnglish}
+                      onCheckedChange={setIsEnglish}
+                    />
+                    <Label htmlFor="variant-english" className="font-normal cursor-pointer">English</Label>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="pilot" id="variant-pilot" />
-                    <Label htmlFor="variant-pilot" className="font-normal cursor-pointer">Pilot opsummering</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="5g-fri" id="variant-5g-fri" />
-                    <Label htmlFor="variant-5g-fri" className="font-normal cursor-pointer">Kun 5g Fri Salg</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="engelsk" id="variant-engelsk" />
-                    <Label htmlFor="variant-engelsk" className="font-normal cursor-pointer">Engelsk opsummering</Label>
-                  </div>
-                </RadioGroup>
+                </div>
               </CardContent>
             </Card>
 
