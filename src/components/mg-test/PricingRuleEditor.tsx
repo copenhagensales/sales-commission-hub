@@ -500,6 +500,39 @@ export function PricingRuleEditor({
         <p className="text-xs text-muted-foreground">
           Vælg ingen for at reglen gælder alle kampagner
         </p>
+
+        {/* Include / Exclude toggle — only meaningful when at least 1 campaign is selected */}
+        {selectedCampaignIds.length > 0 && (
+          <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
+            <Label className="text-sm">Hvordan skal de valgte kampagner bruges?</Label>
+            <RadioGroup
+              value={campaignMatchMode}
+              onValueChange={(v) => setCampaignMatchMode(v === "exclude" ? "exclude" : "include")}
+              className="flex flex-col gap-2"
+            >
+              <div className="flex items-start gap-2">
+                <RadioGroupItem value="include" id="cmm-include" className="mt-0.5" />
+                <Label htmlFor="cmm-include" className="font-normal cursor-pointer leading-snug">
+                  <span className="font-medium">Kun for valgte kampagner</span>
+                  <br />
+                  <span className="text-xs text-muted-foreground">
+                    Reglen matcher salg fra de {selectedCampaignIds.length} valgte kampagner.
+                  </span>
+                </Label>
+              </div>
+              <div className="flex items-start gap-2">
+                <RadioGroupItem value="exclude" id="cmm-exclude" className="mt-0.5" />
+                <Label htmlFor="cmm-exclude" className="font-normal cursor-pointer leading-snug">
+                  <span className="font-medium">For alle kampagner UNDTAGEN valgte</span>
+                  <br />
+                  <span className="text-xs text-muted-foreground">
+                    Reglen matcher salg fra alle andre kampagner end de {selectedCampaignIds.length} valgte.
+                  </span>
+                </Label>
+              </div>
+            </RadioGroup>
+          </div>
+        )}
       </div>
 
       {/* Conditions */}
