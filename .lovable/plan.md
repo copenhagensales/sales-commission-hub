@@ -1,122 +1,55 @@
 
 
-## Verificeret plan: Alka-only udvidelse uden påvirkning af andre integrationer
+## Diagnose: Hvorfor agent-emailen er tom på Alka-leads (kun Alka API)
 
-### Verifikationsresultater (gennemtjekket mod database + kode)
+### Nuværende viden
+- 18.574 Alka-leads tjekket via `/simpleleads` → **0 har email på `lastModifiedByUser`**
+- Agent identificeres kun via `orgCode` (fx `T02OLJE`, `T01CSIM`)
+- `/users` (587 brugere) indeholder emails (`@tryg.dk` m.fl.) — data findes, men leveres ikke inline med leads
+- Vi kalder `/simpleleads` UDEN `Include`-parameter (ASE bruger `Include` på `/leads`-endpointet)
 
-| Tjek | Resultat |
-|---|---|
-| Eksisterer Alka-salg i DB i dag? | **0 salg** — filteret blokerer alt nuværende Alka-trafik |
-| Hvilke andre integrationer deler Alka's konfiguration? | **Tryg** bruger samme host (`wshero01`) + samme `calls_org_codes=["Copenhagen sales"]` |
-| Hvor mange steder filtreres email-domæner? | 3× i `enreach.ts` (linje 503, 651, 740) + 1× i `core/users.ts` |
-| Hvilken kolonne kan bære config? | `dialer_integrations.config` (JSONB) findes allerede — ingen migration nødvendig |
-| Endpoint-routing | `usesLeadsEndpoint` returnerer `true` kun for `dialerName === "ase"` → Alka rammer `/simpleleads` |
-| Calls-sync exclude-liste | `core/calls.ts` ekskluderer `@relatel.dk`, `@ase.dk` m.fl. — IKKE Alka-domæner → sikker |
+### Mål for denne fase
+Bekræft hvilken af 3 årsager der reelt blokerer email-attribution — så Fase 2's design bliver korrekt første gang. **Kun Alka API kaldes**, ingen andre integrationer røres.
 
-### Kritiske risici planen håndterer
+### Tjek der tilføjes til probe (Alka-only)
 
-1. **Tryg deler `Copenhagen sales` orgCode med Alka** → vi må IKKE ændre Alka's `calls_org_codes` uden at vide hvilken orgCode der reelt tilhører Alka-agenter. Probe-fasen skal afklare dette FØR Fase 4.
-2. **Hardkodet whitelist på 4 steder** → en pr-integration override skal læses i ALLE 4, ellers slipper salg igennem ét sted og blokeres et andet (inkonsistens).
-3. **`config`-kolonnen bruges allerede** til `productExtraction`, `dataFilters` m.m. → vi skal læse i `DialerIntegrationConfig`-typen først for at undgå at overskrive eksisterende felter.
+**Fil:** `supabase/functions/probe-enreach-integration/index.ts` (kører kun mod `integration_id=48d8bd23-...`)
 
----
+**Tjek A — `Include` på `/simpleleads`**  
+Kald `/simpleleads?Projects=*&ModifiedFrom=...&Include=lastModifiedByUser,firstProcessedByUser&Limit=10` mod Alka. Sammenlign payload med baseline-kald uden `Include`. Rapportér: er `email`-feltet nu udfyldt?
 
-### Fase 1 — Probe-udvidelse (Alka-isoleret, ingen risiko)
+**Tjek B — Krydsreferér orgCode mod `/users`**  
+Hent `/users` (Alka credentials, 587 brugere), byg map `orgCode → { email, name }`. For de 86 unikke orgCodes vi så i lead-auditten: hvor mange kan slås op? Hvilke email-domæner dominerer?
 
-**Fil:** `supabase/functions/probe-enreach-integration/index.ts` (eksisterer)
+**Tjek C — `/leads/{uniqueId}` på et enkelt Alka-lead**  
+`/leads` (liste) gav 500 globalt, men detalje-endpointet er muligvis åbent. Prøv på 1 konkret Alka `uniqueId` med `Include=lastModifiedByUser,firstProcessedByUser` for at se om enkelt-payload har user-info.
 
-Tilføj én ny rapport-sektion `agentAudit` der:
-- Henter seneste 100 success-leads fra Alka via `/simpleleads`
-- Grupperer på `lastModifiedByUser.orgCode` og `firstProcessedByUser.orgCode`
-- For hver orgCode: tæl, vis email-domæne, marker `wouldPassCurrentFilter` (true/false mod `@copenhagensales.dk`/`@cph-relatel.dk`/`@cph-sales.dk`)
-- Returner top-10 + total `wouldBeFiltered`-count
+### Output-format
 
-**Output afgør Fase 2's whitelist-værdier.** Kører kun mod `integration_id=48d8bd23-...` → 0 påvirkning på Tryg/Eesy/ASE.
+Rapporten skal give entydigt svar:
 
----
-
-### Fase 2 — Pr-integration agent-domæne whitelist (Alka-only aktivering)
-
-**Database:** Ingen migration. Vi skriver til `dialer_integrations.config` JSONB:
-```json
-{ "allowedAgentEmailDomains": ["@copenhagensales.dk", "@cph-relatel.dk", "@cph-sales.dk", "@<alka-domæne fra Fase 1>"] }
 ```
-Kun Alka-rækken (`48d8bd23-...`) opdateres. Tryg/Eesy/ASE rører vi ikke → de har `null` for dette felt.
-
-**Type-update:** `supabase/functions/integration-engine/types.ts` → `DialerIntegrationConfig` får valgfri `allowedAgentEmailDomains?: string[]`.
-
-**Kode-ændringer (4 steder, alle med samme fallback-mønster):**
-1. `enreach.ts` linje 503 (fetchSales)
-2. `enreach.ts` linje 651 (fetchSalesRange)
-3. `enreach.ts` linje 740 (mapLeadToSale — `VALID_AGENT_DOMAINS` for agent-attribution-fallback)
-4. `core/users.ts` linje 6-15 (`VALID_EMAIL_DOMAINS`)
-
-**Mønster pr. sted:**
-```ts
-const domains = this.config?.allowedAgentEmailDomains 
-  ?? ["@copenhagensales.dk", "@cph-relatel.dk", "@cph-sales.dk"]; // fallback = NUVÆRENDE adfærd
+agentDiagnosis: {
+  testA_includeOnSimpleleads: { worked: true/false, sampleEmail: "..." },
+  testB_orgCodeToUserMap: { 
+    totalOrgCodes: 86, 
+    matchedInUsers: <n>, 
+    topDomains: { "@tryg.dk": <n>, ... } 
+  },
+  testC_leadsDetail: { worked: true/false, sampleEmail: "..." },
+  recommendation: "Brug Include på /simpleleads" | "Pre-fetch /users og byg orgCode-map" | "Kombinér"
+}
 ```
 
-**Backwards-kompatibilitet garanteret:** Når `config.allowedAgentEmailDomains` er `undefined` (Tryg, Eesy, ASE, Adversus, Relatel, Lovablecph) → identisk opførsel med i dag. Ingen regression mulig.
+### Filer der berøres
+- `supabase/functions/probe-enreach-integration/index.ts` (udvid med 3 tjek)
 
-`adversus.ts` (linje 265, 452) **rører vi ikke** — Alka er Enreach.
+### Hvad jeg IKKE rører
+- Andre integrationer (Tryg, Eesy, ASE, Adversus) — probe kalder kun Alka credentials
+- `EnreachAdapter`, sync-logik, calls-sync, andre edge functions
+- Database (ren read-only diagnose)
+- Rate limit: probe bruger <20 nye kald, deles med Alka's egen kvote
 
----
-
-### Fase 3 — Udnyt nye `data`-felter (kun konfiguration, ingen kode)
-
-Ingen kode-ændring. `mapLeadToSale` gemmer allerede hele `lead`-objektet i `raw_payload`. Når Fase 2 er ude og Alka-salg lander, kan `Notater`, `Forsikringsselskab`, `KVHXR`, `Gadenavn`, `Husnr` osv. tilgås via:
-- UI: pricing rules conditional matching mod `raw_payload.data.<felt>`
-- Sales-detail visning trækker direkte fra `raw_payload`
-
-Hvis vi senere vil have et felt op som top-level kolonne, gøres det isoleret pr. felt.
-
----
-
-### Fase 4 — Aktivér call-sync for Alka (kun hvis probe-rapporten bekræfter)
-
-**Forudsætning:** Probe-fasen skal afdække den korrekte orgCode for Alka-agenter. Hvis det viser sig at Alka-agenter også bruger `"Copenhagen sales"` (ligesom Tryg), så er feltet allerede sat korrekt og call-sync vil virke når Fase 2 lander Alka-salg.
-
-**Hvis probe viser en anden orgCode (fx `"TRYG Forsikring A/S"` som probe-rapporten antydede):**
-- Opdatér `dialer_integrations.calls_org_codes` for Alka → fx `["TRYG Forsikring A/S"]`
-- Tryg's egen `calls_org_codes` er stadig `["Copenhagen sales"]` → uændret
-- `core/calls.ts` exclude-liste er verificeret: indeholder ikke Alka-relevante domæner → sikker
-
----
-
-### Filer der berøres (komplet liste)
-
-**Fase 1:**
-- `supabase/functions/probe-enreach-integration/index.ts` (udvid)
-
-**Fase 2:**
-- `supabase/functions/integration-engine/types.ts` (tilføj felt til `DialerIntegrationConfig`)
-- `supabase/functions/integration-engine/adapters/enreach.ts` (3 steder)
-- `supabase/functions/integration-engine/core/users.ts` (1 sted)
-- DB: én UPDATE på `dialer_integrations` hvor `id='48d8bd23-...'`
-
-**Fase 3:** Ingen filer.
-
-**Fase 4:** En UPDATE på `dialer_integrations.calls_org_codes` for Alka (kun hvis probe-fasen viser at det er nødvendigt).
-
-### Filer/integrationer der EKSPLICIT IKKE røres
-- `adapters/adversus.ts` — Adversus-integrationer påvirkes ikke
-- `dialer_integrations` for Tryg, Eesy, ASE — config forbliver `null` på `allowedAgentEmailDomains` → fallback til hardkodet whitelist (= identisk med i dag)
-- `core/calls.ts` exclude-liste — verificeret sikker for Alka
-- `EXCLUDED_EMAIL_PATTERNS` (`agent-X@adversus.local`) — bevares
-- `WHITELISTED_EMAILS` (gmail-undtagelser) — bevares globalt
-- Cron-schedules / sync-frekvens
-- UI / pricing rules / produktmapping — bruges først efter Fase 2
-
-### Verificering pr. fase
-- **Fase 1:** Probe-output rapporterer Alka's faktiske orgCodes + hvor mange ville passere nuværende filter. Hvis tallet er 0 bekræftes hypotesen.
-- **Fase 2:** Smoke-test: kør Tryg sync (skal være uændret antal salg) + ASE sync (uændret) + Alka sync (skal nu lande >0 salg). Sammenlign agent-emails på nye Alka-rækker mod whitelist fra Fase 1.
-- **Fase 4:** `dialer_calls`-rækker dukker op for Alka uden at Tryg's call-sync ændres.
-
-### Anbefalet rækkefølge
-1. Godkend Fase 1 alene (5 minutters edge-function-edit, nul risiko)
-2. Læs probe-output sammen → beslut Alka-domæner og om Fase 4 er nødvendig
-3. Godkend Fase 2 (lille kode-diff, fuld backwards-kompatibilitet)
-4. Verificér via smoke-test at andre integrationer er uændrede
-5. Beslut Fase 3/4 separat
+### Næste skridt
+Kør probe → læs rapport → vælg endeligt Fase 2-design (Include-parameter VS user-pre-fetch VS hybrid).
 
