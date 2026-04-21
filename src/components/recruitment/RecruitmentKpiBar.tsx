@@ -14,6 +14,7 @@ import {
   Clock,
   AlertTriangle,
   Percent,
+  UserMinus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
