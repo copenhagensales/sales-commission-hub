@@ -9,7 +9,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Users, Zap, Clock, CheckCircle, XCircle, Plus, Loader2, ShieldCheck, AlertTriangle, FileText, CalendarDays, Eye, PhoneCall, Bell, Layout, BarChart3 } from "lucide-react";
+import { Users, Zap, Clock, CheckCircle, XCircle, Plus, Loader2, ShieldCheck, AlertTriangle, FileText, CalendarDays, Eye, PhoneCall, Bell, Layout, BarChart3, UserMinus } from "lucide-react";
+
+export const REASONS_BY_US = ["Afvist af recruiter", "Manuelt annulleret"];
+export const REASON_PREFIX_BY_US = "Kandidat status ændret til:";
+export const REASONS_BY_CANDIDATE = ["Kandidat afmeldte sig via link", "Kandidat svarede på SMS"];
+
+export function classifyCancellation(reason: string | null | undefined): "cancelled_by_us" | "cancelled_by_candidate" {
+  if (!reason) return "cancelled_by_us";
+  if (REASONS_BY_CANDIDATE.includes(reason)) return "cancelled_by_candidate";
+  return "cancelled_by_us";
+}
 import { Link } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import { da } from "date-fns/locale";
