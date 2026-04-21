@@ -118,10 +118,13 @@ Deno.serve(async (req) => {
           const arr: any[] = Array.isArray(j) ? j : (j.Results || j.results || j.Leads || []);
           scannedTotal += arr.length;
 
-          // Track ALL distinct campaign names we see
+          // Track ALL distinct campaign names we see (try multiple shapes)
           for (const lead of arr) {
-            const campObj = lead.campaign || {};
-            const campName = String(campObj.name || campObj.Name || lead.campaignName || "");
+            const campObj = lead.campaign;
+            let campName = "";
+            if (typeof campObj === "string") campName = campObj;
+            else if (campObj && typeof campObj === "object") campName = String(campObj.name || campObj.Name || campObj.uniqueId || "");
+            if (!campName) campName = String(lead.campaignName || lead.campaignId || "");
             if (campName) campaignNamesSeen.set(campName, (campaignNamesSeen.get(campName) || 0) + 1);
           }
 
