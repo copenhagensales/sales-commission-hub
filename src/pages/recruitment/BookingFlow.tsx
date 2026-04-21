@@ -61,7 +61,11 @@ export default function BookingFlow() {
         `)
         .order("enrolled_at", { ascending: false });
 
-      if (filterStatus !== "all") {
+      if (filterStatus === "cancelled_by_us") {
+        query = query.eq("status", "cancelled");
+      } else if (filterStatus === "cancelled_by_candidate") {
+        query = query.eq("status", "cancelled").in("cancelled_reason", REASONS_BY_CANDIDATE);
+      } else if (filterStatus !== "all") {
         query = query.eq("status", filterStatus);
       }
 
