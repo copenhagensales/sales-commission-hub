@@ -37,8 +37,23 @@ const statusConfig: Record<string, { label: string; icon: typeof CheckCircle; co
   active: { label: "Aktiv", icon: Zap, color: "bg-blue-500/10 text-blue-600 border-blue-500/30" },
   completed: { label: "Fuldført", icon: CheckCircle, color: "bg-green-500/10 text-green-600 border-green-500/30" },
   cancelled: { label: "Annulleret", icon: XCircle, color: "bg-red-500/10 text-red-600 border-red-500/30" },
+  cancelled_by_us: { label: "Vi annullerede", icon: XCircle, color: "bg-red-500/10 text-red-600 border-red-500/30" },
+  cancelled_by_candidate: { label: "Kandidat trak sig", icon: UserMinus, color: "bg-orange-500/10 text-orange-600 border-orange-500/30" },
   pending_approval: { label: "Afventer", icon: Clock, color: "bg-amber-500/10 text-amber-600 border-amber-500/30" },
 };
+
+export default function BookingFlow() {
+  const queryClient = useQueryClient();
+  const [selectedEnrollment, setSelectedEnrollment] = useState<string | null>(null);
+  const [filterStatus, setFilterStatus] = useState<string>("active");
+  const [addCandidateOpen, setAddCandidateOpen] = useState(false);
+
+  // Fetch all enrollments
+  const { data: enrollments, isLoading } = useQuery({
+    queryKey: ["booking-flow-enrollments", filterStatus],
+    queryFn: async () => {
+      let query = supabase
+        .from("booking_flow_enrollments")
 
 export default function BookingFlow() {
   const queryClient = useQueryClient();
