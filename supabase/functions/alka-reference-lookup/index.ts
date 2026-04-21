@@ -75,33 +75,31 @@ Deno.serve(async (req) => {
         return name.includes(sampleCampaign.toLowerCase());
       });
 
-      // Walk windows from today and back, find first success lead in matching campaign
-      let sampleLead: any = null;
-      let scannedTotal = 0;
-      let usedWindow: any = null;
-      let usedCampaignFilter: string | null = null;
-      const closuresSeen = new Map<string, number>();
+      // Discover projects too
+      let projectsList: any[] = [];
+      try {
+        const pRes = await fetch(`${baseUrl}/projects?Limit=500`, { headers });
+        const pJson = await pRes.json().catch(() => []);
+        projectsList = Array.isArray(pJson) ? pJson : (pJson.Results || pJson.results || []);
+      } catch { /* ignore */ }
 
-      // Try each matching campaign id; if none, scan all and filter by name
+      // Walk windows from today and back, find first success lead in matching campaign
       const campaignIds = matchedCampaigns.map((c: any) => c.id || c.Id).filter(Boolean);
+      const matchedCampaignNames = matchedCampaigns.map((c: any) => String(c.name || c.Name || ""));
 
       for (let offset = 0; offset < days && !sampleLead; offset += 3) {
         const from = isoDaysAgo(offset + 3);
         const to = isoDaysAgo(offset);
 
-        // Try with campaign filter if we have ids
-        const eps: { ep: string; tag: string }[] = [];
+        // Try multiple endpoint strategies
+        const eps: { ep: string; tag: string }[] = [
+          { ep: `${baseUrl}/simpleleads?Projects=*&ModifiedFrom=${from}&ModifiedTo=${to}&AllClosedStatuses=true&take=2000`, tag: "simpleleads-Projects=*" },
+          { ep: `${baseUrl}/leads?Projects=*&ModifiedFrom=${from}&ModifiedTo=${to}&AllClosedStatuses=true&IncludeAnswers=true&take=2000`, tag: "leads-Projects=*" },
+        ];
         if (campaignIds.length > 0) {
-          eps.push({
-            ep: `${baseUrl}/simpleleads?Projects=*&Campaigns=${campaignIds.join(",")}&ModifiedFrom=${from}&ModifiedTo=${to}&AllClosedStatuses=true&take=500`,
-            tag: `campaigns=${campaignIds.join(",")}`,
-          });
+          eps.push({ ep: `${baseUrl}/simpleleads?Campaigns=${campaignIds.join(",")}&ModifiedFrom=${from}&ModifiedTo=${to}&AllClosedStatuses=true&take=500`, tag: `simpleleads-Campaigns=${campaignIds.join(",")}` });
+          eps.push({ ep: `${baseUrl}/leads?Campaigns=${campaignIds.join(",")}&ModifiedFrom=${from}&ModifiedTo=${to}&AllClosedStatuses=true&IncludeAnswers=true&take=500`, tag: `leads-Campaigns=${campaignIds.join(",")}` });
         }
-        // Always also try without campaign filter and match by name
-        eps.push({
-          ep: `${baseUrl}/simpleleads?Projects=*&ModifiedFrom=${from}&ModifiedTo=${to}&AllClosedStatuses=true&take=2000`,
-          tag: `name-match:${sampleCampaign}`,
-        });
 
         for (const { ep, tag } of eps) {
           if (sampleLead) break;
