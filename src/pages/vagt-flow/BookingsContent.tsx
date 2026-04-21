@@ -343,7 +343,7 @@ export default function BookingsContent() {
 
   // Fetch booking_diet data for training bonus tags
   const { data: bookingTrainingBonuses = [] } = useQuery({
-    queryKey: ["vagt-booking-training-bonuses", selectedWeek, selectedYear, trainingBonusSalaryType?.id],
+    queryKey: ["vagt-booking-training-bonuses", selectedWeek, selectedYear, trainingBonusSalaryType?.id, allBookingIds],
     queryFn: async () => {
       if (allBookingIds.length === 0 || !trainingBonusSalaryType) return [];
       const { data, error } = await supabase
