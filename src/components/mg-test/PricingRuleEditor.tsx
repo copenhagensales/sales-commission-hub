@@ -164,6 +164,9 @@ export function PricingRuleEditor({
   const [selectedCampaignIds, setSelectedCampaignIds] = useState<string[]>(
     existingRule?.campaign_mapping_ids || []
   );
+  const [campaignMatchMode, setCampaignMatchMode] = useState<"include" | "exclude">(
+    existingRule?.campaign_match_mode === "exclude" ? "exclude" : "include"
+  );
   const [campaignsOpen, setCampaignsOpen] = useState(false);
   const [conditions, setConditions] = useState<Record<string, string | NumericConditionValue>>(
     existingRule?.conditions || {}
