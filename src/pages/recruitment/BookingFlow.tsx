@@ -54,19 +54,6 @@ export default function BookingFlow() {
     queryFn: async () => {
       let query = supabase
         .from("booking_flow_enrollments")
-
-export default function BookingFlow() {
-  const queryClient = useQueryClient();
-  const [selectedEnrollment, setSelectedEnrollment] = useState<string | null>(null);
-  const [filterStatus, setFilterStatus] = useState<string>("active");
-  const [addCandidateOpen, setAddCandidateOpen] = useState(false);
-
-  // Fetch all enrollments
-  const { data: enrollments, isLoading } = useQuery({
-    queryKey: ["booking-flow-enrollments", filterStatus],
-    queryFn: async () => {
-      let query = supabase
-        .from("booking_flow_enrollments")
         .select(`
           *,
           candidates!inner(id, first_name, last_name, email, phone),
