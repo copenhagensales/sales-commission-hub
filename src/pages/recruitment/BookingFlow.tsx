@@ -496,7 +496,10 @@ export default function BookingFlow() {
               <div className="divide-y">
                 {enrollments.map((enrollment: any) => {
                   const candidate = enrollment.candidates;
-                  const status = statusConfig[enrollment.status as string];
+                  const statusKey = enrollment.status === "cancelled"
+                    ? classifyCancellation(enrollment.cancelled_reason)
+                    : (enrollment.status as string);
+                  const status = statusConfig[statusKey];
                   const StatusIcon = status?.icon || Clock;
 
                   return (
