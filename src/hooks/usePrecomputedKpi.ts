@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { REFRESH_PROFILES } from "@/utils/tvMode";
 import { trackFetch } from "@/utils/fetchPerformance";
+import { isKpiCacheStale, logStaleCacheWarning } from "@/utils/kpiCacheStale";
 
 export type KpiPeriod = "today" | "this_week" | "this_month" | "payroll_period" | "current" | "last_24h" | "last_7d" | "last_30d";
 export type KpiScopeType = "global" | "client" | "team" | "employee";
@@ -50,6 +51,11 @@ export function usePrecomputedKpi(
       if (error) {
         console.error("Error fetching precomputed KPI:", error);
         throw error;
+      }
+
+      if (data && isKpiCacheStale(data.calculated_at)) {
+        logStaleCacheWarning(`precomputed-kpi:${kpiSlug}/${period}/${scopeType}`, data.calculated_at);
+        return null;
       }
 
       return data;
@@ -106,6 +112,10 @@ export function usePrecomputedKpis(
           }
 
           if (data) {
+            if (isKpiCacheStale(data.calculated_at)) {
+              logStaleCacheWarning(`precomputed-kpis:${slug}/${period}/${scopeType}`, data.calculated_at);
+              return;
+            }
             results[data.kpi_slug] = {
               value: data.value,
               formatted_value: data.formatted_value,
@@ -161,15 +171,22 @@ export function useClientDashboardKpis(
         last_30d: {},
       };
 
+      let staleSkipped = 0;
       for (const item of data || []) {
         const period = item.period_type as KpiPeriod;
-        if (result[period]) {
-          result[period][item.kpi_slug] = {
-            value: item.value,
-            formatted_value: item.formatted_value,
-            calculated_at: item.calculated_at,
-          };
+        if (!result[period]) continue;
+        if (isKpiCacheStale(item.calculated_at)) {
+          staleSkipped++;
+          continue;
         }
+        result[period][item.kpi_slug] = {
+          value: item.value,
+          formatted_value: item.formatted_value,
+          calculated_at: item.calculated_at,
+        };
+      }
+      if (staleSkipped > 0) {
+        console.warn(`[client-dashboard-kpis] Skipped ${staleSkipped} stale KPI rows for client ${clientId}`);
       }
 
       return result;

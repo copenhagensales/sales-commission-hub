@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { REFRESH_PROFILES } from "@/utils/tvMode";
+import { isKpiCacheStale, logStaleCacheWarning } from "@/utils/kpiCacheStale";
 
 export type LeaderboardPeriod = "today" | "this_week" | "this_month" | "payroll_period";
 export type LeaderboardScope = { type: "global" | "client" | "team"; id?: string | null };
@@ -57,6 +58,11 @@ export function useCachedLeaderboard(
       
       if (!data) {
         console.log(`No cached leaderboard for ${period}/${scope.type}/${scope.id || 'global'}`);
+        return [];
+      }
+
+      if (isKpiCacheStale(data.calculated_at)) {
+        logStaleCacheWarning(`cached-leaderboard:${period}/${scope.type}/${scope.id || 'global'}`, data.calculated_at);
         return [];
       }
       

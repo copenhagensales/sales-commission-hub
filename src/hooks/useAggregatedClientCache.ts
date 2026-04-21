@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { REFRESH_PROFILES } from "@/utils/tvMode";
+import { isKpiCacheStale } from "@/utils/kpiCacheStale";
 import type { LeaderboardEntry } from "@/hooks/useCachedLeaderboard";
 import type { KpiPeriod } from "@/hooks/usePrecomputedKpi";
 
@@ -30,7 +31,7 @@ export function useAggregatedClientKpis(clientIds: string[] | undefined) {
 
       const { data, error } = await supabase
         .from("kpi_cached_values")
-        .select("kpi_slug, period_type, scope_id, value")
+        .select("kpi_slug, period_type, scope_id, value, calculated_at")
         .eq("scope_type", "client")
         .in("scope_id", clientIds)
         .in("kpi_slug", ["sales_count", "total_commission", "total_hours"])
@@ -41,11 +42,19 @@ export function useAggregatedClientKpis(clientIds: string[] | undefined) {
         return result;
       }
 
+      let staleSkipped = 0;
       for (const row of data || []) {
         const period = row.period_type as keyof AggregatedKpis;
         const slug = row.kpi_slug as keyof typeof EMPTY_BUCKET;
         if (!result[period] || !(slug in result[period])) continue;
+        if (isKpiCacheStale(row.calculated_at)) {
+          staleSkipped++;
+          continue;
+        }
         result[period][slug] += Number(row.value) || 0;
+      }
+      if (staleSkipped > 0) {
+        console.warn(`[aggregated-kpis] Skipped ${staleSkipped} stale rows across ${clientIds.length} clients`);
       }
       return result;
     },
@@ -108,13 +117,20 @@ export function useAggregatedClientLeaderboards(
       return [];
     }
 
-    // Latest row per scope_id
+    // Latest non-stale row per scope_id
     const latestPerScope = new Map<string, { leaderboard_data: unknown }>();
+    let staleSkipped = 0;
     for (const row of data || []) {
       if (!row.scope_id) continue;
-      if (!latestPerScope.has(row.scope_id)) {
-        latestPerScope.set(row.scope_id, { leaderboard_data: row.leaderboard_data });
+      if (latestPerScope.has(row.scope_id)) continue;
+      if (isKpiCacheStale(row.calculated_at)) {
+        staleSkipped++;
+        continue;
       }
+      latestPerScope.set(row.scope_id, { leaderboard_data: row.leaderboard_data });
+    }
+    if (staleSkipped > 0) {
+      console.warn(`[aggregated-leaderboard:${period}] Skipped ${staleSkipped} stale rows`);
     }
 
     return mergeLeaderboards(Array.from(latestPerScope.values())).slice(0, limit);
