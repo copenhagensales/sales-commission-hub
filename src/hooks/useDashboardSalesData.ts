@@ -259,6 +259,7 @@ export function useDashboardSalesData({
       // Build a map: product_id -> array of rules (sorted by priority desc for later selection)
       const pricingRulesMap = new Map<string, Array<{ 
         campaign_mapping_ids: string[] | null; 
+        campaign_match_mode: "include" | "exclude";
         conditions: any;
         commission: number; 
         revenue: number; 
@@ -350,7 +351,7 @@ export function useDashboardSalesData({
         shouldFetchPricingRules
           ? supabase
               .from("product_pricing_rules")
-              .select("product_id, campaign_mapping_ids, conditions, commission_dkk, revenue_dkk, priority, is_active")
+              .select("product_id, campaign_mapping_ids, campaign_match_mode, conditions, commission_dkk, revenue_dkk, priority, is_active")
               .eq("is_active", true)
           : Promise.resolve({ data: [] as any[] }),
         hasDialerCampaignIds
@@ -366,6 +367,7 @@ export function useDashboardSalesData({
         const existing = pricingRulesMap.get(rule.product_id) || [];
         existing.push({
           campaign_mapping_ids: rule.campaign_mapping_ids,
+          campaign_match_mode: (rule.campaign_match_mode === "exclude" ? "exclude" : "include"),
           conditions: rule.conditions || {},
           commission: rule.commission_dkk ?? 0,
           revenue: rule.revenue_dkk ?? 0,
@@ -383,17 +385,19 @@ export function useDashboardSalesData({
         
         // Find the first rule that matches (highest priority wins due to sort)
         for (const rule of rules) {
-          // If rule has no campaign restrictions (null or empty array), it applies to all
-          if (!rule.campaign_mapping_ids || rule.campaign_mapping_ids.length === 0) {
-            return rule;
-          }
-          // Check if the campaign matches
-          if (campaignMappingId && rule.campaign_mapping_ids.includes(campaignMappingId)) {
-            return rule;
+          const ids = rule.campaign_mapping_ids;
+          // Universal rule
+          if (!ids || ids.length === 0) return rule;
+          if (rule.campaign_match_mode === "exclude") {
+            // Match all EXCEPT listed campaigns
+            if (!campaignMappingId || !ids.includes(campaignMappingId)) return rule;
+          } else {
+            // include
+            if (campaignMappingId && ids.includes(campaignMappingId)) return rule;
           }
         }
         
-        // Fallback: return rule with null campaign_mapping_ids (applies to all)
+        // Fallback: return rule with no campaign restriction (universal)
         return rules.find(r => !r.campaign_mapping_ids || r.campaign_mapping_ids.length === 0) || null;
       };
 

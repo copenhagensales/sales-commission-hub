@@ -77,34 +77,53 @@ export function DailyRevenueChart({ daysBack = 30 }: DailyRevenueChartProps) {
       // Get product pricing rules (replaces deprecated product_campaign_overrides)
       const { data: productPricingRules } = await supabase
         .from("product_pricing_rules")
-        .select("product_id, campaign_mapping_ids, revenue_dkk, priority")
+        .select("product_id, campaign_mapping_ids, campaign_match_mode, revenue_dkk, priority")
         .eq("is_active", true);
       
-      // Build override map including BOTH campaign-specific AND universal rules
-      // product_id + campaign_mapping_id -> revenue (campaign-specific)
-      // product_id -> revenue (universal fallback, campaign_mapping_ids is null/empty)
-      const campaignOverrideMap = new Map<string, number>();
-      const universalOverrideMap = new Map<string, number>();
-      
       // Sort by priority desc so highest priority wins
-      const sortedRules = [...(productPricingRules || [])].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
-      
+      const sortedRules = [...(productPricingRules || [])].sort(
+        (a, b) => (b.priority ?? 0) - (a.priority ?? 0),
+      );
+
+      // Group rules by product_id, preserving priority order, so we can pick
+      // the first matching rule per (product, campaign) pair below.
+      const rulesByProductId = new Map<
+        string,
+        Array<{
+          campaign_mapping_ids: string[] | null;
+          campaign_match_mode: "include" | "exclude";
+          revenue: number;
+        }>
+      >();
       sortedRules.forEach((rule) => {
-        const campaignIds = rule.campaign_mapping_ids || [];
-        if (campaignIds.length === 0) {
-          // Universal rule - applies to all campaigns
-          if (!universalOverrideMap.has(rule.product_id)) {
-            universalOverrideMap.set(rule.product_id, rule.revenue_dkk ?? 0);
-          }
-        } else {
-          campaignIds.forEach((campaignMappingId: string) => {
-            const key = `${rule.product_id}_${campaignMappingId}`;
-            if (!campaignOverrideMap.has(key)) {
-              campaignOverrideMap.set(key, rule.revenue_dkk ?? 0);
-            }
-          });
-        }
+        if (!rule.product_id) return;
+        const list = rulesByProductId.get(rule.product_id) || [];
+        list.push({
+          campaign_mapping_ids: rule.campaign_mapping_ids,
+          campaign_match_mode:
+            rule.campaign_match_mode === "exclude" ? "exclude" : "include",
+          revenue: rule.revenue_dkk ?? 0,
+        });
+        rulesByProductId.set(rule.product_id, list);
       });
+
+      const findRevenueOverride = (
+        productId: string,
+        campaignMappingId: string | null,
+      ): number | undefined => {
+        const list = rulesByProductId.get(productId);
+        if (!list) return undefined;
+        for (const rule of list) {
+          const ids = rule.campaign_mapping_ids;
+          if (!ids || ids.length === 0) return rule.revenue;
+          if (rule.campaign_match_mode === "exclude") {
+            if (!campaignMappingId || !ids.includes(campaignMappingId)) return rule.revenue;
+          } else {
+            if (campaignMappingId && ids.includes(campaignMappingId)) return rule.revenue;
+          }
+        }
+        return undefined;
+      };
 
       // Map sale_items to sales
       const saleItemsBySaleId: Record<string, any[]> = {};
@@ -120,19 +139,14 @@ export function DailyRevenueChart({ daysBack = 30 }: DailyRevenueChartProps) {
         const saleDate = format(parseISO(sale.sale_datetime), "yyyy-MM-dd");
         const items = saleItemsBySaleId[sale.id] || [];
         const campaignMappingId = sale.dialer_campaign_id 
-          ? campaignIdToMappingId.get(sale.dialer_campaign_id) 
+          ? campaignIdToMappingId.get(sale.dialer_campaign_id) ?? null
           : null;
         
         let saleRevenue = 0;
         items.forEach((item) => {
-          const overrideKey = campaignMappingId ? `${item.product_id}_${campaignMappingId}` : null;
-          const campaignOverride = overrideKey ? campaignOverrideMap.get(overrideKey) : undefined;
-          const universalOverride = universalOverrideMap.get(item.product_id);
-          
-          if (campaignOverride !== undefined) {
-            saleRevenue += campaignOverride;
-          } else if (universalOverride !== undefined) {
-            saleRevenue += universalOverride;
+          const override = findRevenueOverride(item.product_id, campaignMappingId);
+          if (override !== undefined) {
+            saleRevenue += override;
           } else {
             saleRevenue += Number(item.mapped_revenue) || 0;
           }

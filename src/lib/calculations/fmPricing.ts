@@ -1,112 +1,173 @@
 /**
  * FM Pricing Helper
- * 
+ *
  * Provides correct pricing lookup for Field Marketing sales by following
  * the pricing rule hierarchy:
- *   1. Active product_pricing_rules (highest priority wins)
+ *   1. Active product_pricing_rules (highest priority wins, campaign-aware)
  *   2. Base prices from products table (fallback)
- * 
- * FM sales don't have sale_items, so we need to look up prices by product name.
+ *
+ * FM sales don't have sale_items, so we look up prices by product name.
+ * FM sales DO have a campaign context via `client_campaign_id` (mapped through
+ * adversus_campaign_mappings → campaign_mapping.id), so the lookup is
+ * campaign-aware: pass the campaign mapping id to honor include/exclude rules.
  */
 
 import { supabase } from "@/integrations/supabase/client";
+import { ruleMatchesCampaign, type CampaignMatchMode } from "./pricingRuleMatching";
 
-interface FmPricing {
+export interface FmPricing {
   commission: number;
   revenue: number;
 }
 
+interface ProductRow {
+  id: string;
+  name: string | null;
+  commission_dkk: number | null;
+  revenue_dkk: number | null;
+}
+
+interface PricingRuleRow {
+  product_id: string;
+  commission_dkk: number | null;
+  revenue_dkk: number | null;
+  priority: number;
+  campaign_mapping_ids: string[] | null;
+  campaign_match_mode?: CampaignMatchMode | null;
+}
+
 /**
- * Build a pricing map for FM products: product_name (lowercase) -> { commission, revenue }
- * 
- * This follows the same hierarchy as the backend pricing-service.ts:
- * 1. Check product_pricing_rules (active, highest priority wins)
- * 2. Fallback to products.commission_dkk / revenue_dkk
+ * Lookup function returned by the pricing builders.
+ * Pass `campaignMappingId` (the id of `adversus_campaign_mappings`, NOT the dialer id)
+ * to evaluate include/exclude rules. Omit it for backward-compatible
+ * "universal-only" behaviour.
  */
-export async function buildFmPricingMap(): Promise<Map<string, FmPricing>> {
-  // Fetch products (base prices) and active pricing rules in parallel
+export type FmPricingLookup = (
+  productName: string,
+  campaignMappingId?: string | null,
+) => FmPricing;
+
+function buildLookup(
+  products: ProductRow[],
+  pricingRules: PricingRuleRow[],
+): FmPricingLookup {
+  // Group rules by product_id, sorted by priority desc (first match wins).
+  const rulesByProductId = new Map<string, PricingRuleRow[]>();
+  for (const rule of pricingRules) {
+    if (!rule.product_id) continue;
+    const list = rulesByProductId.get(rule.product_id) || [];
+    list.push(rule);
+    rulesByProductId.set(rule.product_id, list);
+  }
+  for (const list of rulesByProductId.values()) {
+    list.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+  }
+
+  // product_name (lowercase) -> base ProductRow
+  const productByName = new Map<string, ProductRow>();
+  for (const product of products) {
+    if (!product.name) continue;
+    productByName.set(product.name.toLowerCase(), product);
+  }
+
+  return (productName: string, campaignMappingId?: string | null): FmPricing => {
+    const key = productName?.toLowerCase();
+    const product = key ? productByName.get(key) : undefined;
+    if (!product) return { commission: 0, revenue: 0 };
+
+    const rules = rulesByProductId.get(product.id) || [];
+    for (const rule of rules) {
+      if (
+        ruleMatchesCampaign(
+          rule.campaign_mapping_ids,
+          rule.campaign_match_mode ?? "include",
+          campaignMappingId ?? null,
+        )
+      ) {
+        return {
+          commission: rule.commission_dkk ?? 0,
+          revenue: rule.revenue_dkk ?? 0,
+        };
+      }
+    }
+
+    return {
+      commission: product.commission_dkk ?? 0,
+      revenue: product.revenue_dkk ?? 0,
+    };
+  };
+}
+
+/**
+ * Async: fetch products + active pricing rules and return a campaign-aware lookup.
+ */
+export async function buildFmPricingLookup(): Promise<FmPricingLookup> {
   const [productsResult, rulesResult] = await Promise.all([
     supabase.from("products").select("id, name, commission_dkk, revenue_dkk"),
     supabase
       .from("product_pricing_rules")
-      .select("product_id, commission_dkk, revenue_dkk, priority, campaign_mapping_ids")
+      .select(
+        "product_id, commission_dkk, revenue_dkk, priority, campaign_mapping_ids, campaign_match_mode",
+      )
       .eq("is_active", true)
       .order("priority", { ascending: false }),
   ]);
 
-  const products = productsResult.data || [];
-  const rules = rulesResult.data || [];
-
-  // Build override map: product_id -> { commission, revenue } (highest priority, universal rules preferred for FM)
-  const overrideByProductId = new Map<string, FmPricing>();
-  
-  // Rules are already sorted by priority desc, so first match wins
-  for (const rule of rules) {
-    if (!rule.product_id) continue;
-    // For FM, we only use universal rules (no campaign restriction) since FM has no campaign mapping
-    const hasCampaignRestriction = rule.campaign_mapping_ids && rule.campaign_mapping_ids.length > 0;
-    if (hasCampaignRestriction) continue;
-    
-    if (!overrideByProductId.has(rule.product_id)) {
-      overrideByProductId.set(rule.product_id, {
-        commission: rule.commission_dkk ?? 0,
-        revenue: rule.revenue_dkk ?? 0,
-      });
-    }
-  }
-
-  // Build final map: product_name (lowercase) -> pricing
-  const pricingMap = new Map<string, FmPricing>();
-  
-  for (const product of products) {
-    if (!product.name) continue;
-    const override = overrideByProductId.get(product.id);
-    pricingMap.set(product.name.toLowerCase(), {
-      commission: override?.commission ?? product.commission_dkk ?? 0,
-      revenue: override?.revenue ?? product.revenue_dkk ?? 0,
-    });
-  }
-
-  return pricingMap;
+  return buildLookup(
+    (productsResult.data || []) as ProductRow[],
+    (rulesResult.data || []) as PricingRuleRow[],
+  );
 }
 
 /**
- * Synchronous version: build FM pricing map from pre-fetched data.
- * Use this when you already have products and pricing rules loaded.
+ * Sync: build lookup from already-fetched products + rules.
  */
-export function buildFmPricingMapSync(
-  products: Array<{ id: string; name: string; commission_dkk: number | null; revenue_dkk: number | null }>,
-  pricingRules: Array<{ product_id: string; commission_dkk: number | null; revenue_dkk: number | null; priority: number; campaign_mapping_ids: string[] | null }>
-): Map<string, FmPricing> {
-  // Build override map from universal rules (no campaign restriction)
-  const overrideByProductId = new Map<string, FmPricing>();
-  
-  // Sort by priority desc
-  const sortedRules = [...pricingRules].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
-  
-  for (const rule of sortedRules) {
-    if (!rule.product_id) continue;
-    const hasCampaignRestriction = rule.campaign_mapping_ids && rule.campaign_mapping_ids.length > 0;
-    if (hasCampaignRestriction) continue;
-    
-    if (!overrideByProductId.has(rule.product_id)) {
-      overrideByProductId.set(rule.product_id, {
-        commission: rule.commission_dkk ?? 0,
-        revenue: rule.revenue_dkk ?? 0,
-      });
-    }
-  }
+export function buildFmPricingLookupSync(
+  products: ProductRow[],
+  pricingRules: PricingRuleRow[],
+): FmPricingLookup {
+  return buildLookup(products, pricingRules);
+}
 
-  const pricingMap = new Map<string, FmPricing>();
-  
+// ---------------------------------------------------------------------------
+// Backward-compatible Map-based API (used by older code paths). The map is
+// derived from a "universal-only" lookup (no campaign context), preserving
+// the previous behaviour: rules with campaign restrictions are skipped.
+// ---------------------------------------------------------------------------
+
+export async function buildFmPricingMap(): Promise<Map<string, FmPricing>> {
+  const [productsResult, rulesResult] = await Promise.all([
+    supabase.from("products").select("id, name, commission_dkk, revenue_dkk"),
+    supabase
+      .from("product_pricing_rules")
+      .select(
+        "product_id, commission_dkk, revenue_dkk, priority, campaign_mapping_ids, campaign_match_mode",
+      )
+      .eq("is_active", true)
+      .order("priority", { ascending: false }),
+  ]);
+  return mapFromLookupInputs(
+    (productsResult.data || []) as ProductRow[],
+    (rulesResult.data || []) as PricingRuleRow[],
+  );
+}
+
+export function buildFmPricingMapSync(
+  products: ProductRow[],
+  pricingRules: PricingRuleRow[],
+): Map<string, FmPricing> {
+  return mapFromLookupInputs(products, pricingRules);
+}
+
+function mapFromLookupInputs(
+  products: ProductRow[],
+  pricingRules: PricingRuleRow[],
+): Map<string, FmPricing> {
+  const lookup = buildLookup(products, pricingRules);
+  const map = new Map<string, FmPricing>();
   for (const product of products) {
     if (!product.name) continue;
-    const override = overrideByProductId.get(product.id);
-    pricingMap.set(product.name.toLowerCase(), {
-      commission: override?.commission ?? product.commission_dkk ?? 0,
-      revenue: override?.revenue ?? product.revenue_dkk ?? 0,
-    });
+    map.set(product.name.toLowerCase(), lookup(product.name, null));
   }
-
-  return pricingMap;
+  return map;
 }

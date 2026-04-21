@@ -655,12 +655,13 @@ export default function DailyReports() {
       // Fetch product pricing rules (replaces product_campaign_overrides)
       const { data: productPricingRules } = await supabase
         .from("product_pricing_rules")
-        .select("product_id, campaign_mapping_ids, commission_dkk, revenue_dkk, priority, is_active")
+        .select("product_id, campaign_mapping_ids, campaign_match_mode, commission_dkk, revenue_dkk, priority, is_active")
         .eq("is_active", true);
       
       // Build a map for pricing rules lookup
       const pricingRulesMap = new Map<string, Array<{ 
         campaign_mapping_ids: string[] | null; 
+        campaign_match_mode: "include" | "exclude";
         commission: number; 
         revenue: number; 
         priority: number;
@@ -671,6 +672,7 @@ export default function DailyReports() {
         const existing = pricingRulesMap.get(rule.product_id) || [];
         existing.push({
           campaign_mapping_ids: rule.campaign_mapping_ids,
+          campaign_match_mode: (rule.campaign_match_mode === "exclude" ? "exclude" : "include"),
           commission: rule.commission_dkk ?? 0,
           revenue: rule.revenue_dkk ?? 0,
           priority: rule.priority ?? 0,
@@ -685,22 +687,24 @@ export default function DailyReports() {
         if (!rules || rules.length === 0) return null;
         
         for (const rule of rules) {
-          if (!rule.campaign_mapping_ids || rule.campaign_mapping_ids.length === 0) {
-            return rule;
-          }
-          if (campaignMappingId && rule.campaign_mapping_ids.includes(campaignMappingId)) {
-            return rule;
+          const ids = rule.campaign_mapping_ids;
+          if (!ids || ids.length === 0) return rule;
+          if (rule.campaign_match_mode === "exclude") {
+            if (!campaignMappingId || !ids.includes(campaignMappingId)) return rule;
+          } else {
+            if (campaignMappingId && ids.includes(campaignMappingId)) return rule;
           }
         }
         return rules.find(r => !r.campaign_mapping_ids || r.campaign_mapping_ids.length === 0) || null;
       };
       
       // Build a map: product_id + campaign_mapping_id -> { commission, revenue } for backward compatibility
+      // Only populated for include-mode rules with explicit campaigns.
       const campaignOverrideMap = new Map<string, { commission: number; revenue: number }>();
       productPricingRules?.forEach(o => {
         if (!o.product_id) return;
-        // For each rule, populate the map for all its campaign mappings
-        if (o.campaign_mapping_ids && o.campaign_mapping_ids.length > 0) {
+        const mode = o.campaign_match_mode === "exclude" ? "exclude" : "include";
+        if (mode === "include" && o.campaign_mapping_ids && o.campaign_mapping_ids.length > 0) {
           o.campaign_mapping_ids.forEach(campId => {
             const key = `${o.product_id}_${campId}`;
             if (!campaignOverrideMap.has(key)) {

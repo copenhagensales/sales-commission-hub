@@ -10259,6 +10259,7 @@ export type Database = {
         Row: {
           allows_immediate_payment: boolean | null
           campaign_mapping_ids: string[] | null
+          campaign_match_mode: string
           change_type: string | null
           changed_at: string | null
           changed_by: string | null
@@ -10278,6 +10279,7 @@ export type Database = {
         Insert: {
           allows_immediate_payment?: boolean | null
           campaign_mapping_ids?: string[] | null
+          campaign_match_mode?: string
           change_type?: string | null
           changed_at?: string | null
           changed_by?: string | null
@@ -10297,6 +10299,7 @@ export type Database = {
         Update: {
           allows_immediate_payment?: boolean | null
           campaign_mapping_ids?: string[] | null
+          campaign_match_mode?: string
           change_type?: string | null
           changed_at?: string | null
           changed_by?: string | null
@@ -10541,6 +10544,7 @@ export type Database = {
         Row: {
           allows_immediate_payment: boolean | null
           campaign_mapping_ids: string[] | null
+          campaign_match_mode: string
           commission_dkk: number
           conditions: Json
           created_at: string | null
@@ -10560,6 +10564,7 @@ export type Database = {
         Insert: {
           allows_immediate_payment?: boolean | null
           campaign_mapping_ids?: string[] | null
+          campaign_match_mode?: string
           commission_dkk: number
           conditions?: Json
           created_at?: string | null
@@ -10579,6 +10584,7 @@ export type Database = {
         Update: {
           allows_immediate_payment?: boolean | null
           campaign_mapping_ids?: string[] | null
+          campaign_match_mode?: string
           commission_dkk?: number
           conditions?: Json
           created_at?: string | null
