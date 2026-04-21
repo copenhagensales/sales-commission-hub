@@ -617,6 +617,9 @@ export class EnreachAdapter implements DialerAdapter {
     campaignMappings?: CampaignMappingConfig[],
   ): Promise<StandardSale[]> {
     try {
+      // Pre-fetch /users → orgCode map when enabled (Alka). No-op for other tenants.
+      await this.ensureUserOrgCodeMap();
+
       const fromStr = range.from.split("T")[0];
       // Bump toStr by +1 day because HeroBase treats ModifiedTo as exclusive
       const toDate = new Date(range.to);
