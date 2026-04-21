@@ -310,12 +310,12 @@ export default function AmoMeetings() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Type *</Label>
-                <Select value={form.meeting_type} onValueChange={v => setForm(f => ({ ...f, meeting_type: v }))}>
+                <Select value={normalizeMeetingType(form.meeting_type)} onValueChange={v => setForm(f => ({ ...f, meeting_type: normalizeMeetingType(v) }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="amo_meeting">Ordinært</SelectItem>
-                    <SelectItem value="extraordinary">Ekstraordinært</SelectItem>
-                    <SelectItem value="annual_discussion">Årligt møde</SelectItem>
+                    {MEETING_TYPES.map(t => (
+                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
