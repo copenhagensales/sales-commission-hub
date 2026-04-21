@@ -71,6 +71,9 @@ export default function BookingFlow() {
 
       const { data, error } = await query;
       if (error) throw error;
+      if (filterStatus === "cancelled_by_us") {
+        return (data || []).filter((e: any) => classifyCancellation(e.cancelled_reason) === "cancelled_by_us");
+      }
       return data;
     },
   });
