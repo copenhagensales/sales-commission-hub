@@ -1,30 +1,18 @@
 
-## Justér omstilling-toggle på Pilot (intern TDC Opsummering)
+## Forkort labels på Pilot omstilling-toggle
 
-### Ændringer (kun `src/pages/TdcOpsummering.tsx`, kun når `summaryVariant === "pilot"`)
+### Ændring (kun `src/pages/TdcOpsummering.tsx`)
+I Pilot-varianten af "Omstilling"-boksen, opdater labels på toggle-switchen:
+- **Venstre label**: `Standard omstilling` → `Standard`
+- **Højre label**: `Professionel omstilling` → `Professionel`
 
-**1. Byt om på toggle-siderne**
-- **Venstre label**: "Standard omstilling" (default/aktiv ved load)
-- **Højre label**: "Professionel omstilling"
-- Switch OFF (default) = Standard omstilling → `isStandardOmstilling = true`
-- Switch ON = Professionel omstilling → `isStandardOmstilling = false`
-- Aktiv label fremhæves (bold/primary), inaktiv dæmpes (`text-muted-foreground`).
-
-**2. Fjern radio-valgene helt på Pilot**
-- Når `isPilot === true`: skjul hele `RadioGroup`-blokken med "Omstilling inkluderet" / "Uden omstilling" (linje ~520-545).
-- Sæt `hasOmstilling` permanent til `true` på Pilot (omstilling er altid inkluderet) og `noOmstilling` til `false`.
-- Vis kun toggle-switchen (Standard ↔ Professionel) som eneste valgmulighed.
-- På Standard- og 5g-fri-varianten: bevar nuværende radio-UI uændret.
-
-**3. Genereret tekst (allerede korrekt logik)**
-- Linjen *"I forhold til jeres omstilling og hvordan den skal virke..."* vises altid på Pilot.
-- Linjen *"Hvis du får brug for menuvalg i fremtiden, så kan du altid opgradere din omstilling"* vises kun når `isStandardOmstilling === true` (Standard omstilling valgt).
-- Når brugeren toggler til Professionel → `isStandardOmstilling = false` → menuvalg-linjen forsvinder automatisk fra output.
+Ordet "omstilling" fjernes fra labels, da det allerede fremgår af boksens titel.
 
 ### Ikke berørt
-- Standard- og 5g-fri-varianten (radio-UI bevares).
-- `summaryLines`-genereringslogik røres ikke (eksisterende betingelser dækker behovet).
-- `src/pages/TdcOpsummeringPublic.tsx` røres ikke.
+- Toggle-adfærd, default-state og styling.
+- Genereret tekst-output (uændret).
+- Standard- og 5g-fri-varianten.
+- `TdcOpsummeringPublic.tsx`.
 
 ### Filer berørt
-- `src/pages/TdcOpsummering.tsx` (kun denne)
+- `src/pages/TdcOpsummering.tsx`
