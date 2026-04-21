@@ -274,11 +274,33 @@ export default function TdcOpsummering() {
   return (
     <MainLayout>
       <div className="container mx-auto py-6 space-y-6 max-w-7xl">
-        <div className="flex items-center gap-3">
-          <FileText className="h-8 w-8 text-primary" />
-          <div>
-            <h1 className="text-2xl font-bold">TDC Opsummering</h1>
-            <p className="text-muted-foreground">Generer en struktureret opsummeringstekst efter et TDC-salg</p>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <FileText className="h-8 w-8 text-primary" />
+            <div>
+              <h1 className="text-2xl font-bold">TDC Opsummering</h1>
+              <p className="text-muted-foreground">Generer en struktureret opsummeringstekst efter et TDC-salg</p>
+            </div>
+          </div>
+          <div className="inline-flex items-center bg-muted/30 rounded-full p-1">
+            {([
+              { val: false, label: "DA" },
+              { val: true, label: "EN" },
+            ] as const).map((opt) => (
+              <button
+                key={opt.label}
+                type="button"
+                onClick={() => setIsEnglish(opt.val)}
+                className={cn(
+                  "px-4 py-1.5 text-sm font-medium rounded-full transition-colors",
+                  isEnglish === opt.val
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -291,34 +313,26 @@ export default function TdcOpsummering() {
                 <CardTitle className="text-lg">Opsummeringstype</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex flex-wrap items-center gap-4">
-                  <RadioGroup
-                    value={summaryVariant}
-                    onValueChange={(val) => setSummaryVariant(val as SummaryVariant)}
-                    className="flex gap-4 flex-wrap"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="standard" id="variant-standard" />
-                      <Label htmlFor="variant-standard" className="font-normal cursor-pointer">Standard opsummering</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="pilot" id="variant-pilot" />
-                      <Label htmlFor="variant-pilot" className="font-normal cursor-pointer">Pilot opsummering</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="5g-fri" id="variant-5g-fri" />
-                      <Label htmlFor="variant-5g-fri" className="font-normal cursor-pointer">Kun 5g Fri Salg</Label>
-                    </div>
-                  </RadioGroup>
-                  <div className="flex items-center gap-2 pl-4 border-l border-border py-1">
-                    <Switch
-                      id="variant-english"
-                      checked={isEnglish}
-                      onCheckedChange={setIsEnglish}
-                      className="border-2 border-primary bg-transparent data-[state=checked]:bg-primary data-[state=unchecked]:bg-transparent [&>span]:bg-primary [&>span]:data-[state=checked]:bg-background"
-                    />
-                    <Label htmlFor="variant-english" className="font-normal cursor-pointer">Engelsk</Label>
-                  </div>
+                <div className="inline-flex w-full bg-muted/30 rounded-lg p-1">
+                  {([
+                    { val: "standard", label: "Standard" },
+                    { val: "pilot", label: "Pilot" },
+                    { val: "5g-fri", label: "Kun 5g fri salg" },
+                  ] as const).map((opt) => (
+                    <button
+                      key={opt.val}
+                      type="button"
+                      onClick={() => setSummaryVariant(opt.val)}
+                      className={cn(
+                        "flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors",
+                        summaryVariant === opt.val
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
                 </div>
               </CardContent>
             </Card>
