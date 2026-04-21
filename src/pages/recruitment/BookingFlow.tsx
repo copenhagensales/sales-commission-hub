@@ -470,7 +470,8 @@ export default function BookingFlow() {
               <SelectItem value="all">Alle statuser</SelectItem>
               <SelectItem value="active">Aktive</SelectItem>
               <SelectItem value="completed">Fuldførte</SelectItem>
-              <SelectItem value="cancelled">Annullerede</SelectItem>
+              <SelectItem value="cancelled_by_us">Vi annullerede</SelectItem>
+              <SelectItem value="cancelled_by_candidate">Kandidat trak sig</SelectItem>
             </SelectContent>
           </Select>
         </div>
