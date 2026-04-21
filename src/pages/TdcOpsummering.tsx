@@ -310,13 +310,14 @@ export default function TdcOpsummering() {
                       <Label htmlFor="variant-5g-fri" className="font-normal cursor-pointer">Kun 5g Fri Salg</Label>
                     </div>
                   </RadioGroup>
-                  <div className="flex items-center space-x-2 pl-4 border-l border-border">
+                  <div className="flex items-center gap-2 pl-4 border-l border-border py-1">
                     <Switch
                       id="variant-english"
                       checked={isEnglish}
                       onCheckedChange={setIsEnglish}
+                      className="border-2 border-primary bg-transparent data-[state=checked]:bg-primary data-[state=unchecked]:bg-transparent [&>span]:bg-primary [&>span]:data-[state=checked]:bg-background"
                     />
-                    <Label htmlFor="variant-english" className="font-normal cursor-pointer">English</Label>
+                    <Label htmlFor="variant-english" className="font-normal cursor-pointer">Engelsk</Label>
                   </div>
                 </div>
               </CardContent>
