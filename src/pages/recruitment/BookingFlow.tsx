@@ -57,7 +57,8 @@ export default function BookingFlow() {
         .select(`
           *,
           candidates!inner(id, first_name, last_name, email, phone),
-          applications(id, role, status)
+          applications(id, role, status),
+          booking_flow_touchpoints(id, status, template_key)
         `)
         .order("enrolled_at", { ascending: false });
 
@@ -252,6 +253,24 @@ export default function BookingFlow() {
 
       const { error: tpErr } = await supabase.from("booking_flow_touchpoints").insert(touchpoints);
       if (tpErr) throw tpErr;
+
+      // Safety net: verify touchpoints were actually created
+      const { count } = await supabase
+        .from("booking_flow_touchpoints")
+        .select("id", { count: "exact", head: true })
+        .eq("enrollment_id", enrollmentId);
+
+      if (!count || count === 0) {
+        await supabase
+          .from("booking_flow_enrollments")
+          .update({
+            status: "cancelled",
+            cancelled_at: new Date().toISOString(),
+            cancelled_reason: "Ingen touchpoints kunne genereres",
+          })
+          .eq("id", enrollmentId);
+        throw new Error("Touchpoints blev ikke oprettet — flow markeret som fejlet");
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["booking-flow-enrollments"] });
@@ -279,6 +298,22 @@ export default function BookingFlow() {
       queryClient.invalidateQueries({ queryKey: ["booking-flow-enrollments"] });
       queryClient.invalidateQueries({ queryKey: ["booking-flow-pending-approvals"] });
       toast.success("Kandidat afvist");
+    },
+    onError: (err: any) => toast.error("Fejl: " + err.message),
+  });
+
+  // Regenerate touchpoints for stuck enrollments
+  const regenerateMutation = useMutation({
+    mutationFn: async (enrollmentId: string) => {
+      const { error } = await supabase.functions.invoke("regenerate-flow-touchpoints", {
+        body: { enrollment_id: enrollmentId },
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["booking-flow-enrollments"] });
+      queryClient.invalidateQueries({ queryKey: ["booking-flow-touchpoints"] });
+      toast.success("Touchpoints regenereret");
     },
     onError: (err: any) => toast.error("Fejl: " + err.message),
   });
@@ -503,6 +538,16 @@ export default function BookingFlow() {
                   const status = statusConfig[statusKey];
                   const StatusIcon = status?.icon || Clock;
 
+                  // Detect "stuck" enrollments: active, no pending outreach touchpoints, approved >24h ago
+                  const tps = (enrollment.booking_flow_touchpoints || []) as Array<{ status: string; template_key: string }>;
+                  const pendingOutreach = tps.filter(
+                    (t) => t.status === "pending" && t.template_key !== "booking_confirmation_sms"
+                  ).length;
+                  const baseTs = enrollment.approved_at ?? enrollment.enrolled_at;
+                  const hoursSince = baseTs ? (Date.now() - new Date(baseTs).getTime()) / 3600000 : 0;
+                  const isStuck =
+                    enrollment.status === "active" && pendingOutreach === 0 && hoursSince > 24;
+
                   return (
                     <div
                       key={enrollment.id}
@@ -517,6 +562,12 @@ export default function BookingFlow() {
                           <p className="text-xs text-muted-foreground">
                             {candidate?.email}
                           </p>
+                          {isStuck && (
+                            <p className="mt-1 text-xs font-medium text-destructive flex items-center gap-1">
+                              <AlertTriangle className="h-3 w-3" />
+                              Ingen touchpoints planlagt
+                            </p>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
@@ -530,6 +581,20 @@ export default function BookingFlow() {
                         <span className="text-xs text-muted-foreground">
                           {formatDistanceToNow(new Date((enrollment as any).approved_at ?? enrollment.enrolled_at), { addSuffix: true, locale: da })}
                         </span>
+                        {isStuck && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              regenerateMutation.mutate(enrollment.id);
+                            }}
+                            disabled={regenerateMutation.isPending}
+                          >
+                            <Zap className="h-3.5 w-3.5 mr-1" />
+                            Regenerér
+                          </Button>
+                        )}
                         {enrollment.status === "active" && (
                           <Button
                             variant="ghost"
