@@ -1,43 +1,30 @@
 
+## Justér omstilling-toggle på Pilot (intern TDC Opsummering)
 
-## Redesign "Opsummeringstype"-boks med pill-segmenter (TDC Opsummering intern)
+### Ændringer (kun `src/pages/TdcOpsummering.tsx`, kun når `summaryVariant === "pilot"`)
 
-### Layout-ændringer (kun øverste del af `src/pages/TdcOpsummering.tsx`)
+**1. Byt om på toggle-siderne**
+- **Venstre label**: "Standard omstilling" (default/aktiv ved load)
+- **Højre label**: "Professionel omstilling"
+- Switch OFF (default) = Standard omstilling → `isStandardOmstilling = true`
+- Switch ON = Professionel omstilling → `isStandardOmstilling = false`
+- Aktiv label fremhæves (bold/primary), inaktiv dæmpes (`text-muted-foreground`).
 
-Match screenshot-designet:
+**2. Fjern radio-valgene helt på Pilot**
+- Når `isPilot === true`: skjul hele `RadioGroup`-blokken med "Omstilling inkluderet" / "Uden omstilling" (linje ~520-545).
+- Sæt `hasOmstilling` permanent til `true` på Pilot (omstilling er altid inkluderet) og `noOmstilling` til `false`.
+- Vis kun toggle-switchen (Standard ↔ Professionel) som eneste valgmulighed.
+- På Standard- og 5g-fri-varianten: bevar nuværende radio-UI uændret.
 
-**1. Header-rækken** (linje 277-283 + flyt sprog-toggle hertil)
-- Behold ikon + titel + undertekst til venstre.
-- Tilføj **DA/EN segmented pill** i højre side af header-rækken (samme `flex justify-between`-række).
-- Pill-design: pillformet container med to "fane"-knapper. Aktiv = grøn fyld (`bg-primary text-primary-foreground`), inaktiv = transparent grå tekst (`text-muted-foreground`).
-- **Default: "DA" aktiv** (`isEnglish = false`).
-- Klik på "DA" → `setIsEnglish(false)`, klik på "EN" → `setIsEnglish(true)`.
-
-**2. "Opsummeringstype"-kortet** (linje 289-324)
-- Fjern den nuværende `RadioGroup` og fjern den separate Switch-blok (sprog-toggle flyttes til header).
-- Erstat med en **segmented pill button group** der visuelt matcher DA/EN-toggle (blot bredere med 3 valg):
-  - Container: pillformet baggrund (`bg-muted/30 rounded-lg p-1 inline-flex`).
-  - 3 knapper: "Standard", "Pilot", "Kun 5g fri salg".
-  - Aktiv knap: grøn fyld + hvid tekst (`bg-primary text-primary-foreground`).
-  - Inaktiv knap: transparent + dæmpet tekst (`text-muted-foreground hover:text-foreground`).
-  - Bredde: hver knap `flex-1` så de fylder kortets bredde jævnt (matcher screenshot).
-
-**3. State + adfærd**
-- `summaryVariant`-state bevares uændret (`"standard" | "pilot" | "5g-fri"`).
-- `isEnglish`-state bevares uændret — bare flyttet visuelt til header.
-- Etiketterne i UI'en forbliver på dansk indtil oversættelser leveres (toggle er stadig ren visuel).
-- Al downstream-logik (`isPilot`, `kun5gFriSalg`, `summaryLines`) røres IKKE.
-
-### Implementation
-- Brug almindelige `<button>`-elementer med `cn()` og `onClick` (ingen ny shadcn-komponent nødvendig).
-- Importér `cn` hvis ikke allerede importeret.
-- Fjern ubrugte importer (`RadioGroup`, `RadioGroupItem`, `Switch`) hvis de ikke bruges andetsteds i filen — verificeres ved implementation.
-
-### Filer berørt
-- `src/pages/TdcOpsummering.tsx` (kun denne — public-version forbliver urørt)
+**3. Genereret tekst (allerede korrekt logik)**
+- Linjen *"I forhold til jeres omstilling og hvordan den skal virke..."* vises altid på Pilot.
+- Linjen *"Hvis du får brug for menuvalg i fremtiden, så kan du altid opgradere din omstilling"* vises kun når `isStandardOmstilling === true` (Standard omstilling valgt).
+- Når brugeren toggler til Professionel → `isStandardOmstilling = false` → menuvalg-linjen forsvinder automatisk fra output.
 
 ### Ikke berørt
-- `src/components/ui/switch.tsx`, `src/components/ui/radio-group.tsx` — globale komponenter ændres ikke.
-- `src/pages/TdcOpsummeringPublic.tsx` — paritet brydes fortsat med vilje.
-- Resten af siden (Valgfrie sektioner, output-panel, validering).
+- Standard- og 5g-fri-varianten (radio-UI bevares).
+- `summaryLines`-genereringslogik røres ikke (eksisterende betingelser dækker behovet).
+- `src/pages/TdcOpsummeringPublic.tsx` røres ikke.
 
+### Filer berørt
+- `src/pages/TdcOpsummering.tsx` (kun denne)
