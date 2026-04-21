@@ -62,27 +62,61 @@ Deno.serve(async (req) => {
       if (u.orgCode && u.email) orgCodeMap.set(u.orgCode, { email: u.email, name: u.name || u.username || "" });
     }
 
-    // Walk windows of 5 days back to `days` ago, fetch all leads, scan
+    // Normalise refs (strip +45 / 45 prefix, spaces, dashes)
+    const normalize = (s: string) => String(s || "").replace(/[^0-9]/g, "").replace(/^45(?=\d{8}$)/, "");
+    const refNorms = refs.map(r => ({ raw: r, norm: normalize(r) }));
+
+    // Walk windows of 3 days back to `days` ago, fetch all leads, scan
     const matches: any[] = [];
-    const refSet = new Set(refs);
     const windows: { from: string; to: string }[] = [];
-    for (let offset = 0; offset < days; offset += 5) {
-      windows.push({ from: isoDaysAgo(offset + 5), to: isoDaysAgo(offset) });
+    for (let offset = 0; offset < days; offset += 3) {
+      windows.push({ from: isoDaysAgo(offset + 3), to: isoDaysAgo(offset) });
     }
 
     let totalScanned = 0;
+    let firstSampleLead: any = null;
+    const allDataFieldNames = new Set<string>();
+    const rawHits: { window: string; ref: string; snippet: string }[] = [];
+
     for (const w of windows) {
       const ep = `${baseUrl}/simpleleads?Projects=*&ModifiedFrom=${w.from}&ModifiedTo=${w.to}&AllClosedStatuses=true&take=2000`;
       const r = await fetch(ep, { headers });
-      const j = await r.json().catch(() => []);
+      const rawText = await r.text();
+
+      // Raw text scan FIRST (before JSON parse) to catch numbers no matter where they are
+      for (const { raw, norm } of refNorms) {
+        if (!norm) continue;
+        // Try a few format variants in raw text
+        const variants = [raw, `+45${norm}`, `45${norm}`, norm];
+        for (const v of variants) {
+          const idx = rawText.indexOf(v);
+          if (idx >= 0) {
+            rawHits.push({
+              window: `${w.from}..${w.to}`,
+              ref: raw,
+              snippet: rawText.substring(Math.max(0, idx - 200), Math.min(rawText.length, idx + 300)),
+            });
+            break;
+          }
+        }
+      }
+
+      let j: any;
+      try { j = JSON.parse(rawText); } catch { j = []; }
       const arr: any[] = Array.isArray(j) ? j : (j.Results || j.results || j.Leads || []);
       totalScanned += arr.length;
+      if (!firstSampleLead && arr.length > 0) firstSampleLead = arr[0];
 
       for (const lead of arr) {
-        const blob = JSON.stringify(lead);
+        if (lead?.data && typeof lead.data === "object") {
+          for (const k of Object.keys(lead.data)) allDataFieldNames.add(k);
+        }
+        // Build a normalised digit-blob from all string values in the lead
+        const digitBlob = JSON.stringify(lead).replace(/[^0-9]/g, "");
         let matched = "";
-        for (const ref of refSet) {
-          if (blob.includes(ref)) { matched = ref; break; }
+        for (const { raw, norm } of refNorms) {
+          if (!norm) continue;
+          if (digitBlob.includes(norm)) { matched = raw; break; }
         }
         if (!matched) continue;
 
@@ -125,11 +159,16 @@ Deno.serve(async (req) => {
 
     return json({
       searched: refs,
+      searchedNormalised: refNorms,
       windowDays: days,
       totalLeadsScanned: totalScanned,
       windowsScanned: windows.length,
       matchesFound: matches.length,
+      rawTextHits: rawHits,
       matches,
+      allDataFieldNames: Array.from(allDataFieldNames).sort(),
+      sampleLeadKeys: firstSampleLead ? Object.keys(firstSampleLead) : [],
+      sampleLeadData: firstSampleLead?.data || null,
     });
   } catch (e) {
     return json({ error: String(e), stack: (e as Error).stack }, 500);
