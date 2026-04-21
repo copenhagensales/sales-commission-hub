@@ -84,6 +84,12 @@ Deno.serve(async (req) => {
       } catch { /* ignore */ }
 
       // Walk windows from today and back, find first success lead in matching campaign
+      let sampleLead: any = null;
+      let scannedTotal = 0;
+      let usedWindow: any = null;
+      let usedCampaignFilter: string | null = null;
+      const closuresSeen = new Map<string, number>();
+      const campaignNamesSeen = new Map<string, number>();
       const campaignIds = matchedCampaigns.map((c: any) => c.id || c.Id).filter(Boolean);
       const matchedCampaignNames = matchedCampaigns.map((c: any) => String(c.name || c.Name || ""));
 
