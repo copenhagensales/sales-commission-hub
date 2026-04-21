@@ -1,74 +1,40 @@
 
 
-## Del "Annulleret" op i to: vi annullerede vs. kandidat trak sig tilbage
+## Tæl tid fra godkendelse, ikke fra ansøgning
 
-### Hvad jeg fandt
+### Problemet
 
-På `/recruitment/booking-flow` er der ét samlet filter "Annullerede" i status-dropdownen. I databasen skelner vi allerede mellem hvem der annullerede via `cancelled_reason`-feltet på `booking_flow_enrollments`:
+På `/recruitment/booking-flow`-listen viser hver kandidat fx "for 3 dage siden". Det tal er `enrolled_at`, som sættes da kandidaten blev oprettet i flow (typisk samtidig med ansøgning/segmentering). For Tier B/C-kandidater der venter i "pending approval" betyder det, at uret tikker mens de ligger i kø — ikke fra det øjeblik recruiter trykkede "Godkend" og flowet faktisk startede.
 
-**Vi (recruiter/system) annullerede:**
-- `Afvist af recruiter` — knap "Afvis" på pending approval
-- `Manuelt annulleret` — XCircle-knap på aktive flows
-- `Kandidat status ændret til: …` — auto-cancellation når application-status ændrer sig (process-booking-flow edge function)
+For Tier A (auto-approved) er `enrolled_at` = godkendelsestidspunktet, så for dem er der intet problem.
 
-**Kandidat trak sig selv:**
-- `Kandidat afmeldte sig via link` — unsubscribe-link i email/SMS
-- `Kandidat svarede på SMS` — STOP/svar via SMS
-- (Bemærk: `Kandidat bookede selv en tid` er status `completed`, ikke cancelled — uændret)
+### Løsning
 
-### Ændringer
+Tilføj `approved_at` (timestamp) til `booking_flow_enrollments` og brug den som visningstid i listen. Falder tilbage til `enrolled_at` for gamle rækker uden `approved_at`.
 
-**1. `src/pages/recruitment/BookingFlow.tsx`**
+**1. DB-migration**
+- Ny kolonne: `booking_flow_enrollments.approved_at timestamptz NULL`
+- Backfill:
+  - For eksisterende rækker hvor `approval_status = 'auto_approved'` → sæt `approved_at = enrolled_at` (ingen ventetid)
+  - For eksisterende `approval_status = 'approved'` rækker → sæt `approved_at = updated_at` (bedste tilgængelige proxy for hvornår de blev godkendt)
+  - Lad `pending_approval`-rækker have `approved_at = NULL` (de er ikke godkendt endnu)
 
-a) Erstat dropdown-option "Annullerede" med to:
-   - `cancelled_by_us` → "Vi annullerede"
-   - `cancelled_by_candidate` → "Kandidat trak sig"
+**2. `src/pages/recruitment/BookingFlow.tsx`**
+- I `approveMutation` (linje 216-222): tilføj `approved_at: new Date().toISOString()` til update-objektet, så fremtidige godkendelser registrerer tidspunktet
+- I `auto-segment-candidate` edge function (linje ~289 hvor enrollment oprettes): når Tier A auto-approves, sæt `approved_at = now()` direkte i insert
+- I listen (linje 530): erstat `enrollment.enrolled_at` med `enrollment.approved_at ?? enrollment.enrolled_at` så vi viser godkendelsestid når det findes, ellers fallback
 
-b) I enrollments-queryen: når filter er en af de to nye værdier, filtrer på `status = 'cancelled'` PLUS `cancelled_reason` matcher den rette gruppe (brug `.in()` med arrayet af reasons for hver gruppe).
-
-c) Udvid `statusConfig` med to virtuelle statuser så badges på listen viser den korrekte etiket og farve:
-   - `cancelled_by_us`: rød "Vi annullerede" (XCircle)
-   - `cancelled_by_candidate`: grå/orange "Kandidat trak sig" (UserMinus-ikon)
-
-d) Når badge rendes pr. enrollment: hvis `status === 'cancelled'`, beregn hvilken af de to grupper rækken hører til ud fra `cancelled_reason` og vis det rigtige badge — ikke det generelle "Annulleret".
-
-**2. `src/components/recruitment/RecruitmentKpiBar.tsx`**
-
-Split KPI-kortet "Annulleret" i to mindre kort (eller én kort med to tal) så ledelsen kan se forskellen på hvad vi afviser vs. hvad kandidaten selv frafalder. Brug samme `.in()`-mønster på `cancelled_reason`.
-
-### Reason-grupperne (én kilde)
-
-Jeg samler arrayet ét sted i `BookingFlow.tsx` (top of file) så det er nemt at vedligeholde:
-
-```ts
-const REASONS_BY_US = [
-  "Afvist af recruiter",
-  "Manuelt annulleret",
-];
-const REASON_PREFIX_BY_US = "Kandidat status ændret til:"; // bruges som startsWith-match
-const REASONS_BY_CANDIDATE = [
-  "Kandidat afmeldte sig via link",
-  "Kandidat svarede på SMS",
-];
-```
-
-For `Kandidat status ændret til: …`-rækker: behandles som "Vi annullerede" (system/recruiter-handling).
-
-For ukendte/manglende `cancelled_reason`: defaulter til "Vi annullerede" (sikker fallback).
+**3. Pending approval-sektion (uændret visning)**
+Pending approval-listen (linje 91-93) viser i forvejen kandidater der venter — for dem giver "tid siden ansøgning" stadig mening (det er ventetid for recruiter). Den ændrer jeg ikke.
 
 ### Hvad jeg IKKE rør
-
-- Database-skema (`cancelled_reason`-feltet eksisterer allerede og bruges korrekt af alle 4 edge functions)
-- Edge functions (`unsubscribe-candidate`, `receive-sms`, `process-booking-flow`, `public-book-candidate`)
-- Status-logik selv (`status = 'cancelled'` forbliver én værdi i DB — vi splitter kun visningen via `cancelled_reason`)
-- Andre faner (Samtaler, Templates osv.)
-- `BookingFlowEngagement.tsx` (har allerede sin egen "self-booked"-logik)
+- `enrolled_at`-kolonnen (bevares som "oprettet i flow")
+- Touchpoint-scheduling (køres fra `now()` ved godkendelse — allerede korrekt)
+- KPI-bar, timeline-dialog, andre faner
+- Logik for pending_approval-listen
 
 ### Verificering
-
-- Filter dropdown viser nu "Vi annullerede" og "Kandidat trak sig" i stedet for "Annullerede"
-- Vælg "Vi annullerede" → ser de 14 nuværende rækker (13 afvist + 1 manuelt)
-- Vælg "Kandidat trak sig" → ser fremtidige unsubscribe/SMS-respons rækker
-- Hver række i listen viser det rigtige badge baseret på `cancelled_reason`
-- KPI-baren viser to separate tal i stedet for ét samlet "Annulleret"
+- Godkend en pending kandidat → tiden i listen viser "for få sekunder siden", ikke "for X dage siden"
+- Eksisterende auto-approved Tier A-kandidater viser uændret tid (backfill = enrolled_at)
+- Eksisterende approved Tier B/C viser approximativt godkendelsestid (backfill = updated_at)
 
