@@ -702,17 +702,30 @@ export function useEmployeesForShifts(teamId?: string) {
       
       // For non-owners, get employees from teams they lead (as leader or assistant)
       if (isOwner !== true && currentEmployeeId) {
-        // Get teams where current user is team_leader OR assistant_team_leader
-        const { data: ledTeams, error: teamsError } = await supabase
-          .from("teams")
-          .select("id, name")
-          .or(`team_leader_id.eq.${currentEmployeeId},assistant_team_leader_id.eq.${currentEmployeeId}`);
-        
-        if (teamsError) throw teamsError;
-        
+        // Get teams where current user is team_leader (direct) OR assistant via junction table
+        const [leaderRes, assistantRes] = await Promise.all([
+          supabase.from("teams").select("id, name").eq("team_leader_id", currentEmployeeId),
+          supabase
+            .from("team_assistant_leaders")
+            .select("team_id, team:teams(id, name)")
+            .eq("employee_id", currentEmployeeId),
+        ]);
+
+        if (leaderRes.error) throw leaderRes.error;
+        if (assistantRes.error) throw assistantRes.error;
+
+        const ledTeamsMap = new Map<string, { id: string; name: string }>();
+        (leaderRes.data || []).forEach((t: any) => ledTeamsMap.set(t.id, { id: t.id, name: t.name }));
+        (assistantRes.data || []).forEach((row: any) => {
+          if (row.team_id && !ledTeamsMap.has(row.team_id)) {
+            ledTeamsMap.set(row.team_id, { id: row.team_id, name: row.team?.name ?? "" });
+          }
+        });
+        const ledTeams = Array.from(ledTeamsMap.values());
+
         console.log("[useEmployeesForShifts] Led teams (leader or assistant):", ledTeams);
-        
-        if (ledTeams && ledTeams.length > 0) {
+
+        if (ledTeams.length > 0) {
           const teamIds = ledTeams.map(t => t.id);
           
           // Get all employees from those teams
