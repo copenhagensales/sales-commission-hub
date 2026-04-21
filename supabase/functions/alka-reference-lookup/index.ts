@@ -20,6 +20,7 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
     const sampleCampaign: string | null = body.sampleCampaign || null;
+    const phones: string[] | null = Array.isArray(body.phones) ? body.phones : null;
     const days: number = body.days || 14;
 
     const supabase = createClient(
