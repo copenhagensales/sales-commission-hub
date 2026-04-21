@@ -17,10 +17,28 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 
-const meetingTypeLabels: Record<string, string> = {
-  amo_meeting: "Ordinært",
-  extraordinary: "Ekstraordinært",
-  annual_discussion: "Årligt møde",
+type MeetingTypeValue = "amo_meeting" | "extraordinary" | "annual_discussion";
+
+const MEETING_TYPES: { value: MeetingTypeValue; label: string }[] = [
+  { value: "amo_meeting", label: "Ordinært" },
+  { value: "extraordinary", label: "Ekstraordinært" },
+  { value: "annual_discussion", label: "Årligt møde" },
+];
+
+const meetingTypeLabels: Record<string, string> = Object.fromEntries(
+  MEETING_TYPES.map(t => [t.value, t.label])
+);
+
+const LEGACY_MEETING_TYPE_MAP: Record<string, MeetingTypeValue> = {
+  ordinary: "amo_meeting",
+  annual: "annual_discussion",
+};
+
+const normalizeMeetingType = (type: string | null | undefined): MeetingTypeValue => {
+  if (!type) return "amo_meeting";
+  if (LEGACY_MEETING_TYPE_MAP[type]) return LEGACY_MEETING_TYPE_MAP[type];
+  if (MEETING_TYPES.some(t => t.value === type)) return type as MeetingTypeValue;
+  return "amo_meeting";
 };
 
 const statusLabels: Record<string, string> = {
@@ -79,8 +97,9 @@ export default function AmoMeetings() {
 
   const save = useMutation({
     mutationFn: async (f: MeetingForm) => {
+      const normalizedType = normalizeMeetingType(f.meeting_type);
       const payload = {
-        meeting_type: f.meeting_type as any,
+        meeting_type: normalizedType as any,
         planned_date: f.planned_date,
         actual_date: f.actual_date || null,
         agenda: f.agenda || null,
@@ -127,7 +146,7 @@ export default function AmoMeetings() {
   const openEdit = (m: any) => {
     setEditing(m);
     setForm({
-      meeting_type: m.meeting_type,
+      meeting_type: normalizeMeetingType(m.meeting_type),
       planned_date: m.planned_date?.split("T")[0] || "",
       actual_date: m.actual_date?.split("T")[0] || "",
       agenda: m.agenda || "",
@@ -291,12 +310,12 @@ export default function AmoMeetings() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Type *</Label>
-                <Select value={form.meeting_type} onValueChange={v => setForm(f => ({ ...f, meeting_type: v }))}>
+                <Select value={normalizeMeetingType(form.meeting_type)} onValueChange={v => setForm(f => ({ ...f, meeting_type: normalizeMeetingType(v) }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="amo_meeting">Ordinært</SelectItem>
-                    <SelectItem value="extraordinary">Ekstraordinært</SelectItem>
-                    <SelectItem value="annual_discussion">Årligt møde</SelectItem>
+                    {MEETING_TYPES.map(t => (
+                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
