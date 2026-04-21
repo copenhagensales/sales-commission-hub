@@ -22,8 +22,8 @@ export class IngestionEngine {
     return coreGetCampaignMappings(this.supabase);
   }
 
-  async processUsers(users: StandardUser[], source: "adversus" | "enreach" = "adversus") {
-    return coreProcessUsers(this.supabase, users, this.log.bind(this), source);
+  async processUsers(users: StandardUser[], source: "adversus" | "enreach" = "adversus", allowedDomains?: string[]) {
+    return coreProcessUsers(this.supabase, users, this.log.bind(this), source, allowedDomains);
   }
 
   async processCampaigns(campaigns: StandardCampaign[]) {
