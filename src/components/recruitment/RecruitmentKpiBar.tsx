@@ -143,18 +143,7 @@ export function RecruitmentKpiBar() {
         </div>
       </div>
 
-      {/* Række 2 — Kandidat-udfald */}
-      <div>
-        <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Kandidat-udfald (sidste 30 dage)</p>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <KpiCard label="Ghostet" value={d?.ghostet ?? 0} icon={Ghost} tone="warning" isLoading={isLoading} />
-          <KpiCard label="Takket nej" value={d?.takketNej ?? 0} icon={ThumbsDown} isLoading={isLoading} />
-          <KpiCard label="Interview booket" value={d?.interview ?? 0} icon={CalendarCheck} subtext="aktuel pipeline" tone="info" isLoading={isLoading} />
-          <KpiCard label="Hired" value={d?.hired ?? 0} icon={Trophy} tone="success" isLoading={isLoading} />
-        </div>
-      </div>
-
-      {/* Række 3 — Touchpoint-sundhed */}
+      {/* Række 2 — Touchpoint-sundhed */}
       <div>
         <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Touchpoint-sundhed</p>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
