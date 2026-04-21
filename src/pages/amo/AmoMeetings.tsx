@@ -18,9 +18,9 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 
 const meetingTypeLabels: Record<string, string> = {
-  ordinary: "Ordinært",
+  amo_meeting: "Ordinært",
   extraordinary: "Ekstraordinært",
-  annual: "Årsmøde",
+  annual_discussion: "Årligt møde",
 };
 
 const statusLabels: Record<string, string> = {
@@ -50,7 +50,7 @@ type MeetingForm = {
 };
 
 const emptyForm: MeetingForm = {
-  meeting_type: "ordinary",
+  meeting_type: "amo_meeting",
   planned_date: "",
   actual_date: "",
   agenda: "",
@@ -294,9 +294,9 @@ export default function AmoMeetings() {
                 <Select value={form.meeting_type} onValueChange={v => setForm(f => ({ ...f, meeting_type: v }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="ordinary">Ordinært</SelectItem>
+                    <SelectItem value="amo_meeting">Ordinært</SelectItem>
                     <SelectItem value="extraordinary">Ekstraordinært</SelectItem>
-                    <SelectItem value="annual">Årsmøde</SelectItem>
+                    <SelectItem value="annual_discussion">Årligt møde</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
