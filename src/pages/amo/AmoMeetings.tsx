@@ -18,6 +18,8 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 
 type MeetingTypeValue = "amo_meeting" | "extraordinary" | "annual_discussion";
+type LegacyMeetingTypeValue = "ordinary" | "annual";
+type MeetingTypeInput = MeetingTypeValue | LegacyMeetingTypeValue;
 
 const MEETING_TYPES: { value: MeetingTypeValue; label: string }[] = [
   { value: "amo_meeting", label: "Ordinært" },
@@ -34,11 +36,11 @@ const LEGACY_MEETING_TYPE_MAP: Record<string, MeetingTypeValue> = {
   annual: "annual_discussion",
 };
 
-const normalizeMeetingType = (type: string | null | undefined): MeetingTypeValue => {
+const normalizeMeetingType = (type: string | null | undefined): MeetingTypeValue | null => {
   if (!type) return "amo_meeting";
   if (LEGACY_MEETING_TYPE_MAP[type]) return LEGACY_MEETING_TYPE_MAP[type];
   if (MEETING_TYPES.some(t => t.value === type)) return type as MeetingTypeValue;
-  return "amo_meeting";
+  return null;
 };
 
 const statusLabels: Record<string, string> = {
@@ -56,7 +58,7 @@ const statusColors: Record<string, string> = {
 };
 
 type MeetingForm = {
-  meeting_type: string;
+  meeting_type: MeetingTypeInput;
   planned_date: string;
   actual_date: string;
   agenda: string;
@@ -98,6 +100,10 @@ export default function AmoMeetings() {
   const save = useMutation({
     mutationFn: async (f: MeetingForm) => {
       const normalizedType = normalizeMeetingType(f.meeting_type);
+      if (!normalizedType) {
+        throw new Error("Ukendt mødetype. Vælg venligst en gyldig mødetype og prøv igen.");
+      }
+
       const payload = {
         meeting_type: normalizedType as any,
         planned_date: f.planned_date,
@@ -139,7 +145,7 @@ export default function AmoMeetings() {
 
   const openNew = () => {
     setEditing(null);
-    setForm(emptyForm);
+    setForm({ ...emptyForm, meeting_type: normalizeMeetingType(emptyForm.meeting_type) ?? "amo_meeting" });
     setDialog(true);
   };
 
@@ -310,7 +316,7 @@ export default function AmoMeetings() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Type *</Label>
-                <Select value={normalizeMeetingType(form.meeting_type)} onValueChange={v => setForm(f => ({ ...f, meeting_type: normalizeMeetingType(v) }))}>
+                <Select value={normalizeMeetingType(form.meeting_type) ?? "amo_meeting"} onValueChange={v => setForm(f => ({ ...f, meeting_type: normalizeMeetingType(v) ?? "amo_meeting" }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {MEETING_TYPES.map(t => (
@@ -372,7 +378,7 @@ export default function AmoMeetings() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialog(false)}>Annuller</Button>
-            <Button onClick={() => save.mutate(form)} disabled={!form.planned_date || save.isPending}>
+            <Button onClick={() => save.mutate({ ...form, meeting_type: normalizeMeetingType(form.meeting_type) ?? form.meeting_type })} disabled={!form.planned_date || save.isPending}>
               {save.isPending ? "Gemmer..." : "Gem"}
             </Button>
           </DialogFooter>
