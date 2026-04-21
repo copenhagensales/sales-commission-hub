@@ -14,6 +14,7 @@ import {
   Clock,
   AlertTriangle,
   Percent,
+  UserMinus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -72,11 +73,14 @@ export function RecruitmentKpiBar() {
       const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
       const nowIso = now.toISOString();
 
+      const REASONS_BY_CANDIDATE = ["Kandidat afmeldte sig via link", "Kandidat svarede på SMS"];
+
       const [
         active,
         newWeek,
         completed,
-        cancelled,
+        cancelledByCandidate,
+        cancelledTotal,
         ghostet,
         takketNej,
         interview,
@@ -88,6 +92,7 @@ export function RecruitmentKpiBar() {
         supabase.from("booking_flow_enrollments").select("id", { count: "exact", head: true }).eq("status", "active"),
         supabase.from("booking_flow_enrollments").select("id", { count: "exact", head: true }).gte("enrolled_at", sevenDaysAgo),
         supabase.from("booking_flow_enrollments").select("id", { count: "exact", head: true }).eq("status", "completed").gte("updated_at", thirtyDaysAgo),
+        supabase.from("booking_flow_enrollments").select("id", { count: "exact", head: true }).eq("status", "cancelled").in("cancelled_reason", REASONS_BY_CANDIDATE).gte("updated_at", thirtyDaysAgo),
         supabase.from("booking_flow_enrollments").select("id", { count: "exact", head: true }).eq("status", "cancelled").gte("updated_at", thirtyDaysAgo),
         supabase.from("candidates").select("id", { count: "exact", head: true }).eq("status", "ghostet").gte("updated_at", thirtyDaysAgo),
         supabase.from("candidates").select("id", { count: "exact", head: true }).eq("status", "takket_nej").gte("updated_at", thirtyDaysAgo),
@@ -101,12 +106,15 @@ export function RecruitmentKpiBar() {
       const hiredCount = hired.count ?? 0;
       const startedCount = flowStarted30d.count ?? 0;
       const conversion = startedCount > 0 ? Math.round((hiredCount / startedCount) * 100) : 0;
+      const cancelledCandidateCount = cancelledByCandidate.count ?? 0;
+      const cancelledUsCount = Math.max(0, (cancelledTotal.count ?? 0) - cancelledCandidateCount);
 
       return {
         active: active.count ?? 0,
         newWeek: newWeek.count ?? 0,
         completed: completed.count ?? 0,
-        cancelled: cancelled.count ?? 0,
+        cancelledByUs: cancelledUsCount,
+        cancelledByCandidate: cancelledCandidateCount,
         ghostet: ghostet.count ?? 0,
         takketNej: takketNej.count ?? 0,
         interview: interview.count ?? 0,
@@ -126,11 +134,12 @@ export function RecruitmentKpiBar() {
       {/* Række 1 — Flow-aktivitet */}
       <div>
         <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Flow-aktivitet</p>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
           <KpiCard label="Aktive i flow" value={d?.active ?? 0} icon={Users} tone="info" isLoading={isLoading} />
           <KpiCard label="Nye sidste 7 dage" value={d?.newWeek ?? 0} icon={UserPlus} subtext="enrollments" isLoading={isLoading} />
           <KpiCard label="Gennemført flow" value={d?.completed ?? 0} icon={CheckCircle2} subtext="sidste 30 dage" tone="success" isLoading={isLoading} />
-          <KpiCard label="Annulleret" value={d?.cancelled ?? 0} icon={XCircle} subtext="sidste 30 dage" tone="danger" isLoading={isLoading} />
+          <KpiCard label="Vi annullerede" value={d?.cancelledByUs ?? 0} icon={XCircle} subtext="sidste 30 dage" tone="danger" isLoading={isLoading} />
+          <KpiCard label="Kandidat trak sig" value={d?.cancelledByCandidate ?? 0} icon={UserMinus} subtext="sidste 30 dage" tone="warning" isLoading={isLoading} />
         </div>
       </div>
 

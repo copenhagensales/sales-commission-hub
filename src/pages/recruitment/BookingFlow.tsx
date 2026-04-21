@@ -9,7 +9,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Users, Zap, Clock, CheckCircle, XCircle, Plus, Loader2, ShieldCheck, AlertTriangle, FileText, CalendarDays, Eye, PhoneCall, Bell, Layout, BarChart3 } from "lucide-react";
+import { Users, Zap, Clock, CheckCircle, XCircle, Plus, Loader2, ShieldCheck, AlertTriangle, FileText, CalendarDays, Eye, PhoneCall, Bell, Layout, BarChart3, UserMinus } from "lucide-react";
+
+export const REASONS_BY_US = ["Afvist af recruiter", "Manuelt annulleret"];
+export const REASON_PREFIX_BY_US = "Kandidat status ændret til:";
+export const REASONS_BY_CANDIDATE = ["Kandidat afmeldte sig via link", "Kandidat svarede på SMS"];
+
+export function classifyCancellation(reason: string | null | undefined): "cancelled_by_us" | "cancelled_by_candidate" {
+  if (!reason) return "cancelled_by_us";
+  if (REASONS_BY_CANDIDATE.includes(reason)) return "cancelled_by_candidate";
+  return "cancelled_by_us";
+}
 import { Link } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import { da } from "date-fns/locale";
@@ -27,6 +37,8 @@ const statusConfig: Record<string, { label: string; icon: typeof CheckCircle; co
   active: { label: "Aktiv", icon: Zap, color: "bg-blue-500/10 text-blue-600 border-blue-500/30" },
   completed: { label: "Fuldført", icon: CheckCircle, color: "bg-green-500/10 text-green-600 border-green-500/30" },
   cancelled: { label: "Annulleret", icon: XCircle, color: "bg-red-500/10 text-red-600 border-red-500/30" },
+  cancelled_by_us: { label: "Vi annullerede", icon: XCircle, color: "bg-red-500/10 text-red-600 border-red-500/30" },
+  cancelled_by_candidate: { label: "Kandidat trak sig", icon: UserMinus, color: "bg-orange-500/10 text-orange-600 border-orange-500/30" },
   pending_approval: { label: "Afventer", icon: Clock, color: "bg-amber-500/10 text-amber-600 border-amber-500/30" },
 };
 
@@ -49,12 +61,19 @@ export default function BookingFlow() {
         `)
         .order("enrolled_at", { ascending: false });
 
-      if (filterStatus !== "all") {
+      if (filterStatus === "cancelled_by_us") {
+        query = query.eq("status", "cancelled");
+      } else if (filterStatus === "cancelled_by_candidate") {
+        query = query.eq("status", "cancelled").in("cancelled_reason", REASONS_BY_CANDIDATE);
+      } else if (filterStatus !== "all") {
         query = query.eq("status", filterStatus);
       }
 
       const { data, error } = await query;
       if (error) throw error;
+      if (filterStatus === "cancelled_by_us") {
+        return (data || []).filter((e: any) => classifyCancellation(e.cancelled_reason) === "cancelled_by_us");
+      }
       return data;
     },
   });
@@ -451,7 +470,8 @@ export default function BookingFlow() {
               <SelectItem value="all">Alle statuser</SelectItem>
               <SelectItem value="active">Aktive</SelectItem>
               <SelectItem value="completed">Fuldførte</SelectItem>
-              <SelectItem value="cancelled">Annullerede</SelectItem>
+              <SelectItem value="cancelled_by_us">Vi annullerede</SelectItem>
+              <SelectItem value="cancelled_by_candidate">Kandidat trak sig</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -476,7 +496,10 @@ export default function BookingFlow() {
               <div className="divide-y">
                 {enrollments.map((enrollment: any) => {
                   const candidate = enrollment.candidates;
-                  const status = statusConfig[enrollment.status as string];
+                  const statusKey = enrollment.status === "cancelled"
+                    ? classifyCancellation(enrollment.cancelled_reason)
+                    : (enrollment.status as string);
+                  const status = statusConfig[statusKey];
                   const StatusIcon = status?.icon || Clock;
 
                   return (
