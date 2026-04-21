@@ -1,59 +1,47 @@
 
 
-## Diagnose: Find CPH-sælgeren på Alka — udtøm alle muligheder
+## Lyn-backfill: Alka 45 dage med pauset normal sync
 
-### Kontekst
-- 178 success-leads i går på Alka — alle attribueret til `@tryg.dk` via `lastModifiedByUser`
-- Du bekræfter at en `@copenhagensales.dk` sælger sidder på opgaven
-- Vi har KUN tjekket `lastModifiedByUser` indtil nu
-- Adapter-koden har 3 fallback-lag: `firstProcessedByUser.email` → `lastModifiedByUser.email` → `orgCode→email`-map
+### Mål
+Hente ALLE salg fra Alka API'en for de sidste 45 dage så hurtigt som muligt — ved at pause den normale 15-min cron sync midlertidigt, så hele API-budgettet (10.000 kald/time) er tilgængeligt for backfill.
 
-### Hypoteser der skal testes (alle ad gangen, kun Alka API + DB read)
+### Plan
 
-**H1: CPH-sælger findes som Enreach-bruger med CPH-email**  
-→ Søg `/users` for alle 3 CPH-domæner
+**Step 1 — Pause normal sync på Alka**  
+Sæt `is_active = false` på Alka-integrationen i `dialer_integrations`. Det stopper den løbende cron fra at bruge API-budget. Tager ~5 sek.
 
-**H2: CPH-sælger er `firstProcessedByUser` (ikke `lastModified`)**  
-→ Scan `firstProcessedByUser` på sidste 7 dage
+**Step 2 — Kør safe-backfill med fuldt budget**  
+Kald `integration-engine` action `safe-backfill` med:
+- `integration_id` = Alka's ID (`48d8bd23-...`)
+- `from` = i dag - 45 dage
+- `to` = i dag
+- `datasets` = `["sales"]` (KUN salg, ingen calls)
+- `uncapped` = `true` (ingen per-dag cap)
+- `background` = `true` (kør asynkront)
 
-**H3: CPH-sælger har en `@tryg.dk` alias-email i Enreach, men findes i vores `employee_master_data` med CPH-email**  
-→ Krydsreferér alle 587 Enreach-brugeres navne mod `employee_master_data.first_name + last_name` hvor `work_email` ender på CPH-domæne
+Med `is_active=false` er der ingen konkurrence om budget. Med Enreach-limit på 10.000 kald/time og typisk ~50-200 kald per dag (afhænger af lead-volumen), kan 45 dage gennemføres på 1-3 timer i stedet for 6-12 timer.
 
-**H4: CPH-sælger findes via et andet brugerfelt (`createdByUser`, `assignedToUser`, etc.)**  
-→ Inspicér ALLE user-relaterede felter i en sample lead-payload med `Include=*` eller bredere
+**Step 3 — Monitor progress**  
+Følg fremskridt via `integration_logs` og `integration_sync_runs` tabellerne. Hver dag logges separat med `details.results`.
 
-**H5: Salgene findes faktisk i DB, men under et andet integration_id (Tryg's egen)**  
-→ Query `sales` for sidste 7 dage hvor `agent_email LIKE '%copenhagensales%'` på TVÆRS af alle Enreach-integrationer
+**Step 4 — Genaktivér normal sync**  
+Når backfill er færdig (eller stopper med `stoppedEarly: true`), sæt `is_active = true` igen. Cron tager over fra næste 15-min-tick.
 
-**H6: CPH-sælgeren bruger en helt 3. email-domain vi ikke har whitelistet endnu**  
-→ List top 50 unikke email-domæner blandt alle 587 Enreach-brugere
-
-### Implementering
-
-**Fil:** `supabase/functions/probe-enreach-integration/index.ts` (udvides med 6 tjek)
-
-Probe kører kun mod Alka credentials (`integration_id=48d8bd23-...`), maks ~15 ekstra API-kald.
-
-### Output-rapport
-
-```
-fullDiagnosis: {
-  H1_cphUsersInEnreach: [{name,email,orgCode,isActive,lastActive}],
-  H2_firstProcessedDomains: { "@tryg.dk":N, "@copenhagensales.dk":N, ...},
-  H3_nameMatchedToCphEmployees: [{enreachName, enreachEmail, cphWorkEmail}],
-  H4_allUserFieldsInLead: ["lastModifiedByUser","firstProcessedByUser",...],
-  H5_existingSalesInDb: { count, sampleAgentEmails:[...] },
-  H6_topDomainsInEnreach: { "@tryg.dk":520, "@alka.dk":40, ...},
-  recommendation: "..."
-}
-```
+### Tekniske noter
+- `safe-backfill` har allerede 30% budget-reserve indbygget — men den reserve er irrelevant nu da intet andet bruger Alka's budget
+- `enableUserPreFetch=true` (fra forrige fase) sikrer at orgCode→email mapping er aktiv → CPH-sælgeren bliver korrekt attribueret
+- Hvis budget alligevel rammer loftet, fortsætter backfill bare i næste time-vindue
+- Calls hentes IKKE i denne kørsel (sparer ~50% af API-kaldene)
 
 ### Hvad jeg IKKE rører
-- Andre integrationer (Tryg, Eesy, ASE, Adversus) — probe kalder kun Alka credentials
-- `EnreachAdapter`, sync-logik, calls-sync
-- Database write (kun SELECT på `sales` + `employee_master_data`)
-- Whitelist-config (allerede sat til kun `@copenhagensales.dk` via tidligere migration)
+- Andre integrationer (Tryg, Eesy, ASE) — kører normalt videre
+- Adapter-kode eller core ingestion-logik
+- Whitelist (stadig kun `@copenhagensales.dk`)
+- DB schema
 
-### Næste skridt
-Kør probe → få entydigt svar på hvor CPH-sælgeren skjuler sig → vælg targeted fix (justér attribution-prioritet, tilføj alias-mapping, eller bekræft at salget skal komme via anden kanal).
+### Næste skridt efter approval
+1. Pause Alka (`is_active=false`)
+2. Trigger safe-backfill 45 dage, kun sales, uncapped, background
+3. Vis dig hvor mange dage der kører + estimeret tid
+4. Når færdig: aktivér Alka igen + rapportér total antal salg hentet
 
