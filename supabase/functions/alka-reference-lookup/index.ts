@@ -114,6 +114,13 @@ Deno.serve(async (req) => {
           const arr: any[] = Array.isArray(j) ? j : (j.Results || j.results || j.Leads || []);
           scannedTotal += arr.length;
 
+          // Track ALL distinct campaign names we see
+          for (const lead of arr) {
+            const campObj = lead.campaign || {};
+            const campName = String(campObj.name || campObj.Name || lead.campaignName || "");
+            if (campName) campaignNamesSeen.set(campName, (campaignNamesSeen.get(campName) || 0) + 1);
+          }
+
           // First filter to leads in matching permission campaigns
           const inCampaign = arr.filter((lead) => {
             const campObj = lead.campaign || {};
