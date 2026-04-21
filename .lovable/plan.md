@@ -1,70 +1,49 @@
 
 
-## Booking-flow engagement rapport
+## Diæter vises ikke på vagtplanen — analyse + fix
 
-### Problem
+### Hvad jeg fandt
 
-Vi kan rapportere på 3 ud af 4 ønskede metrics ud af boksen, men **link-klik tracker vi ikke i dag**. `short_links`-tabellen har kun `code`, `target_url`, `candidate_id`, `link_type`, `created_at` — ingen klik-tæller. Redirect-funktionen (`/r/:code`) fetcher bare `target_url` og sender brugeren videre uden at logge noget.
+Fra screenshot + DB-tjek:
+- Brugeren ser **Eesy FM, uge 19** (4-10/5) — bookinger Aalborg Storcenter (`da3b2393…`) + Kolding Storcenter (`06ca5c22…`).
+- Begge bookinger har **diæter i `booking_diet`** (8 stk på hver, lønart "Diæter" — `e4efc5b4…`) oprettet 20/4 kl. 12:17–12:20, dvs. **før** screenshottet kl. 12:35.
+- Skærmbilledet viser **ingen "Diæt"-badges under nogen dage** — hverken Aalborg eller Kolding. Kun bil-badges (Kolding) og hotel-badge (Aalborg).
+- Koden i `src/pages/vagt-flow/BookingsContent.tsx` (linje 1280–1321 + 1596) HAR rendering for `dietByBookingDate` og query'en (linje 329–342) ramler korrekt mod `salary_type_id = "Diæter"` via `ilike '%diæt%'`.
+- RLS på `booking_diet` er åben for authenticated.
 
-For at få den fulde rapport skal vi først tilføje klik-tracking, derefter bygge selve rapporten.
+### Sandsynlig rodårsag
 
-### Plan
+Query'en `vagt-booking-diets` er gated på `enabled: allBookingIds.length > 0 && !!dietSalaryType`. **Cache-key indeholder ikke `allBookingIds`**, kun `selectedWeek + selectedYear + dietSalaryType?.id`:
 
-**1. Tilføj klik-tracking på short links** (migration)
-- Tilføj kolonner til `short_links`: `click_count INTEGER DEFAULT 0`, `first_clicked_at TIMESTAMPTZ`, `last_clicked_at TIMESTAMPTZ`.
-- Opret tabel `short_link_clicks` (id, short_link_id, candidate_id, clicked_at, user_agent, ip_hash) for detaljerede events (så vi kan beregne unikke klik pr. kandidat).
-- RLS: public insert (logges fra redirect), authenticated read.
+```ts
+queryKey: ["vagt-booking-diets", selectedWeek, selectedYear, dietSalaryType?.id]
+```
 
-**2. Log klik i redirect-flow**
-- Opdatér edge-funktionen `supabase/functions/r/index.ts` til at:
-  - Indsætte en row i `short_link_clicks`
-  - Inkrementere `click_count` og opdatere `last_clicked_at` på `short_links` (og sætte `first_clicked_at` første gang)
-- Opdatér `src/pages/ShortLinkRedirect.tsx` på samme måde (fallback når brugeren rammer SPA-routen direkte).
-- Fire-and-forget: redirect må ikke blokere på logging.
+Det betyder at hvis brugeren først lander på siden mens `bookings`/`marketBookings` stadig loader (så `allBookingIds = []`), kører query'en i `enabled: false`-tilstand. Når bookinger så ankommer og `allBookingIds` udvides, **invaliderer cache-key'en ikke** — query'en re-fyrer ikke, og resultatet forbliver det tomme array fra første render. De samme symptomer ville ramme `vagt-booking-training-bonuses` og `vagt-booking-vehicles` (den sidste virker dog i screenshot — men dens key inkluderer `allBookingIds`, se linje 283).
 
-**3. Byg rapport-side: `/recruitment/booking-flow/engagement`**
-Ny route + side `BookingFlowEngagement.tsx` med periode-filter (default: sidste 30 dage) og 3 sektioner:
+Sammenlign:
+- ✅ `vagt-booking-vehicles` key: `[..., selectedWeek, selectedYear, allBookingIds]` — re-fetcher korrekt
+- ❌ `vagt-booking-diets` key: `[..., selectedWeek, selectedYear, dietSalaryType?.id]` — re-fetcher ikke når `allBookingIds` ændres
+- ❌ `vagt-booking-training-bonuses` key: samme bug
 
-**A. Funnel (top-tal):**
-| Metric | Kilde |
-|---|---|
-| Kandidater i flow | `booking_flow_enrollments` (alle statuser) |
-| Touchpoints sendt | `booking_flow_touchpoints` status=sent |
-| Unikke kandidater der åbnede et booking-link | `short_link_clicks` join `short_links` (link_type='booking') |
-| Kandidater der svarede på SMS | distinct candidates m. `communication_logs` direction='inbound', type='sms' |
-| Selvbookede interviews | `booking_flow_enrollments` cancelled_reason ILIKE 'kandidat selv%' eller candidates.status='interview_scheduled' inden for flow-periode |
-| Ghosted | candidates.status='ghostet' |
-| Takket nej | candidates.status='takket_nej' |
-| Afmeldt (unsubscribe-link) | `short_link_clicks` join `short_links` (link_type='unsubscribe') |
+### Fix
 
-Hver række viser absolut antal + konverteringsrate ift. "Touchpoints sendt".
+Tilføj `allBookingIds` til query-key for begge problematiske queries:
 
-**B. Per-touchpoint breakdown** (tabel)
-Grupperet på `template_key`:
-- Sendt | SMS-svar inden for 48t | Booking-link åbnet inden for 48t | Bookede inden for 48t | Failed
-- Hjælper med at se hvilke beskeder der virker bedst.
+```ts
+queryKey: ["vagt-booking-diets", selectedWeek, selectedYear, dietSalaryType?.id, allBookingIds]
+queryKey: ["vagt-booking-training-bonuses", selectedWeek, selectedYear, trainingBonusSalaryType?.id, allBookingIds]
+```
 
-**C. Per-tier breakdown** (tabel)
-A/B/C-segment × samme kolonner. Viser om vores segmentering rammer de rigtige.
-
-**4. Tilføj link i sidebar/booking-flow page**
-Knap "Engagement-rapport" på `/recruitment/booking-flow` der linker til den nye side.
-
-### Hvad jeg IKKE rører
-- Booking-flow templates / cron / send-logik
-- Eksisterende `/recruitment/booking-flow` UI (kun ny knap)
-- KPI-bar ovenfor (`RecruitmentKpiBar`) — den fortsætter uafhængigt
-
-### Filer
-- Ny migration: `short_links` kolonner + `short_link_clicks` tabel + RLS
-- `supabase/functions/r/index.ts` (log klik)
-- `src/pages/ShortLinkRedirect.tsx` (log klik)
-- Ny: `src/pages/recruitment/BookingFlowEngagement.tsx`
-- `src/routes/pages.ts` + `src/routes/config.tsx` (route)
-- `src/pages/recruitment/BookingFlow.tsx` (knap til rapport — find rigtige filnavn under exploration)
+### Filer der ændres
+- `src/pages/vagt-flow/BookingsContent.tsx` (kun query-keys på linje 330 + 346)
 
 ### Verificering
-- Klik et booking-shortlink → row i `short_link_clicks`, `click_count` stiger
-- Åbn `/recruitment/booking-flow/engagement` → tal matcher SQL-tjek manuelt for sidste 30 dage
-- Periode-filter ændrer alle tre sektioner
+- Genindlæs `/vagt-flow/bookings?week=19&year=2026` → "Diæt"-badges skal nu vises under man-tor på begge Eesy FM-bookinger.
+- Tilsvarende for "Oplæringsbonus"-badges hvor de findes.
+- Nyligt tilføjede diæter (via "Tilføj diæt"-knap) inviderer allerede via mutation `onSuccess` — uændret.
+
+### Hvad jeg IKKE rører
+- RLS, lønart-tabel, mutation-logik, andre faner.
+- Den tilsvarende rendering i `MyBookingSchedule.tsx` (key inkluderer allerede `bookingIds` — virker).
 
