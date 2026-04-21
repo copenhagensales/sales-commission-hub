@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { REFRESH_PROFILES } from "@/utils/tvMode";
 import { trackFetch } from "@/utils/fetchPerformance";
+import { isKpiCacheStale, logStaleCacheWarning } from "@/utils/kpiCacheStale";
 
 export type KpiPeriod = "today" | "this_week" | "this_month" | "payroll_period" | "current" | "last_24h" | "last_7d" | "last_30d";
 export type KpiScopeType = "global" | "client" | "team" | "employee";
