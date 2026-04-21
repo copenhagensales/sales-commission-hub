@@ -199,6 +199,88 @@ serve(async (req) => {
     endpoints.push(simpleLeads);
     await sleep(200);
 
+    // 4b. AGENT AUDIT — fetch 100 leads to map orgCodes/email-domains
+    const CURRENT_WHITELIST = ["@copenhagensales.dk", "@cph-relatel.dk", "@cph-sales.dk"];
+    const auditUrl = `${baseUrl}/simpleleads?${projectFilter}&ModifiedFrom=${sevenDaysAgo}&AllClosedStatuses=true&Limit=100`;
+    let agentAudit: Record<string, unknown> = { skipped: true };
+    try {
+      console.log(`[Probe] → agent-audit: ${auditUrl}`);
+      const resp = await fetch(auditUrl, { headers: { Authorization: authHeader, Accept: "application/json" } });
+      if (resp.ok) {
+        const leads = await resp.json() as Array<Record<string, unknown>>;
+        const groups = new Map<string, { count: number; emails: Set<string>; domains: Set<string>; sources: Set<string>; wouldPass: boolean }>();
+        let totalSuccess = 0;
+        let wouldBeFiltered = 0;
+        let wouldPass = 0;
+
+        const recordUser = (u: unknown, source: "lastModified" | "firstProcessed") => {
+          if (!u || typeof u !== "object") return;
+          const user = u as Record<string, unknown>;
+          const orgCode = (user.orgCode as string) || "(none)";
+          const email = (user.email as string) || "";
+          const domain = email.includes("@") ? "@" + email.split("@")[1].toLowerCase() : "(none)";
+          const passes = CURRENT_WHITELIST.some(d => email.toLowerCase().endsWith(d));
+          const key = orgCode;
+          const g = groups.get(key) ?? { count: 0, emails: new Set(), domains: new Set(), sources: new Set(), wouldPass: passes };
+          g.count++;
+          if (email) g.emails.add(email);
+          if (domain) g.domains.add(domain);
+          g.sources.add(source);
+          if (passes) g.wouldPass = true;
+          groups.set(key, g);
+        };
+
+        for (const lead of leads) {
+          totalSuccess++;
+          const lastUser = lead.lastModifiedByUser as Record<string, unknown> | undefined;
+          const firstUser = lead.firstProcessedByUser as Record<string, unknown> | undefined;
+          recordUser(lastUser, "lastModified");
+          if (firstUser && (firstUser as { email?: string }).email !== (lastUser as { email?: string } | undefined)?.email) {
+            recordUser(firstUser, "firstProcessed");
+          }
+          // Determine if THIS LEAD would pass the current filter (based on lastModifiedByUser like the adapter)
+          const leadEmail = ((lastUser?.email as string) || "").toLowerCase();
+          const passes = CURRENT_WHITELIST.some(d => leadEmail.endsWith(d));
+          if (passes) wouldPass++; else wouldBeFiltered++;
+        }
+
+        const top = Array.from(groups.entries())
+          .map(([orgCode, g]) => ({
+            orgCode,
+            count: g.count,
+            emailDomains: Array.from(g.domains),
+            sampleEmails: Array.from(g.emails).slice(0, 3),
+            sources: Array.from(g.sources),
+            wouldPassCurrentFilter: g.wouldPass,
+          }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 10);
+
+        const allDomains = new Set<string>();
+        for (const g of groups.values()) for (const d of g.domains) allDomains.add(d);
+
+        agentAudit = {
+          totalLeadsAnalyzed: totalSuccess,
+          uniqueOrgCodes: groups.size,
+          uniqueEmailDomains: Array.from(allDomains).sort(),
+          currentWhitelist: CURRENT_WHITELIST,
+          leadsThatWouldPassFilter: wouldPass,
+          leadsThatWouldBeFiltered: wouldBeFiltered,
+          top10OrgCodes: top,
+          recommendation: wouldBeFiltered === totalSuccess
+            ? `🚨 ALLE ${totalSuccess} leads ville blive filtreret væk. Whitelist SKAL udvides for at Alka virker.`
+            : wouldBeFiltered > 0
+              ? `⚠️ ${wouldBeFiltered}/${totalSuccess} leads ville blive filtreret. Tilføj manglende domæner til Alka's allowedAgentEmailDomains.`
+              : `✅ Alle ${totalSuccess} leads passerer nuværende filter — ingen whitelist-ændring nødvendig.`,
+        };
+      } else {
+        agentAudit = { error: `Status ${resp.status}`, body: (await resp.text()).slice(0, 300) };
+      }
+    } catch (e) {
+      agentAudit = { error: (e as Error).message };
+    }
+    await sleep(200);
+
     // 5. RICH /leads with broad Include + Projects=*
     const richInclude = "data,campaign,lastModifiedByUser,firstProcessedByUser,closureData,questions,answers,attempts,history,orgUnit,uploadedByUser";
     const richLeads = await probe(
