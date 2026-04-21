@@ -434,7 +434,8 @@ serve(async (req) => {
     }
     await sleep(200);
 
-    // ============= CPH SELLER HUNT (H1-H6) =============
+    // ============= CPH SELLER HUNT (H1-H6) v2 =============
+    console.log("[Probe] → CPH SELLER HUNT START");
     const CPH_DOMAINS = ["@copenhagensales.dk", "@cph-sales.dk", "@cph-relatel.dk", "@cphsales.dk"];
     const cphSellerHunt: Record<string, unknown> = {};
     let allUsers: Array<Record<string, unknown>> = [];
