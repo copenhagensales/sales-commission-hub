@@ -274,24 +274,15 @@ export function ProductPricingRulesDialog({
           applied_at: new Date().toISOString()
         });
         
-        // Fire-and-forget rematch in background
-        toast.info("Opdaterer salg i baggrunden...");
-        rematchMutation.mutate(
-          { productId },
-          {
-            onSuccess: (result) => {
-              if (result.stats.updated > 0) {
-                toast.success(`✓ ${result.stats.updated} salg opdateret med nye priser`);
-              } else {
-                toast.info("Ingen salg blev opdateret");
-              }
-            },
-            onError: () => {
-              toast.error("Baggrundsopdatering fejlede — prøv rematch manuelt");
-            },
-          }
-        );
-        
+        // Background rematch + KPI refresh + realtime broadcast via central hook
+        sync({
+          invalidate: ["pricing", "products", "sales", "kpi"],
+          rematch: true,
+          productId,
+          effectiveFromDate: format(effectiveDate, "yyyy-MM-dd"),
+          label: "basispris",
+        });
+
         if (isRetroactive) {
           toast.warning("Prisændring gemt med retroaktiv dato");
         }
