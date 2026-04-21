@@ -30,7 +30,7 @@ interface SummaryLine {
 type MbbType = "mobilevoice" | "datadelingskort" | null;
 type NumberChoice = "existing" | "mixed" | "new";
 type StartupChoice = "asap" | "specific";
-type SummaryVariant = "standard" | "pilot" | "5g-fri";
+type SummaryVariant = "standard" | "pilot" | "5g-fri" | "engelsk";
 
 export default function TdcOpsummering() {
   const { toast } = useToast();
@@ -306,6 +306,10 @@ export default function TdcOpsummering() {
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="5g-fri" id="variant-5g-fri" />
                     <Label htmlFor="variant-5g-fri" className="font-normal cursor-pointer">Kun 5g Fri Salg</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="engelsk" id="variant-engelsk" />
+                    <Label htmlFor="variant-engelsk" className="font-normal cursor-pointer">Engelsk opsummering</Label>
                   </div>
                 </RadioGroup>
               </CardContent>
