@@ -291,6 +291,7 @@ Deno.serve(async (req) => {
         status: enrollmentStatus,
         approval_status: approvalStatus,
         segmentation_signals: signals,
+        approved_at: requiresApproval ? null : new Date().toISOString(),
       })
       .select('id')
       .single();
