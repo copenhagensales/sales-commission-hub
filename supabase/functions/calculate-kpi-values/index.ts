@@ -1873,7 +1873,6 @@ function calculateHoursForEmployees(
   shiftData: ShiftDataResult
 ): number {
   const { teamMembers, primaryShifts, shiftDays, timeStampsData, employeeTimeClocksMap } = shiftData;
-  const { teamMembers, primaryShifts, shiftDays, timeStampsData } = shiftData;
   
   let totalHours = 0;
   const start = new Date(startStr.split("T")[0]);
