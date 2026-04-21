@@ -636,15 +636,17 @@ export function ClientDBTab() {
 
   // Determine if we should use KPI cache
   const kpiPeriodType = mapPeriodModeToKpiPeriod(periodMode, periodStart);
-  const useKpiCache = !!kpiPeriodType;
 
-  // Fetch KPI-cached sales data per client
-  const { data: kpiClientData, isLoading: kpiLoading } = useQuery({
+  // Max acceptable age for KPI cache before falling back to live query
+  const KPI_CACHE_MAX_AGE_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+  // Fetch KPI-cached sales data per client (also returns staleness info)
+  const { data: kpiClientResult, isLoading: kpiLoading } = useQuery({
     queryKey: ["kpi-client-sales", kpiPeriodType],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("kpi_cached_values")
-        .select("scope_id, kpi_slug, value")
+        .select("scope_id, kpi_slug, value, calculated_at")
         .eq("scope_type", "client")
         .eq("period_type", kpiPeriodType!)
         .in("kpi_slug", ["sales_count", "total_commission", "total_revenue"]);
@@ -652,10 +654,16 @@ export function ClientDBTab() {
       if (error) throw error;
 
       const byClient: Record<string, { sales: number; commission: number; revenue: number }> = {};
-      
+      let newestCalculatedAt: number | null = null;
+
       for (const row of data || []) {
         if (!row.scope_id) continue;
-        
+
+        const ts = row.calculated_at ? new Date(row.calculated_at).getTime() : null;
+        if (ts !== null && (newestCalculatedAt === null || ts > newestCalculatedAt)) {
+          newestCalculatedAt = ts;
+        }
+
         if (!byClient[row.scope_id]) {
           byClient[row.scope_id] = { sales: 0, commission: 0, revenue: 0 };
         }
@@ -673,14 +681,28 @@ export function ClientDBTab() {
         }
       }
 
-      return byClient;
+      const ageMs = newestCalculatedAt !== null ? Date.now() - newestCalculatedAt : null;
+      const isStale = ageMs === null || ageMs > KPI_CACHE_MAX_AGE_MS;
+
+      return { byClient, newestCalculatedAt, ageMs, isStale };
     },
-    enabled: useKpiCache,
+    enabled: !!kpiPeriodType,
     staleTime: 30000,
     refetchInterval: 60000,
   });
 
-  // Fetch sales by client directly (fallback for custom periods)
+  const kpiClientData = kpiClientResult?.byClient;
+  const kpiCacheIsStale = kpiClientResult?.isStale ?? false;
+  // Only actually use cache if it exists AND is fresh enough
+  const useKpiCache = !!kpiPeriodType && !!kpiClientResult && !kpiCacheIsStale;
+
+  // Warn once when we fall back due to stale cache
+  if (kpiPeriodType && kpiClientResult && kpiCacheIsStale && typeof window !== "undefined") {
+    const ageHours = kpiClientResult.ageMs !== null ? (kpiClientResult.ageMs / 3600000).toFixed(1) : "ukendt";
+    console.warn(`[ClientDBTab] KPI cache er ${ageHours}t gammel (>${KPI_CACHE_MAX_AGE_MS / 3600000}t) — falder tilbage til live query.`);
+  }
+
+  // Fetch sales by client directly (fallback for custom periods OR stale cache)
   const { data: salesByClientDirect, isLoading: directSalesLoading } = useQuery({
     queryKey: ["sales-by-client-direct", periodStart.toISOString(), periodEnd.toISOString()],
     queryFn: async () => {
