@@ -20,6 +20,7 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
     const sampleCampaign: string | null = body.sampleCampaign || null;
+    const phones: string[] | null = Array.isArray(body.phones) ? body.phones : null;
     const days: number = body.days || 14;
 
     const supabase = createClient(
@@ -227,7 +228,144 @@ Deno.serve(async (req) => {
       });
     }
 
-    return json({ error: "Pass {sampleCampaign: 'permission'} to get a sample dump" });
+    // ---------------- PHONES MODE ----------------
+    if (phones && phones.length > 0) {
+      // Normalize phone numbers - extract last 8 digits as the core
+      const normalize = (s: string): string => {
+        const digits = String(s || "").replace(/\D/g, "");
+        return digits.length >= 8 ? digits.slice(-8) : digits;
+      };
+      const targets = new Map<string, string>(); // normalized → original
+      for (const p of phones) {
+        const n = normalize(p);
+        if (n) targets.set(n, p);
+      }
+
+      // Discover all projects
+      let projectsList: any[] = [];
+      try {
+        const pRes = await fetch(`${baseUrl}/projects?Limit=500`, { headers });
+        const pJson = await pRes.json().catch(() => []);
+        projectsList = Array.isArray(pJson) ? pJson : (pJson.Results || pJson.results || []);
+      } catch { /* ignore */ }
+      const projectNames = projectsList.map((p: any) => p.name || p.Name).filter(Boolean);
+
+      // Recursively scan an object for phone-like values
+      const scanForPhones = (obj: any, path = ""): { field: string; value: string; matched: string }[] => {
+        const hits: { field: string; value: string; matched: string }[] = [];
+        if (obj == null) return hits;
+        if (typeof obj === "string" || typeof obj === "number") {
+          const v = String(obj);
+          const n = normalize(v);
+          if (n.length === 8 && targets.has(n)) {
+            hits.push({ field: path, value: v, matched: n });
+          }
+          return hits;
+        }
+        if (typeof obj !== "object") return hits;
+        if (Array.isArray(obj)) {
+          obj.forEach((v, i) => hits.push(...scanForPhones(v, `${path}[${i}]`)));
+          return hits;
+        }
+        for (const [k, v] of Object.entries(obj)) {
+          hits.push(...scanForPhones(v, path ? `${path}.${k}` : k));
+        }
+        return hits;
+      };
+
+      // Result tracking
+      const results = new Map<string, any>();
+      for (const [n, orig] of targets) {
+        results.set(n, { phone: orig, normalized: n, found: false, matches: [] });
+      }
+
+      let totalScanned = 0;
+      const projectStats: Record<string, number> = {};
+
+      // Iterate day-by-day, project-by-project
+      for (let dayOffset = 0; dayOffset < days; dayOffset++) {
+        const from = isoDaysAgo(dayOffset + 1);
+        const to = isoDaysAgo(dayOffset);
+
+        for (const projName of projectNames) {
+          const projEnc = encodeURIComponent(projName);
+          const ep = `${baseUrl}/simpleleads?Projects=${projEnc}&ModifiedFrom=${from}&ModifiedTo=${to}&AllClosedStatuses=true&take=5000`;
+          let arr: any[] = [];
+          try {
+            const r = await fetch(ep, { headers });
+            const j = await r.json().catch(() => []);
+            arr = Array.isArray(j) ? j : (j.Results || j.results || j.Leads || []);
+          } catch { continue; }
+
+          totalScanned += arr.length;
+          projectStats[projName] = (projectStats[projName] || 0) + arr.length;
+
+          for (const lead of arr) {
+            const hits = scanForPhones(lead);
+            if (hits.length === 0) continue;
+            // Group by matched normalized number
+            const matchedNumbers = new Set(hits.map((h) => h.matched));
+            for (const matched of matchedNumbers) {
+              const entry = results.get(matched);
+              if (!entry || entry.found) continue; // already found this number
+              const leadId = lead.uniqueId || lead.UniqueId;
+              // Fetch full lead
+              let fullLead: any = null;
+              try {
+                const fRes = await fetch(`${baseUrl}/leads/${leadId}`, { headers });
+                if (fRes.ok) fullLead = await fRes.json();
+              } catch { /* ignore */ }
+
+              const fpu = lead.firstProcessedByUser || lead.FirstProcessedByUser || {};
+              const lmu = lead.lastModifiedByUser || lead.LastModifiedByUser || {};
+              entry.found = true;
+              entry.lead = {
+                uniqueId: leadId,
+                project: projName,
+                campaign: lead.campaign,
+                status: lead.status,
+                closure: lead.closure,
+                closureData: lead.closureData,
+                firstProcessedTime: lead.firstProcessedTime,
+                lastModifiedTime: lead.lastModifiedTime,
+                uploadTime: lead.uploadTime,
+                ownerOrgUnit: lead.ownerOrgUnit,
+                firstProcessedByUser: { ...fpu, resolved: orgCodeMap.get(fpu.orgCode) || null },
+                lastModifiedByUser: { ...lmu, resolved: orgCodeMap.get(lmu.orgCode) || null },
+                matchedFields: hits.filter((h) => h.matched === matched),
+                dataFields: lead.data || null,
+                rawSimpleLead: lead,
+                fullLeadEndpoint: fullLead,
+              };
+            }
+          }
+
+          // Early exit if all found
+          if (Array.from(results.values()).every((r) => r.found)) break;
+        }
+        if (Array.from(results.values()).every((r) => r.found)) break;
+      }
+
+      // Build final result
+      const matches: Record<string, any> = {};
+      for (const [n, entry] of results) {
+        matches[entry.phone] = entry.found
+          ? { found: true, normalized: n, lead: entry.lead }
+          : { found: false, normalized: n, scannedDays: days, scannedLeads: totalScanned };
+      }
+
+      return json({
+        mode: "phones",
+        searchedPhones: phones,
+        windowDays: days,
+        projectsScanned: projectNames,
+        leadsScannedPerProject: projectStats,
+        totalLeadsScanned: totalScanned,
+        matches,
+      });
+    }
+
+    return json({ error: "Pass {sampleCampaign: 'permission'} or {phones: ['12345678'], days: 10}" });
   } catch (e) {
     return json({ error: String(e), stack: (e as Error).stack }, 500);
   }
