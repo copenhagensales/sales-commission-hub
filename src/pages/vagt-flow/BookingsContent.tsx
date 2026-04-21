@@ -327,7 +327,7 @@ export default function BookingsContent() {
 
   // Fetch booking_diet data for diet tags (filtered to diet salary type only)
   const { data: bookingDiets = [] } = useQuery({
-    queryKey: ["vagt-booking-diets", selectedWeek, selectedYear, dietSalaryType?.id],
+    queryKey: ["vagt-booking-diets", selectedWeek, selectedYear, dietSalaryType?.id, allBookingIds],
     queryFn: async () => {
       if (allBookingIds.length === 0 || !dietSalaryType) return [];
       const { data, error } = await supabase
