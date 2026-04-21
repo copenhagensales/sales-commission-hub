@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
     let totalScanned = 0;
     let firstSampleLead: any = null;
     for (const w of windows) {
-      const ep = `${baseUrl}/simpleleads?ModifiedFrom=${w.from}&ModifiedTo=${w.to}&AllClosedStatuses=true&take=2000`;
+      const ep = `${baseUrl}/simpleleads?Projects=*&ModifiedFrom=${w.from}&ModifiedTo=${w.to}&AllClosedStatuses=true&Status=success&take=2000`;
       const r = await fetch(ep, { headers });
       const j = await r.json().catch(() => []);
       const arr: any[] = Array.isArray(j) ? j : (j.Results || j.results || j.Leads || []);
