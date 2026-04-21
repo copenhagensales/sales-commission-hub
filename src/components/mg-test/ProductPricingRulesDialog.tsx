@@ -181,9 +181,7 @@ export function ProductPricingRulesDialog({
     },
     onSuccess: () => {
       toast.success("Basis-priser opdateret");
-      queryClient.invalidateQueries({ queryKey: ["mg-aggregated-products"] });
-      queryClient.invalidateQueries({ queryKey: ["mg-manual-products"] });
-      queryClient.invalidateQueries({ queryKey: ["products"] });
+      sync({ invalidate: ["products", "sales", "kpi"], label: "basispris" });
       onBaseValuesChange?.();
     },
     onError: (error) => {
@@ -203,9 +201,7 @@ export function ProductPricingRulesDialog({
     },
     onSuccess: () => {
       toast.success("Indstillinger opdateret");
-      queryClient.invalidateQueries({ queryKey: ["mg-aggregated-products"] });
-      queryClient.invalidateQueries({ queryKey: ["mg-manual-products"] });
-      queryClient.invalidateQueries({ queryKey: ["products"] });
+      sync({ invalidate: ["products", "kpi"], label: "tæller-status" });
       onBaseValuesChange?.();
     },
     onError: (error) => {
