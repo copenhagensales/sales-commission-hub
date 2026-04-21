@@ -117,13 +117,20 @@ export function useAggregatedClientLeaderboards(
       return [];
     }
 
-    // Latest row per scope_id
+    // Latest non-stale row per scope_id
     const latestPerScope = new Map<string, { leaderboard_data: unknown }>();
+    let staleSkipped = 0;
     for (const row of data || []) {
       if (!row.scope_id) continue;
-      if (!latestPerScope.has(row.scope_id)) {
-        latestPerScope.set(row.scope_id, { leaderboard_data: row.leaderboard_data });
+      if (latestPerScope.has(row.scope_id)) continue;
+      if (isKpiCacheStale(row.calculated_at)) {
+        staleSkipped++;
+        continue;
       }
+      latestPerScope.set(row.scope_id, { leaderboard_data: row.leaderboard_data });
+    }
+    if (staleSkipped > 0) {
+      console.warn(`[aggregated-leaderboard:${period}] Skipped ${staleSkipped} stale rows`);
     }
 
     return mergeLeaderboards(Array.from(latestPerScope.values())).slice(0, limit);
