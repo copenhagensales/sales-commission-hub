@@ -1,49 +1,73 @@
 
 
-## Diæter vises ikke på vagtplanen — analyse + fix
+## Sejer kan ikke redigere vagtplan / give medarbejder fri — analyse + fix
 
 ### Hvad jeg fandt
 
-Fra screenshot + DB-tjek:
-- Brugeren ser **Eesy FM, uge 19** (4-10/5) — bookinger Aalborg Storcenter (`da3b2393…`) + Kolding Storcenter (`06ca5c22…`).
-- Begge bookinger har **diæter i `booking_diet`** (8 stk på hver, lønart "Diæter" — `e4efc5b4…`) oprettet 20/4 kl. 12:17–12:20, dvs. **før** screenshottet kl. 12:35.
-- Skærmbilledet viser **ingen "Diæt"-badges under nogen dage** — hverken Aalborg eller Kolding. Kun bil-badges (Kolding) og hotel-badge (Aalborg).
-- Koden i `src/pages/vagt-flow/BookingsContent.tsx` (linje 1280–1321 + 1596) HAR rendering for `dietByBookingDate` og query'en (linje 329–342) ramler korrekt mod `salary_type_id = "Diæter"` via `ilike '%diæt%'`.
-- RLS på `booking_diet` er åben for authenticated.
+Sejer Sylvester Schmidt har position **"Assisterende Teamleder TM"** (system_role_key `assisterendetm`) og er **assistent på Eesy TM** via `team_assistant_leaders`-junctiontabellen.
 
-### Sandsynlig rodårsag
+Hans permissions er fine på alle niveauer:
+- ✅ `menu_shift_overview` — view + edit (scope: all)
+- ✅ `menu_absence` — view + edit (scope: team)
+- ✅ `menu_employees` — view + edit (scope: team)
+- ✅ RLS på `shift`/`employee_standard_shifts` tillader ham at skrive (`is_teamleder_or_above` returnerer true for ham via `system_roles.role='teamleder'` + `job_title`-fallback)
 
-Query'en `vagt-booking-diets` er gated på `enabled: allBookingIds.length > 0 && !!dietSalaryType`. **Cache-key indeholder ikke `allBookingIds`**, kun `selectedWeek + selectedYear + dietSalaryType?.id`:
+**Rodårsagen** ligger i `useEmployeesForShifts`-hooken (`src/hooks/useShiftPlanning.ts` linje 706-709), som henter medarbejdere fra de teams brugeren leder:
 
 ```ts
-queryKey: ["vagt-booking-diets", selectedWeek, selectedYear, dietSalaryType?.id]
+.from("teams")
+.select("id, name")
+.or(`team_leader_id.eq.${currentEmployeeId},assistant_team_leader_id.eq.${currentEmployeeId}`)
 ```
 
-Det betyder at hvis brugeren først lander på siden mens `bookings`/`marketBookings` stadig loader (så `allBookingIds = []`), kører query'en i `enabled: false`-tilstand. Når bookinger så ankommer og `allBookingIds` udvides, **invaliderer cache-key'en ikke** — query'en re-fyrer ikke, og resultatet forbliver det tomme array fra første render. De samme symptomer ville ramme `vagt-booking-training-bonuses` og `vagt-booking-vehicles` (den sidste virker dog i screenshot — men dens key inkluderer `allBookingIds`, se linje 283).
+Denne query bruger den **deprecated `assistant_team_leader_id`-kolonne** på `teams`-tabellen. Vi migrerede for længe siden til many-to-many via `team_assistant_leaders`-junctionen (jvf. memory `Team Assistant Structure`). Sejer er KUN assistent via junctionen — `teams.assistant_team_leader_id` er NULL for hans team.
 
-Sammenlign:
-- ✅ `vagt-booking-vehicles` key: `[..., selectedWeek, selectedYear, allBookingIds]` — re-fetcher korrekt
-- ❌ `vagt-booking-diets` key: `[..., selectedWeek, selectedYear, dietSalaryType?.id]` — re-fetcher ikke når `allBookingIds` ændres
-- ❌ `vagt-booking-training-bonuses` key: samme bug
+**Resultat:** `ledTeams.length === 0` → falder ned i `manager_id`-fallback (linje 734-741) → ingen matcher → **tom medarbejderliste**. Derfor:
+- "Meld syg"-dialogen viser ingen medarbejdere at vælge
+- Vagtplan-oversigten viser ingen at planlægge vagter for
+- Han kan ikke give fri / oprette vagter for sit team
+
+`AbsenceManagement.tsx` (linje 76-79) har allerede den rigtige logik (læser fra junction). Det er kun denne ene hook der halter bagud.
 
 ### Fix
 
-Tilføj `allBookingIds` til query-key for begge problematiske queries:
+I `src/hooks/useShiftPlanning.ts` linje ~706-715: erstat `OR`-query'en med samme mønster som `AbsenceManagement.tsx` bruger:
+
+1. Hent teams hvor `team_leader_id = currentEmployeeId`
+2. Hent team_ids fra `team_assistant_leaders` hvor `employee_id = currentEmployeeId`
+3. Union de to lister, dedup, fortsæt som før
+
+Pseudokode:
 
 ```ts
-queryKey: ["vagt-booking-diets", selectedWeek, selectedYear, dietSalaryType?.id, allBookingIds]
-queryKey: ["vagt-booking-training-bonuses", selectedWeek, selectedYear, trainingBonusSalaryType?.id, allBookingIds]
+const [{ data: leaderTeams }, { data: assistantTeams }] = await Promise.all([
+  supabase.from("teams").select("id, name").eq("team_leader_id", currentEmployeeId),
+  supabase.from("team_assistant_leaders")
+    .select("team_id, team:teams(id, name)")
+    .eq("employee_id", currentEmployeeId),
+]);
+const ledTeamIds = [
+  ...new Set([
+    ...(leaderTeams?.map(t => t.id) || []),
+    ...(assistantTeams?.map(a => a.team_id) || []),
+  ]),
+];
 ```
 
+Resten af blokken (hent team_members, dedup, exclude self, fetch employees) er uændret.
+
 ### Filer der ændres
-- `src/pages/vagt-flow/BookingsContent.tsx` (kun query-keys på linje 330 + 346)
+- `src/hooks/useShiftPlanning.ts` (kun den ene `.or(...)`-query inde i `useEmployeesForShifts`)
 
 ### Verificering
-- Genindlæs `/vagt-flow/bookings?week=19&year=2026` → "Diæt"-badges skal nu vises under man-tor på begge Eesy FM-bookinger.
-- Tilsvarende for "Oplæringsbonus"-badges hvor de findes.
-- Nyligt tilføjede diæter (via "Tilføj diæt"-knap) inviderer allerede via mutation `onSuccess` — uændret.
+- Sejer åbner `/shift-planning` eller `/shift-planning/absence` → ser sit Eesy TM-team's medarbejdere
+- "Meld syg"-knappen viser dropdown med Eesy TM-medarbejdere
+- Han kan oprette/slette vagter og fravær for dem
+- Console-log `[useEmployeesForShifts] Led teams (leader or assistant):` viser nu Eesy TM
 
 ### Hvad jeg IKKE rører
-- RLS, lønart-tabel, mutation-logik, andre faner.
-- Den tilsvarende rendering i `MyBookingSchedule.tsx` (key inkluderer allerede `bookingIds` — virker).
+- RLS, system_roles, position_permissions (alt er korrekt)
+- `assistant_team_leader_id`-kolonnen (lader den ligge — udfases separat)
+- Andre hooks der allerede bruger junctionen korrekt (`AbsenceManagement`, `useTeamAssistantLeaders` m.fl.)
+- Owner/teamleder-stierne i samme hook (uændrede)
 
