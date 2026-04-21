@@ -516,43 +516,74 @@ export default function TdcOpsummering() {
                 {/* Omstilling */}
                 <div className="space-y-2">
                   <Label className="font-medium">Omstilling</Label>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="hasOmstilling" 
-                      checked={hasOmstilling}
-                      onCheckedChange={(checked) => {
-                        setHasOmstilling(checked === true);
-                        if (checked) setNoOmstilling(false);
-                      }}
-                    />
-                    <Label htmlFor="hasOmstilling" className="font-normal cursor-pointer">Omstilling inkluderet</Label>
-                  </div>
-                  {hasOmstilling && (
-                    <div className="ml-6">
-                      <div className="flex items-center space-x-2">
-                        <Checkbox 
-                          id="standardOmstilling" 
-                          checked={isStandardOmstilling}
-                          onCheckedChange={(checked) => setIsStandardOmstilling(checked === true)}
-                        />
-                        <Label htmlFor="standardOmstilling" className="font-normal cursor-pointer">Standard omstilling (kan opgraderes senere)</Label>
-                      </div>
+                  {isPilot ? (
+                    <div className="flex items-center gap-3 pt-1">
+                      <span
+                        className={cn(
+                          "text-sm transition-colors",
+                          isStandardOmstilling ? "font-semibold text-foreground" : "text-muted-foreground"
+                        )}
+                      >
+                        Standard omstilling
+                      </span>
+                      <Switch
+                        checked={!isStandardOmstilling}
+                        onCheckedChange={(checked) => {
+                          setIsStandardOmstilling(!checked);
+                          setHasOmstilling(true);
+                          setNoOmstilling(false);
+                        }}
+                      />
+                      <span
+                        className={cn(
+                          "text-sm transition-colors",
+                          !isStandardOmstilling ? "font-semibold text-foreground" : "text-muted-foreground"
+                        )}
+                      >
+                        Professionel omstilling
+                      </span>
                     </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="hasOmstilling"
+                          checked={hasOmstilling}
+                          onCheckedChange={(checked) => {
+                            setHasOmstilling(checked === true);
+                            if (checked) setNoOmstilling(false);
+                          }}
+                        />
+                        <Label htmlFor="hasOmstilling" className="font-normal cursor-pointer">Omstilling inkluderet</Label>
+                      </div>
+                      {hasOmstilling && (
+                        <div className="ml-6">
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="standardOmstilling"
+                              checked={isStandardOmstilling}
+                              onCheckedChange={(checked) => setIsStandardOmstilling(checked === true)}
+                            />
+                            <Label htmlFor="standardOmstilling" className="font-normal cursor-pointer">Standard omstilling (kan opgraderes senere)</Label>
+                          </div>
+                        </div>
+                      )}
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="noOmstilling"
+                          checked={noOmstilling}
+                          onCheckedChange={(checked) => {
+                            setNoOmstilling(checked === true);
+                            if (checked) {
+                              setHasOmstilling(false);
+                              setIsStandardOmstilling(true);
+                            }
+                          }}
+                        />
+                        <Label htmlFor="noOmstilling" className="font-normal cursor-pointer">Ingen Omstilling</Label>
+                      </div>
+                    </>
                   )}
-                  <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="noOmstilling" 
-                      checked={noOmstilling}
-                      onCheckedChange={(checked) => {
-                        setNoOmstilling(checked === true);
-                        if (checked) {
-                          setHasOmstilling(false);
-                          setIsStandardOmstilling(true);
-                        }
-                      }}
-                    />
-                    <Label htmlFor="noOmstilling" className="font-normal cursor-pointer">Ingen Omstilling</Label>
-                  </div>
                 </div>
 
               </CardContent>
