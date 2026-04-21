@@ -259,6 +259,7 @@ export function useDashboardSalesData({
       // Build a map: product_id -> array of rules (sorted by priority desc for later selection)
       const pricingRulesMap = new Map<string, Array<{ 
         campaign_mapping_ids: string[] | null; 
+        campaign_match_mode: "include" | "exclude";
         conditions: any;
         commission: number; 
         revenue: number; 
