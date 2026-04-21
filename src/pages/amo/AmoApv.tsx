@@ -2,7 +2,7 @@ import { useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Shield, Plus, Pencil, Trash2, AlertTriangle, FileText } from "lucide-react";
+import { Shield, Plus, Pencil, Trash2, AlertTriangle, FileText, Copy } from "lucide-react";
 import { format, differenceInDays, addYears } from "date-fns";
 import { da } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -141,6 +141,27 @@ export default function AmoApv() {
     setDialog(true);
   };
 
+  const openCopy = (a: any) => {
+    setEditing(null);
+    setForm({
+      title: `${a.title} (kopi)`,
+      workplace_id: a.workplace_id || "",
+      start_date: "",
+      completed_date: "",
+      reason: a.reason || "triennial",
+      physical_env: a.physical_env || "",
+      psychological_env: a.psychological_env || "",
+      sickness_review: a.sickness_review || "",
+      findings: a.findings || "",
+      risk_level: a.risk_level || "",
+      action_plan: a.action_plan || "",
+      responsible_owner: a.responsible_owner || "",
+      deadline: "",
+      follow_up_status: "",
+    });
+    setDialog(true);
+  };
+
   const openEdit = (a: any) => {
     setEditing(a);
     setForm({
@@ -250,6 +271,9 @@ export default function AmoApv() {
                       "h-3 w-3 rounded-full",
                       status === "green" ? "bg-emerald-500" : status === "yellow" ? "bg-yellow-500" : "bg-red-500"
                     )} />
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openCopy(a)} title="Kopiér som ny APV">
+                      <Copy className="h-3 w-3" />
+                    </Button>
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(a)}>
                       <Pencil className="h-3 w-3" />
                     </Button>
