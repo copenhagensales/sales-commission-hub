@@ -524,7 +524,7 @@ export default function TdcOpsummering() {
                           isStandardOmstilling ? "font-semibold text-foreground" : "text-muted-foreground"
                         )}
                       >
-                        Standard omstilling
+                        Standard
                       </span>
                       <Switch
                         checked={!isStandardOmstilling}
