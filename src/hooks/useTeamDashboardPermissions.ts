@@ -169,10 +169,11 @@ export function useAccessibleDashboards() {
   const { data: rolePermissions } = usePagePermissions();
   
   return useQuery({
-    queryKey: ["accessible-dashboards", user?.id, isOwner],
+    queryKey: ["accessible-dashboards", user?.id, isOwner, role, rolePermissions?.length ?? 0],
     queryFn: async () => {
       // HARDKODET: Ejere har altid fuld adgang til alle dashboards
       if (isOwner) {
+        console.log('[useAccessibleDashboards] owner=true, returning all', DASHBOARD_LIST.length);
         return DASHBOARD_LIST;
       }
       
@@ -271,9 +272,10 @@ export function useAccessibleDashboards() {
         return false;
       });
       
+      console.log('[useAccessibleDashboards] role=', role, 'rolePermissions=', rolePermissions?.length ?? 0, 'teamPerms=', (permissions || []).length, 'accessible=', accessibleDashboards.length);
       return accessibleDashboards;
     },
-    enabled: !!user && isReady,
+    enabled: !!user && isReady && !!rolePermissions && !!role,
     staleTime: 30 * 1000, // 30 sekunder
     refetchOnMount: true,
   });
