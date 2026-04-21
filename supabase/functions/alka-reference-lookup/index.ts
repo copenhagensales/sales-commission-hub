@@ -129,10 +129,12 @@ Deno.serve(async (req) => {
           }
 
           // First filter to leads in matching permission campaigns
+          const campIdSet = new Set(campIds);
           const inCampaign = arr.filter((lead) => {
-            const campObj = lead.campaign || {};
-            const campName = String(campObj.name || campObj.Name || lead.campaignName || "").toLowerCase();
-            return campName.includes(sampleCampaign.toLowerCase());
+            const campObj = lead.campaign;
+            const campId = typeof campObj === "string" ? campObj : (campObj?.uniqueId || campObj?.id || "");
+            const campName = (typeof campObj === "object" ? String(campObj?.name || "") : "").toLowerCase();
+            return campIdSet.has(campId) || campName.includes(sampleCampaign.toLowerCase());
           });
 
           // Track distinct closures seen so we know what "sale" looks like
