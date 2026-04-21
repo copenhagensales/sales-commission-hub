@@ -1,73 +1,66 @@
 
 
-## Sejer kan ikke redigere vagtplan / give medarbejder fri — analyse + fix
+## Hvorfor Jacob ikke ser dashboard-knappen
 
-### Hvad jeg fandt
+### Faktatjek for Jacob (fra DB lige nu)
 
-Sejer Sylvester Schmidt har position **"Assisterende Teamleder TM"** (system_role_key `assisterendetm`) og er **assistent på Eesy TM** via `team_assistant_leaders`-junctiontabellen.
+- **Bruger:** Jacob Lykke Nielson, position `Salgskonsulent`, `system_role_key = medarbejder`, aktiv, har `auth_user_id` ✅
+- **Team:** Medlem af **Relatel** (ikke leader, ikke assistent)
+- **Rolle-permissions:** `medarbejder` har `can_view: true` på 8 dashboards (commission-league, cs-top-20, eesy-tm, fieldmarketing, powerdag, relatel, tdc-erhverv, united) + `menu_dashboards: true`
+- **Team-permissions for Relatel:** `cs-top-20: all` + `relatel: all` → Jacob får adgang som menigt medlem til DISSE to uanset rolle
+- Plus 5 `team_leader`/`leadership`-permissions han IKKE rammes af (han er menigt medlem)
 
-Hans permissions er fine på alle niveauer:
-- ✅ `menu_shift_overview` — view + edit (scope: all)
-- ✅ `menu_absence` — view + edit (scope: team)
-- ✅ `menu_employees` — view + edit (scope: team)
-- ✅ RLS på `shift`/`employee_standard_shifts` tillader ham at skrive (`is_teamleder_or_above` returnerer true for ham via `system_roles.role='teamleder'` + `job_title`-fallback)
+**På papiret skal Jacobs `accessibleDashboards.length` være mindst 8 (rolle) — eller 2 (team-fallback alene). Knappen burde være der.**
 
-**Rodårsagen** ligger i `useEmployeesForShifts`-hooken (`src/hooks/useShiftPlanning.ts` linje 706-709), som henter medarbejdere fra de teams brugeren leder:
+### Hvorfor knappen alligevel kan mangle
 
-```ts
-.from("teams")
-.select("id, name")
-.or(`team_leader_id.eq.${currentEmployeeId},assistant_team_leader_id.eq.${currentEmployeeId}`)
-```
+`EnvironmentSwitcher` rendres KUN hvis både `canAccessDashboards && canAccessMainSystem` er sande (`EnvironmentSwitcher.tsx` linje 17-19). `canAccessDashboards = accessibleDashboards.length > 0` (`AppModeContext.tsx` linje 28). Hvis `useAccessibleDashboards` returnerer en tom liste én gang, gemmer den 0 i 30 sekunders cache → ingen knap.
 
-Denne query bruger den **deprecated `assistant_team_leader_id`-kolonne** på `teams`-tabellen. Vi migrerede for længe siden til many-to-many via `team_assistant_leaders`-junctionen (jvf. memory `Team Assistant Structure`). Sejer er KUN assistent via junctionen — `teams.assistant_team_leader_id` er NULL for hans team.
+To race conditions kan give tom liste for Jacob:
 
-**Resultat:** `ledTeams.length === 0` → falder ned i `manager_id`-fallback (linje 734-741) → ingen matcher → **tom medarbejderliste**. Derfor:
-- "Meld syg"-dialogen viser ingen medarbejdere at vælge
-- Vagtplan-oversigten viser ingen at planlægge vagter for
-- Han kan ikke give fri / oprette vagter for sit team
+**1. `rolePermissions` undefined ved første kald**  
+`useAccessibleDashboards` (linje 233) bruger `rolePermissions` fra `usePagePermissions()` til rolle-fallback, men:
+- `rolePermissions` er IKKE i `queryKey` (linje 172)
+- `rolePermissions` er IKKE i `enabled` (linje 276 har kun `!!user && isReady`)
 
-`AbsenceManagement.tsx` (linje 76-79) har allerede den rigtige logik (læser fra junction). Det er kun denne ene hook der halter bagud.
+Hvis `usePagePermissions` (paginerer via `fetchAllRows`) ikke er færdig når `useAccessibleDashboards` kører første gang, springes rolle-checket over → Jacob er afhængig af team-permissions alene.
+
+**2. `team_dashboard_permissions`-query returnerer tom**  
+Samme query (linje 216-218) henter ALLE team-permissions uden filtre — hvis den første gang får 0 rækker (RLS, netværk, race), falder Jacob til 0 dashboards.
+
+Resultat caches i 30 sek → Jacob ser intet, refresher, ser intet, frustration.
+
+**3. Jacobs rolle resolver ikke til `medarbejder`** (mindre sandsynligt)  
+Hvis `useUnifiedPermissions().role` ikke kan resolve fra `position_id → job_positions.system_role_key` ved race, sammenligningen `p.role_key === role` fejler stille på linje 235 selv når `rolePermissions` ER loaded.
 
 ### Fix
 
-I `src/hooks/useShiftPlanning.ts` linje ~706-715: erstat `OR`-query'en med samme mønster som `AbsenceManagement.tsx` bruger:
+**A. Gør `useAccessibleDashboards` race-safe (kerneårsag)**  
+I `src/hooks/useTeamDashboardPermissions.ts`:
+- Tilføj `rolePermissions` og `role` til `enabled`: `!!user && isReady && !!rolePermissions && !!role`
+- Tilføj dem til `queryKey`: `["accessible-dashboards", user?.id, isOwner, role, rolePermissions?.length]`
+- Cast tom liste til "vent endnu" i stedet for at cache 0 i 30 sek: drop `staleTime` til 0 mens `rolePermissions` lige er ankommet, eller invalider når de skifter
 
-1. Hent teams hvor `team_leader_id = currentEmployeeId`
-2. Hent team_ids fra `team_assistant_leaders` hvor `employee_id = currentEmployeeId`
-3. Union de to lister, dedup, fortsæt som før
+**B. Fjern hard-cache når listen er tom**  
+Hvis `accessibleDashboards` returnerer `[]`, sæt `staleTime: 0` (kun ved tom liste) så vi ikke fastholder 0 i 30 sek mens permissions ankommer.
 
-Pseudokode:
+**C. Diagnostisk console.log**  
+Log `[useAccessibleDashboards] role=X, rolePermissions=N, teamPerms=M, accessible=K` så vi fremover kan se for konkrete brugere hvor det går galt.
 
-```ts
-const [{ data: leaderTeams }, { data: assistantTeams }] = await Promise.all([
-  supabase.from("teams").select("id, name").eq("team_leader_id", currentEmployeeId),
-  supabase.from("team_assistant_leaders")
-    .select("team_id, team:teams(id, name)")
-    .eq("employee_id", currentEmployeeId),
-]);
-const ledTeamIds = [
-  ...new Set([
-    ...(leaderTeams?.map(t => t.id) || []),
-    ...(assistantTeams?.map(a => a.team_id) || []),
-  ]),
-];
-```
+**D. (Valgfri) Fallback-knap**  
+Hvis brugeren har `menu_dashboards: true` på rolle-niveau (Jacob HAR det), vis `EnvironmentSwitcher` selv hvis `accessibleDashboards.length === 0` ved første render — landingen `/dashboards` viser så en tom liste i stedet for at knappen forsvinder helt. Det er mere brugervenligt end "knappen er væk".
 
-Resten af blokken (hent team_members, dedup, exclude self, fetch employees) er uændret.
-
-### Filer der ændres
-- `src/hooks/useShiftPlanning.ts` (kun den ene `.or(...)`-query inde i `useEmployeesForShifts`)
+### Filer
+- `src/hooks/useTeamDashboardPermissions.ts` — fix race + log
+- (Valgfri) `src/components/layout/EnvironmentSwitcher.tsx` eller `AppModeContext.tsx` — gate knap på `menu_dashboards`-rolle-permission i stedet for kun `accessibleDashboards.length > 0`
 
 ### Verificering
-- Sejer åbner `/shift-planning` eller `/shift-planning/absence` → ser sit Eesy TM-team's medarbejdere
-- "Meld syg"-knappen viser dropdown med Eesy TM-medarbejdere
-- Han kan oprette/slette vagter og fravær for dem
-- Console-log `[useEmployeesForShifts] Led teams (leader or assistant):` viser nu Eesy TM
+- Jacob refresher `/home` 5+ gange → knap vises konsistent
+- Console for Jacob: `role=medarbejder, rolePermissions=~120, accessible=8+`
+- Klik knap → lander på `/dashboards` med 8+ kort
 
-### Hvad jeg IKKE rører
-- RLS, system_roles, position_permissions (alt er korrekt)
-- `assistant_team_leader_id`-kolonnen (lader den ligge — udfases separat)
-- Andre hooks der allerede bruger junctionen korrekt (`AbsenceManagement`, `useTeamAssistantLeaders` m.fl.)
-- Owner/teamleder-stierne i samme hook (uændrede)
+### Hvad jeg IKKE rør
+- Database-permissions (Jacobs adgang er korrekt på papir)
+- RLS, role_page_permissions
+- AppSidebar (ingen ny "Dashboards"-menu — kun race-fix)
 
