@@ -67,14 +67,17 @@ export function MainLayout({ children }: MainLayoutProps) {
           
           {/* Collapsed sidebar toggle button - visible when sidebar is collapsed */}
           {isCollapsed && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggle}
-              className="hidden md:flex fixed top-4 left-4 z-50 h-10 w-10 bg-sidebar/95 backdrop-blur-sm border border-sidebar-border shadow-lg hover:bg-sidebar-accent transition-all duration-300 animate-fade-in"
-            >
-              <PanelLeft className="h-5 w-5 text-sidebar-foreground" />
-            </Button>
+            <div className="hidden md:flex fixed top-4 left-4 z-50 items-center gap-2 animate-fade-in">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggle}
+                className="h-10 w-10 bg-sidebar/95 backdrop-blur-sm border border-sidebar-border shadow-lg hover:bg-sidebar-accent transition-all duration-300"
+              >
+                <PanelLeft className="h-5 w-5 text-sidebar-foreground" />
+              </Button>
+              <EnvironmentSwitcher compact />
+            </div>
           )}
           
           {/* Mobile header with burger menu */}
