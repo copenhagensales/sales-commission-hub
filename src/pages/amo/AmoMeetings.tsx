@@ -17,10 +17,28 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 
-const meetingTypeLabels: Record<string, string> = {
-  amo_meeting: "Ordinært",
-  extraordinary: "Ekstraordinært",
-  annual_discussion: "Årligt møde",
+type MeetingTypeValue = "amo_meeting" | "extraordinary" | "annual_discussion";
+
+const MEETING_TYPES: { value: MeetingTypeValue; label: string }[] = [
+  { value: "amo_meeting", label: "Ordinært" },
+  { value: "extraordinary", label: "Ekstraordinært" },
+  { value: "annual_discussion", label: "Årligt møde" },
+];
+
+const meetingTypeLabels: Record<string, string> = Object.fromEntries(
+  MEETING_TYPES.map(t => [t.value, t.label])
+);
+
+const LEGACY_MEETING_TYPE_MAP: Record<string, MeetingTypeValue> = {
+  ordinary: "amo_meeting",
+  annual: "annual_discussion",
+};
+
+const normalizeMeetingType = (type: string | null | undefined): MeetingTypeValue => {
+  if (!type) return "amo_meeting";
+  if (LEGACY_MEETING_TYPE_MAP[type]) return LEGACY_MEETING_TYPE_MAP[type];
+  if (MEETING_TYPES.some(t => t.value === type)) return type as MeetingTypeValue;
+  return "amo_meeting";
 };
 
 const statusLabels: Record<string, string> = {
