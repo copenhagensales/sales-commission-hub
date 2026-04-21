@@ -89,8 +89,8 @@ export function ProductPricingRulesDialog({
   const [effectiveDate, setEffectiveDate] = useState<Date>(new Date());
   const [isRematching, setIsRematching] = useState(false);
 
-  // Rematch hook for automatic price updates
-  const rematchMutation = useRematchPricingRules();
+  // Centralized post-mutation sync (invalidation + rematch + KPI + realtime)
+  const { sync } = useMgTestMutationSync();
 
   // Local state for editable base values
   const [localCommission, setLocalCommission] = useState(String(baseCommission));
