@@ -109,21 +109,38 @@ Deno.serve(async (req) => {
           const arr: any[] = Array.isArray(j) ? j : (j.Results || j.results || j.Leads || []);
           scannedTotal += arr.length;
 
-          for (const lead of arr) {
-            const status = String(lead.status || lead.Status || "").toLowerCase();
-            const closure = String(lead.closure || lead.Closure || "").toLowerCase();
-            // success / sale criteria
-            const isSuccess = status === "success" || closure.includes("salg") || closure.includes("success") || closure.includes("sale");
-            if (!isSuccess) continue;
-
+          // First filter to leads in matching permission campaigns
+          const inCampaign = arr.filter((lead) => {
             const campObj = lead.campaign || {};
             const campName = String(campObj.name || campObj.Name || lead.campaignName || "").toLowerCase();
-            if (campaignIds.length === 0 && !campName.includes(sampleCampaign.toLowerCase())) continue;
+            return campName.includes(sampleCampaign.toLowerCase());
+          });
 
+          // Track distinct closures seen so we know what "sale" looks like
+          for (const lead of inCampaign) {
+            const closure = String(lead.closure || lead.Closure || "");
+            const status = String(lead.status || lead.Status || "");
+            const key = `${status}|${closure}`;
+            closuresSeen.set(key, (closuresSeen.get(key) || 0) + 1);
+          }
+
+          // Pick first lead that looks like a sale (success or contains 'salg')
+          for (const lead of inCampaign) {
+            const status = String(lead.status || lead.Status || "").toLowerCase();
+            const closure = String(lead.closure || lead.Closure || "").toLowerCase();
+            const isSuccess = status === "success" || closure.includes("salg") || closure.includes("success") || closure.includes("sale") || closure.includes("solgt");
+            if (!isSuccess) continue;
             sampleLead = lead;
             usedWindow = { from, to };
             usedCampaignFilter = tag;
             break;
+          }
+
+          // Fallback: if no "success" found but we DID find leads in matching campaigns, take first one anyway
+          if (!sampleLead && inCampaign.length > 0 && offset >= days - 3) {
+            sampleLead = inCampaign[0];
+            usedWindow = { from, to };
+            usedCampaignFilter = `${tag} (fallback-first-in-campaign)`;
           }
         }
       }
