@@ -142,6 +142,7 @@ Deno.serve(async (req) => {
       sampleLeadMasterData: firstSampleLead?.masterData || null,
       sampleLeadContact: firstSampleLead?.contact || null,
       sampleLeadAnswersFirst5: Array.isArray(firstSampleLead?.answers) ? firstSampleLead.answers.slice(0, 5) : null,
+      sampleLeadData: firstSampleLead?.data || null,
     });
   } catch (e) {
     return json({ error: String(e), stack: (e as Error).stack }, 500);
