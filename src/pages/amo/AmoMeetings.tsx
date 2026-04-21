@@ -97,8 +97,9 @@ export default function AmoMeetings() {
 
   const save = useMutation({
     mutationFn: async (f: MeetingForm) => {
+      const normalizedType = normalizeMeetingType(f.meeting_type);
       const payload = {
-        meeting_type: f.meeting_type as any,
+        meeting_type: normalizedType as any,
         planned_date: f.planned_date,
         actual_date: f.actual_date || null,
         agenda: f.agenda || null,
