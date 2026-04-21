@@ -411,6 +411,7 @@ serve(async (req) => {
         baselineDataFields: Array.from(BASELINE_DATA_FIELDS).sort(),
       },
       recommendations,
+      agentAudit,
       endpoints,
     };
 
