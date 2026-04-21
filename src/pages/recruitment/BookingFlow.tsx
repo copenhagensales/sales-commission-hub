@@ -538,6 +538,16 @@ export default function BookingFlow() {
                   const status = statusConfig[statusKey];
                   const StatusIcon = status?.icon || Clock;
 
+                  // Detect "stuck" enrollments: active, no pending outreach touchpoints, approved >24h ago
+                  const tps = (enrollment.booking_flow_touchpoints || []) as Array<{ status: string; template_key: string }>;
+                  const pendingOutreach = tps.filter(
+                    (t) => t.status === "pending" && t.template_key !== "booking_confirmation_sms"
+                  ).length;
+                  const baseTs = enrollment.approved_at ?? enrollment.enrolled_at;
+                  const hoursSince = baseTs ? (Date.now() - new Date(baseTs).getTime()) / 3600000 : 0;
+                  const isStuck =
+                    enrollment.status === "active" && pendingOutreach === 0 && hoursSince > 24;
+
                   return (
                     <div
                       key={enrollment.id}
@@ -552,6 +562,12 @@ export default function BookingFlow() {
                           <p className="text-xs text-muted-foreground">
                             {candidate?.email}
                           </p>
+                          {isStuck && (
+                            <p className="mt-1 text-xs font-medium text-destructive flex items-center gap-1">
+                              <AlertTriangle className="h-3 w-3" />
+                              Ingen touchpoints planlagt
+                            </p>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
@@ -565,6 +581,20 @@ export default function BookingFlow() {
                         <span className="text-xs text-muted-foreground">
                           {formatDistanceToNow(new Date((enrollment as any).approved_at ?? enrollment.enrolled_at), { addSuffix: true, locale: da })}
                         </span>
+                        {isStuck && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              regenerateMutation.mutate(enrollment.id);
+                            }}
+                            disabled={regenerateMutation.isPending}
+                          >
+                            <Zap className="h-3.5 w-3.5 mr-1" />
+                            Regenerér
+                          </Button>
+                        )}
                         {enrollment.status === "active" && (
                           <Button
                             variant="ghost"
