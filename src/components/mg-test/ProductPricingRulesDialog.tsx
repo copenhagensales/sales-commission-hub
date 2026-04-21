@@ -220,8 +220,13 @@ export function ProductPricingRulesDialog({
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["product-pricing-rules", productId] });
       toast.success("Regel slettet");
+      sync({
+        invalidate: ["pricing", "products", "sales", "kpi"],
+        rematch: true,
+        productId,
+        label: "regel-sletning",
+      });
     },
     onError: (error) => {
       toast.error("Kunne ikke slette regel: " + error.message);
