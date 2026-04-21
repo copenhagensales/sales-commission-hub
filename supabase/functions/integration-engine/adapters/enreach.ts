@@ -38,6 +38,56 @@ export class EnreachAdapter implements DialerAdapter {
   private callsOrgCodes: string[] | null;
   private _metrics: ApiMetrics = { apiCalls: 0, rateLimitHits: 0, retries: 0 };
 
+  // orgCode → { email, name } cache populated on demand from /users
+  // when config.enableUserPreFetch === true (currently only Alka).
+  private userOrgCodeMap: Map<string, { email: string; name: string }> | null = null;
+  private userMapFetched = false;
+
+  // Default whitelist (preserves existing behaviour for Tryg/Eesy/ASE/Adversus/Relatel/Lovablecph).
+  private static readonly DEFAULT_AGENT_DOMAINS = ["@copenhagensales.dk", "@cph-relatel.dk", "@cph-sales.dk"];
+  private static readonly WHITELISTED_EMAILS = ["kongtelling@gmail.com", "rasmusventura700@gmail.com"];
+
+  private getAllowedDomains(): string[] {
+    const override = this.config?.allowedAgentEmailDomains;
+    return override && override.length > 0 ? override.map(d => d.toLowerCase()) : EnreachAdapter.DEFAULT_AGENT_DOMAINS;
+  }
+
+  private isValidSyncEmail(email: string | null | undefined): boolean {
+    if (!email) return false;
+    const emailLower = email.toLowerCase();
+    if (EnreachAdapter.WHITELISTED_EMAILS.includes(emailLower)) return true;
+    return this.getAllowedDomains().some(domain => emailLower.endsWith(domain));
+  }
+
+  /**
+   * Pre-fetch /users to build orgCode → email map.
+   * Only runs when config.enableUserPreFetch === true (Alka).
+   * Cached for the lifetime of the adapter instance (one sync run).
+   */
+  private async ensureUserOrgCodeMap(): Promise<void> {
+    if (this.userMapFetched) return;
+    this.userMapFetched = true;
+    if (!this.config?.enableUserPreFetch) return;
+
+    try {
+      console.log(`[EnreachAdapter] enableUserPreFetch=true → pre-fetching /users for orgCode→email map`);
+      const data = await this.get(`/users?Limit=2000`) as unknown;
+      const users = Array.isArray(data) ? data as Array<Record<string, unknown>> : [];
+      const map = new Map<string, { email: string; name: string }>();
+      for (const u of users) {
+        const orgCode = (u.orgCode as string) || "";
+        const email = (u.email as string) || "";
+        const name = (u.name as string) || (u.username as string) || "";
+        if (orgCode && email) map.set(orgCode, { email, name });
+      }
+      this.userOrgCodeMap = map;
+      console.log(`[EnreachAdapter] User pre-fetch complete: ${map.size} orgCode→email mappings`);
+    } catch (e) {
+      console.error(`[EnreachAdapter] User pre-fetch failed:`, e);
+      this.userOrgCodeMap = new Map();
+    }
+  }
+
   getMetrics(): ApiMetrics { return { ...this._metrics }; }
   resetMetrics(): void { this._metrics = { apiCalls: 0, rateLimitHits: 0, retries: 0 }; }
 
