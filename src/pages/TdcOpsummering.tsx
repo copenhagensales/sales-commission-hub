@@ -469,7 +469,9 @@ export default function TdcOpsummering() {
                   </div>
                 )}
 
-                <Separator />
+                {!isPilot && (numberChoice === "existing" || numberChoice === "mixed") && (
+                  <Separator />
+                )}
 
                 {/* Subsidy */}
                 <div className="space-y-2">
