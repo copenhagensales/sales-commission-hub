@@ -141,6 +141,27 @@ export default function AmoApv() {
     setDialog(true);
   };
 
+  const openCopy = (a: any) => {
+    setEditing(null);
+    setForm({
+      title: `${a.title} (kopi)`,
+      workplace_id: a.workplace_id || "",
+      start_date: "",
+      completed_date: "",
+      reason: a.reason || "triennial",
+      physical_env: a.physical_env || "",
+      psychological_env: a.psychological_env || "",
+      sickness_review: a.sickness_review || "",
+      findings: a.findings || "",
+      risk_level: a.risk_level || "",
+      action_plan: a.action_plan || "",
+      responsible_owner: a.responsible_owner || "",
+      deadline: "",
+      follow_up_status: "",
+    });
+    setDialog(true);
+  };
+
   const openEdit = (a: any) => {
     setEditing(a);
     setForm({
