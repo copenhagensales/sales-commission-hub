@@ -183,25 +183,40 @@ serve(async (req) => {
     endpoints.push(await probe("/campaigns", `${baseUrl}/campaigns?Limit=5`, authHeader, { limitSample: true }));
     await sleep(150);
 
-    // 4. Baseline /simpleleads
+    // Determine project filter from /projects response
+    const projectsEp = endpoints.find((e) => e.endpoint === "/projects");
+    const projectSample = projectsEp?.sample as Record<string, unknown> | undefined;
+    const projectUniqueId = (projectSample?.uniqueId as string) || "*";
+    const projectFilter = `Projects=${encodeURIComponent(projectUniqueId)}`;
+
+    // 4. Baseline /simpleleads (with project filter)
     const simpleLeads = await probe(
       "/simpleleads (baseline)",
-      `${baseUrl}/simpleleads?ModifiedFrom=${sevenDaysAgo}&AllClosedStatuses=true&Limit=10`,
+      `${baseUrl}/simpleleads?${projectFilter}&ModifiedFrom=${sevenDaysAgo}&AllClosedStatuses=true&Limit=10`,
       authHeader,
       { extractDataFields: true, limitSample: true }
     );
     endpoints.push(simpleLeads);
     await sleep(200);
 
-    // 5. RICH /leads with broad Include
+    // 5. RICH /leads with broad Include (with project filter)
     const richInclude = "data,campaign,lastModifiedByUser,firstProcessedByUser,closureData,questions,answers,attempts,history,orgUnit,uploadedByUser";
     const richLeads = await probe(
       "/leads (rich Include)",
-      `${baseUrl}/leads?ModifiedFrom=${sevenDaysAgo}&Include=${richInclude}&Limit=10`,
+      `${baseUrl}/leads?${projectFilter}&ModifiedFrom=${sevenDaysAgo}&Include=${richInclude}&Limit=10`,
       authHeader,
       { extractDataFields: true, limitSample: true }
     );
     endpoints.push(richLeads);
+    await sleep(200);
+
+    // 5b. /leads with minimal Include for comparison
+    endpoints.push(await probe(
+      "/leads (minimal Include=data)",
+      `${baseUrl}/leads?${projectFilter}&ModifiedFrom=${sevenDaysAgo}&Include=data&Limit=5`,
+      authHeader,
+      { extractDataFields: true, limitSample: true }
+    ));
     await sleep(200);
 
     // 6. Single lead detail (use uniqueId from richLeads or simpleLeads)
