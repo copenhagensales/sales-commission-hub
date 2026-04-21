@@ -787,6 +787,7 @@ serve(async (req) => {
       recommendations,
       agentAudit,
       agentDiagnosis,
+      cphSellerHunt,
       endpoints,
     };
 
