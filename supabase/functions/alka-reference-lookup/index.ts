@@ -80,6 +80,7 @@ Deno.serve(async (req) => {
       let scannedTotal = 0;
       let usedWindow: any = null;
       let usedCampaignFilter: string | null = null;
+      const closuresSeen = new Map<string, number>();
 
       // Try each matching campaign id; if none, scan all and filter by name
       const campaignIds = matchedCampaigns.map((c: any) => c.id || c.Id).filter(Boolean);
