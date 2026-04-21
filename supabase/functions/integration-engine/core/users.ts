@@ -74,7 +74,8 @@ export async function processUsers(
   supabase: SupabaseClient,
   users: StandardUser[],
   log: (type: "INFO" | "ERROR" | "WARN", msg: string, data?: unknown) => void,
-  source: "adversus" | "enreach" = "adversus"
+  source: "adversus" | "enreach" = "adversus",
+  allowedDomains?: string[]
 ) {
   if (users.length === 0) return { processed: 0, errors: 0, skipped: 0 }
   log("INFO", `Processing ${users.length} users from ${source}...`)
@@ -86,7 +87,7 @@ export async function processUsers(
   for (const user of users) {
     try {
       // Skip users with invalid email domains (whitelist approach)
-      if (!isValidSyncEmail(user.email)) {
+      if (!isValidSyncEmail(user.email, allowedDomains)) {
         log("INFO", `Skipping invalid sync email: ${user.email}`)
         skipped++
         continue
