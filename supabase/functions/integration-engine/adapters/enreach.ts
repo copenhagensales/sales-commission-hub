@@ -552,18 +552,9 @@ export class EnreachAdapter implements DialerAdapter {
         // Map leads to sales, then filter by valid email
         const mappedSales = filtered.map((lead) => this.mapLeadToSale(lead, mappingLookup));
         
-        // Filter out sales with invalid/missing email using whitelist
-        const VALID_EMAIL_DOMAINS = ["@copenhagensales.dk", "@cph-relatel.dk", "@cph-sales.dk"];
-        const WHITELISTED_EMAILS = ["kongtelling@gmail.com", "rasmusventura700@gmail.com"];
-        const isValidSyncEmail = (email: string | null | undefined): boolean => {
-          if (!email) return false;
-          const emailLower = email.toLowerCase();
-          if (WHITELISTED_EMAILS.includes(emailLower)) return true;
-          return VALID_EMAIL_DOMAINS.some(domain => emailLower.endsWith(domain));
-        };
-        
+        // Filter out sales with invalid/missing email using whitelist (per-integration override)
         const validSales = mappedSales.filter(sale => {
-          if (!isValidSyncEmail(sale.agentEmail)) {
+          if (!this.isValidSyncEmail(sale.agentEmail)) {
             const externalId = sale.externalId;
             if (externalId) {
               skipReasonMap.set(externalId, `invalid_email:${sale.agentEmail || 'empty'}`);
