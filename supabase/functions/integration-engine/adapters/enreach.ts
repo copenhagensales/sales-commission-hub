@@ -774,21 +774,35 @@ export class EnreachAdapter implements DialerAdapter {
     const lastModifiedByUser = (lead.lastModifiedByUser || lead.LastModifiedByUser) as
       | Record<string, unknown>
       | undefined;
-    // Smart agent-email: validate against known domains to avoid "Bloomreach_API" etc.
-    const VALID_AGENT_DOMAINS = ["@copenhagensales.dk", "@cph-relatel.dk", "@cph-sales.dk"];
-    const isValidAgentEmail = (email: string | undefined): boolean => {
-      if (!email) return false;
-      return VALID_AGENT_DOMAINS.some(d => email.toLowerCase().endsWith(d));
-    };
+
+    // Pick the orgCode (HeroBase identifier) from first/last user
     const firstOrgCode = firstProcessedByUser?.orgCode as string | undefined;
     const lastOrgCode = lastModifiedByUser?.orgCode as string | undefined;
+    const firstEmailRaw = firstProcessedByUser?.email as string | undefined;
+    const lastEmailRaw = lastModifiedByUser?.email as string | undefined;
+
+    // 1) Direct email from payload (existing path for ASE/Tryg/Eesy)
+    // 2) orgCode-map enrichment (Alka path — orgCode like "T02OLJE" → "o.jensen@tryg.dk")
+    // 3) Fallback: orgCode itself (preserves legacy behaviour for tenants where orgCode IS an email)
+    const enrichEmail = (orgCode: string | undefined, fallbackEmail: string | undefined): string => {
+      if (fallbackEmail && fallbackEmail.includes("@")) return fallbackEmail;
+      if (orgCode && this.userOrgCodeMap?.has(orgCode)) {
+        return this.userOrgCodeMap.get(orgCode)!.email;
+      }
+      return orgCode || "";
+    };
+
+    const firstResolved = enrichEmail(firstOrgCode, firstEmailRaw);
+    const lastResolved = enrichEmail(lastOrgCode, lastEmailRaw);
+
+    // Prefer the resolved email that matches the per-integration whitelist
     let agentOrgCode = "";
-    if (isValidAgentEmail(firstOrgCode)) {
-      agentOrgCode = firstOrgCode!;
-    } else if (isValidAgentEmail(lastOrgCode)) {
-      agentOrgCode = lastOrgCode!;
+    if (this.isValidSyncEmail(firstResolved)) {
+      agentOrgCode = firstResolved;
+    } else if (this.isValidSyncEmail(lastResolved)) {
+      agentOrgCode = lastResolved;
     } else {
-      agentOrgCode = firstOrgCode || lastOrgCode || "";
+      agentOrgCode = firstResolved || lastResolved || "";
     }
 
     let agentName = this.getStr(firstProcessedByUser, ["name", "Name", "fullName"]);
