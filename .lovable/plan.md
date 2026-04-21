@@ -1,17 +1,19 @@
 
-## Forkort labels på Pilot omstilling-toggle
+## Fjern dobbelte separator-linjer mellem sektioner i "Valgfrie sektioner"
+
+### Problem
+I "Valgfrie sektioner"-kortet på både Standard- og Pilot-varianten vises der to vandrette linjer mellem hvert afsnit i stedet for én. Det skaber unødig visuel støj.
 
 ### Ændring (kun `src/pages/TdcOpsummering.tsx`)
-I Pilot-varianten af "Omstilling"-boksen, opdater labels på toggle-switchen:
-- **Venstre label**: `Standard omstilling` → `Standard`
-- **Højre label**: `Professionel omstilling` → `Professionel`
+Gennemgå "Valgfrie sektioner"-blokken og fjern de duplikerede `border-t` / `<Separator />`-elementer, så der kun er én adskillelseslinje mellem hver sektion (MV/Datadelingskort, Nummervalg, Tilskud, Omstilling).
 
-Ordet "omstilling" fjernes fra labels, da det allerede fremgår af boksens titel.
+Konkret approach:
+- Bevar én konsistent separator-strategi (enten kun `<Separator />` eller kun `border-t` på sektions-wrapperen — ikke begge dele).
+- Sikr at den første sektion ikke har en top-separator, og at hver efterfølgende sektion får præcis én.
 
 ### Ikke berørt
-- Toggle-adfærd, default-state og styling.
-- Genereret tekst-output (uændret).
-- Standard- og 5g-fri-varianten.
+- Indhold, labels, radio/toggle-adfærd og state.
+- 5g-fri-varianten (medmindre samme dobbelt-separator-problem også findes der — i så fald rettes den med samme mønster for konsistens).
 - `TdcOpsummeringPublic.tsx`.
 
 ### Filer berørt
