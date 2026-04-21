@@ -272,9 +272,10 @@ export function useAccessibleDashboards() {
         return false;
       });
       
+      console.log('[useAccessibleDashboards] role=', role, 'rolePermissions=', rolePermissions?.length ?? 0, 'teamPerms=', (permissions || []).length, 'accessible=', accessibleDashboards.length);
       return accessibleDashboards;
     },
-    enabled: !!user && isReady,
+    enabled: !!user && isReady && !!rolePermissions && !!role,
     staleTime: 30 * 1000, // 30 sekunder
     refetchOnMount: true,
   });
