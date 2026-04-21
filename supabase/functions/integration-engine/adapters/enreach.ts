@@ -434,6 +434,9 @@ export class EnreachAdapter implements DialerAdapter {
 
   async fetchSales(days: number, campaignMappings?: CampaignMappingConfig[]): Promise<StandardSale[]> {
     try {
+      // Pre-fetch /users → orgCode map when enabled (Alka). No-op for other tenants.
+      await this.ensureUserOrgCodeMap();
+
       // IMPORTANTE: Limitar días para evitar OOM. Máximo 7 días por llamada.
       const effectiveDays = Math.min(days, 7);
       if (days > 7) {
