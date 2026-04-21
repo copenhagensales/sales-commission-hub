@@ -540,7 +540,7 @@ export default function TdcOpsummering() {
                           !isStandardOmstilling ? "font-semibold text-foreground" : "text-muted-foreground"
                         )}
                       >
-                        Professionel omstilling
+                        Professionel
                       </span>
                     </div>
                   ) : (
