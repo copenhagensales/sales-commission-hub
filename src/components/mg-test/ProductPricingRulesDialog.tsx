@@ -603,7 +603,15 @@ export function ProductPricingRulesDialog({
                           </div>
 
                           <div className="text-xs text-muted-foreground mb-1">
-                            Kampagner: {getCampaignNames(rule.campaign_mapping_ids)}
+                            {(() => {
+                              const ids = rule.campaign_mapping_ids;
+                              const mode = rule.campaign_match_mode === "exclude" ? "exclude" : "include";
+                              if (!ids || ids.length === 0) return "Kampagner: Alle";
+                              const names = getCampaignNames(ids);
+                              return mode === "exclude"
+                                ? `Alle undtagen: ${names}`
+                                : `Kampagner: ${names}`;
+                            })()}
                           </div>
 
                           <div className="bg-muted/50 rounded p-2 text-sm mb-2">
