@@ -581,6 +581,7 @@ serve(async (req) => {
       },
       recommendations,
       agentAudit,
+      agentDiagnosis,
       endpoints,
     };
 
