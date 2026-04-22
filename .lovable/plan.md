@@ -1,66 +1,40 @@
 
 
-## Generer Word-dokument med alle unikke formuleringer fra TDC Erhverv opsummering
+## Tilføj engelsk oversættelse til TDC Opsummering
 
 ### Mål
-Producér én `.docx`-fil i `/mnt/documents/` der samler alle unikke sætninger brugt i `TdcOpsummering.tsx` på tværs af de tre varianter (Standard, Pilot, Kun 5g fri salg) — uden dubletter.
+Når DA/EN-toggle står på **EN**, vises hele opsummeringsteksten på engelsk i stedet for dansk — på tværs af alle tre varianter (Standard, Pilot, Kun 5g fri salg). DA er fortsat default. Kun intern brug, ingen i18n-fil oprettes — teksterne lægges direkte i komponenten for hurtig vedligeholdelse.
 
-### Struktur i Word-dokumentet
-Dokumentet organiseres med overskrifter pr. logisk blok, så det er nemt at bruge som reference:
+### Ændring (kun `src/pages/TdcOpsummering.tsx`)
 
-1. **Fælles intro** (bruges i alle varianter)
-   - "For at sikre, at der ikke opstår misforståelser…"
-   - "Aftalen bliver oprettet i (firmanavn)…"
+1. **Oversættelses-map** (top af filen, før komponenten):
+   Opret en konstant `TRANSLATIONS: Record<string, string>` med dansk→engelsk for hver unik linje brugt i `summaryLines`. Engelske formuleringer hentes 1:1 fra det uploadede dokument:
+   - Intro, CVR-linje, produktlinjer (datamængde + hastighedsbegrænsning)
+   - MBB (mobilevoice, datadelingskort, uden router)
+   - Binding (36 mdr. + 5g fri salg-binding)
+   - Pilot welcome call + 3 nummervalg-varianter + frihed-linje + pilot opstart
+   - Standard 3 bekræftelser + nye-numre opstart + 2 opsigelser + 2 opstart-varianter + ordrebekræftelse
+   - Tilføj/opsig-linjen
+   - Tilskud (4 linjer + rød placeholder)
+   - Omstilling (Pilot intro + Standard rød placeholder + tilkøb-menuvalg)
+   - Afslutning ("Har du nogle spørgsmål…")
 
-2. **Produktlinje**
-   - Standard/Pilot variant (datamængde)
-   - 5g fri salg variant (hastighedsbegrænsning)
+2. **Helper i komponenten:**
+   ```ts
+   const t = (da: string) => (isEnglish ? TRANSLATIONS[da] ?? da : da);
+   ```
+   Fallback til dansk hvis et opslag mangler (sikrer ingen tom output).
 
-3. **MBB / Datadelingskort**
-   - Mobilevoice som MBB
-   - Datadelingskort
-   - Uden router
+3. **Anvendelse:** Wrap hver `lines.push({ text: "..." })`-streng i `summaryLines`-useMemo med `t(...)`. Inkludér `isEnglish` i dependency-arrayet. Røde placeholder-linjer oversættes også (markdown/italic-stil bevares som almindelig tekst, `isRed` uændret).
 
-4. **Vilkår & binding**
-   - "I er bundet på kontrakten i 36 måneder."
-   - 5g fri salg-binding-tekst (12 mdr. binding + 3 mdr. opsigelse + opsigelse-anbefaling)
+4. **Toast-besked ved kopi:** `"Kopieret!"` / `"Opsummeringsteksten er kopieret…"` oversættes betinget til `"Copied!"` / `"The summary text has been copied to the clipboard."` når `isEnglish` er true. (UI-labels som kort-titler, knap-tekster, sidebar osv. forbliver på dansk — kun selve opsummeringsoutputtet er flerssproget, jf. krav om "kun internt for nu".)
 
-5. **Pilot welcome call & nummervalg (Pilot)**
-   - Welcome call-linje
-   - "Vi har snakket om, at det som udgangspunkt er" + tre varianter (eksisterende / mixed / nye)
-   - "Hvilke numre i ønsker…"
-   - Pilot opstart-tekst
-
-6. **Standard nummervalg & opstart**
-   - 3 bekræftelsesvarianter (eksisterende / mixed / nye)
-   - "Dine nye numre starter…"
-   - 2 opsigelse-varianter
-   - 2 opstart-varianter (asap / specific dato)
-   - Ordrebekræftelse-linje
-
-7. **Tilføj/opsig abonnementer** (fælles)
-
-8. **Tilskud (hasSubsidy)**
-   - Tilskudslinje
-   - Udlægsordning-linje
-   - "Vi har talt om…" + rød placeholder
-   - Webshop-linje
-
-9. **Omstilling**
-   - Pilot intro-linje
-   - Standard rød placeholder (kaldsflow/hardware)
-   - Opgrader-til-menuvalg-linje (fælles)
-
-10. **Afslutning**
-    - "Har du nogle spørgsmål til mig?"
-
-### Teknisk fremgang
-- Brug `docx`-skill: skrive Node-script der bygger `.docx` med Arial, A4, overskrifter (Heading1/Heading2), almindelige paragraphs og rød tekst (`color: "C00000"`) for placeholder-linjer.
-- Deduplikering: indsamle alle strenge fra `summaryLines`-grenene, normalisere og kun beholde unikke (tomme separator-linjer udelades).
-- Validere `.docx` via skill-script.
-- QA: konvertere til PDF/billede og inspicere før levering.
-- Output: `/mnt/documents/TDC_Opsummering_Formuleringer.docx` + leveres som `<lov-artifact>`.
+### Ikke berørt
+- Toggle-UI (DA/EN findes allerede).
+- Validering, betinget logik, røde markeringer, kopiér-funktion.
+- Øvrige UI-labels på siden (kun output-tekst oversættes).
+- Andre sider/komponenter.
 
 ### Filer berørt
-- Ingen kodeændringer i projektet. Kun generering af artefakt i `/mnt/documents/`.
+- `src/pages/TdcOpsummering.tsx`
 
