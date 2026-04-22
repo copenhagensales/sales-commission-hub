@@ -1,24 +1,24 @@
 
 
-## Fjern numre i parentes fra valgmuligheds-labels
+## Skjul pilot opstart-tekst når "Kun nye numre" er valgt
 
-### Ændring (kun `src/pages/TdcOpsummering.tsx`)
+### Ændring (kun `src/pages/TdcOpsummering.tsx`, linje 239-241)
 
-Fjern de afsluttende ` (n)` fra følgende `<Label>`-tekster:
+Wrap pilot opstart-linjen i en betingelse, så den kun vises når `numberChoice` er `"existing"` eller `"mixed"` — ikke når `"new"` er valgt:
 
-- Linje 453: `Mobilevoice som MBB (1)` → `Mobilevoice som MBB`
-- Linje 470: `Datadelingskort som MBB (2)` → `Datadelingskort som MBB`
-- Linje 504: `uden router (3)` → `uden router`
-- Linje 525: `Kun eksisterende/reserverede numre (4)` → `Kun eksisterende/reserverede numre`
-- Linje 529: `Blanding af eksisterende og nye (5)` → `Blanding af eksisterende og nye`
-- Linje 533: `Kun nye numre (6)` → `Kun nye numre`
-- Linje 550: `Efter binding/opsigelsesperiode (7)` → `Efter binding/opsigelsesperiode`
-- Linje 554: `Med ønskedato (8)` → `Med ønskedato`
+```ts
+if (numberChoice && numberChoice !== "new") {
+  lines.push({ text: t("Numrene starter som udgangspunkt op, når bindingen og opsigelsesperioden hos jeres nuværende udbyder udløber. Vi bestræber os på en samlet opstart, men datoerne for nummerflytning afhænger af jeres nuværende udbyder.") });
+  lines.push({ text: "" });
+}
+```
 
-Gælder alle tre varianter (Standard, Pilot, Kun 5g fri salg), da labels er delte.
+Dækker både dansk og engelsk automatisk via `t()`-helperen.
 
 ### Ikke berørt
-- Logik, værdier (`value="existing"` osv.), opsummeringstekst, oversættelser, øvrig UI.
+- Standard- og 5g-varianter.
+- Øvrige pilot-linjer (welcome call, nummervalg, "Hvilke numre i ønsker…").
+- Oversættelses-map, toggle, validering.
 
 ### Filer berørt
 - `src/pages/TdcOpsummering.tsx`
