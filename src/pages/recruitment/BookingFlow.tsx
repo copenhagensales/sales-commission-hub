@@ -388,9 +388,13 @@ export default function BookingFlow() {
               <Eye className="h-4 w-4" />
               Preview
             </TabsTrigger>
-            <TabsTrigger value="samtaler" className="gap-2">
+            <TabsTrigger value="booking-samtaler" className="gap-2">
               <PhoneCall className="h-4 w-4" />
-              Samtaler
+              Booking samtaler
+            </TabsTrigger>
+            <TabsTrigger value="planlagte-samtaler" className="gap-2">
+              <CalendarDays className="h-4 w-4" />
+              Planlagte jobsamtaler
             </TabsTrigger>
             <TabsTrigger value="notifications" className="gap-2">
               <Bell className="h-4 w-4" />
