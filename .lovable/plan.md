@@ -1,21 +1,18 @@
 
 
-## Dark mode som standard på TDC Opsummering
+## Fix toggle-orientering for dark mode
 
-### Ændring (kun `src/pages/TdcOpsummering.tsx`)
+### Problem
+Lige nu er switchen `checked={isDarkTheme}`. Default `true` betyder at thumb står til højre (mod solen), men aktiverer dark mode → forvirrende.
 
-1. Ændre initial state: `useState(false)` → `useState(true)` for `isDarkTheme`. Gælder automatisk alle tre varianter (Standard, Pilot, Kun 5g fri salg), da samme preview-felt deles.
-2. Bytte rundt på ikonerne i toggle-rækken (linje 637-639):
-   - Venstre ikon: `Moon` (aktiv-tilstand til venstre = dark)
-   - Højre ikon: `Sun` (light til højre)
-   - Switch'en forbliver bundet til `isDarkTheme`, så `checked = true` (default) = dark mode.
+### Løsning (kun `src/pages/TdcOpsummering.tsx`)
+Inverter switch-bindingen så "off" (thumb venstre, ved måne) = dark mode (default), og "on" (thumb højre, ved sol) = light mode.
 
-Brugeren kan stadig slå over til light mode ved at klikke på switchen.
-
-### Ikke berørt
-- `TdcOpsummeringPublic.tsx` (jf. tidligere instruks om kun TDC Erhverv-editoren).
-- Font-size, copy-funktion, summary-generering, varianter.
+Konkret:
+- Switch: `checked={!isDarkTheme}` og `onCheckedChange={(v) => setIsDarkTheme(!v)}`.
+- Beholder `useState(true)` for `isDarkTheme` → switchen starter som "off" (venstre, ved måne-ikonet) og preview vises i dark mode som ønsket.
+- Ikonerne forbliver: `Moon` venstre, `Sun` højre — matcher nu thumb-position korrekt.
 
 ### Filer berørt
-- `src/pages/TdcOpsummering.tsx`
+- `src/pages/TdcOpsummering.tsx` (kun switch-bindingen omkring linje 637-639).
 
