@@ -236,9 +236,11 @@ export default function TdcOpsummering() {
         lines.push({ text: "" });
       }
 
-      // Pilot opstart - generisk tekst (altid)
-      lines.push({ text: t("Numrene starter som udgangspunkt op, når bindingen og opsigelsesperioden hos jeres nuværende udbyder udløber. Vi bestræber os på en samlet opstart, men datoerne for nummerflytning afhænger af jeres nuværende udbyder.") });
-      lines.push({ text: "" });
+      // Pilot opstart - skjules når "Kun nye numre" er valgt
+      if (numberChoice && numberChoice !== "new") {
+        lines.push({ text: t("Numrene starter som udgangspunkt op, når bindingen og opsigelsesperioden hos jeres nuværende udbyder udløber. Vi bestræber os på en samlet opstart, men datoerne for nummerflytning afhænger af jeres nuværende udbyder.") });
+        lines.push({ text: "" });
+      }
 
     } else {
       // Standard: nummervalg
