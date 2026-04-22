@@ -1,24 +1,21 @@
 
 
-## Standard-variant: "Ingen Omstilling" valgt som default
+## Dark mode som standard på TDC Opsummering
 
 ### Ændring (kun `src/pages/TdcOpsummering.tsx`)
 
-Tilføj en `useEffect` der sætter `noOmstilling = true` (og rydder `hasOmstilling`/genskaber `isStandardOmstilling = true`) **når brugeren skifter til Standard-varianten**, hvis ingen omstillings-valg allerede er aktivt.
+1. Ændre initial state: `useState(false)` → `useState(true)` for `isDarkTheme`. Gælder automatisk alle tre varianter (Standard, Pilot, Kun 5g fri salg), da samme preview-felt deles.
+2. Bytte rundt på ikonerne i toggle-rækken (linje 637-639):
+   - Venstre ikon: `Moon` (aktiv-tilstand til venstre = dark)
+   - Højre ikon: `Sun` (light til højre)
+   - Switch'en forbliver bundet til `isDarkTheme`, så `checked = true` (default) = dark mode.
 
-Konkret logik:
-- Når `summaryVariant === "standard"` aktiveres OG hverken `hasOmstilling` eller `noOmstilling` er sat → sæt `noOmstilling = true`.
-- Initial state for `noOmstilling` ændres fra `useState(false)` til `useState(true)`, så første load på Standard (default-varianten) viser "Ingen Omstilling" som forvalgt.
-- Pilot og Kun 5g fri salg røres ikke — deres egen Omstilling-UI / logik ignorerer `noOmstilling`-flaget visuelt (Pilot bruger en separat toggle-blok; 5g springer hele sektionen over). Validering `isOmstillingMissing` bliver automatisk `false` når `noOmstilling = true`, så advarselsbanneret forsvinder for Standard som ønsket.
-
-### Hvorfor en effect og ikke kun ny default
-Kun at ændre `useState(true)` ville også gælde hvis brugeren starter på fx Pilot og senere skifter til Standard efter selv at have ryddet feltet. Effect'en sikrer at Standard altid har et forvalg, men respekterer at brugeren aktivt har valgt "Omstilling inkluderet".
+Brugeren kan stadig slå over til light mode ved at klikke på switchen.
 
 ### Ikke berørt
-- `TdcOpsummeringPublic.tsx` (kun anvendt af TDC opsummering, men brugeren bekræfter ændringen kun gælder TDC Erhverv-opsummeringen — denne fil ER TDC Erhverv-opsummeringen).  
-  Note: `TdcOpsummeringPublic.tsx` er den offentlige spejl-version. Hvis du også vil have ændringen der, så sig til — ellers lader jeg den være urørt jf. din instruks.
-- Pilot-grenen, 5g-fri-grenen, øvrig validering, summary-generering, separators.
+- `TdcOpsummeringPublic.tsx` (jf. tidligere instruks om kun TDC Erhverv-editoren).
+- Font-size, copy-funktion, summary-generering, varianter.
 
 ### Filer berørt
-- `src/pages/TdcOpsummering.tsx` (ændre default på `noOmstilling` + tilføj én `useEffect` ved variant-skift)
+- `src/pages/TdcOpsummering.tsx`
 
