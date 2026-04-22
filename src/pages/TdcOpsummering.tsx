@@ -139,17 +139,20 @@ export default function TdcOpsummering() {
 
     if (isPilot) {
       // Pilot: Vilkår + welcome call + nummervalg in one flow
-      lines.push({ text: "Inden for 7 hverdage vil i blive kontaktet af min kollega, som vil byde jer velkommen og få hjulpet med nummeroverflytning. Vi har snakket om, at det som udgangspunkt er" });
+      lines.push({ text: "Inden for 7 hverdage vil i blive kontaktet af min kollega, som vil byde jer velkommen og få hjulpet med nummeroverflytning." });
       lines.push({ text: "" });
 
       // Pilot nummervalg
       if (numberChoice === "existing") {
+        lines.push({ text: "Vi har snakket om, at det som udgangspunkt er" });
         lines.push({ text: "(antal) eksisterende numre" });
         lines.push({ text: "" });
       } else if (numberChoice === "mixed") {
+        lines.push({ text: "Vi har snakket om, at det som udgangspunkt er" });
         lines.push({ text: "(antal) eksisterende numre og (antal) nye numre" });
         lines.push({ text: "" });
       } else if (numberChoice === "new") {
+        lines.push({ text: "Vi har snakket om, at det som udgangspunkt er" });
         lines.push({ text: "Udelukkende nye numre der oprettes" });
         lines.push({ text: "" });
       }
