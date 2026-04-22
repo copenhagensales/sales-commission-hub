@@ -1,25 +1,51 @@
 
 
-## Pilot: flyt sætning til "nummervalg"-blokken
+## Pilot: Omstillings-tekst altid med + fjern opgrader-tekst i Professionel
 
-### Ændring (kun `src/pages/TdcOpsummering.tsx`, Pilot-grenen ~linje 142-160)
+### Problem
+I Pilot-grenen vises omstillings-teksten kun hvis `hasOmstilling = true`. Brugeren ønsker at hovedteksten altid vises i Pilot-varianten, og at "opgrader"-linjen kun vises ved Standard (ikke Professionel).
 
-Sætningen `"Vi har snakket om, at det som udgangspunkt er"` flyttes fra welcome call-afsnittet ned, så den står som indledning til nummervalgs-teksten.
+### Ændring (kun `src/pages/TdcOpsummering.tsx`, ~linje 230-246)
 
-**Før (linje 142):**
+Omskriv Pilot-grenen i `Omstilling`-blokken så:
+
+1. **Hovedlinjen vises altid** for Pilot (uafhængigt af `hasOmstilling`):
+   ```
+   "I forhold til jeres omstilling og hvordan den skal virke, så er det noget i aftaler med min kollega der ringer og byder jer velkommen."
+   ```
+
+2. **Opgrader-linjen** vises kun når `isStandardOmstilling = true` (Standard valgt på toggle), og fjernes når brugeren skifter til Professionel:
+   ```
+   "Hvis du får brug for menuvalg i fremtiden, så kan du altid opgradere din omstilling"
+   ```
+
+Konkret ny logik for Pilot:
+```ts
+if (isPilot) {
+  lines.push({ text: "I forhold til jeres omstilling..." });
+  lines.push({ text: "" });
+  if (isStandardOmstilling) {
+    lines.push({ text: "Hvis du får brug for menuvalg i fremtiden..." });
+    lines.push({ text: "" });
+  }
+} else if (hasOmstilling) {
+  // Standard-grenen forbliver uændret (rød tekst + opgrader-linje ved standardOmstilling)
+}
 ```
-"Inden for 7 hverdage vil i blive kontaktet af min kollega, som vil byde jer velkommen og få hjulpet med nummeroverflytning. Vi har snakket om, at det som udgangspunkt er"
-```
 
-**Efter:**
-- Linje 142: `"Inden for 7 hverdage vil i blive kontaktet af min kollega, som vil byde jer velkommen og få hjulpet med nummeroverflytning."`
-- Indsæt sætningen `"Vi har snakket om, at det som udgangspunkt er"` som første linje i hver af de tre `numberChoice`-grene (existing / mixed / new), umiddelbart før selve valgs-teksten — uden tom linje imellem, så de to linjer fremstår som ét sammenhængende afsnit.
+Dvs. Pilot-blokken flyttes ud af `if (hasOmstilling)`-betingelsen, mens Standard-grenen beholder sin nuværende `hasOmstilling`-gate.
 
-### Gælder
-- Pilot-varianten, alle tre nummervalg (`existing`, `mixed`, `new`).
+### Bivirkning
+- `isOmstillingMissing`/warning-banner-logikken (linje 88-90) gælder kun når `!kun5gFriSalg`. Pilot er ikke `kun5gFriSalg`, men teksten vises nu altid, så det giver mening også at fjerne `isOmstillingMissing` fra warning-banneret når `isPilot = true` for at undgå falsk advarsel. Ændring i linje 90:
+  ```ts
+  const showWarningBanner = !kun5gFriSalg && (isNummervalgMissing || isOpstartMissing || isMbbMissing || isTilskudMissing || (!isPilot && isOmstillingMissing));
+  ```
 
 ### Ikke berørt
-- Standard, Kun 5g fri salg, øvrig logik, font/tema.
+- Standard-varianten (rød hardware/kaldsflow-linje + opgrader-linje uændret).
+- Kun 5g fri salg.
+- Toggle-UI for Pilot (Standard/Professionel switch).
+- Øvrige felter (nummervalg, opstart, tilskud, MBB).
 
 ### Filer berørt
 - `src/pages/TdcOpsummering.tsx`
