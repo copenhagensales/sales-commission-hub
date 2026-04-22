@@ -35,7 +35,7 @@ type SummaryVariant = "standard" | "pilot" | "5g-fri";
 export default function TdcOpsummering() {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
-  const [isDarkTheme, setIsDarkTheme] = useState(false);
+  const [isDarkTheme, setIsDarkTheme] = useState(true);
   const [fontSize, setFontSize] = useState(16);
 
   // Summary variant toggle
