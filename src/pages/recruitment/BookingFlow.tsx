@@ -29,6 +29,7 @@ import { FlowTemplatesTab } from "@/components/recruitment/FlowTemplatesTab";
 import { BookingSettingsTab } from "@/components/recruitment/BookingSettingsTab";
 import { BookingPreviewTab } from "@/components/recruitment/BookingPreviewTab";
 import { BookingCalendarTab } from "@/components/recruitment/BookingCalendarTab";
+import { BookingFlowConversationsTab } from "@/components/recruitment/BookingFlowConversationsTab";
 import { BookingNotificationsTab } from "@/components/recruitment/BookingNotificationsTab";
 import { BookingPagesTab } from "@/components/recruitment/BookingPagesTab";
 import { addDays, setHours, setMinutes } from "date-fns";
