@@ -344,14 +344,18 @@ export default function TdcOpsummering() {
       await navigator.clipboard.writeText(summaryText);
       setCopied(true);
       toast({
-        title: "Kopieret!",
-        description: "Opsummeringsteksten er kopieret til udklipsholderen.",
+        title: isEnglish ? "Copied!" : "Kopieret!",
+        description: isEnglish
+          ? "The summary text has been copied to the clipboard."
+          : "Opsummeringsteksten er kopieret til udklipsholderen.",
       });
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       toast({
-        title: "Fejl",
-        description: "Kunne ikke kopiere teksten. Prøv igen.",
+        title: isEnglish ? "Error" : "Fejl",
+        description: isEnglish
+          ? "Could not copy the text. Please try again."
+          : "Kunne ikke kopiere teksten. Prøv igen.",
         variant: "destructive",
       });
     }
