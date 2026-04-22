@@ -450,7 +450,7 @@ export default function TdcOpsummering() {
                         }
                       }}
                     />
-                    <Label htmlFor="mobilevoice" className="font-normal cursor-pointer">Mobilevoice som MBB (1)</Label>
+                    <Label htmlFor="mobilevoice" className="font-normal cursor-pointer">Mobilevoice som MBB</Label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <Checkbox
