@@ -467,7 +467,7 @@ export default function TdcOpsummering() {
                         }
                       }}
                     />
-                    <Label htmlFor="datadelingskort" className="font-normal cursor-pointer">Datadelingskort som MBB (2)</Label>
+                    <Label htmlFor="datadelingskort" className="font-normal cursor-pointer">Datadelingskort som MBB</Label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <Checkbox
@@ -501,7 +501,7 @@ export default function TdcOpsummering() {
                           }
                         }}
                       />
-                      <Label htmlFor="withoutRouter" className="font-normal cursor-pointer">uden router (3)</Label>
+                      <Label htmlFor="withoutRouter" className="font-normal cursor-pointer">uden router</Label>
                     </div>
                   )}
                 </div>
@@ -522,15 +522,15 @@ export default function TdcOpsummering() {
                   >
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="existing" id="existing" />
-                      <Label htmlFor="existing" className="font-normal cursor-pointer">Kun eksisterende/reserverede numre (4)</Label>
+                      <Label htmlFor="existing" className="font-normal cursor-pointer">Kun eksisterende/reserverede numre</Label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="mixed" id="mixed" />
-                      <Label htmlFor="mixed" className="font-normal cursor-pointer">Blanding af eksisterende og nye (5)</Label>
+                      <Label htmlFor="mixed" className="font-normal cursor-pointer">Blanding af eksisterende og nye</Label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="new" id="new" />
-                      <Label htmlFor="new" className="font-normal cursor-pointer">Kun nye numre (6)</Label>
+                      <Label htmlFor="new" className="font-normal cursor-pointer">Kun nye numre</Label>
                     </div>
                   </RadioGroup>
                 </div>
@@ -547,11 +547,11 @@ export default function TdcOpsummering() {
                     >
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="asap" id="asap" />
-                        <Label htmlFor="asap" className="font-normal cursor-pointer">Efter binding/opsigelsesperiode (7)</Label>
+                        <Label htmlFor="asap" className="font-normal cursor-pointer">Efter binding/opsigelsesperiode</Label>
                       </div>
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="specific" id="specific" />
-                        <Label htmlFor="specific" className="font-normal cursor-pointer">Med ønskedato (8)</Label>
+                        <Label htmlFor="specific" className="font-normal cursor-pointer">Med ønskedato</Label>
                       </div>
                     </RadioGroup>
                   </div>
