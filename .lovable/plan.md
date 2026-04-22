@@ -1,18 +1,26 @@
 
 
-## Fix toggle-orientering for dark mode
+## Pilot: flyt sætning til "nummervalg"-blokken
 
-### Problem
-Lige nu er switchen `checked={isDarkTheme}`. Default `true` betyder at thumb står til højre (mod solen), men aktiverer dark mode → forvirrende.
+### Ændring (kun `src/pages/TdcOpsummering.tsx`, Pilot-grenen ~linje 142-160)
 
-### Løsning (kun `src/pages/TdcOpsummering.tsx`)
-Inverter switch-bindingen så "off" (thumb venstre, ved måne) = dark mode (default), og "on" (thumb højre, ved sol) = light mode.
+Sætningen `"Vi har snakket om, at det som udgangspunkt er"` flyttes fra welcome call-afsnittet ned, så den står som indledning til nummervalgs-teksten.
 
-Konkret:
-- Switch: `checked={!isDarkTheme}` og `onCheckedChange={(v) => setIsDarkTheme(!v)}`.
-- Beholder `useState(true)` for `isDarkTheme` → switchen starter som "off" (venstre, ved måne-ikonet) og preview vises i dark mode som ønsket.
-- Ikonerne forbliver: `Moon` venstre, `Sun` højre — matcher nu thumb-position korrekt.
+**Før (linje 142):**
+```
+"Inden for 7 hverdage vil i blive kontaktet af min kollega, som vil byde jer velkommen og få hjulpet med nummeroverflytning. Vi har snakket om, at det som udgangspunkt er"
+```
+
+**Efter:**
+- Linje 142: `"Inden for 7 hverdage vil i blive kontaktet af min kollega, som vil byde jer velkommen og få hjulpet med nummeroverflytning."`
+- Indsæt sætningen `"Vi har snakket om, at det som udgangspunkt er"` som første linje i hver af de tre `numberChoice`-grene (existing / mixed / new), umiddelbart før selve valgs-teksten — uden tom linje imellem, så de to linjer fremstår som ét sammenhængende afsnit.
+
+### Gælder
+- Pilot-varianten, alle tre nummervalg (`existing`, `mixed`, `new`).
+
+### Ikke berørt
+- Standard, Kun 5g fri salg, øvrig logik, font/tema.
 
 ### Filer berørt
-- `src/pages/TdcOpsummering.tsx` (kun switch-bindingen omkring linje 637-639).
+- `src/pages/TdcOpsummering.tsx`
 
