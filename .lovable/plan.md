@@ -1,18 +1,24 @@
 
 
-## Flyt DA/EN-toggle ind i "Opsummeringstype"-boksen
+## Fjern numre i parentes fra valgmuligheds-labels
 
 ### Ændring (kun `src/pages/TdcOpsummering.tsx`)
 
-1. **Fjern** DA/EN-toggle-blokken fra header-området (linjer 375-394) i øverste højre hjørne.
-2. **Tilføj** DA/EN-toggle i `CardHeader` for "Opsummeringstype"-kortet (omkring linje 402-404):
-   - Konvertér `CardHeader` til en flex-container (`flex flex-row items-center justify-between`) så `CardTitle` står i venstre side og DA/EN-pillen i højre side.
-   - Genbrug eksisterende styling (`inline-flex items-center bg-muted/30 rounded-full p-1` med samme button-mapping) — kun placering ændres.
-3. Header-rækken (linje ~365-395) reduceres til kun at vise ikon + titel + undertekst (justify-between kan blive til almindelig flex eller bevares uden højre-element).
+Fjern de afsluttende ` (n)` fra følgende `<Label>`-tekster:
+
+- Linje 453: `Mobilevoice som MBB (1)` → `Mobilevoice som MBB`
+- Linje 470: `Datadelingskort som MBB (2)` → `Datadelingskort som MBB`
+- Linje 504: `uden router (3)` → `uden router`
+- Linje 525: `Kun eksisterende/reserverede numre (4)` → `Kun eksisterende/reserverede numre`
+- Linje 529: `Blanding af eksisterende og nye (5)` → `Blanding af eksisterende og nye`
+- Linje 533: `Kun nye numre (6)` → `Kun nye numre`
+- Linje 550: `Efter binding/opsigelsesperiode (7)` → `Efter binding/opsigelsesperiode`
+- Linje 554: `Med ønskedato (8)` → `Med ønskedato`
+
+Gælder alle tre varianter (Standard, Pilot, Kun 5g fri salg), da labels er delte.
 
 ### Ikke berørt
-- `isEnglish`-state, oversættelseslogik, toast, øvrige toggles (Standard/Pilot/5g), validering.
-- Funktionalitet — kun visuel placering.
+- Logik, værdier (`value="existing"` osv.), opsummeringstekst, oversættelser, øvrig UI.
 
 ### Filer berørt
 - `src/pages/TdcOpsummering.tsx`
