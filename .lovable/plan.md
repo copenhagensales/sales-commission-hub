@@ -1,22 +1,26 @@
 
 
-## Opdater opgrader-sætning i Standard og Pilot
+## Tilføj udlægsordning-tekst efter tilskudslinjen
 
-### Ændring (kun `src/pages/TdcOpsummering.tsx`)
+### Ændring (kun `src/pages/TdcOpsummering.tsx`, ~linje 220)
 
-Erstat strengen:
+Efter linjen:
 ```
-"Hvis du får brug for menuvalg i fremtiden, så kan du altid opgradere din omstilling"
-```
-med:
-```
-"Hvis du i fremtiden for brug får menuvalg, er det muligt at tilkøbe."
+"Du får et tilskud på (beløb), som kan bruges fra kontraktens startdato (dato), hvor det samtidig bliver tilgængeligt i vores selvbetjeningsunivers."
 ```
 
-Gælder begge steder hvor sætningen optræder (Standard-grenen og Pilot-grenen i `Omstilling`-blokken). Al eksisterende vis-/skjul-logik (`isStandardOmstilling`, `hasOmstilling`, Pilot vs. Standard) forbliver uændret.
+Indsæt en tom linje (afsnit) og derefter:
+```
+"Hvis du har behov for at benytte tilskuddet før denne dato, så har du mulighed for at lave en udlægsordning, hvor du betaler for produktet nu, og derefter får krediteret pengene på datoen, hvor tilskuddet vil blive frigivet. Du kan ikke få refunderet mere end du har lagt ud for."
+```
+
+Efterfulgt af endnu en tom linje, så den eksisterende "Vi har talt om, at du skal bruge tilskuddet på disse produkter:" stadig står som separat afsnit.
+
+Da `hasSubsidy`-blokken er fælles for både Standard og Pilot (samme kodesti), dækker ændringen automatisk begge varianter. Kun 5g fri salg er ikke berørt (ingen `hasSubsidy`-rendering der).
 
 ### Ikke berørt
-- Kun 5g fri salg, øvrige felter, toggles, validering.
+- Visningslogik (`hasSubsidy`-gate uændret).
+- Øvrige sætninger i tilskudsblokken (rød markør-tekst osv.).
 
 ### Filer berørt
 - `src/pages/TdcOpsummering.tsx`
