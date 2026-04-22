@@ -29,6 +29,7 @@ import { FlowTemplatesTab } from "@/components/recruitment/FlowTemplatesTab";
 import { BookingSettingsTab } from "@/components/recruitment/BookingSettingsTab";
 import { BookingPreviewTab } from "@/components/recruitment/BookingPreviewTab";
 import { BookingCalendarTab } from "@/components/recruitment/BookingCalendarTab";
+import { BookingFlowConversationsTab } from "@/components/recruitment/BookingFlowConversationsTab";
 import { BookingNotificationsTab } from "@/components/recruitment/BookingNotificationsTab";
 import { BookingPagesTab } from "@/components/recruitment/BookingPagesTab";
 import { addDays, setHours, setMinutes } from "date-fns";
@@ -387,9 +388,13 @@ export default function BookingFlow() {
               <Eye className="h-4 w-4" />
               Preview
             </TabsTrigger>
-            <TabsTrigger value="samtaler" className="gap-2">
+            <TabsTrigger value="booking-samtaler" className="gap-2">
               <PhoneCall className="h-4 w-4" />
-              Samtaler
+              Booking samtaler
+            </TabsTrigger>
+            <TabsTrigger value="planlagte-samtaler" className="gap-2">
+              <CalendarDays className="h-4 w-4" />
+              Planlagte jobsamtaler
             </TabsTrigger>
             <TabsTrigger value="notifications" className="gap-2">
               <Bell className="h-4 w-4" />
@@ -640,7 +645,11 @@ export default function BookingFlow() {
             <BookingPreviewTab />
           </TabsContent>
 
-          <TabsContent value="samtaler">
+          <TabsContent value="booking-samtaler">
+            <BookingFlowConversationsTab />
+          </TabsContent>
+
+          <TabsContent value="planlagte-samtaler">
             <BookingCalendarTab />
           </TabsContent>
 
