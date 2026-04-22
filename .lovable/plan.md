@@ -1,27 +1,66 @@
 
 
-## Tilføj udlægsordning-tekst efter tilskudslinjen
+## Generer Word-dokument med alle unikke formuleringer fra TDC Erhverv opsummering
 
-### Ændring (kun `src/pages/TdcOpsummering.tsx`, ~linje 220)
+### Mål
+Producér én `.docx`-fil i `/mnt/documents/` der samler alle unikke sætninger brugt i `TdcOpsummering.tsx` på tværs af de tre varianter (Standard, Pilot, Kun 5g fri salg) — uden dubletter.
 
-Efter linjen:
-```
-"Du får et tilskud på (beløb), som kan bruges fra kontraktens startdato (dato), hvor det samtidig bliver tilgængeligt i vores selvbetjeningsunivers."
-```
+### Struktur i Word-dokumentet
+Dokumentet organiseres med overskrifter pr. logisk blok, så det er nemt at bruge som reference:
 
-Indsæt en tom linje (afsnit) og derefter:
-```
-"Hvis du har behov for at benytte tilskuddet før denne dato, så har du mulighed for at lave en udlægsordning, hvor du betaler for produktet nu, og derefter får krediteret pengene på datoen, hvor tilskuddet vil blive frigivet. Du kan ikke få refunderet mere end du har lagt ud for."
-```
+1. **Fælles intro** (bruges i alle varianter)
+   - "For at sikre, at der ikke opstår misforståelser…"
+   - "Aftalen bliver oprettet i (firmanavn)…"
 
-Efterfulgt af endnu en tom linje, så den eksisterende "Vi har talt om, at du skal bruge tilskuddet på disse produkter:" stadig står som separat afsnit.
+2. **Produktlinje**
+   - Standard/Pilot variant (datamængde)
+   - 5g fri salg variant (hastighedsbegrænsning)
 
-Da `hasSubsidy`-blokken er fælles for både Standard og Pilot (samme kodesti), dækker ændringen automatisk begge varianter. Kun 5g fri salg er ikke berørt (ingen `hasSubsidy`-rendering der).
+3. **MBB / Datadelingskort**
+   - Mobilevoice som MBB
+   - Datadelingskort
+   - Uden router
 
-### Ikke berørt
-- Visningslogik (`hasSubsidy`-gate uændret).
-- Øvrige sætninger i tilskudsblokken (rød markør-tekst osv.).
+4. **Vilkår & binding**
+   - "I er bundet på kontrakten i 36 måneder."
+   - 5g fri salg-binding-tekst (12 mdr. binding + 3 mdr. opsigelse + opsigelse-anbefaling)
+
+5. **Pilot welcome call & nummervalg (Pilot)**
+   - Welcome call-linje
+   - "Vi har snakket om, at det som udgangspunkt er" + tre varianter (eksisterende / mixed / nye)
+   - "Hvilke numre i ønsker…"
+   - Pilot opstart-tekst
+
+6. **Standard nummervalg & opstart**
+   - 3 bekræftelsesvarianter (eksisterende / mixed / nye)
+   - "Dine nye numre starter…"
+   - 2 opsigelse-varianter
+   - 2 opstart-varianter (asap / specific dato)
+   - Ordrebekræftelse-linje
+
+7. **Tilføj/opsig abonnementer** (fælles)
+
+8. **Tilskud (hasSubsidy)**
+   - Tilskudslinje
+   - Udlægsordning-linje
+   - "Vi har talt om…" + rød placeholder
+   - Webshop-linje
+
+9. **Omstilling**
+   - Pilot intro-linje
+   - Standard rød placeholder (kaldsflow/hardware)
+   - Opgrader-til-menuvalg-linje (fælles)
+
+10. **Afslutning**
+    - "Har du nogle spørgsmål til mig?"
+
+### Teknisk fremgang
+- Brug `docx`-skill: skrive Node-script der bygger `.docx` med Arial, A4, overskrifter (Heading1/Heading2), almindelige paragraphs og rød tekst (`color: "C00000"`) for placeholder-linjer.
+- Deduplikering: indsamle alle strenge fra `summaryLines`-grenene, normalisere og kun beholde unikke (tomme separator-linjer udelades).
+- Validere `.docx` via skill-script.
+- QA: konvertere til PDF/billede og inspicere før levering.
+- Output: `/mnt/documents/TDC_Opsummering_Formuleringer.docx` + leveres som `<lov-artifact>`.
 
 ### Filer berørt
-- `src/pages/TdcOpsummering.tsx`
+- Ingen kodeændringer i projektet. Kun generering af artefakt i `/mnt/documents/`.
 
