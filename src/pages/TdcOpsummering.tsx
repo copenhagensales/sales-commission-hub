@@ -364,33 +364,11 @@ export default function TdcOpsummering() {
   return (
     <MainLayout>
       <div className="container mx-auto py-6 space-y-6 max-w-7xl">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <FileText className="h-8 w-8 text-primary" />
-            <div>
-              <h1 className="text-2xl font-bold">TDC Opsummering</h1>
-              <p className="text-muted-foreground">Generer en struktureret opsummeringstekst efter et TDC-salg</p>
-            </div>
-          </div>
-          <div className="inline-flex items-center bg-muted/30 rounded-full p-1">
-            {([
-              { val: false, label: "DA" },
-              { val: true, label: "EN" },
-            ] as const).map((opt) => (
-              <button
-                key={opt.label}
-                type="button"
-                onClick={() => setIsEnglish(opt.val)}
-                className={cn(
-                  "px-4 py-1.5 text-sm font-medium rounded-full transition-colors",
-                  isEnglish === opt.val
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {opt.label}
-              </button>
-            ))}
+        <div className="flex items-center gap-3">
+          <FileText className="h-8 w-8 text-primary" />
+          <div>
+            <h1 className="text-2xl font-bold">TDC Opsummering</h1>
+            <p className="text-muted-foreground">Generer en struktureret opsummeringstekst efter et TDC-salg</p>
           </div>
         </div>
 
@@ -399,8 +377,28 @@ export default function TdcOpsummering() {
           <div className="space-y-6">
             {/* Summary variant toggle */}
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0">
                 <CardTitle className="text-lg">Opsummeringstype</CardTitle>
+                <div className="inline-flex items-center bg-muted/30 rounded-full p-1">
+                  {([
+                    { val: false, label: "DA" },
+                    { val: true, label: "EN" },
+                  ] as const).map((opt) => (
+                    <button
+                      key={opt.label}
+                      type="button"
+                      onClick={() => setIsEnglish(opt.val)}
+                      className={cn(
+                        "px-4 py-1.5 text-sm font-medium rounded-full transition-colors",
+                        isEnglish === opt.val
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="inline-flex w-full bg-muted/30 rounded-lg p-1">
