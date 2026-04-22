@@ -634,9 +634,9 @@ export default function TdcOpsummering() {
                   {/* Controls */}
                   <div className="flex items-center justify-between mb-3 p-2 bg-muted/50 rounded-md">
                     <div className="flex items-center gap-2">
-                      <Sun className="h-4 w-4 text-muted-foreground" />
-                      <Switch checked={isDarkTheme} onCheckedChange={setIsDarkTheme} />
                       <Moon className="h-4 w-4 text-muted-foreground" />
+                      <Switch checked={isDarkTheme} onCheckedChange={setIsDarkTheme} />
+                      <Sun className="h-4 w-4 text-muted-foreground" />
                     </div>
                     
                     <div className="flex items-center gap-3">
