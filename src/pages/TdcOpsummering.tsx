@@ -66,7 +66,15 @@ export default function TdcOpsummering() {
   // Omstilling
   const [hasOmstilling, setHasOmstilling] = useState(false);
   const [isStandardOmstilling, setIsStandardOmstilling] = useState(true);
-  const [noOmstilling, setNoOmstilling] = useState(false);
+  const [noOmstilling, setNoOmstilling] = useState(true);
+
+  // Default "Ingen Omstilling" when switching to Standard variant if nothing is selected
+  useEffect(() => {
+    if (summaryVariant === "standard" && !hasOmstilling && !noOmstilling) {
+      setNoOmstilling(true);
+      setIsStandardOmstilling(true);
+    }
+  }, [summaryVariant, hasOmstilling, noOmstilling]);
 
   // Specialsalg - now derived from summaryVariant
 
