@@ -87,7 +87,7 @@ export default function TdcOpsummering() {
   const isTilskudMissing = !noSubsidy && !hasSubsidy;
   const isOmstillingMissing = !noOmstilling && !hasOmstilling;
 
-  const showWarningBanner = !kun5gFriSalg && (isNummervalgMissing || isOpstartMissing || isMbbMissing || isTilskudMissing || isOmstillingMissing);
+  const showWarningBanner = !kun5gFriSalg && (isNummervalgMissing || isOpstartMissing || isMbbMissing || isTilskudMissing || (!isPilot && isOmstillingMissing));
 
   // Generate summary lines
   const summaryLines = useMemo(() => {
@@ -228,21 +228,19 @@ export default function TdcOpsummering() {
     }
 
     // Omstilling
-    if (hasOmstilling) {
-      if (isPilot) {
-        lines.push({ text: "I forhold til jeres omstilling og hvordan den skal virke, så er det noget i aftaler med min kollega der ringer og byder jer velkommen." });
+    if (isPilot) {
+      lines.push({ text: "I forhold til jeres omstilling og hvordan den skal virke, så er det noget i aftaler med min kollega der ringer og byder jer velkommen." });
+      lines.push({ text: "" });
+      if (isStandardOmstilling) {
+        lines.push({ text: "Hvis du får brug for menuvalg i fremtiden, så kan du altid opgradere din omstilling" });
         lines.push({ text: "" });
-        if (isStandardOmstilling) {
-          lines.push({ text: "Hvis du får brug for menuvalg i fremtiden, så kan du altid opgradere din omstilling" });
-          lines.push({ text: "" });
-        }
-      } else {
-        lines.push({ text: "Gennemgå kaldsflow (Når man ringer på hovednummeret, hvad sker der så?) Gennemgå hardware (Hvad for noget udstyr skal kunden bruge til omstillingen)", isRed: true });
+      }
+    } else if (hasOmstilling) {
+      lines.push({ text: "Gennemgå kaldsflow (Når man ringer på hovednummeret, hvad sker der så?) Gennemgå hardware (Hvad for noget udstyr skal kunden bruge til omstillingen)", isRed: true });
+      lines.push({ text: "" });
+      if (isStandardOmstilling) {
+        lines.push({ text: "Hvis du får brug for menuvalg i fremtiden, så kan du altid opgradere din omstilling." });
         lines.push({ text: "" });
-        if (isStandardOmstilling) {
-          lines.push({ text: "Hvis du får brug for menuvalg i fremtiden, så kan du altid opgradere din omstilling." });
-          lines.push({ text: "" });
-        }
       }
     }
 
