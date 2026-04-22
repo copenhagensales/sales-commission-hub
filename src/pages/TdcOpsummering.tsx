@@ -232,14 +232,14 @@ export default function TdcOpsummering() {
       lines.push({ text: "I forhold til jeres omstilling og hvordan den skal virke, så er det noget i aftaler med min kollega der ringer og byder jer velkommen." });
       lines.push({ text: "" });
       if (isStandardOmstilling) {
-        lines.push({ text: "Hvis du får brug for menuvalg i fremtiden, så kan du altid opgradere din omstilling" });
+        lines.push({ text: "Hvis du i fremtiden for brug får menuvalg, er det muligt at tilkøbe." });
         lines.push({ text: "" });
       }
     } else if (hasOmstilling) {
       lines.push({ text: "Gennemgå kaldsflow (Når man ringer på hovednummeret, hvad sker der så?) Gennemgå hardware (Hvad for noget udstyr skal kunden bruge til omstillingen)", isRed: true });
       lines.push({ text: "" });
       if (isStandardOmstilling) {
-        lines.push({ text: "Hvis du får brug for menuvalg i fremtiden, så kan du altid opgradere din omstilling." });
+        lines.push({ text: "Hvis du i fremtiden for brug får menuvalg, er det muligt at tilkøbe." });
         lines.push({ text: "" });
       }
     }
