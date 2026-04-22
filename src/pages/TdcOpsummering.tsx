@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { FileText, Copy, Check, Sun, Moon, Type } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
@@ -66,7 +66,15 @@ export default function TdcOpsummering() {
   // Omstilling
   const [hasOmstilling, setHasOmstilling] = useState(false);
   const [isStandardOmstilling, setIsStandardOmstilling] = useState(true);
-  const [noOmstilling, setNoOmstilling] = useState(false);
+  const [noOmstilling, setNoOmstilling] = useState(true);
+
+  // Default "Ingen Omstilling" when switching to Standard variant if nothing is selected
+  useEffect(() => {
+    if (summaryVariant === "standard" && !hasOmstilling && !noOmstilling) {
+      setNoOmstilling(true);
+      setIsStandardOmstilling(true);
+    }
+  }, [summaryVariant, hasOmstilling, noOmstilling]);
 
   // Specialsalg - now derived from summaryVariant
 
