@@ -1,34 +1,24 @@
 
 
-## Fix den underliggende KPI-cache der ikke er opdateret siden 13/4
+## Standard-variant: "Ingen Omstilling" valgt som default
 
-### Status
-- DB per Klient er nu beskyttet af stale-check (forrige fix).
-- **MEN**: Hele `kpi_cached_values` har ikke været opdateret i 8 dage — alle klienter, ikke kun Eesy FM.
-- Andre dashboards (TV, klient-dashboards, leaderboards, FM aggregeret) læser stadig direkte fra cachen uden stale-fallback og viser derfor forkerte tal.
+### Ændring (kun `src/pages/TdcOpsummering.tsx`)
 
-### Trin 1: Genstart cachen straks
-Kald edge-funktionen `calculate-kpi-values` manuelt med `chunk: "kpis"` og bagefter `chunk: "leaderboards"` for at få alle cachede tal opdateret med det samme.
+Tilføj en `useEffect` der sætter `noOmstilling = true` (og rydder `hasOmstilling`/genskaber `isStandardOmstilling = true`) **når brugeren skifter til Standard-varianten**, hvis ingen omstillings-valg allerede er aktivt.
 
-### Trin 2: Find ud af hvorfor cron-jobbet er stoppet
-Læs fra `cron.job` og `cron.job_run_details` for at se:
-- Om jobbet bag `trigger_kpi_calculation()` overhovedet eksisterer / er aktivt.
-- Hvornår det sidst kørte og hvilken fejl der eventuelt blev returneret.
+Konkret logik:
+- Når `summaryVariant === "standard"` aktiveres OG hverken `hasOmstilling` eller `noOmstilling` er sat → sæt `noOmstilling = true`.
+- Initial state for `noOmstilling` ændres fra `useState(false)` til `useState(true)`, så første load på Standard (default-varianten) viser "Ingen Omstilling" som forvalgt.
+- Pilot og Kun 5g fri salg røres ikke — deres egen Omstilling-UI / logik ignorerer `noOmstilling`-flaget visuelt (Pilot bruger en separat toggle-blok; 5g springer hele sektionen over). Validering `isOmstillingMissing` bliver automatisk `false` når `noOmstilling = true`, så advarselsbanneret forsvinder for Standard som ønsket.
 
-Rapportér tilbage hvad der findes. Hvis jobbet er deaktiveret eller mangler, præsenterer jeg en separat migration der genskaber/aktiverer det.
+### Hvorfor en effect og ikke kun ny default
+Kun at ændre `useState(true)` ville også gælde hvis brugeren starter på fx Pilot og senere skifter til Standard efter selv at have ryddet feltet. Effect'en sikrer at Standard altid har et forvalg, men respekterer at brugeren aktivt har valgt "Omstilling inkluderet".
 
-### Trin 3 (valgfrit, anbefalet): Beskyt de øvrige cache-læsere
-Tilføj samme stale-check (cache > 2 timer → fallback til live) i:
-- `src/hooks/usePrecomputedKpi.ts` (bruges af TV/klient-dashboards)
-- `src/hooks/useAggregatedClientCache.ts` (FM aggregeret)
-- Leaderboard-hooks der læser `kpi_leaderboard_cache`
+### Ikke berørt
+- `TdcOpsummeringPublic.tsx` (kun anvendt af TDC opsummering, men brugeren bekræfter ændringen kun gælder TDC Erhverv-opsummeringen — denne fil ER TDC Erhverv-opsummeringen).  
+  Note: `TdcOpsummeringPublic.tsx` er den offentlige spejl-version. Hvis du også vil have ændringen der, så sig til — ellers lader jeg den være urørt jf. din instruks.
+- Pilot-grenen, 5g-fri-grenen, øvrig validering, summary-generering, separators.
 
-Det forhindrer at samme tavse fejl rammer andre views fremover.
-
-### Filer der potentielt berøres
-- Ingen ved Trin 1+2 (kun edge function call + read queries).
-- Trin 3: `src/hooks/usePrecomputedKpi.ts`, `src/hooks/useAggregatedClientCache.ts`, evt. leaderboard-hook.
-
-### Spørgsmål
-Skal jeg køre alle 3 trin, eller kun 1+2 (minimum) — og lade Trin 3 vente til vi ved om cron-jobbet kan gøres stabilt igen?
+### Filer berørt
+- `src/pages/TdcOpsummering.tsx` (ændre default på `noOmstilling` + tilføj én `useEffect` ved variant-skift)
 
