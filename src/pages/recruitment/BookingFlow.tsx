@@ -645,7 +645,11 @@ export default function BookingFlow() {
             <BookingPreviewTab />
           </TabsContent>
 
-          <TabsContent value="samtaler">
+          <TabsContent value="booking-samtaler">
+            <BookingFlowConversationsTab />
+          </TabsContent>
+
+          <TabsContent value="planlagte-samtaler">
             <BookingCalendarTab />
           </TabsContent>
 
