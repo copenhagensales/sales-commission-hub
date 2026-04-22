@@ -87,7 +87,7 @@ export default function TdcOpsummering() {
   const isTilskudMissing = !noSubsidy && !hasSubsidy;
   const isOmstillingMissing = !noOmstilling && !hasOmstilling;
 
-  const showWarningBanner = !kun5gFriSalg && (isNummervalgMissing || isOpstartMissing || isMbbMissing || isTilskudMissing || isOmstillingMissing);
+  const showWarningBanner = !kun5gFriSalg && (isNummervalgMissing || isOpstartMissing || isMbbMissing || isTilskudMissing || (!isPilot && isOmstillingMissing));
 
   // Generate summary lines
   const summaryLines = useMemo(() => {
