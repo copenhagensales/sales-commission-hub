@@ -1,39 +1,42 @@
 
-## Diagnose
+## Plan: Screenshots af frontend-skærme
 
-Fannys `job_title` er ændret til "Fieldmarketing" — men `position_id` peger stadig på **"Salgskonsulent"** (rolle: `medarbejder`). UI'et viser `job_title`, men permissions kommer fra `position_id → job_positions.system_role_key`.
+### Realitet
 
-**Konkret:**
-- `employee_master_data.position_id` = Salgskonsulent (`729194f5...`) → rolle `medarbejder` → `menu_section_fieldmarketing.can_view = false` ❌
-- "Fieldmarketing"-positionen (`f4c737ca...`) findes med `system_role_key = fm_medarbejder_` → `menu_section_fieldmarketing.can_view = true` ✅
+Systemet har **179 sider** + dialoger og varianter. At tage screenshots af alt vil:
+- Tage 30-60 minutter browser-tid
+- Producere 200+ billeder
+- Kræve at jeg er logget ind som en rolle der har adgang til alt (ejer)
+- Mange sider kræver data (specifik klient, periode, medarbejder) for at vise noget meningsfuldt
 
-`job_title` er bare en tekst-kolonne; den styrer ikke menuen.
+### Forslag — vælg scope
 
-## Fix
+**A. Hovedmenu-skærme (~15 stk, 5 min)**
+Forsiden af hver topnavigations-sektion: Home, Dashboards-oversigt, Salg, Løn, Compliance, AMO, Indstillinger, Kunder, Teams, Vagtplan, Rekruttering, Field Marketing, MgTest, Rapporter, Onboarding.
 
-Opdatér Fannys `position_id` til Fieldmarketing-positionen:
+**B. Alle dashboards (~20 stk, 10 min)**
+Hvert dashboard under `/dashboards/*` (Relatel, TDC Erhverv, Eesy TM, FM, Tryg, Finansforbundet, ASE, AMO, Economic, osv.).
 
-```sql
-UPDATE employee_master_data
-SET position_id = 'f4c737ca-2a1a-4169-92e7-e8f33b453017'
-WHERE id = 'd60f19b0-dcfa-434e-983f-c40651f45021';
-```
+**C. Specifik sektion (du nævner hvilken)**
+F.eks. "alle skærme under Løn" eller "alle Compliance-sider".
 
-Effekt: Hun får rollen `fm_medarbejder_`, som har adgang til:
-- `menu_section_fieldmarketing` (sektion synlig)
-- `menu_fm_my_schedule`
-- `menu_fm_sales_registration`
+**D. Alt (179 sider, ~45 min)**
+Inklusive admin-værktøjer, MgTest-faner, Onboarding-moduler, AMO-undersider. Mange vil være tomme/loading uden specifik kontekst.
 
-Hun skal lave hard reload (Ctrl+Shift+R) eller logge ud/ind for at React Query-cachen invalideres.
+### Output
 
-## Zone
+PNG-filer i `/mnt/documents/screenshots/` med beskrivende navne (`01-home.png`, `02-dashboard-relatel.png`, …) + en `index.md` der lister alle med rute og kort beskrivelse. Leveret som `<lov-artifact>` så du kan downloade.
 
-`employee_master_data` med rolle-effekt = **rød zone** (Auth/RLS). Kræver din eksplicitte godkendelse før jeg kører UPDATE.
+### Forudsætninger
 
-## Sidenote — åben beslutning
+- Du skal være **logget ind som ejer** i preview først (browseren deler din session)
+- Viewport: 1920×1080 (desktop, fuld bredde)
+- Jeg tager kun ét screenshot pr. side (ingen scroll/dialoger) medmindre du beder om det
 
-CLAUDE.md §7 nævner at `auto_set_position_id`-triggeren kun sætter `position_id` hvis den er **NULL**. Når `job_title` ændres i UI'et på en eksisterende medarbejder, opdateres `position_id` derfor ikke automatisk. Det er sandsynligvis derfor flere personer kan have samme symptom. Skal vi udvide triggeren til også at re-mappe ved `job_title`-ændring? — separat beslutning, ikke en del af denne fix.
+### Mit forslag
 
-## Næste skridt
+**A + B = 35 skærme, ~15 min.** Dækker det visuelt vigtige uden at drukne i admin-undersider. Hvis du vil have specifikke ekstra (f.eks. "også alle MgTest-faner"), så tilføjer vi dem.
 
-Bekræft at jeg må køre UPDATE på Fannys `position_id`.
+### Bekræft
+
+Vælg A / B / C / D / A+B → jeg starter.
