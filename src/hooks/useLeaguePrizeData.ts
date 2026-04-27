@@ -103,14 +103,17 @@ export function usePrizeLeaders(
         }));
 
       if (isActive) {
+        // "Bedste runde" = højeste provision (kr) opnået i én enkelt runde.
+        // Vi henter weekly_provision (kr) — IKKE points_earned — så kval og rounds
+        // sammenlignes i samme enhed (kroner).
         const { data: roundStandings } = await supabase
           .from("league_round_standings")
           .select(`
-            points_earned, round_id,
+            weekly_provision, round_id,
             employee:employee_master_data!league_round_standings_employee_id_fkey(id, first_name, last_name)
           `)
           .eq("season_id", seasonId)
-          .order("points_earned", { ascending: false })
+          .order("weekly_provision", { ascending: false })
           .limit(50);
 
         const roundIds = [...new Set((roundStandings ?? []).map((r: any) => r.round_id).filter(Boolean))];
@@ -121,14 +124,14 @@ export function usePrizeLeaders(
         }
 
         const finishedBestRounds: RankedRound[] = (roundStandings ?? [])
-          .filter((r: any) => r.points_earned > 0)
+          .filter((r: any) => (r.weekly_provision || 0) > 0)
           .map((r: any) => ({
             employee: r.employee as any,
-            points_earned: r.points_earned,
+            points_earned: Math.round(r.weekly_provision), // feltnavnet bevares for bagudkompatibilitet — værdien er kr
             round_number: r.round_id ? (roundNumberMap[r.round_id] ?? null) : null,
           }));
 
-        // Merge kval + finished rounds, sort by points descending
+        // Merge kval + finished rounds, sortér efter provision (kr) faldende
         allBestRounds = [...qualBestRounds, ...finishedBestRounds]
           .sort((a, b) => b.points_earned - a.points_earned);
 
@@ -138,7 +141,7 @@ export function usePrizeLeaders(
           bestRound = {
             employee: top.employee,
             value: top.points_earned,
-            label: `${top.points_earned} pt${roundLabel ? ` (${roundLabel})` : ""}`,
+            label: `${top.points_earned.toLocaleString("da-DK")} kr${roundLabel ? ` (${roundLabel})` : ""}`,
           };
         }
       } else {
