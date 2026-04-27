@@ -401,6 +401,15 @@ export default function CommissionLeague() {
               </div>
           </div>
 
+          {/* Final Round Banner */}
+          {isFinalRound && currentRound && (
+            <FinalRoundBanner
+              endDate={currentRound.end_date}
+              multiplier={finalMultiplier}
+              roundNumber={currentRound.round_number}
+            />
+          )}
+
           {/* Motivation Coach Bar */}
           {isEnrolled && !isFan && currentEmployeeId && (
             <LeagueMotivationBar
