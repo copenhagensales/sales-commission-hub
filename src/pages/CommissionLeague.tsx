@@ -343,18 +343,30 @@ export default function CommissionLeague() {
 
                   {/* === LEFT COLUMN === */}
                   <div className="order-2 md:order-1 flex flex-col gap-1.5">
-                    <div className="inline-flex items-center gap-2 self-center md:self-start">
-                      <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-                      </span>
-                      <span className="text-xs font-semibold uppercase tracking-wider text-emerald-400">
-                        {isQualificationPhase ? "Kvalifikationsrunde" : `Runde ${currentRound?.round_number ?? "?"}`}
-                      </span>
-                      {currentRound?.status === "active" && !isQualificationPhase && (
-                        <span className="text-[10px] text-muted-foreground">(i gang)</span>
-                      )}
-                    </div>
+                    {isFinalRound ? (
+                      <div className="inline-flex items-center gap-2 self-center md:self-start rounded-full bg-gradient-to-r from-amber-500/20 to-red-500/20 px-3 py-1 ring-1 ring-amber-400/50">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-400" />
+                        </span>
+                        <span className="text-xs font-bold uppercase tracking-wider text-amber-300">
+                          🏆 Finale · Runde {currentRound?.round_number}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="inline-flex items-center gap-2 self-center md:self-start">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                        </span>
+                        <span className="text-xs font-semibold uppercase tracking-wider text-emerald-400">
+                          {isQualificationPhase ? "Kvalifikationsrunde" : `Runde ${currentRound?.round_number ?? "?"}`}
+                        </span>
+                        {currentRound?.status === "active" && !isQualificationPhase && (
+                          <span className="text-[10px] text-muted-foreground">(i gang)</span>
+                        )}
+                      </div>
+                    )}
                     <span className="text-xs text-muted-foreground">
                       {enrollmentCount ?? 0} spillere tilmeldt
                     </span>
