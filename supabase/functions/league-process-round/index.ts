@@ -377,8 +377,12 @@ Deno.serve(async (req) => {
     const nextEnd = new Date(nextStart);
     nextEnd.setDate(nextEnd.getDate() + 7);
 
-    // Don't create if past season end
-    if (!season.end_date || nextEnd <= new Date(season.end_date)) {
+    // Antal planlagte runder = antal multipliers i config (fallback til 6).
+    // Forretningsregel: spillet kører N runder uanset om sidste runde overlapper sæsonens end_date med få dage.
+    const totalPlannedRounds = roundMultipliers.length || 6;
+    const shouldCreateNext = nextRoundNumber <= totalPlannedRounds;
+
+    if (shouldCreateNext) {
       const { error: nextRoundError } = await supabase
         .from("league_rounds")
         .insert({
