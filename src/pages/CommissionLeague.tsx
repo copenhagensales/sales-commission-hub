@@ -138,6 +138,15 @@ export default function CommissionLeague() {
   const { data: weeklyProvisionMap } = useLeagueWeeklyProvision(allEmployeeIds.length > 0 ? allEmployeeIds : undefined);
   const { data: roundProvisionMap } = useLeagueRoundProvision(currentRound, allEmployeeIds.length > 0 ? allEmployeeIds : undefined);
 
+  // Final-round detection: sidste planlagte runde i sæsonen
+  const seasonConfig = (season?.config ?? {}) as { round_multipliers?: number[] };
+  const totalPlannedRounds = seasonConfig.round_multipliers?.length ?? 6;
+  const finalMultiplier = seasonConfig.round_multipliers?.[totalPlannedRounds - 1] ?? 2;
+  const isFinalRound =
+    season?.status === "active" &&
+    currentRound?.status === "active" &&
+    currentRound?.round_number === totalPlannedRounds;
+
   const isEnrolled = !!enrollment;
   const isFan = enrollment?.is_spectator === true;
 
