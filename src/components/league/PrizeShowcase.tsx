@@ -242,10 +242,10 @@ export function PrizeShowcase({ standings, prizeLeaders, seasonStatus, isActive,
             rows={(prizeLeaders?.allBestRounds ?? []).map((r, i) => ({
               rank: i + 1,
               name: formatPlayerName(r.employee),
-              value: `${fmtNum(r.points_earned)} pt`,
-              extra: r.round_number ? `Runde ${r.round_number}` : undefined,
+              value: `${fmtNum(r.points_earned)} kr`,
+              extra: r.round_number === 0 ? "Kval" : r.round_number ? `Runde ${r.round_number}` : undefined,
             }))}
-            valueHeader="Point"
+            valueHeader="Provision"
             extraHeader="Runde"
           />
         </DialogContent>
