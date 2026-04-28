@@ -1,11 +1,11 @@
 import { lazy } from "react";
+export { default as Home } from "@/pages/Home";
 
 export const TdcOpsummeringPublic = lazy(() => import("@/pages/TdcOpsummeringPublic"));
 
 const lazyPage = (importFn: () => Promise<any>) => lazy(importFn);
 
 export const Auth = lazyPage(() => import("@/pages/Auth"));
-export const Home = lazyPage(() => import("@/pages/Home"));
 export const Dashboard = lazyPage(() => import("@/pages/Dashboard"));
 export const Agents = lazyPage(() => import("@/pages/Agents"));
 export const Sales = lazyPage(() => import("@/pages/Sales"));
