@@ -166,9 +166,9 @@ export default function UpcomingInterviews() {
       <div className="space-y-6">
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Kommende samtaler</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Kommende jobsamtaler</h1>
             <p className="text-muted-foreground">
-              Oversigt over planlagte jobsamtaler
+              Oversigt over planlagte jobsamtaler (ekskl. bookede screening-opkald)
             </p>
           </div>
           <DropdownMenu>
