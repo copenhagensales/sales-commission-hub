@@ -120,7 +120,7 @@ export function BookingCalendarTab({ bookingType }: BookingCalendarTabProps = {}
     mutationFn: async (candidateId: string) => {
       const { error } = await supabase
         .from("candidates")
-        .update({ status: "contacted", interview_date: null })
+        .update({ status: "contacted", interview_date: null, booking_type: null })
         .eq("id", candidateId);
       if (error) throw error;
     },
@@ -131,7 +131,30 @@ export function BookingCalendarTab({ bookingType }: BookingCalendarTabProps = {}
     onError: (err: any) => toast.error("Fejl: " + err.message),
   });
 
-  const isProcessing = contactedMutation.isPending || unreachableMutation.isPending;
+  // "Konvertér til jobsamtale" mutation - only relevant for phone_screening
+  const convertToInterviewMutation = useMutation({
+    mutationFn: async (candidateId: string) => {
+      const { error } = await supabase
+        .from("candidates")
+        .update({ booking_type: "job_interview" })
+        .eq("id", candidateId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["booking-calendar-candidates"] });
+      toast.success("Konverteret til jobsamtale");
+    },
+    onError: (err: any) => toast.error("Fejl: " + err.message),
+  });
+
+  const isProcessing =
+    contactedMutation.isPending ||
+    unreachableMutation.isPending ||
+    convertToInterviewMutation.isPending;
+
+  const labels = bookingType
+    ? TYPE_LABEL[bookingType]
+    : { singular: "samtale", plural: "samtaler", emptyDay: "Ingen samtaler denne dag" };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-6">
