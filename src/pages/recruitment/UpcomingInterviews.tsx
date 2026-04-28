@@ -121,6 +121,7 @@ export default function UpcomingInterviews() {
       const { data: candidates, error } = await supabase
         .from("candidates")
         .select("id, first_name, last_name, phone, email, interview_date, applied_position")
+        .eq("booking_type", "job_interview")
         .lt("interview_date", now)
         .not("interview_date", "is", null)
         .order("interview_date", { ascending: false })
