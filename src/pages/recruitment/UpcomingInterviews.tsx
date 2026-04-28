@@ -67,6 +67,7 @@ export default function UpcomingInterviews() {
         .from("candidates")
         .select("id, first_name, last_name, phone, email, interview_date, applied_position")
         .eq("status", "interview_scheduled")
+        .eq("booking_type", "job_interview")
         .gte("interview_date", now)
         .not("interview_date", "is", null)
         .order("interview_date", { ascending: true });
@@ -120,6 +121,7 @@ export default function UpcomingInterviews() {
       const { data: candidates, error } = await supabase
         .from("candidates")
         .select("id, first_name, last_name, phone, email, interview_date, applied_position")
+        .eq("booking_type", "job_interview")
         .lt("interview_date", now)
         .not("interview_date", "is", null)
         .order("interview_date", { ascending: false })
@@ -164,9 +166,9 @@ export default function UpcomingInterviews() {
       <div className="space-y-6">
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Kommende samtaler</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Kommende jobsamtaler</h1>
             <p className="text-muted-foreground">
-              Oversigt over planlagte jobsamtaler
+              Oversigt over planlagte jobsamtaler (ekskl. bookede screening-opkald)
             </p>
           </div>
           <DropdownMenu>

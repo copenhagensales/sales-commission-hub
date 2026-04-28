@@ -393,6 +393,10 @@ export default function BookingFlow() {
               Booking samtaler
             </TabsTrigger>
             <TabsTrigger value="planlagte-samtaler" className="gap-2">
+              <PhoneCall className="h-4 w-4" />
+              Bookede opkald
+            </TabsTrigger>
+            <TabsTrigger value="planlagte-jobsamtaler" className="gap-2">
               <CalendarDays className="h-4 w-4" />
               Planlagte jobsamtaler
             </TabsTrigger>
@@ -650,7 +654,11 @@ export default function BookingFlow() {
           </TabsContent>
 
           <TabsContent value="planlagte-samtaler">
-            <BookingCalendarTab />
+            <BookingCalendarTab bookingType="phone_screening" />
+          </TabsContent>
+
+          <TabsContent value="planlagte-jobsamtaler">
+            <BookingCalendarTab bookingType="job_interview" />
           </TabsContent>
 
           <TabsContent value="notifications">

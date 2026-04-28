@@ -292,7 +292,8 @@ export default function CandidateDetail() {
         .from("candidates")
         .update({ 
           interview_date: localDateTime.toISOString(),
-          status: "interview_scheduled"
+          status: "interview_scheduled",
+          booking_type: "job_interview"
         })
         .eq("id", id);
       if (error) throw error;
@@ -302,7 +303,7 @@ export default function CandidateDetail() {
       setShowInterviewDialog(false);
       setInterviewDate(undefined);
       setInterviewTime("10:00");
-      toast.success("Samtale planlagt");
+      toast.success("Jobsamtale planlagt");
     },
     onError: (error: any) => {
       toast.error(error.message || "Kunne ikke planlægge samtale");

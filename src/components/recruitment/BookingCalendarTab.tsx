@@ -6,23 +6,54 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { CheckCircle, XCircle, Phone, Loader2, User } from "lucide-react";
+import { CheckCircle, XCircle, Phone, Loader2, ArrowRightLeft, Briefcase, PhoneCall } from "lucide-react";
 import { format, isSameDay, parseISO } from "date-fns";
 import { da } from "date-fns/locale";
 
-export function BookingCalendarTab() {
+type BookingType = "phone_screening" | "job_interview";
+
+interface BookingCalendarTabProps {
+  /**
+   * Filter calendar to a specific booking type.
+   * - `phone_screening` = candidate self-booked a call via the public booking page
+   * - `job_interview` = internally scheduled job interview
+   * If omitted, both types are shown.
+   */
+  bookingType?: BookingType;
+}
+
+const TYPE_LABEL: Record<BookingType, { singular: string; plural: string; emptyDay: string }> = {
+  phone_screening: {
+    singular: "booket opkald",
+    plural: "bookede opkald",
+    emptyDay: "Ingen bookede opkald denne dag",
+  },
+  job_interview: {
+    singular: "jobsamtale",
+    plural: "jobsamtaler",
+    emptyDay: "Ingen jobsamtaler denne dag",
+  },
+};
+
+export function BookingCalendarTab({ bookingType }: BookingCalendarTabProps = {}) {
   const queryClient = useQueryClient();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
 
   const { data: candidates, isLoading } = useQuery({
-    queryKey: ["booking-calendar-candidates"],
+    queryKey: ["booking-calendar-candidates", bookingType ?? "all"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("candidates")
-        .select("id, first_name, last_name, email, phone, status, interview_date")
+        .select("id, first_name, last_name, email, phone, status, interview_date, booking_type")
         .eq("status", "interview_scheduled")
         .not("interview_date", "is", null)
         .order("interview_date", { ascending: true });
+
+      if (bookingType) {
+        query = query.eq("booking_type", bookingType);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
@@ -89,7 +120,7 @@ export function BookingCalendarTab() {
     mutationFn: async (candidateId: string) => {
       const { error } = await supabase
         .from("candidates")
-        .update({ status: "contacted", interview_date: null })
+        .update({ status: "contacted", interview_date: null, booking_type: null })
         .eq("id", candidateId);
       if (error) throw error;
     },
@@ -100,7 +131,30 @@ export function BookingCalendarTab() {
     onError: (err: any) => toast.error("Fejl: " + err.message),
   });
 
-  const isProcessing = contactedMutation.isPending || unreachableMutation.isPending;
+  // "Konvertér til jobsamtale" mutation - only relevant for phone_screening
+  const convertToInterviewMutation = useMutation({
+    mutationFn: async (candidateId: string) => {
+      const { error } = await supabase
+        .from("candidates")
+        .update({ booking_type: "job_interview" })
+        .eq("id", candidateId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["booking-calendar-candidates"] });
+      toast.success("Konverteret til jobsamtale");
+    },
+    onError: (err: any) => toast.error("Fejl: " + err.message),
+  });
+
+  const isProcessing =
+    contactedMutation.isPending ||
+    unreachableMutation.isPending ||
+    convertToInterviewMutation.isPending;
+
+  const labels = bookingType
+    ? TYPE_LABEL[bookingType]
+    : { singular: "samtale", plural: "samtaler", emptyDay: "Ingen samtaler denne dag" };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-6">
@@ -138,14 +192,14 @@ export function BookingCalendarTab() {
           </CardTitle>
           {candidatesForDate.length > 0 && (
             <p className="text-sm text-muted-foreground">
-              {candidatesForDate.length} samtale{candidatesForDate.length !== 1 ? "r" : ""}
+              {candidatesForDate.length} {candidatesForDate.length === 1 ? labels.singular : labels.plural}
             </p>
           )}
         </CardHeader>
         <CardContent>
           {candidatesForDate.length === 0 ? (
             <p className="text-sm text-muted-foreground py-8 text-center">
-              Ingen samtaler denne dag
+              {labels.emptyDay}
             </p>
           ) : (
             <div className="divide-y">
@@ -155,13 +209,35 @@ export function BookingCalendarTab() {
                   className="flex items-center justify-between py-3 gap-4"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="p-2 rounded-lg bg-primary/10 shrink-0">
-                      <User className="h-4 w-4 text-primary" />
+                    <div className={`p-2 rounded-lg shrink-0 ${
+                      candidate.booking_type === "job_interview"
+                        ? "bg-emerald-500/10"
+                        : "bg-primary/10"
+                    }`}>
+                      {candidate.booking_type === "job_interview" ? (
+                        <Briefcase className="h-4 w-4 text-emerald-600" />
+                      ) : (
+                        <PhoneCall className="h-4 w-4 text-primary" />
+                      )}
                     </div>
                     <div className="min-w-0">
-                      <p className="font-medium text-sm truncate">
-                        {candidate.first_name} {candidate.last_name}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-sm truncate">
+                          {candidate.first_name} {candidate.last_name}
+                        </p>
+                        {!bookingType && (
+                          <Badge
+                            variant="outline"
+                            className={`text-[10px] px-1.5 py-0 ${
+                              candidate.booking_type === "job_interview"
+                                ? "border-emerald-500/30 text-emerald-600"
+                                : "border-primary/30 text-primary"
+                            }`}
+                          >
+                            {candidate.booking_type === "job_interview" ? "Jobsamtale" : "Opkald"}
+                          </Badge>
+                        )}
+                      </div>
                       {candidate.phone && (
                         <p className="text-xs text-muted-foreground flex items-center gap-1">
                           <Phone className="h-3 w-3" />
@@ -175,6 +251,19 @@ export function BookingCalendarTab() {
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
+                    {candidate.booking_type === "phone_screening" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5"
+                        disabled={isProcessing}
+                        onClick={() => convertToInterviewMutation.mutate(candidate.id)}
+                        title="Markér som jobsamtale"
+                      >
+                        <ArrowRightLeft className="h-3.5 w-3.5" />
+                        Jobsamtale
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       variant="outline"

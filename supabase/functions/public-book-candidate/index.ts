@@ -251,6 +251,7 @@ Deno.serve(async (req) => {
       .update({
         status: "interview_scheduled",
         interview_date: interviewDatetime,
+        booking_type: "phone_screening",
       })
       .eq("id", candidateId);
     console.log(`[public-book-candidate] Updated candidate ${candidateId} with interview_date ${interviewDatetime}`);
