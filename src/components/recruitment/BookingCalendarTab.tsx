@@ -10,19 +10,50 @@ import { CheckCircle, XCircle, Phone, Loader2, User } from "lucide-react";
 import { format, isSameDay, parseISO } from "date-fns";
 import { da } from "date-fns/locale";
 
-export function BookingCalendarTab() {
+type BookingType = "phone_screening" | "job_interview";
+
+interface BookingCalendarTabProps {
+  /**
+   * Filter calendar to a specific booking type.
+   * - `phone_screening` = candidate self-booked a call via the public booking page
+   * - `job_interview` = internally scheduled job interview
+   * If omitted, both types are shown.
+   */
+  bookingType?: BookingType;
+}
+
+const TYPE_LABEL: Record<BookingType, { singular: string; plural: string; emptyDay: string }> = {
+  phone_screening: {
+    singular: "booket opkald",
+    plural: "bookede opkald",
+    emptyDay: "Ingen bookede opkald denne dag",
+  },
+  job_interview: {
+    singular: "jobsamtale",
+    plural: "jobsamtaler",
+    emptyDay: "Ingen jobsamtaler denne dag",
+  },
+};
+
+export function BookingCalendarTab({ bookingType }: BookingCalendarTabProps = {}) {
   const queryClient = useQueryClient();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
 
   const { data: candidates, isLoading } = useQuery({
-    queryKey: ["booking-calendar-candidates"],
+    queryKey: ["booking-calendar-candidates", bookingType ?? "all"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("candidates")
-        .select("id, first_name, last_name, email, phone, status, interview_date")
+        .select("id, first_name, last_name, email, phone, status, interview_date, booking_type")
         .eq("status", "interview_scheduled")
         .not("interview_date", "is", null)
         .order("interview_date", { ascending: true });
+
+      if (bookingType) {
+        query = query.eq("booking_type", bookingType);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
