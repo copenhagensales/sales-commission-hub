@@ -33,6 +33,8 @@ const EXPENSE_CATEGORIES = [
   { key: "lokationer", label: "Lokationer", auto: true },
   { key: "hotel", label: "Hotel", auto: true },
   { key: "corpay", label: "Corpay" },
+  { key: "easypark", label: "Easypark" },
+  { key: "greenmobility", label: "Greenmobility" },
   { key: "ipads", label: "iPads (eesy betaler 50%)" },
   { key: "team_arrangement", label: "Team arrangement" },
   { key: "banken", label: "Banken" },
