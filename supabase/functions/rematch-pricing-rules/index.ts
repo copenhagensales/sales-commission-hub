@@ -323,8 +323,12 @@ serve(async (req) => {
     const saleItemIds = body.sale_item_ids as string[] | undefined; // filter by specific sale_item IDs
     const limit = body.limit as number | undefined; // optional limit
     const dryRun = body.dry_run === true;
+    // Optional cutoff on sales.sale_datetime (ISO string). When provided,
+    // only sale_items whose parent sale has sale_datetime >= this value are processed.
+    // Default behaviour (undefined) is unchanged — no datetime filter applied.
+    const minSaleDatetime = body.min_sale_datetime as string | undefined;
 
-    console.log(`[rematch-pricing-rules] Starting with source=${source || "all"}, product_id=${productId || "all"}, sale_ids=${saleIds?.length || 0}, sale_item_ids=${saleItemIds?.length || 0}, limit=${limit || "none"}, dry_run=${dryRun}`);
+    console.log(`[rematch-pricing-rules] Starting with source=${source || "all"}, product_id=${productId || "all"}, sale_ids=${saleIds?.length || 0}, sale_item_ids=${saleItemIds?.length || 0}, limit=${limit || "none"}, dry_run=${dryRun}, min_sale_datetime=${minSaleDatetime || "none"}`);
 
     // Phase 0: Resolve needs_mapping items by looking up adversus_product_mappings
     const resolvedItemIds: string[] = [];
