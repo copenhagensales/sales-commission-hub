@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import Home from "@/pages/Home";
+export { default as Home } from "@/pages/Home";
 
 export const TdcOpsummeringPublic = lazy(() => import("@/pages/TdcOpsummeringPublic"));
 
