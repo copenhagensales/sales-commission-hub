@@ -10264,6 +10264,30 @@ export type Database = {
           },
         ]
       }
+      pricing_backup_2026_04_28: {
+        Row: {
+          backup_type: string
+          created_at: string
+          entity_id: string
+          id: string
+          payload: Json
+        }
+        Insert: {
+          backup_type: string
+          created_at?: string
+          entity_id: string
+          id?: string
+          payload: Json
+        }
+        Update: {
+          backup_type?: string
+          created_at?: string
+          entity_id?: string
+          id?: string
+          payload?: Json
+        }
+        Relationships: []
+      }
       pricing_rule_history: {
         Row: {
           allows_immediate_payment: boolean | null
