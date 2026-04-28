@@ -1,59 +1,75 @@
-## Hvorfor er Runde 6 ikke startet?
+## Problemet
 
-**Root cause:** Bug i `supabase/functions/league-process-round/index.ts:381`.
+I dag er der **kun ét felt** på `candidates`: `status='interview_scheduled'` + `interview_date`. Det bruges til to forskellige ting:
 
-Efter R5 sluttede (27. apr) skulle R6 (27. apr → 4. maj) oprettes. Men sæsonens `end_date` er **3. maj**, og koden tjekker:
+1. **Booking** — kandidat selvbooker en tid via den offentlige booking-side (`public-book-candidate`). Det er bare en aftalt opkaldstid — ikke nødvendigvis en jobsamtale.
+2. **Jobsamtale** — intern booker manuelt via `CandidateDetail` ("Planlæg samtale") fordi I reelt vil holde en jobsamtale.
 
-```ts
-if (!season.end_date || nextEnd <= new Date(season.end_date))
-```
+Begge ender i `status='interview_scheduled'` og dukker op samme sted ("Planlagte jobsamtaler", "Kommende samtaler"). Derfor ser alle public bookings ud som om det er jobsamtaler.
 
-Da `nextEnd` (4. maj) > `season.end_date` (3. maj) blev R6 aldrig indsat — selvom sæson-config har **6 round_multipliers** (`[1, 1.2, 1.4, 1.6, 1.8, 2]`), dvs. R6 er den planlagte finalerunde.
+## Løsning — to spor i datamodel + UI
 
-Det er en off-by-one: tjekket bør være om runden *starter* før sæsonen slutter, ikke om den *ender* før.
+### Datamodel
 
-## Plan
+Tilføj to nye felter til `candidates`:
 
-### 1. Fix round-creation bug (rød zone — pricing/scoring-tilstødende)
+- `booking_type` enum: `'phone_screening'` (default for public booking) | `'job_interview'` (intern beslutning)
+- Behold `interview_date` som tidspunktet, men omdøb begrebsligt til "booket tid"
 
-**Fil:** `supabase/functions/league-process-round/index.ts` (linje 374-399)
+Migration:
+- Tilføj enum `candidate_booking_type`
+- Tilføj kolonne `candidates.booking_type candidate_booking_type` (nullable, default null)
+- Backfill: alle eksisterende `interview_scheduled` der kommer fra `public-book-candidate` → `'phone_screening'`. Dem der er sat manuelt fra `CandidateDetail` → `'job_interview'`. Vi kan ikke skelne historisk, så **alle eksisterende sættes til `phone_screening`** (det er det hyppigste) og I kan opgradere relevante manuelt.
 
-Skift logikken til at oprette runden hvis den planlagte runde ≤ antal `round_multipliers` i config. Det matcher forretningsreglen ("der spilles N runder, hvor N = antal multipliers"). Faldback til date-tjek hvis config mangler.
+### Edge functions
 
-### 2. Manuel oprettelse af R6 nu
+- `public-book-candidate`: sætter `booking_type='phone_screening'` ved oprettelse
+- Ny intern action i `CandidateDetail` ("Planlæg jobsamtale"): sætter `booking_type='job_interview'`
 
-Indsæt R6 direkte i `league_rounds` med:
-- `round_number: 6`
-- `start_date: 2026-04-27`
-- `end_date: 2026-05-04` (eller 2026-05-03 = sæson-slut, valg nedenfor)
-- `status: 'active'`
+### UI-ændringer
 
-### 3. "Sidste runde"-effekt på `/commission-league`
+**1. `BookingFlow.tsx` — fanen "Planlagte jobsamtaler"**
+- Filtrer kun `booking_type='job_interview'` (ikke alle `interview_scheduled`)
+- Tilføj separat fane: **"Bookede opkald"** der viser `booking_type='phone_screening'` (det er det Simon, Hugo m.fl. selvbooker)
 
-Når `currentRound.round_number === total_rounds` (= 6), vises:
+**2. `BookingCalendarTab.tsx` (det er det du ser på screenshottet)**
+- Vis to visuelt adskilte spor: blå prik = booket opkald, grøn prik = jobsamtale
+- Header per dag: "X bookede opkald · Y jobsamtaler"
+- Knap "Konvertér til jobsamtale" på et booket opkald (hvis screening gik godt)
 
-**A. Pulserende rød/guld badge i header** (erstatter den grønne "RUNDE X"-prik):
-- "🏆 FINALE · SIDSTE RUNDE" med animeret glow
-- Erstat emerald-grøn med amber/rød gradient + `animate-pulse`
+**3. `UpcomingInterviews.tsx` ("Kommende samtaler" i sidebar)**
+- Skift til kun at vise `booking_type='job_interview'`
+- Omdøb evt. til "Kommende jobsamtaler"
 
-**B. Hero-banner under header:**
-- Fuld bredde, mørk gradient (amber-900 → red-900) med subtile guld-partikler
-- Tekst: "FINALE-RUNDE · Sidste chance for at sikre titlen"
-- Countdown-timer til runde-slut (genbrug eksisterende `QualificationCountdown`-mønster)
-- Lille tekst: "Point i denne runde tæller ×2"
+**4. `Candidates.tsx` filter**
+- Status-filter "Samtale planlagt" splittes til to: "Booket opkald" og "Jobsamtale planlagt"
 
-**C. Subtle flame-ikon** ved siden af "Bedste runde"-kortet i `PrizeShowcase` med tooltip "Finalemultiplier ×2 aktiv".
+**5. `CandidateDetail.tsx`**
+- Vis tydeligt hvilken type booking kandidaten har
+- To knapper: "Planlæg opkald" vs "Planlæg jobsamtale"
 
-Komponenten bliver ny: `src/components/league/FinalRoundBanner.tsx`. Vises kun når `isLastRound === true` og `currentRound.status === 'active'`.
+### Begrebsafklaring i sproget
 
-### Tekniske detaljer
+Konsekvent terminologi gennem appen:
+- **Booket opkald / screening** = kandidat selvbooker via offentlig side
+- **Jobsamtale** = intern beslutning, manuelt planlagt af jer
 
-- `total_rounds` udledes som `season.config.round_multipliers.length` (6).
-- `isLastRound = currentRound?.round_number === totalRounds`.
-- Multiplier-værdi vises fra `roundMultipliers[5] = 2`.
-- Countdown bruger `currentRound.end_date`.
+## Tekniske detaljer
 
-## Spørgsmål inden implementering
+**Filer der ændres:**
+- Migration: ny enum + kolonne + backfill
+- `supabase/functions/public-book-candidate/index.ts` (sætter `phone_screening`)
+- `src/pages/recruitment/BookingFlow.tsx` (ny fane + filtrering)
+- `src/components/recruitment/BookingCalendarTab.tsx` (to spor visuelt)
+- `src/pages/recruitment/UpcomingInterviews.tsx` (filter + label)
+- `src/pages/recruitment/CandidateDetail.tsx` (to actions)
+- `src/pages/recruitment/Candidates.tsx` (status-filter split)
 
-1. **R6 slutdato:** 4. maj (normal 7-dages runde, går 1 dag over sæson-end) eller 3. maj (præcis sæson-end, 6-dages runde)?
-2. **Skal jeg også sende en `LeagueAnnouncementPopup` "FINALE STARTET" til alle spillere første gang R6 indlæses?** (Der findes allerede et announcement-system.)
+**Zone:** Gul (rekruttering/booking_flow). Ingen rød zone berøres.
+
+**Ingen breaking changes:** `status='interview_scheduled'` består — vi tilføjer kun en dimension oveni.
+
+## Spørgsmål før jeg implementerer
+
+1. **Backfill-strategi:** Sætter vi alle eksisterende `interview_scheduled` til `'phone_screening'` (default), eller `'job_interview'` (det "gamle" begreb)? Mit forslag: `phone_screening`, fordi det er det Simon/Hugo-flow rammer flest.
+2. **Skal "Planlagte jobsamtaler"-fanen i BookingFlow forsvinde helt** og flyttes til sidebar-punktet "Kommende samtaler" (så det er ét sted) — eller beholde begge?

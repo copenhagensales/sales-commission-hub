@@ -2594,6 +2594,9 @@ export type Database = {
           applied_position: string | null
           assigned_to: string | null
           available_from: string | null
+          booking_type:
+            | Database["public"]["Enums"]["candidate_booking_type"]
+            | null
           cohort_assignment_status: string | null
           created_at: string
           email: string | null
@@ -2621,6 +2624,9 @@ export type Database = {
           applied_position?: string | null
           assigned_to?: string | null
           available_from?: string | null
+          booking_type?:
+            | Database["public"]["Enums"]["candidate_booking_type"]
+            | null
           cohort_assignment_status?: string | null
           created_at?: string
           email?: string | null
@@ -2648,6 +2654,9 @@ export type Database = {
           applied_position?: string | null
           assigned_to?: string | null
           available_from?: string | null
+          booking_type?:
+            | Database["public"]["Enums"]["candidate_booking_type"]
+            | null
           cohort_assignment_status?: string | null
           created_at?: string
           email?: string | null
@@ -14664,6 +14673,7 @@ export type Database = {
         | "internal_workshop"
         | "legal_update"
       app_role: "admin" | "payroll" | "manager" | "agent"
+      candidate_booking_type: "phone_screening" | "job_interview"
       clock_type: "override" | "documentation" | "revenue"
       commission_transaction_type: "earn" | "clawback" | "manual_adjustment"
       commission_type: "fixed" | "percentage"
@@ -14873,6 +14883,7 @@ export const Constants = {
         "legal_update",
       ],
       app_role: ["admin", "payroll", "manager", "agent"],
+      candidate_booking_type: ["phone_screening", "job_interview"],
       clock_type: ["override", "documentation", "revenue"],
       commission_transaction_type: ["earn", "clawback", "manual_adjustment"],
       commission_type: ["fixed", "percentage"],
