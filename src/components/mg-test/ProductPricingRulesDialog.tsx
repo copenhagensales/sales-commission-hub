@@ -126,18 +126,31 @@ export function ProductPricingRulesDialog({
   const { data: campaigns } = useQuery({
     queryKey: ["campaign-mappings-for-rules", clientId],
     queryFn: async () => {
-      let query = supabase
-        .from("adversus_campaign_mappings")
-        .select("id, adversus_campaign_name, client_campaign_id, client_campaigns!inner(client_id)")
-        .order("adversus_campaign_name");
-
       if (clientId) {
-        query = query.eq("client_campaigns.client_id", clientId);
+        // Get client_campaign_ids belonging to this client
+        const { data: ccs, error: ccErr } = await supabase
+          .from("client_campaigns")
+          .select("id")
+          .eq("client_id", clientId);
+        if (ccErr) throw ccErr;
+        const ccIds = (ccs || []).map((c) => c.id);
+        if (ccIds.length === 0) return [];
+
+        const { data, error } = await supabase
+          .from("adversus_campaign_mappings")
+          .select("id, adversus_campaign_name")
+          .in("client_campaign_id", ccIds)
+          .order("adversus_campaign_name");
+        if (error) throw error;
+        return data as CampaignMapping[];
       }
 
-      const { data, error } = await query;
+      const { data, error } = await supabase
+        .from("adversus_campaign_mappings")
+        .select("id, adversus_campaign_name")
+        .order("adversus_campaign_name");
       if (error) throw error;
-      return data as unknown as CampaignMapping[];
+      return data as CampaignMapping[];
     },
     enabled: open,
   });
