@@ -126,13 +126,18 @@ export function ProductPricingRulesDialog({
   const { data: campaigns } = useQuery({
     queryKey: ["campaign-mappings-for-rules", clientId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("adversus_campaign_mappings")
-        .select("id, adversus_campaign_name")
+        .select("id, adversus_campaign_name, client_campaign_id, client_campaigns!inner(client_id)")
         .order("adversus_campaign_name");
 
+      if (clientId) {
+        query = query.eq("client_campaigns.client_id", clientId);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
-      return data as CampaignMapping[];
+      return data as unknown as CampaignMapping[];
     },
     enabled: open,
   });
