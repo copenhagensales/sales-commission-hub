@@ -2354,20 +2354,44 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
         };
       });
 
-      for (let i = 0; i < queueItems.length; i += 50) {
-        const batch = queueItems.slice(i, i + 50);
+      // Insert one-by-one so a single duplicate doesn't fail the whole batch.
+      // The DB has a unique index + ASE-trigger that rejects duplicates with code 23505.
+      let inserted = 0;
+      let skippedAsDuplicate = 0;
+      for (const item of queueItems) {
         const { error } = await supabase
           .from("cancellation_queue")
-          .insert(batch as any);
-        if (error) throw error;
+          .insert(item as any);
+        if (error) {
+          const isDup =
+            (error as any).code === "23505" ||
+            /duplicate|unique|dublet/i.test(error.message || "");
+          if (isDup) {
+            skippedAsDuplicate++;
+            continue;
+          }
+          throw error;
+        }
+        inserted++;
       }
 
-      return { count: queueItems.length, dedupRemoved: mergedAwayEntries.length };
+      return {
+        count: inserted,
+        dedupRemoved: mergedAwayEntries.length,
+        skippedAsDuplicate,
+      };
     },
-    onSuccess: ({ count, dedupRemoved }) => {
+    onSuccess: ({ count, dedupRemoved, skippedAsDuplicate }) => {
+      const parts: string[] = [`${count} salg er sendt til godkendelseskøen.`];
+      if (dedupRemoved > 0) {
+        parts.push(`${dedupRemoved} dubletter (samme telefonnummer) blev fjernet.`);
+      }
+      if (skippedAsDuplicate > 0) {
+        parts.push(`${skippedAsDuplicate} blev sprunget over – findes allerede som annullering.`);
+      }
       toast({
         title: "Sendt til godkendelse",
-        description: `${count} salg er sendt til godkendelseskøen.${dedupRemoved > 0 ? ` ${dedupRemoved} dubletter (samme telefonnummer) blev fjernet.` : ''}`,
+        description: parts.join(" "),
       });
       queryClient.invalidateQueries({ queryKey: ["cancellation-imports-history"] });
       queryClient.invalidateQueries({ queryKey: ["cancellation-queue"] });

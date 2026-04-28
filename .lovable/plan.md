@@ -1,75 +1,37 @@
-## Problemet
+Konklusion: Ja, det skal lukkes i databasen – ikke kun i UI. `cancellation_queue` er rød zone, fordi den påvirker løn/fradrag, så ændringen skal laves som en kontrolleret migration + lille upload-guard.
 
-I dag er der **kun ét felt** på `candidates`: `status='interview_scheduled'` + `interview_date`. Det bruges til to forskellige ting:
+Plan:
 
-1. **Booking** — kandidat selvbooker en tid via den offentlige booking-side (`public-book-candidate`). Det er bare en aftalt opkaldstid — ikke nødvendigvis en jobsamtale.
-2. **Jobsamtale** — intern booker manuelt via `CandidateDetail` ("Planlæg samtale") fordi I reelt vil holde en jobsamtale.
+1. Ryd eksisterende ASE-dubletter sikkert
+   - Markér de 22 ekstra ASE-rækker som `rejected` i stedet for at slette dem.
+   - Behold originalen pr. medlemsnummer/salg: den række der har mest komplet økonomidata (`deduction_date`, `Provision`, `CPO`) og ældst `created_at`.
+   - De afviste dubletter får `reviewed_at = now()` og en audit-note i datafeltet, så vi kan se at de blev systemafvist pga. dublet-oprydning.
+   - Resultat: 22 medlemsnumre forbliver med én godkendt annullering hver.
 
-Begge ender i `status='interview_scheduled'` og dukker op samme sted ("Planlagte jobsamtaler", "Kommende samtaler"). Derfor ser alle public bookings ud som om det er jobsamtaler.
+2. Stop nye dubletter i databasen
+   - Tilføj en unik database-regel på aktive annulleringer:
+     - samme `sale_id`
+     - samme `upload_type`
+     - samme `target_product_name` normaliseret
+     - kun for status `pending`/`approved`
+   - Det betyder: samme annullering kan ikke oprettes igen, selv hvis samme fil uploades igen.
+   - `rejected` rækker tæller ikke som aktive, så historik og fejlafvisninger blokerer ikke fremtidige korrekte uploads.
 
-## Løsning — to spor i datamodel + UI
+3. Håndtér ASE-særligt match på medlemsnummer
+   - Da ASE-dubletterne kan komme ind med andet produktnavn (`Salg`, `Lønsikring`, blank), tilføjes en ekstra guard for ASE: samme medlemsnummer + samme salg må ikke eksistere aktivt mere end én gang.
+   - Det lægges i en database-trigger, fordi medlemsnummer ligger i `uploaded_data` JSON og skal normaliseres.
+   - Ved dubletforsøg returneres en klar fejl i stedet for at oprette en ny kø-række.
 
-### Datamodel
+4. Gør uploadflowet pænere for brugeren
+   - I `UploadCancellationsTab` skiftes insert til konfliktsikker indsættelse/fejlhåndtering.
+   - Hvis en upload indeholder dubletter, skal brugeren få en besked ala: “X dubletter blev sprunget over – de findes allerede i annulleringer.”
+   - Ikke flere skjulte dobbelte rækker i “Godkendte”.
 
-Tilføj to nye felter til `candidates`:
+5. QA efter ændringen
+   - Kontrollér at ASE går fra 44 godkendte dubletposter til 22 aktive godkendte poster.
+   - Kontrollér at samme ASE-fil ikke kan oprette dubletter igen.
+   - Kontrollér at Eesy/TDC produkt-niveau annulleringer stadig virker, hvor flere produkter på samme salg kan annulleres separat.
 
-- `booking_type` enum: `'phone_screening'` (default for public booking) | `'job_interview'` (intern beslutning)
-- Behold `interview_date` som tidspunktet, men omdøb begrebsligt til "booket tid"
-
-Migration:
-- Tilføj enum `candidate_booking_type`
-- Tilføj kolonne `candidates.booking_type candidate_booking_type` (nullable, default null)
-- Backfill: alle eksisterende `interview_scheduled` der kommer fra `public-book-candidate` → `'phone_screening'`. Dem der er sat manuelt fra `CandidateDetail` → `'job_interview'`. Vi kan ikke skelne historisk, så **alle eksisterende sættes til `phone_screening`** (det er det hyppigste) og I kan opgradere relevante manuelt.
-
-### Edge functions
-
-- `public-book-candidate`: sætter `booking_type='phone_screening'` ved oprettelse
-- Ny intern action i `CandidateDetail` ("Planlæg jobsamtale"): sætter `booking_type='job_interview'`
-
-### UI-ændringer
-
-**1. `BookingFlow.tsx` — fanen "Planlagte jobsamtaler"**
-- Filtrer kun `booking_type='job_interview'` (ikke alle `interview_scheduled`)
-- Tilføj separat fane: **"Bookede opkald"** der viser `booking_type='phone_screening'` (det er det Simon, Hugo m.fl. selvbooker)
-
-**2. `BookingCalendarTab.tsx` (det er det du ser på screenshottet)**
-- Vis to visuelt adskilte spor: blå prik = booket opkald, grøn prik = jobsamtale
-- Header per dag: "X bookede opkald · Y jobsamtaler"
-- Knap "Konvertér til jobsamtale" på et booket opkald (hvis screening gik godt)
-
-**3. `UpcomingInterviews.tsx` ("Kommende samtaler" i sidebar)**
-- Skift til kun at vise `booking_type='job_interview'`
-- Omdøb evt. til "Kommende jobsamtaler"
-
-**4. `Candidates.tsx` filter**
-- Status-filter "Samtale planlagt" splittes til to: "Booket opkald" og "Jobsamtale planlagt"
-
-**5. `CandidateDetail.tsx`**
-- Vis tydeligt hvilken type booking kandidaten har
-- To knapper: "Planlæg opkald" vs "Planlæg jobsamtale"
-
-### Begrebsafklaring i sproget
-
-Konsekvent terminologi gennem appen:
-- **Booket opkald / screening** = kandidat selvbooker via offentlig side
-- **Jobsamtale** = intern beslutning, manuelt planlagt af jer
-
-## Tekniske detaljer
-
-**Filer der ændres:**
-- Migration: ny enum + kolonne + backfill
-- `supabase/functions/public-book-candidate/index.ts` (sætter `phone_screening`)
-- `src/pages/recruitment/BookingFlow.tsx` (ny fane + filtrering)
-- `src/components/recruitment/BookingCalendarTab.tsx` (to spor visuelt)
-- `src/pages/recruitment/UpcomingInterviews.tsx` (filter + label)
-- `src/pages/recruitment/CandidateDetail.tsx` (to actions)
-- `src/pages/recruitment/Candidates.tsx` (status-filter split)
-
-**Zone:** Gul (rekruttering/booking_flow). Ingen rød zone berøres.
-
-**Ingen breaking changes:** `status='interview_scheduled'` består — vi tilføjer kun en dimension oveni.
-
-## Spørgsmål før jeg implementerer
-
-1. **Backfill-strategi:** Sætter vi alle eksisterende `interview_scheduled` til `'phone_screening'` (default), eller `'job_interview'` (det "gamle" begreb)? Mit forslag: `phone_screening`, fordi det er det Simon/Hugo-flow rammer flest.
-2. **Skal "Planlagte jobsamtaler"-fanen i BookingFlow forsvinde helt** og flyttes til sidebar-punktet "Kommende samtaler" (så det er ét sted) — eller beholde begge?
+Teknisk note:
+- Jeg vil ikke slette eksisterende rækker, fordi annulleringer påvirker løn og historik. `rejected` er den sikre oprydning.
+- Ændringen kræver database-migration og berører `cancellation_queue`, som er rød zone. Når du godkender planen, implementerer jeg den.
