@@ -192,14 +192,14 @@ export function BookingCalendarTab({ bookingType }: BookingCalendarTabProps = {}
           </CardTitle>
           {candidatesForDate.length > 0 && (
             <p className="text-sm text-muted-foreground">
-              {candidatesForDate.length} samtale{candidatesForDate.length !== 1 ? "r" : ""}
+              {candidatesForDate.length} {candidatesForDate.length === 1 ? labels.singular : labels.plural}
             </p>
           )}
         </CardHeader>
         <CardContent>
           {candidatesForDate.length === 0 ? (
             <p className="text-sm text-muted-foreground py-8 text-center">
-              Ingen samtaler denne dag
+              {labels.emptyDay}
             </p>
           ) : (
             <div className="divide-y">
