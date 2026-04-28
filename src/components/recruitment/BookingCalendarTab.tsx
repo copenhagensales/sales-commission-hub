@@ -209,13 +209,35 @@ export function BookingCalendarTab({ bookingType }: BookingCalendarTabProps = {}
                   className="flex items-center justify-between py-3 gap-4"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="p-2 rounded-lg bg-primary/10 shrink-0">
-                      <User className="h-4 w-4 text-primary" />
+                    <div className={`p-2 rounded-lg shrink-0 ${
+                      candidate.booking_type === "job_interview"
+                        ? "bg-emerald-500/10"
+                        : "bg-primary/10"
+                    }`}>
+                      {candidate.booking_type === "job_interview" ? (
+                        <Briefcase className="h-4 w-4 text-emerald-600" />
+                      ) : (
+                        <PhoneCall className="h-4 w-4 text-primary" />
+                      )}
                     </div>
                     <div className="min-w-0">
-                      <p className="font-medium text-sm truncate">
-                        {candidate.first_name} {candidate.last_name}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-sm truncate">
+                          {candidate.first_name} {candidate.last_name}
+                        </p>
+                        {!bookingType && (
+                          <Badge
+                            variant="outline"
+                            className={`text-[10px] px-1.5 py-0 ${
+                              candidate.booking_type === "job_interview"
+                                ? "border-emerald-500/30 text-emerald-600"
+                                : "border-primary/30 text-primary"
+                            }`}
+                          >
+                            {candidate.booking_type === "job_interview" ? "Jobsamtale" : "Opkald"}
+                          </Badge>
+                        )}
+                      </div>
                       {candidate.phone && (
                         <p className="text-xs text-muted-foreground flex items-center gap-1">
                           <Phone className="h-3 w-3" />
@@ -229,6 +251,19 @@ export function BookingCalendarTab({ bookingType }: BookingCalendarTabProps = {}
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
+                    {candidate.booking_type === "phone_screening" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5"
+                        disabled={isProcessing}
+                        onClick={() => convertToInterviewMutation.mutate(candidate.id)}
+                        title="Markér som jobsamtale"
+                      >
+                        <ArrowRightLeft className="h-3.5 w-3.5" />
+                        Jobsamtale
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       variant="outline"
