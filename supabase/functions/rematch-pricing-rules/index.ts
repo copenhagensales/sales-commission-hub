@@ -452,6 +452,11 @@ serve(async (req) => {
         query = query.eq("sales.source", source);
       }
 
+      // Additive datetime cutoff (no-op when undefined → preserves default flow)
+      if (minSaleDatetime) {
+        query = query.gte("sales.sale_datetime", minSaleDatetime);
+      }
+
       if (limit && saleItems.length + PAGE_SIZE >= limit) {
         query = query.limit(limit - saleItems.length);
       }
