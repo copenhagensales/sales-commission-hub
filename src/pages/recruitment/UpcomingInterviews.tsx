@@ -67,6 +67,7 @@ export default function UpcomingInterviews() {
         .from("candidates")
         .select("id, first_name, last_name, phone, email, interview_date, applied_position")
         .eq("status", "interview_scheduled")
+        .eq("booking_type", "job_interview")
         .gte("interview_date", now)
         .not("interview_date", "is", null)
         .order("interview_date", { ascending: true });
