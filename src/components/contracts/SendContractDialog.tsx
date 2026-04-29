@@ -480,7 +480,7 @@ export function SendContractDialog({
               employeeEmail: employee.private_email,
               contractTitle: customTitle || template.name,
               contractId: contract.id,
-              appUrl: window.location.origin,
+              appUrl: getPublicUrl(),
             },
           });
           
