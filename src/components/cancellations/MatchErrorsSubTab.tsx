@@ -592,12 +592,10 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
 
         // Resolve employee from seller mappings or employee list
         let employeeId = mappingsByName.get(excelSeller.toLowerCase());
-        let workEmail: string | undefined;
         let empFullName = "";
 
         if (employeeId) {
           const emp = employees.find(e => e.id === employeeId);
-          workEmail = emp?.work_email;
           empFullName = emp ? `${emp.first_name} ${emp.last_name}`.trim().toLowerCase() : "";
         } else {
           // Try full name match against employees
@@ -607,34 +605,37 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
           });
           if (emp) {
             employeeId = emp.id;
-            workEmail = emp.work_email;
             empFullName = `${emp.first_name} ${emp.last_name}`.trim().toLowerCase();
           } else {
             // Try first name match
             const emp2 = employees.find(e => e.first_name?.toLowerCase() === excelSeller.toLowerCase());
             if (emp2) {
               employeeId = emp2.id;
-              workEmail = emp2.work_email;
               empFullName = `${emp2.first_name} ${emp2.last_name}`.trim().toLowerCase();
             }
           }
         }
 
-        if (!workEmail && !empFullName) {
+        // Multi-email lookup (work + private + dialer-agent emails)
+        const knownEmails = employeeId
+          ? Array.from(employeeIdToEmails.get(employeeId) ?? [])
+          : [];
+
+        if (knownEmails.length === 0 && !empFullName) {
           console.log("[bulk-rematch] No employee found for seller:", excelSeller);
           continue;
         }
 
-        console.log("[bulk-rematch] Resolved seller:", excelSeller, "→ email:", workEmail, "name:", empFullName, "date:", dateValue);
+        console.log("[bulk-rematch] Resolved seller:", excelSeller, "→ emails:", knownEmails, "name:", empFullName, "date:", dateValue);
 
         // Search for sales
         let sales: { id: string }[] | null = null;
 
-        if (workEmail) {
+        if (knownEmails.length > 0) {
           const { data } = await supabase
             .from("sales")
             .select("id")
-            .eq("agent_email", workEmail.toLowerCase())
+            .in("agent_email", knownEmails)
             .gte("sale_datetime", `${dateValue}T00:00:00`)
             .lte("sale_datetime", `${dateValue}T23:59:59`)
             .in("client_campaign_id", campaignIds)
