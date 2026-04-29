@@ -106,14 +106,16 @@ export function LocateSaleDialog({
         }
       }
 
-      // Fallback: get work_email from employee_master_data
+      // Fallback: get work_email + private_email from employee_master_data
+      // (Same multi-email pattern dækkes af buildEmployeeEmailIndex i UploadCancellationsTab.)
       const { data: emp } = await supabase
         .from("employee_master_data")
-        .select("first_name, last_name, work_email")
+        .select("first_name, last_name, work_email, private_email")
         .eq("id", assignedEmployeeId)
         .single();
 
       if (emp?.work_email) emails.add(emp.work_email.toLowerCase());
+      if (emp?.private_email) emails.add(emp.private_email.toLowerCase());
 
       const isMappingBased = agentIds.length > 0;
 
