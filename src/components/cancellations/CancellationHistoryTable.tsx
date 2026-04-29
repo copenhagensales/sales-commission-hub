@@ -50,6 +50,7 @@ export function CancellationHistoryTable({ clientId }: CancellationHistoryTableP
           rows_processed,
           rows_matched,
           error_message,
+          default_deduction_date,
           uploaded_by:employee_master_data!cancellation_imports_uploaded_by_fkey(first_name, last_name)
         `)
         .eq("client_id", clientId)
