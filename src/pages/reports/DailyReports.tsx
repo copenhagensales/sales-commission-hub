@@ -126,10 +126,10 @@ export default function DailyReports() {
   const [period, setPeriod] = useState<string>("today");
   const [customStartDate, setCustomStartDate] = useState<Date | undefined>(undefined);
   const [customEndDate, setCustomEndDate] = useState<Date | undefined>(undefined);
-  const [selectedTeam, setSelectedTeam] = useState<string>("all");
-  const [selectedEmployee, setSelectedEmployee] = useState<string>("all");
-  const [selectedClient, setSelectedClient] = useState<string>("all");
-  const [selectedCampaign, setSelectedCampaign] = useState<string>("all");
+  const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
+  const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
+  const [selectedClients, setSelectedClients] = useState<string[]>([]);
+  const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
   const [selectedColumns, setSelectedColumns] = useState<string[]>(["hours", "sick_days", "vacation_days", "sales", "clients", "commission", "revenue"]);
   const [filterOpen, setFilterOpen] = useState(false);
   const [employeeStatusFilter, setEmployeeStatusFilter] = useState<"active" | "inactive" | "all">("all");
