@@ -3217,6 +3217,83 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               </div>
             )}
 
+            {/* Lønperiode-vælger — gælder kun rækker fra DENNE upload */}
+            {mergedMatchedSales.length > 0 && (
+              <div className="rounded-md border bg-muted/30 p-4 space-y-3">
+                <div className="flex items-start gap-2">
+                  <CalendarIcon className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                  <div className="flex-1">
+                    <Label className="text-sm font-medium">Trækkes på lønperiode</Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Vælg hvilken lønperiode alle {mergedMatchedSales.length} rækker fra denne upload skal trækkes i.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Select
+                    value={deductionMode === "custom" ? "__custom__" : selectedPeriodKey}
+                    onValueChange={(val) => {
+                      if (val === "__custom__") {
+                        setDeductionMode("custom");
+                        setDeductionCustomOpen(true);
+                        return;
+                      }
+                      setDeductionMode("period");
+                      const opt = payrollPeriodOptions.find((p) => p.key === val);
+                      if (opt) setDeductionDate(opt.end);
+                    }}
+                  >
+                    <SelectTrigger className="sm:w-[340px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {payrollPeriodOptions.map((opt) => (
+                        <SelectItem key={opt.key} value={opt.key}>
+                          {opt.label} ({opt.rangeText})
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="__custom__">Vælg specifik dato…</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {deductionMode === "custom" && (
+                    <Popover open={deductionCustomOpen} onOpenChange={setDeductionCustomOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn("justify-start text-left font-normal sm:w-[220px]")}
+                        >
+                          <CalendarIcon className="h-4 w-4 mr-2" />
+                          {formatDate(deductionDate, "d. MMM yyyy", { locale: da })}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={deductionDate}
+                          onSelect={(d) => {
+                            if (d) {
+                              setDeductionDate(d);
+                              setDeductionCustomOpen(false);
+                            }
+                          }}
+                          initialFocus
+                          className={cn("p-3 pointer-events-auto")}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                </div>
+
+                <Badge variant="secondary" className="text-xs">
+                  Alle {mergedMatchedSales.length} rækker fra denne upload trækkes{" "}
+                  {formatDate(deductionDate, "d. MMM yyyy", { locale: da })}
+                  {" "}(lønperiode {formatDate(activePayrollPeriod.start, "d. MMM", { locale: da })} – {formatDate(activePayrollPeriod.end, "d. MMM yyyy", { locale: da })})
+                </Badge>
+              </div>
+            )}
+
             <div className="flex gap-2">
               {mergedMatchedSales.length > 0 && (
                 <Button
