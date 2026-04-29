@@ -656,7 +656,7 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
         }
 
         if (!sales || sales.length === 0) {
-          console.log("[bulk-rematch] No sales found for:", { excelSeller, workEmail, empFullName, dateValue });
+          console.log("[bulk-rematch] No sales found for:", { excelSeller, knownEmails, empFullName, dateValue });
           continue;
         }
 
