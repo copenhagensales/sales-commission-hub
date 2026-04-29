@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { LocateSaleDialog } from "./LocateSaleDialog";
 import { CLIENT_IDS } from "@/utils/clientIds";
+import { buildEmployeeEmailIndex } from "./utils/buildEmployeeEmailIndex";
 
 interface UnmatchedRow {
   [key: string]: unknown;
@@ -127,13 +128,46 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name, work_email, is_active")
+        .select("id, first_name, last_name, work_email, private_email, is_active")
         .order("is_active", { ascending: false })
         .order("first_name");
       if (error) throw error;
       return data || [];
     },
   });
+
+  // Multi-email index (work + private + dialer-agent emails) — Stork 1.x stillads.
+  // Se utils/buildEmployeeEmailIndex.ts.
+  const { data: employeeAgentMappings = [] } = useQuery({
+    queryKey: ["employee-agent-mappings-all"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_agent_mapping")
+        .select("employee_id, agent_id");
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const { data: agentsForEmailIndex = [] } = useQuery({
+    queryKey: ["agents-for-email-index"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("agents")
+        .select("id, email");
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const employeeIdToEmails = useMemo(
+    () => buildEmployeeEmailIndex({
+      employees,
+      mappings: employeeAgentMappings,
+      agents: agentsForEmailIndex,
+    }),
+    [employees, employeeAgentMappings, agentsForEmailIndex],
+  );
 
   // Fetch existing seller mappings
   const { data: existingMappings = [] } = useQuery({
