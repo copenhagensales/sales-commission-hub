@@ -237,11 +237,11 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
           );
       }
 
-      // 2. Get employee work_email and name
+      // 2. Get employee name + multi-email set (work + private + dialer-agents)
       const emp = employees.find(e => e.id === employeeId);
-      const workEmail = emp?.work_email;
+      const knownEmails = Array.from(employeeIdToEmails.get(employeeId) ?? []);
       const empFullName = emp ? `${emp.first_name} ${emp.last_name}`.trim().toLowerCase() : "";
-      if (!workEmail && !empFullName) return { matched: 0 };
+      if (knownEmails.length === 0 && !empFullName) return { matched: 0 };
 
       // 3. Find date column
       const dateCol = uploadConfig?.date_column;
@@ -253,11 +253,11 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
 
       let sales: { id: string }[] | null = null;
 
-      if (workEmail) {
+      if (knownEmails.length > 0) {
         const { data } = await supabase
           .from("sales")
           .select("id")
-          .eq("agent_email", workEmail.toLowerCase())
+          .in("agent_email", knownEmails)
           .gte("sale_datetime", `${dateValue}T00:00:00`)
           .lte("sale_datetime", `${dateValue}T23:59:59`)
           .in("client_campaign_id", campaignIds)
