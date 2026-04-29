@@ -1411,8 +1411,14 @@ export default function DailyReports() {
               {" • "}
               {format(dateRange.start, "d. MMM", { locale: da })}
               {isMultipleDays && ` - ${format(dateRange.end, "d. MMM", { locale: da })}`}
-              {selectedTeam !== "all" && ` • ${teams.find(t => t.id === selectedTeam)?.name}`}
-              {selectedEmployee !== "all" && ` • ${employees.find(e => e.id === selectedEmployee)?.first_name} ${employees.find(e => e.id === selectedEmployee)?.last_name}`}
+              {selectedTeams.length === 1 && ` • ${teams.find(t => t.id === selectedTeams[0])?.name}`}
+              {selectedTeams.length > 1 && ` • ${selectedTeams.length} teams`}
+              {selectedEmployees.length === 1 && ` • ${(() => { const e = employees.find(x => x.id === selectedEmployees[0]); return e ? `${e.first_name} ${e.last_name}` : ""; })()}`}
+              {selectedEmployees.length > 1 && ` • ${selectedEmployees.length} medarbejdere`}
+              {selectedClients.length === 1 && ` • ${clients.find(c => c.id === selectedClients[0])?.name}`}
+              {selectedClients.length > 1 && ` • ${selectedClients.length} kunder`}
+              {selectedCampaigns.length === 1 && ` • ${campaigns.find((c: any) => c.id === selectedCampaigns[0])?.name}`}
+              {selectedCampaigns.length > 1 && ` • ${selectedCampaigns.length} kampagner`}
             </p>
           </CardHeader>
           <CardContent>
