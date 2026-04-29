@@ -1,42 +1,60 @@
-# Multi-select i rapport-filtre
+# Slet Some-modulet komplet
 
-## Mål
-På `/reports/admin` (filterpanelet) skal man kunne vælge **flere** Teams, Medarbejdere, Kunder og Kampagner samtidig — i stedet for kun ét ad gangen. Periode forbliver single-select. Kolonner er allerede multi-select.
+"Some" (social media planning) bruges ikke længere. Fjernes fra UI, kode, ruter, permissions og database. **Ekstraarbejde bevares** (det er et selvstændigt menupunkt der i dag ligger under samme section).
 
-## Hvad ændres
+## Hvad sker der i menuen
 
-**Fil:** `src/pages/reports/ReportsAdmin.tsx` (grøn zone — UI-only)
+I dag ser sidebar-sektionen "Some" sådan ud:
+```text
+Some (section)
+├── SOME          ← slettes
+└── Ekstraarbejde ← bevares
+```
 
-### State
-- `selectedTeam: string` → `selectedTeams: string[]`
-- `selectedEmployee: string` → `selectedEmployees: string[]`
-- `selectedClient: string` → `selectedClients: string[]`
-- `selectedCampaign: string` → `selectedCampaigns: string[]`
-- Default `[]` (= "Alle").
+Efter ændringen flyttes "Ekstraarbejde" op som selvstændig sektion (eller ind under en eksisterende sektion — se spørgsmål nederst). Hele "Some"-section forsvinder ellers.
 
-### UI-mønster
-Genbrug det samme Popover + Checkbox + scroll-liste mønster som "Kolonner i rapport" allerede bruger længere nede i filen. Hver dropdown viser:
-- Trigger-knap med tekst: `"Alle"` hvis tom, ellers `"{n} valgt"` (eller første navn + `+N` hvis 1–2 valgt).
-- Popover-indhold med en scrollbar liste af checkboxes (max-height ~280px).
-- Toggle-funktion pr. felt (samme idé som eksisterende `toggleColumn`).
-- Bevarer den hvide-på-grøn glassmorphism-styling fra de nuværende `Select`-triggers.
+## Database (migration)
 
-### Kampagne-filtrering
-Hvis brugeren har valgt en eller flere kunder, filtreres campaign-listen til kun kampagner hvor `campaign.client_id` matcher én af de valgte kunder. Hvis ingen kunder valgt, vises alle kampagner (uændret).
+Drop 2 tabeller — kun brugt af Some-siden:
+- `some_weekly_metrics`
+- `some_default_goals`
 
-### Aktiv filter-badge
-`getActiveFilterCount()` opdateres: tæller +1 pr. ikke-tom array.
+Slet 3 rækker fra `sidebar_menu_config`:
+- `section_some` (sektion) → erstattes med ny placering for Ekstraarbejde
+- `item_some` → slettes helt
+- `item_extra_work` → re-parenter (ny placering, se spørgsmål)
 
-### Header-sammendrag
-Sammendraget under "Rapport" kortet opdateres til at vise antal valgte (f.eks. `• 3 teams`, `• 2 kunder`) i stedet for ét navn — undtagen ved præcis 1 valgt, så vises navnet.
+## Kode-ændringer
 
-### Søg-handler
-`handleSearch` logger nu arrays. Faktisk rapport-generering er stadig en stub (`toast.success("Rapport genereres...")`) — uændret adfærd, blot multi-værdier i payload.
+**Slet filer:**
+- `src/pages/Some.tsx`
+- `src/hooks/useSomeContent.ts`
+- `src/hooks/useSomeMetrics.ts`
+- Hele mappen `src/components/some/` (12 filer)
 
-## Out of scope
-- Ingen ændringer i datafetching, RPC'er, eller selve rapport-genereringen (den er allerede en stub i denne fil).
-- Ingen ny UI-komponent i `components/ui/` — vi inliner mønsteret som i dag for at holde ændringen minimal.
-- Ingen ændringer til Periode (single-select er korrekt der).
+**Rediger:**
+- `src/routes/pages.ts` — fjern `Some` lazy export (linje 81)
+- `src/routes/config.tsx` — fjern import (linje 65) og rute `/some` (linje 190)
+- `src/config/permissionKeys.ts` — fjern `menu_some`, `tab_some_overview`, `tab_some_content`, `tab_some_goals` (linje 95, 100-102)
+- `src/config/permissions.ts` — fjern `/some`-page (linje 948) og `tab_some_content` (linje 147)
 
-## Risiko
-Grøn zone. Ingen DB, ingen pricing, ingen løn. Eneste forbruger af state er denne fil selv.
+## Permissions/RLS
+
+Når permission-keys fjernes fra `permissionKeys.ts` håndterer det auto-healing system selv oprydning af forældede rækker i `role_page_permissions`. Ingen manuel SQL nødvendig der.
+
+## Konsekvensanalyse
+
+- Eventuel data i `some_weekly_metrics` / `some_default_goals` mistes permanent. Bekræftes af brugerens "bruges ikke mere".
+- Ingen andre filer/RPC'er/edge functions refererer til Some — verificeret med ripgrep.
+- `src/integrations/supabase/types.ts` regenereres automatisk efter migration.
+- Ekstraarbejde-modulet (siden, hooks, komponenter) røres ikke.
+
+## Spørgsmål før jeg går i gang
+
+**Hvor skal "Ekstraarbejde" hen i sidebaren** når sektionen "Some" forsvinder?
+1. Egen ny sektion "Ekstraarbejde" (top-level)
+2. Ind under "Personale"
+3. Ind under "Løn" / anden eksisterende sektion (sig hvilken)
+4. Slet også Ekstraarbejde
+
+Sig hvilken, så implementerer jeg.
