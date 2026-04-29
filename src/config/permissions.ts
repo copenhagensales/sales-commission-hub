@@ -111,13 +111,12 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     ],
   },
 
-  // ==================== SOME MENU ====================
+  // ==================== EKSTRAARBEJDE MENU ====================
   {
-    key: "menu_some",
-    label: "SOME menu",
-    icon: "📹",
+    key: "menu_extra_work_group",
+    label: "Ekstraarbejde menu",
+    icon: "🛠️",
     permissions: [
-      { key: "menu_some", label: "SOME", description: "Adgang til social media modul", hasEditOption: true },
       {
         key: "menu_extra_work",
         label: "Ekstra arbejde",
@@ -131,21 +130,6 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
         description: "Adgang til ekstra arbejde administration",
         hasEditOption: true,
       },
-    ],
-  },
-  {
-    key: "tabs_some",
-    label: "SOME faner",
-    icon: "📑",
-    permissions: [
-      {
-        key: "tab_some_overview",
-        label: "Oversigt",
-        description: "Adgang til SOME oversigt fane",
-        hasEditOption: true,
-      },
-      { key: "tab_some_content", label: "Indhold", description: "Adgang til SOME indhold fane", hasEditOption: true },
-      { key: "tab_some_goals", label: "Mål", description: "Adgang til SOME mål fane", hasEditOption: true },
     ],
   },
   {
@@ -945,5 +929,4 @@ export const LANDING_PAGE_OPTIONS = [
   { value: "/sales", label: "Salg" },
   { value: "/payroll", label: "Lønkørsel" },
   { value: "/onboarding-program", label: "Onboarding" },
-  { value: "/some", label: "SOME" },
 ];

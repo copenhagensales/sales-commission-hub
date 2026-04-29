@@ -91,17 +91,13 @@ export const PERMISSION_KEYS = {
   menu_refer_a_friend: { label: 'Henvis en ven', section: 'mit_hjem', parent: 'menu_section_personal' },
   menu_immediate_payment_ase: { label: 'Straksbetaling (ASE)', section: 'mit_hjem', parent: 'menu_section_personal' },
 
-  // ==================== SOME (under menu_section_some) ====================
-  menu_some: { label: 'SOME', section: 'some', parent: 'menu_section_some' },
-  menu_extra_work: { label: 'Ekstraarbejde', section: 'some', parent: 'menu_section_some' },
-  menu_extra_work_admin: { label: 'Ekstra arbejde admin', section: 'some', parent: 'menu_section_some' },
+  // ==================== EKSTRAARBEJDE (top-level) ====================
+  menu_extra_work: { label: 'Ekstraarbejde', section: 'extra_work', parent: null },
+  menu_extra_work_admin: { label: 'Ekstra arbejde admin', section: 'extra_work', parent: 'menu_extra_work' },
 
-  // SOME Tabs
-  tab_some_overview: { label: 'Fane: SOME Oversigt', section: 'some', parent: 'menu_some' },
-  tab_some_content: { label: 'Fane: SOME Indhold', section: 'some', parent: 'menu_some' },
-  tab_some_goals: { label: 'Fane: SOME Mål', section: 'some', parent: 'menu_some' },
-  tab_extra_work_my: { label: 'Fane: Mit ekstra arbejde', section: 'some', parent: 'menu_extra_work' },
-  tab_extra_work_history: { label: 'Fane: Historik', section: 'some', parent: 'menu_extra_work' },
+  // Ekstraarbejde Tabs
+  tab_extra_work_my: { label: 'Fane: Mit ekstra arbejde', section: 'extra_work', parent: 'menu_extra_work' },
+  tab_extra_work_history: { label: 'Fane: Historik', section: 'extra_work', parent: 'menu_extra_work' },
 
   // ==================== PERSONALE (under menu_section_personale) ====================
   menu_dashboard: { label: 'Dashboard', section: 'personale', parent: 'menu_section_personale' },
