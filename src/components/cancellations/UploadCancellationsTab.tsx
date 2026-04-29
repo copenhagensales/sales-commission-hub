@@ -1931,7 +1931,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               for (const sale of candidateSales) {
                 if (existingIds.has(sale.id)) continue;
                 const saleAgentEmail = (sale.agent_email || "").toLowerCase();
-                if (saleAgentEmail !== agentEmail) continue;
+                if (!employeeEmails.has(saleAgentEmail)) continue;
                 const items = saleItemsMap.get(sale.id) || [];
                 const hasProduct = items.some(item => {
                   const title = item.adversus_product_title?.toLowerCase() || "";
@@ -2014,7 +2014,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             } else {
               for (const sale of candidateSales) {
                 const saleAgentEmail = (sale.agent_email || "").toLowerCase();
-                if (saleAgentEmail !== agentEmail) continue;
+                if (!employeeEmails.has(saleAgentEmail)) continue;
 
                 const saleDateObj = new Date(sale.sale_datetime);
                 if (
@@ -2066,7 +2066,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               const dateCandidates = candidateSales.filter(sale => {
                 if (existingIds.has(sale.id)) return false;
                 const saleAgentEmail = (sale.agent_email || "").toLowerCase();
-                if (saleAgentEmail !== agentEmail) return false;
+                if (!employeeEmails.has(saleAgentEmail)) return false;
                 const saleDateObj = new Date(sale.sale_datetime);
                 return excelDateObj.getFullYear() === saleDateObj.getFullYear()
                     && excelDateObj.getMonth() === saleDateObj.getMonth()
