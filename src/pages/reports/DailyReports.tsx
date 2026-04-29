@@ -252,11 +252,11 @@ export default function DailyReports() {
 
   // Auto-select team based on scope restrictions
   useEffect(() => {
-    // For team-scoped users: pre-select their team when "all" is selected
-    if (scopeReportsDaily === "team" && teams.length > 0 && selectedTeam === "all") {
-      setSelectedTeam(teams[0].id);
+    // For team-scoped users: pre-select their team(s) when none are selected
+    if (scopeReportsDaily === "team" && teams.length > 0 && selectedTeams.length === 0) {
+      setSelectedTeams([teams[0].id]);
     }
-  }, [scopeReportsDaily, teams, selectedTeam]);
+  }, [scopeReportsDaily, teams, selectedTeams]);
 
   // Fetch employees - use employee_master_data when we need inactive employees
   // since employee_basic_info view filters to is_active = true only
@@ -276,20 +276,20 @@ export default function DailyReports() {
         .from("employee_master_data")
         .select("id, first_name, last_name, is_active")
         .order("first_name");
-      
+
       if (employeeStatusFilter === "inactive") {
         query = query.eq("is_active", false);
       }
-      
+
       const { data } = await query;
       return data || [];
     },
   });
 
   const { data: employeesWithClientActivity = [] } = useQuery({
-    queryKey: ["daily-report-employees-with-client-activity", selectedClient],
-    queryFn: () => fetchEmployeesWithClientActivity(selectedClient),
-    enabled: selectedClient !== "all",
+    queryKey: ["daily-report-employees-with-client-activity", selectedClients.sort().join(",")],
+    queryFn: () => fetchEmployeesWithClientActivity(selectedClients),
+    enabled: selectedClients.length > 0,
   });
 
   // Fetch team memberships for employee dropdown filtering
@@ -303,27 +303,51 @@ export default function DailyReports() {
     },
   });
 
-  // Filter employees based on selected team and client activity
+  // Fetch team↔client mapping (for cascading filters)
+  const { data: teamClientLinks = [] } = useQuery({
+    queryKey: ["daily-report-team-clients"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("team_clients")
+        .select("team_id, client_id");
+      return data || [];
+    },
+  });
+
+  // Compute employee IDs that match selected teams
+  const employeeIdsInSelectedTeams = useMemo(() => {
+    if (selectedTeams.length === 0) return null; // null = no team filter
+    const teamSet = new Set(selectedTeams);
+    return new Set(
+      employeeTeamMemberships
+        .filter((tm) => teamSet.has(tm.team_id))
+        .map((tm) => tm.employee_id)
+    );
+  }, [selectedTeams, employeeTeamMemberships]);
+
+  // Compute client IDs linked to selected teams
+  const clientIdsInSelectedTeams = useMemo(() => {
+    if (selectedTeams.length === 0) return null;
+    const teamSet = new Set(selectedTeams);
+    return new Set(
+      teamClientLinks.filter((l) => teamSet.has(l.team_id)).map((l) => l.client_id)
+    );
+  }, [selectedTeams, teamClientLinks]);
+
+  // Filter employees for the dropdown (in-scope vs out-of-scope handled by MultiSelectFilter)
   const filteredEmployees = useMemo(() => {
     let result = employees;
-    
-    // Filter by team if selected
-    if (selectedTeam !== "all") {
-      const teamEmployeeIds = new Set(
-        employeeTeamMemberships
-          .filter(tm => tm.team_id === selectedTeam)
-          .map(tm => tm.employee_id)
-      );
-      result = result.filter(emp => teamEmployeeIds.has(emp.id));
+
+    if (employeeIdsInSelectedTeams) {
+      result = result.filter((emp) => employeeIdsInSelectedTeams.has(emp.id));
     }
-    
-    // Filter by client activity if selected
-    if (selectedClient !== "all") {
-      result = result.filter(emp => employeesWithClientActivity.includes(emp.id));
+
+    if (selectedClients.length > 0) {
+      result = result.filter((emp) => employeesWithClientActivity.includes(emp.id));
     }
-    
+
     return result;
-  }, [employees, selectedTeam, selectedClient, employeesWithClientActivity, employeeTeamMemberships]);
+  }, [employees, employeeIdsInSelectedTeams, selectedClients, employeesWithClientActivity]);
 
   // Fetch clients
   const { data: clients = [] } = useQuery({
