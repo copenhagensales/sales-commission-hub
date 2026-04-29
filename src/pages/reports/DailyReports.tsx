@@ -1097,13 +1097,50 @@ export default function DailyReports() {
 
   const getActiveFilterCount = () => {
     let count = 0;
-    if (selectedTeam !== "all") count++;
-    if (selectedEmployee !== "all") count++;
-    if (selectedClient !== "all") count++;
-    if (selectedCampaign !== "all") count++;
+    if (selectedTeams.length > 0) count++;
+    if (selectedEmployees.length > 0) count++;
+    if (selectedClients.length > 0) count++;
+    if (selectedCampaigns.length > 0) count++;
     if (employeeStatusFilter !== "active") count++;
     return count;
   };
+
+  // Build options for the multi-select filters with cascade-aware out-of-scope marking
+  const teamOptions: MultiOption[] = useMemo(
+    () => teams.map((t) => ({ id: t.id, label: t.name })),
+    [teams]
+  );
+
+  const clientOptions: MultiOption[] = useMemo(() => {
+    return clients.map((c) => ({
+      id: c.id,
+      label: c.name,
+      // If teams are selected, mark clients NOT linked to those teams as out-of-scope
+      outOfScope: clientIdsInSelectedTeams ? !clientIdsInSelectedTeams.has(c.id) : false,
+    }));
+  }, [clients, clientIdsInSelectedTeams]);
+
+  const employeeOptions: MultiOption[] = useMemo(() => {
+    return employees.map((e) => {
+      let outOfScope = false;
+      if (employeeIdsInSelectedTeams && !employeeIdsInSelectedTeams.has(e.id)) {
+        outOfScope = true;
+      }
+      if (selectedClients.length > 0 && !employeesWithClientActivity.includes(e.id)) {
+        outOfScope = true;
+      }
+      return { id: e.id, label: `${e.first_name} ${e.last_name}`, outOfScope };
+    });
+  }, [employees, employeeIdsInSelectedTeams, selectedClients, employeesWithClientActivity]);
+
+  const campaignOptions: MultiOption[] = useMemo(() => {
+    return campaigns.map((c: any) => ({
+      id: c.id,
+      label: c.name,
+      // If clients are selected, only campaigns linked to those clients are in-scope
+      outOfScope: selectedClients.length > 0 ? !selectedClients.includes(c.client_id) : false,
+    }));
+  }, [campaigns, selectedClients]);
 
   const periodOptions = [
     { value: "today", label: "I dag" },
