@@ -213,6 +213,15 @@ export function CancellationHistoryTable({ clientId }: CancellationHistoryTableP
                     <TableCell>{imp.rows_processed ?? "-"}</TableCell>
                     <TableCell>{imp.rows_matched ?? "-"}</TableCell>
                     <TableCell>
+                      {imp.default_deduction_date ? (
+                        <span className="text-xs">
+                          {format(new Date(imp.default_deduction_date + "T00:00:00"), "d. MMM yyyy", { locale: da })}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">–</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
                       {getStatusBadge(imp.status)}
                       {imp.error_message && (
                         <span className="block text-xs text-destructive mt-1">
