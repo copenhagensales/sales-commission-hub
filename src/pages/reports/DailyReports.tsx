@@ -773,10 +773,10 @@ export default function DailyReports() {
         const sellerId = (sale.raw_payload as any)?.fm_seller_id;
         return sellerId && employeeIds.includes(sellerId);
       }).filter(sale => {
-        // Filter by client if selected
-        if (selectedClient !== "all") {
+        // Filter by clients if selected
+        if (selectedClients.length > 0) {
           const clientId = (sale.raw_payload as any)?.fm_client_id;
-          return clientId === selectedClient;
+          return clientId && selectedClients.includes(clientId);
         }
         return true;
       });
