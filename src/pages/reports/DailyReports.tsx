@@ -13,6 +13,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Search, ChevronDown, ChevronRight, Calendar as CalendarIcon, Clock, Palmtree, Thermometer, TrendingUp, Coins, SlidersHorizontal, DollarSign, Building2, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle, Package } from "lucide-react";
+import { MultiSelectFilter, type MultiOption } from "@/components/reports/MultiSelectFilter";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -24,45 +25,49 @@ import { fetchAllRows } from "@/utils/supabasePagination";
 import { useFeatureFlag } from "@/hooks/useFeatureFlag";
 import { resolveHoursSourceBatch, type HoursSourceResult } from "@/lib/resolveHoursSource";
 
-// Helper function to fetch employees with activity on a specific client
-// Uses agent_name (email) from sales, matches to agents, then maps to employees via employee_agent_mapping
-async function fetchEmployeesWithClientActivity(clientId: string): Promise<string[]> {
-  if (clientId === "all") return [];
-  
+// Helper function to fetch employees with activity on specific clients
+// Uses agent_email from sales, matches to agents, then maps to employees via employee_agent_mapping
+async function fetchEmployeesWithClientActivity(clientIds: string[]): Promise<string[]> {
+  if (clientIds.length === 0) return [];
+
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  
+
   // Get user's auth token for RLS-protected tables
   const { data: { session } } = await supabase.auth.getSession();
   const authToken = session?.access_token || supabaseKey;
   const headers = { apikey: supabaseKey, Authorization: `Bearer ${authToken}` };
-  
-  // Get unique agent emails for this client using RPC (avoids fetching all sales)
-  const { data: rpcEmails } = await supabase.rpc("get_distinct_agent_emails_for_client", {
-    p_client_id: clientId,
-  });
-  const agentEmails = (rpcEmails || []).map((r: any) => r.agent_email).filter(Boolean);
-  
-  // Get FM seller IDs for this client from unified sales table (paginated)
+
+  // Get unique agent emails for each client (RPC takes single id, so loop)
+  const agentEmailSets = await Promise.all(
+    clientIds.map((cid) => supabase.rpc("get_distinct_agent_emails_for_client", { p_client_id: cid }))
+  );
+  const agentEmails = [
+    ...new Set(
+      agentEmailSets.flatMap((res) => (res.data || []).map((r: any) => r.agent_email).filter(Boolean))
+    ),
+  ];
+
+  // Get FM seller IDs for these clients from unified sales table (paginated)
   const fmData = await fetchAllRows<{ raw_payload: { fm_seller_id: string; fm_client_id: string } }>(
     "sales", "raw_payload",
     (q) => q.eq("source", "fieldmarketing")
   );
-  const fmDataFiltered = fmData.filter(d => d.raw_payload?.fm_client_id === clientId);
-  const fmEmployeeIds = fmDataFiltered.map(s => s.raw_payload?.fm_seller_id).filter(Boolean);
-  
+  const clientIdSet = new Set(clientIds);
+  const fmDataFiltered = fmData.filter((d) => d.raw_payload?.fm_client_id && clientIdSet.has(d.raw_payload.fm_client_id));
+  const fmEmployeeIds = fmDataFiltered.map((s) => s.raw_payload?.fm_seller_id).filter(Boolean);
+
   // Get all agent mappings with agent email info
   const mappingsRes = await fetch(
     `${supabaseUrl}/rest/v1/employee_agent_mapping?select=employee_id,agents(email)`,
     { headers }
   );
   const mappingsData: { employee_id: string; agents: { email: string } | null }[] = await mappingsRes.json();
-  
-  // Find employee_ids where agent email matches sales agent_name
+
   const employeeIdsFromSales = mappingsData
-    .filter(m => m.agents?.email && agentEmails.includes(m.agents.email))
-    .map(m => m.employee_id);
-  
+    .filter((m) => m.agents?.email && agentEmails.includes(m.agents.email))
+    .map((m) => m.employee_id);
+
   return [...new Set([...employeeIdsFromSales, ...fmEmployeeIds])];
 }
 
@@ -121,10 +126,10 @@ export default function DailyReports() {
   const [period, setPeriod] = useState<string>("today");
   const [customStartDate, setCustomStartDate] = useState<Date | undefined>(undefined);
   const [customEndDate, setCustomEndDate] = useState<Date | undefined>(undefined);
-  const [selectedTeam, setSelectedTeam] = useState<string>("all");
-  const [selectedEmployee, setSelectedEmployee] = useState<string>("all");
-  const [selectedClient, setSelectedClient] = useState<string>("all");
-  const [selectedCampaign, setSelectedCampaign] = useState<string>("all");
+  const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
+  const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
+  const [selectedClients, setSelectedClients] = useState<string[]>([]);
+  const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
   const [selectedColumns, setSelectedColumns] = useState<string[]>(["hours", "sick_days", "vacation_days", "sales", "clients", "commission", "revenue"]);
   const [filterOpen, setFilterOpen] = useState(false);
   const [employeeStatusFilter, setEmployeeStatusFilter] = useState<"active" | "inactive" | "all">("all");
@@ -247,11 +252,11 @@ export default function DailyReports() {
 
   // Auto-select team based on scope restrictions
   useEffect(() => {
-    // For team-scoped users: pre-select their team when "all" is selected
-    if (scopeReportsDaily === "team" && teams.length > 0 && selectedTeam === "all") {
-      setSelectedTeam(teams[0].id);
+    // For team-scoped users: pre-select their team(s) when none are selected
+    if (scopeReportsDaily === "team" && teams.length > 0 && selectedTeams.length === 0) {
+      setSelectedTeams([teams[0].id]);
     }
-  }, [scopeReportsDaily, teams, selectedTeam]);
+  }, [scopeReportsDaily, teams, selectedTeams]);
 
   // Fetch employees - use employee_master_data when we need inactive employees
   // since employee_basic_info view filters to is_active = true only
@@ -271,20 +276,20 @@ export default function DailyReports() {
         .from("employee_master_data")
         .select("id, first_name, last_name, is_active")
         .order("first_name");
-      
+
       if (employeeStatusFilter === "inactive") {
         query = query.eq("is_active", false);
       }
-      
+
       const { data } = await query;
       return data || [];
     },
   });
 
   const { data: employeesWithClientActivity = [] } = useQuery({
-    queryKey: ["daily-report-employees-with-client-activity", selectedClient],
-    queryFn: () => fetchEmployeesWithClientActivity(selectedClient),
-    enabled: selectedClient !== "all",
+    queryKey: ["daily-report-employees-with-client-activity", selectedClients.sort().join(",")],
+    queryFn: () => fetchEmployeesWithClientActivity(selectedClients),
+    enabled: selectedClients.length > 0,
   });
 
   // Fetch team memberships for employee dropdown filtering
@@ -298,27 +303,51 @@ export default function DailyReports() {
     },
   });
 
-  // Filter employees based on selected team and client activity
+  // Fetch team↔client mapping (for cascading filters)
+  const { data: teamClientLinks = [] } = useQuery({
+    queryKey: ["daily-report-team-clients"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("team_clients")
+        .select("team_id, client_id");
+      return data || [];
+    },
+  });
+
+  // Compute employee IDs that match selected teams
+  const employeeIdsInSelectedTeams = useMemo(() => {
+    if (selectedTeams.length === 0) return null; // null = no team filter
+    const teamSet = new Set(selectedTeams);
+    return new Set(
+      employeeTeamMemberships
+        .filter((tm) => teamSet.has(tm.team_id))
+        .map((tm) => tm.employee_id)
+    );
+  }, [selectedTeams, employeeTeamMemberships]);
+
+  // Compute client IDs linked to selected teams
+  const clientIdsInSelectedTeams = useMemo(() => {
+    if (selectedTeams.length === 0) return null;
+    const teamSet = new Set(selectedTeams);
+    return new Set(
+      teamClientLinks.filter((l) => teamSet.has(l.team_id)).map((l) => l.client_id)
+    );
+  }, [selectedTeams, teamClientLinks]);
+
+  // Filter employees for the dropdown (in-scope vs out-of-scope handled by MultiSelectFilter)
   const filteredEmployees = useMemo(() => {
     let result = employees;
-    
-    // Filter by team if selected
-    if (selectedTeam !== "all") {
-      const teamEmployeeIds = new Set(
-        employeeTeamMemberships
-          .filter(tm => tm.team_id === selectedTeam)
-          .map(tm => tm.employee_id)
-      );
-      result = result.filter(emp => teamEmployeeIds.has(emp.id));
+
+    if (employeeIdsInSelectedTeams) {
+      result = result.filter((emp) => employeeIdsInSelectedTeams.has(emp.id));
     }
-    
-    // Filter by client activity if selected
-    if (selectedClient !== "all") {
-      result = result.filter(emp => employeesWithClientActivity.includes(emp.id));
+
+    if (selectedClients.length > 0) {
+      result = result.filter((emp) => employeesWithClientActivity.includes(emp.id));
     }
-    
+
     return result;
-  }, [employees, selectedTeam, selectedClient, employeesWithClientActivity, employeeTeamMemberships]);
+  }, [employees, employeeIdsInSelectedTeams, selectedClients, employeesWithClientActivity]);
 
   // Fetch clients
   const { data: clients = [] } = useQuery({
@@ -346,7 +375,7 @@ export default function DailyReports() {
 
   // Fetch report data
   const { data: reportData = [], isLoading: isLoadingReport, refetch: fetchReport } = useQuery({
-    queryKey: ["daily-report-data", format(dateRange.start, "yyyy-MM-dd"), format(dateRange.end, "yyyy-MM-dd"), selectedTeam, selectedEmployee, selectedClient, employeeStatusFilter, scopeReportsDaily, ledTeamIds, currentEmployee?.id, useNewAssignmentsFlag],
+    queryKey: ["daily-report-data", format(dateRange.start, "yyyy-MM-dd"), format(dateRange.end, "yyyy-MM-dd"), selectedTeams.sort().join(","), selectedEmployees.sort().join(","), selectedClients.sort().join(","), selectedCampaigns.sort().join(","), employeeStatusFilter, scopeReportsDaily, ledTeamIds, currentEmployee?.id, useNewAssignmentsFlag],
     queryFn: async () => {
       const startStr = format(dateRange.start, "yyyy-MM-dd");
       const endStr = format(dateRange.end, "yyyy-MM-dd");
@@ -354,26 +383,26 @@ export default function DailyReports() {
       let filteredEmployees: any[] = [];
       let agentMappings: any[] = [];
 
-      // When a specific client is selected, find employees who have sales for that client
+      // When specific clients are selected, find employees who have sales for those clients
       // This handles employees without team assignments
-      if (selectedClient !== "all") {
-        // First, fetch all sales for this client in the date range to get agent emails (paginated)
+      if (selectedClients.length > 0) {
+        // First, fetch all sales for these clients in the date range to get agent emails (paginated)
         const salesForClient = await fetchAllRows<{ agent_email: string }>(
           "sales", "agent_email, client_campaigns!inner(client_id)",
           (q) => q
-            .eq("client_campaigns.client_id", selectedClient)
+            .in("client_campaigns.client_id", selectedClients)
             .gte("sale_datetime", `${startStr}T00:00:00`)
             .lte("sale_datetime", `${endStr}T23:59:59`)
         );
-        
+
         // Get unique agent emails from these sales
         const agentEmails = [...new Set(
           (salesForClient || [])
             .map((s: any) => s.agent_email?.toLowerCase())
             .filter(Boolean)
         )] as string[];
-        
-        // ALSO fetch seller_ids from unified sales table for this client
+
+        // ALSO fetch seller_ids from unified sales table for these clients
         const fmSellersForClient = await fetchAllRows<{ raw_payload: any }>(
           "sales", "raw_payload",
           (q) => q.eq("source", "fieldmarketing")
@@ -381,38 +410,39 @@ export default function DailyReports() {
             .lte("sale_datetime", `${endStr}T23:59:59`),
           { orderBy: "sale_datetime", ascending: false }
         );
-        
+
+        const selectedClientSet = new Set(selectedClients);
         const fmEmployeeIds = [...new Set(
           (fmSellersForClient || [])
-            .filter((s: any) => s.raw_payload?.fm_client_id === selectedClient)
+            .filter((s: any) => s.raw_payload?.fm_client_id && selectedClientSet.has(s.raw_payload.fm_client_id))
             .map((s: any) => s.raw_payload?.fm_seller_id)
             .filter(Boolean)
         )] as string[];
-        
+
         console.log("[DailyReport] Client sales agent emails:", agentEmails);
-        console.log("[DailyReport] FM seller IDs for client:", fmEmployeeIds.length);
-        
+        console.log("[DailyReport] FM seller IDs for clients:", fmEmployeeIds.length);
+
         if (agentEmails.length > 0) {
           // Find agents matching these emails
           const { data: agentsData } = await supabase
             .from("agents")
             .select("id, email, external_dialer_id");
-          
+
           // Filter agents by email (case-insensitive)
-          const matchingAgents = (agentsData || []).filter(a => 
+          const matchingAgents = (agentsData || []).filter(a =>
             agentEmails.includes(a.email?.toLowerCase())
           );
           const matchingAgentIds = matchingAgents.map(a => a.id);
-          
+
           // Get employee mappings for these agents
           if (matchingAgentIds.length > 0) {
             const { data: mappings } = await supabase
               .from("employee_agent_mapping")
               .select("employee_id, agent_id")
               .in("agent_id", matchingAgentIds);
-            
+
             employeeIds = [...new Set((mappings || []).map(m => m.employee_id))];
-            
+
             // Build agent mappings structure for later use
             agentMappings = (mappings || []).map(m => {
               const agent = matchingAgents.find(a => a.id === m.agent_id);
@@ -424,40 +454,47 @@ export default function DailyReports() {
             });
           }
         }
-        
+
         // Combine with FM employee IDs
         employeeIds = [...new Set([...employeeIds, ...fmEmployeeIds])];
-        
+
+        // Apply selected employees filter (intersection)
+        if (selectedEmployees.length > 0) {
+          const empSet = new Set(selectedEmployees);
+          employeeIds = employeeIds.filter((id) => empSet.has(id));
+        }
+
         // Fetch employee details for all IDs (from sales AND fieldmarketing)
         if (employeeIds.length > 0) {
           let empQuery = supabase
             .from("employee_master_data")
             .select(`id, first_name, last_name, last_team_id, team_members(team:teams(id, name))`)
             .in("id", employeeIds);
-          
+
           if (employeeStatusFilter === "active") {
             empQuery = empQuery.eq("is_active", true);
           } else if (employeeStatusFilter === "inactive") {
             empQuery = empQuery.eq("is_active", false);
           }
-          
+
           const { data: empData } = await empQuery;
-          
+
           filteredEmployees = empData || [];
-          
-          // Apply team filter if a specific team is selected
-          if (selectedTeam !== "all") {
-            filteredEmployees = filteredEmployees.filter(emp => 
-              emp.team_members?.some((tm: any) => tm.team?.id === selectedTeam)
-              || (emp as any).last_team_id === selectedTeam
+
+          // Apply team filter if specific teams are selected
+          if (selectedTeams.length > 0) {
+            const teamSet = new Set(selectedTeams);
+            filteredEmployees = filteredEmployees.filter(emp =>
+              emp.team_members?.some((tm: any) => tm.team?.id && teamSet.has(tm.team.id))
+              || teamSet.has((emp as any).last_team_id)
             );
           }
-          
+
           // Update employeeIds to match filtered list
           employeeIds = filteredEmployees.map((e: any) => e.id);
         }
-        
-        console.log("[DailyReport] Employees found for client:", filteredEmployees.length);
+
+        console.log("[DailyReport] Employees found for clients:", filteredEmployees.length);
       } else {
         // Original logic: fetch all active employees and filter by team
         let employeeQuery = supabase
@@ -469,7 +506,7 @@ export default function DailyReports() {
             last_team_id,
             team_members(team:teams(id, name))
           `)
-        
+
         if (employeeStatusFilter === "active") {
           employeeQuery = employeeQuery.eq("is_active", true);
         } else if (employeeStatusFilter === "inactive") {
@@ -477,15 +514,15 @@ export default function DailyReports() {
         }
         // "all" = no filter
 
-        if (selectedEmployee !== "all") {
-          employeeQuery = employeeQuery.eq("id", selectedEmployee);
+        if (selectedEmployees.length > 0) {
+          employeeQuery = employeeQuery.in("id", selectedEmployees);
         }
 
         const { data: employeesData, error: empError } = await employeeQuery;
         if (empError) throw empError;
 
         filteredEmployees = employeesData || [];
-        
+
         // Apply scope-based filtering first
         if (scopeReportsDaily === "team" && ledTeamIds.length > 0) {
           // Team scope: only employees from user's led teams
@@ -497,17 +534,18 @@ export default function DailyReports() {
           // Own scope: only current user's data
           filteredEmployees = filteredEmployees.filter(emp => emp.id === currentEmployee.id);
         }
-        
+
         // Then apply selected team filter
-        if (selectedTeam !== "all") {
-          filteredEmployees = filteredEmployees.filter(emp => 
-            emp.team_members?.some((tm: any) => tm.team?.id === selectedTeam)
-            || (emp as any).last_team_id === selectedTeam
+        if (selectedTeams.length > 0) {
+          const teamSet = new Set(selectedTeams);
+          filteredEmployees = filteredEmployees.filter(emp =>
+            emp.team_members?.some((tm: any) => tm.team?.id && teamSet.has(tm.team.id))
+            || teamSet.has((emp as any).last_team_id)
           );
         }
 
         employeeIds = filteredEmployees.map(e => e.id);
-        
+
         // Fetch agent mappings for all filtered employees
         if (employeeIds.length > 0) {
           const { data: mappingsData } = await supabase
@@ -608,11 +646,11 @@ export default function DailyReports() {
         
         if (emailIdentifiers.length > 0) {
           // Use fetchAllRows with dynamic !inner join for client filtering (paginated)
-          const joinType = selectedClient !== "all" ? "!inner" : "";
+          const joinType = selectedClients.length > 0 ? "!inner" : "";
           const selectClause = `id,agent_name,agent_email,sale_datetime,client_campaign_id,dialer_campaign_id,client_campaigns${joinType}(client_id),sale_items(quantity,mapped_commission,mapped_revenue,product_id,products(name,counts_as_sale))`;
-          
+
           const emailOrFilter = emailIdentifiers.map(e => `agent_email.ilike.${e}`).join(",");
-          
+
           try {
             salesData = await fetchAllRows(
               "sales", selectClause,
@@ -622,8 +660,8 @@ export default function DailyReports() {
                    .neq("source", "fieldmarketing")
                    .gte("sale_datetime", `${startStr}T00:00:00`)
                   .lte("sale_datetime", `${endStr}T23:59:59`);
-                if (selectedClient !== "all") {
-                  query = query.eq("client_campaigns.client_id", selectedClient);
+                if (selectedClients.length > 0) {
+                  query = query.in("client_campaigns.client_id", selectedClients);
                 }
                 return query;
               }
@@ -735,10 +773,10 @@ export default function DailyReports() {
         const sellerId = (sale.raw_payload as any)?.fm_seller_id;
         return sellerId && employeeIds.includes(sellerId);
       }).filter(sale => {
-        // Filter by client if selected
-        if (selectedClient !== "all") {
+        // Filter by clients if selected
+        if (selectedClients.length > 0) {
           const clientId = (sale.raw_payload as any)?.fm_client_id;
-          return clientId === selectedClient;
+          return clientId && selectedClients.includes(clientId);
         }
         return true;
       });
@@ -1059,13 +1097,50 @@ export default function DailyReports() {
 
   const getActiveFilterCount = () => {
     let count = 0;
-    if (selectedTeam !== "all") count++;
-    if (selectedEmployee !== "all") count++;
-    if (selectedClient !== "all") count++;
-    if (selectedCampaign !== "all") count++;
+    if (selectedTeams.length > 0) count++;
+    if (selectedEmployees.length > 0) count++;
+    if (selectedClients.length > 0) count++;
+    if (selectedCampaigns.length > 0) count++;
     if (employeeStatusFilter !== "active") count++;
     return count;
   };
+
+  // Build options for the multi-select filters with cascade-aware out-of-scope marking
+  const teamOptions: MultiOption[] = useMemo(
+    () => teams.map((t) => ({ id: t.id, label: t.name })),
+    [teams]
+  );
+
+  const clientOptions: MultiOption[] = useMemo(() => {
+    return clients.map((c) => ({
+      id: c.id,
+      label: c.name,
+      // If teams are selected, mark clients NOT linked to those teams as out-of-scope
+      outOfScope: clientIdsInSelectedTeams ? !clientIdsInSelectedTeams.has(c.id) : false,
+    }));
+  }, [clients, clientIdsInSelectedTeams]);
+
+  const employeeOptions: MultiOption[] = useMemo(() => {
+    return employees.map((e) => {
+      let outOfScope = false;
+      if (employeeIdsInSelectedTeams && !employeeIdsInSelectedTeams.has(e.id)) {
+        outOfScope = true;
+      }
+      if (selectedClients.length > 0 && !employeesWithClientActivity.includes(e.id)) {
+        outOfScope = true;
+      }
+      return { id: e.id, label: `${e.first_name} ${e.last_name}`, outOfScope };
+    });
+  }, [employees, employeeIdsInSelectedTeams, selectedClients, employeesWithClientActivity]);
+
+  const campaignOptions: MultiOption[] = useMemo(() => {
+    return campaigns.map((c: any) => ({
+      id: c.id,
+      label: c.name,
+      // If clients are selected, only campaigns linked to those clients are in-scope
+      outOfScope: selectedClients.length > 0 ? !selectedClients.includes(c.client_id) : false,
+    }));
+  }, [campaigns, selectedClients]);
 
   const periodOptions = [
     { value: "today", label: "I dag" },
@@ -1245,25 +1320,16 @@ export default function DailyReports() {
                   )}
 
                   {/* Teams */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-white/70 font-medium">Teams</label>
-                    <Select value={selectedTeam} onValueChange={(v) => { setSelectedTeam(v); setSelectedEmployee("all"); }}>
-                      <SelectTrigger className="bg-white/10 border-white/20 text-white hover:bg-white/20">
-                        <div className="flex items-center justify-between w-full">
-                          <SelectValue placeholder="Alle" />
-                          <SlidersHorizontal className="h-4 w-4 ml-2 opacity-50" />
-                        </div>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {scopeReportsDaily === "alt" && (
-                          <SelectItem value="all">Alle</SelectItem>
-                        )}
-                        {teams.map((team) => (
-                          <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <MultiSelectFilter
+                    label="Teams"
+                    options={teamOptions}
+                    selected={selectedTeams}
+                    onChange={(next) => {
+                      setSelectedTeams(next);
+                      // Clear employee selection when team filter changes (cascade)
+                      setSelectedEmployees([]);
+                    }}
+                  />
 
                   {/* Medarbejder status */}
                   <div className="space-y-1.5">
@@ -1284,63 +1350,39 @@ export default function DailyReports() {
                   </div>
 
                   {/* Medarbejdere */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-white/70 font-medium">Medarbejdere</label>
-                    <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
-                      <SelectTrigger className="bg-white/10 border-white/20 text-white hover:bg-white/20">
-                        <div className="flex items-center justify-between w-full">
-                          <SelectValue placeholder="Alle" />
-                          <SlidersHorizontal className="h-4 w-4 ml-2 opacity-50" />
-                        </div>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Alle</SelectItem>
-                        {filteredEmployees.map((emp) => (
-                          <SelectItem key={emp.id} value={emp.id}>
-                            {emp.first_name} {emp.last_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <MultiSelectFilter
+                    label="Medarbejdere"
+                    options={employeeOptions}
+                    selected={selectedEmployees}
+                    onChange={setSelectedEmployees}
+                    scopeHint={
+                      selectedTeams.length > 0 || selectedClients.length > 0
+                        ? "Filtreret efter teams/kunder"
+                        : null
+                    }
+                  />
 
                   {/* Kunder */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-white/70 font-medium">Kunder</label>
-                    <Select value={selectedClient} onValueChange={setSelectedClient}>
-                      <SelectTrigger className="bg-white/10 border-white/20 text-white hover:bg-white/20">
-                        <div className="flex items-center justify-between w-full">
-                          <SelectValue placeholder="Alle" />
-                          <SlidersHorizontal className="h-4 w-4 ml-2 opacity-50" />
-                        </div>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Alle</SelectItem>
-                        {clients.map((client) => (
-                          <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <MultiSelectFilter
+                    label="Kunder"
+                    options={clientOptions}
+                    selected={selectedClients}
+                    onChange={(next) => {
+                      setSelectedClients(next);
+                      // Clear campaign selection when client filter changes (cascade)
+                      setSelectedCampaigns([]);
+                    }}
+                    scopeHint={selectedTeams.length > 0 ? "Filtreret efter teams" : null}
+                  />
 
                   {/* Kampagner */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-white/70 font-medium">Kampagner</label>
-                    <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
-                      <SelectTrigger className="bg-white/10 border-white/20 text-white hover:bg-white/20">
-                        <div className="flex items-center justify-between w-full">
-                          <SelectValue placeholder="Alle" />
-                          <SlidersHorizontal className="h-4 w-4 ml-2 opacity-50" />
-                        </div>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Alle</SelectItem>
-                        {campaigns.map((campaign) => (
-                          <SelectItem key={campaign.id} value={campaign.id}>{campaign.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <MultiSelectFilter
+                    label="Kampagner"
+                    options={campaignOptions}
+                    selected={selectedCampaigns}
+                    onChange={setSelectedCampaigns}
+                    scopeHint={selectedClients.length > 0 ? "Filtreret efter kunder" : null}
+                  />
 
                 </div>
 
@@ -1369,8 +1411,14 @@ export default function DailyReports() {
               {" • "}
               {format(dateRange.start, "d. MMM", { locale: da })}
               {isMultipleDays && ` - ${format(dateRange.end, "d. MMM", { locale: da })}`}
-              {selectedTeam !== "all" && ` • ${teams.find(t => t.id === selectedTeam)?.name}`}
-              {selectedEmployee !== "all" && ` • ${employees.find(e => e.id === selectedEmployee)?.first_name} ${employees.find(e => e.id === selectedEmployee)?.last_name}`}
+              {selectedTeams.length === 1 && ` • ${teams.find(t => t.id === selectedTeams[0])?.name}`}
+              {selectedTeams.length > 1 && ` • ${selectedTeams.length} teams`}
+              {selectedEmployees.length === 1 && ` • ${(() => { const e = employees.find(x => x.id === selectedEmployees[0]); return e ? `${e.first_name} ${e.last_name}` : ""; })()}`}
+              {selectedEmployees.length > 1 && ` • ${selectedEmployees.length} medarbejdere`}
+              {selectedClients.length === 1 && ` • ${clients.find(c => c.id === selectedClients[0])?.name}`}
+              {selectedClients.length > 1 && ` • ${selectedClients.length} kunder`}
+              {selectedCampaigns.length === 1 && ` • ${campaigns.find((c: any) => c.id === selectedCampaigns[0])?.name}`}
+              {selectedCampaigns.length > 1 && ` • ${selectedCampaigns.length} kampagner`}
             </p>
           </CardHeader>
           <CardContent>
