@@ -1049,11 +1049,18 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
   const subFlatItems = useMemo(() => filteredFlatItems.filter((i) => resolveUploadType(i.upload_type) === subTab), [filteredFlatItems, subTab]);
 
   const allSellers = useMemo(() => {
-    const names = new Set<string>();
-    filteredOppGroups.forEach(g => g.agents.forEach(a => names.add(a)));
-    filteredFlatItems.forEach(i => names.add(i.agentName));
-    return [...names].sort();
-  }, [filteredOppGroups, filteredFlatItems]);
+    // Build resolved seller list: each person appears once even with multiple email aliases
+    const resolvedSet = new Set<string>();
+    filteredOppGroups.forEach(g => g.agents.forEach(a => {
+      const r = resolve(a);
+      if (r) resolvedSet.add(r);
+    }));
+    filteredFlatItems.forEach(i => {
+      const r = resolve(i.agentName);
+      if (r) resolvedSet.add(r);
+    });
+    return [...resolvedSet].sort();
+  }, [filteredOppGroups, filteredFlatItems, resolve]);
 
   const filterAndSort = <T extends { agentName?: string; agents?: string[]; oppNumber?: string; oppGroup?: string; phone?: string; company?: string; saleDate?: string; createdAt?: string; fileName?: string }>(
     items: T[],
@@ -1065,8 +1072,11 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
 
     if (sellerFilter !== "all") {
       result = result.filter(item => {
-        const agent = getAgent(item);
-        return agent === sellerFilter || (item as any).agents?.includes(sellerFilter);
+        const agentsArr = (item as any).agents as string[] | undefined;
+        const resolvedAgents = agentsArr && agentsArr.length > 0
+          ? agentsArr.map(a => resolve(a))
+          : [resolve(getAgent(item))];
+        return resolvedAgents.includes(sellerFilter);
       });
     }
 
@@ -1098,19 +1108,19 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
     filterAndSort(
       subOppGroups,
       g => g.agents.join(", "),
-      g => [g.oppGroup, ...g.agents, g.fileName].join(" "),
+      g => [g.oppGroup, ...g.agents, ...g.agents.map(a => resolve(a)), g.fileName].join(" "),
       g => g.createdAt,
     ),
-    [subOppGroups, sellerFilter, searchQuery, sortKey, sortDir]);
+    [subOppGroups, sellerFilter, searchQuery, sortKey, sortDir, resolve]);
 
   const processedFlatItems = useMemo(() =>
     filterAndSort(
       subFlatItems,
       i => i.agentName,
-      i => [i.agentName, i.oppNumber, i.phone, i.company, i.fileName].join(" "),
+      i => [i.agentName, resolve(i.agentName), i.oppNumber, i.phone, i.company, i.fileName].join(" "),
       i => i.saleDate,
     ),
-    [subFlatItems, sellerFilter, searchQuery, sortKey, sortDir]);
+    [subFlatItems, sellerFilter, searchQuery, sortKey, sortDir, resolve]);
 
   const cancellationCount = useMemo(() =>
     filteredOppGroups.filter((g) => resolveUploadType(g.uploadType) === "cancellation").length +
@@ -1754,7 +1764,7 @@ export function ApprovalQueueTab({ clientId }: ApprovalQueueTabProps) {
                   <SelectContent>
                     <SelectItem value="all">Alle sælgere</SelectItem>
                     {allSellers.map(name => (
-                      <SelectItem key={name} value={name}>{resolve(name)}</SelectItem>
+                      <SelectItem key={name} value={name}>{name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
