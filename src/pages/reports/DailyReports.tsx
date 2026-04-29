@@ -646,11 +646,11 @@ export default function DailyReports() {
         
         if (emailIdentifiers.length > 0) {
           // Use fetchAllRows with dynamic !inner join for client filtering (paginated)
-          const joinType = selectedClient !== "all" ? "!inner" : "";
+          const joinType = selectedClients.length > 0 ? "!inner" : "";
           const selectClause = `id,agent_name,agent_email,sale_datetime,client_campaign_id,dialer_campaign_id,client_campaigns${joinType}(client_id),sale_items(quantity,mapped_commission,mapped_revenue,product_id,products(name,counts_as_sale))`;
-          
+
           const emailOrFilter = emailIdentifiers.map(e => `agent_email.ilike.${e}`).join(",");
-          
+
           try {
             salesData = await fetchAllRows(
               "sales", selectClause,
@@ -660,8 +660,8 @@ export default function DailyReports() {
                    .neq("source", "fieldmarketing")
                    .gte("sale_datetime", `${startStr}T00:00:00`)
                   .lte("sale_datetime", `${endStr}T23:59:59`);
-                if (selectedClient !== "all") {
-                  query = query.eq("client_campaigns.client_id", selectedClient);
+                if (selectedClients.length > 0) {
+                  query = query.in("client_campaigns.client_id", selectedClients);
                 }
                 return query;
               }
