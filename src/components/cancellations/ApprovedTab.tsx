@@ -43,7 +43,7 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
         .from("cancellation_queue")
         .select(`
           id, status, upload_type, reviewed_at, reviewed_by, created_at, opp_group, deduction_date, uploaded_data,
-          sale:sales!cancellation_queue_sale_id_fkey(id, sale_datetime, agent_name, agent_email, raw_payload, sale_items(product:products(name))),
+          sale:sales!cancellation_queue_sale_id_fkey(id, sale_datetime, agent_name, agent_email, raw_payload, sale_items(mapped_commission, product:products(name))),
           reviewer:employee_master_data!cancellation_queue_reviewed_by_fkey(first_name, last_name)
         `)
         .in("status", ["approved", "rejected"])
@@ -84,6 +84,8 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
         const ud = item.uploaded_data as Record<string, any> | null;
         const provRaw = ud?.["Provision"];
         const provValue = typeof provRaw === "object" && provRaw !== null ? provRaw.result : (typeof provRaw === "number" ? provRaw : null);
+        const saleItems = (item.sale?.sale_items || []) as Array<{ mapped_commission: number | null; product: { name: string } | null }>;
+        const systemCommission = saleItems.reduce((sum, si) => sum + (si.mapped_commission || 0), 0);
         return {
           id: item.id,
           status: item.status,
@@ -99,9 +101,10 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
           reviewerName: item.reviewer
             ? `${item.reviewer.first_name || ""} ${item.reviewer.last_name || ""}`.trim()
             : "",
-          product: (item.sale?.sale_items || []).map((si: any) => si.product?.name).filter(Boolean).join(", ") || "",
+          product: saleItems.map((si) => si.product?.name).filter(Boolean).join(", ") || "",
           memberNumber: ud?.["Medlemsnummer"] != null ? String(ud["Medlemsnummer"]) : "",
-          provision: typeof provValue === "number" ? provValue : null,
+          uploadedProvision: typeof provValue === "number" ? provValue : null,
+          systemCommission,
         };
       });
     },
@@ -225,19 +228,26 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
     onError: () => toast.error("Kunne ikke opdatere fradragsdatoer"),
   });
 
+  // Build resolved seller map: each person appears once even with multiple email aliases
   const sellers = useMemo(() => {
-    const set = new Set(items.map((i) => i.agentName).filter(Boolean));
-    return Array.from(set).sort();
-  }, [items]);
+    const resolvedSet = new Set<string>();
+    for (const i of items) {
+      if (!i.agentName) continue;
+      const r = resolve(i.agentName);
+      if (r) resolvedSet.add(r);
+    }
+    return Array.from(resolvedSet).sort();
+  }, [items, resolve]);
 
   const filtered = useMemo(() => {
     let result = [...items];
-    if (sellerFilter !== "all") result = result.filter((i) => i.agentName === sellerFilter);
+    if (sellerFilter !== "all") result = result.filter((i) => resolve(i.agentName) === sellerFilter);
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(
         (i) =>
           i.agentName.toLowerCase().includes(q) ||
+          resolve(i.agentName).toLowerCase().includes(q) ||
           i.opp.toLowerCase().includes(q) ||
           i.reviewerName.toLowerCase().includes(q)
       );
@@ -324,7 +334,7 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
               <SelectContent>
                 <SelectItem value="all">Alle sælgere</SelectItem>
                 {sellers.map((s) => (
-                <SelectItem key={s} value={s}>{resolve(s)}</SelectItem>
+                  <SelectItem key={s} value={s}>{s}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -346,7 +356,8 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
                 <TableHead className="cursor-pointer" onClick={() => toggleSort("type")}>Type <SortIcon col="type" /></TableHead>
                 {isAse && <TableHead>Produkt</TableHead>}
                 {isAse && <TableHead>Medlemsnr.</TableHead>}
-                {isAse && <TableHead>Provision</TableHead>}
+                {isAse && <TableHead>Uploaded provision</TableHead>}
+                {isAse && <TableHead>System commission</TableHead>}
                 <TableHead className="cursor-pointer" onClick={() => toggleSort("status")}>Status <SortIcon col="status" /></TableHead>
                 <TableHead className="cursor-pointer" onClick={() => toggleSort("deduction")}>Trækkes i <SortIcon col="deduction" /></TableHead>
                 <TableHead>Behandlet af</TableHead>
@@ -369,7 +380,8 @@ export function ApprovedTab({ clientId }: ApprovedTabProps) {
                     </TableCell>
                     {isAse && <TableCell>{item.product || "-"}</TableCell>}
                     {isAse && <TableCell className="font-mono text-xs">{item.memberNumber || "-"}</TableCell>}
-                    {isAse && <TableCell>{item.provision != null ? `${item.provision.toLocaleString("da-DK")} kr.` : "-"}</TableCell>}
+                    {isAse && <TableCell>{item.uploadedProvision != null ? `${item.uploadedProvision.toLocaleString("da-DK")} kr.` : "-"}</TableCell>}
+                    {isAse && <TableCell>{item.systemCommission > 0 ? `${item.systemCommission.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr.` : "-"}</TableCell>}
                     <TableCell>
                       <Badge variant={item.status === "approved" ? "default" : "destructive"}>
                         {item.status === "approved" ? "Godkendt" : "Afvist"}
