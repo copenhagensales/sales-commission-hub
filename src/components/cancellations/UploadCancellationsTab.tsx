@@ -676,9 +676,33 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name, work_email, is_active")
+        .select("id, first_name, last_name, work_email, private_email, is_active")
         .order("is_active", { ascending: false })
         .order("first_name");
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Multi-email index: employee_id → Set<all known emails> (work + private + dialer-agents).
+  // See utils/buildEmployeeEmailIndex.ts. Stillads til Stork 2.0.
+  const { data: employeeAgentMappings = [] } = useQuery({
+    queryKey: ["employee-agent-mappings-all"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_agent_mapping")
+        .select("employee_id, agent_id");
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const { data: agentsForEmailIndex = [] } = useQuery({
+    queryKey: ["agents-for-email-index"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("agents")
+        .select("id, email");
       if (error) throw error;
       return data || [];
     },
