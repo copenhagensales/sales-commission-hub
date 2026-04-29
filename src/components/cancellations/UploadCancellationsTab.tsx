@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { CLIENT_IDS } from "@/utils/clientIds";
 import { extractOpp } from "./utils/extractOpp";
+import { buildEmployeeEmailIndex } from "./utils/buildEmployeeEmailIndex";
 import { groupConditionsByProduct, findMatchingProductId, evaluateConditions } from "@/utils/productConditionMatcher";
 import { formatCurrency } from "@/lib/calculations/formatting";
 import { useAgentNameResolver } from "@/hooks/useAgentNameResolver";
@@ -1764,10 +1765,13 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             sellerToEmployeeId.set(sm.excel_seller_name.toLowerCase(), sm.employee_id);
           }
 
-          const employeeIdToEmail = new Map<string, string>();
-          for (const emp of allEmployees) {
-            if (emp.work_email) employeeIdToEmail.set(emp.id, emp.work_email.toLowerCase());
-          }
+          // Multi-email index: dækker work_email, private_email og alle dialer-agent-emails
+          // for hver medarbejder. Erstatter den smalle work_email-only Map.
+          const employeeIdToEmails = buildEmployeeEmailIndex({
+            employees: allEmployees,
+            mappings: employeeAgentMappings,
+            agents: agentsForEmailIndex,
+          });
 
           const firstNameToEmployeeId = new Map<string, string>();
           for (const emp of allEmployees) {
@@ -1900,8 +1904,8 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               return;
             }
 
-            const agentEmail = employeeIdToEmail.get(employeeId);
-            if (!agentEmail) return;
+            const employeeEmails = employeeIdToEmails.get(employeeId);
+            if (!employeeEmails || employeeEmails.size === 0) return;
 
             const excelDateObj = parseFlexibleDate(excelDate);
             const prodCol3 = activeConfig?.product_columns?.[0];
