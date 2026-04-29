@@ -1320,25 +1320,16 @@ export default function DailyReports() {
                   )}
 
                   {/* Teams */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-white/70 font-medium">Teams</label>
-                    <Select value={selectedTeam} onValueChange={(v) => { setSelectedTeam(v); setSelectedEmployee("all"); }}>
-                      <SelectTrigger className="bg-white/10 border-white/20 text-white hover:bg-white/20">
-                        <div className="flex items-center justify-between w-full">
-                          <SelectValue placeholder="Alle" />
-                          <SlidersHorizontal className="h-4 w-4 ml-2 opacity-50" />
-                        </div>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {scopeReportsDaily === "alt" && (
-                          <SelectItem value="all">Alle</SelectItem>
-                        )}
-                        {teams.map((team) => (
-                          <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <MultiSelectFilter
+                    label="Teams"
+                    options={teamOptions}
+                    selected={selectedTeams}
+                    onChange={(next) => {
+                      setSelectedTeams(next);
+                      // Clear employee selection when team filter changes (cascade)
+                      setSelectedEmployees([]);
+                    }}
+                  />
 
                   {/* Medarbejder status */}
                   <div className="space-y-1.5">
@@ -1359,63 +1350,39 @@ export default function DailyReports() {
                   </div>
 
                   {/* Medarbejdere */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-white/70 font-medium">Medarbejdere</label>
-                    <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
-                      <SelectTrigger className="bg-white/10 border-white/20 text-white hover:bg-white/20">
-                        <div className="flex items-center justify-between w-full">
-                          <SelectValue placeholder="Alle" />
-                          <SlidersHorizontal className="h-4 w-4 ml-2 opacity-50" />
-                        </div>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Alle</SelectItem>
-                        {filteredEmployees.map((emp) => (
-                          <SelectItem key={emp.id} value={emp.id}>
-                            {emp.first_name} {emp.last_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <MultiSelectFilter
+                    label="Medarbejdere"
+                    options={employeeOptions}
+                    selected={selectedEmployees}
+                    onChange={setSelectedEmployees}
+                    scopeHint={
+                      selectedTeams.length > 0 || selectedClients.length > 0
+                        ? "Filtreret efter teams/kunder"
+                        : null
+                    }
+                  />
 
                   {/* Kunder */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-white/70 font-medium">Kunder</label>
-                    <Select value={selectedClient} onValueChange={setSelectedClient}>
-                      <SelectTrigger className="bg-white/10 border-white/20 text-white hover:bg-white/20">
-                        <div className="flex items-center justify-between w-full">
-                          <SelectValue placeholder="Alle" />
-                          <SlidersHorizontal className="h-4 w-4 ml-2 opacity-50" />
-                        </div>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Alle</SelectItem>
-                        {clients.map((client) => (
-                          <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <MultiSelectFilter
+                    label="Kunder"
+                    options={clientOptions}
+                    selected={selectedClients}
+                    onChange={(next) => {
+                      setSelectedClients(next);
+                      // Clear campaign selection when client filter changes (cascade)
+                      setSelectedCampaigns([]);
+                    }}
+                    scopeHint={selectedTeams.length > 0 ? "Filtreret efter teams" : null}
+                  />
 
                   {/* Kampagner */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-white/70 font-medium">Kampagner</label>
-                    <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
-                      <SelectTrigger className="bg-white/10 border-white/20 text-white hover:bg-white/20">
-                        <div className="flex items-center justify-between w-full">
-                          <SelectValue placeholder="Alle" />
-                          <SlidersHorizontal className="h-4 w-4 ml-2 opacity-50" />
-                        </div>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Alle</SelectItem>
-                        {campaigns.map((campaign) => (
-                          <SelectItem key={campaign.id} value={campaign.id}>{campaign.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <MultiSelectFilter
+                    label="Kampagner"
+                    options={campaignOptions}
+                    selected={selectedCampaigns}
+                    onChange={setSelectedCampaigns}
+                    scopeHint={selectedClients.length > 0 ? "Filtreret efter kunder" : null}
+                  />
 
                 </div>
 
