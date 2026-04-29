@@ -383,26 +383,26 @@ export default function DailyReports() {
       let filteredEmployees: any[] = [];
       let agentMappings: any[] = [];
 
-      // When a specific client is selected, find employees who have sales for that client
+      // When specific clients are selected, find employees who have sales for those clients
       // This handles employees without team assignments
-      if (selectedClient !== "all") {
-        // First, fetch all sales for this client in the date range to get agent emails (paginated)
+      if (selectedClients.length > 0) {
+        // First, fetch all sales for these clients in the date range to get agent emails (paginated)
         const salesForClient = await fetchAllRows<{ agent_email: string }>(
           "sales", "agent_email, client_campaigns!inner(client_id)",
           (q) => q
-            .eq("client_campaigns.client_id", selectedClient)
+            .in("client_campaigns.client_id", selectedClients)
             .gte("sale_datetime", `${startStr}T00:00:00`)
             .lte("sale_datetime", `${endStr}T23:59:59`)
         );
-        
+
         // Get unique agent emails from these sales
         const agentEmails = [...new Set(
           (salesForClient || [])
             .map((s: any) => s.agent_email?.toLowerCase())
             .filter(Boolean)
         )] as string[];
-        
-        // ALSO fetch seller_ids from unified sales table for this client
+
+        // ALSO fetch seller_ids from unified sales table for these clients
         const fmSellersForClient = await fetchAllRows<{ raw_payload: any }>(
           "sales", "raw_payload",
           (q) => q.eq("source", "fieldmarketing")
@@ -410,38 +410,39 @@ export default function DailyReports() {
             .lte("sale_datetime", `${endStr}T23:59:59`),
           { orderBy: "sale_datetime", ascending: false }
         );
-        
+
+        const selectedClientSet = new Set(selectedClients);
         const fmEmployeeIds = [...new Set(
           (fmSellersForClient || [])
-            .filter((s: any) => s.raw_payload?.fm_client_id === selectedClient)
+            .filter((s: any) => s.raw_payload?.fm_client_id && selectedClientSet.has(s.raw_payload.fm_client_id))
             .map((s: any) => s.raw_payload?.fm_seller_id)
             .filter(Boolean)
         )] as string[];
-        
+
         console.log("[DailyReport] Client sales agent emails:", agentEmails);
-        console.log("[DailyReport] FM seller IDs for client:", fmEmployeeIds.length);
-        
+        console.log("[DailyReport] FM seller IDs for clients:", fmEmployeeIds.length);
+
         if (agentEmails.length > 0) {
           // Find agents matching these emails
           const { data: agentsData } = await supabase
             .from("agents")
             .select("id, email, external_dialer_id");
-          
+
           // Filter agents by email (case-insensitive)
-          const matchingAgents = (agentsData || []).filter(a => 
+          const matchingAgents = (agentsData || []).filter(a =>
             agentEmails.includes(a.email?.toLowerCase())
           );
           const matchingAgentIds = matchingAgents.map(a => a.id);
-          
+
           // Get employee mappings for these agents
           if (matchingAgentIds.length > 0) {
             const { data: mappings } = await supabase
               .from("employee_agent_mapping")
               .select("employee_id, agent_id")
               .in("agent_id", matchingAgentIds);
-            
+
             employeeIds = [...new Set((mappings || []).map(m => m.employee_id))];
-            
+
             // Build agent mappings structure for later use
             agentMappings = (mappings || []).map(m => {
               const agent = matchingAgents.find(a => a.id === m.agent_id);
@@ -453,40 +454,47 @@ export default function DailyReports() {
             });
           }
         }
-        
+
         // Combine with FM employee IDs
         employeeIds = [...new Set([...employeeIds, ...fmEmployeeIds])];
-        
+
+        // Apply selected employees filter (intersection)
+        if (selectedEmployees.length > 0) {
+          const empSet = new Set(selectedEmployees);
+          employeeIds = employeeIds.filter((id) => empSet.has(id));
+        }
+
         // Fetch employee details for all IDs (from sales AND fieldmarketing)
         if (employeeIds.length > 0) {
           let empQuery = supabase
             .from("employee_master_data")
             .select(`id, first_name, last_name, last_team_id, team_members(team:teams(id, name))`)
             .in("id", employeeIds);
-          
+
           if (employeeStatusFilter === "active") {
             empQuery = empQuery.eq("is_active", true);
           } else if (employeeStatusFilter === "inactive") {
             empQuery = empQuery.eq("is_active", false);
           }
-          
+
           const { data: empData } = await empQuery;
-          
+
           filteredEmployees = empData || [];
-          
-          // Apply team filter if a specific team is selected
-          if (selectedTeam !== "all") {
-            filteredEmployees = filteredEmployees.filter(emp => 
-              emp.team_members?.some((tm: any) => tm.team?.id === selectedTeam)
-              || (emp as any).last_team_id === selectedTeam
+
+          // Apply team filter if specific teams are selected
+          if (selectedTeams.length > 0) {
+            const teamSet = new Set(selectedTeams);
+            filteredEmployees = filteredEmployees.filter(emp =>
+              emp.team_members?.some((tm: any) => tm.team?.id && teamSet.has(tm.team.id))
+              || teamSet.has((emp as any).last_team_id)
             );
           }
-          
+
           // Update employeeIds to match filtered list
           employeeIds = filteredEmployees.map((e: any) => e.id);
         }
-        
-        console.log("[DailyReport] Employees found for client:", filteredEmployees.length);
+
+        console.log("[DailyReport] Employees found for clients:", filteredEmployees.length);
       } else {
         // Original logic: fetch all active employees and filter by team
         let employeeQuery = supabase
@@ -498,7 +506,7 @@ export default function DailyReports() {
             last_team_id,
             team_members(team:teams(id, name))
           `)
-        
+
         if (employeeStatusFilter === "active") {
           employeeQuery = employeeQuery.eq("is_active", true);
         } else if (employeeStatusFilter === "inactive") {
@@ -506,15 +514,15 @@ export default function DailyReports() {
         }
         // "all" = no filter
 
-        if (selectedEmployee !== "all") {
-          employeeQuery = employeeQuery.eq("id", selectedEmployee);
+        if (selectedEmployees.length > 0) {
+          employeeQuery = employeeQuery.in("id", selectedEmployees);
         }
 
         const { data: employeesData, error: empError } = await employeeQuery;
         if (empError) throw empError;
 
         filteredEmployees = employeesData || [];
-        
+
         // Apply scope-based filtering first
         if (scopeReportsDaily === "team" && ledTeamIds.length > 0) {
           // Team scope: only employees from user's led teams
@@ -526,17 +534,18 @@ export default function DailyReports() {
           // Own scope: only current user's data
           filteredEmployees = filteredEmployees.filter(emp => emp.id === currentEmployee.id);
         }
-        
+
         // Then apply selected team filter
-        if (selectedTeam !== "all") {
-          filteredEmployees = filteredEmployees.filter(emp => 
-            emp.team_members?.some((tm: any) => tm.team?.id === selectedTeam)
-            || (emp as any).last_team_id === selectedTeam
+        if (selectedTeams.length > 0) {
+          const teamSet = new Set(selectedTeams);
+          filteredEmployees = filteredEmployees.filter(emp =>
+            emp.team_members?.some((tm: any) => tm.team?.id && teamSet.has(tm.team.id))
+            || teamSet.has((emp as any).last_team_id)
           );
         }
 
         employeeIds = filteredEmployees.map(e => e.id);
-        
+
         // Fetch agent mappings for all filtered employees
         if (employeeIds.length > 0) {
           const { data: mappingsData } = await supabase
