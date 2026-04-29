@@ -78,7 +78,6 @@ export const BookingFlowEngagement = lazyPage(() => import("@/pages/recruitment/
 export const PublicCandidateBooking = lazyPage(() => import("@/pages/recruitment/PublicCandidateBooking"));
 export const PublicUnsubscribe = lazyPage(() => import("@/pages/recruitment/PublicUnsubscribe"));
 
-export const Some = lazyPage(() => import("@/pages/Some"));
 export const TimeStamp = lazyPage(() => import("@/pages/TimeStamp"));
 
 export const ClientSalesOverview = lazyPage(() => import("@/pages/ClientSalesOverview"));

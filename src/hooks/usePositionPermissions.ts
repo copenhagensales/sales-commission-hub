@@ -102,7 +102,7 @@ const PERMISSION_SCOPE_MAP: Record<string, string> = {
   'menu_career_wishes_overview': 'scope_career_wishes',
   'menu_fm_overview': 'scope_fieldmarketing',
   'menu_extra_work': 'scope_extra_work',
-  'menu_some': 'scope_some',
+  // 'menu_some' removed
   'menu_sales': 'scope_sales',
   'menu_car_quiz_admin': 'scope_quiz',
   'menu_reports_daily': 'scope_reports_daily',
@@ -541,8 +541,7 @@ export function usePermissions() {
     canViewDashboard: hasPermission("menu_dashboard"),
     canViewHomeGoals: canView("menu_home_goals"),
     canEditHomeGoals: canEdit("menu_home_goals"),
-    canViewSome: canView("menu_some"),
-    canEditSome: canEdit("menu_some"),
+    // canViewSome / canEditSome removed
     canViewSales: canView("menu_sales"),
     canEditSales: canEdit("menu_sales"),
     canViewLogics: canView("menu_logics"),

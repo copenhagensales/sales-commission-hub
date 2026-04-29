@@ -12111,69 +12111,6 @@ export type Database = {
         }
         Relationships: []
       }
-      some_default_goals: {
-        Row: {
-          id: string
-          insta_posts_target: number
-          insta_stories_target: number
-          tiktok_videos_target: number
-          updated_at: string | null
-        }
-        Insert: {
-          id?: string
-          insta_posts_target?: number
-          insta_stories_target?: number
-          tiktok_videos_target?: number
-          updated_at?: string | null
-        }
-        Update: {
-          id?: string
-          insta_posts_target?: number
-          insta_stories_target?: number
-          tiktok_videos_target?: number
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      some_weekly_metrics: {
-        Row: {
-          created_at: string | null
-          id: string
-          insta_followers: number | null
-          insta_likes: number | null
-          insta_views: number | null
-          tiktok_followers: number | null
-          tiktok_likes: number | null
-          tiktok_views: number | null
-          updated_at: string | null
-          week_start_date: string
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          insta_followers?: number | null
-          insta_likes?: number | null
-          insta_views?: number | null
-          tiktok_followers?: number | null
-          tiktok_likes?: number | null
-          tiktok_views?: number | null
-          updated_at?: string | null
-          week_start_date: string
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          insta_followers?: number | null
-          insta_likes?: number | null
-          insta_views?: number | null
-          tiktok_followers?: number | null
-          tiktok_likes?: number | null
-          tiktok_views?: number | null
-          updated_at?: string | null
-          week_start_date?: string
-        }
-        Relationships: []
-      }
       supplier_contacts: {
         Row: {
           created_at: string

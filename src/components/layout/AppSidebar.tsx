@@ -94,9 +94,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   const [personnelOpen, setPersonnelOpen] = useState(location.pathname.startsWith("/employees") || location.pathname === "/login-log" || location.pathname === "/upcoming-starts");
   const [mgOpen, setMgOpen] = useState(location.pathname === "/mg-test");
   // Dashboard state removed - dashboards are now in separate environment
-  const [someOpen, setSomeOpen] = useState(
-    ["/some", "/extra-work"].includes(location.pathname)
-  );
+  // (SOME menu removed; Ekstraarbejde is now top-level)
   const [onboardingOpen, setOnboardingOpen] = useState(
     location.pathname.startsWith("/onboarding-program") || location.pathname === "/onboarding-program/kursus" || location.pathname === "/coaching-templates"
   );
@@ -416,8 +414,8 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   // SECTION-PERMISSION ENFORCEMENT: Section permission must be true for ANY child items to show
   // This ensures the sidebar matches what the Permission Editor shows
   
-  // Check if SOME menu should be visible
-  const showSomeMenu = !isMenuHidden('section_some') && (p.canViewSome || p.canViewExtraWork);
+  // Check if Ekstraarbejde menu should be visible (top-level standalone)
+  const showExtraWorkMenu = p.canViewExtraWork;
 
   // Check if any Personnel menu items are visible (requires section permission)
   const showPersonnelMenu = !isMenuHidden('section_personale') && p.canView("menu_section_personale") && 
@@ -804,50 +802,21 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
             );
           })}
 
-          {/* SOME menu */}
-          {showSomeMenu && (
-            <Collapsible open={someOpen} onOpenChange={setSomeOpen}>
-              <CollapsibleTrigger className={cn(
-                "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                ["/some", "/extra-work"].includes(location.pathname)
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground" 
+          {/* Ekstraarbejde (top-level) */}
+          {showExtraWorkMenu && (
+            <NavLink
+              to="/extra-work"
+              onClick={handleNavClick}
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                location.pathname === "/extra-work"
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
                   : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-              )}>
-                <div className="flex items-center gap-3">
-                  <Video className="h-5 w-5" />
-                  SOME
-                </div>
-                {someOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pl-4 space-y-1 mt-1">
-                {p.canViewSome && (
-                  <NavLink
-                    to="/some"
-                    onClick={handleNavClick}
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                      location.pathname === "/some" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                    )}
-                  >
-                    <Video className="h-4 w-4" />
-                    SOME
-                  </NavLink>
-                )}
-                {p.canViewExtraWork && (
-                  <NavLink
-                    to="/extra-work"
-                    onClick={handleNavClick}
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                      location.pathname === "/extra-work" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                    )}
-                  >
-                    <HeartHandshake className="h-4 w-4" />
-                    {t("sidebar.extraWork")}
-                  </NavLink>
-                )}
-              </CollapsibleContent>
-            </Collapsible>
+              )}
+            >
+              <HeartHandshake className="h-5 w-5" />
+              {t("sidebar.extraWork")}
+            </NavLink>
           )}
 
           {/* Personale (Personnel) menu */}

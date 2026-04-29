@@ -54,7 +54,7 @@ const DASHBOARD_ACCESS_LEVELS: AccessLevel[] = ["full", "none"];
 const isDashboardSection = (sectionKey: string) => sectionKey === "menu_section_dashboards";
 
 const sectionOrder = [
-  "menu_section_personal", "menu_section_some", "menu_section_personale",
+  "menu_section_personal", "menu_section_personale",
   "menu_section_ledelse", "menu_section_vagtplan", "menu_section_fieldmarketing",
   "menu_section_mg", "menu_section_salary", "menu_section_dashboards",
   "menu_section_test", "menu_section_rekruttering", "menu_section_onboarding",
