@@ -375,7 +375,7 @@ export default function DailyReports() {
 
   // Fetch report data
   const { data: reportData = [], isLoading: isLoadingReport, refetch: fetchReport } = useQuery({
-    queryKey: ["daily-report-data", format(dateRange.start, "yyyy-MM-dd"), format(dateRange.end, "yyyy-MM-dd"), selectedTeam, selectedEmployee, selectedClient, employeeStatusFilter, scopeReportsDaily, ledTeamIds, currentEmployee?.id, useNewAssignmentsFlag],
+    queryKey: ["daily-report-data", format(dateRange.start, "yyyy-MM-dd"), format(dateRange.end, "yyyy-MM-dd"), selectedTeams.sort().join(","), selectedEmployees.sort().join(","), selectedClients.sort().join(","), selectedCampaigns.sort().join(","), employeeStatusFilter, scopeReportsDaily, ledTeamIds, currentEmployee?.id, useNewAssignmentsFlag],
     queryFn: async () => {
       const startStr = format(dateRange.start, "yyyy-MM-dd");
       const endStr = format(dateRange.end, "yyyy-MM-dd");
