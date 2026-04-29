@@ -26,7 +26,7 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     icon: "📁",
     permissions: [
       { key: "menu_section_personal", label: "Mit Hjem sektion", description: "Adgang til Mit Hjem menuen", hasEditOption: false },
-      { key: "menu_section_some", label: "SOME sektion", description: "Adgang til SOME menuen", hasEditOption: false },
+      // menu_section_some removed
       { key: "menu_section_personale", label: "Personale sektion", description: "Adgang til Personale menuen", hasEditOption: false },
       { key: "menu_section_ledelse", label: "Ledelse sektion", description: "Adgang til Ledelse menuen", hasEditOption: false },
       { key: "menu_section_test", label: "Test sektion", description: "Adgang til Test menuen", hasEditOption: false },

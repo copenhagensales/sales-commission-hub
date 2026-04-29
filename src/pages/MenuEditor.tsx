@@ -38,7 +38,7 @@ import {
 const DEFAULT_LABELS: Record<string, string> = {
   section_mit_hjem: "Mit Hjem",
   section_spil: "Spil",
-  section_some: "SOME",
+  // section_some removed
   section_personale: "Personale",
   section_ledelse: "Ledelse",
   section_vagtplan: "Vagtplan",

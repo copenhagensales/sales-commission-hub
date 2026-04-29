@@ -14,7 +14,7 @@ type DataScope = "egen" | "team" | "alt";
 const generateAllPermissions = (): RolePreviewPermissions => ({
   // Menu section permissions (for PreviewSidebar)
   menu_section_personal: true,
-  menu_section_some: true,
+  // menu_section_some removed
   menu_section_personale: true,
   menu_section_ledelse: true,
   menu_section_test: true,
@@ -29,7 +29,7 @@ const generateAllPermissions = (): RolePreviewPermissions => ({
   
   // Main menu
   menu_dashboard: true,
-  menu_some: { view: true, edit: true },
+  // menu_some removed
   menu_sales: { view: true, edit: true },
   menu_logics: { view: true, edit: true },
   menu_closing_shifts: { view: true, edit: true },

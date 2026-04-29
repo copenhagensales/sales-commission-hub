@@ -77,9 +77,7 @@ const permissionIconMap: Record<string, React.ReactNode> = {
   menu_my_absence: <Clock className="h-4 w-4" />,
   menu_my_coaching: <GraduationCap className="h-4 w-4" />,
   
-  // SOME
-  menu_section_some: <Video className="h-4 w-4" />,
-  menu_some: <Video className="h-4 w-4" />,
+  // Ekstraarbejde (top-level)
   menu_extra_work: <HeartHandshake className="h-4 w-4" />,
   
   // PERSONALE
@@ -200,7 +198,6 @@ const permissionIconMap: Record<string, React.ReactNode> = {
 // Section order for grouping permissions
 const sectionOrder: string[] = [
   'menu_section_personal',
-  'menu_section_some',
   'menu_section_personale',
   'menu_section_ledelse',
   'menu_section_vagtplan',
@@ -225,7 +222,7 @@ const sectionChildren: Record<string, string[]> = {
     'menu_career_wishes', 'menu_my_feedback', 'menu_refer_friend',
     'menu_my_sales', 'menu_my_shifts', 'menu_my_absence', 'menu_my_coaching'
   ],
-  menu_section_some: ['menu_some', 'menu_extra_work'],
+  // menu_section_some removed; menu_extra_work is now top-level (no parent section grouping)
   menu_section_personale: [
     'menu_dashboard', 'menu_employees', 'menu_teams', 'menu_permissions',
     'menu_login_log', 'menu_upcoming_starts'

@@ -25,7 +25,7 @@ import {
 export const PERMISSION_KEYS = {
   // ==================== MENU SEKTIONER (Parent permissions - top level) ====================
   menu_section_personal: { label: 'Mit Hjem', section: 'sections', parent: null },
-  menu_section_some: { label: 'SOME sektion', section: 'sections', parent: null },
+  // menu_section_some removed
   menu_section_personale: { label: 'Personale', section: 'sections', parent: null },
   menu_section_ledelse: { label: 'Ledelse', section: 'sections', parent: null },
   menu_section_test: { label: 'Test', section: 'sections', parent: null },
@@ -406,7 +406,7 @@ export const SECTION_ICONS: Record<string, typeof Home> = {
   menu_section_dashboards: BarChart3,
   menu_section_onboarding: GraduationCap,
   menu_section_reports: FileBarChart,
-  menu_section_some: Video,
+  // menu_section_some removed
   menu_section_sales_system: ShoppingCart,
   menu_section_salary: Briefcase,
   menu_section_admin: Wrench,
