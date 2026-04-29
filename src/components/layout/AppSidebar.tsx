@@ -94,9 +94,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   const [personnelOpen, setPersonnelOpen] = useState(location.pathname.startsWith("/employees") || location.pathname === "/login-log" || location.pathname === "/upcoming-starts");
   const [mgOpen, setMgOpen] = useState(location.pathname === "/mg-test");
   // Dashboard state removed - dashboards are now in separate environment
-  const [someOpen, setSomeOpen] = useState(
-    ["/some", "/extra-work"].includes(location.pathname)
-  );
+  // (SOME menu removed; Ekstraarbejde is now top-level)
   const [onboardingOpen, setOnboardingOpen] = useState(
     location.pathname.startsWith("/onboarding-program") || location.pathname === "/onboarding-program/kursus" || location.pathname === "/coaching-templates"
   );
