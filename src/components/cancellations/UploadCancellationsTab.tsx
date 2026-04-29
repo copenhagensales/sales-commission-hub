@@ -598,6 +598,40 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
   const [unmatchedSellerRows, setUnmatchedSellerRows] = useState<UnmatchedSellerRow[]>([]);
   const [sellerDropdownSelections, setSellerDropdownSelections] = useState<Record<string, string>>({});
 
+  // Lønperiode for trækkedato — gælder kun rækker fra DENNE upload
+  const [deductionDate, setDeductionDate] = useState<Date>(() => getPayrollPeriod(new Date()).end);
+  const [deductionMode, setDeductionMode] = useState<"period" | "custom">("period");
+  const [deductionCustomOpen, setDeductionCustomOpen] = useState(false);
+
+  // Build 4 candidate payroll periods (forrige, indeværende, næste, derefter)
+  const payrollPeriodOptions = useMemo(() => {
+    const periods = listPayrollPeriods(new Date(), [-1, 0, 1, 2]);
+    const labels: Record<number, string> = {
+      [-1]: "Forrige lønperiode",
+      0: "Indeværende lønperiode",
+      1: "Næste lønperiode",
+      2: "Lønperioden derefter",
+    };
+    return periods.map((p) => ({
+      offset: p.offset,
+      start: p.start,
+      end: p.end,
+      label: labels[p.offset] ?? `Lønperiode ${p.offset >= 0 ? "+" : ""}${p.offset}`,
+      rangeText: `${formatDate(p.start, "d. MMM", { locale: da })} – ${formatDate(p.end, "d. MMM yyyy", { locale: da })}`,
+      // Store as YYYY-MM-DD key for select value
+      key: formatDate(p.end, "yyyy-MM-dd"),
+    }));
+  }, []);
+
+  const selectedPeriodKey = useMemo(
+    () => formatDate(deductionDate, "yyyy-MM-dd"),
+    [deductionDate],
+  );
+  const matchedPeriodOption = payrollPeriodOptions.find((p) => p.key === selectedPeriodKey);
+  const activePayrollPeriod = matchedPeriodOption
+    ? { start: matchedPeriodOption.start, end: matchedPeriodOption.end }
+    : getPayrollPeriod(deductionDate);
+
   // Check for active import blocking new uploads (includes orphan imports with NULL client_id)
   const { data: activeImport } = useQuery({
     queryKey: ["active-import-block", selectedClientId],
