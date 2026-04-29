@@ -25,45 +25,49 @@ import { fetchAllRows } from "@/utils/supabasePagination";
 import { useFeatureFlag } from "@/hooks/useFeatureFlag";
 import { resolveHoursSourceBatch, type HoursSourceResult } from "@/lib/resolveHoursSource";
 
-// Helper function to fetch employees with activity on a specific client
-// Uses agent_name (email) from sales, matches to agents, then maps to employees via employee_agent_mapping
-async function fetchEmployeesWithClientActivity(clientId: string): Promise<string[]> {
-  if (clientId === "all") return [];
-  
+// Helper function to fetch employees with activity on specific clients
+// Uses agent_email from sales, matches to agents, then maps to employees via employee_agent_mapping
+async function fetchEmployeesWithClientActivity(clientIds: string[]): Promise<string[]> {
+  if (clientIds.length === 0) return [];
+
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  
+
   // Get user's auth token for RLS-protected tables
   const { data: { session } } = await supabase.auth.getSession();
   const authToken = session?.access_token || supabaseKey;
   const headers = { apikey: supabaseKey, Authorization: `Bearer ${authToken}` };
-  
-  // Get unique agent emails for this client using RPC (avoids fetching all sales)
-  const { data: rpcEmails } = await supabase.rpc("get_distinct_agent_emails_for_client", {
-    p_client_id: clientId,
-  });
-  const agentEmails = (rpcEmails || []).map((r: any) => r.agent_email).filter(Boolean);
-  
-  // Get FM seller IDs for this client from unified sales table (paginated)
+
+  // Get unique agent emails for each client (RPC takes single id, so loop)
+  const agentEmailSets = await Promise.all(
+    clientIds.map((cid) => supabase.rpc("get_distinct_agent_emails_for_client", { p_client_id: cid }))
+  );
+  const agentEmails = [
+    ...new Set(
+      agentEmailSets.flatMap((res) => (res.data || []).map((r: any) => r.agent_email).filter(Boolean))
+    ),
+  ];
+
+  // Get FM seller IDs for these clients from unified sales table (paginated)
   const fmData = await fetchAllRows<{ raw_payload: { fm_seller_id: string; fm_client_id: string } }>(
     "sales", "raw_payload",
     (q) => q.eq("source", "fieldmarketing")
   );
-  const fmDataFiltered = fmData.filter(d => d.raw_payload?.fm_client_id === clientId);
-  const fmEmployeeIds = fmDataFiltered.map(s => s.raw_payload?.fm_seller_id).filter(Boolean);
-  
+  const clientIdSet = new Set(clientIds);
+  const fmDataFiltered = fmData.filter((d) => d.raw_payload?.fm_client_id && clientIdSet.has(d.raw_payload.fm_client_id));
+  const fmEmployeeIds = fmDataFiltered.map((s) => s.raw_payload?.fm_seller_id).filter(Boolean);
+
   // Get all agent mappings with agent email info
   const mappingsRes = await fetch(
     `${supabaseUrl}/rest/v1/employee_agent_mapping?select=employee_id,agents(email)`,
     { headers }
   );
   const mappingsData: { employee_id: string; agents: { email: string } | null }[] = await mappingsRes.json();
-  
-  // Find employee_ids where agent email matches sales agent_name
+
   const employeeIdsFromSales = mappingsData
-    .filter(m => m.agents?.email && agentEmails.includes(m.agents.email))
-    .map(m => m.employee_id);
-  
+    .filter((m) => m.agents?.email && agentEmails.includes(m.agents.email))
+    .map((m) => m.employee_id);
+
   return [...new Set([...employeeIdsFromSales, ...fmEmployeeIds])];
 }
 
