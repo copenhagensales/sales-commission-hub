@@ -186,6 +186,7 @@ export function CancellationHistoryTable({ clientId }: CancellationHistoryTableP
                   <TableHead>Uploadet af</TableHead>
                   <TableHead>Rækker</TableHead>
                   <TableHead>Matchede</TableHead>
+                  <TableHead>Trækkes</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-[80px]">Handling</TableHead>
                 </TableRow>
