@@ -415,7 +415,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   // This ensures the sidebar matches what the Permission Editor shows
   
   // Check if Ekstraarbejde menu should be visible (top-level standalone)
-  const showExtraWorkMenu = !isMenuHidden('section_some') && p.canViewExtraWork;
+  const showExtraWorkMenu = p.canViewExtraWork;
 
   // Check if any Personnel menu items are visible (requires section permission)
   const showPersonnelMenu = !isMenuHidden('section_personale') && p.canView("menu_section_personale") && 
