@@ -2177,6 +2177,7 @@ export type Database = {
           client_id: string
           config_id: string | null
           created_at: string
+          default_deduction_date: string | null
           error_message: string | null
           file_name: string
           file_size_bytes: number | null
@@ -2192,6 +2193,7 @@ export type Database = {
           client_id: string
           config_id?: string | null
           created_at?: string
+          default_deduction_date?: string | null
           error_message?: string | null
           file_name: string
           file_size_bytes?: number | null
@@ -2207,6 +2209,7 @@ export type Database = {
           client_id?: string
           config_id?: string | null
           created_at?: string
+          default_deduction_date?: string | null
           error_message?: string | null
           file_name?: string
           file_size_bytes?: number | null

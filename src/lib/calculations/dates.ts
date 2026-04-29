@@ -103,6 +103,40 @@ export function getPreviousPayrollPeriod(date: Date = new Date()): { start: Date
 }
 
 /**
+ * Gets the payroll period immediately after the period containing the provided date.
+ */
+export function getNextPayrollPeriod(date: Date = new Date()): { start: Date; end: Date } {
+  const current = getPayrollPeriod(date);
+  const nextDate = new Date(current.end);
+  nextDate.setDate(nextDate.getDate() + 1);
+  return getPayrollPeriod(nextDate);
+}
+
+/**
+ * Returns a list of payroll periods relative to a center date.
+ * `offsets` are integer step counts where 0 = the period containing centerDate,
+ * -1 = previous period, +1 = next period, etc.
+ */
+export function listPayrollPeriods(
+  centerDate: Date = new Date(),
+  offsets: number[] = [-1, 0, 1, 2],
+): Array<{ start: Date; end: Date; offset: number }> {
+  return offsets.map((offset) => {
+    let period = getPayrollPeriod(centerDate);
+    if (offset < 0) {
+      for (let i = 0; i < -offset; i++) {
+        period = getPreviousPayrollPeriod(period.start);
+      }
+    } else if (offset > 0) {
+      for (let i = 0; i < offset; i++) {
+        period = getNextPayrollPeriod(period.end);
+      }
+    }
+    return { ...period, offset };
+  });
+}
+
+/**
  * Gets ISO week number for a date (Monday-based).
  */
 export function getWeekNumber(date: Date): number {

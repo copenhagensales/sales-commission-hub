@@ -20,6 +20,7 @@ interface CancellationImport {
   rows_processed: number | null;
   rows_matched: number | null;
   error_message: string | null;
+  default_deduction_date: string | null;
   uploaded_by: {
     first_name: string | null;
     last_name: string | null;
@@ -49,6 +50,7 @@ export function CancellationHistoryTable({ clientId }: CancellationHistoryTableP
           rows_processed,
           rows_matched,
           error_message,
+          default_deduction_date,
           uploaded_by:employee_master_data!cancellation_imports_uploaded_by_fkey(first_name, last_name)
         `)
         .eq("client_id", clientId)
@@ -184,6 +186,7 @@ export function CancellationHistoryTable({ clientId }: CancellationHistoryTableP
                   <TableHead>Uploadet af</TableHead>
                   <TableHead>Rækker</TableHead>
                   <TableHead>Matchede</TableHead>
+                  <TableHead>Trækkes</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-[80px]">Handling</TableHead>
                 </TableRow>
@@ -209,6 +212,15 @@ export function CancellationHistoryTable({ clientId }: CancellationHistoryTableP
                     </TableCell>
                     <TableCell>{imp.rows_processed ?? "-"}</TableCell>
                     <TableCell>{imp.rows_matched ?? "-"}</TableCell>
+                    <TableCell>
+                      {imp.default_deduction_date ? (
+                        <span className="text-xs">
+                          {format(new Date(imp.default_deduction_date + "T00:00:00"), "d. MMM yyyy", { locale: da })}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">–</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {getStatusBadge(imp.status)}
                       {imp.error_message && (

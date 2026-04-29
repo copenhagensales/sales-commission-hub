@@ -31,7 +31,13 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
-import { Upload, FileSpreadsheet, Check, X, Loader2, AlertCircle, Save, Settings, ArrowLeft, ArrowRight, Ban, ShoppingCart, Pencil, Plus, Trash2, Layers } from "lucide-react";
+import { Upload, FileSpreadsheet, Check, X, Loader2, AlertCircle, Save, Settings, ArrowLeft, ArrowRight, Ban, ShoppingCart, Pencil, Plus, Trash2, Layers, CalendarIcon } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format as formatDate } from "date-fns";
+import { da } from "date-fns/locale";
+import { cn } from "@/lib/utils";
+import { getPayrollPeriod, listPayrollPeriods } from "@/lib/calculations/dates";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -591,6 +597,40 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
   const autoMatchPending = useRef(false);
   const [unmatchedSellerRows, setUnmatchedSellerRows] = useState<UnmatchedSellerRow[]>([]);
   const [sellerDropdownSelections, setSellerDropdownSelections] = useState<Record<string, string>>({});
+
+  // Lønperiode for trækkedato — gælder kun rækker fra DENNE upload
+  const [deductionDate, setDeductionDate] = useState<Date>(() => getPayrollPeriod(new Date()).end);
+  const [deductionMode, setDeductionMode] = useState<"period" | "custom">("period");
+  const [deductionCustomOpen, setDeductionCustomOpen] = useState(false);
+
+  // Build 4 candidate payroll periods (forrige, indeværende, næste, derefter)
+  const payrollPeriodOptions = useMemo(() => {
+    const periods = listPayrollPeriods(new Date(), [-1, 0, 1, 2]);
+    const labels: Record<number, string> = {
+      [-1]: "Forrige lønperiode",
+      0: "Indeværende lønperiode",
+      1: "Næste lønperiode",
+      2: "Lønperioden derefter",
+    };
+    return periods.map((p) => ({
+      offset: p.offset,
+      start: p.start,
+      end: p.end,
+      label: labels[p.offset] ?? `Lønperiode ${p.offset >= 0 ? "+" : ""}${p.offset}`,
+      rangeText: `${formatDate(p.start, "d. MMM", { locale: da })} – ${formatDate(p.end, "d. MMM yyyy", { locale: da })}`,
+      // Store as YYYY-MM-DD key for select value
+      key: formatDate(p.end, "yyyy-MM-dd"),
+    }));
+  }, []);
+
+  const selectedPeriodKey = useMemo(
+    () => formatDate(deductionDate, "yyyy-MM-dd"),
+    [deductionDate],
+  );
+  const matchedPeriodOption = payrollPeriodOptions.find((p) => p.key === selectedPeriodKey);
+  const activePayrollPeriod = matchedPeriodOption
+    ? { start: matchedPeriodOption.start, end: matchedPeriodOption.end }
+    : getPayrollPeriod(deductionDate);
 
   // Check for active import blocking new uploads (includes orphan imports with NULL client_id)
   const { data: activeImport } = useQuery({
@@ -2293,6 +2333,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             config_id: configId,
             client_id: selectedClientId || null,
             unmatched_rows: unmatchedRows.length > 0 ? unmatchedRows : null,
+            default_deduction_date: formatDate(deductionDate, "yyyy-MM-dd"),
           } as any)
           .select("id")
           .single();
@@ -2351,6 +2392,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           opp_group: sale.oppNumber || null,
           client_id: selectedClientId || null,
           target_product_name: sale.targetProductName || null,
+          deduction_date: formatDate(deductionDate, "yyyy-MM-dd"),
         };
       });
 
@@ -3172,6 +3214,83 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
                     ))}
                   </TableBody>
                 </Table>
+              </div>
+            )}
+
+            {/* Lønperiode-vælger — gælder kun rækker fra DENNE upload */}
+            {mergedMatchedSales.length > 0 && (
+              <div className="rounded-md border bg-muted/30 p-4 space-y-3">
+                <div className="flex items-start gap-2">
+                  <CalendarIcon className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                  <div className="flex-1">
+                    <Label className="text-sm font-medium">Trækkes på lønperiode</Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Vælg hvilken lønperiode alle {mergedMatchedSales.length} rækker fra denne upload skal trækkes i.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Select
+                    value={deductionMode === "custom" ? "__custom__" : selectedPeriodKey}
+                    onValueChange={(val) => {
+                      if (val === "__custom__") {
+                        setDeductionMode("custom");
+                        setDeductionCustomOpen(true);
+                        return;
+                      }
+                      setDeductionMode("period");
+                      const opt = payrollPeriodOptions.find((p) => p.key === val);
+                      if (opt) setDeductionDate(opt.end);
+                    }}
+                  >
+                    <SelectTrigger className="sm:w-[340px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {payrollPeriodOptions.map((opt) => (
+                        <SelectItem key={opt.key} value={opt.key}>
+                          {opt.label} ({opt.rangeText})
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="__custom__">Vælg specifik dato…</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {deductionMode === "custom" && (
+                    <Popover open={deductionCustomOpen} onOpenChange={setDeductionCustomOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn("justify-start text-left font-normal sm:w-[220px]")}
+                        >
+                          <CalendarIcon className="h-4 w-4 mr-2" />
+                          {formatDate(deductionDate, "d. MMM yyyy", { locale: da })}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={deductionDate}
+                          onSelect={(d) => {
+                            if (d) {
+                              setDeductionDate(d);
+                              setDeductionCustomOpen(false);
+                            }
+                          }}
+                          initialFocus
+                          className={cn("p-3 pointer-events-auto")}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                </div>
+
+                <Badge variant="secondary" className="text-xs">
+                  Alle {mergedMatchedSales.length} rækker fra denne upload trækkes{" "}
+                  {formatDate(deductionDate, "d. MMM yyyy", { locale: da })}
+                  {" "}(lønperiode {formatDate(activePayrollPeriod.start, "d. MMM", { locale: da })} – {formatDate(activePayrollPeriod.end, "d. MMM yyyy", { locale: da })})
+                </Badge>
               </div>
             )}
 
