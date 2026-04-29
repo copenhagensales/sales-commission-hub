@@ -2392,6 +2392,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
           opp_group: sale.oppNumber || null,
           client_id: selectedClientId || null,
           target_product_name: sale.targetProductName || null,
+          deduction_date: formatDate(deductionDate, "yyyy-MM-dd"),
         };
       });
 
