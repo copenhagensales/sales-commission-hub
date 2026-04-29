@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { LocateSaleDialog } from "./LocateSaleDialog";
 import { CLIENT_IDS } from "@/utils/clientIds";
+import { buildEmployeeEmailIndex } from "./utils/buildEmployeeEmailIndex";
 
 interface UnmatchedRow {
   [key: string]: unknown;
@@ -127,13 +128,46 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name, work_email, is_active")
+        .select("id, first_name, last_name, work_email, private_email, is_active")
         .order("is_active", { ascending: false })
         .order("first_name");
       if (error) throw error;
       return data || [];
     },
   });
+
+  // Multi-email index (work + private + dialer-agent emails) — Stork 1.x stillads.
+  // Se utils/buildEmployeeEmailIndex.ts.
+  const { data: employeeAgentMappings = [] } = useQuery({
+    queryKey: ["employee-agent-mappings-all"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_agent_mapping")
+        .select("employee_id, agent_id");
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const { data: agentsForEmailIndex = [] } = useQuery({
+    queryKey: ["agents-for-email-index"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("agents")
+        .select("id, email");
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const employeeIdToEmails = useMemo(
+    () => buildEmployeeEmailIndex({
+      employees,
+      mappings: employeeAgentMappings,
+      agents: agentsForEmailIndex,
+    }),
+    [employees, employeeAgentMappings, agentsForEmailIndex],
+  );
 
   // Fetch existing seller mappings
   const { data: existingMappings = [] } = useQuery({
@@ -203,11 +237,11 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
           );
       }
 
-      // 2. Get employee work_email and name
+      // 2. Get employee name + multi-email set (work + private + dialer-agents)
       const emp = employees.find(e => e.id === employeeId);
-      const workEmail = emp?.work_email;
+      const knownEmails = Array.from(employeeIdToEmails.get(employeeId) ?? []);
       const empFullName = emp ? `${emp.first_name} ${emp.last_name}`.trim().toLowerCase() : "";
-      if (!workEmail && !empFullName) return { matched: 0 };
+      if (knownEmails.length === 0 && !empFullName) return { matched: 0 };
 
       // 3. Find date column
       const dateCol = uploadConfig?.date_column;
@@ -219,11 +253,11 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
 
       let sales: { id: string }[] | null = null;
 
-      if (workEmail) {
+      if (knownEmails.length > 0) {
         const { data } = await supabase
           .from("sales")
           .select("id")
-          .eq("agent_email", workEmail.toLowerCase())
+          .in("agent_email", knownEmails)
           .gte("sale_datetime", `${dateValue}T00:00:00`)
           .lte("sale_datetime", `${dateValue}T23:59:59`)
           .in("client_campaign_id", campaignIds)
@@ -558,12 +592,10 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
 
         // Resolve employee from seller mappings or employee list
         let employeeId = mappingsByName.get(excelSeller.toLowerCase());
-        let workEmail: string | undefined;
         let empFullName = "";
 
         if (employeeId) {
           const emp = employees.find(e => e.id === employeeId);
-          workEmail = emp?.work_email;
           empFullName = emp ? `${emp.first_name} ${emp.last_name}`.trim().toLowerCase() : "";
         } else {
           // Try full name match against employees
@@ -573,34 +605,37 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
           });
           if (emp) {
             employeeId = emp.id;
-            workEmail = emp.work_email;
             empFullName = `${emp.first_name} ${emp.last_name}`.trim().toLowerCase();
           } else {
             // Try first name match
             const emp2 = employees.find(e => e.first_name?.toLowerCase() === excelSeller.toLowerCase());
             if (emp2) {
               employeeId = emp2.id;
-              workEmail = emp2.work_email;
               empFullName = `${emp2.first_name} ${emp2.last_name}`.trim().toLowerCase();
             }
           }
         }
 
-        if (!workEmail && !empFullName) {
+        // Multi-email lookup (work + private + dialer-agent emails)
+        const knownEmails = employeeId
+          ? Array.from(employeeIdToEmails.get(employeeId) ?? [])
+          : [];
+
+        if (knownEmails.length === 0 && !empFullName) {
           console.log("[bulk-rematch] No employee found for seller:", excelSeller);
           continue;
         }
 
-        console.log("[bulk-rematch] Resolved seller:", excelSeller, "→ email:", workEmail, "name:", empFullName, "date:", dateValue);
+        console.log("[bulk-rematch] Resolved seller:", excelSeller, "→ emails:", knownEmails, "name:", empFullName, "date:", dateValue);
 
         // Search for sales
         let sales: { id: string }[] | null = null;
 
-        if (workEmail) {
+        if (knownEmails.length > 0) {
           const { data } = await supabase
             .from("sales")
             .select("id")
-            .eq("agent_email", workEmail.toLowerCase())
+            .in("agent_email", knownEmails)
             .gte("sale_datetime", `${dateValue}T00:00:00`)
             .lte("sale_datetime", `${dateValue}T23:59:59`)
             .in("client_campaign_id", campaignIds)
@@ -621,7 +656,7 @@ export function MatchErrorsSubTab({ clientId }: MatchErrorsSubTabProps) {
         }
 
         if (!sales || sales.length === 0) {
-          console.log("[bulk-rematch] No sales found for:", { excelSeller, workEmail, empFullName, dateValue });
+          console.log("[bulk-rematch] No sales found for:", { excelSeller, knownEmails, empFullName, dateValue });
           continue;
         }
 

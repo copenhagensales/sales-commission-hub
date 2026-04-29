@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { CLIENT_IDS } from "@/utils/clientIds";
 import { extractOpp } from "./utils/extractOpp";
+import { buildEmployeeEmailIndex } from "./utils/buildEmployeeEmailIndex";
 import { groupConditionsByProduct, findMatchingProductId, evaluateConditions } from "@/utils/productConditionMatcher";
 import { formatCurrency } from "@/lib/calculations/formatting";
 import { useAgentNameResolver } from "@/hooks/useAgentNameResolver";
@@ -676,9 +677,33 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name, work_email, is_active")
+        .select("id, first_name, last_name, work_email, private_email, is_active")
         .order("is_active", { ascending: false })
         .order("first_name");
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Multi-email index: employee_id → Set<all known emails> (work + private + dialer-agents).
+  // See utils/buildEmployeeEmailIndex.ts. Stillads til Stork 2.0.
+  const { data: employeeAgentMappings = [] } = useQuery({
+    queryKey: ["employee-agent-mappings-all"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_agent_mapping")
+        .select("employee_id, agent_id");
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const { data: agentsForEmailIndex = [] } = useQuery({
+    queryKey: ["agents-for-email-index"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("agents")
+        .select("id, email");
       if (error) throw error;
       return data || [];
     },
@@ -1740,10 +1765,13 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             sellerToEmployeeId.set(sm.excel_seller_name.toLowerCase(), sm.employee_id);
           }
 
-          const employeeIdToEmail = new Map<string, string>();
-          for (const emp of allEmployees) {
-            if (emp.work_email) employeeIdToEmail.set(emp.id, emp.work_email.toLowerCase());
-          }
+          // Multi-email index: dækker work_email, private_email og alle dialer-agent-emails
+          // for hver medarbejder. Erstatter den smalle work_email-only Map.
+          const employeeIdToEmails = buildEmployeeEmailIndex({
+            employees: allEmployees,
+            mappings: employeeAgentMappings,
+            agents: agentsForEmailIndex,
+          });
 
           const firstNameToEmployeeId = new Map<string, string>();
           for (const emp of allEmployees) {
@@ -1876,8 +1904,8 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               return;
             }
 
-            const agentEmail = employeeIdToEmail.get(employeeId);
-            if (!agentEmail) return;
+            const employeeEmails = employeeIdToEmails.get(employeeId);
+            if (!employeeEmails || employeeEmails.size === 0) return;
 
             const excelDateObj = parseFlexibleDate(excelDate);
             const prodCol3 = activeConfig?.product_columns?.[0];
@@ -1903,7 +1931,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               for (const sale of candidateSales) {
                 if (existingIds.has(sale.id)) continue;
                 const saleAgentEmail = (sale.agent_email || "").toLowerCase();
-                if (saleAgentEmail !== agentEmail) continue;
+                if (!employeeEmails.has(saleAgentEmail)) continue;
                 const items = saleItemsMap.get(sale.id) || [];
                 const hasProduct = items.some(item => {
                   const title = item.adversus_product_title?.toLowerCase() || "";
@@ -1986,7 +2014,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
             } else {
               for (const sale of candidateSales) {
                 const saleAgentEmail = (sale.agent_email || "").toLowerCase();
-                if (saleAgentEmail !== agentEmail) continue;
+                if (!employeeEmails.has(saleAgentEmail)) continue;
 
                 const saleDateObj = new Date(sale.sale_datetime);
                 if (
@@ -2038,7 +2066,7 @@ export function UploadCancellationsTab({ clientId: selectedClientId }: UploadCan
               const dateCandidates = candidateSales.filter(sale => {
                 if (existingIds.has(sale.id)) return false;
                 const saleAgentEmail = (sale.agent_email || "").toLowerCase();
-                if (saleAgentEmail !== agentEmail) return false;
+                if (!employeeEmails.has(saleAgentEmail)) return false;
                 const saleDateObj = new Date(sale.sale_datetime);
                 return excelDateObj.getFullYear() === saleDateObj.getFullYear()
                     && excelDateObj.getMonth() === saleDateObj.getMonth()
