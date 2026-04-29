@@ -20,6 +20,7 @@ interface CancellationImport {
   rows_processed: number | null;
   rows_matched: number | null;
   error_message: string | null;
+  default_deduction_date: string | null;
   uploaded_by: {
     first_name: string | null;
     last_name: string | null;
