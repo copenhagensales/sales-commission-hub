@@ -14,6 +14,7 @@ import { da } from "date-fns/locale";
 import { Send, Eye, AlertTriangle, Lock } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
+import { getPublicUrl } from "@/lib/getPublicUrl";
 
 type ContractType = "employment" | "amendment" | "nda" | "company_car" | "termination" | "team_leader" | "assistant_team_leader" | "other";
 
@@ -479,7 +480,7 @@ export function SendContractDialog({
               employeeEmail: employee.private_email,
               contractTitle: customTitle || template.name,
               contractId: contract.id,
-              appUrl: window.location.origin,
+              appUrl: getPublicUrl(),
             },
           });
           

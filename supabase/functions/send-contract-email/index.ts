@@ -101,7 +101,10 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    const baseUrl = appUrl || "https://jwlimmeijpfmaksvmuru.lovable.app";
+    // Always link to production employee portal — ignore appUrl if it's a Lovable preview domain
+    const isLovableDomain = (url?: string) =>
+      !!url && (url.includes(".lovableproject.com") || url.includes(".lovable.app"));
+    const baseUrl = appUrl && !isLovableDomain(appUrl) ? appUrl : "https://stork.copenhagensales.dk";
     const loginUrl = `${baseUrl}/auth`;
 
     const htmlBody = `
