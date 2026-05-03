@@ -648,8 +648,21 @@ export default function CommissionLeague() {
             </>
           )}
 
-          {/* Active Season UI */}
-          {isActivePhase && isEnrolled && (
+          {/* Completed season banner */}
+          {isCompletedPhase && (
+            <Card className="bg-gradient-to-r from-amber-500/10 to-yellow-600/10 border-amber-500/40">
+              <CardContent className="py-4 flex items-center gap-3">
+                <Trophy className="h-6 w-6 text-yellow-400" />
+                <div>
+                  <p className="font-bold">Sæson {season.season_number} afsluttet</p>
+                  <p className="text-sm text-muted-foreground">Endeligt resultat vises herunder.</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Active or Completed Season UI */}
+          {(isActivePhase || isCompletedPhase) && (isEnrolled || isCompletedPhase) && (
             <>
               {/* My status card for active season */}
               {!isFan && mySeasonStanding && (
