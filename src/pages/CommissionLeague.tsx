@@ -434,8 +434,8 @@ export default function CommissionLeague() {
             roundProvisionMap={roundProvisionMap || {}}
           />
 
-          {/* Not enrolled - show landing */}
-          {!isEnrolled && (
+          {/* Not enrolled - show landing (skjules når sæson er afsluttet) */}
+          {!isEnrolled && !isCompletedPhase && (
             <Card className="bg-gradient-to-br from-primary/20 via-slate-800 to-slate-900 border-primary/30 overflow-hidden">
               <CardContent className="py-8">
                 <div className="grid md:grid-cols-2 gap-8 items-center">
