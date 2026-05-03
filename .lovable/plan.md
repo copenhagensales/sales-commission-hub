@@ -1,28 +1,32 @@
-## Diagnose
+## Opdater sale_datetime for 9 TDC Erhverv OPP-numre
 
-Sæson 1 er sat til `status = 'completed'` i DB, men runde 6 kører stadig (slut 4. maj 2026, dvs. i morgen). Nogen har manuelt trykket "afslut sæson" via admin-knappen.
+Kun dato ændres — klokkeslæt bevares. Ingen sletninger. Ingen ændringer på `sale_items`/commission ud over dato-flytningen.
 
-Derudover skjuler `CommissionLeague.tsx` HELE liga-siden når status ≠ `active`/`qualification` — også færdige resultater. Det er en bug: en afsluttet sæson skal stadig kunne ses i historik-form.
+### Migration
 
-## To ændringer
+```sql
+-- OPP-1082198 → 16/4 (1 record allerede 16/4, 2 flyttes)
+UPDATE sales SET sale_datetime = make_timestamptz(2026, 4, 16,
+  EXTRACT(HOUR FROM sale_datetime)::int,
+  EXTRACT(MINUTE FROM sale_datetime)::int,
+  EXTRACT(SECOND FROM sale_datetime), 'UTC')
+WHERE id IN ('363585c4-e8d8-4715-b29d-f7c6d8aa1a4e','122ab003-b8ab-4cd1-a41c-8a16ad932ba5');
 
-### 1. Genåbn den nuværende sæson (data-fix)
-- Sæt `league_seasons.status = 'active'` for sæson 1 (id `1413d941-...`) via migration.
-- Runde 6 er allerede `active` med end_date 4. maj — så cron'en `league-process-round` afslutter den automatisk i morgen.
+-- OPP-1081464 → 17/4 (3 records)
+UPDATE sales SET sale_datetime = make_timestamptz(2026, 4, 17, ...)
+WHERE id IN ('1f453ae4-...','e24b5370-...','7cf91ef8-...');
 
-### 2. Vis færdige sæsoner (kode-fix) — GUL ZONE
-**`src/hooks/useLeagueData.ts`** (`useActiveSeason`):
-- Udvid query til at inkludere `completed` som fallback: hvis ingen `qualification`/`active` findes, returnér seneste `completed` sæson.
+-- OPP-1073821 → 17/4 (2 records)
+-- OPP-1070694 → 20/4 (1)
+-- OPP-1082657 → 20/4 (1)
+-- OPP-1082880 → 21/4 (1)
+-- OPP-1082825 → 21/4 (2)
+-- OPP-1083038 → 22/4 (1)
+-- OPP-1083197 → 23/4 (1)
+```
 
-**`src/pages/CommissionLeague.tsx`**:
-- Fjern `season?.status === "active"` gating på data-hooks (linje 109-112) — hent også standings/runder for `completed` sæsoner.
-- Tilføj `isCompletedPhase = season.status === "completed"` flag.
-- Vis slut-resultat med banner "Sæson X afsluttet — endeligt resultat" øverst når completed.
-- Skjul tilmelding/unenroll-knapper og sticky-bar live-data når completed; vis i stedet final placering.
-- "Ingen aktiv sæson"-kortet vises kun hvis der slet ingen sæsoner findes.
+I alt 13 rækker opdateres.
 
-## Zone
-Gul zone (liga-modul, ikke løn/pricing). Ingen DB-skema-ændringer udover én UPDATE på status-felt.
+### Rød zone
 
-## Åben beslutning
-Skal admin-knappen "afslut sæson" beskyttes med en bekræftelses-dialog så det ikke sker ved et uheld igen? (Ja/Nej før jeg tilføjer det.)
+`sales` tabellen påvirker lønperiode-tilknytning (15→14-cyklus) og kan trigge pricing-rematch. Klokkeslæt bevares så time-baseret logik er uændret.
