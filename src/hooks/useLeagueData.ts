@@ -60,22 +60,33 @@ export interface QualificationStanding {
   };
 }
 
-// Get active season (qualification or active)
+// Get active season (qualification or active), or fall back to most recent completed season
 export function useActiveSeason() {
   return useQuery({
     queryKey: ["league-active-season"],
     staleTime: 300000, // 5 minutter - sæsoner ændrer sig sjældent
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Prefer live season
+      const { data: live, error: liveErr } = await supabase
         .from("league_seasons")
         .select("*")
         .in("status", ["qualification", "active"])
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
+      if (liveErr) throw liveErr;
+      if (live) return live as LeagueSeason;
 
-      if (error) throw error;
-      return data as LeagueSeason | null;
+      // Fallback: vis seneste afsluttede sæson som historik
+      const { data: completed, error: compErr } = await supabase
+        .from("league_seasons")
+        .select("*")
+        .eq("status", "completed")
+        .order("season_number", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (compErr) throw compErr;
+      return (completed as LeagueSeason | null) ?? null;
     },
   });
 }

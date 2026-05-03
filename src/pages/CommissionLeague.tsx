@@ -105,11 +105,13 @@ export default function CommissionLeague() {
   const unenrollAndFanMutation = useUnenrollAndBecomeFan();
   const fanMutation = useEnrollAsFan();
 
-  // Active season hooks
-  const { data: currentRound } = useCurrentRound(season?.status === "active" ? season?.id : undefined);
-  const { data: seasonStandings, isLoading: seasonStandingsLoading } = useSeasonStandings(season?.status === "active" ? season?.id : undefined);
-  const { data: roundHistory } = useRoundHistory(season?.status === "active" ? season?.id : undefined);
-  const { data: mySeasonStanding } = useMySeasonStanding(season?.status === "active" ? season?.id : undefined);
+  // Active or completed season hooks (vis også historik for afsluttede sæsoner)
+  const seasonHistoryEligible = season?.status === "active" || season?.status === "completed";
+  const seasonIdForHistory = seasonHistoryEligible ? season?.id : undefined;
+  const { data: currentRound } = useCurrentRound(seasonIdForHistory);
+  const { data: seasonStandings, isLoading: seasonStandingsLoading } = useSeasonStandings(seasonIdForHistory);
+  const { data: roundHistory } = useRoundHistory(seasonIdForHistory);
+  const { data: mySeasonStanding } = useMySeasonStanding(seasonIdForHistory);
   // Default to last round (active round) index; update when roundHistory loads
   const activeRoundIndex = useMemo(() => {
     if (!roundHistory || roundHistory.length === 0) return 0;
@@ -269,6 +271,7 @@ export default function CommissionLeague() {
 
   const isQualificationPhase = season.status === "qualification";
   const isActivePhase = season.status === "active";
+  const isCompletedPhase = season.status === "completed";
 
   // Compute sticky bar data
   const stickyData = (() => {
@@ -431,8 +434,8 @@ export default function CommissionLeague() {
             roundProvisionMap={roundProvisionMap || {}}
           />
 
-          {/* Not enrolled - show landing */}
-          {!isEnrolled && (
+          {/* Not enrolled - show landing (skjules når sæson er afsluttet) */}
+          {!isEnrolled && !isCompletedPhase && (
             <Card className="bg-gradient-to-br from-primary/20 via-slate-800 to-slate-900 border-primary/30 overflow-hidden">
               <CardContent className="py-8">
                 <div className="grid md:grid-cols-2 gap-8 items-center">
@@ -645,8 +648,21 @@ export default function CommissionLeague() {
             </>
           )}
 
-          {/* Active Season UI */}
-          {isActivePhase && isEnrolled && (
+          {/* Completed season banner */}
+          {isCompletedPhase && (
+            <Card className="bg-gradient-to-r from-amber-500/10 to-yellow-600/10 border-amber-500/40">
+              <CardContent className="py-4 flex items-center gap-3">
+                <Trophy className="h-6 w-6 text-yellow-400" />
+                <div>
+                  <p className="font-bold">Sæson {season.season_number} afsluttet</p>
+                  <p className="text-sm text-muted-foreground">Endeligt resultat vises herunder.</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Active or Completed Season UI */}
+          {(isActivePhase || isCompletedPhase) && (isEnrolled || isCompletedPhase) && (
             <>
               {/* My status card for active season */}
               {!isFan && mySeasonStanding && (
