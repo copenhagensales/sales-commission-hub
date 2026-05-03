@@ -271,6 +271,7 @@ export default function CommissionLeague() {
 
   const isQualificationPhase = season.status === "qualification";
   const isActivePhase = season.status === "active";
+  const isCompletedPhase = season.status === "completed";
 
   // Compute sticky bar data
   const stickyData = (() => {
