@@ -105,11 +105,13 @@ export default function CommissionLeague() {
   const unenrollAndFanMutation = useUnenrollAndBecomeFan();
   const fanMutation = useEnrollAsFan();
 
-  // Active season hooks
-  const { data: currentRound } = useCurrentRound(season?.status === "active" ? season?.id : undefined);
-  const { data: seasonStandings, isLoading: seasonStandingsLoading } = useSeasonStandings(season?.status === "active" ? season?.id : undefined);
-  const { data: roundHistory } = useRoundHistory(season?.status === "active" ? season?.id : undefined);
-  const { data: mySeasonStanding } = useMySeasonStanding(season?.status === "active" ? season?.id : undefined);
+  // Active or completed season hooks (vis også historik for afsluttede sæsoner)
+  const seasonHistoryEligible = season?.status === "active" || season?.status === "completed";
+  const seasonIdForHistory = seasonHistoryEligible ? season?.id : undefined;
+  const { data: currentRound } = useCurrentRound(seasonIdForHistory);
+  const { data: seasonStandings, isLoading: seasonStandingsLoading } = useSeasonStandings(seasonIdForHistory);
+  const { data: roundHistory } = useRoundHistory(seasonIdForHistory);
+  const { data: mySeasonStanding } = useMySeasonStanding(seasonIdForHistory);
   // Default to last round (active round) index; update when roundHistory loads
   const activeRoundIndex = useMemo(() => {
     if (!roundHistory || roundHistory.length === 0) return 0;
