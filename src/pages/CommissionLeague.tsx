@@ -525,7 +525,7 @@ export default function CommissionLeague() {
           />
 
           {/* Not enrolled - show landing (skjules når sæson er afsluttet) */}
-          {!isEnrolled && !isCompletedPhase && (
+          {!isEnrolled && !isCompletedPhase && !isViewingHistorical && (
             <Card className="bg-gradient-to-br from-primary/20 via-slate-800 to-slate-900 border-primary/30 overflow-hidden">
               <CardContent className="py-8">
                 <div className="grid md:grid-cols-2 gap-8 items-center">
