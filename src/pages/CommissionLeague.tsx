@@ -379,7 +379,14 @@ export default function CommissionLeague() {
 
                   {/* === LEFT COLUMN === */}
                   <div className="order-2 md:order-1 flex flex-col gap-1.5">
-                    {isFinalRound ? (
+                    {isCompletedPhase ? (
+                      <div className="inline-flex items-center gap-2 self-center md:self-start rounded-full bg-yellow-500/15 px-3 py-1 ring-1 ring-yellow-500/40">
+                        <Trophy className="h-3.5 w-3.5 text-yellow-400" />
+                        <span className="text-xs font-bold uppercase tracking-wider text-yellow-300">
+                          Sæson afsluttet
+                        </span>
+                      </div>
+                    ) : isFinalRound ? (
                       <div className="inline-flex items-center gap-2 self-center md:self-start rounded-full bg-gradient-to-r from-amber-500/20 to-red-500/20 px-3 py-1 ring-1 ring-amber-400/50">
                         <span className="relative flex h-2 w-2">
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
