@@ -378,7 +378,7 @@ export default function CommissionLeague() {
 
   // Confetti when entering top 3
   useEffect(() => {
-    if (!currentEmployeeId || !stickyData) return;
+    if (!currentEmployeeId || !stickyData || isViewingHistorical) return;
     const currentRankVal = stickyData.rank;
     if (currentRankVal <= 3) {
       const key = `confetti-top3-${currentEmployeeId}`;
@@ -387,12 +387,12 @@ export default function CommissionLeague() {
         confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
       }
     }
-  }, [stickyData?.rank, currentEmployeeId]);
+  }, [stickyData?.rank, currentEmployeeId, isViewingHistorical]);
 
   return (
     <MainLayout>
-      {/* Sticky status bar */}
-      {stickyData && isEnrolled && (
+      {/* Sticky status bar - kun for live sæson */}
+      {stickyData && isEnrolled && !isViewingHistorical && (
         <LeagueStickyBar
           rank={stickyData.rank}
           division={stickyData.division}
