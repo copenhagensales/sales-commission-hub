@@ -14,6 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
 import {
   useActiveSeason,
+  useViewableSeasons,
   useMyEnrollment,
   useQualificationStandings,
   useMyQualificationStanding,
@@ -63,6 +64,68 @@ import { getRandomQuote, getPerformanceStatus } from "@/lib/gamification-quotes"
 import { LeagueMotivationBar } from "@/components/league/LeagueMotivationBar";
 import { usePersonalWeeklyStats } from "@/hooks/usePersonalWeeklyStats";
 
+type ViewableSeason = {
+  id: string;
+  season_number: number;
+  status: string;
+  start_date: string | null;
+  end_date: string | null;
+};
+
+function SeasonSwitcher({
+  seasons,
+  currentSeasonId,
+  onChange,
+}: {
+  seasons: ViewableSeason[];
+  currentSeasonId: string;
+  onChange: (id: string) => void;
+}) {
+  const sorted = [...seasons].sort((a, b) => a.season_number - b.season_number);
+  const idx = sorted.findIndex(s => s.id === currentSeasonId);
+  const prev = idx > 0 ? sorted[idx - 1] : null;
+  const next = idx >= 0 && idx < sorted.length - 1 ? sorted[idx + 1] : null;
+
+  const labelFor = (s: ViewableSeason) => {
+    const isLive = s.status === "qualification" || s.status === "active";
+    return `Sæson ${s.season_number}${isLive ? " (live)" : ""}`;
+  };
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-7 w-7"
+        disabled={!prev}
+        onClick={() => prev && onChange(prev.id)}
+        aria-label="Forrige sæson"
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
+      <select
+        value={currentSeasonId}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-7 rounded-md border border-slate-700 bg-slate-800/60 px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+      >
+        {[...sorted].reverse().map(s => (
+          <option key={s.id} value={s.id}>{labelFor(s)}</option>
+        ))}
+      </select>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-7 w-7"
+        disabled={!next}
+        onClick={() => next && onChange(next.id)}
+        aria-label="Næste sæson"
+      >
+        <ChevronRight className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
+
 export default function CommissionLeague() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -95,7 +158,12 @@ export default function CommissionLeague() {
     fetchEmployeeId();
   }, []);
 
-  const { data: season, isLoading: seasonLoading } = useActiveSeason();
+  const [viewedSeasonId, setViewedSeasonId] = useState<string | undefined>(undefined);
+  const { data: viewableSeasons } = useViewableSeasons();
+  const { data: season, isLoading: seasonLoading } = useActiveSeason(viewedSeasonId);
+  // Detect if user is browsing a historical (non-live) season
+  const liveSeasonExists = (viewableSeasons || []).some(s => s.status === "qualification" || s.status === "active");
+  const isViewingHistorical = !!viewedSeasonId && season?.status === "completed";
   const { data: enrollment, isLoading: enrollmentLoading } = useMyEnrollment(season?.id);
   const { data: standings, isLoading: standingsLoading, refetch: refetchStandings } = useQualificationStandings(season?.id);
   const { data: myStanding } = useMyQualificationStanding(season?.id);
@@ -310,7 +378,7 @@ export default function CommissionLeague() {
 
   // Confetti when entering top 3
   useEffect(() => {
-    if (!currentEmployeeId || !stickyData) return;
+    if (!currentEmployeeId || !stickyData || isViewingHistorical) return;
     const currentRankVal = stickyData.rank;
     if (currentRankVal <= 3) {
       const key = `confetti-top3-${currentEmployeeId}`;
@@ -319,12 +387,12 @@ export default function CommissionLeague() {
         confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
       }
     }
-  }, [stickyData?.rank, currentEmployeeId]);
+  }, [stickyData?.rank, currentEmployeeId, isViewingHistorical]);
 
   return (
     <MainLayout>
-      {/* Sticky status bar */}
-      {stickyData && isEnrolled && (
+      {/* Sticky status bar - kun for live sæson */}
+      {stickyData && isEnrolled && !isViewingHistorical && (
         <LeagueStickyBar
           rank={stickyData.rank}
           division={stickyData.division}
@@ -390,6 +458,28 @@ export default function CommissionLeague() {
                       </h1>
                     </div>
                     <span className="text-xs text-muted-foreground/60">Formand: Oscar Belcher</span>
+
+                    {/* Sæson-vælger – bladr mellem sæsoner */}
+                    {viewableSeasons && viewableSeasons.length > 1 && (
+                      <SeasonSwitcher
+                        seasons={viewableSeasons}
+                        currentSeasonId={season.id}
+                        onChange={(id) => {
+                          // If user picks the live season, clear override so default logic kicks in
+                          const picked = viewableSeasons.find(s => s.id === id);
+                          const isLive = picked?.status === "qualification" || picked?.status === "active";
+                          setViewedSeasonId(isLive && liveSeasonExists ? undefined : id);
+                          setSelectedRoundIndex(null);
+                        }}
+                      />
+                    )}
+
+                    {isViewingHistorical && (
+                      <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-300">
+                        Historisk visning
+                      </Badge>
+                    )}
+
                     <LeagueRulesSheet compact />
                   </div>
 
@@ -414,7 +504,7 @@ export default function CommissionLeague() {
           )}
 
           {/* Motivation Coach Bar */}
-          {isEnrolled && !isFan && currentEmployeeId && (
+          {isEnrolled && !isFan && currentEmployeeId && !isViewingHistorical && (
             <LeagueMotivationBar
               employeeId={currentEmployeeId}
               myStanding={isActivePhase ? (mySeasonStanding ?? null) : (myStanding ?? null)}
@@ -435,7 +525,7 @@ export default function CommissionLeague() {
           />
 
           {/* Not enrolled - show landing (skjules når sæson er afsluttet) */}
-          {!isEnrolled && !isCompletedPhase && (
+          {!isEnrolled && !isCompletedPhase && !isViewingHistorical && (
             <Card className="bg-gradient-to-br from-primary/20 via-slate-800 to-slate-900 border-primary/30 overflow-hidden">
               <CardContent className="py-8">
                 <div className="grid md:grid-cols-2 gap-8 items-center">

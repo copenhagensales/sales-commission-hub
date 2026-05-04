@@ -181,7 +181,7 @@ export function SeasonManagerCard() {
           <p className="text-center py-8 text-muted-foreground">Ingen sæsoner oprettet endnu</p>
         ) : (
           <>
-            <p className="text-xs text-muted-foreground mb-2">Status opdateres automatisk baseret på datoerne</p>
+            <p className="text-xs text-muted-foreground mb-2">Status opdateres automatisk hvert 5. minut baseret på datoerne (kladde → kvalifikation → aktiv → afsluttet). Manuel ændring tilsidesætter.</p>
             <div className="rounded-md border overflow-x-auto">
               <Table>
               <TableHeader>
