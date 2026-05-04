@@ -116,6 +116,7 @@ function ReferralKpiSection() {
 
 export default function RecruitmentDashboard() {
   const [chartPeriod, setChartPeriod] = useState(30);
+  const [weeklyPeriod, setWeeklyPeriod] = useState(10);
 
   const { data: candidates = [] } = useQuery({
     queryKey: ["candidates"],
@@ -303,10 +304,10 @@ export default function RecruitmentDashboard() {
   }, [candidates, chartPeriod]);
 
   const weeklyChartData = useMemo(() => {
-    const endDate = startOfDay(new Date());
-    const startDate = subDays(endDate, chartPeriod);
+    const thisWeekStart = startOfISOWeek(new Date());
+    const startDate = subDays(thisWeekStart, (weeklyPeriod - 1) * 7);
     const weekStarts = eachWeekOfInterval(
-      { start: startDate, end: endDate },
+      { start: startDate, end: thisWeekStart },
       { weekStartsOn: 1 }
     );
 
@@ -328,7 +329,7 @@ export default function RecruitmentDashboard() {
         count,
       };
     });
-  }, [candidates, chartPeriod]);
+  }, [candidates, weeklyPeriod]);
 
   return (
     <MainLayout>
@@ -641,9 +642,19 @@ export default function RecruitmentDashboard() {
               <TrendingUp className="h-5 w-5" />
               Ansøgninger pr. uge
             </CardTitle>
-            <p className="text-xs text-muted-foreground">
-              Følger samme periode som grafen ovenfor
-            </p>
+            <div className="flex gap-1 overflow-x-auto pb-1 -mb-1">
+              {[5, 10, 25, 50].map((weeks) => (
+                <Button
+                  key={weeks}
+                  variant={weeklyPeriod === weeks ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setWeeklyPeriod(weeks)}
+                  className="text-xs px-2 sm:px-3 shrink-0"
+                >
+                  {weeks} uger
+                </Button>
+              ))}
+            </div>
           </div>
         </CardHeader>
         <CardContent>
