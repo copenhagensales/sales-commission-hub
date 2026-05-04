@@ -1,29 +1,105 @@
-## Tilføj ny graf: Ansøgninger pr. uge
+## Samlet plan — Liga: data-fix, sæson-vælger og Hall of Fame
 
-Under den eksisterende "Ansøgninger over tid"-graf på `/recruitment` tilføjes en ny graf der viser udviklingen aggregeret pr. ISO-uge.
+### 1. Backfill manglende rundedata for runde 6 (rød zone)
 
-### Hvad bygges
-- Nyt `Card` lige under den nuværende area chart med titel **"Ansøgninger pr. uge"**.
-- Bar chart (Recharts) med én søjle pr. uge.
-- X-akse label-format: `Uge 17` (med årstal i tooltip ved årsskifte).
-- Tooltip viser: `Uge X, YYYY` + antal + dato-interval (man–søn).
-- Samme periode-vælger (30d / 60d / 90d / 6m / 12m) — genbruger `chartPeriod`-state, så begge grafer følges ad.
+Runde 6 er markeret `completed` i DB, men har 0 standings (de andre runder har 69 hver). Edge funktionen `league-process-round` har enten fejlet midtvejs eller blev kaldt to gange.
 
-### Data
-- Genbruger samme rådata som den nuværende `chartData` (kandidater grupperet pr. dag).
-- Aggregeres på frontend pr. ISO-uge med `date-fns` (`startOfISOWeek`, `getISOWeek`, `getISOWeekYear`) — ingen DB-ændringer.
-- Tomme uger i perioden vises som 0 (kontinuerlig x-akse).
+**Fix:**
+- Sæt midlertidigt sæson-status = `active` og runde 6 status = `active`
+- Kald `league-process-round` med seasonId
+- Verificér 69 nye `league_round_standings`-rækker er oprettet og at `league_season_standings` ser rigtige ud
+- Sæt sæson- og runde-status tilbage til `completed`
+
+Kører som SQL + edge function-kald. Verificér før jeg er færdig.
+
+---
+
+### 2. Sæson-vælger på `/commission-league` (gul zone)
+
+I dag returnerer `useActiveSeason` kun ÉN sæson. Tilføj dropdown øverst i sæson-kortet.
+
+**Fil:** `src/pages/CommissionLeague.tsx` (+ minor wiring)
+
+- Brug eksisterende `useAllSeasons()`
+- Ny state `selectedSeasonId` (default = aktiv sæson, ellers seneste completed)
+- Erstat `season` med beregnet `displaySeason = allSeasons.find(s => s.id === selectedSeasonId) ?? activeSeason`
+- Dropdown i headeren af "Sæson X"-kortet: `Sæson 1 (afsluttet)`, `Sæson 2 (i gang)` osv. — sorteret nyeste først
+- Eksisterende historik-hooks (`useCurrentRound`, `useSeasonStandings`, `useRoundHistory`, `useMySeasonStanding`, `usePrizeLeaders`) peger nu på `displaySeason.id`
+- Når en historisk sæson vises: skjul tilmeldings-/qualification-CTA'er — det er kun arkiv
+
+---
+
+### 3. Hall of Fame — Afsluttet sæson-visning (gul zone)
+
+I dag ser en afsluttet sæson nærmest identisk ud med en aktiv: samme Top 3-kort, samme tre special-priser, samme banner. Det føles ikke som en afslutning. Oplæg:
+
+**Designkoncept: "Sæson X — Hall of Fame"**
+
+Når `season.status === "completed"` erstattes hele toppen af siden med en dedikeret hall-of-fame-visning. Ingen "afsluttes når sæsonen starter"-lås, ingen aktiv-runde-indikatorer.
+
+#### Sektion A — Helte-podium (fuld bredde, øverst)
+
+Stort podium-element, ikke tre side-om-side bokse. Inspireret af et faktisk pris-podium:
+
+```text
+                    ┌────────┐
+                    │  🥇    │
+                    │ Avatar │
+        ┌────────┐  │ Navn   │  ┌────────┐
+        │  🥈    │  │ X pt   │  │  🥉    │
+        │ Avatar │  │ Team   │  │ Avatar │
+        │ Navn   │  │        │  │ Navn   │
+        │ X pt   │  │        │  │ X pt   │
+        └────────┘  └────────┘  └────────┘
+           2.          1.          3.
+```
+
+- Vinderen i midten, højere end nr. 2 og 3
+- Avatar fra `useEmployeeAvatars` (allerede i projektet), faldback initialer
+- Guld/sølv/bronze gradient-baggrund pr. plads
+- Konfetti-animation eller subtil shimmer ved første visning (engang pr. session via sessionStorage-key per sæson)
+- Klik = åbn detalje-dialog med fuld division 1 standings (genbrug eksisterende dialog fra `PrizeShowcase`)
+- Trofæ-ikon med sæson-nummer: "S1 Mester"
+
+#### Sektion B — Special-priser (3 hyldede kort)
+
+Under podiet, tre større visnings-kort (ikke små chips som i dag):
+
+| Kort | Indhold |
+|---|---|
+| 🔥 **Bedste Runde** | Navn, runde + provision, lille sparkline der peaker |
+| ⭐ **Sæsonens Talent** | Navn, "rookie" badge, points |
+| 🚀 **Sæsonens Comeback** | Navn, "+N pladser", før/efter division |
+
+Hvert kort har medaljon-look (ikke flade chips). Klik åbner top-10-dialog som i dag.
+
+#### Sektion C — Sæson-resumé (ny, kompakt strip)
+
+En række key stats om hele sæsonen:
+- Antal spillere
+- Antal runder spillet
+- Total provision tjent (sum)
+- Antal op-/nedrykninger
+- Vinder af hver division (lille liste, kollapsbar)
+
+#### Sektion D — Eksisterende runde-historik bevares
+
+`Sæson 1`-kortet med Kval/R1–R6-chips og resultater bevares uændret nedenunder. Det er stadig vejen til at se rundedetaljer — bare flyttet ned så Hall of Fame får førstepladsen.
+
+---
 
 ### Tekniske detaljer
-- **Fil:** `src/pages/recruitment/RecruitmentDashboard.tsx` (eneste fil ændres).
-- **Imports tilføjes:** `BarChart`, `Bar` fra recharts; `startOfISOWeek`, `endOfISOWeek`, `getISOWeek`, `getISOWeekYear` fra `date-fns`.
-- **Ny memo `weeklyChartData`** der mapper `chartData` (daglige tællinger) → array af `{ weekKey, weekLabel, weekStart, weekEnd, count }`.
-- Styling matcher eksisterende graf (samme `chartConfig`, `hsl(var(--primary))`, samme højde `h-[200px] sm:h-[300px]`).
 
-### Zone
-**Grøn zone** — ren UI/visualisering, ingen pricing/løn/RLS/DB påvirkes. Ingen migration. Ingen nye hooks.
+**Berørte filer:**
+- `src/pages/CommissionLeague.tsx` — sæson-vælger, betinget rendering: `completed` → ny `<HallOfFame>`-komponent øverst
+- **Ny:** `src/components/league/HallOfFame.tsx` — podium + special prizes + season summary
+- **Ny:** `src/components/league/HallOfFamePodium.tsx` — det store 3-trins-podium
+- **Ny hook (evt.):** `useSeasonSummary(seasonId)` — aggregerer sum-tal til strip'en (kan også laves inline med eksisterende standings)
+- `src/components/league/PrizeShowcase.tsx` — bruges fortsat for aktiv sæson; ingen ændring
 
-### Out of scope
-- Ingen ændring af eksisterende daglige graf.
-- Ingen ny filtrering pr. status/kilde (kan tilføjes senere hvis ønsket).
-- Ingen DB-ændringer.
+**Data:** Genbruger `useSeasonStandings`, `usePrizeLeaders`, `useRoundHistory`, `useEmployeeAvatars`. Ingen nye RPC'er nødvendige.
+
+**Zone:** Alt UI = gul. Backfill (#1) = rød.
+
+**Åben beslutning (afventer dit svar):**
+Skal jeg også bygge **auto-start af næste sæson** når en sæson markeres completed (cron eller trigger), eller skal Sæson 2 oprettes manuelt via SeasonManagerCard som i dag?

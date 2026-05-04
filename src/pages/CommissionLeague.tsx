@@ -14,6 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
 import {
   useActiveSeason,
+  useAllSeasons,
   useMyEnrollment,
   useQualificationStandings,
   useMyQualificationStanding,
@@ -23,7 +24,16 @@ import {
   useEnrollmentCount,
   useEnrollAsFan,
   NON_PARTICIPATING_ROLES,
+  type LeagueSeason,
 } from "@/hooks/useLeagueData";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { HallOfFame } from "@/components/league/HallOfFame";
 import {
   useCurrentRound,
   useSeasonStandings,
@@ -95,7 +105,25 @@ export default function CommissionLeague() {
     fetchEmployeeId();
   }, []);
 
-  const { data: season, isLoading: seasonLoading } = useActiveSeason();
+  const { data: activeSeason, isLoading: seasonLoading } = useActiveSeason();
+  const { data: allSeasons } = useAllSeasons();
+  const [selectedSeasonId, setSelectedSeasonId] = useState<string | undefined>(undefined);
+
+  // Resolve which season is being viewed: explicit selection > active season
+  const season: LeagueSeason | null = useMemo(() => {
+    if (selectedSeasonId && allSeasons) {
+      const found = allSeasons.find((s) => s.id === selectedSeasonId);
+      if (found) return found;
+    }
+    return activeSeason ?? null;
+  }, [selectedSeasonId, allSeasons, activeSeason]);
+
+  // Visible historical seasons in dropdown: anything beyond draft
+  const selectableSeasons = useMemo(
+    () => (allSeasons ?? []).filter((s) => s.status !== "draft"),
+    [allSeasons]
+  );
+
   const { data: enrollment, isLoading: enrollmentLoading } = useMyEnrollment(season?.id);
   const { data: standings, isLoading: standingsLoading, refetch: refetchStandings } = useQualificationStandings(season?.id);
   const { data: myStanding } = useMyQualificationStanding(season?.id);
@@ -119,6 +147,11 @@ export default function CommissionLeague() {
     return activeIdx >= 0 ? activeIdx : roundHistory.length - 1;
   }, [roundHistory]);
   const [selectedRoundIndex, setSelectedRoundIndex] = useState<number | null>(null);
+
+  // Reset selected round when switching seasons
+  useEffect(() => {
+    setSelectedRoundIndex(null);
+  }, [season?.id]);
   const effectiveIndex = selectedRoundIndex ?? activeRoundIndex;
   const selectedRound = roundHistory ? roundHistory[effectiveIndex] : undefined;
   const { data: selectedRoundStandings } = useRoundStandings(selectedRound?.status !== "active" ? selectedRound?.id : undefined);
@@ -346,7 +379,14 @@ export default function CommissionLeague() {
 
                   {/* === LEFT COLUMN === */}
                   <div className="order-2 md:order-1 flex flex-col gap-1.5">
-                    {isFinalRound ? (
+                    {isCompletedPhase ? (
+                      <div className="inline-flex items-center gap-2 self-center md:self-start rounded-full bg-yellow-500/15 px-3 py-1 ring-1 ring-yellow-500/40">
+                        <Trophy className="h-3.5 w-3.5 text-yellow-400" />
+                        <span className="text-xs font-bold uppercase tracking-wider text-yellow-300">
+                          Sæson afsluttet
+                        </span>
+                      </div>
+                    ) : isFinalRound ? (
                       <div className="inline-flex items-center gap-2 self-center md:self-start rounded-full bg-gradient-to-r from-amber-500/20 to-red-500/20 px-3 py-1 ring-1 ring-amber-400/50">
                         <span className="relative flex h-2 w-2">
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
@@ -390,7 +430,29 @@ export default function CommissionLeague() {
                       </h1>
                     </div>
                     <span className="text-xs text-muted-foreground/60">Formand: Oscar Belcher</span>
-                    <LeagueRulesSheet compact />
+                    <div className="flex items-center gap-2 flex-wrap justify-center">
+                      <LeagueRulesSheet compact />
+                      {selectableSeasons.length > 1 && (
+                        <Select
+                          value={season.id}
+                          onValueChange={(val) => setSelectedSeasonId(val)}
+                        >
+                          <SelectTrigger className="h-7 w-auto min-w-[140px] text-xs bg-slate-800/60 border-slate-700">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {selectableSeasons.map((s) => (
+                              <SelectItem key={s.id} value={s.id} className="text-xs">
+                                Sæson {s.season_number}
+                                {s.status === "active" && " · i gang"}
+                                {s.status === "qualification" && " · kval"}
+                                {s.status === "completed" && " · afsluttet"}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
                   </div>
 
                   {/* === RIGHT COLUMN === */}
@@ -425,14 +487,26 @@ export default function CommissionLeague() {
             />
           )}
 
-          {/* Prize Showcase */}
-          <PrizeShowcase
-            standings={isActivePhase ? (seasonStandings || []) : (standings || [])}
-            prizeLeaders={prizeLeaders}
-            seasonStatus={season.status || ""}
-            isActive={isActivePhase}
-            roundProvisionMap={roundProvisionMap || {}}
-          />
+          {/* Prize Showcase / Hall of Fame */}
+          {isCompletedPhase ? (
+            <HallOfFame
+              seasonId={season.id}
+              seasonNumber={season.season_number}
+              startDate={season.start_date}
+              endDate={season.end_date}
+              standings={seasonStandings || []}
+              prizeLeaders={prizeLeaders}
+              rounds={(roundHistory || []).map(r => ({ id: r.id, round_number: r.round_number, status: r.status }))}
+            />
+          ) : (
+            <PrizeShowcase
+              standings={isActivePhase ? (seasonStandings || []) : (standings || [])}
+              prizeLeaders={prizeLeaders}
+              seasonStatus={season.status || ""}
+              isActive={isActivePhase}
+              roundProvisionMap={roundProvisionMap || {}}
+            />
+          )}
 
           {/* Not enrolled - show landing (skjules når sæson er afsluttet) */}
           {!isEnrolled && !isCompletedPhase && (
@@ -648,18 +722,7 @@ export default function CommissionLeague() {
             </>
           )}
 
-          {/* Completed season banner */}
-          {isCompletedPhase && (
-            <Card className="bg-gradient-to-r from-amber-500/10 to-yellow-600/10 border-amber-500/40">
-              <CardContent className="py-4 flex items-center gap-3">
-                <Trophy className="h-6 w-6 text-yellow-400" />
-                <div>
-                  <p className="font-bold">Sæson {season.season_number} afsluttet</p>
-                  <p className="text-sm text-muted-foreground">Endeligt resultat vises herunder.</p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          {/* Completed season banner removed — Hall of Fame replaces it visually above */}
 
           {/* Active or Completed Season UI */}
           {(isActivePhase || isCompletedPhase) && (isEnrolled || isCompletedPhase) && (
