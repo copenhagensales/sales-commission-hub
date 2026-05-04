@@ -423,7 +423,29 @@ export default function CommissionLeague() {
                       </h1>
                     </div>
                     <span className="text-xs text-muted-foreground/60">Formand: Oscar Belcher</span>
-                    <LeagueRulesSheet compact />
+                    <div className="flex items-center gap-2 flex-wrap justify-center">
+                      <LeagueRulesSheet compact />
+                      {selectableSeasons.length > 1 && (
+                        <Select
+                          value={season.id}
+                          onValueChange={(val) => setSelectedSeasonId(val)}
+                        >
+                          <SelectTrigger className="h-7 w-auto min-w-[140px] text-xs bg-slate-800/60 border-slate-700">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {selectableSeasons.map((s) => (
+                              <SelectItem key={s.id} value={s.id} className="text-xs">
+                                Sæson {s.season_number}
+                                {s.status === "active" && " · i gang"}
+                                {s.status === "qualification" && " · kval"}
+                                {s.status === "completed" && " · afsluttet"}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
                   </div>
 
                   {/* === RIGHT COLUMN === */}
