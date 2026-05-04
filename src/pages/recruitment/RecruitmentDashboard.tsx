@@ -19,7 +19,7 @@ import {
   Ghost,
   Handshake
 } from "lucide-react";
-import { format, subDays, eachDayOfInterval, startOfDay } from "date-fns";
+import { format, subDays, eachDayOfInterval, startOfDay, startOfISOWeek, endOfISOWeek, getISOWeek, getISOWeekYear, eachWeekOfInterval } from "date-fns";
 import { da } from "date-fns/locale";
 import { 
   ChartContainer, 
@@ -297,6 +297,34 @@ export default function RecruitmentDashboard() {
 
       return {
         date: day.toISOString(),
+        count,
+      };
+    });
+  }, [candidates, chartPeriod]);
+
+  const weeklyChartData = useMemo(() => {
+    const endDate = startOfDay(new Date());
+    const startDate = subDays(endDate, chartPeriod);
+    const weekStarts = eachWeekOfInterval(
+      { start: startDate, end: endDate },
+      { weekStartsOn: 1 }
+    );
+
+    return weekStarts.map(weekStart => {
+      const wStart = startOfISOWeek(weekStart);
+      const wEnd = endOfISOWeek(weekStart);
+      const count = candidates.filter(c => {
+        const created = new Date(c.created_at);
+        return created >= wStart && created <= wEnd;
+      }).length;
+
+      return {
+        weekKey: `${getISOWeekYear(wStart)}-W${getISOWeek(wStart)}`,
+        weekLabel: `Uge ${getISOWeek(wStart)}`,
+        weekNumber: getISOWeek(wStart),
+        weekYear: getISOWeekYear(wStart),
+        weekStart: wStart.toISOString(),
+        weekEnd: wEnd.toISOString(),
         count,
       };
     });
@@ -605,6 +633,72 @@ export default function RecruitmentDashboard() {
         </CardContent>
       </Card>
 
+      {/* Applicants Per Week Chart */}
+      <Card className="bg-card border-border">
+        <CardHeader className="space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              Ansøgninger pr. uge
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Følger samme periode som grafen ovenfor
+            </p>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <ChartContainer config={chartConfig} className="h-[200px] sm:h-[300px] w-full">
+            <BarChart data={weeklyChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <XAxis
+                dataKey="weekLabel"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
+                interval={weeklyChartData.length > 20 ? Math.floor(weeklyChartData.length / 10) : 0}
+              />
+              <YAxis
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
+                allowDecimals={false}
+                width={30}
+              />
+              <ChartTooltip
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const d = payload[0].payload;
+                  return (
+                    <div className="rounded-lg border border-border bg-background px-3 py-2 text-xs shadow-xl">
+                      <p className="font-medium text-foreground">
+                        Uge {d.weekNumber}, {d.weekYear}
+                      </p>
+                      <p className="text-muted-foreground">
+                        {format(new Date(d.weekStart), "d. MMM", { locale: da })} – {format(new Date(d.weekEnd), "d. MMM", { locale: da })}
+                      </p>
+                      <p className="text-foreground mt-1">
+                        <span className="font-semibold">{d.count}</span> ansøgninger
+                      </p>
+                    </div>
+                  );
+                }}
+              />
+              <Bar
+                dataKey="count"
+                fill="hsl(var(--primary))"
+                radius={[4, 4, 0, 0]}
+                maxBarSize={48}
+              >
+                <LabelList
+                  dataKey="count"
+                  position="top"
+                  style={{ fontSize: 10, fontWeight: 600, fill: "hsl(var(--foreground))" }}
+                  formatter={(value: number) => (value > 0 ? value : "")}
+                />
+              </Bar>
+            </BarChart>
+          </ChartContainer>
+        </CardContent>
+      </Card>
 
 
       </div>
