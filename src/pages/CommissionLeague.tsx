@@ -396,6 +396,28 @@ export default function CommissionLeague() {
                       </h1>
                     </div>
                     <span className="text-xs text-muted-foreground/60">Formand: Oscar Belcher</span>
+
+                    {/* Sæson-vælger – bladr mellem sæsoner */}
+                    {viewableSeasons && viewableSeasons.length > 1 && (
+                      <SeasonSwitcher
+                        seasons={viewableSeasons}
+                        currentSeasonId={season.id}
+                        onChange={(id) => {
+                          // If user picks the live season, clear override so default logic kicks in
+                          const picked = viewableSeasons.find(s => s.id === id);
+                          const isLive = picked?.status === "qualification" || picked?.status === "active";
+                          setViewedSeasonId(isLive && liveSeasonExists ? undefined : id);
+                          setSelectedRoundIndex(null);
+                        }}
+                      />
+                    )}
+
+                    {isViewingHistorical && (
+                      <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-300">
+                        Historisk visning
+                      </Badge>
+                    )}
+
                     <LeagueRulesSheet compact />
                   </div>
 
