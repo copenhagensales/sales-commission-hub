@@ -147,6 +147,11 @@ export default function CommissionLeague() {
     return activeIdx >= 0 ? activeIdx : roundHistory.length - 1;
   }, [roundHistory]);
   const [selectedRoundIndex, setSelectedRoundIndex] = useState<number | null>(null);
+
+  // Reset selected round when switching seasons
+  useEffect(() => {
+    setSelectedRoundIndex(null);
+  }, [season?.id]);
   const effectiveIndex = selectedRoundIndex ?? activeRoundIndex;
   const selectedRound = roundHistory ? roundHistory[effectiveIndex] : undefined;
   const { data: selectedRoundStandings } = useRoundStandings(selectedRound?.status !== "active" ? selectedRound?.id : undefined);
