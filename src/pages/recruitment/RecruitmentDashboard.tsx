@@ -302,6 +302,34 @@ export default function RecruitmentDashboard() {
     });
   }, [candidates, chartPeriod]);
 
+  const weeklyChartData = useMemo(() => {
+    const endDate = startOfDay(new Date());
+    const startDate = subDays(endDate, chartPeriod);
+    const weekStarts = eachWeekOfInterval(
+      { start: startDate, end: endDate },
+      { weekStartsOn: 1 }
+    );
+
+    return weekStarts.map(weekStart => {
+      const wStart = startOfISOWeek(weekStart);
+      const wEnd = endOfISOWeek(weekStart);
+      const count = candidates.filter(c => {
+        const created = new Date(c.created_at);
+        return created >= wStart && created <= wEnd;
+      }).length;
+
+      return {
+        weekKey: `${getISOWeekYear(wStart)}-W${getISOWeek(wStart)}`,
+        weekLabel: `Uge ${getISOWeek(wStart)}`,
+        weekNumber: getISOWeek(wStart),
+        weekYear: getISOWeekYear(wStart),
+        weekStart: wStart.toISOString(),
+        weekEnd: wEnd.toISOString(),
+        count,
+      };
+    });
+  }, [candidates, chartPeriod]);
+
   return (
     <MainLayout>
       <div className="space-y-6">
