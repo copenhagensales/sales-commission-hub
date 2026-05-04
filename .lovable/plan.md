@@ -1,32 +1,29 @@
-## Opdater sale_datetime for 9 TDC Erhverv OPP-numre
+## Tilføj ny graf: Ansøgninger pr. uge
 
-Kun dato ændres — klokkeslæt bevares. Ingen sletninger. Ingen ændringer på `sale_items`/commission ud over dato-flytningen.
+Under den eksisterende "Ansøgninger over tid"-graf på `/recruitment` tilføjes en ny graf der viser udviklingen aggregeret pr. ISO-uge.
 
-### Migration
+### Hvad bygges
+- Nyt `Card` lige under den nuværende area chart med titel **"Ansøgninger pr. uge"**.
+- Bar chart (Recharts) med én søjle pr. uge.
+- X-akse label-format: `Uge 17` (med årstal i tooltip ved årsskifte).
+- Tooltip viser: `Uge X, YYYY` + antal + dato-interval (man–søn).
+- Samme periode-vælger (30d / 60d / 90d / 6m / 12m) — genbruger `chartPeriod`-state, så begge grafer følges ad.
 
-```sql
--- OPP-1082198 → 16/4 (1 record allerede 16/4, 2 flyttes)
-UPDATE sales SET sale_datetime = make_timestamptz(2026, 4, 16,
-  EXTRACT(HOUR FROM sale_datetime)::int,
-  EXTRACT(MINUTE FROM sale_datetime)::int,
-  EXTRACT(SECOND FROM sale_datetime), 'UTC')
-WHERE id IN ('363585c4-e8d8-4715-b29d-f7c6d8aa1a4e','122ab003-b8ab-4cd1-a41c-8a16ad932ba5');
+### Data
+- Genbruger samme rådata som den nuværende `chartData` (kandidater grupperet pr. dag).
+- Aggregeres på frontend pr. ISO-uge med `date-fns` (`startOfISOWeek`, `getISOWeek`, `getISOWeekYear`) — ingen DB-ændringer.
+- Tomme uger i perioden vises som 0 (kontinuerlig x-akse).
 
--- OPP-1081464 → 17/4 (3 records)
-UPDATE sales SET sale_datetime = make_timestamptz(2026, 4, 17, ...)
-WHERE id IN ('1f453ae4-...','e24b5370-...','7cf91ef8-...');
+### Tekniske detaljer
+- **Fil:** `src/pages/recruitment/RecruitmentDashboard.tsx` (eneste fil ændres).
+- **Imports tilføjes:** `BarChart`, `Bar` fra recharts; `startOfISOWeek`, `endOfISOWeek`, `getISOWeek`, `getISOWeekYear` fra `date-fns`.
+- **Ny memo `weeklyChartData`** der mapper `chartData` (daglige tællinger) → array af `{ weekKey, weekLabel, weekStart, weekEnd, count }`.
+- Styling matcher eksisterende graf (samme `chartConfig`, `hsl(var(--primary))`, samme højde `h-[200px] sm:h-[300px]`).
 
--- OPP-1073821 → 17/4 (2 records)
--- OPP-1070694 → 20/4 (1)
--- OPP-1082657 → 20/4 (1)
--- OPP-1082880 → 21/4 (1)
--- OPP-1082825 → 21/4 (2)
--- OPP-1083038 → 22/4 (1)
--- OPP-1083197 → 23/4 (1)
-```
+### Zone
+**Grøn zone** — ren UI/visualisering, ingen pricing/løn/RLS/DB påvirkes. Ingen migration. Ingen nye hooks.
 
-I alt 13 rækker opdateres.
-
-### Rød zone
-
-`sales` tabellen påvirker lønperiode-tilknytning (15→14-cyklus) og kan trigge pricing-rematch. Klokkeslæt bevares så time-baseret logik er uændret.
+### Out of scope
+- Ingen ændring af eksisterende daglige graf.
+- Ingen ny filtrering pr. status/kilde (kan tilføjes senere hvis ønsket).
+- Ingen DB-ændringer.
