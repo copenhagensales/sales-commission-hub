@@ -437,18 +437,34 @@ export default function CommissionLeague() {
                           value={season.id}
                           onValueChange={(val) => setSelectedSeasonId(val)}
                         >
-                          <SelectTrigger className="h-7 w-auto min-w-[140px] text-xs bg-slate-800/60 border-slate-700">
+                          <SelectTrigger
+                            aria-label="Vælg sæson"
+                            className="h-8 w-auto min-w-[180px] text-xs font-semibold bg-yellow-500/10 hover:bg-yellow-500/15 border-yellow-500/40 text-yellow-200 ring-1 ring-yellow-500/20"
+                          >
+                            <Calendar className="h-3.5 w-3.5 mr-1.5 text-yellow-400" />
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {selectableSeasons.map((s) => (
-                              <SelectItem key={s.id} value={s.id} className="text-xs">
-                                Sæson {s.season_number}
-                                {s.status === "active" && " · i gang"}
-                                {s.status === "qualification" && " · kval"}
-                                {s.status === "completed" && " · afsluttet"}
-                              </SelectItem>
-                            ))}
+                            <div className="px-2 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                              Skift sæson
+                            </div>
+                            {selectableSeasons
+                              .slice()
+                              .sort((a, b) => b.season_number - a.season_number)
+                              .map((s) => (
+                                <SelectItem key={s.id} value={s.id} className="text-xs">
+                                  <span className="font-semibold">Sæson {s.season_number}</span>
+                                  {s.status === "active" && (
+                                    <span className="ml-2 text-emerald-400">· i gang</span>
+                                  )}
+                                  {s.status === "qualification" && (
+                                    <span className="ml-2 text-emerald-400">· kvalifikation</span>
+                                  )}
+                                  {s.status === "completed" && (
+                                    <span className="ml-2 text-muted-foreground">· afsluttet</span>
+                                  )}
+                                </SelectItem>
+                              ))}
                           </SelectContent>
                         </Select>
                       )}
