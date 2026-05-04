@@ -1,57 +1,42 @@
-## Problem
+## To dele
 
-På en **afsluttet** sæson viser Hall of Fame forkerte data i de tre priskort, fordi `usePrizeLeaders` har en separat "qualification only"-gren der aktiveres når `season.status !== 'active'`. Den gren ignorerer alle færdigspillede runder. Derudover er confetti hægtet på `sessionStorage` og kører kun 1,8 sekunder én gang.
+### 1. Confetti — kun guld
 
-### Konkrete bugs i `src/hooks/useLeaguePrizeData.ts`
+I `src/components/league/HallOfFamePodium.tsx` erstattes farvepaletten i `useEffect` så confetti kun bruger guld/amber-toner (ingen sølv, bronze, lilla, pink):
 
-| Pris | Nuværende adfærd ved `status='completed'` | Skal være |
-|---|---|---|
-| Bedste Runde | Kun kval-runden (`qualBestRounds`) → viser "Theo E 36.720 kr" fra kval | Højeste `weekly_provision` på tværs af kval + R1–R6 (samme merge som active-grenen) |
-| Sæsonens Talent | Bruger `current_provision` fra kval-tabellen i kr | Bruger `total_points` fra `league_season_standings` (filtreret på <90 dages ansættelse), samme som active+round≥2 |
-| Sæsonens Comeback | Kun kval-intern rank-bevægelse (`previous_overall_rank` vs `overall_rank` i kval) | Forbedring fra kval-final-rank → season-final-rank (samme som active-grenen) |
+```ts
+const goldSilverBronze = [
+  "#fde047", "#facc15", "#eab308", "#ca8a04",
+  "#fbbf24", "#f59e0b", "#fde68a", "#fef3c7",
+];
+```
 
-### Confetti i `HallOfFamePodium.tsx`
+(Variabelnavnet beholdes for at minimere diff — det er bare farverne der ændres.)
 
-- `sessionStorage`-gate forhindrer ny fyring efter første visning
-- `duration = 1800` ms → stopper næsten med det samme
-- Lav `particleCount: 4` per side
+### 2. Sæson 2 startes
 
-## Plan
+Sæson 1 er `completed` (sluttede 3. maj 2026). Der findes ingen Sæson 2. Jeg opretter én via insert med samme rytme som Sæson 1, men med **7 dages kvalifikationsvindue** og ~6 ugers sæson:
 
-### 1. `src/hooks/useLeaguePrizeData.ts` — behandl `completed` som `active`
+| Felt | Værdi |
+|---|---|
+| `season_number` | 2 |
+| `status` | `qualification` |
+| `is_active` | `true` |
+| `qualification_source_start` / `_end` | 2026-05-04 00:00 → 2026-05-10 21:59:59 (UTC) — 7 dage |
+| `qualification_start_at` / `_end_at` | 2026-05-04 00:00 → 2026-05-10 21:59:59 (UTC) |
+| `start_date` | 2026-05-11 |
+| `end_date` | 2026-06-21 (6 uger) |
 
-Ændre branch-betingelsen fra `isActive` til `hasFinishedRounds` (`status in ('active','completed')`). Kort sagt:
+Insert er idempotent (kun hvis Sæson 2 ikke findes). Andre sæsoner sættes til `is_active = false` så kun Sæson 2 er aktiv.
 
-- **`allStandings`**: Hent altid når sæsonen er active ELLER completed (i dag kun active).
-- **`usePointsForTalent`**: True når sæsonen er completed, eller active med `currentRoundNumber >= 2`. (Completed = sæsonen er kørt færdig, points er endelige.)
-- **Bedste Runde**: Fjern `if (isActive) … else …`. Kør altid merge af `qualBestRounds + finishedBestRounds` så længe sæsonen ikke kun er i kval-fase. Hvis sæsonen aldrig kom forbi kval (ingen `league_round_standings`-rækker), fungerer det stadig fordi `finishedBestRounds` er tom.
-- **Comeback**: Brug season-standings-grenen når `status in ('active','completed')`. Kval-only-grenen bruges kun for ren kval-fase.
+Brugeren kan justere alle datoer bagefter via SeasonManagerCard → SeasonSettingsDialog.
 
-Den eneste reelle "kval-only"-gren tilbage er sæsoner med `status='qualification'` (eller hvad der nu signalerer at kun kval er kørt) — alt med færdige runder behandles ens.
+### Zone
 
-### 2. `src/components/league/HallOfFamePodium.tsx` — konstant, kraftigere confetti
+- HallOfFamePodium: grøn (kun farver).
+- Insert i `league_seasons`: gul. Rører ikke Sæson 1's data.
 
-- Fjern `sessionStorage`-gate og `fired.current` engangs-logik.
-- Skift fra "1,8 sek burst" til en `setInterval` der fyrer hver ~700-900 ms så længe komponenten er mountet.
-- Hver fyring: `particleCount: 60` per side, fra venstre+højre nederste hjørner, varieret farve (guld/sølv/bronze + accent), `scalar: 1.1`, `gravity: 0.9`.
-- Ekstra opstarts-burst: stort centerskud (`particleCount: 200`, `spread: 100`, `origin: { y: 0.6 }`) ved mount.
-- Cleanup: `clearInterval` i return fra `useEffect`.
-- Respektér `prefers-reduced-motion` (skip loop hvis brugeren har det slået til).
-- Ingen ændringer til styling/markup udenfor `useEffect`.
+### Filer der ændres
 
-### 3. Verifikation
-
-- Åbn `/commission-league` med Sæson 1 (completed, 6 runder).
-- Forvent: "Bedste Runde" viser højeste `weekly_provision` på tværs af kval+R1-R6 (sandsynligvis fra én af de afsluttede runder, ikke kval).
-- "Sæsonens Talent" viser den nyansatte (<90 dage før sæsonstart) med flest `total_points`.
-- "Sæsonens Comeback" viser største stigning fra kval-final-rank til season-final-rank.
-- Confetti løber konstant fra begge nederste hjørner.
-
-## Zone
-
-Gul. Rør kun rapport/UI-hook (`useLeaguePrizeData`) og presentation-komponent (`HallOfFamePodium`). Ingen DB-ændringer. Ingen lønberegning, ingen pricing.
-
-## Filer der ændres
-
-- `src/hooks/useLeaguePrizeData.ts`
 - `src/components/league/HallOfFamePodium.tsx`
+- INSERT i `league_seasons` for ny Sæson 2.

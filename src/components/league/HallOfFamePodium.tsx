@@ -48,10 +48,8 @@ export function HallOfFamePodium({
     if (reduce) return;
 
     const goldSilverBronze = [
-      "#facc15", "#f59e0b", "#fde68a", "#fbbf24", // gold
-      "#e5e7eb", "#cbd5e1", "#94a3b8",             // silver
-      "#b45309", "#92400e", "#d97706",             // bronze
-      "#a78bfa", "#f472b6",                        // accents
+      "#fde047", "#facc15", "#eab308", "#ca8a04",
+      "#fbbf24", "#f59e0b", "#fde68a", "#fef3c7",
     ];
 
     // Big opening burst
