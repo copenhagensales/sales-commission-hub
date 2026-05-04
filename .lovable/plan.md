@@ -1,105 +1,57 @@
-## Samlet plan — Liga: data-fix, sæson-vælger og Hall of Fame
+## Problem
 
-### 1. Backfill manglende rundedata for runde 6 (rød zone)
+På en **afsluttet** sæson viser Hall of Fame forkerte data i de tre priskort, fordi `usePrizeLeaders` har en separat "qualification only"-gren der aktiveres når `season.status !== 'active'`. Den gren ignorerer alle færdigspillede runder. Derudover er confetti hægtet på `sessionStorage` og kører kun 1,8 sekunder én gang.
 
-Runde 6 er markeret `completed` i DB, men har 0 standings (de andre runder har 69 hver). Edge funktionen `league-process-round` har enten fejlet midtvejs eller blev kaldt to gange.
+### Konkrete bugs i `src/hooks/useLeaguePrizeData.ts`
 
-**Fix:**
-- Sæt midlertidigt sæson-status = `active` og runde 6 status = `active`
-- Kald `league-process-round` med seasonId
-- Verificér 69 nye `league_round_standings`-rækker er oprettet og at `league_season_standings` ser rigtige ud
-- Sæt sæson- og runde-status tilbage til `completed`
+| Pris | Nuværende adfærd ved `status='completed'` | Skal være |
+|---|---|---|
+| Bedste Runde | Kun kval-runden (`qualBestRounds`) → viser "Theo E 36.720 kr" fra kval | Højeste `weekly_provision` på tværs af kval + R1–R6 (samme merge som active-grenen) |
+| Sæsonens Talent | Bruger `current_provision` fra kval-tabellen i kr | Bruger `total_points` fra `league_season_standings` (filtreret på <90 dages ansættelse), samme som active+round≥2 |
+| Sæsonens Comeback | Kun kval-intern rank-bevægelse (`previous_overall_rank` vs `overall_rank` i kval) | Forbedring fra kval-final-rank → season-final-rank (samme som active-grenen) |
 
-Kører som SQL + edge function-kald. Verificér før jeg er færdig.
+### Confetti i `HallOfFamePodium.tsx`
 
----
+- `sessionStorage`-gate forhindrer ny fyring efter første visning
+- `duration = 1800` ms → stopper næsten med det samme
+- Lav `particleCount: 4` per side
 
-### 2. Sæson-vælger på `/commission-league` (gul zone)
+## Plan
 
-I dag returnerer `useActiveSeason` kun ÉN sæson. Tilføj dropdown øverst i sæson-kortet.
+### 1. `src/hooks/useLeaguePrizeData.ts` — behandl `completed` som `active`
 
-**Fil:** `src/pages/CommissionLeague.tsx` (+ minor wiring)
+Ændre branch-betingelsen fra `isActive` til `hasFinishedRounds` (`status in ('active','completed')`). Kort sagt:
 
-- Brug eksisterende `useAllSeasons()`
-- Ny state `selectedSeasonId` (default = aktiv sæson, ellers seneste completed)
-- Erstat `season` med beregnet `displaySeason = allSeasons.find(s => s.id === selectedSeasonId) ?? activeSeason`
-- Dropdown i headeren af "Sæson X"-kortet: `Sæson 1 (afsluttet)`, `Sæson 2 (i gang)` osv. — sorteret nyeste først
-- Eksisterende historik-hooks (`useCurrentRound`, `useSeasonStandings`, `useRoundHistory`, `useMySeasonStanding`, `usePrizeLeaders`) peger nu på `displaySeason.id`
-- Når en historisk sæson vises: skjul tilmeldings-/qualification-CTA'er — det er kun arkiv
+- **`allStandings`**: Hent altid når sæsonen er active ELLER completed (i dag kun active).
+- **`usePointsForTalent`**: True når sæsonen er completed, eller active med `currentRoundNumber >= 2`. (Completed = sæsonen er kørt færdig, points er endelige.)
+- **Bedste Runde**: Fjern `if (isActive) … else …`. Kør altid merge af `qualBestRounds + finishedBestRounds` så længe sæsonen ikke kun er i kval-fase. Hvis sæsonen aldrig kom forbi kval (ingen `league_round_standings`-rækker), fungerer det stadig fordi `finishedBestRounds` er tom.
+- **Comeback**: Brug season-standings-grenen når `status in ('active','completed')`. Kval-only-grenen bruges kun for ren kval-fase.
 
----
+Den eneste reelle "kval-only"-gren tilbage er sæsoner med `status='qualification'` (eller hvad der nu signalerer at kun kval er kørt) — alt med færdige runder behandles ens.
 
-### 3. Hall of Fame — Afsluttet sæson-visning (gul zone)
+### 2. `src/components/league/HallOfFamePodium.tsx` — konstant, kraftigere confetti
 
-I dag ser en afsluttet sæson nærmest identisk ud med en aktiv: samme Top 3-kort, samme tre special-priser, samme banner. Det føles ikke som en afslutning. Oplæg:
+- Fjern `sessionStorage`-gate og `fired.current` engangs-logik.
+- Skift fra "1,8 sek burst" til en `setInterval` der fyrer hver ~700-900 ms så længe komponenten er mountet.
+- Hver fyring: `particleCount: 60` per side, fra venstre+højre nederste hjørner, varieret farve (guld/sølv/bronze + accent), `scalar: 1.1`, `gravity: 0.9`.
+- Ekstra opstarts-burst: stort centerskud (`particleCount: 200`, `spread: 100`, `origin: { y: 0.6 }`) ved mount.
+- Cleanup: `clearInterval` i return fra `useEffect`.
+- Respektér `prefers-reduced-motion` (skip loop hvis brugeren har det slået til).
+- Ingen ændringer til styling/markup udenfor `useEffect`.
 
-**Designkoncept: "Sæson X — Hall of Fame"**
+### 3. Verifikation
 
-Når `season.status === "completed"` erstattes hele toppen af siden med en dedikeret hall-of-fame-visning. Ingen "afsluttes når sæsonen starter"-lås, ingen aktiv-runde-indikatorer.
+- Åbn `/commission-league` med Sæson 1 (completed, 6 runder).
+- Forvent: "Bedste Runde" viser højeste `weekly_provision` på tværs af kval+R1-R6 (sandsynligvis fra én af de afsluttede runder, ikke kval).
+- "Sæsonens Talent" viser den nyansatte (<90 dage før sæsonstart) med flest `total_points`.
+- "Sæsonens Comeback" viser største stigning fra kval-final-rank til season-final-rank.
+- Confetti løber konstant fra begge nederste hjørner.
 
-#### Sektion A — Helte-podium (fuld bredde, øverst)
+## Zone
 
-Stort podium-element, ikke tre side-om-side bokse. Inspireret af et faktisk pris-podium:
+Gul. Rør kun rapport/UI-hook (`useLeaguePrizeData`) og presentation-komponent (`HallOfFamePodium`). Ingen DB-ændringer. Ingen lønberegning, ingen pricing.
 
-```text
-                    ┌────────┐
-                    │  🥇    │
-                    │ Avatar │
-        ┌────────┐  │ Navn   │  ┌────────┐
-        │  🥈    │  │ X pt   │  │  🥉    │
-        │ Avatar │  │ Team   │  │ Avatar │
-        │ Navn   │  │        │  │ Navn   │
-        │ X pt   │  │        │  │ X pt   │
-        └────────┘  └────────┘  └────────┘
-           2.          1.          3.
-```
+## Filer der ændres
 
-- Vinderen i midten, højere end nr. 2 og 3
-- Avatar fra `useEmployeeAvatars` (allerede i projektet), faldback initialer
-- Guld/sølv/bronze gradient-baggrund pr. plads
-- Konfetti-animation eller subtil shimmer ved første visning (engang pr. session via sessionStorage-key per sæson)
-- Klik = åbn detalje-dialog med fuld division 1 standings (genbrug eksisterende dialog fra `PrizeShowcase`)
-- Trofæ-ikon med sæson-nummer: "S1 Mester"
-
-#### Sektion B — Special-priser (3 hyldede kort)
-
-Under podiet, tre større visnings-kort (ikke små chips som i dag):
-
-| Kort | Indhold |
-|---|---|
-| 🔥 **Bedste Runde** | Navn, runde + provision, lille sparkline der peaker |
-| ⭐ **Sæsonens Talent** | Navn, "rookie" badge, points |
-| 🚀 **Sæsonens Comeback** | Navn, "+N pladser", før/efter division |
-
-Hvert kort har medaljon-look (ikke flade chips). Klik åbner top-10-dialog som i dag.
-
-#### Sektion C — Sæson-resumé (ny, kompakt strip)
-
-En række key stats om hele sæsonen:
-- Antal spillere
-- Antal runder spillet
-- Total provision tjent (sum)
-- Antal op-/nedrykninger
-- Vinder af hver division (lille liste, kollapsbar)
-
-#### Sektion D — Eksisterende runde-historik bevares
-
-`Sæson 1`-kortet med Kval/R1–R6-chips og resultater bevares uændret nedenunder. Det er stadig vejen til at se rundedetaljer — bare flyttet ned så Hall of Fame får førstepladsen.
-
----
-
-### Tekniske detaljer
-
-**Berørte filer:**
-- `src/pages/CommissionLeague.tsx` — sæson-vælger, betinget rendering: `completed` → ny `<HallOfFame>`-komponent øverst
-- **Ny:** `src/components/league/HallOfFame.tsx` — podium + special prizes + season summary
-- **Ny:** `src/components/league/HallOfFamePodium.tsx` — det store 3-trins-podium
-- **Ny hook (evt.):** `useSeasonSummary(seasonId)` — aggregerer sum-tal til strip'en (kan også laves inline med eksisterende standings)
-- `src/components/league/PrizeShowcase.tsx` — bruges fortsat for aktiv sæson; ingen ændring
-
-**Data:** Genbruger `useSeasonStandings`, `usePrizeLeaders`, `useRoundHistory`, `useEmployeeAvatars`. Ingen nye RPC'er nødvendige.
-
-**Zone:** Alt UI = gul. Backfill (#1) = rød.
-
-**Åben beslutning (afventer dit svar):**
-Skal jeg også bygge **auto-start af næste sæson** når en sæson markeres completed (cron eller trigger), eller skal Sæson 2 oprettes manuelt via SeasonManagerCard som i dag?
+- `src/hooks/useLeaguePrizeData.ts`
+- `src/components/league/HallOfFamePodium.tsx`

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { Trophy, Crown } from "lucide-react";
 import confetti from "canvas-confetti";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -39,36 +39,73 @@ export function HallOfFamePodium({
   avatarMap,
   onClickRank,
 }: HallOfFamePodiumProps) {
-  const fired = useRef(false);
-
-  // Confetti once per season per session
+  // Continuous confetti while the Hall of Fame is mounted.
+  // Respects prefers-reduced-motion.
   useEffect(() => {
-    if (fired.current) return;
-    const key = `hof-confetti-${seasonId}`;
-    if (sessionStorage.getItem(key)) return;
-    sessionStorage.setItem(key, "1");
-    fired.current = true;
+    const reduce =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) return;
 
-    const duration = 1800;
-    const end = Date.now() + duration;
-    const colors = ["#facc15", "#f59e0b", "#fde68a", "#fbbf24"];
-    (function frame() {
+    const goldSilverBronze = [
+      "#facc15", "#f59e0b", "#fde68a", "#fbbf24", // gold
+      "#e5e7eb", "#cbd5e1", "#94a3b8",             // silver
+      "#b45309", "#92400e", "#d97706",             // bronze
+      "#a78bfa", "#f472b6",                        // accents
+    ];
+
+    // Big opening burst
+    confetti({
+      particleCount: 220,
+      spread: 100,
+      startVelocity: 55,
+      origin: { x: 0.5, y: 0.6 },
+      colors: goldSilverBronze,
+      scalar: 1.15,
+      gravity: 0.9,
+    });
+
+    // Continuous side cannons
+    const interval = window.setInterval(() => {
       confetti({
-        particleCount: 4,
+        particleCount: 60,
         angle: 60,
-        spread: 70,
-        origin: { x: 0, y: 0.7 },
-        colors,
+        spread: 75,
+        startVelocity: 50,
+        origin: { x: 0, y: 0.75 },
+        colors: goldSilverBronze,
+        scalar: 1.1,
+        gravity: 0.9,
       });
       confetti({
-        particleCount: 4,
+        particleCount: 60,
         angle: 120,
-        spread: 70,
-        origin: { x: 1, y: 0.7 },
-        colors,
+        spread: 75,
+        startVelocity: 50,
+        origin: { x: 1, y: 0.75 },
+        colors: goldSilverBronze,
+        scalar: 1.1,
+        gravity: 0.9,
       });
-      if (Date.now() < end) requestAnimationFrame(frame);
-    })();
+    }, 800);
+
+    // Occasional center pop for extra sparkle
+    const popInterval = window.setInterval(() => {
+      confetti({
+        particleCount: 80,
+        spread: 360,
+        startVelocity: 35,
+        origin: { x: 0.5, y: 0.4 },
+        colors: goldSilverBronze,
+        scalar: 1,
+        gravity: 1,
+      });
+    }, 2400);
+
+    return () => {
+      window.clearInterval(interval);
+      window.clearInterval(popInterval);
+    };
   }, [seasonId]);
 
   const Step = ({
