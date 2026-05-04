@@ -504,7 +504,7 @@ export default function CommissionLeague() {
           )}
 
           {/* Motivation Coach Bar */}
-          {isEnrolled && !isFan && currentEmployeeId && (
+          {isEnrolled && !isFan && currentEmployeeId && !isViewingHistorical && (
             <LeagueMotivationBar
               employeeId={currentEmployeeId}
               myStanding={isActivePhase ? (mySeasonStanding ?? null) : (myStanding ?? null)}
