@@ -14,6 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
 import {
   useActiveSeason,
+  useAllSeasons,
   useMyEnrollment,
   useQualificationStandings,
   useMyQualificationStanding,
@@ -23,7 +24,16 @@ import {
   useEnrollmentCount,
   useEnrollAsFan,
   NON_PARTICIPATING_ROLES,
+  type LeagueSeason,
 } from "@/hooks/useLeagueData";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { HallOfFame } from "@/components/league/HallOfFame";
 import {
   useCurrentRound,
   useSeasonStandings,
