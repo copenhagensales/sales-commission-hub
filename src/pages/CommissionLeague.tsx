@@ -487,14 +487,26 @@ export default function CommissionLeague() {
             />
           )}
 
-          {/* Prize Showcase */}
-          <PrizeShowcase
-            standings={isActivePhase ? (seasonStandings || []) : (standings || [])}
-            prizeLeaders={prizeLeaders}
-            seasonStatus={season.status || ""}
-            isActive={isActivePhase}
-            roundProvisionMap={roundProvisionMap || {}}
-          />
+          {/* Prize Showcase / Hall of Fame */}
+          {isCompletedPhase ? (
+            <HallOfFame
+              seasonId={season.id}
+              seasonNumber={season.season_number}
+              startDate={season.start_date}
+              endDate={season.end_date}
+              standings={seasonStandings || []}
+              prizeLeaders={prizeLeaders}
+              rounds={(roundHistory || []).map(r => ({ id: r.id, round_number: r.round_number, status: r.status }))}
+            />
+          ) : (
+            <PrizeShowcase
+              standings={isActivePhase ? (seasonStandings || []) : (standings || [])}
+              prizeLeaders={prizeLeaders}
+              seasonStatus={season.status || ""}
+              isActive={isActivePhase}
+              roundProvisionMap={roundProvisionMap || {}}
+            />
+          )}
 
           {/* Not enrolled - show landing (skjules når sæson er afsluttet) */}
           {!isEnrolled && !isCompletedPhase && (
