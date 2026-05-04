@@ -14,6 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
 import {
   useActiveSeason,
+  useViewableSeasons,
   useMyEnrollment,
   useQualificationStandings,
   useMyQualificationStanding,
