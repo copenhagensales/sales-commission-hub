@@ -304,10 +304,10 @@ export default function RecruitmentDashboard() {
   }, [candidates, chartPeriod]);
 
   const weeklyChartData = useMemo(() => {
-    const endDate = startOfDay(new Date());
-    const startDate = subDays(endDate, chartPeriod);
+    const thisWeekStart = startOfISOWeek(new Date());
+    const startDate = subDays(thisWeekStart, (weeklyPeriod - 1) * 7);
     const weekStarts = eachWeekOfInterval(
-      { start: startDate, end: endDate },
+      { start: startDate, end: thisWeekStart },
       { weekStartsOn: 1 }
     );
 
@@ -329,7 +329,7 @@ export default function RecruitmentDashboard() {
         count,
       };
     });
-  }, [candidates, chartPeriod]);
+  }, [candidates, weeklyPeriod]);
 
   return (
     <MainLayout>
