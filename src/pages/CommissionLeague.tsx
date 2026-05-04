@@ -361,18 +361,7 @@ export default function CommissionLeague() {
   // Today provision for sticky bar
   const myTodayProvision = currentEmployeeId ? (todayProvisionMap?.[currentEmployeeId] ?? 0) : 0;
 
-  // Confetti when entering top 3
-  useEffect(() => {
-    if (!currentEmployeeId || !stickyData) return;
-    const currentRankVal = stickyData.rank;
-    if (currentRankVal <= 3) {
-      const key = `confetti-top3-${currentEmployeeId}`;
-      if (!sessionStorage.getItem(key)) {
-        sessionStorage.setItem(key, "1");
-        confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
-      }
-    }
-  }, [stickyData?.rank, currentEmployeeId]);
+  // (confetti useEffect moved above early returns to keep hook order stable)
 
   return (
     <MainLayout>
