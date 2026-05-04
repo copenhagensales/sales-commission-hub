@@ -116,6 +116,7 @@ function ReferralKpiSection() {
 
 export default function RecruitmentDashboard() {
   const [chartPeriod, setChartPeriod] = useState(30);
+  const [weeklyPeriod, setWeeklyPeriod] = useState(10);
 
   const { data: candidates = [] } = useQuery({
     queryKey: ["candidates"],
