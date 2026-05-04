@@ -105,7 +105,25 @@ export default function CommissionLeague() {
     fetchEmployeeId();
   }, []);
 
-  const { data: season, isLoading: seasonLoading } = useActiveSeason();
+  const { data: activeSeason, isLoading: seasonLoading } = useActiveSeason();
+  const { data: allSeasons } = useAllSeasons();
+  const [selectedSeasonId, setSelectedSeasonId] = useState<string | undefined>(undefined);
+
+  // Resolve which season is being viewed: explicit selection > active season
+  const season: LeagueSeason | null = useMemo(() => {
+    if (selectedSeasonId && allSeasons) {
+      const found = allSeasons.find((s) => s.id === selectedSeasonId);
+      if (found) return found;
+    }
+    return activeSeason ?? null;
+  }, [selectedSeasonId, allSeasons, activeSeason]);
+
+  // Visible historical seasons in dropdown: anything beyond draft
+  const selectableSeasons = useMemo(
+    () => (allSeasons ?? []).filter((s) => s.status !== "draft"),
+    [allSeasons]
+  );
+
   const { data: enrollment, isLoading: enrollmentLoading } = useMyEnrollment(season?.id);
   const { data: standings, isLoading: standingsLoading, refetch: refetchStandings } = useQualificationStandings(season?.id);
   const { data: myStanding } = useMyQualificationStanding(season?.id);
