@@ -642,9 +642,19 @@ export default function RecruitmentDashboard() {
               <TrendingUp className="h-5 w-5" />
               Ansøgninger pr. uge
             </CardTitle>
-            <p className="text-xs text-muted-foreground">
-              Følger samme periode som grafen ovenfor
-            </p>
+            <div className="flex gap-1 overflow-x-auto pb-1 -mb-1">
+              {[5, 10, 25, 50].map((weeks) => (
+                <Button
+                  key={weeks}
+                  variant={weeklyPeriod === weeks ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setWeeklyPeriod(weeks)}
+                  className="text-xs px-2 sm:px-3 shrink-0"
+                >
+                  {weeks} uger
+                </Button>
+              ))}
+            </div>
           </div>
         </CardHeader>
         <CardContent>
