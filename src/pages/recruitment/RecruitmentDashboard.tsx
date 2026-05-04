@@ -19,7 +19,7 @@ import {
   Ghost,
   Handshake
 } from "lucide-react";
-import { format, subDays, eachDayOfInterval, startOfDay } from "date-fns";
+import { format, subDays, eachDayOfInterval, startOfDay, startOfISOWeek, endOfISOWeek, getISOWeek, getISOWeekYear, eachWeekOfInterval } from "date-fns";
 import { da } from "date-fns/locale";
 import { 
   ChartContainer, 
