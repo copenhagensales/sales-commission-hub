@@ -96,7 +96,12 @@ export default function CommissionLeague() {
     fetchEmployeeId();
   }, []);
 
-  const { data: season, isLoading: seasonLoading } = useActiveSeason();
+  const [viewedSeasonId, setViewedSeasonId] = useState<string | undefined>(undefined);
+  const { data: viewableSeasons } = useViewableSeasons();
+  const { data: season, isLoading: seasonLoading } = useActiveSeason(viewedSeasonId);
+  // Detect if user is browsing a historical (non-live) season
+  const liveSeasonExists = (viewableSeasons || []).some(s => s.status === "qualification" || s.status === "active");
+  const isViewingHistorical = !!viewedSeasonId && season?.status === "completed";
   const { data: enrollment, isLoading: enrollmentLoading } = useMyEnrollment(season?.id);
   const { data: standings, isLoading: standingsLoading, refetch: refetchStandings } = useQualificationStandings(season?.id);
   const { data: myStanding } = useMyQualificationStanding(season?.id);
