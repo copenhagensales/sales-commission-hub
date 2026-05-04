@@ -55,11 +55,17 @@ export function usePrizeLeaders(
         .eq("id", seasonId)
         .maybeSingle();
 
-      const isActive = seasonData?.status === "active";
-      const usePointsForTalent = isActive && currentRoundNumber != null && currentRoundNumber >= 2;
+      const status = seasonData?.status;
+      // Treat both 'active' and 'completed' as "has finished/ongoing rounds".
+      // Only pure qualification phase falls back to kval-only logic.
+      const hasRounds = status === "active" || status === "completed";
+      const isCompleted = status === "completed";
+      const usePointsForTalent =
+        isCompleted ||
+        (hasRounds && currentRoundNumber != null && currentRoundNumber >= 2);
 
       // --- All by points (for Top 3 dialog) ---
-      const { data: allStandings } = isActive
+      const { data: allStandings } = hasRounds
         ? await supabase
             .from("league_season_standings")
             .select(`
@@ -102,7 +108,7 @@ export function usePrizeLeaders(
           round_number: 0, // 0 = Kval
         }));
 
-      if (isActive) {
+      if (hasRounds) {
         // "Bedste runde" = højeste provision (kr) opnået i én enkelt runde.
         // Vi henter weekly_provision (kr) — IKKE points_earned — så kval og rounds
         // sammenlignes i samme enhed (kroner).
@@ -224,7 +230,7 @@ export function usePrizeLeaders(
       let allComebacks: RankedComeback[] = [];
       let comeback: PrizeLeader | null = null;
 
-      if (isActive) {
+      if (hasRounds) {
         // Use qualification final ranking as baseline for comeback
         const { data: qualRankings } = await supabase
           .from("league_qualification_standings")
