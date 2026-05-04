@@ -1,73 +1,29 @@
-## Mål
-1. Sæson 1 er afsluttet → vis den korrekt som "afsluttet" og ryd op i runde 6 (står stadig `active`).
-2. Brugeren skal kunne **bladre** mellem sæsoner (S1, S2, …) på `/commission-league`.
-3. **Næste sæson skal starte automatisk** — uden at en admin manuelt skal trykke "Aktiv".
+## Tilføj ny graf: Ansøgninger pr. uge
 
----
+Under den eksisterende "Ansøgninger over tid"-graf på `/recruitment` tilføjes en ny graf der viser udviklingen aggregeret pr. ISO-uge.
 
-## Hvad er på plads i dag
+### Hvad bygges
+- Nyt `Card` lige under den nuværende area chart med titel **"Ansøgninger pr. uge"**.
+- Bar chart (Recharts) med én søjle pr. uge.
+- X-akse label-format: `Uge 17` (med årstal i tooltip ved årsskifte).
+- Tooltip viser: `Uge X, YYYY` + antal + dato-interval (man–søn).
+- Samme periode-vælger (30d / 60d / 90d / 6m / 12m) — genbruger `chartPeriod`-state, så begge grafer følges ad.
 
-- `league_seasons` har 1 række: Sæson 1, status `completed`, slutdato 2026-05-03.
-- `useActiveSeason()` viser allerede `completed` som fallback når der ikke er en live sæson — men kun den **seneste**.
-- Der findes ingen UI til at vælge en anden (gammel) sæson på spillersiden.
-- Der findes **ingen cron/auto-flow** der promoverer en kladde-sæson til `qualification` → `active` → `completed` baseret på datoer. Status sættes manuelt i `SeasonManagerCard`.
-- Runde 6 i Sæson 1 står stadig `active` selvom sæsonen er `completed` (datafejl).
+### Data
+- Genbruger samme rådata som den nuværende `chartData` (kandidater grupperet pr. dag).
+- Aggregeres på frontend pr. ISO-uge med `date-fns` (`startOfISOWeek`, `getISOWeek`, `getISOWeekYear`) — ingen DB-ændringer.
+- Tomme uger i perioden vises som 0 (kontinuerlig x-akse).
 
----
+### Tekniske detaljer
+- **Fil:** `src/pages/recruitment/RecruitmentDashboard.tsx` (eneste fil ændres).
+- **Imports tilføjes:** `BarChart`, `Bar` fra recharts; `startOfISOWeek`, `endOfISOWeek`, `getISOWeek`, `getISOWeekYear` fra `date-fns`.
+- **Ny memo `weeklyChartData`** der mapper `chartData` (daglige tællinger) → array af `{ weekKey, weekLabel, weekStart, weekEnd, count }`.
+- Styling matcher eksisterende graf (samme `chartConfig`, `hsl(var(--primary))`, samme højde `h-[200px] sm:h-[300px]`).
 
-## Plan
+### Zone
+**Grøn zone** — ren UI/visualisering, ingen pricing/løn/RLS/DB påvirkes. Ingen migration. Ingen nye hooks.
 
-### 1. Datafix (migration)
-- Sæt `league_rounds.status = 'completed'` for runde 6 i Sæson 1.
-- Bekræft `league_seasons.is_active = false` for Sæson 1.
-
-### 2. Sæson-vælger på spillersiden (`CommissionLeague.tsx`)
-
-Tilføj en kompakt sæson-switcher i hero-headeren (ved siden af "Sæson X"-titlen):
-
-```text
-[ ◀  Sæson 1  ▼  ▶ ]   ← dropdown + pile
-```
-
-- Ny hook `useViewableSeasons()` henter alle sæsoner med status `qualification | active | completed` (skjuler kladder for almindelige brugere).
-- Ny lokal state `viewedSeasonId`. Default = den "live" sæson (qualification/active), ellers seneste completed.
-- Alle eksisterende hooks (`useMyEnrollment`, `useQualificationStandings`, `useCurrentRound`, `useSeasonStandings`, `useRoundHistory`, …) får `viewedSeasonId` i stedet for `season.id`.
-- Når man kigger på en **gammel** sæson:
-  - Skjul tilmeldings-/fan-knapper og sticky bar (de hører til live sæson).
-  - Vis tydelig badge: "Historisk – afsluttet d. {end_date}".
-  - Confetti-effekten må ikke trigge for historiske sæsoner.
-
-### 3. Auto-status for sæsoner
-
-To dele:
-
-**a) DB-funktion `league_auto_advance_seasons()`** (SECURITY DEFINER):
-- For hver sæson:
-  - `draft` + `qualification_start_at <= now()` → `qualification` (+ `is_active = true`).
-  - `qualification` + `qualification_end_at <= now()` og `start_date <= now()` → `active`.
-  - `active` + `end_date IS NOT NULL` og `end_date < now()` → `completed` (+ `is_active = false`, og luk evt. åbne runder).
-- Sikrer at maks. 1 sæson kan være `active` ad gangen (samme garde som `useUpdateSeasonStatus`).
-
-**b) pg_cron job** der kalder funktionen hver 5. minut.
-
-Resultatet: Når en admin opretter Sæson 2 som kladde med datoer i fremtiden, skifter den selv til `qualification` og senere `active`/`completed` uden manuel handling.
-
-### 4. UI-feedback i admin (`SeasonManagerCard`)
-- Lille hjælpetekst: "Status opdateres automatisk hvert 5. minut baseret på datoerne. Manuel ændring tilsidesætter."
-- (Allerede delvist til stede — udvides.)
-
----
-
-## Tekniske detaljer
-
-**Filer der ændres:**
-- `supabase/migrations/<ny>.sql` — datafix + `league_auto_advance_seasons()` + pg_cron schedule.
-- `src/hooks/useLeagueData.ts` — ny `useViewableSeasons()` hook.
-- `src/pages/CommissionLeague.tsx` — sæson-switcher + brug af `viewedSeasonId` overalt + skjul live-only UI for historiske sæsoner.
-- `src/components/league/SeasonManagerCard.tsx` — opdateret hjælpetekst.
-
-**Rød zone-tjek:** Ingen lønberegning, ingen pricing, ingen GDPR. Påvirker kun league-feature (gul zone). OK at implementere når godkendt.
-
-**Åbne spørgsmål (besluttes inden implementation):**
-- Skal kladder (`draft`) være synlige i sæson-switcheren for ejere/admins? Foreslår: nej, kun synlig i admin-siden.
-- Når Sæson 2 auto-aktiveres, skal spillere fra Sæson 1 så **auto-tilmeldes** Sæson 2, eller skal de tilmelde sig manuelt? Foreslår: manuel tilmelding (matcher nuværende mønster), men sig til hvis I vil have auto-tilmelding.
+### Out of scope
+- Ingen ændring af eksisterende daglige graf.
+- Ingen ny filtrering pr. status/kilde (kan tilføjes senere hvis ønsket).
+- Ingen DB-ændringer.

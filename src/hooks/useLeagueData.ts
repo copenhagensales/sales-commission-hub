@@ -60,24 +60,12 @@ export interface QualificationStanding {
   };
 }
 
-// Get active season (qualification or active), or fall back to most recent completed season.
-// Optionally pass a specific seasonId to view a historical season instead of the live one.
-export function useActiveSeason(viewSeasonId?: string) {
+// Get active season (qualification or active), or fall back to most recent completed season
+export function useActiveSeason() {
   return useQuery({
-    queryKey: ["league-active-season", viewSeasonId ?? "live"],
+    queryKey: ["league-active-season"],
     staleTime: 300000, // 5 minutter - sæsoner ændrer sig sjældent
     queryFn: async () => {
-      // If a specific season is requested, return it directly
-      if (viewSeasonId) {
-        const { data, error } = await supabase
-          .from("league_seasons")
-          .select("*")
-          .eq("id", viewSeasonId)
-          .maybeSingle();
-        if (error) throw error;
-        return (data as LeagueSeason | null) ?? null;
-      }
-
       // Prefer live season
       const { data: live, error: liveErr } = await supabase
         .from("league_seasons")
@@ -99,23 +87,6 @@ export function useActiveSeason(viewSeasonId?: string) {
         .maybeSingle();
       if (compErr) throw compErr;
       return (completed as LeagueSeason | null) ?? null;
-    },
-  });
-}
-
-// All seasons that should be visible in the season switcher (excludes drafts)
-export function useViewableSeasons() {
-  return useQuery({
-    queryKey: ["league-viewable-seasons"],
-    staleTime: 300000,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("league_seasons")
-        .select("id, season_number, status, start_date, end_date")
-        .in("status", ["qualification", "active", "completed"])
-        .order("season_number", { ascending: false });
-      if (error) throw error;
-      return (data || []) as Pick<LeagueSeason, "id" | "season_number" | "status" | "start_date" | "end_date">[];
     },
   });
 }
