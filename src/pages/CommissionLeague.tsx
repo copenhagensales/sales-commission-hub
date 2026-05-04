@@ -64,6 +64,68 @@ import { getRandomQuote, getPerformanceStatus } from "@/lib/gamification-quotes"
 import { LeagueMotivationBar } from "@/components/league/LeagueMotivationBar";
 import { usePersonalWeeklyStats } from "@/hooks/usePersonalWeeklyStats";
 
+type ViewableSeason = {
+  id: string;
+  season_number: number;
+  status: string;
+  start_date: string | null;
+  end_date: string | null;
+};
+
+function SeasonSwitcher({
+  seasons,
+  currentSeasonId,
+  onChange,
+}: {
+  seasons: ViewableSeason[];
+  currentSeasonId: string;
+  onChange: (id: string) => void;
+}) {
+  const sorted = [...seasons].sort((a, b) => a.season_number - b.season_number);
+  const idx = sorted.findIndex(s => s.id === currentSeasonId);
+  const prev = idx > 0 ? sorted[idx - 1] : null;
+  const next = idx >= 0 && idx < sorted.length - 1 ? sorted[idx + 1] : null;
+
+  const labelFor = (s: ViewableSeason) => {
+    const isLive = s.status === "qualification" || s.status === "active";
+    return `Sæson ${s.season_number}${isLive ? " (live)" : ""}`;
+  };
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-7 w-7"
+        disabled={!prev}
+        onClick={() => prev && onChange(prev.id)}
+        aria-label="Forrige sæson"
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
+      <select
+        value={currentSeasonId}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-7 rounded-md border border-slate-700 bg-slate-800/60 px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+      >
+        {[...sorted].reverse().map(s => (
+          <option key={s.id} value={s.id}>{labelFor(s)}</option>
+        ))}
+      </select>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-7 w-7"
+        disabled={!next}
+        onClick={() => next && onChange(next.id)}
+        aria-label="Næste sæson"
+      >
+        <ChevronRight className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
+
 export default function CommissionLeague() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
