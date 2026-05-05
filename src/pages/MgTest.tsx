@@ -452,7 +452,7 @@ export default function MgTest() {
     },
   });
 
-  // Fetch sale_items with needs_mapping=true in last 30 days (full rows for dialog)
+  // Fetch sale_items with needs_mapping=true in last 30 days (full rows for dialog + grouped UI)
   const { data: needsMappingItems } = useQuery({
     queryKey: ["mg-needs-mapping-items"],
     queryFn: async () => {
@@ -460,7 +460,7 @@ export default function MgTest() {
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       const { data, error } = await supabase
         .from("sale_items")
-        .select("id, adversus_product_title, created_at, quantity, sale_id, sales(agent_name)")
+        .select("id, adversus_product_title, adversus_external_id, created_at, quantity, sale_id, sales(agent_name, source, client_campaign_id, client_campaigns(id, name, client_id, clients(id, name)))")
         .eq("needs_mapping", true)
         .is("product_id", null)
         .gte("created_at", thirtyDaysAgo.toISOString())
@@ -469,6 +469,53 @@ export default function MgTest() {
       return data ?? [];
     },
   });
+
+  // Group needs-mapping sale_items by external_id + title + client for the
+  // "Manglende mapping"-gruppe i produktfanen.
+  type UnmappedProductGroup = {
+    key: string;
+    adversus_external_id: string | null;
+    adversus_product_title: string | null;
+    clientId: string | null;
+    clientName: string | null;
+    sale_source: string | null;
+    salesCount: number;
+    latest: string | null;
+  };
+  const unmappedProductGroups: UnmappedProductGroup[] = useMemo(() => {
+    const map = new Map<string, UnmappedProductGroup>();
+    (needsMappingItems ?? []).forEach((item: any) => {
+      const sale = item.sales ?? null;
+      const cc = sale?.client_campaigns ?? null;
+      const clientId = cc?.client_id ?? cc?.clients?.id ?? null;
+      const clientName = cc?.clients?.name ?? null;
+      const key = `${item.adversus_external_id ?? ""}::${item.adversus_product_title ?? ""}::${clientId ?? "no-client"}`;
+      const existing = map.get(key);
+      if (existing) {
+        existing.salesCount += item.quantity ?? 1;
+        if (!existing.latest || (item.created_at && item.created_at > existing.latest)) {
+          existing.latest = item.created_at;
+        }
+      } else {
+        map.set(key, {
+          key,
+          adversus_external_id: item.adversus_external_id ?? null,
+          adversus_product_title: item.adversus_product_title ?? null,
+          clientId,
+          clientName,
+          sale_source: sale?.source ?? null,
+          salesCount: item.quantity ?? 1,
+          latest: item.created_at ?? null,
+        });
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => {
+      const ac = a.clientName ?? "";
+      const bc = b.clientName ?? "";
+      if (ac !== bc) return ac.localeCompare(bc, "da");
+      return (a.adversus_product_title ?? "").localeCompare(b.adversus_product_title ?? "", "da");
+    });
+  }, [needsMappingItems]);
   const needsMappingCount = needsMappingItems?.length ?? 0;
   const [showNeedsMappingDialog, setShowNeedsMappingDialog] = useState(false);
 
