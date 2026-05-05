@@ -150,8 +150,8 @@ Deno.serve(async (req) => {
     const employeeIds = seasonStandings.map(s => s.employee_id);
 
     // --- Use get_sales_aggregates_v2 RPC (single source of truth) ---
-    const roundStart = toStartOfDay(expiredRound.start_date);
-    const roundEnd = toEndOfDay(expiredRound.end_date);
+    const roundStart = passthrough(expiredRound.start_date);
+    const roundEnd = passthrough(expiredRound.end_date);
 
     console.log(`[league-process-round] Round period: ${roundStart} to ${roundEnd}`);
 
