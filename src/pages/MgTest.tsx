@@ -2312,22 +2312,32 @@ export default function MgTest() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Produktnavn</TableHead>
+                    <TableHead>External ID</TableHead>
+                    <TableHead>Kunde / kilde</TableHead>
                     <TableHead>Sælger</TableHead>
                     <TableHead>Dato</TableHead>
                     <TableHead>Antal</TableHead>
-                    <TableHead>Sale Item ID</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(needsMappingItems ?? []).map((item: any) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="font-medium">{item.adversus_product_title ?? "—"}</TableCell>
-                      <TableCell>{item.sales?.agent_name ?? "—"}</TableCell>
-                      <TableCell>{item.created_at ? new Date(item.created_at).toLocaleDateString("da-DK") : "—"}</TableCell>
-                      <TableCell>{item.quantity ?? 1}</TableCell>
-                      <TableCell className="font-mono text-xs">{item.id.slice(0, 8)}</TableCell>
-                    </TableRow>
-                  ))}
+                  {(needsMappingItems ?? []).map((item: any) => {
+                    const cc = item.sales?.client_campaigns ?? null;
+                    const clientName = cc?.clients?.name ?? null;
+                    const source = item.sales?.source ?? null;
+                    return (
+                      <TableRow key={item.id}>
+                        <TableCell className="font-medium">{item.adversus_product_title ?? "—"}</TableCell>
+                        <TableCell className="font-mono text-xs">{item.adversus_external_id ?? "—"}</TableCell>
+                        <TableCell className="text-xs">
+                          {clientName ?? <span className="text-muted-foreground">Ingen kunde</span>}
+                          {source && <span className="text-muted-foreground"> · {source}</span>}
+                        </TableCell>
+                        <TableCell>{item.sales?.agent_name ?? "—"}</TableCell>
+                        <TableCell>{item.created_at ? new Date(item.created_at).toLocaleDateString("da-DK") : "—"}</TableCell>
+                        <TableCell>{item.quantity ?? 1}</TableCell>
+                      </TableRow>
+                    );
+                  })}
                   {(needsMappingItems ?? []).length === 0 && (
                     <TableRow>
                       <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
