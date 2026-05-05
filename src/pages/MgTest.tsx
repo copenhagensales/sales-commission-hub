@@ -2679,7 +2679,7 @@ export default function MgTest() {
                             </TableBody>
                           </Table>
                         </div>
-                        {group.rows.length > ITEMS_PER_SECTION && !expandedProductSections[groupKey] && (
+                        {groupKey !== "unmapped" && group.rows.length > ITEMS_PER_SECTION && !expandedProductSections[groupKey] && (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -2689,7 +2689,7 @@ export default function MgTest() {
                             {t("mgTest.showMore", { count: group.rows.length - ITEMS_PER_SECTION })}
                           </Button>
                         )}
-                        {expandedProductSections[groupKey] && group.rows.length > ITEMS_PER_SECTION && (
+                        {groupKey !== "unmapped" && expandedProductSections[groupKey] && group.rows.length > ITEMS_PER_SECTION && (
                           <Button
                             variant="ghost"
                             size="sm"
