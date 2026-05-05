@@ -29,13 +29,12 @@ function calculatePoints(
 }
 
 /**
- * Normalise a date value into a proper ISO string at start-of-day or end-of-day.
+ * Round windows are stored as proper UTC timestamps representing
+ * Copenhagen-local boundaries (Mon 00:00 -> Sun 23:59:59 CPH time).
+ * We pass them through unchanged so the aggregates RPC sees the exact window.
  */
-function toStartOfDay(raw: string): string {
-  return `${raw.slice(0, 10)}T00:00:00+00:00`;
-}
-function toEndOfDay(raw: string): string {
-  return `${raw.slice(0, 10)}T23:59:59+00:00`;
+function passthrough(raw: string): string {
+  return raw;
 }
 
 Deno.serve(async (req) => {
@@ -151,8 +150,8 @@ Deno.serve(async (req) => {
     const employeeIds = seasonStandings.map(s => s.employee_id);
 
     // --- Use get_sales_aggregates_v2 RPC (single source of truth) ---
-    const roundStart = toStartOfDay(expiredRound.start_date);
-    const roundEnd = toEndOfDay(expiredRound.end_date);
+    const roundStart = passthrough(expiredRound.start_date);
+    const roundEnd = passthrough(expiredRound.end_date);
 
     console.log(`[league-process-round] Round period: ${roundStart} to ${roundEnd}`);
 
@@ -372,10 +371,13 @@ Deno.serve(async (req) => {
       .eq("id", expiredRound.id);
 
     // --- Create next round ---
+    // expiredRound.end_date = Sunday 21:59:59 UTC (= Sunday 23:59:59 CPH).
+    // Next round starts 1 second later (Monday 00:00 CPH = Sunday 22:00 UTC)
+    // and ends 7 days minus 1 second after start (next Sunday 23:59:59 CPH).
     const nextRoundNumber = expiredRound.round_number + 1;
-    const nextStart = new Date(expiredRound.end_date);
-    const nextEnd = new Date(nextStart);
-    nextEnd.setDate(nextEnd.getDate() + 7);
+    const expiredEnd = new Date(expiredRound.end_date);
+    const nextStart = new Date(expiredEnd.getTime() + 1000); // +1s -> Mon 00:00 CPH
+    const nextEnd = new Date(nextStart.getTime() + 7 * 24 * 60 * 60 * 1000 - 1000); // Sun 23:59:59 CPH
 
     // Antal planlagte runder = antal multipliers i config (fallback til 6).
     // Forretningsregel: spillet kører N runder uanset om sidste runde overlapper sæsonens end_date med få dage.
@@ -396,7 +398,7 @@ Deno.serve(async (req) => {
       if (nextRoundError) {
         console.error("[league-process-round] Failed to create next round:", nextRoundError);
       } else {
-        console.log(`[league-process-round] Created round ${nextRoundNumber}`);
+        console.log(`[league-process-round] Created round ${nextRoundNumber}: ${nextStart.toISOString()} -> ${nextEnd.toISOString()}`);
       }
     } else {
       console.log(`[league-process-round] Season ends before next round, not creating`);
