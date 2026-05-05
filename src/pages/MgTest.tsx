@@ -772,18 +772,37 @@ export default function MgTest() {
     return aggregatedProducts.filter(p => !p.product?.is_hidden);
   }, [aggregatedProducts, showHiddenProducts]);
 
+  // Dedikeret sektion: alle produktgrupper der mangler mapping (needs_mapping=true,
+  // product_id IS NULL). Vises som én samlet gruppe øverst, uanset kunde.
+  const unmappedMappingRows: AggregatedProduct[] = useMemo(() => {
+    return unmappedProductGroups.map((u) => ({
+      key: `unmapped::${u.key}`,
+      adversus_external_id: u.adversus_external_id,
+      adversus_product_title: u.adversus_product_title,
+      mappingTitles: u.adversus_product_title ? [u.adversus_product_title] : [],
+      mappingExternalIds: u.adversus_external_id ? [u.adversus_external_id] : [],
+      mappingCount: u.salesCount,
+      product: null,
+      campaignId: u.clientId,
+      campaignLabel: u.clientName ?? "Manglende mapping",
+      sale_source: u.sale_source ?? null,
+    }));
+  }, [unmappedProductGroups]);
+
   const productsByCampaign = useMemo(() => {
     const groups = new Map<
       string,
       { campaignId: string | null; campaignLabel: string; rows: AggregatedProduct[] }
     >();
 
-    // Første gruppe: Manglende mapping (ingen kunde valgt)
-    groups.set("unmapped", {
-      campaignId: "unmapped",
-      campaignLabel: "Manglende mapping",
-      rows: [],
-    });
+    // Dedikeret gruppe øverst: alle umappede produkter samlet, uanset kunde.
+    if (unmappedMappingRows.length > 0) {
+      groups.set("unmapped", {
+        campaignId: "unmapped",
+        campaignLabel: "Manglende mapping",
+        rows: unmappedMappingRows,
+      });
+    }
 
     // Én gruppe pr. kendt kunde fra "Kundenavne"-fanen
     clients?.forEach((client) => {
@@ -796,10 +815,13 @@ export default function MgTest() {
       }
     });
 
-    // Fordel produkter i grupper (use filtered products)
+    // Fordel mappede produkter i kundegrupper. Umappede produkter (product=null)
+    // hører til den dedikerede "Manglende mapping"-gruppe og udelades her for
+    // at undgå at gemme dem under en kundegruppe hvor de er svære at finde.
     filteredAggregatedProducts.forEach((row) => {
-      const clientId = row.campaignId; // her bruger vi campaignId som kunde-id
-      const groupKey = clientId ?? "unmapped";
+      if (!row.product) return; // håndteres af unmapped-gruppen ovenfor
+      const clientId = row.campaignId;
+      const groupKey = clientId ?? "no-client";
       const existing = groups.get(groupKey);
 
       if (existing) {
@@ -807,48 +829,8 @@ export default function MgTest() {
       } else {
         groups.set(groupKey, {
           campaignId: clientId,
-          campaignLabel: clientId ? row.campaignLabel : "Manglende mapping",
+          campaignLabel: clientId ? row.campaignLabel : "Uden kunde",
           rows: [row],
-        });
-      }
-    });
-
-    // Tilføj sale_items der mangler product_id (needs_mapping=true) som
-    // pseudo-rækker i den korrekte kunde-gruppe (eller "Manglende mapping"
-    // hvis kunde ikke kunne udledes via salgets client_campaign).
-    unmappedProductGroups.forEach((u) => {
-      // Skip hvis et eksisterende produkt med samme external_id+title allerede
-      // findes i den samme kunde-gruppe (undgå dubletter mod RPC-data).
-      const targetGroupKey = u.clientId ?? "unmapped";
-      const targetGroup = groups.get(targetGroupKey);
-      const dupe = targetGroup?.rows.some(
-        (r) =>
-          (r.adversus_external_id ?? "") === (u.adversus_external_id ?? "") &&
-          (r.adversus_product_title ?? "") === (u.adversus_product_title ?? "") &&
-          !r.product, // kun dubletter mod andre umappede
-      );
-      if (dupe) return;
-
-      const pseudoRow: AggregatedProduct = {
-        key: `unmapped::${u.key}`,
-        adversus_external_id: u.adversus_external_id,
-        adversus_product_title: u.adversus_product_title,
-        mappingTitles: u.adversus_product_title ? [u.adversus_product_title] : [],
-        mappingExternalIds: u.adversus_external_id ? [u.adversus_external_id] : [],
-        mappingCount: u.salesCount,
-        product: null,
-        campaignId: u.clientId,
-        campaignLabel: u.clientName ?? "Manglende mapping",
-        sale_source: u.sale_source ?? null,
-      };
-
-      if (targetGroup) {
-        targetGroup.rows.push(pseudoRow);
-      } else {
-        groups.set(targetGroupKey, {
-          campaignId: u.clientId,
-          campaignLabel: u.clientName ?? "Manglende mapping",
-          rows: [pseudoRow],
         });
       }
     });
@@ -865,7 +847,7 @@ export default function MgTest() {
 
       return a.campaignLabel.localeCompare(b.campaignLabel, "da");
     });
-  }, [filteredAggregatedProducts, clients, unmappedProductGroups]);
+  }, [filteredAggregatedProducts, clients, unmappedMappingRows]);
 
   const emailSuggestions = useMemo<EmailMatchSuggestion[]>(() => {
     if (!agents || !vagtEmployees || !employeeIdentities) return [];
@@ -2432,8 +2414,8 @@ export default function MgTest() {
                       <div>
                         <CardTitle className="text-base font-semibold">{group.campaignLabel}</CardTitle>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {group.campaignLabel === t("mgTest.missingMapping")
-                            ? t("mgTest.missingMappingDesc")
+                          {groupKey === "unmapped"
+                            ? `${group.rows.length} produktgruppe(r) mangler mapping · ${group.rows.reduce((sum, r) => sum + (r.mappingCount ?? 0), 0)} salg i alt`
                             : t("mgTest.productsForCustomer", { count: group.rows.length })}
                         </p>
                       </div>
@@ -2477,7 +2459,7 @@ export default function MgTest() {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {(expandedProductSections[groupKey] ? group.rows : group.rows.slice(0, ITEMS_PER_SECTION)).map((row) => {
+                              {(groupKey === "unmapped" || expandedProductSections[groupKey] ? group.rows : group.rows.slice(0, ITEMS_PER_SECTION)).map((row) => {
                                 const current = editValues[row.key];
                                 const productId = row.product?.id ?? null;
                                 // Use campaignId which contains client_id from aggregated data
@@ -2697,7 +2679,7 @@ export default function MgTest() {
                             </TableBody>
                           </Table>
                         </div>
-                        {group.rows.length > ITEMS_PER_SECTION && !expandedProductSections[groupKey] && (
+                        {groupKey !== "unmapped" && group.rows.length > ITEMS_PER_SECTION && !expandedProductSections[groupKey] && (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -2707,7 +2689,7 @@ export default function MgTest() {
                             {t("mgTest.showMore", { count: group.rows.length - ITEMS_PER_SECTION })}
                           </Button>
                         )}
-                        {expandedProductSections[groupKey] && group.rows.length > ITEMS_PER_SECTION && (
+                        {groupKey !== "unmapped" && expandedProductSections[groupKey] && group.rows.length > ITEMS_PER_SECTION && (
                           <Button
                             variant="ghost"
                             size="sm"

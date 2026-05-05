@@ -1,49 +1,51 @@
-**Konklusion:** Produkterne findes i databasen, men MgTest-visningen skjuler/forvirrer dem, fordi gruppen "Manglende mapping" ikke nødvendigvis svarer til `needs_mapping=true`, og fordi listen begrænses/afhænger af en generel produkt-RPC. Jeg vil lave et lille UI/data-fix, ikke ændre pricing-logikken.
+**Konklusion:** Data er der. Problemet er nu primært UI: Produktfanen viser kun **3 rækker pr. gruppe** som default, og Eesy-produkterne bliver lagt under kundegruppen **Eesy TM** – ikke i den øverste gruppe “Manglende mapping”. Derfor ser det ud som om alle produkter ikke er under mapping, selvom dialogen viser dem.
 
 **Fund lige nu**
-- Der er aktuelt **390 sale_items** de seneste 30 dage med `needs_mapping=true` og `product_id IS NULL`.
-- De fordeler sig bl.a. på:
-  - Tryg/ukendt kampagne: 350 items
-  - Finansforbundet: 24 items
-  - Eesy TM: 13 items
-  - Relatel: 3 items
-- Eesy TM umappede produkter findes bl.a.:
-  - `Fri tale + 100 GB data (5G) (6 mdr. binding)`
-  - `Fri tale + 80 GB data (5G) (6 mdr. binding)`
-  - `Fri tale + 40 GB data (5G) (6 mdr. binding)`
-  - `Fri tale + fri data (5G) (6 mdr. binding) 10 % Rabat`
+- Databasen har **394 sale_items** med `needs_mapping=true` og `product_id IS NULL` de seneste 30 dage.
+- Det er **11 distinkte produkt/kunde-grupper**.
+- Eesy TM har aktuelt disse umappede grupper:
+  - `9457` — Fri tale + 40 GB data (5G) — 2 salg
+  - `9458` — Fri tale + 80 GB data (5G) — 4 salg
+  - `9459` — Fri tale + 100 GB data (5G) — 8 salg
+  - `Fri tale + fri data ... 10 % Rabat` — 1 salg
+- Screenshotet viser den rå detalje-dialog, men ikke en samlet mapping-arbejdsvisning. Den er svær at bruge, fordi den viser enkeltsalg og er begrænset i højden.
 
 **Zone**
-- Dette rammer MgTest/datamapping UI og en eksisterende read/query-visning: **gul zone**.
-- Jeg ændrer ikke pricing-motor, løn, `sale_items` historik eller provisionsberegning i dette step.
+- Dette er **gul zone**: MgTest UI/data-flow.
+- Jeg ændrer ikke pricing-motor, lønberegning, `sale_items` historik eller provisionssatser i dette fix.
 
 **Plan**
-1. **Lav separat datakilde til manglende mappings i MgTest**
-   - Brug den eksisterende `needsMappingItems` query som sand kilde for alert/dialog.
-   - Udvid den med `adversus_external_id`, `sale_source`, `sales(client_campaign_id, client_campaigns(...clients...))`, så produkt, kilde og kunde kan vises.
+1. **Lav en dedikeret “Produkter der mangler mapping”-sektion øverst i Produktmapping-fanen**
+   - Vises altid over kundegrupperne, når der findes umappede produkter.
+   - Bruger `unmappedProductGroups` direkte som kilde, ikke den almindelige produktgruppering.
+   - Viser én række pr. produkt/kunde-gruppe, ikke én række pr. sale_item.
 
-2. **Vis en rigtig “Manglende mapping”-tabel direkte i produktfanen**
-   - Øverst i produktfanen vises de umappede produkt-typer grupperet efter `adversus_external_id + adversus_product_title + kunde`.
-   - Kolonner: Produktnavn, External ID, Kunde/kilde, Antal salg, seneste dato, handling.
-   - Handlingen bliver den eksisterende mapping-flow: vælg kunde/produktindstillinger, opret mapping og sæt `product_id` på relevante `sale_items`.
+2. **Vis alle umappede produktgrupper som default**
+   - Den nye sektion skal ikke være begrænset til `ITEMS_PER_SECTION = 3`.
+   - Kolonner: Produktnavn, External ID, Kunde, Kilde, Antal salg, Seneste dato, Handling.
+   - Eesy TM-produkterne skal derfor kunne ses samlet uden at trykke “vis flere” i en kundegruppe.
 
-3. **Ret cache/invalidation efter mapping**
-   - Efter mapping invalidér både:
-     - `mg-needs-mapping-items`
-     - `mg-aggregated-products`
-     - `adversus-product-mappings`
-     - `products`
-   - I dag invalidéres primært `mg-needs-mapping-count`, men count er afledt af `mg-needs-mapping-items`, så UI kan blive stale.
+3. **Flyt/justér pseudo-rækker så “Manglende mapping” betyder reelt `needs_mapping=true`**
+   - I stedet for at gemme Eesy TM umappede produkter under Eesy TM-kortet, skal den dedikerede mapping-sektion vise alle umappede produktgrupper uanset kunde.
+   - De normale kundegrupper kan stadig vise eksisterende/mappede produkter, men de skal ikke være eneste sted at finde umappede produkter.
 
-4. **Gør alerten mere brugbar**
-   - Alerten skal vise faktisk antal umappede sale_items og åbne detaljer.
-   - Dialogen skal vise External ID + kilde/kunde, så man kan identificere Eesy TM-produkterne hurtigt.
+4. **Gør detalje-dialogen mere brugbar**
+   - Behold dialogen til rå enkeltsalg.
+   - Tilføj en lille opsummering øverst: antal salg + antal produktgrupper.
+   - Eventuelt gruppér dialogen eller tydeliggør at den viser enkeltsalg, ikke produktgrupper.
 
-5. **Verificering**
-   - Bekræft i databasen at de umappede Eesy TM-produkter kommer ud af queryen.
-   - Bekræft at MgTest viser dem i “Manglende mapping” uden at skulle rematche eller ændre priser.
-   - Ingen rematch køres automatisk i denne rettelse, medmindre du bagefter mapper produkterne og aktivt vil opdatere historiske priser.
+5. **Ret mapping-handlinger fra den nye sektion**
+   - Handlingerne genbruger eksisterende flow:
+     - Vælg kunde/opret produkt
+     - Opret og åbn pricing
+     - Opret og skjul produkt
+   - Efter handling invalidéres fortsat `mg-needs-mapping-items`, `mg-aggregated-products`, `adversus-product-mappings`, `products`.
+
+6. **Verificering**
+   - Tjek at den nye sektion viser 11 produkt/kunde-grupper.
+   - Tjek at Eesy TM viser de 4 relevante grupper (`9457`, `9458`, `9459`, rabat-produktet).
+   - Tjek at mapping af én gruppe fjerner den fra listen efter cache refresh.
 
 **Teknisk note**
-- Jeg vil helst holde fixet i `src/pages/MgTest.tsx` først, fordi det er der nuværende visning allerede ligger.
-- Hvis det viser sig at RPC’en `get_aggregated_product_types()` også skal justeres for langsigtet korrekthed, laver jeg en separat migration-plan, fordi DB-funktioner/pricing-adjacent logik er højere risiko.
+- Fix holdes i `src/pages/MgTest.tsx` først, fordi det er dér den nuværende Produktmapping-visning ligger.
+- Jeg vil ikke splitte MgTest op i denne omgang, selvom filen er stor, for at holde ændringen lille og målrettet.
