@@ -507,7 +507,10 @@ serve(async (req) => {
     const saleItemMetaById = new Map<string, SaleItemMeta>();
     const saleItemsBySaleId = new Map<string, SaleItemMeta[]>();
 
-    if (saleIdsForContext.length > 0) {
+    // Sibling prefetch is only needed for ASE ghost-item / duplicate-Lønsikring detection.
+    // Skip it for non-ASE rematches to save significant CPU and DB time.
+    const needsSiblingContext = !source || source === "ase" || saleItems.some((si: any) => (si.sales as any)?.source === "ase");
+    if (needsSiblingContext && saleIdsForContext.length > 0) {
       const saleIdChunkSize = 500;
       for (let i = 0; i < saleIdsForContext.length; i += saleIdChunkSize) {
         const chunk = saleIdsForContext.slice(i, i + saleIdChunkSize);
