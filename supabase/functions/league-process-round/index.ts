@@ -371,10 +371,13 @@ Deno.serve(async (req) => {
       .eq("id", expiredRound.id);
 
     // --- Create next round ---
+    // expiredRound.end_date = Sunday 21:59:59 UTC (= Sunday 23:59:59 CPH).
+    // Next round starts 1 second later (Monday 00:00 CPH = Sunday 22:00 UTC)
+    // and ends 7 days minus 1 second after start (next Sunday 23:59:59 CPH).
     const nextRoundNumber = expiredRound.round_number + 1;
-    const nextStart = new Date(expiredRound.end_date);
-    const nextEnd = new Date(nextStart);
-    nextEnd.setDate(nextEnd.getDate() + 7);
+    const expiredEnd = new Date(expiredRound.end_date);
+    const nextStart = new Date(expiredEnd.getTime() + 1000); // +1s -> Mon 00:00 CPH
+    const nextEnd = new Date(nextStart.getTime() + 7 * 24 * 60 * 60 * 1000 - 1000); // Sun 23:59:59 CPH
 
     // Antal planlagte runder = antal multipliers i config (fallback til 6).
     // Forretningsregel: spillet kører N runder uanset om sidste runde overlapper sæsonens end_date med få dage.
@@ -395,7 +398,7 @@ Deno.serve(async (req) => {
       if (nextRoundError) {
         console.error("[league-process-round] Failed to create next round:", nextRoundError);
       } else {
-        console.log(`[league-process-round] Created round ${nextRoundNumber}`);
+        console.log(`[league-process-round] Created round ${nextRoundNumber}: ${nextStart.toISOString()} -> ${nextEnd.toISOString()}`);
       }
     } else {
       console.log(`[league-process-round] Season ends before next round, not creating`);
