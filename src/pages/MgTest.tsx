@@ -452,7 +452,7 @@ export default function MgTest() {
     },
   });
 
-  // Fetch sale_items with needs_mapping=true in last 30 days (full rows for dialog)
+  // Fetch sale_items with needs_mapping=true in last 30 days (full rows for dialog + grouped UI)
   const { data: needsMappingItems } = useQuery({
     queryKey: ["mg-needs-mapping-items"],
     queryFn: async () => {
@@ -460,7 +460,7 @@ export default function MgTest() {
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       const { data, error } = await supabase
         .from("sale_items")
-        .select("id, adversus_product_title, created_at, quantity, sale_id, sales(agent_name)")
+        .select("id, adversus_product_title, adversus_external_id, created_at, quantity, sale_id, sales(agent_name, source, client_campaign_id, client_campaigns(id, name, client_id, clients(id, name)))")
         .eq("needs_mapping", true)
         .is("product_id", null)
         .gte("created_at", thirtyDaysAgo.toISOString())
@@ -469,6 +469,53 @@ export default function MgTest() {
       return data ?? [];
     },
   });
+
+  // Group needs-mapping sale_items by external_id + title + client for the
+  // "Manglende mapping"-gruppe i produktfanen.
+  type UnmappedProductGroup = {
+    key: string;
+    adversus_external_id: string | null;
+    adversus_product_title: string | null;
+    clientId: string | null;
+    clientName: string | null;
+    sale_source: string | null;
+    salesCount: number;
+    latest: string | null;
+  };
+  const unmappedProductGroups: UnmappedProductGroup[] = useMemo(() => {
+    const map = new Map<string, UnmappedProductGroup>();
+    (needsMappingItems ?? []).forEach((item: any) => {
+      const sale = item.sales ?? null;
+      const cc = sale?.client_campaigns ?? null;
+      const clientId = cc?.client_id ?? cc?.clients?.id ?? null;
+      const clientName = cc?.clients?.name ?? null;
+      const key = `${item.adversus_external_id ?? ""}::${item.adversus_product_title ?? ""}::${clientId ?? "no-client"}`;
+      const existing = map.get(key);
+      if (existing) {
+        existing.salesCount += item.quantity ?? 1;
+        if (!existing.latest || (item.created_at && item.created_at > existing.latest)) {
+          existing.latest = item.created_at;
+        }
+      } else {
+        map.set(key, {
+          key,
+          adversus_external_id: item.adversus_external_id ?? null,
+          adversus_product_title: item.adversus_product_title ?? null,
+          clientId,
+          clientName,
+          sale_source: sale?.source ?? null,
+          salesCount: item.quantity ?? 1,
+          latest: item.created_at ?? null,
+        });
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => {
+      const ac = a.clientName ?? "";
+      const bc = b.clientName ?? "";
+      if (ac !== bc) return ac.localeCompare(bc, "da");
+      return (a.adversus_product_title ?? "").localeCompare(b.adversus_product_title ?? "", "da");
+    });
+  }, [needsMappingItems]);
   const needsMappingCount = needsMappingItems?.length ?? 0;
   const [showNeedsMappingDialog, setShowNeedsMappingDialog] = useState(false);
 
@@ -766,6 +813,46 @@ export default function MgTest() {
       }
     });
 
+    // Tilføj sale_items der mangler product_id (needs_mapping=true) som
+    // pseudo-rækker i den korrekte kunde-gruppe (eller "Manglende mapping"
+    // hvis kunde ikke kunne udledes via salgets client_campaign).
+    unmappedProductGroups.forEach((u) => {
+      // Skip hvis et eksisterende produkt med samme external_id+title allerede
+      // findes i den samme kunde-gruppe (undgå dubletter mod RPC-data).
+      const targetGroupKey = u.clientId ?? "unmapped";
+      const targetGroup = groups.get(targetGroupKey);
+      const dupe = targetGroup?.rows.some(
+        (r) =>
+          (r.adversus_external_id ?? "") === (u.adversus_external_id ?? "") &&
+          (r.adversus_product_title ?? "") === (u.adversus_product_title ?? "") &&
+          !r.product, // kun dubletter mod andre umappede
+      );
+      if (dupe) return;
+
+      const pseudoRow: AggregatedProduct = {
+        key: `unmapped::${u.key}`,
+        adversus_external_id: u.adversus_external_id,
+        adversus_product_title: u.adversus_product_title,
+        mappingTitles: u.adversus_product_title ? [u.adversus_product_title] : [],
+        mappingExternalIds: u.adversus_external_id ? [u.adversus_external_id] : [],
+        mappingCount: u.salesCount,
+        product: null,
+        campaignId: u.clientId,
+        campaignLabel: u.clientName ?? "Manglende mapping",
+        sale_source: u.sale_source ?? null,
+      };
+
+      if (targetGroup) {
+        targetGroup.rows.push(pseudoRow);
+      } else {
+        groups.set(targetGroupKey, {
+          campaignId: u.clientId,
+          campaignLabel: u.clientName ?? "Manglende mapping",
+          rows: [pseudoRow],
+        });
+      }
+    });
+
     const result = Array.from(groups.values());
 
     // Sortér så "Manglende mapping" altid står først, derefter kunder alfabetisk
@@ -778,7 +865,7 @@ export default function MgTest() {
 
       return a.campaignLabel.localeCompare(b.campaignLabel, "da");
     });
-  }, [filteredAggregatedProducts, clients]);
+  }, [filteredAggregatedProducts, clients, unmappedProductGroups]);
 
   const emailSuggestions = useMemo<EmailMatchSuggestion[]>(() => {
     if (!agents || !vagtEmployees || !employeeIdentities) return [];
@@ -1052,12 +1139,12 @@ export default function MgTest() {
       queryClient.invalidateQueries({ queryKey: ["adversus-product-mappings"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["mg-client-campaigns"] });
-      queryClient.invalidateQueries({ queryKey: ["mg-needs-mapping-count"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-needs-mapping-items"] });
       // Auto-rematch: trigger pricing rule matching for newly mapped items
       supabase.functions.invoke("rematch-pricing-rules", { body: {} }).then((res) => {
         if (res.data?.stats?.updated > 0) {
           toast.success(`Auto-rematch: ${res.data.stats.updated} salg opdateret med priser`);
-          queryClient.invalidateQueries({ queryKey: ["mg-needs-mapping-count"] });
+          queryClient.invalidateQueries({ queryKey: ["mg-needs-mapping-items"] });
         }
       }).catch(() => { /* silent */ });
     },
@@ -1151,12 +1238,12 @@ export default function MgTest() {
       queryClient.invalidateQueries({ queryKey: ["mg-aggregated-products"] });
       queryClient.invalidateQueries({ queryKey: ["adversus-product-mappings"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
-      queryClient.invalidateQueries({ queryKey: ["mg-needs-mapping-count"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-needs-mapping-items"] });
       // Auto-rematch for newly mapped items
       supabase.functions.invoke("rematch-pricing-rules", { body: {} }).then((res) => {
         if (res.data?.stats?.updated > 0) {
           toast.success(`Auto-rematch: ${res.data.stats.updated} salg opdateret med priser`);
-          queryClient.invalidateQueries({ queryKey: ["mg-needs-mapping-count"] });
+          queryClient.invalidateQueries({ queryKey: ["mg-needs-mapping-items"] });
         }
       }).catch(() => { /* silent */ });
     },
@@ -2225,25 +2312,35 @@ export default function MgTest() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Produktnavn</TableHead>
+                    <TableHead>External ID</TableHead>
+                    <TableHead>Kunde / kilde</TableHead>
                     <TableHead>Sælger</TableHead>
                     <TableHead>Dato</TableHead>
                     <TableHead>Antal</TableHead>
-                    <TableHead>Sale Item ID</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(needsMappingItems ?? []).map((item: any) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="font-medium">{item.adversus_product_title ?? "—"}</TableCell>
-                      <TableCell>{item.sales?.agent_name ?? "—"}</TableCell>
-                      <TableCell>{item.created_at ? new Date(item.created_at).toLocaleDateString("da-DK") : "—"}</TableCell>
-                      <TableCell>{item.quantity ?? 1}</TableCell>
-                      <TableCell className="font-mono text-xs">{item.id.slice(0, 8)}</TableCell>
-                    </TableRow>
-                  ))}
+                  {(needsMappingItems ?? []).map((item: any) => {
+                    const cc = item.sales?.client_campaigns ?? null;
+                    const clientName = cc?.clients?.name ?? null;
+                    const source = item.sales?.source ?? null;
+                    return (
+                      <TableRow key={item.id}>
+                        <TableCell className="font-medium">{item.adversus_product_title ?? "—"}</TableCell>
+                        <TableCell className="font-mono text-xs">{item.adversus_external_id ?? "—"}</TableCell>
+                        <TableCell className="text-xs">
+                          {clientName ?? <span className="text-muted-foreground">Ingen kunde</span>}
+                          {source && <span className="text-muted-foreground"> · {source}</span>}
+                        </TableCell>
+                        <TableCell>{item.sales?.agent_name ?? "—"}</TableCell>
+                        <TableCell>{item.created_at ? new Date(item.created_at).toLocaleDateString("da-DK") : "—"}</TableCell>
+                        <TableCell>{item.quantity ?? 1}</TableCell>
+                      </TableRow>
+                    );
+                  })}
                   {(needsMappingItems ?? []).length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                         Ingen umappede salg fundet
                       </TableCell>
                     </TableRow>

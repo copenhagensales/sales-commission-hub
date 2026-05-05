@@ -1,104 +1,49 @@
+**Konklusion:** Produkterne findes i databasen, men MgTest-visningen skjuler/forvirrer dem, fordi gruppen "Manglende mapping" ikke nødvendigvis svarer til `needs_mapping=true`, og fordi listen begrænses/afhænger af en generel produkt-RPC. Jeg vil lave et lille UI/data-fix, ikke ændre pricing-logikken.
 
-# Fix Eesy TM pricing-regression (exclude-mode) + Winback 15 mdr-konsolidering
+**Fund lige nu**
+- Der er aktuelt **390 sale_items** de seneste 30 dage med `needs_mapping=true` og `product_id IS NULL`.
+- De fordeler sig bl.a. på:
+  - Tryg/ukendt kampagne: 350 items
+  - Finansforbundet: 24 items
+  - Eesy TM: 13 items
+  - Relatel: 3 items
+- Eesy TM umappede produkter findes bl.a.:
+  - `Fri tale + 100 GB data (5G) (6 mdr. binding)`
+  - `Fri tale + 80 GB data (5G) (6 mdr. binding)`
+  - `Fri tale + 40 GB data (5G) (6 mdr. binding)`
+  - `Fri tale + fri data (5G) (6 mdr. binding) 10 % Rabat`
 
-## TL;DR
+**Zone**
+- Dette rammer MgTest/datamapping UI og en eksisterende read/query-visning: **gul zone**.
+- Jeg ændrer ikke pricing-motor, løn, `sale_items` historik eller provisionsberegning i dette step.
 
-Bug findes ét sted: **`supabase/functions/integration-engine/core/sales.ts`** (linje 163-169 + SELECT linje 668). Den læser ikke `campaign_match_mode` og behandler alle regler som "include". Resultat: exclude-regler matcher aldrig på nye salg → de falder tilbage til base-pris.
+**Plan**
+1. **Lav separat datakilde til manglende mappings i MgTest**
+   - Brug den eksisterende `needsMappingItems` query som sand kilde for alert/dialog.
+   - Udvid den med `adversus_external_id`, `sale_source`, `sales(client_campaign_id, client_campaigns(...clients...))`, så produkt, kilde og kunde kan vises.
 
-`_shared/pricing-service.ts` og `rematch-pricing-rules/index.ts` har allerede korrekt logik. De er ikke ramt.
+2. **Vis en rigtig “Manglende mapping”-tabel direkte i produktfanen**
+   - Øverst i produktfanen vises de umappede produkt-typer grupperet efter `adversus_external_id + adversus_product_title + kunde`.
+   - Kolonner: Produktnavn, External ID, Kunde/kilde, Antal salg, seneste dato, handling.
+   - Handlingen bliver den eksisterende mapping-flow: vælg kunde/produktindstillinger, opret mapping og sæt `product_id` på relevante `sale_items`.
 
-Brugerens tabel = forventet resultat efter fix. Satser bekræftet korrekte.
+3. **Ret cache/invalidation efter mapping**
+   - Efter mapping invalidér både:
+     - `mg-needs-mapping-items`
+     - `mg-aggregated-products`
+     - `adversus-product-mappings`
+     - `products`
+   - I dag invalidéres primært `mg-needs-mapping-count`, men count er afledt af `mg-needs-mapping-items`, så UI kan blive stale.
 
-## Zone
+4. **Gør alerten mere brugbar**
+   - Alerten skal vise faktisk antal umappede sale_items og åbne detaljer.
+   - Dialogen skal vise External ID + kilde/kunde, så man kan identificere Eesy TM-produkterne hurtigt.
 
-**RØD** — pricing-motoren (top-10 kritisk fil). Ændringen er minimal og 1:1 alignment med allerede deployeret logik fra to søsterfiler. Kræver eksplicit godkendelse jf. princip §4.
+5. **Verificering**
+   - Bekræft i databasen at de umappede Eesy TM-produkter kommer ud af queryen.
+   - Bekræft at MgTest viser dem i “Manglende mapping” uden at skulle rematche eller ændre priser.
+   - Ingen rematch køres automatisk i denne rettelse, medmindre du bagefter mapper produkterne og aktivt vil opdatere historiske priser.
 
-## Hvorfor
-
-Sidste uges ændring tilføjede `campaign_match_mode = 'exclude'` på Eesy TM-reglerne. `_shared/pricing-service.ts` og `rematch-pricing-rules` blev opdateret. **Webhook-pipeline (`integration-engine`) blev glemt.**
-
-Forretningsregel (bekræftet):
-- Exclude-listen = konkurrenceleads, winback, FS leads, Inboxgame mv. → får HØJ base-pris (350/300)
-- Alt andet (Karman, Admill, Mobilpriser, Tjenestetorvet mv.) → matcher reglen og får LAV pris (260/225)
-
-## Ændringer
-
-### 1. Kode-fix (1 fil, 2 steder)
-
-**`supabase/functions/integration-engine/core/sales.ts`**
-
-**A) Linje 668** — tilføj `campaign_match_mode` til SELECT.
-
-**B) Linje 163-169** — erstat include-only check med samme logik som `_shared/pricing-service.ts`:
-
-```ts
-const ids = rule.campaign_mapping_ids;
-const hasRestriction = !!ids && ids.length > 0;
-const mode = rule.campaign_match_mode === "exclude" ? "exclude" : "include";
-
-let campaignMatches: boolean;
-if (!hasRestriction) {
-  campaignMatches = true;                                              // universal
-} else if (mode === "include") {
-  campaignMatches = !!campaignMappingId && ids!.includes(campaignMappingId);
-} else { // exclude
-  campaignMatches = !campaignMappingId || !ids!.includes(campaignMappingId);
-}
-if (!campaignMatches) continue;
-```
-
-Note (princip §8): logikken findes nu 3 steder. Bør konsolideres til én delt helper i `_shared/` som separat oprydningsopgave — uden for denne fix.
-
-### 2. Rematch af historiske data
-
-Kør `rematch-pricing-rules` for **Eesy TM** sale_items siden **2026-04-28**.
-
-Først `dry_run=true` → rapport:
-- Antal items der ændres pr. produkt
-- Total commission-delta
-- Stikprøve på 5 sager
-
-Derefter rigtig kørsel + broadcast `pricing_rules_updated` på `mg-test-sync` så `useSalesAggregates`, `EesyTmDashboard` og daily reports rydder cache.
-
-### 3. Winback 15 mdr-konsolidering
-
-To `adversus_campaign_mappings`-rækker for samme kampagne:
-- "Winback 15 mdr"
-- "Winback 15 mdr." (med punktum)
-
-Plan:
-1. Identificér de to mapping-IDs i DB.
-2. Vælg én som kanonisk (den med flest historiske referencer — typisk uden punktum, jf. mønster fra Winback 6 mdr-fixet).
-3. Opdater `sales.client_campaign_id` på alle salg fra dublet → kanonisk mapping.
-4. Opdater alle `product_pricing_rules.campaign_mapping_ids`-arrays der refererer dubletten.
-5. Deaktivér dubletten (`is_active=false`) i stedet for at slette — bevarer historik (princip §1: historik bevares altid).
-
-### 4. Verifikation efter deploy
-
-`supabase--read_query` mod 5 nyeste salg pr. produkt:
-- Karman Internettjek (NEJ) → 260 / 225 ✅
-- FS leads fra Bisnode (JA) → 350 / 300 ✅
-- Mobilpriser - Premium (NEJ, lille) → 260 / 225 ✅
-- Winback 15 mdr (uanset variant) → 350 / 300 ✅
-
-## Forventet resultat
-
-Matcher brugerens tabel 1:1 efter fix + rematch.
-
-**Fri tale + fri data (5G):** Alle ⬇-rækker → 260. ✅-rækker uændret.
-**Fri Tale + 70 GB:** Alle ⬇-rækker → 225, alle ⬆-rækker → 300.
-
-## Parkeret (ikke i denne leverance)
-
-- **CAMP7343C81 / CAMP7371C81 / CAMP7526C81** — navne ukendte. Volumen er stor (samlet 374 salg på de to produkter), så de bør navngives når kilden er identificeret. Tilføj som separat opgave senere.
-- **Admill - Internet leads outlier (5G, snit 416 kr)** — bekræftet manuel/forkert provision. Behandles via salgs-redigering (ikke pricing-fix). Separat opgave.
-
-## Næste skridt
-
-Når du godkender, skifter jeg til build-mode og:
-1. Implementerer kode-fixet i `sales.ts`.
-2. Deployer `integration-engine`.
-3. Kører dry-run rematch og rapporterer tal.
-4. Beder om go/no-go på rigtig rematch.
-5. Udfører Winback 15 mdr-konsolidering (insert-tool).
-6. Verificerer.
+**Teknisk note**
+- Jeg vil helst holde fixet i `src/pages/MgTest.tsx` først, fordi det er der nuværende visning allerede ligger.
+- Hvis det viser sig at RPC’en `get_aggregated_product_types()` også skal justeres for langsigtet korrekthed, laver jeg en separat migration-plan, fordi DB-funktioner/pricing-adjacent logik er højere risiko.
