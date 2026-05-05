@@ -2459,7 +2459,7 @@ export default function MgTest() {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {(expandedProductSections[groupKey] ? group.rows : group.rows.slice(0, ITEMS_PER_SECTION)).map((row) => {
+                              {(groupKey === "unmapped" || expandedProductSections[groupKey] ? group.rows : group.rows.slice(0, ITEMS_PER_SECTION)).map((row) => {
                                 const current = editValues[row.key];
                                 const productId = row.product?.id ?? null;
                                 // Use campaignId which contains client_id from aggregated data
