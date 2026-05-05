@@ -1,55 +1,104 @@
-# Fix: Umappede salg vises ikke under "Manglende mapping"
 
-## Problem
+# Fix Eesy TM pricing-regression (exclude-mode) + Winback 15 mdr-konsolidering
 
-Banneret øverst på MG Test viser **"379 salg mangler produktmapping (seneste 30 dage)"**, men selve "Manglende mapping"-tabellen i Mapping produkt-fanen er tom.
+## TL;DR
 
-## Root cause
+Bug findes ét sted: **`supabase/functions/integration-engine/core/sales.ts`** (linje 163-169 + SELECT linje 668). Den læser ikke `campaign_match_mode` og behandler alle regler som "include". Resultat: exclude-regler matcher aldrig på nye salg → de falder tilbage til base-pris.
 
-Database-funktionen `get_aggregated_product_types` returnerer kun **én** række pr. (adversus_external_id, adversus_product_title) via `DISTINCT ON`. Sortering prioriterer rækker hvor `product_id IS NOT NULL`:
+`_shared/pricing-service.ts` og `rematch-pricing-rules/index.ts` har allerede korrekt logik. De er ikke ramt.
 
-```sql
-ORDER BY
-  si.adversus_external_id,
-  si.adversus_product_title,
-  CASE WHEN si.product_id IS NOT NULL THEN 0 ELSE 1 END,  -- mappet vinder
-  si.created_at DESC
+Brugerens tabel = forventet resultat efter fix. Satser bekræftet korrekte.
+
+## Zone
+
+**RØD** — pricing-motoren (top-10 kritisk fil). Ændringen er minimal og 1:1 alignment med allerede deployeret logik fra to søsterfiler. Kræver eksplicit godkendelse jf. princip §4.
+
+## Hvorfor
+
+Sidste uges ændring tilføjede `campaign_match_mode = 'exclude'` på Eesy TM-reglerne. `_shared/pricing-service.ts` og `rematch-pricing-rules` blev opdateret. **Webhook-pipeline (`integration-engine`) blev glemt.**
+
+Forretningsregel (bekræftet):
+- Exclude-listen = konkurrenceleads, winback, FS leads, Inboxgame mv. → får HØJ base-pris (350/300)
+- Alt andet (Karman, Admill, Mobilpriser, Tjenestetorvet mv.) → matcher reglen og får LAV pris (260/225)
+
+## Ændringer
+
+### 1. Kode-fix (1 fil, 2 steder)
+
+**`supabase/functions/integration-engine/core/sales.ts`**
+
+**A) Linje 668** — tilføj `campaign_match_mode` til SELECT.
+
+**B) Linje 163-169** — erstat include-only check med samme logik som `_shared/pricing-service.ts`:
+
+```ts
+const ids = rule.campaign_mapping_ids;
+const hasRestriction = !!ids && ids.length > 0;
+const mode = rule.campaign_match_mode === "exclude" ? "exclude" : "include";
+
+let campaignMatches: boolean;
+if (!hasRestriction) {
+  campaignMatches = true;                                              // universal
+} else if (mode === "include") {
+  campaignMatches = !!campaignMappingId && ids!.includes(campaignMappingId);
+} else { // exclude
+  campaignMatches = !campaignMappingId || !ids!.includes(campaignMappingId);
+}
+if (!campaignMatches) continue;
 ```
 
-Resultat: hvis blot ét salg med samme titel har en mapping, "vinder" den mappede række, og de umappede salg forsvinder fra listen. RPC'en returnerer kun **9 umappede produkt-grupper**, selvom der er **379 sale_items uden mapping** fordelt på ~10+ unikke titler.
+Note (princip §8): logikken findes nu 3 steder. Bør konsolideres til én delt helper i `_shared/` som separat oprydningsopgave — uden for denne fix.
 
-Eksempler på titler der er skjult i dag:
-- `Meeting -- AE_1_police` (263 umappede)
-- `Meeting -- AE_permision` (73 umappede)
-- `TRYG SMS - Finansforbundet` (24 umappede)
-- `Fri tale + 100 GB data (5G) (6 mdr. binding)` (3 umappede)
+### 2. Rematch af historiske data
 
-## Fix
+Kør `rematch-pricing-rules` for **Eesy TM** sale_items siden **2026-04-28**.
 
-Opdatér `DISTINCT ON` til også at gruppere på `(product_id IS NULL)`. Så får vi to separate rækker pr. titel hvis både mappede og umappede varianter findes — og umappede salg dukker korrekt op under "Manglende mapping" gruppen i UI.
+Først `dry_run=true` → rapport:
+- Antal items der ændres pr. produkt
+- Total commission-delta
+- Stikprøve på 5 sager
 
-```sql
-DISTINCT ON (
-  si.adversus_external_id,
-  si.adversus_product_title,
-  (si.product_id IS NULL)   -- ny: separer mappet vs. umappet
-)
-...
-ORDER BY
-  si.adversus_external_id,
-  si.adversus_product_title,
-  (si.product_id IS NULL),
-  si.created_at DESC
-```
+Derefter rigtig kørsel + broadcast `pricing_rules_updated` på `mg-test-sync` så `useSalesAggregates`, `EesyTmDashboard` og daily reports rydder cache.
 
-## Berørte filer
+### 3. Winback 15 mdr-konsolidering
 
-- **Migration (DB):** Opdater funktionen `public.get_aggregated_product_types()`. Rød zone (pricing-relaterede mapping-flows) — derfor afgrænset til denne ene RPC, ingen andre tabeller eller funktioner.
-- **Frontend:** Ingen ændringer. `aggregatedProducts`-logikken i `src/pages/MgTest.tsx` håndterer allerede rækker uden `product_id` korrekt (linje 652-669) — de placeres automatisk i "Manglende mapping"-gruppen via `clientId ?? "unmapped"`-routing.
+To `adversus_campaign_mappings`-rækker for samme kampagne:
+- "Winback 15 mdr"
+- "Winback 15 mdr." (med punktum)
+
+Plan:
+1. Identificér de to mapping-IDs i DB.
+2. Vælg én som kanonisk (den med flest historiske referencer — typisk uden punktum, jf. mønster fra Winback 6 mdr-fixet).
+3. Opdater `sales.client_campaign_id` på alle salg fra dublet → kanonisk mapping.
+4. Opdater alle `product_pricing_rules.campaign_mapping_ids`-arrays der refererer dubletten.
+5. Deaktivér dubletten (`is_active=false`) i stedet for at slette — bevarer historik (princip §1: historik bevares altid).
+
+### 4. Verifikation efter deploy
+
+`supabase--read_query` mod 5 nyeste salg pr. produkt:
+- Karman Internettjek (NEJ) → 260 / 225 ✅
+- FS leads fra Bisnode (JA) → 350 / 300 ✅
+- Mobilpriser - Premium (NEJ, lille) → 260 / 225 ✅
+- Winback 15 mdr (uanset variant) → 350 / 300 ✅
 
 ## Forventet resultat
 
-Efter fix:
-- "Manglende mapping"-gruppen viser ~10+ produkter (én pr. unik titel uden mapping)
-- Banner-tællingen og listen stemmer overens
-- Eksisterende mappede produkter vises uændret i deres respektive kunde-grupper
+Matcher brugerens tabel 1:1 efter fix + rematch.
+
+**Fri tale + fri data (5G):** Alle ⬇-rækker → 260. ✅-rækker uændret.
+**Fri Tale + 70 GB:** Alle ⬇-rækker → 225, alle ⬆-rækker → 300.
+
+## Parkeret (ikke i denne leverance)
+
+- **CAMP7343C81 / CAMP7371C81 / CAMP7526C81** — navne ukendte. Volumen er stor (samlet 374 salg på de to produkter), så de bør navngives når kilden er identificeret. Tilføj som separat opgave senere.
+- **Admill - Internet leads outlier (5G, snit 416 kr)** — bekræftet manuel/forkert provision. Behandles via salgs-redigering (ikke pricing-fix). Separat opgave.
+
+## Næste skridt
+
+Når du godkender, skifter jeg til build-mode og:
+1. Implementerer kode-fixet i `sales.ts`.
+2. Deployer `integration-engine`.
+3. Kører dry-run rematch og rapporterer tal.
+4. Beder om go/no-go på rigtig rematch.
+5. Udfører Winback 15 mdr-konsolidering (insert-tool).
+6. Verificerer.

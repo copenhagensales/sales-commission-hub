@@ -160,11 +160,22 @@ function matchPricingRule(
       }
     }
 
-    const hasCampaignRestriction = rule.campaign_mapping_ids && rule.campaign_mapping_ids.length > 0;
-    const campaignMatches = hasCampaignRestriction && campaignMappingId && rule.campaign_mapping_ids!.includes(campaignMappingId);
+    // Campaign restriction with include/exclude support
+    // Mirrors logic in supabase/functions/_shared/pricing-service.ts and rematch-pricing-rules
+    const ids = rule.campaign_mapping_ids;
+    const hasRestriction = !!ids && ids.length > 0;
+    const mode = (rule as any).campaign_match_mode === "exclude" ? "exclude" : "include";
 
-    // Check campaign restriction if rule has campaign_mapping_ids
-    if (hasCampaignRestriction && !campaignMatches) {
+    let campaignMatches: boolean;
+    if (!hasRestriction) {
+      campaignMatches = true; // universal rule
+    } else if (mode === "include") {
+      campaignMatches = !!campaignMappingId && ids!.includes(campaignMappingId);
+    } else {
+      // exclude: matches when sale's campaign is NOT in the list (or sale has no campaign)
+      campaignMatches = !campaignMappingId || !ids!.includes(campaignMappingId);
+    }
+    if (!campaignMatches) {
       continue;
     }
 
@@ -665,7 +676,7 @@ export async function processSales(
   const [productsResult, mappingsResult, pricingRulesResult, campaignMappingsResult, integrationsResult] = await Promise.all([
     fetchAllPaginated(supabase, "products", "id, name, commission_dkk, revenue_dkk", (q) => q),
     fetchAllPaginated(supabase, "adversus_product_mappings", "*", (q) => q),
-    fetchAllPaginated(supabase, "product_pricing_rules", "id, product_id, name, conditions, commission_dkk, revenue_dkk, priority, is_active, campaign_mapping_ids, effective_from, effective_to, use_rule_name_as_display", (q) => q.eq("is_active", true)),
+    fetchAllPaginated(supabase, "product_pricing_rules", "id, product_id, name, conditions, commission_dkk, revenue_dkk, priority, is_active, campaign_mapping_ids, campaign_match_mode, effective_from, effective_to, use_rule_name_as_display", (q) => q.eq("is_active", true)),
     fetchAllPaginated(supabase, "adversus_campaign_mappings", "id, adversus_campaign_id", (q) => q),
     supabase.from("dialer_integrations").select("id, name").eq("is_active", true)
   ]);
