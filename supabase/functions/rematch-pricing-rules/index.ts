@@ -331,8 +331,11 @@ serve(async (req) => {
     console.log(`[rematch-pricing-rules] Starting with source=${source || "all"}, product_id=${productId || "all"}, sale_ids=${saleIds?.length || 0}, sale_item_ids=${saleItemIds?.length || 0}, limit=${limit || "none"}, dry_run=${dryRun}, min_sale_datetime=${minSaleDatetime || "none"}`);
 
     // Phase 0: Resolve needs_mapping items by looking up adversus_product_mappings
+    // Skip when caller targets a specific product / sales / items — Phase 0 is only
+    // relevant for the global "rematch everything" run and is the most expensive part.
+    const skipPhase0 = !!(productId || (saleIds && saleIds.length > 0) || (saleItemIds && saleItemIds.length > 0));
     const resolvedItemIds: string[] = [];
-    {
+    if (!skipPhase0) {
       const { data: needsMappingItems, error: nmError } = await supabase
         .from("sale_items")
         .select("id, adversus_product_title, adversus_external_id, unit_price")
