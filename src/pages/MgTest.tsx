@@ -813,6 +813,46 @@ export default function MgTest() {
       }
     });
 
+    // Tilføj sale_items der mangler product_id (needs_mapping=true) som
+    // pseudo-rækker i den korrekte kunde-gruppe (eller "Manglende mapping"
+    // hvis kunde ikke kunne udledes via salgets client_campaign).
+    unmappedProductGroups.forEach((u) => {
+      // Skip hvis et eksisterende produkt med samme external_id+title allerede
+      // findes i den samme kunde-gruppe (undgå dubletter mod RPC-data).
+      const targetGroupKey = u.clientId ?? "unmapped";
+      const targetGroup = groups.get(targetGroupKey);
+      const dupe = targetGroup?.rows.some(
+        (r) =>
+          (r.adversus_external_id ?? "") === (u.adversus_external_id ?? "") &&
+          (r.adversus_product_title ?? "") === (u.adversus_product_title ?? "") &&
+          !r.product, // kun dubletter mod andre umappede
+      );
+      if (dupe) return;
+
+      const pseudoRow: AggregatedProduct = {
+        key: `unmapped::${u.key}`,
+        adversus_external_id: u.adversus_external_id,
+        adversus_product_title: u.adversus_product_title,
+        mappingTitles: u.adversus_product_title ? [u.adversus_product_title] : [],
+        mappingExternalIds: u.adversus_external_id ? [u.adversus_external_id] : [],
+        mappingCount: u.salesCount,
+        product: null,
+        campaignId: u.clientId,
+        campaignLabel: u.clientName ?? "Manglende mapping",
+        sale_source: u.sale_source ?? null,
+      };
+
+      if (targetGroup) {
+        targetGroup.rows.push(pseudoRow);
+      } else {
+        groups.set(targetGroupKey, {
+          campaignId: u.clientId,
+          campaignLabel: u.clientName ?? "Manglende mapping",
+          rows: [pseudoRow],
+        });
+      }
+    });
+
     const result = Array.from(groups.values());
 
     // Sortér så "Manglende mapping" altid står først, derefter kunder alfabetisk
@@ -825,7 +865,7 @@ export default function MgTest() {
 
       return a.campaignLabel.localeCompare(b.campaignLabel, "da");
     });
-  }, [filteredAggregatedProducts, clients]);
+  }, [filteredAggregatedProducts, clients, unmappedProductGroups]);
 
   const emailSuggestions = useMemo<EmailMatchSuggestion[]>(() => {
     if (!agents || !vagtEmployees || !employeeIdentities) return [];
