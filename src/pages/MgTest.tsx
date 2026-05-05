@@ -2414,8 +2414,8 @@ export default function MgTest() {
                       <div>
                         <CardTitle className="text-base font-semibold">{group.campaignLabel}</CardTitle>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {group.campaignLabel === t("mgTest.missingMapping")
-                            ? t("mgTest.missingMappingDesc")
+                          {groupKey === "unmapped"
+                            ? `${group.rows.length} produktgruppe(r) mangler mapping · ${group.rows.reduce((sum, r) => sum + (r.mappingCount ?? 0), 0)} salg i alt`
                             : t("mgTest.productsForCustomer", { count: group.rows.length })}
                         </p>
                       </div>
