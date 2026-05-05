@@ -27,7 +27,7 @@ const QUERY_GROUPS: Record<Exclude<MgTestInvalidationGroup, "kpi">, string[]> = 
     "mg-manual-products",
     "products",
     "needs-mapping",
-    "mg-needs-mapping-count",
+    "mg-needs-mapping-items",
     "mg-mapped-product-ids",
     "aggregated-product-types",
   ],

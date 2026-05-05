@@ -1139,12 +1139,12 @@ export default function MgTest() {
       queryClient.invalidateQueries({ queryKey: ["adversus-product-mappings"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["mg-client-campaigns"] });
-      queryClient.invalidateQueries({ queryKey: ["mg-needs-mapping-count"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-needs-mapping-items"] });
       // Auto-rematch: trigger pricing rule matching for newly mapped items
       supabase.functions.invoke("rematch-pricing-rules", { body: {} }).then((res) => {
         if (res.data?.stats?.updated > 0) {
           toast.success(`Auto-rematch: ${res.data.stats.updated} salg opdateret med priser`);
-          queryClient.invalidateQueries({ queryKey: ["mg-needs-mapping-count"] });
+          queryClient.invalidateQueries({ queryKey: ["mg-needs-mapping-items"] });
         }
       }).catch(() => { /* silent */ });
     },
@@ -1238,12 +1238,12 @@ export default function MgTest() {
       queryClient.invalidateQueries({ queryKey: ["mg-aggregated-products"] });
       queryClient.invalidateQueries({ queryKey: ["adversus-product-mappings"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
-      queryClient.invalidateQueries({ queryKey: ["mg-needs-mapping-count"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-needs-mapping-items"] });
       // Auto-rematch for newly mapped items
       supabase.functions.invoke("rematch-pricing-rules", { body: {} }).then((res) => {
         if (res.data?.stats?.updated > 0) {
           toast.success(`Auto-rematch: ${res.data.stats.updated} salg opdateret med priser`);
-          queryClient.invalidateQueries({ queryKey: ["mg-needs-mapping-count"] });
+          queryClient.invalidateQueries({ queryKey: ["mg-needs-mapping-items"] });
         }
       }).catch(() => { /* silent */ });
     },

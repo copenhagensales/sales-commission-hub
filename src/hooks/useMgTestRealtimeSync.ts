@@ -17,7 +17,7 @@ const QUERY_KEYS_TO_INVALIDATE = [
   "mg-manual-products",
   "products",
   "needs-mapping",
-  "mg-needs-mapping-count",
+  "mg-needs-mapping-items",
   "mg-mapped-product-ids",
   "aggregated-product-types",
   "dashboard-sales-data",
