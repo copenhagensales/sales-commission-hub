@@ -331,8 +331,11 @@ serve(async (req) => {
     console.log(`[rematch-pricing-rules] Starting with source=${source || "all"}, product_id=${productId || "all"}, sale_ids=${saleIds?.length || 0}, sale_item_ids=${saleItemIds?.length || 0}, limit=${limit || "none"}, dry_run=${dryRun}, min_sale_datetime=${minSaleDatetime || "none"}`);
 
     // Phase 0: Resolve needs_mapping items by looking up adversus_product_mappings
+    // Skip when caller targets a specific product / sales / items — Phase 0 is only
+    // relevant for the global "rematch everything" run and is the most expensive part.
+    const skipPhase0 = !!(productId || (saleIds && saleIds.length > 0) || (saleItemIds && saleItemIds.length > 0));
     const resolvedItemIds: string[] = [];
-    {
+    if (!skipPhase0) {
       const { data: needsMappingItems, error: nmError } = await supabase
         .from("sale_items")
         .select("id, adversus_product_title, adversus_external_id, unit_price")
@@ -504,7 +507,10 @@ serve(async (req) => {
     const saleItemMetaById = new Map<string, SaleItemMeta>();
     const saleItemsBySaleId = new Map<string, SaleItemMeta[]>();
 
-    if (saleIdsForContext.length > 0) {
+    // Sibling prefetch is only needed for ASE ghost-item / duplicate-Lønsikring detection.
+    // Skip it for non-ASE rematches to save significant CPU and DB time.
+    const needsSiblingContext = !source || source === "ase" || saleItems.some((si: any) => (si.sales as any)?.source === "ase");
+    if (needsSiblingContext && saleIdsForContext.length > 0) {
       const saleIdChunkSize = 500;
       for (let i = 0; i < saleIdsForContext.length; i += saleIdChunkSize) {
         const chunk = saleIdsForContext.slice(i, i + saleIdChunkSize);
@@ -812,30 +818,39 @@ serve(async (req) => {
     if (!dryRun && updates.length > 0) {
       console.log(`[rematch-pricing-rules] Applying ${updates.length} updates...`);
 
-      // Batch updates in chunks of 100
-      const chunkSize = 100;
-      for (let i = 0; i < updates.length; i += chunkSize) {
-        const chunk = updates.slice(i, i + chunkSize);
-
-        for (const update of chunk) {
-          const { error: updateError } = await supabase
-            .from("sale_items")
-            .update({
-              product_id: update.product_id,
-              matched_pricing_rule_id: update.matched_pricing_rule_id,
-              mapped_commission: update.mapped_commission,
-              mapped_revenue: update.mapped_revenue,
-              needs_mapping: update.needs_mapping,
-              display_name: update.display_name,
-            })
-            .eq("id", update.id);
-
-          if (updateError) {
-            console.error(`[rematch-pricing-rules] Error updating sale_item ${update.id}:`, updateError);
+      // Run updates in parallel batches to drastically reduce wall-clock time
+      // (sequential awaited per-row updates were causing WORKER_RESOURCE_LIMIT).
+      const concurrency = 25;
+      let completed = 0;
+      for (let i = 0; i < updates.length; i += concurrency) {
+        const batch = updates.slice(i, i + concurrency);
+        const results = await Promise.allSettled(
+          batch.map((update) =>
+            supabase
+              .from("sale_items")
+              .update({
+                product_id: update.product_id,
+                matched_pricing_rule_id: update.matched_pricing_rule_id,
+                mapped_commission: update.mapped_commission,
+                mapped_revenue: update.mapped_revenue,
+                needs_mapping: update.needs_mapping,
+                display_name: update.display_name,
+              })
+              .eq("id", update.id)
+          )
+        );
+        for (let j = 0; j < results.length; j++) {
+          const r = results[j];
+          if (r.status === "rejected") {
+            console.error(`[rematch-pricing-rules] Error updating sale_item ${batch[j].id}:`, r.reason);
+          } else if ((r.value as any)?.error) {
+            console.error(`[rematch-pricing-rules] Error updating sale_item ${batch[j].id}:`, (r.value as any).error);
           }
         }
-
-        console.log(`[rematch-pricing-rules] Updated ${Math.min(i + chunkSize, updates.length)}/${updates.length}`);
+        completed += batch.length;
+        if (completed % 200 === 0 || completed === updates.length) {
+          console.log(`[rematch-pricing-rules] Updated ${completed}/${updates.length}`);
+        }
       }
 
       console.log(`[rematch-pricing-rules] Successfully updated ${updates.length} sale_items`);
