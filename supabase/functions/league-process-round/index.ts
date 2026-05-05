@@ -29,13 +29,12 @@ function calculatePoints(
 }
 
 /**
- * Normalise a date value into a proper ISO string at start-of-day or end-of-day.
+ * Round windows are stored as proper UTC timestamps representing
+ * Copenhagen-local boundaries (Mon 00:00 -> Sun 23:59:59 CPH time).
+ * We pass them through unchanged so the aggregates RPC sees the exact window.
  */
-function toStartOfDay(raw: string): string {
-  return `${raw.slice(0, 10)}T00:00:00+00:00`;
-}
-function toEndOfDay(raw: string): string {
-  return `${raw.slice(0, 10)}T23:59:59+00:00`;
+function passthrough(raw: string): string {
+  return raw;
 }
 
 Deno.serve(async (req) => {
