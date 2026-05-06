@@ -1,0 +1,101 @@
+name: Regenerate snapshots
+
+# Auto-regenerates docs/system-snapshot.md, docs/ui-snapshot.md and
+# docs/cross-reference.md when the schema or source code changes.
+#
+# REQUIRED SECRETS (set in GitHub → Settings → Secrets and variables → Actions):
+#   - SUPABASE_DB_URL_READONLY
+#       Connection string for a login user that has been granted the
+#       `snapshot_readonly` role. Format:
+#         postgresql://<user>:<password>@<host>:5432/postgres
+#       The role enforces RLS and has a 10s statement_timeout.
+#
+# The workflow uses the built-in GITHUB_TOKEN to push regenerated files back to
+# main. The "[skip ci]" tag in the commit message prevents an infinite loop.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "supabase/migrations/**"
+      - "src/**"
+      - "scripts/generate-*.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: regenerate-snapshots
+  cancel-in-progress: false
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    # Skip if the commit that triggered this run was itself a snapshot regen
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install psql client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Verify SUPABASE_DB_URL_READONLY is set
+        env:
+          SUPABASE_DB_URL_READONLY: ${{ secrets.SUPABASE_DB_URL_READONLY }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL_READONLY" ]; then
+            echo "::error::SUPABASE_DB_URL_READONLY secret is not set."
+            echo "Create a database user, GRANT snapshot_readonly TO <user>, and add the connection string as a repo secret."
+            exit 1
+          fi
+
+      - name: Generate system snapshot (DB)
+        env:
+          PGURL: ${{ secrets.SUPABASE_DB_URL_READONLY }}
+        run: |
+          # The generator uses bare `psql` and inherits PG* env vars.
+          # Parse the URL into PG* vars so we don't pass the connection string on the CLI.
+          export PGSERVICE=""
+          # `psql` accepts a URL via PGURL-equivalent: simplest is to wrap with a single -d arg.
+          # We expose a small wrapper so the script's `psql -At ...` calls connect via URL.
+          mkdir -p "$HOME/.bin"
+          cat > "$HOME/.bin/psql" <<'EOF'
+          #!/usr/bin/env bash
+          exec /usr/bin/psql "$PGURL" "$@"
+          EOF
+          chmod +x "$HOME/.bin/psql"
+          export PATH="$HOME/.bin:$PATH"
+          bun run scripts/generate-system-snapshot.ts
+
+      - name: Generate UI snapshot
+        run: bun run scripts/generate-ui-snapshot.ts
+
+      - name: Generate cross-reference
+        run: bun run scripts/generate-cross-reference.ts
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/system-snapshot.md docs/ui-snapshot.md docs/cross-reference.md
+          if git diff --cached --quiet; then
+            echo "No snapshot changes — nothing to commit."
+            exit 0
+          fi
+          git commit -m "chore: regenerate snapshots [skip ci]"
+          git push origin HEAD:main
