@@ -305,7 +305,7 @@ Tre snapshot-filer ligger i `docs/` og auto-regenereres af GitHub Action ved pus
 Læs i denne rækkefølge: start med `cross-reference.md` for overblik → slå op i `system-snapshot.md` (DB) eller `ui-snapshot.md` (kode) for detaljer.
 
 ### Bibel
-**Bibel v3.1** ligger i Claude.ai-projektet som startupload. Mathias (eller Claude.ai som mellemmand) kan citere fra den hvis behov opstår. CLAUDE.md indeholder de centrale principper — du skal kunne arbejde fra denne fil alene.
+**Bibel v3.1** ligger i `docs/bibel.md` i repo. Læs den ved første session som principielt fundament — CLAUDE.md er den tekniske forlængelse. Ved konflikt mellem bibel og CLAUDE.md vinder CLAUDE.md (mere specifik), men rapportér uenigheden så biblen kan opdateres.
 
 ### Dybere rapporter
 Ligger i Claude.ai-projektet, ikke i repo: `system-bibel-v2_1.docx` (forrige bibel-version, kontekst), `system-bibel-faktatjek.md`, `no-go-zones-ai-aendringer.md`, `tekniske-principper-bibel.md`, `struktur-rapport-4-logikker.md`, `rolle-struktur-vurdering.md`, `pricing-prioritet-rapport.md`, `arbejdsmoenstre-rapport.md`. Bed Mathias eller Claude.ai citere derfra hvis det bliver relevant.
