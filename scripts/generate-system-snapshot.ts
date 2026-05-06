@@ -43,9 +43,11 @@ function redactValue(col: string, val: any): any {
 }
 
 function psql(sql: string): any[] {
-  const json = execSync(`psql -At -F$'\\t' -c ${JSON.stringify(`SELECT json_agg(t) FROM (${sql}) t`)}`, {
+  const wrapped = `SELECT json_agg(t) FROM (${sql}) t;`;
+  const json = execSync(`psql -At -v ON_ERROR_STOP=1`, {
     encoding: "utf8",
-    maxBuffer: 1024 * 1024 * 100,
+    maxBuffer: 1024 * 1024 * 200,
+    input: wrapped,
   }).trim();
   if (!json || json === "") return [];
   try {
