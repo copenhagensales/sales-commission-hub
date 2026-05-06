@@ -1,6 +1,6 @@
-# Copenhagen Sales — Claude Code kontekst
+# Stork — AI-kontekst for repo
 
-Dette er startuploaden for enhver AI-session i dette repo. Læs hele filen før første handling. Ved konflikt med andre kilder vinder denne fil. Detaljer findes i `/mnt/project/`-rapporter og i memory-noter (~95 stk).
+Startupload for enhver AI-session i dette repo (Lovable, Code, Codex). Læs hele filen før første handling. Ved konflikt med andre kilder vinder denne fil. Bibel v3.1 er det overordnede fundament; CLAUDE.md er den tekniske forlængelse for AI-byggere.
 
 ---
 
@@ -14,40 +14,44 @@ Dette er startuploaden for enhver AI-session i dette repo. Læs hele filen før 
 
 ---
 
-## 2. Systemet i tal
+## 2. Hvad du ikke kan udlede selv
 
 - **Stack:** React + TypeScript + Supabase + Lovable (primær udviklingsmotor)
-- **Database:** 267 tabeller, 120 RPC'er, 662 migrations
-- **Frontend:** 408 komponenter, 179 sider, 111 hooks
-- **Edge functions:** 109
-- **Tests:** 3 filer (`hours.test.ts`, `vacation-pay.test.ts`, `cronOverlapDetector.test.ts`)
-- **Memory-noter:** ~95 stk (sekundær dokumentation)
-- **Compliance:** GDPR, EU AI Act, bogføringsloven, arbejdsmiljøloven
+- **Tests:** 3 filer (`hours.test.ts`, `vacation-pay.test.ts`, `cronOverlapDetector.test.ts`). Lav dækning er erkendt — ikke et hul du behøver opdage.
+- **Memory-noter:** ~95 stk i Lovable-projektet (sekundær dokumentation). Ikke i repoet.
+- **Compliance:** GDPR, EU AI Act, bogføringsloven, arbejdsmiljøloven.
+
+Tællinger (tabeller, komponenter, edge functions, migrations) udelades bevidst — du tæller selv direkte i koden, og tal går hurtigt forældet.
 
 ---
 
-## 3. De 15 grundprincipper (tidsløse — bærer alle beslutninger)
+## 3. Principper (bibel v3.1)
 
-### Forretning
-1. **Databasen er sandheden.** Alt andet er views af samme sandhed.
-2. **Historik bevares altid.** Med strategi for arkivering og sletning over tid.
-3. **Lønperiode låses ved udbetaling.** (Formel DB-lås er åben beslutning — i dag kode-konvention.)
-4. **Klient er dimensionen.** Brand udfases gradvist; FM-booking bruger den stadig.
-5. **Provision ved registrering.** Motivation vigtigere end timing-præcision.
-6. **Lønunderskud ruller over.** Ingen negativ løn. Afskrives ved medarbejder-stop.
-7. **Teamleder-DB beskyttes.** Uinddrivelige beløb fra stoppede medarbejdere tæller ikke.
+### Vision
+
+1. **Grundighed.** Forstå før handling. Symptomer er ikke årsager. Evidens, ikke antagelser.
+2. **Metode.** Flow: forstå, validér, byg, verificér. Hvert skridt bekræftet før det næste.
+3. **Én sandhed.** Databasen er sandheden — alt andet er views. Logik findes ét sted i koden. UI viser hvad systemet gør.
+4. **Enkelhed uden kompromis.** Det enkleste der løser problemet. Kompleksitet uden værdi er gæld.
+5. **Optimering, ikke lapper.** Hver løsning gør systemet bedre. Find rod-årsagen. Når du rører noget, efterlad det stærkere end du fandt det.
+6. **Mål.** Stork skal kunne forstås, vedligeholdes og vokse — af to partnere med AI som arbejdsredskab.
+7. **Historik bevares.** Med strategi for arkivering og sletning over tid.
 
 ### System
-8. **Single source of truth, også i koden.** Samme forretningsregel må kun eksistere ét sted. Duplikeret logik driver.
+
+8. **Single source of truth, også i koden.** Samme forretningsregel må kun eksistere ét sted. Duplikeret logik driver fra hinanden.
 9. **Data-adgang går gennem service-lag.** Komponenter tilgår aldrig Supabase direkte — altid via custom hook med React Query.
-10. **Views og realtime sync holder sandheden konsistent.** Mutations skal invalidere relevante caches. Cross-session ændringer (pricing, mappings) broadcastes.
+10. **Cache-konsistens.** Mutations skal invalidere relevante caches. Cross-session ændringer (pricing, mappings) broadcastes.
 
 ### Arbejde
-11. **Biblen er startuploaden, memory-noter er detaljen.** Ved konflikt vinder biblen/denne fil.
-12. **Zone-tvivl er rød zone.** Ved tvivl: spørg. Rød zone kræver eksplicit skriftlig godkendelse.
-13. **Kort, konkret, highlighted.** Start med konklusionen. Bullets og overskrifter til det scanbare. Aldrig salgssprog eller selvros.
-14. **Konsolidering er ikke nok — oprydning er nødvendig.** Skygge-kode er teknisk gæld der akkumulerer rente. Når du konsoliderer, foreslå også sletning af det erstattede.
-15. **Forståelse før handling.** Hvorfor løses opgaven? Hvilke principper påvirkes? Implementation kommer sidst.
+
+11. **Forståelse før handling.** Hvorfor løses opgaven? Hvilke principper påvirkes? Implementation kommer sidst.
+12. **Evidens før plan.** Diagnose kræver bevis. Citat fra koden (fil + linje), konkret SQL-resultat, eller git-hash. "Det ser ud som" er ikke evidens.
+13. **Zone-tvivl er rød zone — én gang.** Ved reel tvivl: spørg. Når et scope er godkendt, gælder godkendelsen for filerne i scope (se §4 ramme-aftale).
+14. **Konsolidering er ikke nok — oprydning er nødvendig.** Skygge-kode er teknisk gæld der akkumulerer rente. Når du konsoliderer, foreslå sletning af det erstattede.
+15. **Bibel/CLAUDE.md > memory-noter ved konflikt.** Bibel er fundamentet, memory-noter er detaljen.
+16. **Kort som default, langt når det betaler sig.** Start med konklusionen. Bullets og overskrifter til det scanbare. Aldrig salgssprog eller selvros. Lange tabeller eller dybe analyser er fine når emnet kræver det — disciplinen er ikke "altid kort".
+17. **Ambition er default.** Forsigtighed aktiveres ved reel tvivl, ikke ved hver beslutning. Stork bygges af to partnere med AI som arbejdsredskab — flow og kvalitet er ikke i konflikt. Hvis du gentager spørgsmål Mathias allerede har besvaret, eller stopper for noget der er afklaret, bremser du arbejdet uden at beskytte noget.
 
 ---
 
@@ -62,6 +66,12 @@ Berører ændringen lønberegning?  → Altid RØD.
 Berører ændringen persondata?    → Altid RØD.
 Berører ændringen DB-skema?      → Altid migration + RLS-tjek.
 ```
+
+### Ramme-aftale tæller
+
+Når Mathias har godkendt en plan og dens scope, gælder godkendelsen for filerne i scope. Du behøver ikke spørge igen ved hver enkelt fil. Bed kun om ny godkendelse hvis arbejdet rører noget UDEN FOR det aftalte scope, eller hvis du opdager noget der ændrer risikobilledet (fx en hardkodet logik der påvirker andre kasser).
+
+Forsigtighed er ikke inaktivitet. Spørg når der er reel tvivl — ikke som ritual.
 
 ### Top 10 filer der ALDRIG må ændres uden godkendelse
 1. `src/lib/calculations/hours.ts`
@@ -207,16 +217,53 @@ Tre identiteter parallelt: `employee_master_data`, `agents` (pr. dialer-kilde), 
 
 ---
 
-## 9. Arbejdsgang i Claude Code
+## 9. Arbejdsgang for AI-byggere
+
+### Aktører i samarbejdet
+Fem aktører: **Mathias** (beslutter, definerer retning), **Claude.ai** (mellemmand, formulerer prompts, holder flow), **Claude Code** (teknisk analyse, dyb kodevalidering), **Lovable** (primær bygger-AI), **Codex** (sekundær AI til validering).
+
+Ingen AI er alene i koden. Antag aldrig at HEAD matcher det du så sidste session — en anden AI kan have committet siden.
+
+### Før session
+- `git fetch --all && git pull` mod `origin/main`. **`origin/main` er sandheden** — ikke din cache, ikke memory-noter, ikke det du husker.
+- Læs CLAUDE.md fra HEAD før du begynder.
+- For DB/UI-arbejde: læs også de relevante snapshot-filer i `docs/` (se §10). De auto-regenereres ved push til main, så de er aktuelle.
+- Hvis Mathias siger "en anden AI har lige committet X": tjek `git log origin/main --oneline -10` før du arbejder videre.
 
 ### Før du gør noget
-1. Forstå opgaven (princip 15). Hvis uklar: spørg hvorfor.
-2. Find zonen (rød/gul/grøn). Ved tvivl: rød.
+1. Forstå opgaven (princip 11). Hvis uklar: spørg hvorfor.
+2. Find zonen (rød/gul/grøn). Ved reel tvivl: rød. Hvis Mathias har godkendt scope: arbejd inden for scope.
 3. Hvis opgaven rører en åben beslutning (§7): spørg Mathias/Kasper, gæt ikke.
+
+### Diagnose før plan
+- Symptom + evidens + rod-årsag + fix. **Aldrig plan uden evidens.**
+- Evidens = citat fra koden (fil + linjenummer), konkret SQL-resultat, eller git-hash. "Det ser ud som" er ikke evidens.
+- Lapper er gæld der vokser med renter. Hvis fixet ikke gør systemet stærkere, er det ikke det rigtige fix (princip 5).
+
+### Én ordre = én commit
+- Bundling er afvist. Hvis opgaven er "fix annullerings-matching", commit kun det.
+- Hvis du opdager noget parallelt der bør fixes: rapportér det til Mathias. Ret det ikke i samme commit.
+- Refactor + bugfix i samme commit gør review umuligt og rollback farligt.
+
+### Konflikt mellem AI'er
+- Hvis to AI'er er uenige om en fil: **ord-for-ord citat med linjenummer fra HEAD vinder**. Ikke hukommelse, ikke beskrivelse.
+- Når du citerer: `path/to/file.ts:42-58` med faktisk indhold.
+- Hvis ingen kan citere: ingen vinder. Mathias afgør.
+
+### Færdig-rapport-krav
+Hver "færdig"-rapport skal indeholde:
+- Commit-hash (eller liste af hashes hvis flere commits)
+- Ændrede filer + linjeantal pr. fil
+- Bekræftelse: ingen andre filer rørt
+- Bekræftelse: pushet til `origin/main`
+- Hvis ikke pushet: sig det eksplicit
+
+Uden disse fire er rapporten ikke færdig.
 
 ### Før du ændrer en fil
 - Læs filen. Læs dens tests hvis de findes.
-- Hvis rød zone: rapportér det til brugeren og bed om eksplicit godkendelse med plan.
+- Hvis rød zone OG ingen ramme-aftale dækker filen (§4): rapportér det og bed om godkendelse med plan.
+- Hvis rød zone OG ramme-aftale dækker filen: arbejd videre — du har godkendelsen. Rapportér i færdig-rapport.
 - Hvis ændringen rører DB-skema: skriv migration. Tjek RLS.
 - Hvis ændringen rører pricing eller løn: tjek at frontend + edge fortsat er 1:1.
 
@@ -227,33 +274,46 @@ Tre identiteter parallelt: `employee_master_data`, `agents` (pr. dialer-kilde), 
 - Ingen hardkodede rolle-keys (`if (role === 'ejer')`).
 
 ### Kommunikationsstil
-- Dansk.
-- Kort, konkret, highlighted. Start med konklusionen.
-- Ved lange svar: TL;DR øverst.
+- Dansk. Konklusion først. Konkret. Ærlig — også når det er ubehageligt.
+- Ingen salgssprog, ingen selvros.
 - Én velvalgt spørgsmål ad gangen, ikke ti.
 - Konkrete valg, ikke åbne spørgsmål. Ikke "hvad synes du", men "A gør X, B gør Y — hvilket?".
-- Ærlig. Også når det er ubehageligt. Udfordr når noget virker galt — spørg ikke om tilladelse først.
-- Ingen salgssprog, ingen selvros.
+- Udfordr når noget virker galt — spørg ikke om tilladelse først.
 
 ### Prompt-skabeloner
 
 **Analyse (ingen ændringer):**
-> Analysér [område]. Ingen ændringer — kun læsning. (1) Hvordan det fungerer i dag. (2) Hvilke filer/tabeller/funktioner styrer det. (3) Hvor logikken er inkonsistent eller hardkodet. (4) Hvilke beslutninger der ikke er truffet.
+> Analysér [område]. Ingen ændringer — kun læsning. (1) Hvordan det fungerer i dag. (2) Hvilke filer/tabeller/funktioner styrer det. (3) Hvor logikken er inkonsistent eller hardkodet. (4) Hvilke beslutninger der ikke er truffet. Citér fil + linjenumre.
 
 **Implementation:**
-> Implementér [feature]. Tjek zonen først — stop hvis rød. Følg principperne. Rapportér hvilke filer ændres og om der er zone-konflikter.
+> Implementér [feature]. `git pull` først. Tjek zonen — stop hvis rød. Følg principperne. Rapportér hvilke filer ændres og om der er zone-konflikter. Én commit. Færdig-rapport med hash + push-bekræftelse.
 
 **Bug-fix:**
-> Bug: [beskrivelse]. Find ROOT CAUSE før fix. Foreslå to løsninger: (1) hurtigt fix og (2) grundig løsning. Ingen ændringer før godkendelse.
+> Bug: [beskrivelse]. `git pull` først. Find ROOT CAUSE før fix — citér evidens. Foreslå to løsninger: (1) hurtigt fix og (2) grundig løsning der ikke er en lap. Ingen ændringer før godkendelse.
 
 ---
 
 ## 10. Hvor du finder mere
 
-- **Dybere rapporter (i Claude.ai-projektet, ikke nødvendigvis i repo):** `system-bibel-v2.docx`, `system-bibel-faktatjek.md`, `no-go-zones-ai-aendringer.md`, `tekniske-principper-bibel.md`, `struktur-rapport-4-logikker.md`, `rolle-struktur-vurdering.md`, `pricing-prioritet-rapport.md`, `arbejdsmoenstre-rapport.md`.
-- **Memory-noter:** ~95 stk i Lovable-projektet. Biblen/denne fil er fundamentet; memory-noter er detaljen. Ved konflikt vinder denne fil.
-- **Koden selv:** Sandheden om hvad der faktisk sker. Når denne fil og koden er uenige, er koden virkeligheden — men rapportér uenigheden så biblen kan opdateres.
+### Primær teknisk reference (i repo, auto-regenereret)
+Tre snapshot-filer ligger i `docs/` og auto-regenereres af GitHub Action ved push til main. Læs dem før DB- eller UI-arbejde:
+
+- **`docs/system-snapshot.md`** — komplet Supabase-snapshot: tabeller (skema + RLS + sample-rækker), RPC'er med body-preview, edge functions med secrets/JWT-status, triggers, foreign keys. PII er auto-redacted. Note: når CI regenererer, kan sample-data være tynd pga. RLS — skema og strukturer er altid komplette.
+- **`docs/ui-snapshot.md`** — frontend-kortlægning: sider, komponenter med hooks, fuld kildekode for hooks og `lib/calculations/`, routes, config, contexts.
+- **`docs/cross-reference.md`** — krydsreferencer: hvilke filer rører hver tabel, hvem kalder hver RPC og edge function, hvor hver hook bruges, liste over filer der kalder Supabase direkte udenfor `hooks/`.
+
+Læs i denne rækkefølge: start med `cross-reference.md` for overblik → slå op i `system-snapshot.md` (DB) eller `ui-snapshot.md` (kode) for detaljer.
+
+### Bibel
+**Bibel v3.1** ligger i Claude.ai-projektet som startupload. Mathias (eller Claude.ai som mellemmand) kan citere fra den hvis behov opstår. CLAUDE.md indeholder de centrale principper — du skal kunne arbejde fra denne fil alene.
+
+### Dybere rapporter
+Ligger i Claude.ai-projektet, ikke i repo: `system-bibel-v2_1.docx` (forrige bibel-version, kontekst), `system-bibel-faktatjek.md`, `no-go-zones-ai-aendringer.md`, `tekniske-principper-bibel.md`, `struktur-rapport-4-logikker.md`, `rolle-struktur-vurdering.md`, `pricing-prioritet-rapport.md`, `arbejdsmoenstre-rapport.md`. Bed Mathias eller Claude.ai citere derfra hvis det bliver relevant.
+
+### Memory-noter og kode
+- **Memory-noter:** ~95 stk i Lovable-projektet. CLAUDE.md + snapshot-filerne er fundamentet; memory-noter er detaljen. Ved konflikt vinder denne fil.
+- **Koden selv:** Sandheden om hvad der faktisk sker. Når denne fil og koden er uenige, er koden virkeligheden — men rapportér uenigheden så CLAUDE.md kan opdateres.
 
 ---
 
-*Version 1.0 · April 2026 · Opdateres ved principielle ændringer.*
+*Version 2.1 · maj 2026 · matcher bibel v3.1 · opdateres ved principielle ændringer.*
