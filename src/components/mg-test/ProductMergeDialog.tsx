@@ -647,7 +647,10 @@ export function ProductMergeDialog({
     if (step === 1) return !!selectedClientId;
     if (step === 2) return true; // mode is always selected
     if (step === 3) {
-      if (mode === "merge") return selectedKeys.size >= 2;
+      if (mode === "merge") {
+        // Need at least 2 total selected, and at least 1 must be a real product (target)
+        return selectedKeys.size >= 2 && selectedProducts.length >= 1;
+      }
       if (mode === "unmerge") return selectedKeys.size >= 1;
     }
     if (step === 4 && mode === "merge") return true; // pricing rules
