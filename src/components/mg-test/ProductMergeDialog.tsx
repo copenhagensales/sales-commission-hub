@@ -50,6 +50,10 @@ interface ProductRow {
   is_active: boolean;
   merged_into_product_id: string | null;
   isMergeParent: boolean;
+  // Unmapped source: sale_items with needs_mapping=true and product_id IS NULL
+  isUnmapped?: boolean;
+  unmappedExternalId?: string | null;
+  unmappedSalesCount?: number;
 }
 
 interface ClientOption {
