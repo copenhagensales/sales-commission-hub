@@ -402,7 +402,7 @@ export function ProductMergeDialog({
       loadProducts(selectedClientId);
       setStep(3);
     } else if (step === 3) {
-      if (mode === "merge" && selectedKeys.size >= 2) {
+      if (mode === "merge" && selectedKeys.size >= 2 && selectedProducts.length >= 1) {
         loadPricingRules();
         setStep(4);
       } else if (mode === "unmerge" && selectedKeys.size >= 1) {
