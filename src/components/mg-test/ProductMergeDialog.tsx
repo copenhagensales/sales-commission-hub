@@ -686,8 +686,15 @@ export function ProductMergeDialog({
       queryClient.invalidateQueries({ queryKey: ["sales-aggregates"] });
       queryClient.invalidateQueries({ queryKey: ["kpi"] });
       queryClient.invalidateQueries({ queryKey: ["aggregated-product-types"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-needs-mapping-items"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-aggregated-products"] });
 
-      toast.success(`${selectedProducts.length} produkter merget til "${mergedProductName.trim()}"`);
+      const totalMerged = selectedProducts.length + selectedUnmapped.length;
+      let msg = `${totalMerged} produkt(er) merget til "${mergedProductName.trim()}"`;
+      if (selectedUnmapped.length > 0) {
+        msg += ` (${unmappedSaleItemsMoved} umappede salg flyttet, ${adversusMappingsCreated} nye Adversus-mappings)`;
+      }
+      toast.success(msg);
       onOpenChange(false);
       onMergeComplete();
     } catch (err: any) {
