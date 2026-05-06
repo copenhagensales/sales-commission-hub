@@ -418,7 +418,7 @@ export function ProductMergeDialog({
   }
 
   async function handleMerge() {
-    if (!mergedProductName.trim() || selectedProducts.length < 2) return;
+    if (!mergedProductName.trim() || selectedAll.length < 2 || selectedProducts.length < 1) return;
     setMerging(true);
     try {
       const allIds = selectedProducts.map((p) => p.id!).filter(Boolean);
