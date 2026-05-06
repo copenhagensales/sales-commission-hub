@@ -1,51 +1,83 @@
-**Konklusion:** Data er der. Problemet er nu primært UI: Produktfanen viser kun **3 rækker pr. gruppe** som default, og Eesy-produkterne bliver lagt under kundegruppen **Eesy TM** – ikke i den øverste gruppe “Manglende mapping”. Derfor ser det ud som om alle produkter ikke er under mapping, selvom dialogen viser dem.
+# Fix typo i integration-engine sales.ts:233 + valgfri type-cleanup
 
-**Fund lige nu**
-- Databasen har **394 sale_items** med `needs_mapping=true` og `product_id IS NULL` de seneste 30 dage.
-- Det er **11 distinkte produkt/kunde-grupper**.
-- Eesy TM har aktuelt disse umappede grupper:
-  - `9457` — Fri tale + 40 GB data (5G) — 2 salg
-  - `9458` — Fri tale + 80 GB data (5G) — 4 salg
-  - `9459` — Fri tale + 100 GB data (5G) — 8 salg
-  - `Fri tale + fri data ... 10 % Rabat` — 1 salg
-- Screenshotet viser den rå detalje-dialog, men ikke en samlet mapping-arbejdsvisning. Den er svær at bruge, fordi den viser enkeltsalg og er begrænset i højden.
+## TL;DR
 
-**Zone**
-- Dette er **gul zone**: MgTest UI/data-flow.
-- Jeg ændrer ikke pricing-motor, lønberegning, `sale_items` historik eller provisionssatser i dette fix.
+Tre præcise ændringer i to filer. Retter `ReferenceError: hasCampaignRestriction is not defined` der får `matchPricingRule` til at fejle silent på success-branchen i Deno edge runtime — rod-årsag til ASE/Relatel 0-commission siden 5. maj.
 
-**Plan**
-1. **Lav en dedikeret “Produkter der mangler mapping”-sektion øverst i Produktmapping-fanen**
-   - Vises altid over kundegrupperne, når der findes umappede produkter.
-   - Bruger `unmappedProductGroups` direkte som kilde, ikke den almindelige produktgruppering.
-   - Viser én række pr. produkt/kunde-gruppe, ikke én række pr. sale_item.
+Ingen migrationer. Ingen DB-ændringer. Ingen rematch i denne PR.
 
-2. **Vis alle umappede produktgrupper som default**
-   - Den nye sektion skal ikke være begrænset til `ITEMS_PER_SECTION = 3`.
-   - Kolonner: Produktnavn, External ID, Kunde, Kilde, Antal salg, Seneste dato, Handling.
-   - Eesy TM-produkterne skal derfor kunne ses samlet uden at trykke “vis flere” i en kundegruppe.
+## Verificeret før plan
 
-3. **Flyt/justér pseudo-rækker så “Manglende mapping” betyder reelt `needs_mapping=true`**
-   - I stedet for at gemme Eesy TM umappede produkter under Eesy TM-kortet, skal den dedikerede mapping-sektion vise alle umappede produktgrupper uanset kunde.
-   - De normale kundegrupper kan stadig vise eksisterende/mappede produkter, men de skal ikke være eneste sted at finde umappede produkter.
+Læst `supabase/functions/integration-engine/core/sales.ts` linje 160-245 ord-for-ord:
 
-4. **Gør detalje-dialogen mere brugbar**
-   - Behold dialogen til rå enkeltsalg.
-   - Tilføj en lille opsummering øverst: antal salg + antal produktgrupper.
-   - Eventuelt gruppér dialogen eller tydeliggør at den viser enkeltsalg, ikke produktgrupper.
+- **Linje 166:** `const hasRestriction = !!ids && ids.length > 0;` — variablen hedder `hasRestriction`.
+- **Linje 167:** `const mode = (rule as any).campaign_match_mode === "exclude" ? "exclude" : "include";` — `as any`-cast bekræftet.
+- **Linje 233:** `hasCampaignRestriction,` — shorthand-property der refererer en udefineret variabel. Bug bekræftet.
 
-5. **Ret mapping-handlinger fra den nye sektion**
-   - Handlingerne genbruger eksisterende flow:
-     - Vælg kunde/opret produkt
-     - Opret og åbn pricing
-     - Opret og skjul produkt
-   - Efter handling invalidéres fortsat `mg-needs-mapping-items`, `mg-aggregated-products`, `adversus-product-mappings`, `products`.
+Linjenumre matcher 1:1 med bygge-ordren.
 
-6. **Verificering**
-   - Tjek at den nye sektion viser 11 produkt/kunde-grupper.
-   - Tjek at Eesy TM viser de 4 relevante grupper (`9457`, `9458`, `9459`, rabat-produktet).
-   - Tjek at mapping af én gruppe fjerner den fra listen efter cache refresh.
+## Ændring 1 — Fix typo (rød zone, godkendt)
 
-**Teknisk note**
-- Fix holdes i `src/pages/MgTest.tsx` først, fordi det er dér den nuværende Produktmapping-visning ligger.
-- Jeg vil ikke splitte MgTest op i denne omgang, selvom filen er stor, for at holde ændringen lille og målrettet.
+**Fil:** `supabase/functions/integration-engine/core/sales.ts`
+**Linje:** 233
+
+Før:
+```ts
+        hasCampaignRestriction,
+```
+
+Efter:
+```ts
+        hasCampaignRestriction: hasRestriction,
+```
+
+Bevarer log-feltnavnet `hasCampaignRestriction` så det matcher `rematch-pricing-rules/index.ts:240` og ikke brækker eventuelle log-aggregeringer. Værdien kommer nu fra den faktisk deklarerede variabel `hasRestriction`.
+
+## Ændring 2 — Tilføj felt til PricingRule-type (grøn zone)
+
+**Fil:** `supabase/functions/integration-engine/types.ts`
+**Placering:** Tilføj felt i eksisterende `PricingRule`-interface (lige efter `campaign_mapping_ids`, før `effective_from`).
+
+Tilføj linje:
+```ts
+  campaign_match_mode?: "include" | "exclude";
+```
+
+## Ændring 3 — Fjern `as any`-cast (grøn zone)
+
+**Fil:** `supabase/functions/integration-engine/core/sales.ts`
+**Linje:** 167
+
+Før:
+```ts
+    const mode = (rule as any).campaign_match_mode === "exclude" ? "exclude" : "include";
+```
+
+Efter:
+```ts
+    const mode = rule.campaign_match_mode === "exclude" ? "exclude" : "include";
+```
+
+Ingen runtime-effekt — kun TypeScript-rydning muliggjort af ændring 2.
+
+## Hvad der IKKE røres
+
+- `_shared/pricing-service.ts`
+- `rematch-pricing-rules/index.ts`
+- `pricingRuleMatching.ts` (frontend)
+- `fmPricing.ts`
+- `sale_items`, `product_pricing_rules`, `products` (ingen DB)
+- Ingen migration
+- Ingen rematch-operation (separat fra denne PR)
+- Alle andre filer
+
+## Acceptkriterier
+
+- `ReferenceError` elimineres i success-branchen af `matchPricingRule`.
+- Eksisterende include/exclude-logik uændret.
+- `as any`-cast på linje 167 er væk; typen bærer feltet.
+- Diff begrænset til netop disse to filer og netop disse tre punkter.
+
+## Verificering efter deploy (separat fra PR)
+
+Tales om bagefter — denne PR rører ikke historiske `sale_items`. Rematch for ASE/Relatel siden 5. maj kører som separat operation efter du har bekræftet at nye salg pricer korrekt.
