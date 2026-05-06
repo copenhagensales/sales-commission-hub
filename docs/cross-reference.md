@@ -1,6 +1,6 @@
 # Cross-reference
 
-Auto-genereret: 2026-05-06T14:16:52.179Z
+Auto-genereret: 2026-05-06T14:42:14.044Z
 
 Kortlægger afhængigheder mellem DB-laget og UI-laget. Brug denne fil for at besvare:
 - *"Hvis jeg ændrer tabel X — hvilke hooks/sider knækker?"*
@@ -2934,11 +2934,11 @@ Total: **107** custom hooks.
 - src/components/dashboard/WidgetSettingsTab.tsx
 - src/pages/dashboards/DesignDashboard.tsx
 
-## 6. ⚠️ Anti-pattern: Direkte Supabase-kald udenfor `hooks/`
+## 6. Direkte Supabase-kald udenfor `hooks/`
 
-Princip 9: *Komponenter tilgår aldrig Supabase direkte — altid via custom hook.*
+Filer der kalder `supabase.from()` eller `supabase.rpc()` direkte fra komponenter, sider eller utils.
 
-**274 filer** bryder service-lag-princippet.
+**274 filer** kalder Supabase direkte udenfor `hooks/`.
 
 ### `src/utils/fetchPerformance.ts`
 - Tabeller: `sales`

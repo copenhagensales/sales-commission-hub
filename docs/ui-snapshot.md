@@ -1,6 +1,6 @@
 # UI-snapshot
 
-Auto-genereret: 2026-05-06T14:16:50.297Z
+Auto-genereret: 2026-05-06T14:42:12.014Z
 
 Komplet kortlægning af frontend-laget: routes, sider, komponenter, hooks og forretningslogik.
 Bruges sammen med `system-snapshot.md` (DB) og `cross-reference.md` (krydsreferencer).
@@ -458,7 +458,7 @@ Total: **178** sider.
 - **Export:** `EconomicUpload`
 - **Størrelse:** 15056 bytes, 403 linjer
 - **Hooks brugt:** `useDropzone`, `useMutation`, `useQuery`, `useQueryClient`, `useToast`
-- **Tabeller direkte:** `economic_imports` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `economic_imports`
 - **RPC/Edge:** `edge:import-economic-zip`
 
 ### `src/pages/admin/KpiDefinitions.tsx`
@@ -470,61 +470,61 @@ Total: **178** sider.
 - **Export:** `SecurityDashboard`
 - **Størrelse:** 35656 bytes, 948 linjer
 - **Hooks brugt:** `useMutation`, `useQuery`, `useQueryClient`
-- **Tabeller direkte:** `employee_master_data`, `failed_login_attempts`, `job_positions`, `trusted_ip_ranges` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `employee_master_data`, `failed_login_attempts`, `job_positions`, `trusted_ip_ranges`
 - **RPC/Edge:** `edge:force-password-reset`, `edge:reset-user-mfa`
 
 ### `src/pages/Agents.tsx`
 - **Export:** `Agents`
 - **Størrelse:** 10349 bytes, 272 linjer
 - **Hooks brugt:** `useQuery`
-- **Tabeller direkte:** `agents` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `agents`
 
 ### `src/pages/amo/AmoAnnualDiscussion.tsx`
 - **Export:** `AmoAnnualDiscussion`
 - **Størrelse:** 12810 bytes, 306 linjer
 - **Hooks brugt:** `useMutation`, `useQuery`, `useQueryClient`
-- **Tabeller direkte:** `amo_annual_discussions` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `amo_annual_discussions`
 
 ### `src/pages/amo/AmoApv.tsx`
 - **Export:** `AmoApv`
 - **Størrelse:** 18632 bytes, 437 linjer
 - **Hooks brugt:** `useMutation`, `useQuery`, `useQueryClient`
-- **Tabeller direkte:** `amo_apv`, `amo_workplaces` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `amo_apv`, `amo_workplaces`
 
 ### `src/pages/amo/AmoAuditLog.tsx`
 - **Export:** `AmoAuditLog`
 - **Størrelse:** 10724 bytes, 260 linjer
-- **Tabeller direkte:** `amo_audit_log` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `amo_audit_log`
 
 ### `src/pages/amo/AmoDashboard.tsx`
 - **Export:** `AmoDashboard`
 - **Størrelse:** 17369 bytes, 382 linjer
 - **Hooks brugt:** `useNavigate`, `useQuery`
-- **Tabeller direkte:** `amo_amr_elections`, `amo_annual_discussions`, `amo_apv`, `amo_documents`, `amo_kemi_apv`, `amo_meetings`, `amo_members`, `amo_tasks`, `amo_training_courses` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `amo_amr_elections`, `amo_annual_discussions`, `amo_apv`, `amo_documents`, `amo_kemi_apv`, `amo_meetings`, `amo_members`, `amo_tasks`, `amo_training_courses`
 
 ### `src/pages/amo/AmoDocuments.tsx`
 - **Export:** `AmoDocuments`
 - **Størrelse:** 14772 bytes, 323 linjer
 - **Hooks brugt:** `useMutation`, `useQuery`, `useQueryClient`
-- **Tabeller direkte:** `amo_documents` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `amo_documents`
 
 ### `src/pages/amo/AmoKemiApv.tsx`
 - **Export:** `AmoKemiApv`
 - **Størrelse:** 13427 bytes, 268 linjer
 - **Hooks brugt:** `useMutation`, `useQuery`, `useQueryClient`
-- **Tabeller direkte:** `amo_kemi_apv` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `amo_kemi_apv`
 
 ### `src/pages/amo/AmoMeetings.tsx`
 - **Export:** `AmoMeetings`
 - **Størrelse:** 16401 bytes, 391 linjer
 - **Hooks brugt:** `useMutation`, `useQuery`, `useQueryClient`
-- **Tabeller direkte:** `amo_meetings` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `amo_meetings`
 
 ### `src/pages/amo/AmoOrganisation.tsx`
 - **Export:** `AmoOrganisation`
 - **Størrelse:** 20902 bytes, 473 linjer
 - **Hooks brugt:** `useMutation`, `useQuery`, `useQueryClient`
-- **Tabeller direkte:** `amo_amr_elections`, `amo_members`, `amo_workplaces` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `amo_amr_elections`, `amo_members`, `amo_workplaces`
 
 ### `src/pages/amo/AmoPlaceholder.tsx`
 - **Export:** `AmoPlaceholder`
@@ -534,18 +534,18 @@ Total: **178** sider.
 ### `src/pages/amo/AmoSettings.tsx`
 - **Export:** `AmoSettings`
 - **Størrelse:** 11594 bytes, 275 linjer
-- **Tabeller direkte:** `amo_compliance_rules` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `amo_compliance_rules`
 
 ### `src/pages/amo/AmoTasks.tsx`
 - **Export:** `AmoTasks`
 - **Størrelse:** 19964 bytes, 451 linjer
-- **Tabeller direkte:** `amo_members`, `amo_tasks` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `amo_members`, `amo_tasks`
 
 ### `src/pages/amo/AmoTraining.tsx`
 - **Export:** `AmoTraining`
 - **Størrelse:** 19087 bytes, 411 linjer
 - **Hooks brugt:** `useMutation`, `useQuery`, `useQueryClient`
-- **Tabeller direkte:** `amo_members`, `amo_training_courses` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `amo_members`, `amo_training_courses`
 
 ### `src/pages/Auth.tsx`
 - **Export:** `Auth`
@@ -563,14 +563,14 @@ Total: **178** sider.
 - **Export:** `CareerWishes`
 - **Størrelse:** 18185 bytes, 400 linjer
 - **Hooks brugt:** `useAuth`, `useMutation`, `useQuery`, `useQueryClient`, `useToast`
-- **Tabeller direkte:** `career_wishes`, `clients`, `employee_master_data` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `career_wishes`, `clients`, `employee_master_data`
 - **RPC/Edge:** `edge:send-career-wish-notification`
 
 ### `src/pages/CareerWishesOverview.tsx`
 - **Export:** `CareerWishesOverview`
 - **Størrelse:** 13758 bytes, 316 linjer
 - **Hooks brugt:** `useAuth`, `useMutation`, `useQuery`, `useQueryClient`
-- **Tabeller direkte:** `career_wishes` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `career_wishes`
 
 ### `src/pages/CarQuiz.tsx`
 - **Export:** `CarQuiz`
@@ -581,7 +581,7 @@ Total: **178** sider.
 - **Export:** `CarQuizAdmin`
 - **Størrelse:** 9259 bytes, 221 linjer
 - **Hooks brugt:** `useAllCarQuizCompletions`, `useQuery`, `useQuizTemplate`, `useUpdateQuizTemplate`
-- **Tabeller direkte:** `employee_master_data` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `employee_master_data`
 
 ### `src/pages/ClientForecast.tsx`
 - **Export:** `ClientForecast`
@@ -597,14 +597,14 @@ Total: **178** sider.
 - **Export:** `ClientSalesOverview`
 - **Størrelse:** 12745 bytes, 335 linjer
 - **Hooks brugt:** `useQuery`
-- **Tabeller direkte:** `dialer_integrations` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `dialer_integrations`
 - **RPC/Edge:** `edge:client-sales-overview`
 
 ### `src/pages/ClosingShifts.tsx`
 - **Export:** `ClosingShifts`
 - **Størrelse:** 32821 bytes, 809 linjer
 - **Hooks brugt:** `useMutation`, `useQuery`, `useQueryClient`
-- **Tabeller direkte:** `closing_shifts`, `deactivation_reminder_config`, `employee_master_data`, `teams`, `weekend_cleanup_config` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `closing_shifts`, `deactivation_reminder_config`, `employee_master_data`, `teams`, `weekend_cleanup_config`
 - **RPC/Edge:** `edge:send-closing-reminder`, `edge:send-weekend-cleanup`
 
 ### `src/pages/CodeOfConduct.tsx`
@@ -616,7 +616,7 @@ Total: **178** sider.
 - **Export:** `CodeOfConductAdmin`
 - **Størrelse:** 26694 bytes, 657 linjer
 - **Hooks brugt:** `useAuth`, `usePermissions`, `useQuery`
-- **Tabeller direkte:** `code_of_conduct_attempts`, `code_of_conduct_completions`, `code_of_conduct_reminders`, `employee_master_data` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `code_of_conduct_attempts`, `code_of_conduct_completions`, `code_of_conduct_reminders`, `employee_master_data`
 
 ### `src/pages/CommissionLeague.tsx`
 - **Export:** `CommissionLeague`
@@ -629,7 +629,7 @@ Total: **178** sider.
 - **Export:** `CompanyOverview`
 - **Størrelse:** 16226 bytes, 409 linjer
 - **Hooks brugt:** `useQuery`
-- **Tabeller direkte:** `candidates`, `employee_master_data`, `historical_employment`, `team_members` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `candidates`, `employee_master_data`, `historical_employment`, `team_members`
 
 ### `src/pages/compliance/AdminDocumentation.tsx`
 - **Export:** `AdminDocumentation`
@@ -640,13 +640,13 @@ Total: **178** sider.
 - **Export:** `AiGovernance`
 - **Størrelse:** 34823 bytes, 692 linjer
 - **Hooks brugt:** `useMutation`, `useNavigate`, `useQuery`, `useQueryClient`
-- **Tabeller direkte:** `ai_governance_roles`, `ai_instruction_log`, `ai_use_case_registry`, `employee_master_data` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `ai_governance_roles`, `ai_instruction_log`, `ai_use_case_registry`, `employee_master_data`
 
 ### `src/pages/compliance/ComplianceNotifications.tsx`
 - **Export:** `ComplianceNotifications`
 - **Størrelse:** 8532 bytes, 245 linjer
 - **Hooks brugt:** `useMutation`, `useNavigate`, `useQuery`, `useQueryClient`
-- **Tabeller direkte:** `agents`, `compliance_notification_recipients` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `agents`, `compliance_notification_recipients`
 - **RPC/Edge:** `edge:check-compliance-reviews`
 
 ### `src/pages/compliance/ComplianceOverview.tsx`
@@ -658,7 +658,7 @@ Total: **178** sider.
 - **Export:** `ContractAccessLog`
 - **Størrelse:** 8484 bytes, 212 linjer
 - **Hooks brugt:** `useNavigate`, `useQuery`
-- **Tabeller direkte:** `contract_access_log`, `contracts`, `employee_master_data` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `contract_access_log`, `contracts`, `employee_master_data`
 
 ### `src/pages/compliance/DataTransferRegistry.tsx`
 - **Export:** `DataTransferRegistry`
@@ -674,7 +674,7 @@ Total: **178** sider.
 - **Export:** `EmployeePrivacy`
 - **Størrelse:** 10297 bytes, 178 linjer
 - **Hooks brugt:** `useNavigate`, `useQuery`
-- **Tabeller direkte:** `employee_master_data` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `employee_master_data`
 
 ### `src/pages/compliance/GdprAwareness.tsx`
 - **Export:** `GdprAwareness`
@@ -685,7 +685,7 @@ Total: **178** sider.
 - **Export:** `InternalProcesses`
 - **Størrelse:** 13931 bytes, 248 linjer
 - **Hooks brugt:** `useNavigate`, `useQuery`
-- **Tabeller direkte:** `employee_master_data` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `employee_master_data`
 
 ### `src/pages/compliance/ProcessingActivities.tsx`
 - **Export:** `ProcessingActivities`
@@ -696,7 +696,7 @@ Total: **178** sider.
 - **Export:** `RetentionPolicies`
 - **Størrelse:** 25279 bytes, 575 linjer
 - **Hooks brugt:** `useMutation`, `useQuery`, `useQueryClient`
-- **Tabeller direkte:** `campaign_retention_policies`, `client_campaigns`, `data_retention_policies`, `gdpr_cleanup_log` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `campaign_retention_policies`, `client_campaigns`, `data_retention_policies`, `gdpr_cleanup_log`
 
 ### `src/pages/compliance/SecurityIncidents.tsx`
 - **Export:** `SecurityIncidents`
@@ -707,20 +707,20 @@ Total: **178** sider.
 - **Export:** `SensitiveAccessLog`
 - **Størrelse:** 7057 bytes, 170 linjer
 - **Hooks brugt:** `useNavigate`, `useQuery`
-- **Tabeller direkte:** `employee_master_data`, `sensitive_data_access_log` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `employee_master_data`, `sensitive_data_access_log`
 
 ### `src/pages/Contracts.tsx`
 - **Export:** `Contracts`
 - **Størrelse:** 29382 bytes, 723 linjer
 - **Hooks brugt:** `useMutation`, `usePermissions`, `useQuery`, `useQueryClient`
-- **Tabeller direkte:** `contract_signatures`, `contract_templates`, `contracts` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `contract_signatures`, `contract_templates`, `contracts`
 - **RPC/Edge:** `edge:sync-contracts-to-sharepoint`
 
 ### `src/pages/ContractSign.tsx`
 - **Export:** `ContractSign`
 - **Størrelse:** 33779 bytes, 773 linjer
 - **Hooks brugt:** `useAuth`, `useIsMobile`, `useMutation`, `useNavigate`, `useQuery`, `useQueryClient`
-- **Tabeller direkte:** `contract_signatures`, `contracts`, `employee_master_data` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `contract_signatures`, `contracts`, `employee_master_data`
 - **RPC/Edge:** `edge:generate-contract-pdf`
 
 ### `src/pages/CsTop20Dashboard.tsx`
@@ -742,20 +742,20 @@ Total: **178** sider.
 - **Export:** `CphSalesDashboard`
 - **Størrelse:** 52364 bytes, 1307 linjer
 - **Hooks brugt:** `useCachedLeaderboard`, `usePrecomputedKpis`, `useQuery`, `useRequireDashboardAccess`
-- **Tabeller direkte:** `absence_request_v2`, `candidates`, `client_campaigns`, `clients`, `cohort_members`, `employee_master_data`, `onboarding_cohorts`, `sale_items`, `sales`, `team_clients`, `team_members` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `absence_request_v2`, `candidates`, `client_campaigns`, `clients`, `cohort_members`, `employee_master_data`, `onboarding_cohorts`, `sale_items`, `sales`, `team_clients`, `team_members`
 - **RPC/Edge:** `edge:tv-dashboard-data`, `get_team_performance_summary`
 
 ### `src/pages/dashboards/DashboardHome.tsx`
 - **Export:** `DashboardHome`
 - **Størrelse:** 6791 bytes, 170 linjer
 - **Hooks brugt:** `useAccessibleDashboards`, `useAuth`, `useNavigate`, `useQuery`
-- **Tabeller direkte:** `employee_master_data` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `employee_master_data`
 
 ### `src/pages/dashboards/DashboardSettings.tsx`
 - **Export:** `DashboardSettings`
 - **Størrelse:** 79149 bytes, 1765 linjer
 - **Hooks brugt:** `useMutation`, `useQuery`, `useQueryClient`, `useToast`
-- **Tabeller direkte:** `dashboard_kpis` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `dashboard_kpis`
 
 ### `src/pages/dashboards/DesignDashboard.tsx`
 - **Export:** `DesignDashboard`
@@ -779,13 +779,13 @@ Total: **178** sider.
 - **Export:** `PowerdagInput`
 - **Størrelse:** 6119 bytes, 154 linjer
 - **Hooks brugt:** `useActiveEvent`, `useQueryClient`, `useRulesForEvent`, `useScoresForEvent`, `useUpsertScore`
-- **Tabeller direkte:** `powerdag_point_rules` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `powerdag_point_rules`
 
 ### `src/pages/dashboards/SalesOverviewAll.tsx`
 - **Export:** `SalesOverviewAll`
 - **Størrelse:** 11847 bytes, 305 linjer
 - **Hooks brugt:** `usePrecomputedKpis`, `useQuery`, `useRequireDashboardAccess`
-- **Tabeller direkte:** `clients`, `employee_master_data`, `kpi_cached_values` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `clients`, `employee_master_data`, `kpi_cached_values`
 - **RPC/Edge:** `edge:tv-dashboard-data`
 
 ### `src/pages/economic/EconomicBudget.tsx`
@@ -812,7 +812,7 @@ Total: **178** sider.
 - **Export:** `EconomicMapping`
 - **Størrelse:** 20353 bytes, 498 linjer
 - **Hooks brugt:** `useAutoSuggestMapping`, `useCreateFordelingsregel`, `useEconomicFordelingsregler`, `useEconomicKategorier`, `useEconomicKontoMapping`, `useEconomicKontoplan`, `useTeams`, `useUpdateKontoMapping`
-- **Tabeller direkte:** `economic_fordelingsregler` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `economic_fordelingsregler`
 
 ### `src/pages/economic/EconomicPosteringer.tsx`
 - **Export:** `EconomicPosteringer`
@@ -823,14 +823,14 @@ Total: **178** sider.
 - **Export:** `EconomicRevenueMatch`
 - **Størrelse:** 39450 bytes, 858 linjer
 - **Hooks brugt:** `useClientMappings`, `useClients`, `useMutation`, `useQuery`, `useQueryClient`, `useRevenuePosteringer`, `useSystemRevenue`
-- **Tabeller direkte:** `clients`, `economic_client_mapping`, `economic_posteringer` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `clients`, `economic_client_mapping`, `economic_posteringer`
 - **RPC/Edge:** `get_sales_aggregates_v2`
 
 ### `src/pages/economic/SalesValidation.tsx`
 - **Export:** `SalesValidation`
 - **Størrelse:** 46018 bytes, 974 linjer
 - **Hooks brugt:** `useCurrentEmployeeId`, `useDropzone`, `useQuery`
-- **Tabeller direkte:** `client_campaigns`, `clients`, `sale_items`, `sales`, `sales_validation_uploads` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `client_campaigns`, `clients`, `sale_items`, `sales`, `sales_validation_uploads`
 
 ### `src/pages/EesyTmDashboard.tsx`
 - **Export:** `EesyTmDashboard`
@@ -840,21 +840,21 @@ Total: **178** sider.
 - **Export:** `EmailTemplates`
 - **Størrelse:** 19114 bytes, 493 linjer
 - **Hooks brugt:** `useMutation`, `useQuery`, `useQueryClient`
-- **Tabeller direkte:** `email_templates` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `email_templates`
 - **RPC/Edge:** `edge:send-test-email`
 
 ### `src/pages/EmployeeDetail.tsx`
 - **Export:** `EmployeeDetail`
 - **Størrelse:** 62619 bytes, 1439 linjer
 - **Hooks brugt:** `useMutation`, `useNavigate`, `usePermissions`, `useQuery`, `useQueryClient`, `useToast`, `useTwilioDevice`
-- **Tabeller direkte:** `absence_request_v2`, `clients`, `contract_signatures`, `contracts`, `employee`, `employee_absence`, `employee_master_data`, `job_positions`, `lateness_record`, `time_stamps` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `absence_request_v2`, `clients`, `contract_signatures`, `contracts`, `employee`, `employee_absence`, `employee_master_data`, `job_positions`, `lateness_record`, `time_stamps`
 - **RPC/Edge:** `edge:initiate-password-reset`, `edge:reset-login-attempts`, `edge:set-user-password`
 
 ### `src/pages/EmployeeMasterData.tsx`
 - **Export:** `EmployeeMasterData`
 - **Størrelse:** 52863 bytes, 1144 linjer
 - **Hooks brugt:** `useMutation`, `useNavigate`, `usePermissions`, `usePrecomputedKpis`, `useQuery`, `useQueryClient`, `useSearchParams`, `useToast`, `useTranslation`, `useTwilioDevice`, `useUnifiedPermissions`
-- **Tabeller direkte:** `contracts`, `deactivation_reminder_config`, `employee_master_data`, `job_positions`, `team_members` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `contracts`, `deactivation_reminder_config`, `employee_master_data`, `job_positions`, `team_members`
 - **RPC/Edge:** `edge:create-employee-user`, `edge:send-deactivation-reminder`, `edge:send-employee-invitation`
 
 ### `src/pages/EmployeeOnboarding.tsx`
@@ -867,43 +867,43 @@ Total: **178** sider.
 - **Export:** `ExcelFieldMatcher`
 - **Størrelse:** 18255 bytes, 445 linjer
 - **Hooks brugt:** `useDropzone`
-- **Tabeller direkte:** `employee_master_data` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `employee_master_data`
 
 ### `src/pages/ExtraWork.tsx`
 - **Export:** `ExtraWork`
 - **Størrelse:** 7349 bytes, 190 linjer
 - **Hooks brugt:** `useAuth`, `useMyExtraWork`, `useQuery`
-- **Tabeller direkte:** `employee_master_data`, `shift` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `employee_master_data`, `shift`
 
 ### `src/pages/ExtraWorkAdmin.tsx`
 - **Export:** `ExtraWorkAdmin`
 - **Størrelse:** 17162 bytes, 444 linjer
 - **Hooks brugt:** `useAuth`, `usePermissions`, `useQuery`, `useTeamExtraWork`, `useUpdateExtraWork`
-- **Tabeller direkte:** `employee_master_data` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `employee_master_data`
 
 ### `src/pages/HeadToHead.tsx`
 - **Export:** `HeadToHead`
 - **Størrelse:** 2120 bytes, 63 linjer
 - **Hooks brugt:** `useAuth`, `useQuery`
-- **Tabeller direkte:** `employee_basic_info`, `employee_master_data` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `employee_basic_info`, `employee_master_data`
 
 ### `src/pages/Home.tsx`
 - **Export:** `Home`
 - **Størrelse:** 38976 bytes, 878 linjer
 - **Hooks brugt:** `useActiveSeason`, `useAuth`, `useMutation`, `useMyEnrollment`, `useNavigate`, `usePermissions`, `usePersonalWeeklyStats`, `usePrecomputedKpis`, `useQuery`, `useQueryClient`, `useRolePreview`
-- **Tabeller direkte:** `company_events`, `employee_master_data`, `employee_sales_goals`, `event_attendees`, `event_team_invitations`, `teams` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `company_events`, `employee_master_data`, `employee_sales_goals`, `event_attendees`, `event_team_invitations`, `teams`
 
 ### `src/pages/ImmediatePaymentASE.tsx`
 - **Export:** `ImmediatePaymentASE`
 - **Størrelse:** 18540 bytes, 430 linjer
 - **Hooks brugt:** `useAuth`, `useMutation`, `useQuery`, `useQueryClient`
-- **Tabeller direkte:** `client_campaigns`, `employee_agent_mapping`, `employee_master_data`, `product_pricing_rules`, `sale_items`, `sales` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `client_campaigns`, `employee_agent_mapping`, `employee_master_data`, `product_pricing_rules`, `sale_items`, `sales`
 
 ### `src/pages/LiveStats.tsx`
 - **Export:** `LiveStats`
 - **Størrelse:** 44044 bytes, 944 linjer
 - **Hooks brugt:** `useNavigate`, `useQuery`
-- **Tabeller direkte:** `clients`, `dashboard_kpis`, `employee_master_data` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `clients`, `dashboard_kpis`, `employee_master_data`
 
 ### `src/pages/Logikker.tsx`
 - **Export:** `Logikker`
@@ -928,27 +928,27 @@ Total: **178** sider.
 - **Export:** `MgTest`
 - **Størrelse:** 167693 bytes, 3918 linjer
 - **Hooks brugt:** `useMutation`, `useQuery`, `useQueryClient`, `useTranslation`, `useVagtEmployees`
-- **Tabeller direkte:** `adversus_campaign_mappings`, `adversus_product_mappings`, `agents`, `client_campaigns`, `clients`, `employee`, `employee_identity`, `master_employee`, `product_campaign_overrides`, `product_pricing_rules`, `products`, `sale_items`, `sales`, `team_clients` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `adversus_campaign_mappings`, `adversus_product_mappings`, `agents`, `client_campaigns`, `clients`, `employee`, `employee_identity`, `master_employee`, `product_campaign_overrides`, `product_pricing_rules`, `products`, `sale_items`, `sales`, `team_clients`
 - **RPC/Edge:** `edge:integration-engine`, `edge:rematch-pricing-rules`, `get_aggregated_product_types`
 
 ### `src/pages/MyContracts.tsx`
 - **Export:** `MyContracts`
 - **Størrelse:** 12013 bytes, 292 linjer
 - **Hooks brugt:** `useNavigate`, `useQuery`
-- **Tabeller direkte:** `contracts`, `employee_master_data` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `contracts`, `employee_master_data`
 
 ### `src/pages/MyGoals.tsx`
 - **Export:** `MyGoals`
 - **Størrelse:** 8404 bytes, 239 linjer
 - **Hooks brugt:** `usePersonalSalesStats`, `useQuery`, `useRolePreview`
-- **Tabeller direkte:** `absence_request_v2`, `danish_holiday`, `employee_master_data` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `absence_request_v2`, `danish_holiday`, `employee_master_data`
 - **RPC/Edge:** `get_current_employee_id`
 
 ### `src/pages/MyProfile.tsx`
 - **Export:** `MyProfile`
 - **Størrelse:** 97291 bytes, 2170 linjer
 - **Hooks brugt:** `useNavigate`, `useQuery`, `useQueryClient`, `useRolePreview`, `useSearchParams`
-- **Tabeller direkte:** `absence_request_v2`, `booking_assignment`, `contracts`, `danish_holiday`, `employee`, `employee_absence`, `employee_agent_mapping`, `employee_master_data`, `lateness_record`, `sales`, `team_members`, `time_stamps` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `absence_request_v2`, `booking_assignment`, `contracts`, `danish_holiday`, `employee`, `employee_absence`, `employee_agent_mapping`, `employee_master_data`, `lateness_record`, `sales`, `team_members`, `time_stamps`
 
 ### `src/pages/MyTimeClock.tsx`
 - **Export:** `MyTimeClock`
@@ -983,7 +983,7 @@ Total: **178** sider.
 - **Export:** `LeaderOnboardingView`
 - **Størrelse:** 14745 bytes, 372 linjer
 - **Hooks brugt:** `useCoachingCoverageStats`, `useCoachingTasks`, `useCurrentEmployeeId`, `useOnboardingDays`, `useQuery`, `useUpdateCoachingTask`
-- **Tabeller direkte:** `employee_master_data`, `team_members` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `employee_master_data`, `team_members`
 
 ### `src/pages/onboarding/MyFeedback.tsx`
 - **Export:** `MyFeedback`
@@ -994,7 +994,7 @@ Total: **178** sider.
 - **Export:** `OnboardingAdmin`
 - **Størrelse:** 23016 bytes, 380 linjer
 - **Hooks brugt:** `useOnboardingDays`, `useOnboardingDrills`, `useQueryClient`
-- **Tabeller direkte:** `onboarding_days`, `onboarding_drills` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `onboarding_days`, `onboarding_drills`
 
 ### `src/pages/onboarding/OnboardingCourse.tsx`
 - **Export:** `OnboardingCourse`
@@ -1009,7 +1009,7 @@ Total: **178** sider.
 - **Export:** `OnboardingAnalyse`
 - **Størrelse:** 40242 bytes, 907 linjer
 - **Hooks brugt:** `useQuery`
-- **Tabeller direkte:** `employee_master_data`, `historical_employment`, `sales`, `team_members` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `employee_master_data`, `historical_employment`, `sales`, `team_members`
 
 ### `src/pages/Permissions.tsx`
 - **Export:** `Permissions`
@@ -1021,14 +1021,14 @@ Total: **178** sider.
 - **Export:** `UpcomingStarts`
 - **Størrelse:** 33598 bytes, 875 linjer
 - **Hooks brugt:** `useMutation`, `usePermissions`, `useQuery`, `useQueryClient`, `useToast`
-- **Tabeller direkte:** `agents`, `candidates`, `cohort_members`, `employee_agent_mapping`, `employee_master_data`, `onboarding_cohorts` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `agents`, `candidates`, `cohort_members`, `employee_agent_mapping`, `employee_master_data`, `onboarding_cohorts`
 - **RPC/Edge:** `edge:send-employee-invitation`
 
 ### `src/pages/PublicPulseSurvey.tsx`
 - **Export:** `PublicPulseSurvey`
 - **Størrelse:** 20352 bytes, 489 linjer
 - **Hooks brugt:** `useMutation`, `useQuery`, `useQuizTemplate`
-- **Tabeller direkte:** `pulse_surveys`, `teams` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `pulse_surveys`, `teams`
 - **RPC/Edge:** `edge:submit-pulse-survey`
 
 ### `src/pages/PublicReferralForm.tsx`
@@ -1040,102 +1040,102 @@ Total: **178** sider.
 - **Export:** `PulseSurvey`
 - **Størrelse:** 24177 bytes, 445 linjer
 - **Hooks brugt:** `useActivePulseSurvey`, `useAuth`, `useDeletePulseSurveyDraft`, `useHasCompletedSurvey`, `useNavigate`, `usePulseSurveyDraft`, `useQuery`, `useSavePulseSurveyDraft`, `useSearchParams`, `useSubmitPulseSurvey`
-- **Tabeller direkte:** `employee_master_data`, `teams` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `employee_master_data`, `teams`
 
 ### `src/pages/PulseSurveyResults.tsx`
 - **Export:** `PulseSurveyResults`
 - **Størrelse:** 32656 bytes, 700 linjer
 - **Hooks brugt:** `useActivatePulseSurvey`, `useAllPulseSurveys`, `useNavigate`, `usePulseSurveyResults`, `useQuery`, `useQuizTemplate`, `useUpdateQuizTemplate`
-- **Tabeller direkte:** `teams` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `teams`
 
 ### `src/pages/recruitment/BookingFlow.tsx`
 - **Export:** `BookingFlow`
 - **Størrelse:** 29539 bytes, 708 linjer
 - **Hooks brugt:** `useMutation`, `useQuery`, `useQueryClient`
-- **Tabeller direkte:** `booking_flow_enrollments`, `booking_flow_steps`, `booking_flow_touchpoints`, `booking_notification_recipients`, `candidates` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `booking_flow_enrollments`, `booking_flow_steps`, `booking_flow_touchpoints`, `booking_notification_recipients`, `candidates`
 - **RPC/Edge:** `edge:regenerate-flow-touchpoints`, `edge:send-recruitment-email`
 
 ### `src/pages/recruitment/BookingFlowEngagement.tsx`
 - **Export:** `BookingFlowEngagement`
 - **Størrelse:** 18482 bytes, 467 linjer
 - **Hooks brugt:** `useQuery`
-- **Tabeller direkte:** `booking_flow_enrollments`, `booking_flow_touchpoints`, `candidates`, `communication_logs`, `short_link_clicks`, `short_links` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `booking_flow_enrollments`, `booking_flow_touchpoints`, `candidates`, `communication_logs`, `short_link_clicks`, `short_links`
 
 ### `src/pages/recruitment/CandidateDetail.tsx`
 - **Export:** `CandidateDetail`
 - **Størrelse:** 46250 bytes, 1057 linjer
 - **Hooks brugt:** `useMutation`, `useNavigate`, `useQuery`, `useQueryClient`, `useTwilioDeviceContext`
-- **Tabeller direkte:** `call_records`, `candidates`, `cohort_members`, `communication_logs`, `employee_master_data` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `call_records`, `candidates`, `cohort_members`, `communication_logs`, `employee_master_data`
 - **RPC/Edge:** `edge:send-employee-invitation`
 
 ### `src/pages/recruitment/Candidates.tsx`
 - **Export:** `Candidates`
 - **Størrelse:** 26068 bytes, 594 linjer
 - **Hooks brugt:** `useNavigate`, `useQuery`, `useQueryClient`
-- **Tabeller direkte:** `call_records`, `candidates`, `communication_logs` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `call_records`, `candidates`, `communication_logs`
 
 ### `src/pages/recruitment/EmailTemplates.tsx`
 - **Export:** `EmailTemplates`
 - **Størrelse:** 28616 bytes, 741 linjer
 - **Hooks brugt:** `useMutation`, `useQuery`, `useQueryClient`
-- **Tabeller direkte:** `email_templates` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `email_templates`
 - **RPC/Edge:** `edge:send-test-email`
 
 ### `src/pages/recruitment/Messages.tsx`
 - **Export:** `Messages`
 - **Størrelse:** 32045 bytes, 732 linjer
 - **Hooks brugt:** `useQuery`, `useQueryClient`
-- **Tabeller direkte:** `call_records`, `candidates`, `communication_logs` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `call_records`, `candidates`, `communication_logs`
 - **Realtime channels:** `messages-realtime`
 
 ### `src/pages/recruitment/PublicCandidateBooking.tsx`
 - **Export:** `PublicCandidateBooking`
 - **Størrelse:** 19592 bytes, 368 linjer
 - **Hooks brugt:** `useMutation`, `useQuery`
-- **Tabeller direkte:** `booking_page_config`, `booking_page_content` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `booking_page_config`, `booking_page_content`
 - **RPC/Edge:** `edge:get-public-availability`, `edge:public-book-candidate`, `edge:unsubscribe-candidate`
 
 ### `src/pages/recruitment/PublicUnsubscribe.tsx`
 - **Export:** `PublicUnsubscribe`
 - **Størrelse:** 4334 bytes, 114 linjer
-- **Tabeller direkte:** `booking_page_content`, `candidates` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `booking_page_content`, `candidates`
 - **RPC/Edge:** `edge:unsubscribe-candidate`
 
 ### `src/pages/recruitment/RecruitmentDashboard.tsx`
 - **Export:** `RecruitmentDashboard`
 - **Størrelse:** 30155 bytes, 719 linjer
 - **Hooks brugt:** `useQuery`
-- **Tabeller direkte:** `candidates`, `communication_logs`, `employee_referrals` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `candidates`, `communication_logs`, `employee_referrals`
 
 ### `src/pages/recruitment/Referrals.tsx`
 - **Export:** `Referrals`
 - **Størrelse:** 23463 bytes, 584 linjer
 - **Hooks brugt:** `useAllReferrals`, `useConvertReferralToCandidate`, `useDeleteReferral`, `useMarkBonusPaid`, `useNavigate`, `useQuery`, `useUpdateReferralStatus`
-- **Tabeller direkte:** `employee_master_data` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `employee_master_data`
 
 ### `src/pages/recruitment/SmsTemplates.tsx`
 - **Export:** `SmsTemplates`
 - **Størrelse:** 8726 bytes, 256 linjer
 - **Hooks brugt:** `useMutation`, `useQuery`, `useQueryClient`
-- **Tabeller direkte:** `sms_templates` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `sms_templates`
 
 ### `src/pages/recruitment/UpcomingHires.tsx`
 - **Export:** `UpcomingHires`
 - **Størrelse:** 5585 bytes, 159 linjer
 - **Hooks brugt:** `useQuery`
-- **Tabeller direkte:** `candidates` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `candidates`
 
 ### `src/pages/recruitment/UpcomingInterviews.tsx`
 - **Export:** `UpcomingInterviews`
 - **Størrelse:** 12249 bytes, 317 linjer
 - **Hooks brugt:** `useMutation`, `useNavigate`, `useQuery`, `useQueryClient`
-- **Tabeller direkte:** `candidates` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `candidates`
 
 ### `src/pages/recruitment/Winback.tsx`
 - **Export:** `Winback`
 - **Størrelse:** 7355 bytes, 211 linjer
 - **Hooks brugt:** `useQuery`, `useUnifiedPermissions`
-- **Tabeller direkte:** `candidates` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `candidates`
 
 ### `src/pages/ReferAFriend.tsx`
 - **Export:** `ReferAFriend`
@@ -1154,14 +1154,14 @@ Total: **178** sider.
 - **Export:** `DailyReports`
 - **Størrelse:** 81727 bytes, 1780 linjer
 - **Hooks brugt:** `useCurrentEmployee`, `useFeatureFlag`, `usePermissions`, `useQuery`
-- **Tabeller direkte:** `absence_request_v2`, `adversus_campaign_mappings`, `agents`, `client_campaigns`, `clients`, `employee_agent_mapping`, `employee_basic_info`, `employee_master_data`, `product_pricing_rules`, `products`, `team_assistant_leaders`, `team_clients`, `team_members`, `team_standard_shift_days`, `team_standard_shifts`, `teams`, `time_stamps` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `absence_request_v2`, `adversus_campaign_mappings`, `agents`, `client_campaigns`, `clients`, `employee_agent_mapping`, `employee_basic_info`, `employee_master_data`, `product_pricing_rules`, `products`, `team_assistant_leaders`, `team_clients`, `team_members`, `team_standard_shift_days`, `team_standard_shifts`, `teams`, `time_stamps`
 - **RPC/Edge:** `get_distinct_agent_emails_for_client`
 
 ### `src/pages/reports/LocationReportTab.tsx`
 - **Export:** `(anon)`
 - **Størrelse:** 13426 bytes, 373 linjer
 - **Hooks brugt:** `useQuery`
-- **Tabeller direkte:** `booking`, `location` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `booking`, `location`
 
 ### `src/pages/reports/RawSalesTable.tsx`
 - **Export:** `(anon)`
@@ -1171,7 +1171,7 @@ Total: **178** sider.
 - **Export:** `ReportsAdmin`
 - **Størrelse:** 15346 bytes, 412 linjer
 - **Hooks brugt:** `useQuery`
-- **Tabeller direkte:** `client_campaigns`, `clients`, `employee_master_data`, `teams` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `client_campaigns`, `clients`, `employee_master_data`, `teams`
 
 ### `src/pages/reports/ReportsEmployee.tsx`
 - **Export:** `ReportsEmployee`
@@ -1188,7 +1188,7 @@ Total: **178** sider.
 - **Export:** `RevenueByClient`
 - **Størrelse:** 34881 bytes, 787 linjer
 - **Hooks brugt:** `useAuth`, `useMutation`, `useQuery`, `useQueryClient`
-- **Tabeller direkte:** `adversus_campaign_mappings`, `booking`, `client_adjustment_percents`, `clients`, `product_pricing_rules`, `sale_items` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `adversus_campaign_mappings`, `booking`, `client_adjustment_percents`, `clients`, `product_pricing_rules`, `sale_items`
 
 ### `src/pages/ResetPassword.tsx`
 - **Export:** `ResetPassword`
@@ -1200,19 +1200,19 @@ Total: **178** sider.
 - **Export:** `RolePreview`
 - **Størrelse:** 8764 bytes, 238 linjer
 - **Hooks brugt:** `useNavigate`, `useQuery`, `useRolePreview`, `useSearchParams`
-- **Tabeller direkte:** `employee_master_data`, `job_positions` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `employee_master_data`, `job_positions`
 
 ### `src/pages/salary/Cancellations.tsx`
 - **Export:** `Cancellations`
 - **Størrelse:** 8687 bytes, 187 linjer
 - **Hooks brugt:** `useQuery`, `useUnifiedPermissions`
-- **Tabeller direkte:** `clients` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `clients`
 
 ### `src/pages/SalarySchemes.tsx`
 - **Export:** `SalarySchemes`
 - **Størrelse:** 11345 bytes, 316 linjer
 - **Hooks brugt:** `useMutation`, `useQuery`, `useQueryClient`
-- **Tabeller direkte:** `employee_master_data`, `employee_salary_schemes`, `salary_schemes` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `employee_master_data`, `employee_salary_schemes`, `salary_schemes`
 
 ### `src/pages/SalaryTypes.tsx`
 - **Export:** `SalaryTypes`
@@ -1225,50 +1225,50 @@ Total: **178** sider.
 ### `src/pages/Settings.tsx`
 - **Export:** `Settings`
 - **Størrelse:** 51901 bytes, 1175 linjer
-- **Tabeller direkte:** `adversus_events`, `api_integrations`, `tdc_cancellation_imports`, `webhook_endpoints` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `adversus_events`, `api_integrations`, `tdc_cancellation_imports`, `webhook_endpoints`
 - **RPC/Edge:** `edge:integration-engine`, `edge:update-cron-schedule`
 
 ### `src/pages/shift-planning/AbsenceManagement.tsx`
 - **Export:** `AbsenceManagement`
 - **Størrelse:** 15748 bytes, 406 linjer
 - **Hooks brugt:** `useAbsenceRequests`, `useCurrentEmployee`, `useDepartments`, `usePermissions`, `useQuery`, `useUpdateAbsenceRequest`
-- **Tabeller direkte:** `team_assistant_leaders`, `team_members`, `teams` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `team_assistant_leaders`, `team_members`, `teams`
 
 ### `src/pages/shift-planning/MySchedule.tsx`
 - **Export:** `MySchedule`
 - **Størrelse:** 21675 bytes, 520 linjer
 - **Hooks brugt:** `useAbsenceRequests`, `useAbsencesForDateRange`, `useCurrentEmployee`, `useDanishHolidays`, `useMyShifts`, `useQuery`, `useTimeStampsForRange`
-- **Tabeller direkte:** `employee_standard_shifts`, `lateness_record`, `team_members`, `team_standard_shift_days`, `team_standard_shifts` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `employee_standard_shifts`, `lateness_record`, `team_members`, `team_standard_shift_days`, `team_standard_shifts`
 
 ### `src/pages/shift-planning/ShiftOverview.tsx`
 - **Export:** `ShiftOverview`
 - **Størrelse:** 88096 bytes, 1943 linjer
 - **Hooks brugt:** `useAbsencesForDateRange`, `useDanishHolidays`, `useDepartments`, `useEmployeesForShifts`, `useFeatureFlag`, `useMutation`, `usePendingVacationRequests`, `usePermissions`, `useQuery`, `useQueryClient`, `useShifts`
-- **Tabeller direkte:** `absence_request_v2`, `agents`, `daily_bonus_payouts`, `employee_agent_mapping`, `employee_master_data`, `employee_standard_shifts`, `lateness_record`, `sales`, `team_client_daily_bonus`, `team_members`, `team_standard_shift_days`, `team_standard_shifts`, `time_stamps` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `absence_request_v2`, `agents`, `daily_bonus_payouts`, `employee_agent_mapping`, `employee_master_data`, `employee_standard_shifts`, `lateness_record`, `sales`, `team_client_daily_bonus`, `team_members`, `team_standard_shift_days`, `team_standard_shifts`, `time_stamps`
 
 ### `src/pages/shift-planning/TimeTracking.tsx`
 - **Export:** `TimeTracking`
 - **Størrelse:** 10534 bytes, 262 linjer
 - **Hooks brugt:** `useDepartments`, `useQuery`
-- **Tabeller direkte:** `team_members`, `time_entry` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `team_members`, `time_entry`
 
 ### `src/pages/ShortLinkRedirect.tsx`
 - **Export:** `ShortLinkRedirect`
 - **Størrelse:** 1340 bytes, 46 linjer
-- **Tabeller direkte:** `short_link_clicks`, `short_links` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `short_link_clicks`, `short_links`
 
 ### `src/pages/SystemFeedback.tsx`
 - **Export:** `SystemFeedback`
 - **Størrelse:** 49997 bytes, 1157 linjer
 - **Hooks brugt:** `useAuth`, `useCurrentEmployeeId`, `useDropzone`, `useIsOwner`, `useMutation`, `useQuery`, `useQueryClient`, `useToast`
-- **Tabeller direkte:** `employee_master_data`, `system_feedback`, `system_feedback_access`, `system_feedback_comments`, `system_feedback_recipients` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `employee_master_data`, `system_feedback`, `system_feedback_access`, `system_feedback_comments`, `system_feedback_recipients`
 - **RPC/Edge:** `edge:notify-feedback-status-change`, `edge:notify-system-feedback`, `is_owner`
 
 ### `src/pages/SystemStability.tsx`
 - **Export:** `SystemStability`
 - **Størrelse:** 24367 bytes, 523 linjer
 - **Hooks brugt:** `useQuery`, `useStabilityAlerts`
-- **Tabeller direkte:** `dialer_integrations`, `integration_logs`, `integration_schedule_audit`, `integration_sync_runs` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `dialer_integrations`, `integration_logs`, `integration_schedule_audit`, `integration_sync_runs`
 - **RPC/Edge:** `get_active_cron_jobs`
 
 ### `src/pages/TdcErhvervDashboard.tsx`
@@ -1289,13 +1289,13 @@ Total: **178** sider.
 - **Export:** `TeamGoals`
 - **Størrelse:** 24825 bytes, 577 linjer
 - **Hooks brugt:** `useMutation`, `useQuery`, `useQueryClient`, `useTeamGoalForecast`
-- **Tabeller direkte:** `team_monthly_goals`, `teams` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `team_monthly_goals`, `teams`
 
 ### `src/pages/Teams.tsx`
 - **Export:** `Teams`
 - **Størrelse:** 12595 bytes, 338 linjer
 - **Hooks brugt:** `useMutation`, `useQuery`, `useQueryClient`, `useToast`
-- **Tabeller direkte:** `employee_master_data`, `teams` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `employee_master_data`, `teams`
 
 ### `src/pages/TimeStamp.tsx`
 - **Export:** `TimeStamp`
@@ -1306,7 +1306,7 @@ Total: **178** sider.
 - **Export:** `TvBoardAdmin`
 - **Størrelse:** 13497 bytes, 343 linjer
 - **Hooks brugt:** `useMutation`, `useQuery`, `useQueryClient`
-- **Tabeller direkte:** `tv_board_access` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `tv_board_access`
 
 ### `src/pages/tv-board/TvBoardDirect.tsx`
 - **Export:** `TvBoardDirect`
@@ -1317,13 +1317,13 @@ Total: **178** sider.
 - **Export:** `TvBoardLogin`
 - **Størrelse:** 3992 bytes, 108 linjer
 - **Hooks brugt:** `useNavigate`, `useSearchParams`
-- **Tabeller direkte:** `tv_board_access` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `tv_board_access`
 
 ### `src/pages/tv-board/TvBoardView.tsx`
 - **Export:** `TvBoardView`
 - **Størrelse:** 3604 bytes, 105 linjer
 - **Hooks brugt:** `useNavigate`, `useQueryClient`
-- **Tabeller direkte:** `tv_board_access` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `tv_board_access`
 
 ### `src/pages/tv-board/TvLeagueDashboard.tsx`
 - **Export:** `TvLeagueDashboard`
@@ -1334,13 +1334,13 @@ Total: **178** sider.
 - **Export:** `UnitedDashboard`
 - **Størrelse:** 9080 bytes, 198 linjer
 - **Hooks brugt:** `useQuery`, `useUnitedTeamClients`
-- **Tabeller direkte:** `agents`, `client_campaigns`, `employee_agent_mapping`, `kpi_cached_values`, `shift`, `team_clients`, `teams` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `agents`, `client_campaigns`, `employee_agent_mapping`, `kpi_cached_values`, `shift`, `team_clients`, `teams`
 
 ### `src/pages/vagt-flow/Billing.tsx`
 - **Export:** `VagtBilling`
 - **Størrelse:** 24848 bytes, 612 linjer
 - **Hooks brugt:** `useQuery`
-- **Tabeller direkte:** `booking`, `supplier_discount_rules`, `supplier_location_exceptions`, `team_clients`, `teams` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `booking`, `supplier_discount_rules`, `supplier_location_exceptions`, `team_clients`, `teams`
 
 ### `src/pages/vagt-flow/BookingManagement.tsx`
 - **Export:** `BookingManagement`
@@ -1351,13 +1351,13 @@ Total: **178** sider.
 - **Export:** `VagtBookings`
 - **Størrelse:** 36987 bytes, 854 linjer
 - **Hooks brugt:** `useMutation`, `useNavigate`, `useQuery`, `useQueryClient`, `useSearchParams`, `useToast`
-- **Tabeller direkte:** `absence_request_v2`, `booking`, `booking_assignment`, `employee_master_data`, `team_clients`, `teams`, `vehicle`, `vehicle_mileage` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `absence_request_v2`, `booking`, `booking_assignment`, `employee_master_data`, `team_clients`, `teams`, `vehicle`, `vehicle_mileage`
 
 ### `src/pages/vagt-flow/BookingsContent.tsx`
 - **Export:** `BookingsContent`
 - **Størrelse:** 84146 bytes, 1826 linjer
 - **Hooks brugt:** `useBookingHotels`, `useMutation`, `useNavigate`, `usePermissions`, `useQuery`, `useQueryClient`, `useSearchParams`, `useToast`
-- **Tabeller direkte:** `absence_request_v2`, `booking`, `booking_assignment`, `booking_diet`, `booking_vehicle`, `employee_master_data`, `salary_types`, `team_clients`, `team_members`, `teams`, `vehicle` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `absence_request_v2`, `booking`, `booking_assignment`, `booking_diet`, `booking_vehicle`, `employee_master_data`, `salary_types`, `team_clients`, `team_members`, `teams`, `vehicle`
 
 ### `src/pages/vagt-flow/BookWeek.tsx`
 - **Export:** `VagtBookWeek`
@@ -1367,26 +1367,26 @@ Total: **178** sider.
 - **Export:** `BookWeekContent`
 - **Størrelse:** 37032 bytes, 900 linjer
 - **Hooks brugt:** `useMutation`, `useNavigate`, `useQuery`, `useQueryClient`, `useSearchParams`, `useToast`
-- **Tabeller direkte:** `booking`, `location`, `location_placements`, `team_clients`, `teams` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `booking`, `location`, `location_placements`, `team_clients`, `teams`
 
 ### `src/pages/vagt-flow/EditSalesRegistrations.tsx`
 - **Export:** `EditSalesRegistrations`
 - **Størrelse:** 47537 bytes, 1173 linjer
 - **Hooks brugt:** `useMutation`, `useQuery`, `useQueryClient`
-- **Tabeller direkte:** `clients`, `employee_master_data`, `location`, `products`, `sale_items`, `sales` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `clients`, `employee_master_data`, `location`, `products`, `sale_items`, `sales`
 - **RPC/Edge:** `edge:rematch-pricing-rules`
 
 ### `src/pages/vagt-flow/FieldmarketingDashboard.tsx`
 - **Export:** `FieldmarketingDashboard`
 - **Størrelse:** 23298 bytes, 582 linjer
 - **Hooks brugt:** `useFieldmarketingSales`, `useFieldmarketingSalesStats`, `useQuery`, `useTranslation`
-- **Tabeller direkte:** `clients`, `employee_master_data`, `product_pricing_rules`, `products` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `clients`, `employee_master_data`, `product_pricing_rules`, `products`
 
 ### `src/pages/vagt-flow/FmChecklistContent.tsx`
 - **Export:** `FmChecklistContent`
 - **Størrelse:** 23175 bytes, 590 linjer
 - **Hooks brugt:** `useAddChecklistTemplate`, `useAddEmailRecipient`, `useAuth`, `useDeactivateChecklistTemplate`, `useEmployeeId`, `useFmChecklistCompletions`, `useFmChecklistEmailConfig`, `useFmChecklistEmailRecipients`, `useFmChecklistTemplates`, `useRemoveEmailRecipient`, `useToggleChecklistCompletion`, `useUpdateCompletionNote`, `useUpdateEmailConfig`
-- **Tabeller direkte:** `employee_master_data` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `employee_master_data`
 
 ### `src/pages/vagt-flow/HotelsContent.tsx`
 - **Export:** `HotelsContent`
@@ -1397,56 +1397,56 @@ Total: **178** sider.
 - **Export:** `VagtFlowIndex`
 - **Størrelse:** 7607 bytes, 183 linjer
 - **Hooks brugt:** `useNavigate`, `useQuery`
-- **Tabeller direkte:** `booking`, `employee`, `location` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `booking`, `employee`, `location`
 
 ### `src/pages/vagt-flow/LocationDetail.tsx`
 - **Export:** `LocationDetail`
 - **Størrelse:** 25999 bytes, 644 linjer
 - **Hooks brugt:** `useMutation`, `useNavigate`, `usePermissions`, `useQuery`, `useQueryClient`, `useSearchParams`, `useToast`
-- **Tabeller direkte:** `adversus_campaign_mappings`, `client_campaigns`, `location`, `location_placements`, `team_clients`, `teams` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `adversus_campaign_mappings`, `client_campaigns`, `location`, `location_placements`, `team_clients`, `teams`
 
 ### `src/pages/vagt-flow/LocationHistoryContent.tsx`
 - **Export:** `LocationHistoryContent`
 - **Størrelse:** 39093 bytes, 899 linjer
 - **Hooks brugt:** `useQuery`
-- **Tabeller direkte:** `booking`, `booking_diet`, `booking_hotel`, `location`, `location_placements`, `sales` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `booking`, `booking_diet`, `booking_hotel`, `location`, `location_placements`, `sales`
 
 ### `src/pages/vagt-flow/LocationProfitabilityContent.tsx`
 - **Export:** `LocationProfitabilityContent`
 - **Størrelse:** 32993 bytes, 748 linjer
 - **Hooks brugt:** `useMutation`, `useQuery`, `useQueryClient`, `useSearchParams`
-- **Tabeller direkte:** `booking`, `booking_diet`, `booking_hotel`, `location_placements`, `sales` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `booking`, `booking_diet`, `booking_hotel`, `location_placements`, `sales`
 
 ### `src/pages/vagt-flow/Locations.tsx`
 - **Export:** `VagtLocations`
 - **Størrelse:** 26166 bytes, 646 linjer
 - **Hooks brugt:** `useMutation`, `useNavigate`, `usePermissions`, `useQuery`, `useQueryClient`, `useSearchParams`, `useToast`
-- **Tabeller direkte:** `location`, `team_clients`, `teams` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `location`, `team_clients`, `teams`
 
 ### `src/pages/vagt-flow/LocationsContent.tsx`
 - **Export:** `LocationsContent`
 - **Størrelse:** 17812 bytes, 467 linjer
 - **Hooks brugt:** `useMutation`, `useNavigate`, `usePermissions`, `useQuery`, `useQueryClient`, `useSearchParams`, `useToast`
-- **Tabeller direkte:** `location`, `team_clients`, `teams` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `location`, `team_clients`, `teams`
 
 ### `src/pages/vagt-flow/MarketsContent.tsx`
 - **Export:** `MarketsContent`
 - **Størrelse:** 38207 bytes, 862 linjer
 - **Hooks brugt:** `useMutation`, `useNavigate`, `useQuery`, `useQueryClient`, `useToast`
-- **Tabeller direkte:** `booking`, `booking_assignment`, `booking_vehicle`, `employee_master_data`, `team_clients`, `team_members`, `teams`, `vehicle` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `booking`, `booking_assignment`, `booking_vehicle`, `employee_master_data`, `team_clients`, `team_members`, `teams`, `vehicle`
 
 ### `src/pages/vagt-flow/MyBookingSchedule.tsx`
 - **Export:** `MyBookingSchedule`
 - **Størrelse:** 27050 bytes, 596 linjer
 - **Hooks brugt:** `useAuth`, `useMutation`, `useQuery`, `useQueryClient`
-- **Tabeller direkte:** `booking_assignment`, `booking_diet`, `booking_hotel`, `booking_vehicle`, `employee_master_data`, `vehicle_return_confirmation` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `booking_assignment`, `booking_diet`, `booking_hotel`, `booking_vehicle`, `employee_master_data`, `vehicle_return_confirmation`
 - **RPC/Edge:** `edge:notify-vehicle-returned`
 
 ### `src/pages/vagt-flow/SalesRegistration.tsx`
 - **Export:** `SalesRegistration`
 - **Størrelse:** 30324 bytes, 858 linjer
 - **Hooks brugt:** `useAuth`, `useCreateFieldmarketingSale`, `useNavigate`, `usePermissions`, `useQuery`, `useTranslation`
-- **Tabeller direkte:** `booking`, `booking_assignment`, `client_campaigns`, `employee_master_data`, `location`, `products` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `booking`, `booking_assignment`, `client_campaigns`, `employee_master_data`, `location`, `products`
 
 ### `src/pages/vagt-flow/TimeOffRequests.tsx`
 - **Export:** `VagtTimeOffRequests`
@@ -1462,13 +1462,13 @@ Total: **178** sider.
 - **Export:** `VagtplanFMContent`
 - **Størrelse:** 32966 bytes, 786 linjer
 - **Hooks brugt:** `useAbsencesForDateRange`, `useDanishHolidays`, `usePendingVacationRequests`, `useQuery`, `useShifts`
-- **Tabeller direkte:** `booking_assignment`, `daily_bonus_payouts`, `employee_standard_shifts`, `lateness_record`, `team_members`, `team_standard_shift_days`, `team_standard_shifts`, `teams`, `time_stamps` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `booking_assignment`, `daily_bonus_payouts`, `employee_standard_shifts`, `lateness_record`, `team_members`, `team_standard_shift_days`, `team_standard_shifts`, `teams`, `time_stamps`
 
 ### `src/pages/vagt-flow/Vehicles.tsx`
 - **Export:** `VagtVehicles`
 - **Størrelse:** 12287 bytes, 325 linjer
 - **Hooks brugt:** `useMutation`, `useQuery`, `useQueryClient`, `useToast`
-- **Tabeller direkte:** `vehicle`, `vehicle_mileage` ⚠️ (bryder service-lag-princip)
+- **Tabeller direkte:** `vehicle`, `vehicle_mileage`
 
 ## 3. Komponenter (`src/components/`)
 
@@ -29259,9 +29259,9 @@ export const useWidgetTypes = () => {
 
 ```
 
-## 5. `src/lib/calculations/` — FULD KILDEKODE (RØD ZONE)
+## 5. `src/lib/calculations/` — FULD KILDEKODE
 
-⚠️ Disse filer er forretningskritiske (løn, pricing, vacation, hours). Må ALDRIG ændres uden eksplicit godkendelse.
+Forretningslogik for løn, pricing, vacation og hours. Delt 1:1 med edge functions i `supabase/functions/_shared/`.
 
 ### `src/lib/calculations/dates.ts`
 ```ts

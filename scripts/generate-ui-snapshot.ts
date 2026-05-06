@@ -7,7 +7,7 @@
  *  - Sider (fil, hooks brugt, supabase-kald, RPC-kald)
  *  - Komponenter (fil, props-signatur, hooks brugt)
  *  - Hooks (FULD KILDEKODE — kritisk for ekstern AI)
- *  - Lib/calculations (FULD KILDEKODE — pricing/løn = rød zone)
+ *  - Lib/calculations (FULD KILDEKODE — pricing/løn-beregninger)
  *
  * Kør: bun run scripts/generate-ui-snapshot.ts
  */
@@ -162,7 +162,7 @@ for (const p of pages) {
   push(`- **Export:** \`${exp}\``);
   push(`- **Størrelse:** ${p.size} bytes, ${p.content.split("\n").length} linjer`);
   if (hooks.length) push(`- **Hooks brugt:** ${hooks.map((h) => `\`${h}\``).join(", ")}`);
-  if (sb.tables.length) push(`- **Tabeller direkte:** ${sb.tables.map((t) => `\`${t}\``).join(", ")} ⚠️ (bryder service-lag-princip)`);
+  if (sb.tables.length) push(`- **Tabeller direkte:** ${sb.tables.map((t) => `\`${t}\``).join(", ")}`);
   if (sb.rpcs.length) push(`- **RPC/Edge:** ${sb.rpcs.map((r) => `\`${r}\``).join(", ")}`);
   if (sb.channels.length) push(`- **Realtime channels:** ${sb.channels.map((c) => `\`${c}\``).join(", ")}`);
   push();
@@ -226,9 +226,9 @@ for (const h of hooks) {
 }
 
 // ===== LIB/CALCULATIONS — FULL CODE (RED ZONE) =====
-push("## 5. `src/lib/calculations/` — FULD KILDEKODE (RØD ZONE)");
+push("## 5. `src/lib/calculations/` — FULD KILDEKODE");
 push();
-push("⚠️ Disse filer er forretningskritiske (løn, pricing, vacation, hours). Må ALDRIG ændres uden eksplicit godkendelse.");
+push("Forretningslogik for løn, pricing, vacation og hours. Delt 1:1 med edge functions i `supabase/functions/_shared/`.");
 push();
 const calcs = walk(join(ROOT, "lib/calculations"), (p) => /\.tsx?$/.test(p));
 for (const c of calcs) {
