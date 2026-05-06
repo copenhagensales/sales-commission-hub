@@ -50,6 +50,10 @@ interface ProductRow {
   is_active: boolean;
   merged_into_product_id: string | null;
   isMergeParent: boolean;
+  // Unmapped source: sale_items with needs_mapping=true and product_id IS NULL
+  isUnmapped?: boolean;
+  unmappedExternalId?: string | null;
+  unmappedSalesCount?: number;
 }
 
 interface ClientOption {
@@ -246,6 +250,56 @@ export function ProductMergeDialog({
         }
       }
 
+      // Fetch unmapped sale_items (needs_mapping=true, product_id IS NULL) for this client
+      // Last 30 days to match the MgTest "Manglende mapping" UI window
+      try {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const { data: unmappedItems, error: unmappedErr } = await supabase
+          .from("sale_items")
+          .select("id, adversus_product_title, adversus_external_id, quantity, sales!inner(client_campaigns!inner(client_id))")
+          .eq("needs_mapping", true)
+          .is("product_id", null)
+          .gte("created_at", thirtyDaysAgo.toISOString())
+          .eq("sales.client_campaigns.client_id", clientId);
+        if (unmappedErr) {
+          console.error("Load unmapped items error:", unmappedErr);
+        } else if (unmappedItems && unmappedItems.length > 0) {
+          // Group by (external_id, title)
+          const unmappedMap = new Map<string, { externalId: string | null; title: string; salesCount: number }>();
+          for (const it of unmappedItems as any[]) {
+            const externalId = it.adversus_external_id ?? null;
+            const title = it.adversus_product_title ?? "Ukendt";
+            const groupKey = `unmapped::${externalId ?? ""}::${title}`;
+            const existing = unmappedMap.get(groupKey);
+            if (existing) {
+              existing.salesCount += it.quantity ?? 1;
+            } else {
+              unmappedMap.set(groupKey, { externalId, title, salesCount: it.quantity ?? 1 });
+            }
+          }
+          for (const [groupKey, g] of unmappedMap.entries()) {
+            // Skip if already covered (very unlikely, but be safe)
+            if (result.some((r) => r.key === groupKey)) continue;
+            result.push({
+              key: groupKey,
+              id: null,
+              name: g.title,
+              internalName: null,
+              client_campaign_id: null,
+              is_active: true,
+              merged_into_product_id: null,
+              isMergeParent: false,
+              isUnmapped: true,
+              unmappedExternalId: g.externalId,
+              unmappedSalesCount: g.salesCount,
+            });
+          }
+        }
+      } catch (unmappedFetchErr) {
+        console.error("Unmapped fetch failed:", unmappedFetchErr);
+      }
+
       setProducts(result.sort((a, b) => a.name.localeCompare(b.name, "da")));
     } catch (e) {
       console.error("Load products error:", e);
@@ -300,7 +354,11 @@ export function ProductMergeDialog({
     }
   }
 
-  const selectedProducts = products.filter((p) => selectedKeys.has(p.key) && p.id);
+  // All selected rows (incl. unmapped sources)
+  const selectedAll = products.filter((p) => selectedKeys.has(p.key));
+  // Only rows backed by an existing products.id (target candidates + mapped sources)
+  const selectedProducts = selectedAll.filter((p) => !!p.id);
+  const selectedUnmapped = selectedAll.filter((p) => p.isUnmapped && !p.id);
   
   // Detect "expand existing merge" mode: if exactly one selected product is a merge parent
   const selectedParents = selectedProducts.filter((p) => p.isMergeParent);
@@ -344,7 +402,7 @@ export function ProductMergeDialog({
       loadProducts(selectedClientId);
       setStep(3);
     } else if (step === 3) {
-      if (mode === "merge" && selectedKeys.size >= 2) {
+      if (mode === "merge" && selectedKeys.size >= 2 && selectedProducts.length >= 1) {
         loadPricingRules();
         setStep(4);
       } else if (mode === "unmerge" && selectedKeys.size >= 1) {
@@ -360,7 +418,7 @@ export function ProductMergeDialog({
   }
 
   async function handleMerge() {
-    if (!mergedProductName.trim() || selectedProducts.length < 2) return;
+    if (!mergedProductName.trim() || selectedAll.length < 2 || selectedProducts.length < 1) return;
     setMerging(true);
     try {
       const allIds = selectedProducts.map((p) => p.id!).filter(Boolean);
@@ -458,6 +516,95 @@ export function ProductMergeDialog({
         }
       }
 
+      // Handle UNMAPPED sources: attach their existing sale_items to targetId AND
+      // create adversus_product_mappings so future sales also land on targetId.
+      let unmappedSaleItemsMoved = 0;
+      let adversusMappingsCreated = 0;
+      if (selectedUnmapped.length > 0) {
+        const externalIds = selectedUnmapped
+          .map((u) => u.unmappedExternalId)
+          .filter((x): x is string => !!x);
+
+        if (externalIds.length > 0) {
+          // 1) Find sale_ids belonging to this client (last 30 days, needs_mapping=true, no product)
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          const { data: candidateItems, error: candErr } = await supabase
+            .from("sale_items")
+            .select("id, adversus_external_id, unit_price, sales!inner(client_campaigns!inner(client_id))")
+            .eq("needs_mapping", true)
+            .is("product_id", null)
+            .in("adversus_external_id", externalIds)
+            .gte("created_at", thirtyDaysAgo.toISOString())
+            .eq("sales.client_campaigns.client_id", selectedClientId);
+          if (candErr) throw candErr;
+
+          const itemIds = (candidateItems ?? []).map((i: any) => i.id);
+          if (itemIds.length > 0) {
+            const { error: updErr, count: updCount } = await supabase
+              .from("sale_items")
+              .update({ product_id: targetId, needs_mapping: false })
+              .in("id", itemIds);
+            if (updErr) throw updErr;
+            unmappedSaleItemsMoved = updCount ?? itemIds.length;
+          }
+
+          // 2) Create adversus_product_mappings for each unique (external_id, unit_price)
+          //    so future sales auto-resolve. UNIQUE index is (adversus_external_id, COALESCE(unit_price,-1)).
+          const mappingPairs = new Map<string, { external_id: string; unit_price: number | null; title: string | null }>();
+          for (const it of (candidateItems ?? []) as any[]) {
+            const ext = it.adversus_external_id as string;
+            const up = it.unit_price ?? null;
+            const pairKey = `${ext}::${up ?? "null"}`;
+            if (!mappingPairs.has(pairKey)) {
+              const titleFromSelected = selectedUnmapped.find((u) => u.unmappedExternalId === ext)?.name ?? null;
+              mappingPairs.set(pairKey, { external_id: ext, unit_price: up, title: titleFromSelected });
+            }
+          }
+          // Also ensure at least one mapping row per selected external_id even if no sale_items exist
+          for (const u of selectedUnmapped) {
+            if (!u.unmappedExternalId) continue;
+            if (!Array.from(mappingPairs.values()).some(v => v.external_id === u.unmappedExternalId)) {
+              mappingPairs.set(`${u.unmappedExternalId}::null`, { external_id: u.unmappedExternalId, unit_price: null, title: u.name });
+            }
+          }
+
+          for (const pair of mappingPairs.values()) {
+            // Check if a mapping already exists for this (external_id, unit_price) pair
+            let existingQuery = supabase
+              .from("adversus_product_mappings")
+              .select("id")
+              .eq("adversus_external_id", pair.external_id);
+            existingQuery = pair.unit_price === null
+              ? existingQuery.is("unit_price", null)
+              : existingQuery.eq("unit_price", pair.unit_price);
+            const { data: existingRows, error: existErr } = await existingQuery.limit(1);
+            if (existErr) throw existErr;
+
+            if (existingRows && existingRows.length > 0) {
+              // Update existing row to point to target
+              const { error: upErr } = await supabase
+                .from("adversus_product_mappings")
+                .update({ product_id: targetId, adversus_product_title: pair.title })
+                .eq("id", existingRows[0].id);
+              if (upErr) throw upErr;
+            } else {
+              // Insert new mapping row
+              const { error: insErr } = await supabase
+                .from("adversus_product_mappings")
+                .insert({
+                  adversus_external_id: pair.external_id,
+                  adversus_product_title: pair.title,
+                  unit_price: pair.unit_price,
+                  product_id: targetId,
+                });
+              if (insErr) throw insErr;
+              adversusMappingsCreated++;
+            }
+          }
+        }
+      }
+
       // Handle pricing rules according to user choices
       for (const [ruleId, action] of ruleActions.entries()) {
         if (action.action === "keep") {
@@ -539,8 +686,15 @@ export function ProductMergeDialog({
       queryClient.invalidateQueries({ queryKey: ["sales-aggregates"] });
       queryClient.invalidateQueries({ queryKey: ["kpi"] });
       queryClient.invalidateQueries({ queryKey: ["aggregated-product-types"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-needs-mapping-items"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-aggregated-products"] });
 
-      toast.success(`${selectedProducts.length} produkter merget til "${mergedProductName.trim()}"`);
+      const totalMerged = selectedProducts.length + selectedUnmapped.length;
+      let msg = `${totalMerged} produkt(er) merget til "${mergedProductName.trim()}"`;
+      if (selectedUnmapped.length > 0) {
+        msg += ` (${unmappedSaleItemsMoved} umappede salg flyttet, ${adversusMappingsCreated} nye Adversus-mappings)`;
+      }
+      toast.success(msg);
       onOpenChange(false);
       onMergeComplete();
     } catch (err: any) {
@@ -589,7 +743,10 @@ export function ProductMergeDialog({
     if (step === 1) return !!selectedClientId;
     if (step === 2) return true; // mode is always selected
     if (step === 3) {
-      if (mode === "merge") return selectedKeys.size >= 2;
+      if (mode === "merge") {
+        // Need at least 2 total selected, and at least 1 must be a real product (target)
+        return selectedKeys.size >= 2 && selectedProducts.length >= 1;
+      }
       if (mode === "unmerge") return selectedKeys.size >= 1;
     }
     if (step === 4 && mode === "merge") return true; // pricing rules
@@ -771,9 +928,11 @@ export function ProductMergeDialog({
                 ) : (
                   products.map((p) => {
                     const isSelected = selectedKeys.has(p.key);
-                    const isUnmapped = !p.id;
+                    const isUnmapped = !!p.isUnmapped;
+                    const isMissingProduct = !p.id && !isUnmapped; // legacy: rpc-row uden product_id
                     const isMergedChild = !!p.merged_into_product_id && p.merged_into_product_id !== p.id;
-                    const isDisabled = isUnmapped || isMergedChild;
+                    // Unmapped rows are now selectable as sources; only legacy missing-product rows and merged children are disabled
+                    const isDisabled = isMissingProduct || isMergedChild;
                     return (
                       <div
                         key={p.key}
@@ -798,12 +957,18 @@ export function ProductMergeDialog({
                           {p.internalName && p.internalName !== p.name && (
                             <span className="block truncate text-xs text-muted-foreground">Internt: {p.internalName}</span>
                           )}
+                          {isUnmapped && (
+                            <span className="block truncate text-xs text-muted-foreground">
+                              Ext ID: {p.unmappedExternalId ?? "—"} · {p.unmappedSalesCount ?? 0} salg
+                            </span>
+                          )}
                         </div>
                         <div className="flex gap-1 flex-shrink-0">
                           {isMergedChild && <Badge variant="secondary" className="text-[10px]">Allerede merget</Badge>}
                           {p.isMergeParent && <Badge variant="outline" className="text-[10px] border-primary/40 text-primary">Merge-parent</Badge>}
-                          {isUnmapped && <Badge variant="secondary" className="text-[10px]">Ikke mappet</Badge>}
-                          {!p.is_active && !isUnmapped && !isMergedChild && <Badge variant="secondary" className="text-[10px]">Inaktiv</Badge>}
+                          {isUnmapped && <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-600">Ikke mappet</Badge>}
+                          {isMissingProduct && <Badge variant="secondary" className="text-[10px]">Mangler produkt</Badge>}
+                          {!p.is_active && !isUnmapped && !isMissingProduct && !isMergedChild && <Badge variant="secondary" className="text-[10px]">Inaktiv</Badge>}
                         </div>
                       </div>
                     );
@@ -958,7 +1123,12 @@ export function ProductMergeDialog({
                 <AlertTriangle className="h-4 w-4 text-amber-500" />
                 Opsummering
               </p>
-              <p>{selectedProducts.length} produkter merges til "{mergedProductName || "..."}"</p>
+              <p>{selectedAll.length} produkt(er) merges til "{mergedProductName || "..."}"</p>
+              {selectedUnmapped.length > 0 && (
+                <p className="text-amber-600">
+                  Heraf {selectedUnmapped.length} umappede gruppe(r) — eksisterende salg flyttes til target og fremtidige salg auto-mappes.
+                </p>
+              )}
               {pricingRules.length > 0 && (
                 <>
                   <p>{rulesKept} prisregler beholdes</p>
@@ -995,7 +1165,7 @@ export function ProductMergeDialog({
                 className="gap-2"
               >
                 {merging && <Loader2 className="h-4 w-4 animate-spin" />}
-                Merge {selectedProducts.length} produkter
+                Merge {selectedAll.length} produkter
               </Button>
             ) : (
               <Button
