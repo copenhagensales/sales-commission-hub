@@ -1,21 +1,31 @@
-# Stork 2.0 — Fase 2 pakke
+# Stork 2.0 — Fase 2, Runde 2
 
-Materiale til fire AI-aktører (Claude.ai, Claude Code, Codex, Lovable) som hver svarer uafhængigt på samme spørgsmål: hvilken model skal Stork 2.0 bygges efter.
+Pakken indeholder de fire uafhængige svar fra runde 1 (anonymiseret) plus den oprindelige opgave-pakke. Hver AI-aktør reviderer sit bud efter at have læst de tre andre.
 
 ## Filer i pakken
 
-**`PROMPT-fase-2-find-model.md`**
-Selve opgaven. Identisk prompt til alle fire aktører.
+### Runde 2 — det nye
 
-**`dokument-1-forstaaelse.md`**
-Komplet kortlægning af Stork i dag. 5 dele: systemet i dag, visionen, vores tænkning (15 forretningsregler + status-modellen + hot spots), ufravigelige krav (GDPR, compliance, datasikkerhed, audit), bilag.
+**`PROMPT-runde-2.md`** — Læs denne først. Beskriver hvad runde 2 går ud på.
 
-**`storks-logikker.md`**
-Lovables logik-rapport. 28 logikker fordelt på 7 faser — kerne-økonomi, attribution, permissions, tid/låsning, klient-specifikke, integration, cross-cutting. Hver med slug, beregningsformel, SQL-query, datakilder, status (OK/USIKKER/ROD).
+**`svar-A.md`, `svar-B.md`, `svar-C.md`, `svar-D.md`** — De fire svar fra runde 1, anonymiseret og randomiseret. Et af dem er dit eget. Læs alle fire.
 
-**`stork-logikker-til-gennemgang.md`**
-Mathias' tænkning samlet i 14 sektioner — sandhed og data, salgets livscyklus, annullering, salgsvalidering, provision og løn, identitet, klient/produkt/pris, tid og perioder, roller og rettigheder, stamme og grene, UI som styringspanel, dashboards som modul, kode-arkitektur, compliance.
+### Original opgave — fra runde 1
 
-## Også relevant — pulles fra GitHub
+**`PROMPT-fase-2-find-model.md`** — Den oprindelige opgave hver aktør svarede på.
+
+**`dokument-1-forstaaelse.md`** — Komplet kortlægning af Stork i dag. 5 dele.
+
+**`storks-logikker.md`** — 28 logikker fordelt på 7 faser.
+
+**`stork-logikker-til-gennemgang.md`** — Mathias' tænkning i 14 sektioner.
+
+### Også relevant — pulles fra GitHub
 
 `docs/bibel.md` · `CLAUDE.md` · `docs/system-snapshot.md` · `docs/ui-snapshot.md` · `docs/cross-reference.md`
+
+```
+git fetch --all && git pull origin main
+```
+
+Hvis du ikke har git-adgang, sig til så Mathias uploader dem.
