@@ -250,6 +250,56 @@ export function ProductMergeDialog({
         }
       }
 
+      // Fetch unmapped sale_items (needs_mapping=true, product_id IS NULL) for this client
+      // Last 30 days to match the MgTest "Manglende mapping" UI window
+      try {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const { data: unmappedItems, error: unmappedErr } = await supabase
+          .from("sale_items")
+          .select("id, adversus_product_title, adversus_external_id, quantity, sales!inner(client_campaigns!inner(client_id))")
+          .eq("needs_mapping", true)
+          .is("product_id", null)
+          .gte("created_at", thirtyDaysAgo.toISOString())
+          .eq("sales.client_campaigns.client_id", clientId);
+        if (unmappedErr) {
+          console.error("Load unmapped items error:", unmappedErr);
+        } else if (unmappedItems && unmappedItems.length > 0) {
+          // Group by (external_id, title)
+          const unmappedMap = new Map<string, { externalId: string | null; title: string; salesCount: number }>();
+          for (const it of unmappedItems as any[]) {
+            const externalId = it.adversus_external_id ?? null;
+            const title = it.adversus_product_title ?? "Ukendt";
+            const groupKey = `unmapped::${externalId ?? ""}::${title}`;
+            const existing = unmappedMap.get(groupKey);
+            if (existing) {
+              existing.salesCount += it.quantity ?? 1;
+            } else {
+              unmappedMap.set(groupKey, { externalId, title, salesCount: it.quantity ?? 1 });
+            }
+          }
+          for (const [groupKey, g] of unmappedMap.entries()) {
+            // Skip if already covered (very unlikely, but be safe)
+            if (result.some((r) => r.key === groupKey)) continue;
+            result.push({
+              key: groupKey,
+              id: null,
+              name: g.title,
+              internalName: null,
+              client_campaign_id: null,
+              is_active: true,
+              merged_into_product_id: null,
+              isMergeParent: false,
+              isUnmapped: true,
+              unmappedExternalId: g.externalId,
+              unmappedSalesCount: g.salesCount,
+            });
+          }
+        }
+      } catch (unmappedFetchErr) {
+        console.error("Unmapped fetch failed:", unmappedFetchErr);
+      }
+
       setProducts(result.sort((a, b) => a.name.localeCompare(b.name, "da")));
     } catch (e) {
       console.error("Load products error:", e);
