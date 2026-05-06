@@ -200,6 +200,7 @@ export interface PricingRule {
   priority: number;
   is_active: boolean;
   campaign_mapping_ids?: string[] | null;
+  campaign_match_mode?: "include" | "exclude";
   effective_from?: string | null;  // Date string: rule is valid from this date (inclusive)
   effective_to?: string | null;    // Date string: rule is valid until this date (exclusive), null = no end date
   use_rule_name_as_display?: boolean;  // If true, use rule name instead of product name in dashboards

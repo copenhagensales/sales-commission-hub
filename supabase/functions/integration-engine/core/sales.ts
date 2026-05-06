@@ -164,7 +164,7 @@ function matchPricingRule(
     // Mirrors logic in supabase/functions/_shared/pricing-service.ts and rematch-pricing-rules
     const ids = rule.campaign_mapping_ids;
     const hasRestriction = !!ids && ids.length > 0;
-    const mode = (rule as any).campaign_match_mode === "exclude" ? "exclude" : "include";
+    const mode = rule.campaign_match_mode === "exclude" ? "exclude" : "include";
 
     let campaignMatches: boolean;
     if (!hasRestriction) {
@@ -230,7 +230,7 @@ function matchPricingRule(
       log?.("INFO", `Matched pricing rule "${rule.name}" for product ${productId}`, {
         ruleId: rule.id,
         conditions,
-        hasCampaignRestriction,
+        hasCampaignRestriction: hasRestriction,
         commission: rule.commission_dkk,
         revenue: rule.revenue_dkk
       });
