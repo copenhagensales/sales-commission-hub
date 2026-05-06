@@ -829,9 +829,11 @@ export function ProductMergeDialog({
                 ) : (
                   products.map((p) => {
                     const isSelected = selectedKeys.has(p.key);
-                    const isUnmapped = !p.id;
+                    const isUnmapped = !!p.isUnmapped;
+                    const isMissingProduct = !p.id && !isUnmapped; // legacy: rpc-row uden product_id
                     const isMergedChild = !!p.merged_into_product_id && p.merged_into_product_id !== p.id;
-                    const isDisabled = isUnmapped || isMergedChild;
+                    // Unmapped rows are now selectable as sources; only legacy missing-product rows and merged children are disabled
+                    const isDisabled = isMissingProduct || isMergedChild;
                     return (
                       <div
                         key={p.key}
@@ -856,12 +858,18 @@ export function ProductMergeDialog({
                           {p.internalName && p.internalName !== p.name && (
                             <span className="block truncate text-xs text-muted-foreground">Internt: {p.internalName}</span>
                           )}
+                          {isUnmapped && (
+                            <span className="block truncate text-xs text-muted-foreground">
+                              Ext ID: {p.unmappedExternalId ?? "—"} · {p.unmappedSalesCount ?? 0} salg
+                            </span>
+                          )}
                         </div>
                         <div className="flex gap-1 flex-shrink-0">
                           {isMergedChild && <Badge variant="secondary" className="text-[10px]">Allerede merget</Badge>}
                           {p.isMergeParent && <Badge variant="outline" className="text-[10px] border-primary/40 text-primary">Merge-parent</Badge>}
-                          {isUnmapped && <Badge variant="secondary" className="text-[10px]">Ikke mappet</Badge>}
-                          {!p.is_active && !isUnmapped && !isMergedChild && <Badge variant="secondary" className="text-[10px]">Inaktiv</Badge>}
+                          {isUnmapped && <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-600">Ikke mappet</Badge>}
+                          {isMissingProduct && <Badge variant="secondary" className="text-[10px]">Mangler produkt</Badge>}
+                          {!p.is_active && !isUnmapped && !isMissingProduct && !isMergedChild && <Badge variant="secondary" className="text-[10px]">Inaktiv</Badge>}
                         </div>
                       </div>
                     );
