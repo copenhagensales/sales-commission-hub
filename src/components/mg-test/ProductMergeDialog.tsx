@@ -1165,7 +1165,7 @@ export function ProductMergeDialog({
                 className="gap-2"
               >
                 {merging && <Loader2 className="h-4 w-4 animate-spin" />}
-                Merge {selectedProducts.length} produkter
+                Merge {selectedAll.length} produkter
               </Button>
             ) : (
               <Button
