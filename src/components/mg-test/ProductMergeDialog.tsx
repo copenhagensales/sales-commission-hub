@@ -354,7 +354,11 @@ export function ProductMergeDialog({
     }
   }
 
-  const selectedProducts = products.filter((p) => selectedKeys.has(p.key) && p.id);
+  // All selected rows (incl. unmapped sources)
+  const selectedAll = products.filter((p) => selectedKeys.has(p.key));
+  // Only rows backed by an existing products.id (target candidates + mapped sources)
+  const selectedProducts = selectedAll.filter((p) => !!p.id);
+  const selectedUnmapped = selectedAll.filter((p) => p.isUnmapped && !p.id);
   
   // Detect "expand existing merge" mode: if exactly one selected product is a merge parent
   const selectedParents = selectedProducts.filter((p) => p.isMergeParent);
