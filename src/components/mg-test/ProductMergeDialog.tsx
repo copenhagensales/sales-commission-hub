@@ -516,6 +516,95 @@ export function ProductMergeDialog({
         }
       }
 
+      // Handle UNMAPPED sources: attach their existing sale_items to targetId AND
+      // create adversus_product_mappings so future sales also land on targetId.
+      let unmappedSaleItemsMoved = 0;
+      let adversusMappingsCreated = 0;
+      if (selectedUnmapped.length > 0) {
+        const externalIds = selectedUnmapped
+          .map((u) => u.unmappedExternalId)
+          .filter((x): x is string => !!x);
+
+        if (externalIds.length > 0) {
+          // 1) Find sale_ids belonging to this client (last 30 days, needs_mapping=true, no product)
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          const { data: candidateItems, error: candErr } = await supabase
+            .from("sale_items")
+            .select("id, adversus_external_id, unit_price, sales!inner(client_campaigns!inner(client_id))")
+            .eq("needs_mapping", true)
+            .is("product_id", null)
+            .in("adversus_external_id", externalIds)
+            .gte("created_at", thirtyDaysAgo.toISOString())
+            .eq("sales.client_campaigns.client_id", selectedClientId);
+          if (candErr) throw candErr;
+
+          const itemIds = (candidateItems ?? []).map((i: any) => i.id);
+          if (itemIds.length > 0) {
+            const { error: updErr, count: updCount } = await supabase
+              .from("sale_items")
+              .update({ product_id: targetId, needs_mapping: false })
+              .in("id", itemIds);
+            if (updErr) throw updErr;
+            unmappedSaleItemsMoved = updCount ?? itemIds.length;
+          }
+
+          // 2) Create adversus_product_mappings for each unique (external_id, unit_price)
+          //    so future sales auto-resolve. UNIQUE index is (adversus_external_id, COALESCE(unit_price,-1)).
+          const mappingPairs = new Map<string, { external_id: string; unit_price: number | null; title: string | null }>();
+          for (const it of (candidateItems ?? []) as any[]) {
+            const ext = it.adversus_external_id as string;
+            const up = it.unit_price ?? null;
+            const pairKey = `${ext}::${up ?? "null"}`;
+            if (!mappingPairs.has(pairKey)) {
+              const titleFromSelected = selectedUnmapped.find((u) => u.unmappedExternalId === ext)?.name ?? null;
+              mappingPairs.set(pairKey, { external_id: ext, unit_price: up, title: titleFromSelected });
+            }
+          }
+          // Also ensure at least one mapping row per selected external_id even if no sale_items exist
+          for (const u of selectedUnmapped) {
+            if (!u.unmappedExternalId) continue;
+            if (!Array.from(mappingPairs.values()).some(v => v.external_id === u.unmappedExternalId)) {
+              mappingPairs.set(`${u.unmappedExternalId}::null`, { external_id: u.unmappedExternalId, unit_price: null, title: u.name });
+            }
+          }
+
+          for (const pair of mappingPairs.values()) {
+            // Check if a mapping already exists for this (external_id, unit_price) pair
+            let existingQuery = supabase
+              .from("adversus_product_mappings")
+              .select("id")
+              .eq("adversus_external_id", pair.external_id);
+            existingQuery = pair.unit_price === null
+              ? existingQuery.is("unit_price", null)
+              : existingQuery.eq("unit_price", pair.unit_price);
+            const { data: existingRows, error: existErr } = await existingQuery.limit(1);
+            if (existErr) throw existErr;
+
+            if (existingRows && existingRows.length > 0) {
+              // Update existing row to point to target
+              const { error: upErr } = await supabase
+                .from("adversus_product_mappings")
+                .update({ product_id: targetId, adversus_product_title: pair.title })
+                .eq("id", existingRows[0].id);
+              if (upErr) throw upErr;
+            } else {
+              // Insert new mapping row
+              const { error: insErr } = await supabase
+                .from("adversus_product_mappings")
+                .insert({
+                  adversus_external_id: pair.external_id,
+                  adversus_product_title: pair.title,
+                  unit_price: pair.unit_price,
+                  product_id: targetId,
+                });
+              if (insErr) throw insErr;
+              adversusMappingsCreated++;
+            }
+          }
+        }
+      }
+
       // Handle pricing rules according to user choices
       for (const [ruleId, action] of ruleActions.entries()) {
         if (action.action === "keep") {
