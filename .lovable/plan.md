@@ -1,8 +1,6 @@
-# Fix typo i integration-engine sales.ts:233 + valgfri type-cleanup
-
 ## TL;DR
 
-Tre præcise ændringer i to filer. Retter `ReferenceError: hasCampaignRestriction is not defined` der får `matchPricingRule` til at fejle silent på success-branchen i Deno edge runtime — rod-årsag til ASE/Relatel 0-commission siden 5. maj.
+Tre præcise ændringer i to filer i `supabase/functions/integration-engine/`. Retter `ReferenceError: hasCampaignRestriction is not defined` der får `matchPricingRule` til at fejle silent på success-branchen i Deno edge runtime — rod-årsag til ASE/Relatel 0-commission siden 5. maj.
 
 Ingen migrationer. Ingen DB-ændringer. Ingen rematch i denne PR.
 
@@ -18,8 +16,7 @@ Linjenumre matcher 1:1 med bygge-ordren.
 
 ## Ændring 1 — Fix typo (rød zone, godkendt)
 
-**Fil:** `supabase/functions/integration-engine/core/sales.ts`
-**Linje:** 233
+**Fil:** `supabase/functions/integration-engine/core/sales.ts` · linje 233
 
 Før:
 ```ts
@@ -36,17 +33,15 @@ Bevarer log-feltnavnet `hasCampaignRestriction` så det matcher `rematch-pricing
 ## Ændring 2 — Tilføj felt til PricingRule-type (grøn zone)
 
 **Fil:** `supabase/functions/integration-engine/types.ts`
-**Placering:** Tilføj felt i eksisterende `PricingRule`-interface (lige efter `campaign_mapping_ids`, før `effective_from`).
+**Placering:** I eksisterende `PricingRule`-interface, indsæt mellem `campaign_mapping_ids` (linje 202) og `effective_from` (linje 203):
 
-Tilføj linje:
 ```ts
   campaign_match_mode?: "include" | "exclude";
 ```
 
 ## Ændring 3 — Fjern `as any`-cast (grøn zone)
 
-**Fil:** `supabase/functions/integration-engine/core/sales.ts`
-**Linje:** 167
+**Fil:** `supabase/functions/integration-engine/core/sales.ts` · linje 167
 
 Før:
 ```ts
@@ -78,6 +73,6 @@ Ingen runtime-effekt — kun TypeScript-rydning muliggjort af ændring 2.
 - `as any`-cast på linje 167 er væk; typen bærer feltet.
 - Diff begrænset til netop disse to filer og netop disse tre punkter.
 
-## Verificering efter deploy (separat fra PR)
+## Efter implementation
 
-Tales om bagefter — denne PR rører ikke historiske `sale_items`. Rematch for ASE/Relatel siden 5. maj kører som separat operation efter du har bekræftet at nye salg pricer korrekt.
+Jeg deployer `integration-engine` med `supabase--deploy_edge_functions` så fixet er live umiddelbart. Rematch for ASE/Relatel siden 5. maj kører som separat operation efter du har bekræftet at nye salg pricer korrekt.
