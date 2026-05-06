@@ -200,9 +200,9 @@ for (const h of sortedHooks) {
 }
 
 // ===== Anti-pattern: direct supabase calls in components/pages =====
-push("## 6. ⚠️ Anti-pattern: Direkte Supabase-kald udenfor `hooks/`");
+push("## 6. Direkte Supabase-kald udenfor `hooks/`");
 push();
-push("Princip 9: *Komponenter tilgår aldrig Supabase direkte — altid via custom hook.*");
+push("Filer der kalder `supabase.from()` eller `supabase.rpc()` direkte fra komponenter, sider eller utils.");
 push();
 const violations: { file: string; tables: string[]; rpcs: string[] }[] = [];
 for (const f of allFiles) {
@@ -215,7 +215,7 @@ for (const f of allFiles) {
     violations.push({ file: relative(".", f.path), tables: [...tables], rpcs: [...rpcs] });
   }
 }
-push(`**${violations.length} filer** bryder service-lag-princippet.`);
+push(`**${violations.length} filer** kalder Supabase direkte udenfor \`hooks/\`.`);
 push();
 for (const v of violations) {
   push(`### \`${v.file}\``);
@@ -229,4 +229,4 @@ writeFileSync(OUT, lines.join("\n"));
 const sizeKb = (Buffer.byteLength(lines.join("\n")) / 1024).toFixed(0);
 console.log(`✅ ${OUT} skrevet (${sizeKb} KB)`);
 console.log(`   ${sortedTables.length} tabeller · ${sortedRpcs.length} RPC'er · ${sortedEdges.length} edge funcs · ${sortedHooks.length} hooks`);
-console.log(`   ⚠️  ${violations.length} filer bryder service-lag-princippet`);
+console.log(`   ${violations.length} filer kalder Supabase direkte udenfor hooks/`);
