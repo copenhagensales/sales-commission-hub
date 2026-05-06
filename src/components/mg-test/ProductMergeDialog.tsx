@@ -1123,7 +1123,12 @@ export function ProductMergeDialog({
                 <AlertTriangle className="h-4 w-4 text-amber-500" />
                 Opsummering
               </p>
-              <p>{selectedProducts.length} produkter merges til "{mergedProductName || "..."}"</p>
+              <p>{selectedAll.length} produkt(er) merges til "{mergedProductName || "..."}"</p>
+              {selectedUnmapped.length > 0 && (
+                <p className="text-amber-600">
+                  Heraf {selectedUnmapped.length} umappede gruppe(r) — eksisterende salg flyttes til target og fremtidige salg auto-mappes.
+                </p>
+              )}
               {pricingRules.length > 0 && (
                 <>
                   <p>{rulesKept} prisregler beholdes</p>
