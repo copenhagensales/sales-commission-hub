@@ -213,6 +213,12 @@ md.push(`- Realtime tabeller: ${realtime.length}`);
 md.push(`- Cron jobs: ${cronJobs.length}`);
 md.push(`- Edge functions: ${edgeFns.length}\n`);
 
+md.push(`## Note om sample-data\n`);
+md.push(`Sample-rækker afhænger af den DB-rolle der genererer denne fil:\n`);
+md.push(`- Når genereret af CI (snapshot_readonly + RLS): sample-data kan være tynd eller mangle, fordi CI-rollen ikke har auth-kontekst og derfor blokeres af RLS-policies`);
+md.push(`- Når genereret manuelt (service_role lokalt): sample-data er fyldigere\n`);
+md.push(`Skema, RPC'er, RLS-policies, triggers, edge functions og krydsreferencer er uafhængige af dette og altid komplette.\n`);
+
 md.push(`## PII-redaction\n`);
 md.push(`Sample-data er udeladt for: ${[...NO_SAMPLE_TABLES].join(", ")}.\n`);
 md.push(`Følsomme kolonner (CPR, bank, email, navn, etc.) er erstattet med \`[REDACTED]\`.\n`);
