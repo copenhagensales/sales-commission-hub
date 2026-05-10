@@ -1,78 +1,32 @@
-## TL;DR
+## Plan: Ret straks-flag på ASE-salg
 
-Tre præcise ændringer i to filer i `supabase/functions/integration-engine/`. Retter `ReferenceError: hasCampaignRestriction is not defined` der får `matchPricingRule` til at fejle silent på success-branchen i Deno edge runtime — rod-årsag til ASE/Relatel 0-commission siden 5. maj.
+### Scope
+Korriger `is_immediate_payment` på `sale_items` hvor flaget er forkert, baseret på FAK-upload som sandhed.
 
-Ingen migrationer. Ingen DB-ændringer. Ingen rematch i denne PR.
+### Trin
 
-## Verificeret før plan
+**1. Ret de 5 verificerede mismatches (data-fix)**
+Via `supabase--insert` (UPDATE):
+- **3 OVERBETALT-cases** (DB=straks, FAK=Uden straks): Sæt `is_immediate_payment=false` på "Salg"-item — inkl. Oliver Holton-salget (28ae6b96…).
+- **2 UNDERBETALT-cases** (DB=uden, FAK=Straks): Sæt `is_immediate_payment=true` på "Salg"-item.
+- Trigger rematch via `rematch-pricing-rules` for de berørte `sale_id`'s, så `mapped_commission` og `mapped_revenue` opdateres til korrekt pris.
 
-Læst `supabase/functions/integration-engine/core/sales.ts` linje 160-245 ord-for-ord:
+**2. Audit af de 698 "ikke verificerbare"**
+- Eksportér liste til CSV (allerede delvist gjort i `/mnt/documents/ase_straks_audit.csv`).
+- Når FAK-upload kommer ind for disse salg, vil cancellation-flow naturligt afsløre mismatch.
+- **Ingen masse-ændring nu** — vi har ikke evidens for hvad der er korrekt for disse 698.
 
-- **Linje 166:** `const hasRestriction = !!ids && ids.length > 0;` — variablen hedder `hasRestriction`.
-- **Linje 167:** `const mode = (rule as any).campaign_match_mode === "exclude" ? "exclude" : "include";` — `as any`-cast bekræftet.
-- **Linje 233:** `hasCampaignRestriction,` — shorthand-property der refererer en udefineret variabel. Bug bekræftet.
+**3. Rapportér rod-årsag (ingen kode-ændring)**
+- 84% straks-andel på ASE Salg er strukturelt mistænkeligt, men ingen kode i HEAD sætter flaget automatisk.
+- Sandsynlig forklaring: historisk masse-toggle eller import fra før audit-trail eksisterede.
+- **Anbefaling til separat opgave (ikke i dette scope):** Tilføj audit-log på `ImmediatePaymentASE.tsx` toggle (hvem/hvornår) for at fange fremtidige fejl.
 
-Linjenumre matcher 1:1 med bygge-ordren.
+### Hvad der IKKE indgår
+- Ingen kode-ændringer i `ImmediatePaymentASE.tsx` (foreslået som separat opgave).
+- Ingen ændring af pricing-motoren.
+- Ingen masse-fix af de 698 ikke-verificerede.
 
-## Ændring 1 — Fix typo (rød zone, godkendt)
-
-**Fil:** `supabase/functions/integration-engine/core/sales.ts` · linje 233
-
-Før:
-```ts
-        hasCampaignRestriction,
-```
-
-Efter:
-```ts
-        hasCampaignRestriction: hasRestriction,
-```
-
-Bevarer log-feltnavnet `hasCampaignRestriction` så det matcher `rematch-pricing-rules/index.ts:240` og ikke brækker eventuelle log-aggregeringer. Værdien kommer nu fra den faktisk deklarerede variabel `hasRestriction`.
-
-## Ændring 2 — Tilføj felt til PricingRule-type (grøn zone)
-
-**Fil:** `supabase/functions/integration-engine/types.ts`
-**Placering:** I eksisterende `PricingRule`-interface, indsæt mellem `campaign_mapping_ids` (linje 202) og `effective_from` (linje 203):
-
-```ts
-  campaign_match_mode?: "include" | "exclude";
-```
-
-## Ændring 3 — Fjern `as any`-cast (grøn zone)
-
-**Fil:** `supabase/functions/integration-engine/core/sales.ts` · linje 167
-
-Før:
-```ts
-    const mode = (rule as any).campaign_match_mode === "exclude" ? "exclude" : "include";
-```
-
-Efter:
-```ts
-    const mode = rule.campaign_match_mode === "exclude" ? "exclude" : "include";
-```
-
-Ingen runtime-effekt — kun TypeScript-rydning muliggjort af ændring 2.
-
-## Hvad der IKKE røres
-
-- `_shared/pricing-service.ts`
-- `rematch-pricing-rules/index.ts`
-- `pricingRuleMatching.ts` (frontend)
-- `fmPricing.ts`
-- `sale_items`, `product_pricing_rules`, `products` (ingen DB)
-- Ingen migration
-- Ingen rematch-operation (separat fra denne PR)
-- Alle andre filer
-
-## Acceptkriterier
-
-- `ReferenceError` elimineres i success-branchen af `matchPricingRule`.
-- Eksisterende include/exclude-logik uændret.
-- `as any`-cast på linje 167 er væk; typen bærer feltet.
-- Diff begrænset til netop disse to filer og netop disse tre punkter.
-
-## Efter implementation
-
-Jeg deployer `integration-engine` med `supabase--deploy_edge_functions` så fixet er live umiddelbart. Rematch for ASE/Relatel siden 5. maj kører som separat operation efter du har bekræftet at nye salg pricer korrekt.
+### Tekniske detaljer
+- Berørte tabeller: `sale_items` (UPDATE af `is_immediate_payment`), efterfulgt af `mapped_commission`/`mapped_revenue` via rematch.
+- Rød zone: pricing-motoren røres ikke — kun data-korrektion på `sale_items`.
+- Færdig-rapport vil indeholde: liste over ændrede `sale_item_id`'s, ny pricing efter rematch, before/after diff på commission+revenue.
