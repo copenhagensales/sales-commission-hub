@@ -404,6 +404,21 @@ async function autoTransitionSeasonStatuses(supabase: SupabaseClient) {
         }
       }
 
+      // Idempotent recovery: if season is already active but missing init data
+      // (e.g. qualification_standings were not yet populated when transition fired),
+      // re-run initializeActiveSeasonData. Safe because it upserts standings and
+      // only inserts round 1 if it does not already exist (handled below).
+      if (season.status === "active" && !newStatus) {
+        const { count: roundCount } = await supabase
+          .from("league_rounds")
+          .select("*", { count: "exact", head: true })
+          .eq("season_id", season.id);
+        if ((roundCount ?? 0) === 0) {
+          console.log(`[auto-transition] Active season S${season.season_number} missing rounds — re-initializing`);
+          await initializeActiveSeasonData(supabase, season.id, season.start_date, season.config);
+        }
+      }
+
       // If active season exists, trigger round processing
       if (season.status === "active" || newStatus === "active") {
         needsRoundProcessing = true;
