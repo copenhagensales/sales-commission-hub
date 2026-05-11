@@ -255,6 +255,34 @@ export function useMyQualificationStanding(seasonId: string | undefined) {
   });
 }
 
+// Helper: resolve current user's employee_id (tolerant to RLS / dupes)
+async function resolveEmployeeId(userId: string): Promise<string> {
+  const { data, error } = await supabase
+    .from("employee_master_data")
+    .select("id")
+    .eq("auth_user_id", userId)
+    .order("is_active", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("Din medarbejderprofil kunne ikke findes. Kontakt en administrator.");
+  return data.id;
+}
+
+// Helper: find latest enrollment row for (season, employee) regardless of is_active
+async function findLatestEnrollment(seasonId: string, employeeId: string) {
+  const { data, error } = await supabase
+    .from("league_enrollments")
+    .select("id, is_active, is_spectator")
+    .eq("season_id", seasonId)
+    .eq("employee_id", employeeId)
+    .order("enrolled_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error && error.code !== "PGRST116") throw error;
+  return data;
+}
+
 // Enroll in season
 export function useEnrollInSeason() {
   const queryClient = useQueryClient();
@@ -263,55 +291,37 @@ export function useEnrollInSeason() {
   return useMutation({
     mutationFn: async (seasonId: string) => {
       if (!user?.id) throw new Error("Not authenticated");
-      
-      // Get employee_id
-      const { data: employee, error: empError } = await supabase
-        .from("employee_master_data")
-        .select("id")
-        .eq("auth_user_id", user.id)
-        .single();
-      
-      if (empError) throw empError;
+      const employeeId = await resolveEmployeeId(user.id);
       
       // Check if employee is in "Stab" team - they become spectators
       const { data: stabMembership } = await supabase
         .from("team_members")
         .select("team_id, teams!inner(name)")
-        .eq("employee_id", employee.id)
+        .eq("employee_id", employeeId)
         .eq("teams.name", "Stab")
+        .limit(1)
         .maybeSingle();
       
       const isSpectator = !!stabMembership;
-      
-      // Check if there's an existing inactive enrollment
-      const { data: existing } = await supabase
-        .from("league_enrollments")
-        .select("id, is_active")
-        .eq("season_id", seasonId)
-        .eq("employee_id", employee.id)
-        .maybeSingle();
+      const existing = await findLatestEnrollment(seasonId, employeeId);
       
       if (existing) {
-        // Re-activate existing enrollment (update spectator status too)
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from("league_enrollments")
           .update({ is_active: true, is_spectator: isSpectator })
-          .eq("id", existing.id)
-          .select()
-          .single();
+          .eq("id", existing.id);
         if (error) throw error;
-        return data;
+        return { ...existing, is_active: true, is_spectator: isSpectator };
       } else {
-        // Create new enrollment
         const { data, error } = await supabase
           .from("league_enrollments")
           .insert({
             season_id: seasonId,
-            employee_id: employee.id,
+            employee_id: employeeId,
             is_spectator: isSpectator,
           })
           .select()
-          .single();
+          .maybeSingle();
         if (error) throw error;
         return data;
       }
@@ -331,42 +341,26 @@ export function useEnrollAsFan() {
   return useMutation({
     mutationFn: async (seasonId: string) => {
       if (!user?.id) throw new Error("Not authenticated");
-      
-      const { data: employee, error: empError } = await supabase
-        .from("employee_master_data")
-        .select("id")
-        .eq("auth_user_id", user.id)
-        .single();
-      
-      if (empError) throw empError;
-      
-      // Check existing enrollment
-      const { data: existing } = await supabase
-        .from("league_enrollments")
-        .select("id")
-        .eq("season_id", seasonId)
-        .eq("employee_id", employee.id)
-        .maybeSingle();
+      const employeeId = await resolveEmployeeId(user.id);
+      const existing = await findLatestEnrollment(seasonId, employeeId);
       
       if (existing) {
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from("league_enrollments")
           .update({ is_active: true, is_spectator: true })
-          .eq("id", existing.id)
-          .select()
-          .single();
+          .eq("id", existing.id);
         if (error) throw error;
-        return data;
+        return { ...existing, is_active: true, is_spectator: true };
       } else {
         const { data, error } = await supabase
           .from("league_enrollments")
           .insert({
             season_id: seasonId,
-            employee_id: employee.id,
+            employee_id: employeeId,
             is_spectator: true,
           })
           .select()
-          .single();
+          .maybeSingle();
         if (error) throw error;
         return data;
       }
@@ -386,20 +380,13 @@ export function useUnenrollFromSeason() {
   return useMutation({
     mutationFn: async (seasonId: string) => {
       if (!user?.id) throw new Error("Not authenticated");
-      
-      const { data: employee, error: empError } = await supabase
-        .from("employee_master_data")
-        .select("id")
-        .eq("auth_user_id", user.id)
-        .single();
-      
-      if (empError) throw empError;
+      const employeeId = await resolveEmployeeId(user.id);
       
       const { error } = await supabase
         .from("league_enrollments")
         .update({ is_active: false })
         .eq("season_id", seasonId)
-        .eq("employee_id", employee.id);
+        .eq("employee_id", employeeId);
 
       if (error) throw error;
       
@@ -407,7 +394,7 @@ export function useUnenrollFromSeason() {
         .from("league_qualification_standings")
         .delete()
         .eq("season_id", seasonId)
-        .eq("employee_id", employee.id);
+        .eq("employee_id", employeeId);
     },
     onSuccess: (_, seasonId) => {
       queryClient.invalidateQueries({ queryKey: ["league-my-enrollment", seasonId] });
@@ -426,21 +413,14 @@ export function useUnenrollAndBecomeFan() {
   return useMutation({
     mutationFn: async (seasonId: string) => {
       if (!user?.id) throw new Error("Not authenticated");
-      
-      const { data: employee, error: empError } = await supabase
-        .from("employee_master_data")
-        .select("id")
-        .eq("auth_user_id", user.id)
-        .single();
-      
-      if (empError) throw empError;
+      const employeeId = await resolveEmployeeId(user.id);
       
       // Convert to spectator instead of deactivating
       const { error } = await supabase
         .from("league_enrollments")
         .update({ is_spectator: true })
         .eq("season_id", seasonId)
-        .eq("employee_id", employee.id);
+        .eq("employee_id", employeeId);
 
       if (error) throw error;
       
@@ -449,7 +429,7 @@ export function useUnenrollAndBecomeFan() {
         .from("league_qualification_standings")
         .delete()
         .eq("season_id", seasonId)
-        .eq("employee_id", employee.id);
+        .eq("employee_id", employeeId);
     },
     onSuccess: (_, seasonId) => {
       queryClient.invalidateQueries({ queryKey: ["league-my-enrollment", seasonId] });
