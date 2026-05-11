@@ -110,12 +110,16 @@ export function useMyEnrollment(seasonId: string | undefined) {
       
       if (!employee) return null;
       
+      // Defensive: order + limit(1) so duplicate rows never trigger
+      // PostgREST PGRST116 ("Cannot coerce the result to a single JSON object")
       const { data, error } = await supabase
         .from("league_enrollments")
         .select("id, employee_id, season_id, enrolled_at, is_active, is_spectator")
         .eq("season_id", seasonId)
         .eq("employee_id", employee.id)
         .eq("is_active", true)
+        .order("enrolled_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (error && error.code !== "PGRST116") throw error;
