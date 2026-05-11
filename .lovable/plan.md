@@ -1,61 +1,74 @@
 ## Diagnose
 
-**Bruger:** Lucas Vico Petersen (`471ebb1a-983a-4d09-b48d-6a954aafd1e0`, work_email `luvp@copenhagensales.dk`).
+**Aktiv sæson:** S2 `f1df70db-b1dc-4afd-aa8c-943b4a55e1c6`, status `active`, start_date `2026-05-11`, end_date `2026-06-21`.
 
-**Faktisk DB-tilstand (lige nu):**
-- Lucas ER tilmeldt aktiv sæson `f1df70db` (`league_enrollments.d9548614`, `is_active=true`, `is_spectator=false`, enrolled 6/5).
-- Han har også standing i `league_qualification_standings` (5.250 kr, 27 deals).
-- Kun ét `employee_master_data`-record, kun ét aktivt team (Eesy TM), ingen Stab-medlemskab.
+**Faktisk DB-tilstand:**
+- `league_qualification_standings`: 47 rækker for S2 (sidst beregnet 11/5 18:30) ✅
+- `league_season_standings`: **0 rækker** ❌
+- `league_rounds`: **0 rækker** ❌
+- Status er allerede flippet til `active` på `2026-05-11 00:00:00.098+00`.
 
-**Symptom i screenshot:**
-1. UI viser "Tilmeld mig nu" → `useMyEnrollment` returnerede `null`, selvom rækken findes.
-2. Klik → toast "Cannot coerce the result to a single JSON object" (PostgREST `PGRST116`: `.single()` / `.maybeSingle()` fik 0 eller >1 rækker).
+**Rod-årsag:** Race condition i `supabase/functions/calculate-kpi-values/index.ts`:
 
-**Rod-årsag (mest sandsynlig):** `useEnrollInSeason` i `src/hooks/useLeagueData.ts`:
+1. `auto-transition`-logikken (linje 366-403) kører hvert minut og flipper status `qualification → active` så snart `start_date <= now`. For S2 skete det kl. 00:00:00 UTC den 11/5.
+2. Straks efter kalder den `initializeActiveSeasonData()` (linje 259-321), som henter `league_qualification_standings` og kopierer dem til `league_season_standings` + opretter runde 1.
+3. **MEN** kvalifikationsperioden sluttede officielt 10/5 21:59:59 UTC, og `league-calculate-standings` (cron-baseret) havde ikke nødvendigvis populereret de endelige `qualification_standings` på det præcise sekund hvor transition skete.
+4. Linje 270-273:
+   ```ts
+   if (!qualStandings || qualStandings.length === 0) {
+     console.log("[season-init] No qualification standings to copy");
+     return;  // ← early return, INGEN runde oprettes
+   }
+   ```
+5. Funktionen returnerede uden at oprette runde 1. Status blev dog opdateret til `active` (linje 389-396 kører før `initializeActiveSeasonData`), så ved næste kørsel matcher `season.status === "qualification"` ikke længere → transition-logikken hopper helt over → `initializeActiveSeasonData` kaldes aldrig igen.
 
-`src/hooks/useLeagueData.ts:283-288`
-```ts
-const { data: existing } = await supabase
-  .from("league_enrollments")
-  .select("id, is_active")
-  .eq("season_id", seasonId)
-  .eq("employee_id", employee.id)
-  .maybeSingle();   // ← fejler hvis der findes >1 række (active + inactive)
-```
-
-`maybeSingle()` kaster "Cannot coerce" hvis der er flere rækker. Der er INGEN unique constraint i DB der forhindrer flere `league_enrollments`-rækker pr. (season_id, employee_id) — så samme par kan have både en historisk (is_active=false) og en ny række. Hos andre brugere har det allerede ramt (jf. `useUnenrollAndBecomeFan` der senere tilføjer en separat række ved spectator-skift).
-
-Tilsvarende risiko: `.update().select().single()` (linje 297) og `.insert().select().single()` (linje 310) — hvis RLS filtrerer den returnerede række ved `SELECT after write` får man 0 rækker → samme fejl.
-
-**Hvorfor `useMyEnrollment` returnerede null:** Den bruger `.maybeSingle()` med `.eq("is_active", true)` — hvis Lucas på et tidspunkt har haft 2 aktive rækker (fx fra en tidligere fan/player-skift bug), fejler det stille (kastet `error`, query returnerer ingen data, UI antager "ikke tilmeldt").
+Resultatet: Sæsonen er teknisk "active" men har ingen runder eller season_standings, så hele runde-systemet står stille.
 
 ## Plan
 
-**Scope:** Kun `src/hooks/useLeagueData.ts` (gul zone — liga-feature, ikke løn/pricing). Ingen DB-skema-ændringer i denne omgang.
+**Scope:** `supabase/functions/calculate-kpi-values/index.ts` (gul zone — liga-feature, ikke løn/pricing) + en engangs-fix for S2 via direkte data-indsættelse. Ingen rød zone.
 
-### Steg 1 — Diagnose-bekræftelse (read-only, før kode-ændring)
-- Kør query: `SELECT season_id, employee_id, count(*) FROM league_enrollments GROUP BY 1,2 HAVING count(*) > 1;` for at bekræfte om dubletter eksisterer. Hvis ja → liste antal berørte brugere.
-- Tjek om Lucas har historik af spectator-skift der kan have lavet dubletter.
+### Steg 1 — Engangs-fix for S2 (akut)
+Manuel trigger af `initializeActiveSeasonData` for S2 ved enten:
+- (a) Kalde edge function `calculate-kpi-values` med en intern flag, eller
+- (b) Køre en SQL-migration der kopierer `qualification_standings → season_standings` + indsætter runde 1 for S2 direkte.
 
-### Steg 2 — Fix mutation-robusthed (`useEnrollInSeason`, `useEnrollAsFan`, `useUnenrollAndBecomeFan`)
-- Erstat `existing-check` med `.order("is_active", { ascending: false }).order("enrolled_at", { ascending: false }).limit(1).maybeSingle()` — så vi altid finder den nyeste/aktive uanset dubletter.
-- Gør UPDATE/INSERT-result tolerant: brug `.maybeSingle()` + tjek for null + fallback re-fetch hvis RLS skjuler returneret række.
-- Samme robusthedsfix i `useUnenrollFromSeason` og `useUnenrollAndBecomeFan` (samme mønster).
+**Anbefaling:** (b) — Insert via migration (read-only på qual_standings, insert på season_standings + league_rounds). Dette er idempotent for S2 specifikt og fjerner blocker med det samme.
 
-### Steg 3 — Fix read-hook (`useMyEnrollment`)
-- Erstat `.maybeSingle()` med `.order("enrolled_at", { ascending: false }).limit(1).maybeSingle()` — defensivt mod dubletter.
-- Behold `is_active=true`-filter.
+Runde 1 vindue baseret på `season.start_date`:
+- `start_date = 2026-05-11 00:00:00 UTC`
+- `end_date = start_date + 7 dage = 2026-05-18 00:00:00 UTC`
+- `status = 'active'`
 
-### Steg 4 — Optional follow-up (rapporteres separat, IKKE i samme commit)
-- Foreslå DB-migration: `UNIQUE (season_id, employee_id)` på `league_enrollments` + oprydning af eksisterende dubletter. Dette er en strukturel fix og kræver separat godkendelse — det er den rigtige løsning, men kode-fix ovenfor stopper bløder med det samme.
+### Steg 2 — Strukturel fix (idempotent re-init)
+Ret `auto-transition`-logikken til at også re-køre `initializeActiveSeasonData` når sæsonen ALLEREDE er `active` men mangler runder/standings. Tilføj efter linje 376:
 
-### Verifikation
-- Bekræft Lucas's UI viser "tilmeldt"-state efter cache-invalidate (han ER allerede i DB).
-- Test med en testbruger der har dubletter (hvis Steg 1 finder nogen).
+```ts
+// Idempotent recovery: if season is already active but missing init data, retry
+if (season.status === "active" && !newStatus) {
+  const { count: roundCount } = await supabase
+    .from("league_rounds")
+    .select("*", { count: "exact", head: true })
+    .eq("season_id", season.id);
+  if (roundCount === 0) {
+    console.log(`[auto-transition] Active season S${season.season_number} missing rounds — re-initializing`);
+    await initializeActiveSeasonData(supabase, season.id, season.start_date, season.config);
+  }
+}
+```
+
+Dette beskytter mod fremtidige race conditions med qualification_standings-cron.
+
+### Steg 3 — Verifikation
+- Bekræft `league_rounds` har 1 row for S2 med status `active`.
+- Bekræft `league_season_standings` har 47 rows for S2.
+- Bekræft `league-process-round` edge function ikke fejler ved næste kørsel.
+- Tjek UI på `/commission-league` viser runde 1 som aktiv.
 
 ## Hvad jeg IKKE rører
-- DB-skema (foreslås kun som follow-up).
-- Andre liga-hooks udover de nævnte.
-- Ingen ændringer i RLS, permissions eller pricing.
+- `league-process-round`-funktionen (den virker fint når runder først eksisterer).
+- `league-calculate-standings`-cron.
+- Qualification-fasen logik.
+- Pricing, løn, RLS, permissions.
 
-Bekræft scope, så implementerer jeg Steg 1 (diagnose-query) først og rapporterer tilbage før Steg 2-3.
+Bekræft scope, så starter jeg med Steg 1 (migration der populerer S2) + Steg 2 (idempotent edge-fix) i samme commit.

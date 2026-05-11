@@ -295,7 +295,17 @@ async function initializeActiveSeasonData(supabase: SupabaseClient, seasonId: st
     }
     console.log(`[season-init] Created ${seasonStandings.length} season standings`);
 
-    // 2. Create first round
+    // 2. Create first round (idempotent — skip if any round already exists)
+    const { count: existingRounds } = await supabase
+      .from("league_rounds")
+      .select("*", { count: "exact", head: true })
+      .eq("season_id", seasonId);
+
+    if ((existingRounds ?? 0) > 0) {
+      console.log("[season-init] Rounds already exist — skipping round 1 creation");
+      return;
+    }
+
     const roundStart = new Date(startDate);
     const roundEnd = new Date(roundStart);
     roundEnd.setDate(roundEnd.getDate() + 7);
@@ -400,6 +410,21 @@ async function autoTransitionSeasonStatuses(supabase: SupabaseClient) {
 
         // Initialize season data when transitioning to active
         if (newStatus === "active") {
+          await initializeActiveSeasonData(supabase, season.id, season.start_date, season.config);
+        }
+      }
+
+      // Idempotent recovery: if season is already active but missing init data
+      // (e.g. qualification_standings were not yet populated when transition fired),
+      // re-run initializeActiveSeasonData. Safe because it upserts standings and
+      // only inserts round 1 if it does not already exist (handled below).
+      if (season.status === "active" && !newStatus) {
+        const { count: roundCount } = await supabase
+          .from("league_rounds")
+          .select("*", { count: "exact", head: true })
+          .eq("season_id", season.id);
+        if ((roundCount ?? 0) === 0) {
+          console.log(`[auto-transition] Active season S${season.season_number} missing rounds — re-initializing`);
           await initializeActiveSeasonData(supabase, season.id, season.start_date, season.config);
         }
       }
