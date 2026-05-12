@@ -1,28 +1,41 @@
 ## Problem
-Kunder-dropdown'en på `/reports/daily` viser kun A→E (7 første kunder). Tryg, TDC Erhverv, Yousee m.fl. ligger længere nede, men dropdown'en kan ikke scrolles.
 
-## Root cause
-`src/components/reports/MultiSelectFilter.tsx` linje 88:
+Tryg er kun linket til team **United** i `team_clients`. I `MultiSelectFilter.tsx:42-46` skjules "udenfor scope"-options helt — de vises kun hvis allerede valgt:
+
+```ts
+const inScope = options.filter((o) => !o.outOfScope);
+const outOfScopeSelected = options.filter((o) => o.outOfScope && selected.includes(o.id));
+return [...inScope, ...outOfScopeSelected];
 ```
-<div className="space-y-1 max-h-[280px] overflow-y-auto">
-```
-Listen overflow'er korrekt rent CSS-mæssigt, men komponenten bruges inde i en Radix `Sheet` (filterpanelet, `DailyReports.tsx:1236`). Sheet'ens scroll-lock og event-håndtering forhindrer wheel-events i at nå den indre `overflow-y-auto`-container i Popover'en.
+
+For team-scopede brugere (`scopeReportsDaily === "team"`) auto-vælges deres team i `DailyReports.tsx:256-258`. Hvis deres team ikke ejer Tryg → Tryg markeres `outOfScope` i `clientOptions` (linje 1119) → filtreres helt væk.
+
+Selv hvis du selv intet team har valgt, sker auto-selection inden du ser dropdown'en.
 
 ## Fix
-Én ændring i `src/components/reports/MultiSelectFilter.tsx`:
 
-1. Erstat den rå `<div className="... overflow-y-auto">` med shadcn's `ScrollArea`-komponent (`@/components/ui/scroll-area`), som håndterer wheel-events korrekt inde i Sheet/Dialog-kontekster og giver synlig scrollbar.
+Vis altid alle options i dropdown'en. Out-of-scope vises blot greyed/italic med "(udenfor filter)"-mærket — labellen findes allerede i komponenten, men når aldrig DOM'en pga. filtreringen.
 
-```tsx
-<ScrollArea className="max-h-[280px] pr-2">
-  <div className="space-y-1">
-    {visibleOptions.map(...)}
-  </div>
-</ScrollArea>
+### Ændring (1 fil, grøn zone)
+
+`src/components/reports/MultiSelectFilter.tsx` — opdater `visibleOptions`:
+
+```ts
+const visibleOptions = useMemo(() => {
+  const inScope = options.filter((o) => !o.outOfScope);
+  const outOfScope = options.filter((o) => o.outOfScope);
+  return [...inScope, ...outOfScope];
+}, [options]);
 ```
 
-Det er en grøn-zone UI-ændring i én præsentationskomponent. Ingen forretningslogik, ingen DB.
+Out-of-scope renderes nederst (sortering bevaret), greyed og kursiv via eksisterende `option.outOfScope`-check på linje 102-105. Klikbare så bruger kan vælge dem.
 
-## Verifikation
-- Åbn `/reports/daily` → Filtre → Kunder. Bekræft at alle 14 kunder (incl. Tryg) kan scrolles.
-- Samme komponent bruges også til Teams, Medarbejdere, Kampagner — bekræft at de stadig virker.
+### Effekt
+
+- Tryg (og andre kunder udenfor brugerens team-scope) er altid synlige og valgbare.
+- Samme adfærd for Teams, Medarbejdere, Kampagner — alle bruger samme komponent. Konsistent.
+- Ingen ændring i hvilke data der hentes; kun præsentation.
+
+## Zone
+
+Grøn (presentation, ingen forretningslogik, ingen DB).
