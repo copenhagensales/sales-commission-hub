@@ -38,12 +38,12 @@ export function MultiSelectFilter({
     );
   };
 
-  // Render order: in-scope first, then out-of-scope (only if selected so user can deselect)
+  // Render order: in-scope first, then out-of-scope (greyed but always visible/selectable)
   const visibleOptions = useMemo(() => {
     const inScope = options.filter((o) => !o.outOfScope);
-    const outOfScopeSelected = options.filter((o) => o.outOfScope && selected.includes(o.id));
-    return [...inScope, ...outOfScopeSelected];
-  }, [options, selected]);
+    const outOfScope = options.filter((o) => o.outOfScope);
+    return [...inScope, ...outOfScope];
+  }, [options]);
 
   const triggerText = (() => {
     if (selected.length === 0) return placeholder;
