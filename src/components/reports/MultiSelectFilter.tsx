@@ -84,27 +84,29 @@ export function MultiSelectFilter({
               )}
             </div>
           )}
-          <div className="space-y-1 max-h-[280px] overflow-y-auto">
-            {visibleOptions.length === 0 && (
-              <div className="text-sm text-muted-foreground p-2">Ingen valgmuligheder</div>
-            )}
-            {visibleOptions.map((option) => (
-              <div
-                key={option.id}
-                className="flex items-center space-x-3 p-2 rounded-md hover:bg-accent cursor-pointer"
-                onClick={() => toggle(option.id)}
-              >
-                <Checkbox
-                  checked={selected.includes(option.id)}
-                  onCheckedChange={() => toggle(option.id)}
-                />
-                <span className={`text-sm ${option.outOfScope ? "text-muted-foreground italic" : ""}`}>
-                  {option.label}
-                  {option.outOfScope && <span className="ml-1 text-xs">(udenfor filter)</span>}
-                </span>
-              </div>
-            ))}
-          </div>
+          <ScrollArea className="max-h-[280px] pr-2">
+            <div className="space-y-1">
+              {visibleOptions.length === 0 && (
+                <div className="text-sm text-muted-foreground p-2">Ingen valgmuligheder</div>
+              )}
+              {visibleOptions.map((option) => (
+                <div
+                  key={option.id}
+                  className="flex items-center space-x-3 p-2 rounded-md hover:bg-accent cursor-pointer"
+                  onClick={() => toggle(option.id)}
+                >
+                  <Checkbox
+                    checked={selected.includes(option.id)}
+                    onCheckedChange={() => toggle(option.id)}
+                  />
+                  <span className={`text-sm ${option.outOfScope ? "text-muted-foreground italic" : ""}`}>
+                    {option.label}
+                    {option.outOfScope && <span className="ml-1 text-xs">(udenfor filter)</span>}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
         </PopoverContent>
       </Popover>
     </div>
