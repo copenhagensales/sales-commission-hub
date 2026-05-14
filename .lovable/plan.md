@@ -1,41 +1,43 @@
-## Problem
+## Plan: Opret "Fri tale + 100 GB data (5G) (6 mdr. binding)" som rigtigt produkt
 
-Tryg er kun linket til team **United** i `team_clients`. I `MultiSelectFilter.tsx:42-46` skjules "udenfor scope"-options helt — de vises kun hvis allerede valgt:
+Spejler 1:1 strukturen for søsterproduktet "Fri tale + 110" (id `5e20993c-be45-4913-b2a0-7a7edb2282a2`) på Eesy TM-kampagnen, så det nye produkt opfører sig præcis som de andre — ingen hardkodning.
 
-```ts
-const inScope = options.filter((o) => !o.outOfScope);
-const outOfScopeSelected = options.filter((o) => o.outOfScope && selected.includes(o.id));
-return [...inScope, ...outOfScopeSelected];
-```
+### 1. Opret produkt
+INSERT i `products`:
+- Navn: `Fri tale + 100`
+- `client_campaign_id`: `d031126c-aec0-4b80-bbe2-bbc31c4f04ba` (Eesy TM Products — samme som 110)
+- `commission_dkk`: **350** (basis = kolde leads)
+- `revenue_dkk`: **700**
+- `counts_as_sale: true`, `is_active: true`
 
-For team-scopede brugere (`scopeReportsDaily === "team"`) auto-vælges deres team i `DailyReports.tsx:256-258`. Hvis deres team ikke ejer Tryg → Tryg markeres `outOfScope` i `clientOptions` (linje 1119) → filtreres helt væk.
+### 2. Opret Adversus-mapping (så fremtidige salg auto-matcher)
+INSERT i `adversus_product_mappings`:
+- `adversus_product_title` = `adversus_external_id` = `Fri tale + 100 GB data (5G) (6 mdr. binding)`
+- `product_id` = nyt produkt-id
 
-Selv hvis du selv intet team har valgt, sker auto-selection inden du ser dropdown'en.
+### 3. Opret pricing rule for varme leads
+INSERT i `product_pricing_rules` — kopi af "Specialkampagne 2026"-reglen fra 110:
+- `name`: `Specialkampagne 2026`
+- `priority`: 10
+- `campaign_match_mode`: `exclude` (samme 20 varme campaign_mapping_ids som 110-reglen)
+- `commission_dkk`: **260**, `revenue_dkk`: **700**
+- `effective_from`: `2026-01-01`
+- `is_active: true`
 
-## Fix
+Resultat: salg på de 20 varme kampagner matcher reglen (260/700). Alle øvrige (kolde) falder tilbage til produkt-basis (350/700) — samme mønster som "Fri tale + 110".
 
-Vis altid alle options i dropdown'en. Out-of-scope vises blot greyed/italic med "(udenfor filter)"-mærket — labellen findes allerede i komponenten, men når aldrig DOM'en pga. filtreringen.
+### 4. Reparér eksisterende salg
+De 12 sale_items i maj som står med `needs_mapping = true` og 0 kr re-matches:
+- Kør `rematch-pricing-rules` edge function for de berørte sales, eller
+- Direkte UPDATE: sæt `product_id`, `mapped_commission`, `mapped_revenue`, `needs_mapping = false` baseret på sale.dialer_campaign_id mod de 20 ekskluderede campaign_mappings (warm = 260/700, ellers 350/700).
 
-### Ændring (1 fil, grøn zone)
+Jeg foreslår edge function-vejen — det er den officielle pricing-motor (rød zone-konsistens, princip 8: én sandhed).
 
-`src/components/reports/MultiSelectFilter.tsx` — opdater `visibleOptions`:
+### Tekniske noter
+- `dd1bb992-...` campaign mapping-listen kopieres ord-for-ord fra 110-regel `3e7647ad-33bb-4539-bde5-09456e6acdfb` for at sikre identisk warm/cold-opdeling.
+- Ingen kodeændringer. Alt sker via data (insert tool + edge function).
+- Berører `product_pricing_rules` + `sale_items` (rød zone — pricing). Bekræft inden jeg kører.
 
-```ts
-const visibleOptions = useMemo(() => {
-  const inScope = options.filter((o) => !o.outOfScope);
-  const outOfScope = options.filter((o) => o.outOfScope);
-  return [...inScope, ...outOfScope];
-}, [options]);
-```
-
-Out-of-scope renderes nederst (sortering bevaret), greyed og kursiv via eksisterende `option.outOfScope`-check på linje 102-105. Klikbare så bruger kan vælge dem.
-
-### Effekt
-
-- Tryg (og andre kunder udenfor brugerens team-scope) er altid synlige og valgbare.
-- Samme adfærd for Teams, Medarbejdere, Kampagner — alle bruger samme komponent. Konsistent.
-- Ingen ændring i hvilke data der hentes; kun præsentation.
-
-## Zone
-
-Grøn (presentation, ingen forretningslogik, ingen DB).
+### Bekræft venligst
+1. Produktnavn `Fri tale + 100` (uden " GB data (5G)..." — matcher 110-mønstret)? Eller fuldt navn?
+2. OK at køre `rematch-pricing-rules` på de 12 berørte salg bagefter?
