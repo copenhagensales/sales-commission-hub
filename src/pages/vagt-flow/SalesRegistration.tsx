@@ -574,7 +574,7 @@ const SalesRegistration = () => {
           onClick={handleSubmit}
           className="w-full"
           size="lg"
-          disabled={!currentEmployee || !activeBooking?.location?.id || productSelections.length === 0 || isSubmitting}
+          disabled={!currentEmployee || !activeBooking?.location?.id || bookingMissingCampaign || productSelections.length === 0 || isSubmitting}
         >
           <Save className="h-5 w-5 mr-2" />
           {isSubmitting ? "Gemmer..." : "Registrer salg"}
