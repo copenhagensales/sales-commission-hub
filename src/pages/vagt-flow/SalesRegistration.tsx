@@ -246,86 +246,34 @@ const SalesRegistration = () => {
     },
   });
 
-  // Fetch products based on the campaign from active booking
+  // Fetch products based on the campaign from active booking.
+  // STRENGT: vi kræver booking.campaign_id — ellers kan sælgeren se blandet
+  // produktliste (fx Eesy Gaden + Eesy Marked) og ende med forkert pris.
+  // Hvis campaign mangler, returnér tomt → UI viser fejl-besked længere nede.
   const { data: products, isLoading: productsLoading } = useQuery({
-    queryKey: ["campaign-products", activeBooking?.campaign?.id, activeBooking?.brand?.name, activeBooking?.client?.id],
+    queryKey: ["campaign-products", activeBooking?.campaign?.id],
     queryFn: async () => {
-      // If booking has a direct campaign_id, use it
-      if (activeBooking?.campaign?.id) {
-        const { data, error } = await supabase
-          .from("products")
-          .select("id, name")
-          .eq("client_campaign_id", activeBooking.campaign.id)
-          .neq("name", "Lokation")
-          .order("name");
-        if (error) throw error;
-        
-        const seen = new Set<string>();
-        return (data || []).filter((p) => {
-          if (seen.has(p.name)) return false;
-          seen.add(p.name);
-          return true;
-        });
-      }
-      
-      // Fallback 1: search by brand name if no campaign_id
-      if (activeBooking?.brand?.name) {
-        const { data: campaigns } = await supabase
-          .from("client_campaigns")
-          .select("id, name")
-          .ilike("name", `%${activeBooking.brand.name}%`);
-        
-        if (campaigns && campaigns.length > 0) {
-          const campaignIds = campaigns.map(c => c.id);
-          
-          const { data, error } = await supabase
-            .from("products")
-            .select("id, name")
-            .in("client_campaign_id", campaignIds)
-            .neq("name", "Lokation")
-            .order("name");
-          if (error) throw error;
-          
-          const seen = new Set<string>();
-          return (data || []).filter((p) => {
-            if (seen.has(p.name)) return false;
-            seen.add(p.name);
-            return true;
-          });
-        }
-      }
-      
-      // Fallback 2: search by client_id if no campaign or brand
-      if (activeBooking?.client?.id) {
-        const { data: campaigns } = await supabase
-          .from("client_campaigns")
-          .select("id")
-          .eq("client_id", activeBooking.client.id);
-        
-        if (campaigns && campaigns.length > 0) {
-          const campaignIds = campaigns.map(c => c.id);
-          
-          const { data, error } = await supabase
-            .from("products")
-            .select("id, name")
-            .in("client_campaign_id", campaignIds)
-            .neq("name", "Lokation")
-            .order("name");
-          if (error) throw error;
-          
-          const seen = new Set<string>();
-          return (data || []).filter((p) => {
-            if (seen.has(p.name)) return false;
-            seen.add(p.name);
-            return true;
-          });
-        }
-      }
-      
-      return [];
+      if (!activeBooking?.campaign?.id) return [];
+
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, name")
+        .eq("client_campaign_id", activeBooking.campaign.id)
+        .neq("name", "Lokation")
+        .order("name");
+      if (error) throw error;
+
+      const seen = new Set<string>();
+      return (data || []).filter((p) => {
+        if (seen.has(p.name)) return false;
+        seen.add(p.name);
+        return true;
+      });
     },
-    enabled: !!(activeBooking?.campaign?.id || activeBooking?.brand?.name || activeBooking?.client?.id),
+    enabled: !!activeBooking?.campaign?.id,
   });
+
+  const bookingMissingCampaign = !!activeBooking && !activeBooking?.campaign?.id;
 
   const addProduct = (productId: string) => {
     const product = products?.find((p) => p.id === productId);
@@ -558,6 +506,16 @@ const SalesRegistration = () => {
           <CardContent>
             {productsLoading ? (
               <p className="text-muted-foreground text-sm">Henter produkter...</p>
+            ) : bookingMissingCampaign ? (
+              <div className="flex items-start gap-2 p-3 rounded-lg border border-destructive/30 bg-destructive/5">
+                <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                <div className="text-sm text-destructive">
+                  <p className="font-medium">Bookingen mangler kampagne</p>
+                  <p className="text-destructive/80 mt-0.5">
+                    Kontakt din leder — bookingen skal have en kampagne tilknyttet, før der kan registreres salg (ellers kan prisen blive forkert).
+                  </p>
+                </div>
+              </div>
             ) : !products || products.length === 0 ? (
               <div className="flex items-center gap-2 p-3 rounded-lg border border-destructive/30 bg-destructive/5">
                 <AlertCircle className="h-5 w-5 text-destructive" />
@@ -616,7 +574,7 @@ const SalesRegistration = () => {
           onClick={handleSubmit}
           className="w-full"
           size="lg"
-          disabled={!currentEmployee || !activeBooking?.location?.id || productSelections.length === 0 || isSubmitting}
+          disabled={!currentEmployee || !activeBooking?.location?.id || bookingMissingCampaign || productSelections.length === 0 || isSubmitting}
         >
           <Save className="h-5 w-5 mr-2" />
           {isSubmitting ? "Gemmer..." : "Registrer salg"}
