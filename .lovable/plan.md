@@ -1,75 +1,49 @@
-# Plan: Eesy FM marked-pricing — quick-fix + permanent fix
+## Diagnose (evidens)
 
-## Baggrund (evidens)
+Sælger: **Nanna Chanell Johansen** (`nacj@copenhagensales.dk`), periode 15/4–14/5.
 
-- 104 salg på 14/5 (Lillebælt plads 1+2, Sindal Marked) fik gade-pris (360 kr) i stedet for marked-pris (295 kr).
-- Rod-årsag: De 3 bookings havde `campaign_id = NULL`. Fallback i `SalesRegistration.tsx:250-327` matchede både "Eesy marked" og "Eesy gaden" produkter via `name ILIKE '%<brand>%'`, så sælgeren så blandet produktliste.
-- På Dølle 30/4 var `booking.campaign_id = "Eesy marked"` korrekt sat → kun marked-produkter blev vist → korrekt pris.
-- Dette er en **registrerings-/data-integritetsfejl**, ikke et pricing-engine problem.
+Stork-tællinger pr. dialer-kampagne:
+- 104520 TRYG - FDM: **327** (Adversus: 326) → +1
+- 106190 AKA: **76** (Adversus: 75) → +1
+- 104835 TRYG - Hjerteforening: **23** (Adversus: 22) → +1
 
----
+I hver kampagne findes præcis ét salg med `sales.validation_status = 'cancelled'`:
 
-## Del 1 — Quick-fix på 14/5 (rød zone: pricing-data)
+| Kampagne | adversus_external_id | sale_datetime |
+|---|---|---|
+| 104520 FDM | 1320755 | 2026-04-15 08:24 |
+| 106190 AKA | 1322872 | 2026-04-15 15:03 |
+| 104835 Hjerteforening | 1365505 | 2026-05-13 13:25 |
 
-Tre trin, godkendes som én pakke:
+**Konklusion:** Stork-tælleren der vises som "succes pr. kampagne" filtrerer ikke `validation_status = 'cancelled'` fra. Adversus tæller dem ikke. Differencen er 1:1 med antallet af cancelled salg.
 
-1. **Opdater 3 bookings** (`bookings`-tabellen) for 14/5:
-   - Lillebælt plads 1, Lillebælt plads 2, Sindal Marked → sæt `campaign_id` til "Eesy marked"-kampagnen.
-2. **Opdater 104 salgs `client_campaign_id`** fra "eesy FM Gaden Products" → "Eesy marked" på de berørte salg fra 14/5 på disse 3 lokationer.
-3. **Kør `rematch-pricing-rules`** for de 104 salg → genberegner `mapped_commission` og `mapped_revenue` til marked-pris (295 kr).
+Ingen reelle dubletter (ingen duplikat `adversus_external_id`, ingen duplikat telefon med samme phone).
 
-**Forventet effekt:** ~−6.760 kr i provision (marked-pris er lavere end gade-pris). Ingen anden data berøres.
+## Åbne spørgsmål før implementation
 
-**Sikkerhed:** Quick-fix udføres via `supabase--insert` (UPDATE) med præcise WHERE-klausuler på dato + lokation + agent. Før vi kører noget: jeg viser dig SQL'en og det eksakte antal rækker der rammes, så du kan bekræfte.
+1. **Hvor vises tallene?** Du står på `/vagt-flow/edit-sales`. Er det her tallene 327/76/23 vises, eller i et andet view (dashboard, sælgerprofil, kampagnerapport)? Skærmbillede eller sti hjælper mig med at ramme præcis det rigtige sted i første hug. `validation_status` håndteres forskelligt mellem 30+ filer — flere af dem ekskluderer allerede cancelled, andre ikke.
 
----
+2. **Definition af "succes" på tværs af Stork.** To muligheder:
+   - **(a) Lokal fix:** kun det view du peger på filtrerer `validation_status != 'cancelled'`.
+   - **(b) Global regel:** alle "succes/møde-tællere" pr. kampagne (dashboards, sælgerprofiler, leaderboards, KPI'er) ekskluderer `cancelled`. Konsistent men rød zone — `useSalesAggregates` / `get_sales_aggregates_v2` påvirker løn-tal.
 
-## Del 2 — Permanent fix (gul zone: FM-booking UI + validering)
+   Anbefaling: **(a) først** for at lukke det konkrete symptom, derefter audit af alle steder i en separat opgave.
 
-Mål: Det skal være **umuligt** at oprette en FM-booking uden `campaign_id`, og fallback-logikken skal stoppe i stedet for at gætte.
+3. **Hvad ligger bag `validation_status = 'cancelled'`?** De tre salg er fra 15/4 og 13/5. Skal jeg verificere at de faktisk er annulleret i Adversus (forventet), eller om de er "annulleret i Stork men aktive i Adversus" (utilsigtet)? Det afgør om fixet er kun visuelt, eller om der også er et data-sync-problem.
 
-### 2A. Frontend — krav om kampagne ved oprettelse af FM-booking
+## Forslag til plan (afventer dine svar)
 
-- I FM booking-dialogen (vagtplan/booking flow): gør `campaign_id` til **påkrævet felt** med synlig validering.
-- Hvis lokationen har `type = 'marked'` → forfilter dropdown til marked-kampagner for det valgte brand. Tilsvarende for gade.
-- Disabler "Gem"-knap indtil kampagne er valgt.
+**Del 1 — bekræft scope (rød/gul zone):**
+- Du peger på den konkrete komponent/RPC der viser 327/76/23
+- Jeg verificerer i koden at den ikke filtrerer cancelled
 
-### 2B. SalesRegistration fallback — fail-loud i stedet for fail-silent
+**Del 2 — fix (gul zone hvis kun visning, rød hvis aggregates_v2):**
+- Tilføj `validation_status != 'cancelled'` (eller `IS DISTINCT FROM 'cancelled'`) i den relevante query
+- Test: tallene bliver 326/75/22 for Nanna i samme periode
 
-I `SalesRegistration.tsx:250-327`:
-- Hvis `booking.campaign_id` er NULL → vis fejl-besked til sælger ("Booking mangler kampagne — kontakt teamleder") i stedet for at vise blandet produktliste.
-- Forhindrer at salget overhovedet kan oprettes på en defekt booking.
+**Del 3 — audit (separat opgave, kun hvis du vil):**
+- Liste alle steder i koden hvor "antal salg/møder pr. kampagne" beregnes
+- Markér hvilke filtrerer cancelled og hvilke ikke
+- Beslut én konsistent regel (ref. princip 3: én sandhed)
 
-### 2C. DB-niveau backstop (foreslået, beder om bekræftelse)
-
-To muligheder — vælg én i opfølgning:
-- **(i)** NOT NULL constraint på `bookings.campaign_id` for FM-bookings (kræver oprydning af eksisterende NULL-rækker først).
-- **(ii)** Kun trigger-validering: trigger der blokerer INSERT/UPDATE hvis FM-booking har NULL campaign.
-
-Default-anbefaling: **(ii) trigger** — mindre risiko for at bryde historiske data.
-
----
-
-## Rækkefølge & rapportering
-
-1. Jeg leverer SQL til Del 1 (trin 1+2) som forhåndsvisning. Du godkender.
-2. Jeg eksekverer UPDATE'erne via insert-tool og kører rematch.
-3. Jeg implementerer 2A + 2B (kode-ændringer i FM-booking + SalesRegistration).
-4. Jeg leverer migration til 2C-trigger separat til godkendelse (rød zone: DB-skema + pricing-relateret).
-
-Hver del = én commit, færdig-rapport med hash, filer og linjeantal.
-
----
-
-## Filer i scope
-
-- **Del 1:** Ingen kodefiler — kun data-UPDATE + edge function-call (`rematch-pricing-rules`).
-- **Del 2A:** FM booking-dialog komponent (jeg lokaliserer og bekræfter præcis fil før ændring).
-- **Del 2B:** `src/pages/.../SalesRegistration.tsx` (linjer 250-327).
-- **Del 2C:** Ny migration med validation-trigger på `bookings`.
-
-## Åbne spørgsmål før start
-
-1. Bekræft "Eesy marked" som korrekt target-kampagne for de 3 bookings.
-2. Skal Del 2C implementeres som trigger (ii) eller NOT NULL (i)?
-3. Skal fail-loud i 2B også gælde TM-bookings, eller kun FM?
+Ingen filer ændres før du svarer på spørgsmål 1 og 2.
