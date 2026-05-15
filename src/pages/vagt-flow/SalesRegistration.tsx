@@ -246,32 +246,88 @@ const SalesRegistration = () => {
     },
   });
 
-  // Fetch products based on the campaign from active booking.
-  // STRENGT: vi kræver booking.campaign_id — ellers kan sælgeren se blandet
-  // produktliste (fx Eesy Gaden + Eesy Marked) og ende med forkert pris.
-  // Hvis campaign mangler, returnér tomt → UI viser fejl-besked længere nede.
-  const { data: products, isLoading: productsLoading } = useQuery({
-    queryKey: ["campaign-products", activeBooking?.campaign?.id],
+  // Fetch products i to grupper:
+  //  1) Primær: produkter på bookingens egen kampagne (strengt — beskytter
+  //     Eesy gade/marked-skellet inden for samme klient).
+  //  2) Cross-client: produkter fra ANDRE klienter som sælgeren er tilknyttet
+  //     (employee_client_assignments). Bruges når flere klienter deler stand,
+  //     fx YouSee-sælger på en Eesy-marked-stand. Vi krydser ALDRIG inden for
+  //     samme klient — kun mellem klienter.
+  const { data: productGroups, isLoading: productsLoading } = useQuery({
+    queryKey: [
+      "campaign-products",
+      activeBooking?.campaign?.id,
+      activeBooking?.client?.id,
+      currentEmployee?.id,
+    ],
     queryFn: async () => {
-      if (!activeBooking?.campaign?.id) return [];
+      if (!activeBooking?.campaign?.id) return { primary: [], crossClient: [] };
 
-      const { data, error } = await supabase
+      // 1) Primær liste — uændret
+      const { data: primaryData, error: primaryErr } = await supabase
         .from("products")
         .select("id, name")
         .eq("client_campaign_id", activeBooking.campaign.id)
         .neq("name", "Lokation")
         .order("name");
-      if (error) throw error;
+      if (primaryErr) throw primaryErr;
 
-      const seen = new Set<string>();
-      return (data || []).filter((p) => {
-        if (seen.has(p.name)) return false;
-        seen.add(p.name);
+      const primarySeen = new Set<string>();
+      const primary = (primaryData || []).filter((p) => {
+        if (primarySeen.has(p.name)) return false;
+        primarySeen.add(p.name);
         return true;
       });
+
+      // 2) Cross-client — kræver sælger + booking.client
+      if (!currentEmployee?.id || !activeBooking?.client?.id) {
+        return { primary, crossClient: [] };
+      }
+
+      const { data: assignments, error: assignErr } = await supabase
+        .from("employee_client_assignments")
+        .select("client_id")
+        .eq("employee_id", currentEmployee.id);
+      if (assignErr) throw assignErr;
+
+      const otherClientIds = (assignments || [])
+        .map((a) => a.client_id)
+        .filter((id) => id && id !== activeBooking.client!.id);
+
+      if (otherClientIds.length === 0) {
+        return { primary, crossClient: [] };
+      }
+
+      const { data: crossData, error: crossErr } = await supabase
+        .from("products")
+        .select("id, name, client_id, client_campaign_id, client_campaigns!inner(name)")
+        .in("client_id", otherClientIds)
+        .neq("client_id", activeBooking.client.id)
+        .neq("name", "Lokation")
+        .order("name");
+      if (crossErr) throw crossErr;
+
+      const crossSeen = new Set<string>();
+      const crossClient = (crossData || [])
+        .filter((p) => {
+          const key = `${p.client_campaign_id}:${p.name}`;
+          if (crossSeen.has(key)) return false;
+          crossSeen.add(key);
+          return true;
+        })
+        .map((p) => ({
+          id: p.id,
+          name: p.name,
+          campaignName: (p.client_campaigns as any)?.name ?? null,
+        }));
+
+      return { primary, crossClient };
     },
     enabled: !!activeBooking?.campaign?.id,
   });
+
+  const products = productGroups?.primary ?? [];
+  const crossClientProducts = productGroups?.crossClient ?? [];
 
   const bookingMissingCampaign = !!activeBooking && !activeBooking?.campaign?.id;
 
