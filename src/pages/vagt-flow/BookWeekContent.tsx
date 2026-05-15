@@ -209,6 +209,15 @@ export default function BookWeekContent() {
       const campaignMapping = location?.client_campaign_mapping as Record<string, string> | null;
       const campaignId = campaignMapping?.[clientId] || null;
 
+      // Hard guard: a booking without campaign_id breaks pricing (sælgere får forkert pris).
+      // Tving en mapping i stedet for at oprette en defekt booking.
+      if (!campaignId) {
+        throw new Error(
+          `Lokationen "${location?.name ?? "(ukendt)"}" mangler kampagne-mapping for den valgte kunde. ` +
+          `Tilføj mappingen under Lokationer → kampagne-mapping før du opretter bookingen.`
+        );
+      }
+
       // Parse total price for markets
       const parsedTotalPrice = isMarket && marketTotalPrice ? parseFloat(marketTotalPrice) : null;
 
