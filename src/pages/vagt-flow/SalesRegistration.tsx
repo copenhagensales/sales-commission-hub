@@ -274,9 +274,7 @@ const SalesRegistration = () => {
   const bookingMissingCampaign = !!activeBooking && !activeBooking?.campaign?.id;
 
   const addProduct = (productId: string) => {
-    const product =
-      products?.find((p) => p.id === productId) ||
-      crossClientProducts?.find((p) => p.id === productId);
+    const product = products?.find((p) => p.id === productId);
     if (!product) return;
 
     const existing = productSelections.find((p) => p.productId === productId);
