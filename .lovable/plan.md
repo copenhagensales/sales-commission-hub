@@ -1,61 +1,75 @@
-## Synkronisér TDC Opsummering (intern + offentlig) via delt kode
+# Plan: Eesy FM marked-pricing — quick-fix + permanent fix
 
-### Mål
-`/tdc-opsummering` (intern) og `/tdc-public` (offentlig) skal vise nøjagtigt samme indhold, layout og tekstgenerering. Fremtidige rettelser sker ét sted og slår igennem begge steder. **Public-URL `/tdc-public` ændres ikke.**
+## Baggrund (evidens)
 
-### Tilgang
-Løft den fælles del ud i to nye filer; intern + public bliver tynde wrappers. Følger Princip 8 (single source of truth, også i koden).
+- 104 salg på 14/5 (Lillebælt plads 1+2, Sindal Marked) fik gade-pris (360 kr) i stedet for marked-pris (295 kr).
+- Rod-årsag: De 3 bookings havde `campaign_id = NULL`. Fallback i `SalesRegistration.tsx:250-327` matchede både "Eesy marked" og "Eesy gaden" produkter via `name ILIKE '%<brand>%'`, så sælgeren så blandet produktliste.
+- På Dølle 30/4 var `booking.campaign_id = "Eesy marked"` korrekt sat → kun marked-produkter blev vist → korrekt pris.
+- Dette er en **registrerings-/data-integritetsfejl**, ikke et pricing-engine problem.
 
-### Nye filer
-1. **`src/lib/tdcOpsummering/generateSummary.ts`**
-   - Ren funktion: `(state) => SummaryLine[]`
-   - `TRANSLATIONS`-map (dansk + engelsk)
-   - Delte typer (`SummaryLine`, `FormState`, `SummaryVariant`, `MbbType`, `NumberChoice`, `StartupChoice`)
-   - Ingen React, ingen Supabase. Kan unit-testes.
+---
 
-2. **`src/components/tdc-opsummering/TdcOpsummeringForm.tsx`**
-   - Hele UI'et samlet: variant-vælger (Standard / Pilot / Kun 5G Fri / Engelsk), MBB-sektion (Mobilevoice / Datadelingskort / Ingen / uden router), nummervalg, opstart, tilskud, omstilling + standard-omstilling-toggle, 5G Fri-validering med fejlbanner, tema-vælger, font-slider, preview med nummererede noter (1)–(8) og rød-markerede kritiske linjer, "Kopier tekst"-knap.
-   - Bruger `generateSummary()` fra delt lib.
+## Del 1 — Quick-fix på 14/5 (rød zone: pricing-data)
 
-### Reduceres til skal
-3. **`src/pages/TdcOpsummering.tsx`** (787 → ~30 linjer)
-   ```tsx
-   <MainLayout><TdcOpsummeringForm /></MainLayout>
-   ```
-4. **`src/pages/TdcOpsummeringPublic.tsx`** (601 → ~25 linjer)
-   ```tsx
-   <div className="min-h-screen bg-background p-4 md:p-8">
-     <header className="max-w-7xl mx-auto mb-6 flex items-center gap-3">
-       <FileText className="text-primary" />
-       <div>
-         <h1 className="text-2xl font-bold">TDC Opsummering</h1>
-         <p className="text-muted-foreground text-sm">Generer en struktureret opsummeringstekst efter et TDC-salg</p>
-       </div>
-     </header>
-     <TdcOpsummeringForm />
-   </div>
-   ```
-   Public bevarer den simple header (Valg A — bekræftet). Ingen synlig ændring for slutbrugere.
+Tre trin, godkendes som én pakke:
 
-### Hvad der IKKE røres
-- `src/routes/config.tsx` — `/tdc-public` (`access: "public"`) og `/tdc-opsummering` (`positionPermission: "menu_tdc_opsummering"`) beholdes 1:1.
-- `src/routes/pages.ts` — lazy-imports peger på samme filnavne.
-- Ringesystem-link til `/tdc-public` virker uændret.
-- Ingen DB, edge functions, permissions eller RLS.
+1. **Opdater 3 bookings** (`bookings`-tabellen) for 14/5:
+   - Lillebælt plads 1, Lillebælt plads 2, Sindal Marked → sæt `campaign_id` til "Eesy marked"-kampagnen.
+2. **Opdater 104 salgs `client_campaign_id`** fra "eesy FM Gaden Products" → "Eesy marked" på de berørte salg fra 14/5 på disse 3 lokationer.
+3. **Kør `rematch-pricing-rules`** for de 104 salg → genberegner `mapped_commission` og `mapped_revenue` til marked-pris (295 kr).
 
-### Hvad public får forærende ved sync
-Public har i dag halve features. Efter refactor får den automatisk:
-- Fuld engelsk-oversættelse via `TRANSLATIONS`
-- Tema-vælger
-- Font-størrelse-slider
-- Eventuelle fremtidige rettelser i intern slår automatisk igennem.
+**Forventet effekt:** ~−6.760 kr i provision (marked-pris er lavere end gade-pris). Ingen anden data berøres.
 
-### Zone & risiko
-**Gul zone.** Pure UI-refactor + indholdssync. Ingen rød-zone-filer (ingen pricing, løn, RLS, permissions). Risiko: subtle state-bugs hvis state-flyt brydes — mitigeres ved at flytte hele state-blokken samlet ind i `TdcOpsummeringForm` og bevare al logik 1:1.
+**Sikkerhed:** Quick-fix udføres via `supabase--insert` (UPDATE) med præcise WHERE-klausuler på dato + lokation + agent. Før vi kører noget: jeg viser dig SQL'en og det eksakte antal rækker der rammes, så du kan bekræfte.
 
-### Verifikation efter implementation
-1. `/tdc-opsummering` (logget ind): alle felter, tema, font-slider, engelsk, preview-tekst identisk med før.
-2. `/tdc-public` (incognito, ingen login): samme indhold som intern, samme URL, samme simple header.
-3. Samme input på begge sider → byte-for-byte identisk genereret tekst.
-4. Ringesystem-knap åbner `/tdc-public` uændret.
-5. Build/typecheck grøn.
+---
+
+## Del 2 — Permanent fix (gul zone: FM-booking UI + validering)
+
+Mål: Det skal være **umuligt** at oprette en FM-booking uden `campaign_id`, og fallback-logikken skal stoppe i stedet for at gætte.
+
+### 2A. Frontend — krav om kampagne ved oprettelse af FM-booking
+
+- I FM booking-dialogen (vagtplan/booking flow): gør `campaign_id` til **påkrævet felt** med synlig validering.
+- Hvis lokationen har `type = 'marked'` → forfilter dropdown til marked-kampagner for det valgte brand. Tilsvarende for gade.
+- Disabler "Gem"-knap indtil kampagne er valgt.
+
+### 2B. SalesRegistration fallback — fail-loud i stedet for fail-silent
+
+I `SalesRegistration.tsx:250-327`:
+- Hvis `booking.campaign_id` er NULL → vis fejl-besked til sælger ("Booking mangler kampagne — kontakt teamleder") i stedet for at vise blandet produktliste.
+- Forhindrer at salget overhovedet kan oprettes på en defekt booking.
+
+### 2C. DB-niveau backstop (foreslået, beder om bekræftelse)
+
+To muligheder — vælg én i opfølgning:
+- **(i)** NOT NULL constraint på `bookings.campaign_id` for FM-bookings (kræver oprydning af eksisterende NULL-rækker først).
+- **(ii)** Kun trigger-validering: trigger der blokerer INSERT/UPDATE hvis FM-booking har NULL campaign.
+
+Default-anbefaling: **(ii) trigger** — mindre risiko for at bryde historiske data.
+
+---
+
+## Rækkefølge & rapportering
+
+1. Jeg leverer SQL til Del 1 (trin 1+2) som forhåndsvisning. Du godkender.
+2. Jeg eksekverer UPDATE'erne via insert-tool og kører rematch.
+3. Jeg implementerer 2A + 2B (kode-ændringer i FM-booking + SalesRegistration).
+4. Jeg leverer migration til 2C-trigger separat til godkendelse (rød zone: DB-skema + pricing-relateret).
+
+Hver del = én commit, færdig-rapport med hash, filer og linjeantal.
+
+---
+
+## Filer i scope
+
+- **Del 1:** Ingen kodefiler — kun data-UPDATE + edge function-call (`rematch-pricing-rules`).
+- **Del 2A:** FM booking-dialog komponent (jeg lokaliserer og bekræfter præcis fil før ændring).
+- **Del 2B:** `src/pages/.../SalesRegistration.tsx` (linjer 250-327).
+- **Del 2C:** Ny migration med validation-trigger på `bookings`.
+
+## Åbne spørgsmål før start
+
+1. Bekræft "Eesy marked" som korrekt target-kampagne for de 3 bookings.
+2. Skal Del 2C implementeres som trigger (ii) eller NOT NULL (i)?
+3. Skal fail-loud i 2B også gælde TM-bookings, eller kun FM?
