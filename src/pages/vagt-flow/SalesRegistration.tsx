@@ -246,37 +246,109 @@ const SalesRegistration = () => {
     },
   });
 
-  // Fetch products based on the campaign from active booking.
-  // STRENGT: vi kræver booking.campaign_id — ellers kan sælgeren se blandet
-  // produktliste (fx Eesy Gaden + Eesy Marked) og ende med forkert pris.
-  // Hvis campaign mangler, returnér tomt → UI viser fejl-besked længere nede.
-  const { data: products, isLoading: productsLoading } = useQuery({
-    queryKey: ["campaign-products", activeBooking?.campaign?.id],
+  // Fetch products i to grupper:
+  //  1) Primær: produkter på bookingens egen kampagne (strengt — beskytter
+  //     Eesy gade/marked-skellet inden for samme klient).
+  //  2) Cross-client: produkter fra ANDRE klienter som sælgeren er tilknyttet
+  //     (employee_client_assignments). Bruges når flere klienter deler stand,
+  //     fx YouSee-sælger på en Eesy-marked-stand. Vi krydser ALDRIG inden for
+  //     samme klient — kun mellem klienter.
+  const { data: productGroups, isLoading: productsLoading } = useQuery({
+    queryKey: [
+      "campaign-products",
+      activeBooking?.campaign?.id,
+      activeBooking?.client?.id,
+      currentEmployee?.id,
+    ],
     queryFn: async () => {
-      if (!activeBooking?.campaign?.id) return [];
+      if (!activeBooking?.campaign?.id) return { primary: [], crossClient: [] };
 
-      const { data, error } = await supabase
+      // 1) Primær liste — uændret
+      const { data: primaryData, error: primaryErr } = await supabase
         .from("products")
         .select("id, name")
         .eq("client_campaign_id", activeBooking.campaign.id)
         .neq("name", "Lokation")
         .order("name");
-      if (error) throw error;
+      if (primaryErr) throw primaryErr;
 
-      const seen = new Set<string>();
-      return (data || []).filter((p) => {
-        if (seen.has(p.name)) return false;
-        seen.add(p.name);
+      const primarySeen = new Set<string>();
+      const primary = (primaryData || []).filter((p) => {
+        if (primarySeen.has(p.name)) return false;
+        primarySeen.add(p.name);
         return true;
       });
+
+      // 2) Cross-client — kræver sælger + booking.client
+      if (!currentEmployee?.id || !activeBooking?.client?.id) {
+        return { primary, crossClient: [] };
+      }
+
+      const { data: assignments, error: assignErr } = await supabase
+        .from("employee_client_assignments")
+        .select("client_id")
+        .eq("employee_id", currentEmployee.id);
+      if (assignErr) throw assignErr;
+
+      const otherClientIds = (assignments || [])
+        .map((a) => a.client_id)
+        .filter((id) => id && id !== activeBooking.client!.id);
+
+      if (otherClientIds.length === 0) {
+        return { primary, crossClient: [] };
+      }
+
+      // Find andre klienters kampagner
+      const { data: otherCampaigns, error: campErr } = await supabase
+        .from("client_campaigns")
+        .select("id, name")
+        .in("client_id", otherClientIds);
+      if (campErr) throw campErr;
+
+      const otherCampaignIds = (otherCampaigns || []).map((c) => c.id);
+      if (otherCampaignIds.length === 0) {
+        return { primary, crossClient: [] };
+      }
+      const campaignNameById = new Map(
+        (otherCampaigns || []).map((c) => [c.id, c.name as string]),
+      );
+
+      const { data: crossData, error: crossErr } = await supabase
+        .from("products")
+        .select("id, name, client_campaign_id")
+        .in("client_campaign_id", otherCampaignIds)
+        .neq("name", "Lokation")
+        .order("name");
+      if (crossErr) throw crossErr;
+
+      const crossSeen = new Set<string>();
+      const crossClient = (crossData || [])
+        .filter((p) => {
+          const key = `${p.client_campaign_id}:${p.name}`;
+          if (crossSeen.has(key)) return false;
+          crossSeen.add(key);
+          return true;
+        })
+        .map((p) => ({
+          id: p.id,
+          name: p.name,
+          campaignName: campaignNameById.get(p.client_campaign_id as string) ?? null,
+        }));
+
+      return { primary, crossClient };
     },
     enabled: !!activeBooking?.campaign?.id,
   });
 
+  const products = productGroups?.primary ?? [];
+  const crossClientProducts = productGroups?.crossClient ?? [];
+
   const bookingMissingCampaign = !!activeBooking && !activeBooking?.campaign?.id;
 
   const addProduct = (productId: string) => {
-    const product = products?.find((p) => p.id === productId);
+    const product =
+      products?.find((p) => p.id === productId) ||
+      crossClientProducts?.find((p) => p.id === productId);
     if (!product) return;
 
     const existing = productSelections.find((p) => p.productId === productId);
@@ -568,6 +640,73 @@ const SalesRegistration = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Cross-client produkter — andre klienter på samme stand */}
+        {crossClientProducts.length > 0 && (
+          <Card className="border-amber-500/30">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Tag className="h-4 w-4 text-amber-600" />
+                Andre klienter på standen
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Produkter fra andre klienter du er tilknyttet. Bruges når flere klienter deler samme stand.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {crossClientProducts.map((product) => {
+                  const quantity = getProductQuantity(product.id);
+                  return (
+                    <div
+                      key={product.id}
+                      className={`flex items-center justify-between p-3 rounded-lg border ${
+                        quantity > 0
+                          ? "border-primary bg-primary/5"
+                          : "border-border"
+                      }`}
+                    >
+                      <div className="flex-1">
+                        <span className="text-sm font-medium block">
+                          {product.name}
+                        </span>
+                        {product.campaignName && (
+                          <span className="text-xs text-muted-foreground">
+                            {product.campaignName}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => removeProduct(product.id)}
+                          disabled={quantity === 0}
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                        <span className="w-8 text-center font-medium">
+                          {quantity}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => addProduct(product.id)}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Submit button */}
         <Button

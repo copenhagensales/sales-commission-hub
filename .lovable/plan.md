@@ -1,31 +1,37 @@
-## Hvorfor 360 kr?
+## Bekræftet med dig
 
-Cassandra's 2 salg på Sindal Marked 15/5 har:
-- `client_campaign_id = Eesy marked` ✓ (fra gårsdagens fix)
-- `dialer_campaign_id = NULL` ✗
-- `matched_pricing_rule_id = NULL` ✗
+- YouSee har ingen marked-provision. Sælgerne skal bare kunne vælge "Yousee gaden"-produkter (440 kr base) når de står på en delt stand med Eesy.
+- Eesy gade/marked-skellet skal IKKE røres — det gælder kun internt i Eesy.
 
-Pricing-motoren slår op via `dialer_campaign_id → adversus_campaign_mappings` for at finde "Eesy marked"-reglen. Når den er NULL, falder den tilbage til base-prisen på produktet (Eesy uden første måned (Nuuday) = 360 kr). Markedsprisen burde være **295 kr**.
+## Evidens (verificeret)
 
-Det er præcis samme rod-årsag som vi fandt i går — men disse 8 salg blev ikke fanget i sidste batch fordi de allerede stod på "Eesy marked" og derfor ikke var i søgningen efter "gade"-salg.
-
-## Berørte salg (8 stk, 15/5)
-
-| Sælger | Plads | Produkt | Nu | Burde være |
-|---|---|---|---|---|
-| Cassandra Filippa Graves (×2) | Sindal | Nuuday | 360 kr | 295 kr |
-| Noa Tejdell Raba (×2) | Lillebælt 1 | IKKE Nuuday | 450 kr | 385 kr |
-| Martina Cubranovic (×1) | Lillebælt 1 | IKKE Nuuday | 450 kr | 385 kr |
-| Jonathan Goldschmidt (×3) | Lillebælt 2 | IKKE Nuuday | 450 kr | 385 kr |
-
-**Forventet effekt:** 2×(−65) + 6×(−65) = **−520 kr provision**
+- `client_campaigns` for YouSee: kun "Yousee gaden" og "Yousee Products" (TM). Ingen marked-kampagne.
+- 16 YouSee gaden-produkter, alle base 440 kr provision, **0 aktive pricing rules** → ingen marked-pris findes overhovedet.
+- `enrich_fm_sale`-trigger sætter `sales.client_campaign_id` ud fra **det valgte produkts** kampagne, ikke bookingens. → Et YouSee gaden-produkt valgt på en Eesy marked-booking afregnes som "Yousee gaden" 440 kr. Korrekt.
 
 ## Plan
 
-1. **UPDATE** `sales.dialer_campaign_id = 'manual-1766081582109'` for de 8 sale-IDs (filter: source=fieldmarketing, sale_datetime::date=2026-05-15, client_campaign_id=Eesy marked, matched_pricing_rule_id IS NULL via sale_items).
-2. **Kald** `rematch-pricing-rules` edge function for produkterne `a638c296…` (Nuuday) og `4ee2c0c6…` (IKKE Nuuday).
-3. **Verificér** at alle 8 sale_items har `matched_pricing_rule_id` sat og `mapped_commission = 295/385`.
+Kun frontend, kun `src/pages/vagt-flow/SalesRegistration.tsx`. Ingen DB-, trigger- eller pricing-motor-ændring.
 
-**Zone:** Rød (pricing-data). Samme bug-mønster som de foregående fixes.
+1. **Udvid produkt-query** (linje 253-274) så den henter to grupper:
+   - **Primær:** `WHERE client_campaign_id = booking.campaign.id` (uændret).
+   - **Cross-client:** `WHERE client_id IN (sælgerens tilknyttede klienter) AND client_id != booking.client_id`.
 
-Sig "kør" for at eksekvere.
+   Sælgerens klienter hentes via `employee_client_assignments` (samme kilde som `useEmployeeClientAssignments`).
+
+2. **Sikkerhedsregel i query:** cross-client-listen tilføjer ALDRIG produkter hvor `client_id = booking.client_id`. Det beskytter Eesy gade/marked — en Eesy-sælger kan ikke pludselig vælge Eesy gaden-produkt på en Eesy marked-booking via fallback.
+
+3. **UI:** to sektioner i produktvælgeren:
+   - "Produkter" (primær)
+   - "Andre klienter på standen" (cross-client) — kun synlig hvis listen ikke er tom.
+
+4. **Verificér efter deploy:**
+   - YouSee-sælger på Eesy marked-stand → ser Yousee gaden-produkter under "Andre klienter".
+   - Vælger ét → tjek `sales.client_campaign_id = 743980b0…` (Yousee gaden) og `mapped_commission = 440`.
+   - Eesy-sælger på Eesy marked-stand → ser KUN Eesy marked-produkter (uændret, ingen Eesy gaden via fallback).
+
+## Zone
+
+Gul. `SalesRegistration.tsx` er ikke i §4 rød zone. Pricing-motor og trigger røres ikke. Ramme-aftalen for "fix YouSee FM produktvalg" dækker filen.
+
+Sig "kør" så implementerer jeg.
