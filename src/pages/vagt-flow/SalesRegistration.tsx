@@ -641,6 +641,73 @@ const SalesRegistration = () => {
           </CardContent>
         </Card>
 
+        {/* Cross-client produkter — andre klienter på samme stand */}
+        {crossClientProducts.length > 0 && (
+          <Card className="border-amber-500/30">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Tag className="h-4 w-4 text-amber-600" />
+                Andre klienter på standen
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Produkter fra andre klienter du er tilknyttet. Bruges når flere klienter deler samme stand.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {crossClientProducts.map((product) => {
+                  const quantity = getProductQuantity(product.id);
+                  return (
+                    <div
+                      key={product.id}
+                      className={`flex items-center justify-between p-3 rounded-lg border ${
+                        quantity > 0
+                          ? "border-primary bg-primary/5"
+                          : "border-border"
+                      }`}
+                    >
+                      <div className="flex-1">
+                        <span className="text-sm font-medium block">
+                          {product.name}
+                        </span>
+                        {product.campaignName && (
+                          <span className="text-xs text-muted-foreground">
+                            {product.campaignName}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => removeProduct(product.id)}
+                          disabled={quantity === 0}
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                        <span className="w-8 text-center font-medium">
+                          {quantity}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => addProduct(product.id)}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Submit button */}
         <Button
           onClick={handleSubmit}
