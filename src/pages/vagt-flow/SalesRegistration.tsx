@@ -506,6 +506,16 @@ const SalesRegistration = () => {
           <CardContent>
             {productsLoading ? (
               <p className="text-muted-foreground text-sm">Henter produkter...</p>
+            ) : bookingMissingCampaign ? (
+              <div className="flex items-start gap-2 p-3 rounded-lg border border-destructive/30 bg-destructive/5">
+                <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                <div className="text-sm text-destructive">
+                  <p className="font-medium">Bookingen mangler kampagne</p>
+                  <p className="text-destructive/80 mt-0.5">
+                    Kontakt din leder — bookingen skal have en kampagne tilknyttet, før der kan registreres salg (ellers kan prisen blive forkert).
+                  </p>
+                </div>
+              </div>
             ) : !products || products.length === 0 ? (
               <div className="flex items-center gap-2 p-3 rounded-lg border border-destructive/30 bg-destructive/5">
                 <AlertCircle className="h-5 w-5 text-destructive" />
