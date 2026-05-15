@@ -246,86 +246,34 @@ const SalesRegistration = () => {
     },
   });
 
-  // Fetch products based on the campaign from active booking
+  // Fetch products based on the campaign from active booking.
+  // STRENGT: vi kræver booking.campaign_id — ellers kan sælgeren se blandet
+  // produktliste (fx Eesy Gaden + Eesy Marked) og ende med forkert pris.
+  // Hvis campaign mangler, returnér tomt → UI viser fejl-besked længere nede.
   const { data: products, isLoading: productsLoading } = useQuery({
-    queryKey: ["campaign-products", activeBooking?.campaign?.id, activeBooking?.brand?.name, activeBooking?.client?.id],
+    queryKey: ["campaign-products", activeBooking?.campaign?.id],
     queryFn: async () => {
-      // If booking has a direct campaign_id, use it
-      if (activeBooking?.campaign?.id) {
-        const { data, error } = await supabase
-          .from("products")
-          .select("id, name")
-          .eq("client_campaign_id", activeBooking.campaign.id)
-          .neq("name", "Lokation")
-          .order("name");
-        if (error) throw error;
-        
-        const seen = new Set<string>();
-        return (data || []).filter((p) => {
-          if (seen.has(p.name)) return false;
-          seen.add(p.name);
-          return true;
-        });
-      }
-      
-      // Fallback 1: search by brand name if no campaign_id
-      if (activeBooking?.brand?.name) {
-        const { data: campaigns } = await supabase
-          .from("client_campaigns")
-          .select("id, name")
-          .ilike("name", `%${activeBooking.brand.name}%`);
-        
-        if (campaigns && campaigns.length > 0) {
-          const campaignIds = campaigns.map(c => c.id);
-          
-          const { data, error } = await supabase
-            .from("products")
-            .select("id, name")
-            .in("client_campaign_id", campaignIds)
-            .neq("name", "Lokation")
-            .order("name");
-          if (error) throw error;
-          
-          const seen = new Set<string>();
-          return (data || []).filter((p) => {
-            if (seen.has(p.name)) return false;
-            seen.add(p.name);
-            return true;
-          });
-        }
-      }
-      
-      // Fallback 2: search by client_id if no campaign or brand
-      if (activeBooking?.client?.id) {
-        const { data: campaigns } = await supabase
-          .from("client_campaigns")
-          .select("id")
-          .eq("client_id", activeBooking.client.id);
-        
-        if (campaigns && campaigns.length > 0) {
-          const campaignIds = campaigns.map(c => c.id);
-          
-          const { data, error } = await supabase
-            .from("products")
-            .select("id, name")
-            .in("client_campaign_id", campaignIds)
-            .neq("name", "Lokation")
-            .order("name");
-          if (error) throw error;
-          
-          const seen = new Set<string>();
-          return (data || []).filter((p) => {
-            if (seen.has(p.name)) return false;
-            seen.add(p.name);
-            return true;
-          });
-        }
-      }
-      
-      return [];
+      if (!activeBooking?.campaign?.id) return [];
+
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, name")
+        .eq("client_campaign_id", activeBooking.campaign.id)
+        .neq("name", "Lokation")
+        .order("name");
+      if (error) throw error;
+
+      const seen = new Set<string>();
+      return (data || []).filter((p) => {
+        if (seen.has(p.name)) return false;
+        seen.add(p.name);
+        return true;
+      });
     },
-    enabled: !!(activeBooking?.campaign?.id || activeBooking?.brand?.name || activeBooking?.client?.id),
+    enabled: !!activeBooking?.campaign?.id,
   });
+
+  const bookingMissingCampaign = !!activeBooking && !activeBooking?.campaign?.id;
 
   const addProduct = (productId: string) => {
     const product = products?.find((p) => p.id === productId);
