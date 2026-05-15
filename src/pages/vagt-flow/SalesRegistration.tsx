@@ -246,114 +246,35 @@ const SalesRegistration = () => {
     },
   });
 
-  // Streng brand-separation:
-  //  - Sælgerens brand bestemmes af is_primary=true i employee_client_assignments
-  //    (fx Eesy FM ELLER Yousee — ikke begge).
-  //  - Hvis bookingens klient = sælgerens primære klient → vis bookingens produkter.
-  //  - Hvis bookingens klient ≠ sælgerens primære klient (delt stand) → vis KUN
-  //    sælgerens egne brand-produkter under "Andre klienter på standen".
-  //  - Sælgere kan ALDRIG registrere salg på et brand de ikke er tilknyttet primært.
-  const { data: productGroups, isLoading: productsLoading } = useQuery({
-    queryKey: [
-      "campaign-products",
-      activeBooking?.campaign?.id,
-      activeBooking?.client?.id,
-      currentEmployee?.id,
-    ],
+  // Hent produkter for bookingens kampagne. Hvis bookingen mangler kampagne,
+  // returneres en tom liste — UI viser så en advarsel om at lederen skal
+  // udfylde booking. Korrekt brand bestemmes 100% af bookingen.
+  const { data: products, isLoading: productsLoading } = useQuery({
+    queryKey: ["campaign-products", activeBooking?.campaign?.id],
     queryFn: async () => {
-      if (!activeBooking?.campaign?.id || !activeBooking?.client?.id) {
-        return { primary: [], crossClient: [] };
-      }
-
-      // Find sælgerens primære klient
-      let primaryClientId: string | null = null;
-      if (currentEmployee?.id) {
-        const { data: primaryAssign, error: primAssignErr } = await supabase
-          .from("employee_client_assignments")
-          .select("client_id")
-          .eq("employee_id", currentEmployee.id)
-          .eq("is_primary", true)
-          .maybeSingle();
-        if (primAssignErr) throw primAssignErr;
-        primaryClientId = primaryAssign?.client_id ?? null;
-      }
-
-      // Hvis ingen primær klient er sat: fald tilbage til bookingens egen klient
-      // (dvs. tidligere standardadfærd — ingen cross-client).
-      const sellerBrandClientId = primaryClientId ?? activeBooking.client.id;
-      const sellerOwnsBookingClient = sellerBrandClientId === activeBooking.client.id;
-
-      if (sellerOwnsBookingClient) {
-        // Sælger er på sin egen klients booking → vis bookingens kampagne-produkter
-        const { data: primaryData, error: primaryErr } = await supabase
-          .from("products")
-          .select("id, name")
-          .eq("client_campaign_id", activeBooking.campaign.id)
-          .neq("name", "Lokation")
-          .order("name");
-        if (primaryErr) throw primaryErr;
-
-        const seen = new Set<string>();
-        const primary = (primaryData || []).filter((p) => {
-          if (seen.has(p.name)) return false;
-          seen.add(p.name);
-          return true;
-        });
-        return { primary, crossClient: [] };
-      }
-
-      // Delt stand: sælger er på en ANDEN klients booking
-      // → vis kun produkter fra sælgerens egen brand-klient
-      const { data: ownCampaigns, error: campErr } = await supabase
-        .from("client_campaigns")
-        .select("id, name")
-        .eq("client_id", sellerBrandClientId);
-      if (campErr) throw campErr;
-
-      const ownCampaignIds = (ownCampaigns || []).map((c) => c.id);
-      if (ownCampaignIds.length === 0) {
-        return { primary: [], crossClient: [] };
-      }
-      const campaignNameById = new Map(
-        (ownCampaigns || []).map((c) => [c.id, c.name as string]),
-      );
-
-      const { data: crossData, error: crossErr } = await supabase
+      if (!activeBooking?.campaign?.id) return [];
+      const { data, error } = await supabase
         .from("products")
-        .select("id, name, client_campaign_id")
-        .in("client_campaign_id", ownCampaignIds)
+        .select("id, name")
+        .eq("client_campaign_id", activeBooking.campaign.id)
         .neq("name", "Lokation")
         .order("name");
-      if (crossErr) throw crossErr;
+      if (error) throw error;
 
       const seen = new Set<string>();
-      const crossClient = (crossData || [])
-        .filter((p) => {
-          const key = `${p.client_campaign_id}:${p.name}`;
-          if (seen.has(key)) return false;
-          seen.add(key);
-          return true;
-        })
-        .map((p) => ({
-          id: p.id,
-          name: p.name,
-          campaignName: campaignNameById.get(p.client_campaign_id as string) ?? null,
-        }));
-
-      return { primary: [], crossClient };
+      return (data || []).filter((p) => {
+        if (seen.has(p.name)) return false;
+        seen.add(p.name);
+        return true;
+      });
     },
-    enabled: !!activeBooking?.campaign?.id && !!activeBooking?.client?.id,
+    enabled: !!activeBooking?.campaign?.id,
   });
-
-  const products = productGroups?.primary ?? [];
-  const crossClientProducts = productGroups?.crossClient ?? [];
 
   const bookingMissingCampaign = !!activeBooking && !activeBooking?.campaign?.id;
 
   const addProduct = (productId: string) => {
-    const product =
-      products?.find((p) => p.id === productId) ||
-      crossClientProducts?.find((p) => p.id === productId);
+    const product = products?.find((p) => p.id === productId);
     if (!product) return;
 
     const existing = productSelections.find((p) => p.productId === productId);
@@ -646,72 +567,6 @@ const SalesRegistration = () => {
           </CardContent>
         </Card>
 
-        {/* Cross-client produkter — andre klienter på samme stand */}
-        {crossClientProducts.length > 0 && (
-          <Card className="border-amber-500/30">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Tag className="h-4 w-4 text-amber-600" />
-                Andre klienter på standen
-              </CardTitle>
-              <p className="text-xs text-muted-foreground">
-                Produkter fra andre klienter du er tilknyttet. Bruges når flere klienter deler samme stand.
-              </p>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {crossClientProducts.map((product) => {
-                  const quantity = getProductQuantity(product.id);
-                  return (
-                    <div
-                      key={product.id}
-                      className={`flex items-center justify-between p-3 rounded-lg border ${
-                        quantity > 0
-                          ? "border-primary bg-primary/5"
-                          : "border-border"
-                      }`}
-                    >
-                      <div className="flex-1">
-                        <span className="text-sm font-medium block">
-                          {product.name}
-                        </span>
-                        {product.campaignName && (
-                          <span className="text-xs text-muted-foreground">
-                            {product.campaignName}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => removeProduct(product.id)}
-                          disabled={quantity === 0}
-                        >
-                          <Minus className="h-4 w-4" />
-                        </Button>
-                        <span className="w-8 text-center font-medium">
-                          {quantity}
-                        </span>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => addProduct(product.id)}
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Submit button */}
         <Button
