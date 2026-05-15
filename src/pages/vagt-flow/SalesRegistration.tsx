@@ -298,11 +298,25 @@ const SalesRegistration = () => {
         return { primary, crossClient: [] };
       }
 
+      // Find andre klienters kampagner
+      const { data: otherCampaigns, error: campErr } = await supabase
+        .from("client_campaigns")
+        .select("id, name")
+        .in("client_id", otherClientIds);
+      if (campErr) throw campErr;
+
+      const otherCampaignIds = (otherCampaigns || []).map((c) => c.id);
+      if (otherCampaignIds.length === 0) {
+        return { primary, crossClient: [] };
+      }
+      const campaignNameById = new Map(
+        (otherCampaigns || []).map((c) => [c.id, c.name as string]),
+      );
+
       const { data: crossData, error: crossErr } = await supabase
         .from("products")
-        .select("id, name, client_id, client_campaign_id, client_campaigns!inner(name)")
-        .in("client_id", otherClientIds)
-        .neq("client_id", activeBooking.client.id)
+        .select("id, name, client_campaign_id")
+        .in("client_campaign_id", otherCampaignIds)
         .neq("name", "Lokation")
         .order("name");
       if (crossErr) throw crossErr;
@@ -318,7 +332,7 @@ const SalesRegistration = () => {
         .map((p) => ({
           id: p.id,
           name: p.name,
-          campaignName: (p.client_campaigns as any)?.name ?? null,
+          campaignName: campaignNameById.get(p.client_campaign_id as string) ?? null,
         }));
 
       return { primary, crossClient };
