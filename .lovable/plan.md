@@ -1,30 +1,31 @@
-## Endelig plan — godkendt scope
+## Hvorfor 360 kr?
 
-**Trin 1 — Ret booking (1 række):**
-- UPDATE `booking c05bc7bd-a246-442b-8664-24be4967b5ff` (Ganløse Kræmmermarked plads 2, 8–10/5) → `campaign_id = 0835d092-2504-43e4-b818-55d4dd7ddedb` (Eesy marked).
+Cassandra's 2 salg på Sindal Marked 15/5 har:
+- `client_campaign_id = Eesy marked` ✓ (fra gårsdagens fix)
+- `dialer_campaign_id = NULL` ✗
+- `matched_pricing_rule_id = NULL` ✗
 
-**Trin 2 — Ret 26 salg (`client_campaign_id` → Eesy marked):**
+Pricing-motoren slår op via `dialer_campaign_id → adversus_campaign_mappings` for at finde "Eesy marked"-reglen. Når den er NULL, falder den tilbage til base-prisen på produktet (Eesy uden første måned (Nuuday) = 360 kr). Markedsprisen burde være **295 kr**.
 
-| Dato | Location | Antal salg |
-|---|---|---|
-| 8/5 | Ganløse Kræmmermarked (plads 2) | 2 |
-| 9/5 | Ganløse Kræmmermarked (plads 2) | 7 |
-| 10/5 | Ganløse Kræmmermarked (plads 2) | 5 |
-| 15/5 | Lillebælt Marked (plads 1) | 7 |
-| 15/5 | Lillebælt Marked (plads 2) | 5 |
-| **Total** | | **26** |
+Det er præcis samme rod-årsag som vi fandt i går — men disse 8 salg blev ikke fanget i sidste batch fordi de allerede stod på "Eesy marked" og derfor ikke var i søgningen efter "gade"-salg.
 
-Filter: `source='fieldmarketing'` AND `(raw_payload->>'fm_location_id')::uuid` IN de 3 location-IDs AND `client_campaign_id IN ('eesy FM Gaden Products'-id, 'Eesy gaden'-id)` AND `sale_datetime` i de relevante datointervaller.
+## Berørte salg (8 stk, 15/5)
 
-**Trin 3 — Rematch pricing:**
-- Kald `rematch-pricing-rules` edge function (uden filter, så alle 26 sale_items genberegnes med marked-priser: 295/385 kr).
+| Sælger | Plads | Produkt | Nu | Burde være |
+|---|---|---|---|---|
+| Cassandra Filippa Graves (×2) | Sindal | Nuuday | 360 kr | 295 kr |
+| Noa Tejdell Raba (×2) | Lillebælt 1 | IKKE Nuuday | 450 kr | 385 kr |
+| Martina Cubranovic (×1) | Lillebælt 1 | IKKE Nuuday | 450 kr | 385 kr |
+| Jonathan Goldschmidt (×3) | Lillebælt 2 | IKKE Nuuday | 450 kr | 385 kr |
 
-**Trin 4 — Verifikation:**
-- Kør samme audit-query som ovenfor → bekræft at INGEN markeds-locations 4–15/5 har gade-kampagne længere.
-- Rapportér ny provi-sum pr. dato + difference.
+**Forventet effekt:** 2×(−65) + 6×(−65) = **−520 kr provision**
 
-**Forventet samlet effekt:** ~26 salg × ~65 kr provi-reduktion ≈ **−1.700 kr i provi** der korrekt afregnes som markedssalg i stedet for gadesalg.
+## Plan
 
-**Zone:** Rød (pricing-data + booking). Ramme-aftale dækker sammen-hængende fix af samme bug-mønster fra i går.
+1. **UPDATE** `sales.dialer_campaign_id = 'manual-1766081582109'` for de 8 sale-IDs (filter: source=fieldmarketing, sale_datetime::date=2026-05-15, client_campaign_id=Eesy marked, matched_pricing_rule_id IS NULL via sale_items).
+2. **Kald** `rematch-pricing-rules` edge function for produkterne `a638c296…` (Nuuday) og `4ee2c0c6…` (IKKE Nuuday).
+3. **Verificér** at alle 8 sale_items har `matched_pricing_rule_id` sat og `mapped_commission = 295/385`.
 
-Klar til at køre. Bekræft med "kør" eller "ja".
+**Zone:** Rød (pricing-data). Samme bug-mønster som de foregående fixes.
+
+Sig "kør" for at eksekvere.
