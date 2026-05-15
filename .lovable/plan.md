@@ -1,37 +1,43 @@
-## Bekræftet med dig
+# Plan: Rul tilbage og gør kampagne obligatorisk på booking
 
-- YouSee har ingen marked-provision. Sælgerne skal bare kunne vælge "Yousee gaden"-produkter (440 kr base) når de står på en delt stand med Eesy.
-- Eesy gade/marked-skellet skal IKKE røres — det gælder kun internt i Eesy.
+## Hvad jeg fandt
 
-## Evidens (verificeret)
+**SalesRegistration.tsx** — mine to ændringer (cross-client fallback + is_primary-filter) skal væk. Pricing-rule-rettelserne ligger i DB-tabellen `product_pricing_rules` (separat migration), ikke i denne fil. Revert er sikkert.
 
-- `client_campaigns` for YouSee: kun "Yousee gaden" og "Yousee Products" (TM). Ingen marked-kampagne.
-- 16 YouSee gaden-produkter, alle base 440 kr provision, **0 aktive pricing rules** → ingen marked-pris findes overhovedet.
-- `enrich_fm_sale`-trigger sætter `sales.client_campaign_id` ud fra **det valgte produkts** kampagne, ikke bookingens. → Et YouSee gaden-produkt valgt på en Eesy marked-booking afregnes som "Yousee gaden" 440 kr. Korrekt.
+**Booking-creation:** Kun ét sted opretter `booking`-rækker direkte (`BookWeekContent.tsx:229`) — det har ALLEREDE hard guard mod manglende kampagne.
+
+**Booking-edit:** `EditBookingDialog.tsx:1077` validerer ALLEREDE at kampagne er udfyldt før save.
+
+**DB-status:** `booking.campaign_id` er `nullable`, og **132 historiske bookinger har NULL**. Det er hullet — UI er fint, men DB tillader stadig huller (fx via direkte SQL eller fremtidige nye flows).
 
 ## Plan
 
-Kun frontend, kun `src/pages/vagt-flow/SalesRegistration.tsx`. Ingen DB-, trigger- eller pricing-motor-ændring.
+### Trin 1 — Revert SalesRegistration.tsx
+Reset linje 249-341 og 348 og 644-720 tilbage til original adfærd:
+- Én simpel `useQuery` der kun henter produkter på `client_campaign_id = booking.campaign.id`
+- `addProduct` bruger kun `products` (ingen crossClientProducts)
+- Slet "Andre klienter på standen"-kortet helt
 
-1. **Udvid produkt-query** (linje 253-274) så den henter to grupper:
-   - **Primær:** `WHERE client_campaign_id = booking.campaign.id` (uændret).
-   - **Cross-client:** `WHERE client_id IN (sælgerens tilknyttede klienter) AND client_id != booking.client_id`.
+### Trin 2 — Ryd 132 NULL-bookinger
+Migration der auto-udfylder `campaign_id` på eksisterende NULL-rækker via `location.client_campaign_mapping[client_id]` (samme logik som `BookWeekContent.tsx:209-210` bruger ved oprettelse). Rækker der ikke kan auto-mappes (manglende mapping) → log dem til dig som CSV via en SELECT, så du selv kan rette dem manuelt FØR vi går videre.
 
-   Sælgerens klienter hentes via `employee_client_assignments` (samme kilde som `useEmployeeClientAssignments`).
+**Vigtigt:** Trin 3 kører IKKE før alle 132 er fixet. Ellers fejler NOT NULL-migrationen.
 
-2. **Sikkerhedsregel i query:** cross-client-listen tilføjer ALDRIG produkter hvor `client_id = booking.client_id`. Det beskytter Eesy gade/marked — en Eesy-sælger kan ikke pludselig vælge Eesy gaden-produkt på en Eesy marked-booking via fallback.
+### Trin 3 — DB NOT NULL constraint
+Når 0 rækker har NULL: migration der sætter `ALTER TABLE booking ALTER COLUMN campaign_id SET NOT NULL`. Derefter er det fysisk umuligt at oprette booking uden kampagne — uanset hvilket flow eller direkte SQL.
 
-3. **UI:** to sektioner i produktvælgeren:
-   - "Produkter" (primær)
-   - "Andre klienter på standen" (cross-client) — kun synlig hvis listen ikke er tom.
-
-4. **Verificér efter deploy:**
-   - YouSee-sælger på Eesy marked-stand → ser Yousee gaden-produkter under "Andre klienter".
-   - Vælger ét → tjek `sales.client_campaign_id = 743980b0…` (Yousee gaden) og `mapped_commission = 440`.
-   - Eesy-sælger på Eesy marked-stand → ser KUN Eesy marked-produkter (uændret, ingen Eesy gaden via fallback).
+### Trin 4 — Lille UI-stramning (valgfri)
+I `EditBookingDialog` og `BookWeekContent` — udskift `toast.error("Vælg venligst en kampagne")` med en rød border + inline fejltekst på selve felt-rækken, så det er umuligt at overse. (Begge steder har allerede `border-destructive` — bare at gøre den mere prominent.)
 
 ## Zone
+- **Trin 1 (revert):** Gul → grøn (UI revert, original adfærd).
+- **Trin 2 (auto-fill 132 rækker):** Gul (data-update på `booking`, ikke rød zone-tabel).
+- **Trin 3 (NOT NULL):** Gul (skema-ændring på `booking`).
+- **Trin 4 (UI stramning):** Grøn.
 
-Gul. `SalesRegistration.tsx` er ikke i §4 rød zone. Pricing-motor og trigger røres ikke. Ramme-aftalen for "fix YouSee FM produktvalg" dækker filen.
+## Hvad jeg har brug for fra dig
+1. **Bekræft revert** af SalesRegistration.tsx (mister "Andre klienter"-kortet helt — det er den oprindelige adfærd).
+2. **Bekræft trin 2-strategien:** auto-fyld via `location.client_campaign_mapping` + CSV til dig over rækker der ikke kan mappes. Eller foretrækker du at se de 132 rækker FØRST og selv beslutte?
+3. **Trin 4 (UI-stramning) — ja eller nej?** Det er ikke strengt nødvendigt da DB-constraint i trin 3 alligevel garanterer det.
 
-Sig "kør" så implementerer jeg.
+Sig til så kører jeg.
