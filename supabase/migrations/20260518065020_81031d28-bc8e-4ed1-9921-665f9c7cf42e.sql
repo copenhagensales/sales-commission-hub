@@ -1,0 +1,1 @@
+ALTER TABLE public.pulse_surveys DROP CONSTRAINT IF EXISTS pulse_surveys_year_month_key;

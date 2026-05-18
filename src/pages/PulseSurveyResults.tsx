@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useAllPulseSurveys, usePulseSurveyResults, useActivatePulseSurvey } from "@/hooks/usePulseSurvey";
+import { useAllPulseSurveys, usePulseSurveyResults, useActivatePulseSurvey, useDeactivatePulseSurvey, useActivePulseSurvey } from "@/hooks/usePulseSurvey";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer } from "recharts";
@@ -168,6 +168,8 @@ export default function PulseSurveyResults() {
   const [selectedTeamId, setSelectedTeamId] = useState<string>('all');
   const { data: responses, isLoading: responsesLoading } = usePulseSurveyResults(selectedSurveyId);
   const activateSurvey = useActivatePulseSurvey();
+  const deactivateSurvey = useDeactivatePulseSurvey();
+  const { data: activeSurvey } = useActivePulseSurvey();
   const [linkCopied, setLinkCopied] = useState(false);
 
   // Template editing
@@ -284,15 +286,29 @@ export default function PulseSurveyResults() {
   }, [surveys]);
 
   const handleActivateSurvey = async () => {
+    if (activeSurvey) {
+      const ok = window.confirm(
+        'Der er allerede en aktiv pulsmåling for denne måned. Hvis du fortsætter, lukkes den nuværende og en NY startes (besvarelser bevares som separat runde). Vil du fortsætte?'
+      );
+      if (!ok) return;
+    }
     try {
       await activateSurvey.mutateAsync();
-      toast.success('Pulsmåling aktiveret for denne måned');
+      toast.success('Ny pulsmåling aktiveret. Del linket med medarbejderne.');
     } catch (error: any) {
-      if (error.code === '23505') {
-        toast.error('Der findes allerede en pulsmåling for denne måned');
-      } else {
-        toast.error('Kunne ikke aktivere pulsmåling');
-      }
+      toast.error(error?.message || 'Kunne ikke aktivere pulsmåling');
+    }
+  };
+
+  const handleDeactivateSurvey = async () => {
+    if (!activeSurvey) return;
+    const ok = window.confirm('Luk den aktive pulsmåling? Besvarelser bevares — medarbejdere kan bare ikke længere udfylde den.');
+    if (!ok) return;
+    try {
+      await deactivateSurvey.mutateAsync(activeSurvey.id);
+      toast.success('Pulsmåling lukket');
+    } catch (error: any) {
+      toast.error(error?.message || 'Kunne ikke lukke pulsmåling');
     }
   };
 
@@ -317,9 +333,18 @@ export default function PulseSurveyResults() {
               <FlaskConical className="h-4 w-4 mr-2" />
               Test pulsmåling
             </Button>
+            {activeSurvey && (
+              <Button
+                variant="destructive"
+                onClick={handleDeactivateSurvey}
+                disabled={deactivateSurvey.isPending}
+              >
+                Luk aktiv pulsmåling
+              </Button>
+            )}
             <Button onClick={handleActivateSurvey} disabled={activateSurvey.isPending}>
               <Plus className="h-4 w-4 mr-2" />
-              Aktiver ny pulsmåling
+              {activeSurvey ? 'Start ny pulsmåling' : 'Aktiver ny pulsmåling'}
             </Button>
           </div>
         </div>

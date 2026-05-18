@@ -1,25 +1,55 @@
 ## Mål
-Flyt 34 Eesy-salg fra "Eesy gaden" til "Eesy marked" og kør rematch, så commission falder fra 360/450 → 295/385.
+Du styrer selv hvornår en pulsmåling starter og stopper. Knappen virker altid. Systemet opretter ikke længere selv en undersøgelse d. 15. hver måned.
 
-## Scope
-Kun salg i lønperioden 15. apr – 14. maj 2026 hvor:
-- Produkt = "Eesy uden første måned (Nuuday)" eller "(IKKE Nuuday)"
-- `mapped_commission` = 360 eller 450
-- Sælger var booket samme dag på et marked-location under campaign `0835d092` (Eesy marked)
+## Hvad jeg gør
 
-## Berørte sælgere
-fasc (11), oscj (7), jmek (6), jubj (4), thes (4), kond (2) — i alt 34 salg, ~2.210 kr overbetaling.
+### 1. Luk den nuværende maj-pulsmåling
+Sætter `is_active = false` på maj-undersøgelsen (id `d5d0a842…`). De 12 besvarelser bevares — de er stadig synlige i resultater-visningen, men menupunktet/popup'en forsvinder for medarbejderne.
 
-## Trin
-1. **UPDATE** `sales.client_campaign_id = '0835d092-2504-43e4-b818-55d4dd7ddedb'` for de 34 salg som matcher kriterierne (gade-takst + booket på marked).
-2. **Kør rematch** via `rematch-pricing-rules` edge function for de 34 sale_ids → `mapped_commission` opdateres til 295/385.
-3. **Verificér** at alle 34 nu står med 295 eller 385.
-4. **Rapportér** ny overbetaling per sælger (forventet: 0 kr).
+### 2. Slå auto-aktivering fra
+Slår cron-jobbet `activate-pulse-survey-monthly` (kører 09:00 d. 15.) fra. Fra nu af opretter systemet ALDRIG selv en pulsmåling.
 
-## Ikke i scope (separat opgave)
-- Hvorfor allerede-marked-salg fik 360/450 (pricing-regel matcher ikke som forventet — undersøges i trin 2 fra forrige besked).
-- Eventuel manuel lønjustering — sker automatisk ved næste sync når `mapped_commission` er korrekt.
+### 3. Tillad flere pulsmålinger pr. måned (migration)
+Database har i dag `UNIQUE (year, month)` på `pulse_surveys`. Det skal fjernes — ellers kan du ikke starte en ny i samme måned hvis du allerede har lukket én.
 
-## Risici
-- Rød zone (pricing/løn). Ramme-aftale: brugeren har eksplicit bedt om at køre trin 1.
-- Salgene rører `sale_items.mapped_commission` (rød zone tabel) — men dette er præcis det rematch-funktionen er bygget til.
+### 4. Gør knappen "Aktiver ny pulsmåling" funktionel
+Ny logik i `useActivatePulseSurvey` (`src/hooks/usePulseSurvey.ts`):
+- Deaktiverer ALLE eksisterende aktive pulsmålinger for indeværende måned (sikkerhedsnet — der bør kun være én).
+- Indsætter en ny række med `is_active = true` for nuværende `year/month`.
+- Invaliderer cache så UI'et opdaterer.
+
+`useActivePulseSurvey` ændres til `order by created_at desc limit 1` så vi altid får den nyeste aktive.
+
+### 5. Tilføj "Luk aktiv pulsmåling"-knap i UI
+I `src/pages/PulseSurveyResults.tsx` ved siden af de eksisterende knapper:
+- Hvis der findes en aktiv undersøgelse for indeværende måned → vis rød "Luk aktiv pulsmåling"-knap der sætter `is_active = false`.
+- "Aktiver ny pulsmåling" får tooltip/bekræftelse hvis der allerede er en aktiv (advarsel om at den nuværende lukkes).
+
+## Hvad du efterfølgende gør
+1. Tryk "Aktiver ny pulsmåling" når du vil starte en ny runde.
+2. Kopiér `https://sales-sync-pay.lovable.app/survey`-linket fra siden og send det ud (Teams/mail).
+3. Når du er færdig med en runde, tryk "Luk aktiv pulsmåling".
+
+## Tekniske detaljer
+
+**Migration:**
+```sql
+ALTER TABLE public.pulse_surveys DROP CONSTRAINT pulse_surveys_year_month_key;
+```
+
+**Data-ændringer (via insert-værktøj):**
+```sql
+UPDATE public.pulse_surveys SET is_active = false 
+  WHERE id = 'd5d0a842-4409-421a-8926-9c6ef04d95c1';
+
+SELECT cron.unschedule('activate-pulse-survey-monthly');
+```
+
+**Edge function `activate-pulse-survey`** beholdes uberørt (ingen kalder den efter cron er væk — kan ryddes op senere).
+
+**Filer berørt:**
+- `src/hooks/usePulseSurvey.ts` — ny aktiverings-logik + ny `useDeactivatePulseSurvey`-hook + opdater `useActivePulseSurvey`
+- `src/pages/PulseSurveyResults.tsx` — tilføj luk-knap, opdater aktivér-knap med confirm-dialog
+
+## Risiko
+Lav. Kun pulsmålings-flowet røres. Eksisterende besvarelser og maj-undersøgelsens data slettes ikke.
