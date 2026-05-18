@@ -168,6 +168,8 @@ export default function PulseSurveyResults() {
   const [selectedTeamId, setSelectedTeamId] = useState<string>('all');
   const { data: responses, isLoading: responsesLoading } = usePulseSurveyResults(selectedSurveyId);
   const activateSurvey = useActivatePulseSurvey();
+  const deactivateSurvey = useDeactivatePulseSurvey();
+  const { data: activeSurvey } = useActivePulseSurvey();
   const [linkCopied, setLinkCopied] = useState(false);
 
   // Template editing
