@@ -39,6 +39,8 @@ export function useActivePulseSurvey() {
         .eq('year', year)
         .eq('month', month)
         .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (error && error.code !== 'PGRST116') throw error;
