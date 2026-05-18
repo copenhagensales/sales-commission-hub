@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useAllPulseSurveys, usePulseSurveyResults, useActivatePulseSurvey } from "@/hooks/usePulseSurvey";
+import { useAllPulseSurveys, usePulseSurveyResults, useActivatePulseSurvey, useDeactivatePulseSurvey, useActivePulseSurvey } from "@/hooks/usePulseSurvey";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer } from "recharts";
