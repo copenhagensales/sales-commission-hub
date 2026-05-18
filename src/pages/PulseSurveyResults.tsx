@@ -286,15 +286,29 @@ export default function PulseSurveyResults() {
   }, [surveys]);
 
   const handleActivateSurvey = async () => {
+    if (activeSurvey) {
+      const ok = window.confirm(
+        'Der er allerede en aktiv pulsmåling for denne måned. Hvis du fortsætter, lukkes den nuværende og en NY startes (besvarelser bevares som separat runde). Vil du fortsætte?'
+      );
+      if (!ok) return;
+    }
     try {
       await activateSurvey.mutateAsync();
-      toast.success('Pulsmåling aktiveret for denne måned');
+      toast.success('Ny pulsmåling aktiveret. Del linket med medarbejderne.');
     } catch (error: any) {
-      if (error.code === '23505') {
-        toast.error('Der findes allerede en pulsmåling for denne måned');
-      } else {
-        toast.error('Kunne ikke aktivere pulsmåling');
-      }
+      toast.error(error?.message || 'Kunne ikke aktivere pulsmåling');
+    }
+  };
+
+  const handleDeactivateSurvey = async () => {
+    if (!activeSurvey) return;
+    const ok = window.confirm('Luk den aktive pulsmåling? Besvarelser bevares — medarbejdere kan bare ikke længere udfylde den.');
+    if (!ok) return;
+    try {
+      await deactivateSurvey.mutateAsync(activeSurvey.id);
+      toast.success('Pulsmåling lukket');
+    } catch (error: any) {
+      toast.error(error?.message || 'Kunne ikke lukke pulsmåling');
     }
   };
 
