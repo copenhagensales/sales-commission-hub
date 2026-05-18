@@ -333,9 +333,18 @@ export default function PulseSurveyResults() {
               <FlaskConical className="h-4 w-4 mr-2" />
               Test pulsmåling
             </Button>
+            {activeSurvey && (
+              <Button
+                variant="destructive"
+                onClick={handleDeactivateSurvey}
+                disabled={deactivateSurvey.isPending}
+              >
+                Luk aktiv pulsmåling
+              </Button>
+            )}
             <Button onClick={handleActivateSurvey} disabled={activateSurvey.isPending}>
               <Plus className="h-4 w-4 mr-2" />
-              Aktiver ny pulsmåling
+              {activeSurvey ? 'Start ny pulsmåling' : 'Aktiver ny pulsmåling'}
             </Button>
           </div>
         </div>
