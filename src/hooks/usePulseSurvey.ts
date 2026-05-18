@@ -348,7 +348,9 @@ export function useDeletePulseSurveyDraft() {
   });
 }
 
-// Hook to manually activate a survey (for testing or admin)
+// Hook to manually activate a new pulse survey for the current month.
+// Deactivates any existing active surveys for the current month first (safety net),
+// then inserts a new active row. Works even if a closed survey already exists.
 export function useActivatePulseSurvey() {
   const queryClient = useQueryClient();
 
@@ -358,18 +360,43 @@ export function useActivatePulseSurvey() {
       const year = now.getFullYear();
       const month = now.getMonth() + 1;
 
+      // Deactivate any active surveys for this month (should be 0 or 1)
+      const { error: deactivateError } = await supabase
+        .from('pulse_surveys')
+        .update({ is_active: false })
+        .eq('year', year)
+        .eq('month', month)
+        .eq('is_active', true);
+
+      if (deactivateError) throw deactivateError;
+
       const { data, error } = await supabase
         .from('pulse_surveys')
-        .insert({
-          year,
-          month,
-          is_active: true
-        })
+        .insert({ year, month, is_active: true })
         .select()
         .single();
 
       if (error) throw error;
       return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pulse-surveys-all'] });
+      queryClient.invalidateQueries({ queryKey: ['pulse-survey-active'] });
+    }
+  });
+}
+
+// Hook to deactivate (close) a pulse survey. Responses are preserved.
+export function useDeactivatePulseSurvey() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (surveyId: string) => {
+      const { error } = await supabase
+        .from('pulse_surveys')
+        .update({ is_active: false })
+        .eq('id', surveyId);
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pulse-surveys-all'] });
