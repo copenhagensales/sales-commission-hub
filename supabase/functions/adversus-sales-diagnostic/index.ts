@@ -149,10 +149,12 @@ Deno.serve(async (req) => {
       integration: { id: integration.id, name: integration.name },
       filter: { days, leadId, phone, campaignId },
       totals: { rawSalesFetched: allSales.length, pages: pageStats },
+      debug: { firstUrl: debugFirstUrl, firstBody: debugFirstBody },
       byCampaign,
       matches,
       leadDetails,
     });
+
   } catch (err) {
     return json({ error: (err as Error).message }, 500);
   }
