@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
     const pageStats: { page: number; count: number; status: number }[] = [];
 
     while (hasMore && page <= maxPages) {
-      const url = `${baseUrl}/v1/sales?pageSize=${pageSize}&page=${page}&filters=${filterStr}`;
+      const url = `${baseUrl}/sales?pageSize=${pageSize}&page=${page}&filters=${filterStr}`;
       const res = await fetch(url, { headers: { Authorization: auth } });
       pageStats.push({ page, count: 0, status: res.status });
       if (!res.ok) {
