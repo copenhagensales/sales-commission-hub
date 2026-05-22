@@ -75,8 +75,8 @@ Deno.serve(async (req) => {
         break;
       }
       const data = await res.json();
-      const sales = data.sales || [];
-      if (page === 1) debugFirstBody = JSON.stringify(data).slice(0, 500);
+      const sales = Array.isArray(data) ? data : (data.sales || []);
+      if (page === 1) debugFirstBody = "";
       pageStats[pageStats.length - 1].count = sales.length;
       allSales.push(...sales);
       if (sales.length < pageSize) hasMore = false;
