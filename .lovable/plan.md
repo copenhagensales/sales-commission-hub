@@ -1,55 +1,42 @@
-## Mål
-Du styrer selv hvornår en pulsmåling starter og stopper. Knappen virker altid. Systemet opretter ikke længere selv en undersøgelse d. 15. hver måned.
+# Plan: Få salg fra "Tjenestetorvet - Premium" (Adversus-kampagne 114001) ind i systemet
 
-## Hvad jeg gør
+## Rod-årsag (kort)
 
-### 1. Luk den nuværende maj-pulsmåling
-Sætter `is_active = false` på maj-undersøgelsen (id `d5d0a842…`). De 12 besvarelser bevares — de er stadig synlige i resultater-visningen, men menupunktet/popup'en forsvinder for medarbejderne.
+Salgene findes i Adversus på campaign id `114001` ("Tjenestetorvet - Premium"). De kommer ikke ind i Stork fordi der ikke findes nogen række i `adversus_campaign_mappings` med `adversus_campaign_id = '114001'`. Integration-engine henter selve salget fra Adversus, men uden mapping får sale'n ingen `client_campaign_id` → ingen klient-attribution, ingen pricing, ingen provision.
 
-### 2. Slå auto-aktivering fra
-Slår cron-jobbet `activate-pulse-survey-monthly` (kører 09:00 d. 15.) fra. Fra nu af opretter systemet ALDRIG selv en pulsmåling.
+Vi løser det uden at hardkode `114001` nogen steder. Vi bruger den eksisterende oprettelses-UI i MgTest, og bagefter triggerer vi en backfill via den eksisterende safe-backfill UI.
 
-### 3. Tillad flere pulsmålinger pr. måned (migration)
-Database har i dag `UNIQUE (year, month)` på `pulse_surveys`. Det skal fjernes — ellers kan du ikke starte en ny i samme måned hvis du allerede har lukket én.
+## Hvad vi gør
 
-### 4. Gør knappen "Aktiver ny pulsmåling" funktionel
-Ny logik i `useActivatePulseSurvey` (`src/hooks/usePulseSurvey.ts`):
-- Deaktiverer ALLE eksisterende aktive pulsmålinger for indeværende måned (sikkerhedsnet — der bør kun være én).
-- Indsætter en ny række med `is_active = true` for nuværende `year/month`.
-- Invaliderer cache så UI'et opdaterer.
+1. **Opret mapping via eksisterende UI (ingen kodeændring).**
+   I MgTest → fanen "Kampagner" → "Opret kampagne":
+   - Navn: `Tjenestetorvet - Premium`
+   - Klient: Eesy TM (samme klient som de øvrige Tjenestetorvet-kampagner kører under)
+   - Externt ID: `114001`
+   Dette inserter både en `client_campaigns`-række og en `adversus_campaign_mappings`-række med `adversus_campaign_id = '114001'`. Ingen ny kode, ingen konstant.
 
-`useActivePulseSurvey` ændres til `order by created_at desc limit 1` så vi altid får den nyeste aktive.
+2. **Verificér pricing-dækning.**
+   Tjek at de produkter der sælges på kampagnen er dækket af eksisterende `product_pricing_rules`. Hvis en regel har `campaign_mapping_ids` sat (include-mode) og 114001 ikke er med, skal mappingen tilføjes på reglen via MgTest → produkt → "Pricing-regler". Universelle regler (ingen `campaign_mapping_ids`) matcher automatisk.
 
-### 5. Tilføj "Luk aktiv pulsmåling"-knap i UI
-I `src/pages/PulseSurveyResults.tsx` ved siden af de eksisterende knapper:
-- Hvis der findes en aktiv undersøgelse for indeværende måned → vis rød "Luk aktiv pulsmåling"-knap der sætter `is_active = false`.
-- "Aktiver ny pulsmåling" får tooltip/bekræftelse hvis der allerede er en aktiv (advarsel om at den nuværende lukkes).
+3. **Backward sync via eksisterende UI.**
+   Settings → Dialer Integrations → Adversus/Eesy TM-integrationen → "Sync date range" → kør safe-backfill fra første kendte salgsdato på kampagnen (Christoffer Forman havde et salg 22.05.2026 kl. 10:41) → i dag. Dette puller historiske salg fra Adversus, mapper dem mod den nye `client_campaign_id`, og kører pricing-match.
 
-## Hvad du efterfølgende gør
-1. Tryk "Aktiver ny pulsmåling" når du vil starte en ny runde.
-2. Kopiér `https://sales-sync-pay.lovable.app/survey`-linket fra siden og send det ud (Teams/mail).
-3. Når du er færdig med en runde, tryk "Luk aktiv pulsmåling".
+4. **Rematch pricing (hvis trin 3 ikke gør det automatisk).**
+   Hvis salgene kommer ind uden mapped provision/revenue: kør "Rematch pricing rules" fra MgTest på de berørte produkter.
 
-## Tekniske detaljer
+5. **Verificér i Sales Overview / dagsrapport for 22.05.2026** at Christoffer Formans manglende salg på `1006478073` nu fremgår.
 
-**Migration:**
-```sql
-ALTER TABLE public.pulse_surveys DROP CONSTRAINT pulse_surveys_year_month_key;
-```
+## Hvad vi IKKE gør
 
-**Data-ændringer (via insert-værktøj):**
-```sql
-UPDATE public.pulse_surveys SET is_active = false 
-  WHERE id = 'd5d0a842-4409-421a-8926-9c6ef04d95c1';
-
-SELECT cron.unschedule('activate-pulse-survey-monthly');
-```
-
-**Edge function `activate-pulse-survey`** beholdes uberørt (ingen kalder den efter cron er væk — kan ryddes op senere).
-
-**Filer berørt:**
-- `src/hooks/usePulseSurvey.ts` — ny aktiverings-logik + ny `useDeactivatePulseSurvey`-hook + opdater `useActivePulseSurvey`
-- `src/pages/PulseSurveyResults.tsx` — tilføj luk-knap, opdater aktivér-knap med confirm-dialog
+- Vi tilføjer ikke `114001` som konstant i nogen `.ts`-fil.
+- Vi rører ikke `EesyTmAdapter`, `pricing-service.ts`, `permissionKeys.ts` eller andre rød zone-filer.
+- Vi laver ingen migrations.
+- Vi opretter ingen ny UI — alt findes allerede (MgTest "Opret kampagne" + Settings "Sync date range").
 
 ## Risiko
-Lav. Kun pulsmålings-flowet røres. Eksisterende besvarelser og maj-undersøgelsens data slettes ikke.
+
+Grøn. Ren data-indtastning + brug af eksisterende safe-backfill (budget-aware). Ingen kodeændring.
+
+## Åbent spørgsmål før vi går videre
+
+Er Eesy TM den rigtige klient til "Tjenestetorvet - Premium", eller skal den ligge under en anden klient (fx ny "Tjenestetorvet Premium"-klient eller eksisterende Tjenestetorvet-klient hvis sådan en findes)? Dette afgør valg af klient i trin 1 og kan ikke gættes — se Bibel §7.
