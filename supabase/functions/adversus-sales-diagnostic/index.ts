@@ -61,22 +61,29 @@ Deno.serve(async (req) => {
     let hasMore = true;
     const pageStats: { page: number; count: number; status: number }[] = [];
 
+    let debugFirstUrl = "";
+    let debugFirstBody = "";
     while (hasMore && page <= maxPages) {
       const url = `${baseUrl}/sales?pageSize=${pageSize}&page=${page}&filters=${filterStr}`;
-      const res = await fetch(url, { headers: { Authorization: auth } });
+      if (page === 1) debugFirstUrl = url;
+      const res = await fetch(url, { headers: { Authorization: auth, "Content-Type": "application/json" } });
       pageStats.push({ page, count: 0, status: res.status });
       if (!res.ok) {
+        const t = await res.text();
+        if (page === 1) debugFirstBody = t.slice(0, 500);
         pageStats[pageStats.length - 1].count = -1;
         break;
       }
       const data = await res.json();
       const sales = data.sales || [];
+      if (page === 1) debugFirstBody = JSON.stringify(data).slice(0, 500);
       pageStats[pageStats.length - 1].count = sales.length;
       allSales.push(...sales);
       if (sales.length < pageSize) hasMore = false;
       else page++;
       await new Promise((r) => setTimeout(r, 200));
     }
+
 
     // Build per-campaign counts (overall + by state)
     const byCampaign: Record<string, { total: number; states: Record<string, number> }> = {};
