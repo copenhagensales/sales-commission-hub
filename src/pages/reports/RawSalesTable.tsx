@@ -12,6 +12,8 @@ interface RawRow {
   employee_name: string;
   sale_datetime: string;
   product_name: string;
+  campaign_name: string | null;
+  location_name: string | null;
   quantity: number;
   commission: number;
   revenue: number;
@@ -63,6 +65,8 @@ export function RawSalesTable({ data, isLoading, isError, error }: RawSalesTable
             <TableHead className="sticky left-0 bg-background z-10">Dato</TableHead>
             <TableHead>Medarbejder</TableHead>
             <TableHead>Produkt</TableHead>
+            <TableHead>Kampagne</TableHead>
+            <TableHead>Lokation</TableHead>
             <TableHead className="text-right">Antal</TableHead>
             <TableHead className="text-right">Provision (DKK)</TableHead>
             <TableHead className="text-right">Revenue (DKK)</TableHead>
@@ -89,6 +93,8 @@ export function RawSalesTable({ data, isLoading, isError, error }: RawSalesTable
               </TableCell>
               <TableCell className="whitespace-nowrap">{r.employee_name}</TableCell>
               <TableCell className="whitespace-nowrap">{r.product_name}</TableCell>
+              <TableCell className="whitespace-nowrap">{r.campaign_name ?? ""}</TableCell>
+              <TableCell className="whitespace-nowrap">{r.location_name ?? ""}</TableCell>
               <TableCell className="text-right">{r.quantity}</TableCell>
               <TableCell className="text-right">
                 {Math.round(Number(r.commission ?? 0)).toLocaleString("da-DK")}

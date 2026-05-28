@@ -45,6 +45,8 @@ interface RawRow {
   employee_name: string;
   sale_datetime: string;
   product_name: string;
+  campaign_name: string | null;
+  location_name: string | null;
   quantity: number;
   commission: number;
   revenue: number;
@@ -190,6 +192,8 @@ export default function ReportsManagement() {
       Dato: r.sale_datetime ? new Date(r.sale_datetime).toLocaleString("da-DK") : "",
       Medarbejder: r.employee_name ?? "",
       Produkt: r.product_name ?? "",
+      Kampagne: r.campaign_name ?? "",
+      Lokation: r.location_name ?? "",
       Antal: r.quantity ?? 1,
       "Provision (DKK)": Math.round(Number(r.commission ?? 0)),
       "Revenue (DKK)": Math.round(Number(r.revenue ?? 0)),
@@ -204,7 +208,7 @@ export default function ReportsManagement() {
       `${clientLabel.toLowerCase().replace(/\s+/g, "-")}-salg-${periodLabel}.xlsx`,
       [
         { name: "Opsummering", rows: summaryRows, columnWidths: summaryWidths },
-        { name: "Rådata", rows: rawRows, columnWidths: [20, 25, 20, 8, 14, 14, 14, 20, 12, 18, 18] },
+        { name: "Rådata", rows: rawRows, columnWidths: [20, 25, 20, 22, 22, 8, 14, 14, 14, 20, 12, 18, 18] },
       ]
     );
   };
