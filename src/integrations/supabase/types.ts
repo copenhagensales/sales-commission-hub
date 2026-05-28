@@ -14376,11 +14376,13 @@ export type Database = {
             Args: { p_client_id: string; p_end: string; p_start: string }
             Returns: {
               adversus_opp_number: string
+              campaign_name: string
               commission: number
               customer_company: string
               customer_phone: string
               employee_name: string
               internal_reference: string
+              location_name: string
               product_name: string
               quantity: number
               revenue: number
@@ -14392,17 +14394,19 @@ export type Database = {
             Args: {
               p_client_id: string
               p_end: string
-              p_limit?: number
-              p_offset?: number
+              p_limit: number
+              p_offset: number
               p_start: string
             }
             Returns: {
               adversus_opp_number: string
+              campaign_name: string
               commission: number
               customer_company: string
               customer_phone: string
               employee_name: string
               internal_reference: string
+              location_name: string
               product_name: string
               quantity: number
               revenue: number
