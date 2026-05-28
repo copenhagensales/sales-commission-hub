@@ -1,22 +1,27 @@
-## Plan: Safe-backfill på Eesy TM (kampagne 114001)
+## Kontekst
 
-### Hvad
-Kør `safe-backfill` på `integration-engine` for Eesy TM-integrationen for at hente evt. manglende salg de seneste 14 dage — inkl. nyligt åbnet kampagne 114001 (Tjenestetorvet Premium).
+Adgang til Adversus-kampagne 114001 (Eesy TM) blev givet tirsdag 26/5. Vi har allerede kørt en 14-dages backfill i dag uden at finde nye salg ud over det ene fra 28/5. Spørgsmålet er om Adversus API'et nu (efter adgang er givet) returnerer historiske salg fra før 26/5, eller om adgangen kun gælder fremadrettet.
 
-### Hvordan
-Kald edge function `integration-engine` med:
-- `action: "safe-backfill"`
-- `integration_id: fe87f6eb-dc6a-4209-9a47-d84054381452` (Eesy TM, provider: adversus)
-- `from: 2026-05-14`
-- `to: 2026-05-28`
-- `datasets: ["sales"]`
-- `background: true`
+## Plan
 
-Køres som ren tool-invocation via `supabase--curl_edge_functions` — ingen kodeændringer.
+1. **Kør udvidet backfill: 90 dage tilbage** på Eesy TM-integrationen (`fe87f6eb-dc6a-4209-9a47-d84054381452`)
+   - `action: "safe-backfill"`, `datasets: ["sales"]`, `from: 2026-02-27`, `to: 2026-05-28`, `background: true`
+   - Idempotent — rører ikke eksisterende salg på andre kampagner
 
-### Efter kørsel
-Genkør samme dags-aggregat på `sales`-tabellen filtreret på `dialer_campaign_id = '114001'` for at se om nye dage/salg er kommet ind.
+2. **Vent ~60 sek** og tjek `integration_logs` for status/fejl
 
-### Forbehold
-- Hvis Eesy endnu ikke har givet integrationen læseadgang til kampagnen, returnerer Adversus ingen rækker for 114001 — backfill fejler ikke, men finder bare 0 nye salg.
-- Backfill rammer hele Eesy TM (ikke kun kampagne 114001); andre kampagner upserts idempotent og påvirker ikke historik.
+3. **Verificér resultat** med to queries på `sales` filtreret på `dialer_campaign_id = '114001'`:
+   - Antal salg pr. uge de sidste 90 dage
+   - Specifik check på det kendte salg fra 22/5 (Emne-ID 1006478073, telefon 42415580)
+
+4. **Konkludér**:
+   - Hvis flere salg dukker op → vi har nu komplet historik, og Mathias kan se hvor langt tilbage Adversus rakte
+   - Hvis stadig kun salget fra 28/5 → Adversus giver kun adgang fra adgangstidspunktet og frem. Så skal Eesy enten genåbne historikken eller levere data manuelt (CSV-eksport fra deres side)
+
+## Hvad jeg IKKE rører
+
+- Ingen ændringer i pricing, sale_items, mappings eller andre integrationer
+- Ingen ændringer i koden — kun edge function-kald + read queries
+- Andre kampagner upsertes idempotent og påvirkes ikke
+
+Skal jeg køre det?
