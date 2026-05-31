@@ -2,7 +2,6 @@ import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChevronDown } from "lucide-react";
 
 export interface MultiOption {
@@ -84,7 +83,7 @@ export function MultiSelectFilter({
               )}
             </div>
           )}
-          <ScrollArea className="max-h-[280px] pr-2">
+          <div className="max-h-[360px] overflow-y-auto pr-2">
             <div className="space-y-1">
               {visibleOptions.length === 0 && (
                 <div className="text-sm text-muted-foreground p-2">Ingen valgmuligheder</div>
@@ -106,7 +105,7 @@ export function MultiSelectFilter({
                 </div>
               ))}
             </div>
-          </ScrollArea>
+          </div>
         </PopoverContent>
       </Popover>
     </div>
