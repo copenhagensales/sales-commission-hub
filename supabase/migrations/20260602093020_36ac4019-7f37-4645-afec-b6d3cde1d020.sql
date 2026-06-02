@@ -1,0 +1,1 @@
+DELETE FROM public.danish_holiday WHERE name = 'Grundlovsdag';
