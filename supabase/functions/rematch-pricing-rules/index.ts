@@ -421,6 +421,7 @@ serve(async (req) => {
         source,
         raw_payload,
         dialer_campaign_id,
+        client_campaign_id,
         sale_datetime
       )
     `;
@@ -577,8 +578,13 @@ serve(async (req) => {
     console.log(`[rematch-pricing-rules] Loaded ${productsMap.size} products with base prices for fallback`);
 
     // Get unique campaign IDs and fetch their mapping IDs
+    // For dialer-driven sales (Adversus/Enreach) we map via dialer_campaign_id -> adversus_campaign_id.
+    // For Field Marketing sales there is no dialer_campaign_id; the campaign is stored as client_campaign_id
+    // and adversus_campaign_mappings has a client_campaign_id FK we can resolve directly.
     const campaignIds = [...new Set(saleItems.map((si: any) => (si.sales as any)?.dialer_campaign_id).filter(Boolean))];
+    const clientCampaignIds = [...new Set(saleItems.map((si: any) => (si.sales as any)?.client_campaign_id).filter(Boolean))];
     const campaignMappingsMap = new Map<string, string>();
+    const clientCampaignMappingsMap = new Map<string, string>();
 
     if (campaignIds.length > 0) {
       const { data: campaignMappings } = await supabase
@@ -592,6 +598,23 @@ serve(async (req) => {
         }
       }
     }
+
+    if (clientCampaignIds.length > 0) {
+      const { data: clientMappings } = await supabase
+        .from("adversus_campaign_mappings")
+        .select("id, client_campaign_id")
+        .in("client_campaign_id", clientCampaignIds);
+
+      if (clientMappings) {
+        for (const mapping of clientMappings) {
+          if (mapping.client_campaign_id) {
+            clientCampaignMappingsMap.set(mapping.client_campaign_id, mapping.id);
+          }
+        }
+      }
+    }
+    
+
 
     // Process each sale_item
     const updates: { id: string; product_id: string; matched_pricing_rule_id: string | null; mapped_commission: number; mapped_revenue: number; needs_mapping: boolean; display_name: string | null }[] = [];
@@ -693,9 +716,12 @@ serve(async (req) => {
         console.log(`[rematch-pricing-rules] Product corrected for item ${item.id}: ${originalProductId} → ${correctProductId}`);
       }
 
-      // Get campaign mapping ID
+      // Get campaign mapping ID — prefer dialer-driven mapping, fall back to FM client_campaign mapping
       const campaignId = (item.sales as any)?.dialer_campaign_id;
-      const campaignMappingId = campaignId ? campaignMappingsMap.get(campaignId) : null;
+      const clientCampaignId = (item.sales as any)?.client_campaign_id;
+      const campaignMappingId = (campaignId ? campaignMappingsMap.get(campaignId) : null)
+        ?? (clientCampaignId ? clientCampaignMappingsMap.get(clientCampaignId) : null)
+        ?? null;
 
       // Get sale date for date-based rule filtering
       const saleDate = sale?.sale_datetime || null;
