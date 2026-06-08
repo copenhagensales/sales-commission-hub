@@ -17,7 +17,12 @@ function categorizeProduct(name: string): ProductCategory | null {
   const lower = name.toLowerCase();
   if (lower.includes("fri tale")) return "mobile_voice";
   if (lower.includes("mbb") || lower.includes("mobilt bredbånd") || lower.includes("mobilt bredbaand")) return "mobilt_bredbaand";
-  if (lower.includes("switch") || lower.includes("omstillingsbruger") || lower.includes("professional") || lower.includes("contact center")) return "switch";
+  if (
+    lower.includes("contact center") ||
+    lower.includes("professionel omstilling") ||
+    lower.includes("unlimited") ||
+    lower.includes("omstilling til brugere")
+  ) return "switch";
   return null;
 }
 
