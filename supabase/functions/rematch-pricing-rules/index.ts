@@ -611,7 +611,7 @@ serve(async (req) => {
             clientCampaignMappingsMap.set(mapping.client_campaign_id, mapping.id);
           }
         }
-      }
+    console.log(`[rematch-pricing-rules] FM mapping debug: clientCampaignIds=${clientCampaignIds.length}, resolved=${clientCampaignMappingsMap.size}, sample=${JSON.stringify([...clientCampaignMappingsMap.entries()].slice(0,3))}`);
     }
 
     // Process each sale_item
