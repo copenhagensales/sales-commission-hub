@@ -714,9 +714,12 @@ serve(async (req) => {
         console.log(`[rematch-pricing-rules] Product corrected for item ${item.id}: ${originalProductId} → ${correctProductId}`);
       }
 
-      // Get campaign mapping ID
+      // Get campaign mapping ID — prefer dialer-driven mapping, fall back to FM client_campaign mapping
       const campaignId = (item.sales as any)?.dialer_campaign_id;
-      const campaignMappingId = campaignId ? campaignMappingsMap.get(campaignId) : null;
+      const clientCampaignId = (item.sales as any)?.client_campaign_id;
+      const campaignMappingId = (campaignId ? campaignMappingsMap.get(campaignId) : null)
+        ?? (clientCampaignId ? clientCampaignMappingsMap.get(clientCampaignId) : null)
+        ?? null;
 
       // Get sale date for date-based rule filtering
       const saleDate = sale?.sale_datetime || null;
