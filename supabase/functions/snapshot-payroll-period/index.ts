@@ -1,10 +1,9 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getPayrollPeriod, getPreviousPayrollPeriod, toDateString } from "../_shared/date-helpers.ts";
+import { requireCronOrOwner, sharedCorsHeaders } from "../_shared/auth.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const corsHeaders = sharedCorsHeaders;
+
 
 function formatValue(value: number, category: string): string {
   if (category === "revenue" || category === "commission") {
@@ -86,9 +85,9 @@ Deno.serve(async (req) => {
   const startTime = Date.now();
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const auth = await requireCronOrOwner(req);
+    if (auth instanceof Response) return auth;
+    const supabase = auth.svc;
 
     // Parse request body for optional overrides
     let body: any = {};
