@@ -14545,6 +14545,7 @@ export type Database = {
         Args: { p_employee_id: string }
         Returns: number
       }
+      record_tv_board_heartbeat: { Args: { p_id: string }; Returns: undefined }
       remove_role_by_email: { Args: { _email: string }; Returns: undefined }
       rollback_cancellation_import: {
         Args: { p_import_id: string }
@@ -14625,6 +14626,28 @@ export type Database = {
       verify_internal_cron_secret: {
         Args: { _token: string }
         Returns: boolean
+      }
+      verify_tv_board_code: {
+        Args: { p_code: string }
+        Returns: {
+          access_count: number
+          auto_rotate: boolean
+          celebration_duration: number
+          celebration_effect: string
+          celebration_enabled: boolean
+          celebration_metric: string
+          celebration_source_dashboard: string
+          celebration_text: string
+          celebration_trigger_condition: string
+          dashboard_slug: string
+          dashboard_slugs: string[]
+          expires_at: string
+          id: string
+          is_active: boolean
+          rotate_interval_seconds: number
+          rotate_intervals_per_dashboard: Json
+          start_fullscreen: boolean
+        }[]
       }
     }
     Enums: {

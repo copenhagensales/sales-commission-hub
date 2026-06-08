@@ -46,19 +46,18 @@ export default function TvBoardView() {
         return;
       }
 
-      const { data, error } = await supabase
-        .from("tv_board_access")
-        .select("id, dashboard_slug, is_active")
-        .eq("access_code", storedCode)
-        .eq("is_active", true)
-        .single();
+      const { data, error } = await supabase.rpc("verify_tv_board_code", {
+        p_code: storedCode,
+      });
 
-      if (error || !data || data.dashboard_slug !== slug) {
+      const row = Array.isArray(data) ? data[0] : data;
+      if (error || !row || row.dashboard_slug !== slug) {
         sessionStorage.removeItem("tv_board_code");
         sessionStorage.removeItem("tv_board_slug");
         navigate(`/tv?returnTo=${slug}`);
         return;
       }
+
 
       setIsVerified(true);
       setLoading(false);

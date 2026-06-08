@@ -29,11 +29,12 @@ Erstat `USING(true)` med `is_manager_or_above(auth.uid())`:
 - `integration_circuit_breaker` (kun service_role)
 - `kpi_watermarks` (kun service_role)
 
-### Batch 3 — Publikt læsbare data fjernes
-- `kpi_cached_values` + `kpi_leaderboard_cache`: drop `USING(true)` SELECT; krav `authenticated`. TV-board flow skal validere kode server-side via edge function i stedet for direkte tabel-read.
-- `tv_board_access`: drop public SELECT; lav RPC `verify_tv_board_code(code text) returns dashboard_config` (SECURITY DEFINER, returnerer kun match). Opdaterer `useTvBoardConfig` til at bruge RPC.
-- `integration_debug_log`: restrict ALL til service_role + owner.
-- Peer-data via `is_in_my_teams` på `absence_request_v2`, `career_wishes`, `car_quiz_submissions`, `car_quiz_completions`, `code_of_conduct_attempts`: skift til team-leader-or-above.
+### Batch 3 — Publikt læsbare data fjernes ✅ KØRT
+- `kpi_cached_values` + `kpi_leaderboard_cache`: SELECT kræver nu `authenticated`.
+- `tv_board_access`: anon SELECT/UPDATE droppet. Ny `verify_tv_board_code(code)` + `record_tv_board_heartbeat(id)` RPC (SECURITY DEFINER) håndterer offentlig TV-board adgang uden at eksponere hele tabellen. Frontend (`useTvBoardConfig`, `TvBoardLogin`, `TvBoardView`) bruger nu RPC.
+- `integration_debug_log`: `ALL USING(true)` erstattet med service_role-only write.
+- Peer-data: "Team members can view..." droppet på `absence_request_v2`, `career_wishes`, `car_quiz_submissions`, `car_quiz_completions`, `code_of_conduct_attempts`. Kun selv + teamleder + ejer kan se.
+
 
 ### Batch 4 — Storage buckets privatiseres
 - `chat-attachments`: bucket → private, SELECT-policy kræver medlem af `chat_conversation_members`.

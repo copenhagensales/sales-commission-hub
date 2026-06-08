@@ -96,65 +96,39 @@ export function useTvBoardConfig(accessCode: string | undefined) {
     }
 
     try {
-      const { data, error } = await supabase
-        .from("tv_board_access")
-        .select(
-          `
-            id,
-            dashboard_slug,
-            dashboard_slugs,
-            is_active,
-            access_count,
-            auto_rotate,
-            rotate_interval_seconds,
-            rotate_intervals_per_dashboard,
-            celebration_enabled,
-            celebration_effect,
-            celebration_duration,
-            celebration_trigger_condition,
-            celebration_text,
-            celebration_metric,
-            celebration_source_dashboard,
-            start_fullscreen,
-            expires_at
-          `
-        )
-        .eq("access_code", normalizedCode)
-        .maybeSingle();
+      const { data, error } = await supabase.rpc("verify_tv_board_code", {
+        p_code: normalizedCode,
+      });
 
       if (error) {
         const transient = isLikelyTransient(error);
         if (transient) {
           setTransientError("Midlertidig forbindelsesfejl – forsøger igen …");
-          // Keep last known good tvData if we have it
           scheduleNextRefresh(false);
           setLoading(false);
           return;
         }
 
-        // Non-transient: treat as hard error (but keep UI message generic)
         setHardError({ reason: "invalid", message: "Ugyldig eller inaktiv adgangskode" });
         setLoading(false);
         return;
       }
 
-      // No row -> invalid
-      if (!data) {
+      const row = Array.isArray(data) ? data[0] : data;
+      if (!row) {
         setHardError({ reason: "invalid", message: "Ugyldig eller inaktiv adgangskode" });
         setLoading(false);
         return;
       }
 
-      // Inactive
-      if (!data.is_active) {
+      if (!row.is_active) {
         setHardError({ reason: "inactive", message: "Linket er deaktiveret" });
         setLoading(false);
         return;
       }
 
-      // Expired (if feature is used)
-      if ((data as any).expires_at) {
-        const expiresAt = new Date((data as any).expires_at);
+      if ((row as any).expires_at) {
+        const expiresAt = new Date((row as any).expires_at);
         if (!Number.isNaN(expiresAt.getTime()) && expiresAt.getTime() < Date.now()) {
           setHardError({ reason: "expired", message: "Linket er udløbet" });
           setLoading(false);
@@ -162,7 +136,7 @@ export function useTvBoardConfig(accessCode: string | undefined) {
         }
       }
 
-      setTvData(data as TvBoardData);
+      setTvData(row as TvBoardData);
       setHardError(null);
       setTransientError(null);
       setLoading(false);
@@ -171,15 +145,9 @@ export function useTvBoardConfig(accessCode: string | undefined) {
       const now = Date.now();
       if (now - lastHeartbeatRef.current > HEARTBEAT_INTERVAL) {
         lastHeartbeatRef.current = now;
-        supabase
-          .from("tv_board_access")
-          .update({
-            last_accessed_at: new Date().toISOString(),
-            access_count: (data.access_count || 0) + 1,
-          })
-          .eq("id", data.id)
-          .then(); // fire-and-forget
+        supabase.rpc("record_tv_board_heartbeat", { p_id: row.id }).then();
       }
+
 
       scheduleNextRefresh(true);
     } catch (e) {
