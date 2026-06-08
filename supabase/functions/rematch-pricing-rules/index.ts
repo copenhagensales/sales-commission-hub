@@ -421,6 +421,7 @@ serve(async (req) => {
         source,
         raw_payload,
         dialer_campaign_id,
+        client_campaign_id,
         sale_datetime
       )
     `;
