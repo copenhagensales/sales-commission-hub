@@ -1,49 +1,67 @@
-## Mål
+## Hvad jeg fandt på tværs af Eesy FM + Yousee FM
 
-Lukke pricing-hullet i indeværende lønperiode (15/5–14/6) ved at oprette de manglende "NY provision" (+10%) og "Ny tilskud" (20%) regler for alle Relatel-produkter undtagen MBB, og derefter rematche `sale_items` så `mapped_commission` opdateres bagudrettet.
+Kørt en sammenligning af `mapped_commission` på alle FM sale_items siden 15/5 mod den kampagne-specifikke regel der burde have matchet (`adversus_campaign_mappings` → `product_pricing_rules`).
 
-## Reglerne (bekræftet formel)
+**Resultat:**
 
-- **NY provision** = `products.commission_dkk × 1,10` — gælder ALLE Relatel-produkter UNDTAGEN MBB. `effective_from = 2026-05-15`, `priority = 0`, ingen `conditions`.
-- **Ny tilskud** = `(base × 1,10) + (gammelt_tilskud_beløb × 0,20)`, hvor `gammelt_tilskud_beløb = (gammel_tilskud_comm − base) / 0,125` — gælder ALLE Relatel-produkter INKL. MBB (hvis et gammelt tilskud findes). `effective_from = 2026-05-15`, `priority = 0`, `conditions = {Tilskud: 0%}`.
-- Revenue uændret (kopieres fra gammel regel eller `products.revenue_dkk`).
+| Kampagne | Items med forkert pris | Samlet overbetaling |
+|---|---|---|
+| Eesy marked | **395** | **25.675 kr** |
+| Eesy gaden | 0 | 0 |
+| eesy FM Gaden Products | 0 | 0 |
+| Yousee gaden | 0 | 0 |
 
-## Omfang (foreløbig)
+Yousee gaden har ingen kampagne-specifikke regler (priser = base 440 kr på alle Fri-produkter) — derfor intet problem dér.
 
-Indenfor Relatel-kampagner med salg i 2026:
+Eesy gaden har regler der koincidentielt = base-pris (360/450) — derfor heller intet problem.
 
-- ~20+ produkter mangler "NY provision" — inkluderer de 7 du listede plus flere (Bruger +MV, Contact Center, Datadeling-varianter, ATL FULD PRIS-varianter, 5 GB / 5 Timer, Omstillingsbruger, Switch-varianter).
-- ~6 produkter mangler "Ny tilskud" men har gammel tilskud-regel (Fri Tale 60 BTL #2/#5, 1000 BTL #3, 2000 BTL #3, m.fl.).
-- **Switch Professionel ATL**: gammel regel "tilskud normalt" (priority 5) slår nye regler fordi de ikke findes. Skal også have NY provision + Ny tilskud.
+**Eesy marked er den eneste kampagne hvor de specifikke regler er LAVERE end base**, og det er præcis dér overbetalingen sker. Top 5 ramte sælgere:
 
-## Plan
+| Sælger | Overbetaling |
+|---|---|
+| mech@ (Melissa) | 5.395 kr |
+| saro@ | 4.485 kr |
+| jubj@ | 2.275 kr |
+| thes@ (Theo) | 1.885 kr |
+| nore@ | 1.820 kr |
 
-### Trin 1 — Generér konkret regel-liste til godkendelse
-SQL der lister hver foreslået ny regel (produkt, gammel base, ny comm, evt. ny tilskud comm, kilde-regel). Du gennemgår listen og bekræfter inden indsættelse. Især vigtigt for produkter hvor `gammel_tilskud_comm == base` (betyder reelt 0 kr tilskud — ny tilskud-regel ikke nødvendig).
+(+ ~20 andre sælgere med mindre beløb)
 
-### Trin 2 — Migration der indsætter reglerne
-Én migration der `INSERT`'er alle godkendte regler i `product_pricing_rules` med `effective_from='2026-05-15'`, `is_active=true`, `priority=0`. Skriver også til `pricing_rule_history` via eksisterende trigger.
+## Spor A — Rematch (fjerner overbetalingen)
 
-### Trin 3 — Kør `rematch-pricing-rules` edge function
-Genberegner `mapped_commission` og `mapped_revenue` på alle `sale_items` for salg i indeværende lønperiode (15/5 og frem). Bruger eksisterende infrastruktur — ingen kodeændring.
+Kald `rematch-pricing-rules` edge function målrettet de 395 ramte sale_items. Tre måder at scope det på (vælger den sidste — mest sikker):
 
-### Trin 4 — Verifikation
-Genkør Silas-summen: skal stige fra 19.344 kr mod ca. 20.180 kr du regnede manuelt. Hvis tallet stadig afviger: identificér konkrete salg hvor regel ikke matchede.
+1. ❌ Hele lønperioden 15/5+ — for stort scope, ramler i `WORKER_RESOURCE_LIMIT` som vi så tidligere.
+2. ❌ Hele FM-source 15/5+ — stadig for stort.
+3. ✅ **Eksplicit liste af de 395 `sale_item_ids` jeg har identificeret** — sender dem i batches af 100 via `body.sale_item_ids` til edge function. Hurtig, deterministisk, ingen risiko for at røre andet.
 
-## Røde flag (skal afklares før Trin 1)
+Efter kørsel: re-verificér med samme diff-query → forventer 0 mispriced items, 0 kr overpayment.
 
-1. **Scope**: Skal det KUN være Relatel-klienten, eller også andre klienter (Tryg, Finansforbundet, Nuuday, ASE)? Du nævnte "alle produkter" — jeg antager indtil videre "alle Relatel-produkter" baseret på den oprindelige forretningsbeskrivelse.
-2. **Switch Professionel ATL**: Skal også med (+10% og ny tilskud)? Min antagelse: ja, ifølge din regel "alle undtagen MBB".
-3. **ATL FULD PRIS-varianter**: Listen indeholder produkter som `ATL FULD PRIS Fri Tale + 10 GB (36 mdr.)` der historisk har været spejlinger af BTL-varianter. Skal de også have nye regler, eller er de udfasede/aliasser?
-4. **MBB**: Bekræftet at MBB IKKE skal have +10% provision. Skal MBB have "Ny tilskud" (20%)? Hvis ja, har MBB en gammel tilskud-regel jeg kan basere beregningen på? Aktuelt har 5G MBB ingen tilskud-regel.
+## Spor B — Root cause + permanent fix
 
-## Sikkerhed (rød zone)
+**Symptom:** `create_fm_sale_items`-triggeren har korrekt SQL til at slå kampagne-specifik regel op via `adversus_campaign_mappings`, men i praksis lander Eesy marked-salg konsekvent på base-pris. Data + timestamps udelukker at `client_campaign_id` blev opdateret efter insert. Det skal afdækkes i isoleret test (jeg har ikke kunnet reproducere fra data alene), men selve fix'et er ikke afhængigt af root cause:
 
-Pricing-motoren er rød zone (CLAUDE.md §4). Migrationen rører `product_pricing_rules` der indgår i Tier 1-afhængighed. Derfor:
+**Fix (defense in depth — virker uanset root cause):**
 
-- Ingen `UPDATE`/`DELETE` på eksisterende regler — kun `INSERT` af nye.
-- Rematch kører kun mod sale_items i 2026-05-15+ vindue (ikke historisk forurening).
-- `pricing_rule_history` får automatisk audit-trail via eksisterende trigger.
-- Migration udføres efter du har bekræftet listen i Trin 1.
+1. **Skriv `matched_pricing_rule_id` ind på sale_item** i både `create_fm_sale_items` og `heal_fm_missing_sale_items`. I dag sættes feltet aldrig for FM-salg → vi kan ikke se hvilken regel der vandt → bug bliver usynlig. Med ID'et på plads bliver enhver fremtidig mismatch synlig i én SQL.
 
-Bekræft de 4 røde flag, så genererer jeg den endelige liste til Trin 1.
+2. **Tilføj en `assert`-blok i `create_fm_sale_items`** der logger en `integration_logs` warning HVIS `client_campaign_id` har en `adversus_campaign_mapping`-row OG der findes en aktiv regel for produktet + mapping, men `v_rule_commission` alligevel kommer ud som NULL. Det vil fange root cause første gang det sker igen.
+
+3. **Daglig integritets-check (cron, 30 min efter midnat):** Kør samme diff-query jeg brugte ovenfor mod sidste 24t FM-salg. Send Slack/email til Mathias hvis mispriced items > 0. Stopper at en lignende bug forsvinder ind i lønkørslen.
+
+4. **(Valgfrit) Hård validering før løn:** Tilføj knap "Tjek FM-pricing-integritet" på Cancellations/Salary-siden der kører diff-query for lønperioden og blokerer eksport hvis afvigelser findes.
+
+## Rækkefølge og scope
+
+1. Spor A: rematch 395 items (read-only edge function call, ingen migration).
+2. Spor B trin 1+2: migration der ændrer `create_fm_sale_items` + `heal_fm_missing_sale_items` (RØD ZONE — pricing-motor. Beder dig bekræfte før den køres).
+3. Spor B trin 3: ny edge function `fm-pricing-integrity-check` + cron-job.
+4. Spor B trin 4: UI-knap (kan vente til efter trin 1-3 har stabiliseret sig).
+
+## Røde flag / bekræft før implementering
+
+- **Bekræft 295/385 kr ER de korrekte Eesy marked-priser** (du har bekræftet logikken tidligere — men de gælder altså bagudrettet for HELE lønperioden 15/5+, ikke kun fra i dag).
+- **Melissa-attribution (sælger-dropdown bug) er IKKE inkluderet i denne plan** — Spor B her løser kun pricing. Hvem-registrerede-salget er en separat sag og afventer din beslutning.
+- Spor B trin 1 rører pricing-motoren (rød zone). Ramme-aftalen fra de seneste kasser dækker ikke FM-triggere — beder eksplicit om go før jeg deployer migrationen.
+
+Klar til at gå i gang når du siger go. Hvis du kun vil have Spor A nu og udskyde Spor B, siger du bare det.
