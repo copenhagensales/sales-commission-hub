@@ -21,27 +21,20 @@ export default function TvBoardLogin() {
     setError("");
 
     try {
-      const { data, error: queryError } = await supabase
-        .from("tv_board_access")
-        .select("id, dashboard_slug, is_active")
-        .eq("access_code", code.toUpperCase())
-        .eq("is_active", true)
-        .single();
+      const { data, error: queryError } = await supabase.rpc("verify_tv_board_code", {
+        p_code: code.toUpperCase(),
+      });
 
-      if (queryError || !data) {
+      const row = Array.isArray(data) ? data[0] : data;
+      if (queryError || !row) {
         setError("Ugyldig eller deaktiveret adgangskode. Tjek koden eller kontakt en administrator.");
         setLoading(false);
         return;
       }
 
-      // Update access count and last accessed
-      await supabase
-        .from("tv_board_access")
-        .update({
-          last_accessed_at: new Date().toISOString(),
-          access_count: (data as any).access_count + 1 || 1,
-        })
-        .eq("id", data.id);
+      // Heartbeat (fire-and-forget)
+      supabase.rpc("record_tv_board_heartbeat", { p_id: row.id }).then();
+
 
       // Store code in sessionStorage for the session
       sessionStorage.setItem("tv_board_code", code.toUpperCase());
