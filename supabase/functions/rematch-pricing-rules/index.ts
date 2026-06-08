@@ -611,8 +611,10 @@ serve(async (req) => {
             clientCampaignMappingsMap.set(mapping.client_campaign_id, mapping.id);
           }
         }
-    console.log(`[rematch-pricing-rules] FM mapping debug: clientCampaignIds=${clientCampaignIds.length}, resolved=${clientCampaignMappingsMap.size}, sample=${JSON.stringify([...clientCampaignMappingsMap.entries()].slice(0,3))}`);
+      }
     }
+    console.log(`[rematch-pricing-rules] FM mapping debug: clientCampaignIds=${clientCampaignIds.length}, resolved=${clientCampaignMappingsMap.size}, sample=${JSON.stringify([...clientCampaignMappingsMap.entries()].slice(0,3))}`);
+
 
     // Process each sale_item
     const updates: { id: string; product_id: string; matched_pricing_rule_id: string | null; mapped_commission: number; mapped_revenue: number; needs_mapping: boolean; display_name: string | null }[] = [];
