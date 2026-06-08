@@ -1,67 +1,56 @@
-## Hvad jeg fandt på tværs af Eesy FM + Yousee FM
+## Security fixes — gruppeplan
 
-Kørt en sammenligning af `mapped_commission` på alle FM sale_items siden 15/5 mod den kampagne-specifikke regel der burde have matchet (`adversus_campaign_mappings` → `product_pricing_rules`).
+Scanneren har fundet ~30 issues. Mange rammer **rød zone** (løn, pricing, GDPR, auth, RLS). Iht. CLAUDE.md §4 skal jeg have eksplicit godkendelse + plan før rød zone-ændringer. Jeg foreslår at lukke dem i 5 batches du kan godkende hver for sig, så vi ikke rører alt på én gang.
 
-**Resultat:**
+---
 
-| Kampagne | Items med forkert pris | Samlet overbetaling |
-|---|---|---|
-| Eesy marked | **395** | **25.675 kr** |
-| Eesy gaden | 0 | 0 |
-| eesy FM Gaden Products | 0 | 0 |
-| Yousee gaden | 0 | 0 |
+### Batch 1 — Edge functions uden auth (kritisk, lav risiko at fixe)
+Tilføj auth-check (Bearer JWT + `is_owner`/`is_manager_or_above`) eller cron-secret. Mønstret findes allerede i `force-password-reset` og `_shared/gdpr-auth.ts`.
 
-Yousee gaden har ingen kampagne-specifikke regler (priser = base 440 kr på alle Fri-produkter) — derfor intet problem dér.
+Filer:
+- `set-user-password`, `create-employee-user`, `delete-auth-user` → owner-check
+- `batch-set-fieldmarketing-passwords` → owner-check
+- `generate-contract-pdf` → ejer-af-kontrakt eller manager
+- `import-products` → manager
+- `update-cron-schedule` → owner
+- `snapshot-payroll-period` → cron-secret eller owner (RØD: rører løn-snapshots)
+- `cleanup-inactive-employees` → cron-secret (RØD: sletter ansatte)
+- `execute-scheduled-team-changes` → cron-secret
+- `activate-pulse-survey` → cron-secret
 
-Eesy gaden har regler der koincidentielt = base-pris (360/450) — derfor heller intet problem.
+Risiko: lav — vi tilføjer kun guards, fjerner ingen funktionalitet. Eksisterende UI-kald sender allerede JWT via `supabase.functions.invoke()`. Cron-jobs skal opdateres til at sende `x-cron-secret` header — jeg tilføjer en `CRON_SECRET` secret og opdaterer `pg_cron`-jobs.
 
-**Eesy marked er den eneste kampagne hvor de specifikke regler er LAVERE end base**, og det er præcis dér overbetalingen sker. Top 5 ramte sælgere:
+### Batch 2 — RLS låses ned på finansielle/HR tabeller (RØD ZONE)
+Erstat `USING(true)` med `is_manager_or_above(auth.uid())`:
+- `salary_types` (løn — RØD)
+- `booking_startup_bonus` (løn — RØD)
+- `employee_absence` (egen-INSERT for medarbejder, fuld adgang for manager)
+- `scheduled_team_changes` (manager)
+- `integration_circuit_breaker` (kun service_role)
+- `kpi_watermarks` (kun service_role)
 
-| Sælger | Overbetaling |
-|---|---|
-| mech@ (Melissa) | 5.395 kr |
-| saro@ | 4.485 kr |
-| jubj@ | 2.275 kr |
-| thes@ (Theo) | 1.885 kr |
-| nore@ | 1.820 kr |
+### Batch 3 — Publikt læsbare data fjernes
+- `kpi_cached_values` + `kpi_leaderboard_cache`: drop `USING(true)` SELECT; krav `authenticated`. TV-board flow skal validere kode server-side via edge function i stedet for direkte tabel-read.
+- `tv_board_access`: drop public SELECT; lav RPC `verify_tv_board_code(code text) returns dashboard_config` (SECURITY DEFINER, returnerer kun match). Opdaterer `useTvBoardConfig` til at bruge RPC.
+- `integration_debug_log`: restrict ALL til service_role + owner.
+- Peer-data via `is_in_my_teams` på `absence_request_v2`, `career_wishes`, `car_quiz_submissions`, `car_quiz_completions`, `code_of_conduct_attempts`: skift til team-leader-or-above.
 
-(+ ~20 andre sælgere med mindre beløb)
+### Batch 4 — Storage buckets privatiseres
+- `chat-attachments`: bucket → private, SELECT-policy kræver medlem af `chat_conversation_members`.
+- `vehicle-return-photos`: bucket → private, SELECT-policy kræver egen confirmation eller manager.
 
-## Spor A — Rematch (fjerner overbetalingen)
+Begge kræver at frontend henter via signed URLs i stedet for public URL. Jeg opdaterer relevante hooks.
 
-Kald `rematch-pricing-rules` edge function målrettet de 395 ramte sale_items. Tre måder at scope det på (vælger den sidste — mest sikker):
+### Batch 5 — XSS + Realtime + SECURITY DEFINER linter
+- Sanitize kontrakt-HTML med DOMPurify (allerede installeret iht. memory) i `ContractSign.tsx`, `Contracts.tsx`, `SendContractDialog.tsx`.
+- Realtime channel authorization: tilføj RLS på `realtime.messages` scoped til auth.uid().
+- Supabase linter: SECURITY DEFINER view + functions executable af anon — gennemgå og REVOKE EXECUTE FROM anon på funktioner der ikke skal være offentlige.
 
-1. ❌ Hele lønperioden 15/5+ — for stort scope, ramler i `WORKER_RESOURCE_LIMIT` som vi så tidligere.
-2. ❌ Hele FM-source 15/5+ — stadig for stort.
-3. ✅ **Eksplicit liste af de 395 `sale_item_ids` jeg har identificeret** — sender dem i batches af 100 via `body.sale_item_ids` til edge function. Hurtig, deterministisk, ingen risiko for at røre andet.
+---
 
-Efter kørsel: re-verificér med samme diff-query → forventer 0 mispriced items, 0 kr overpayment.
+### Hvad jeg foreslår
+Start med **Batch 1 (edge functions auth)** — det er den største og mest akutte hul (kontooverttagelse muligt med kun anon-key). Det er let at rulle ud uden at bryde noget.
 
-## Spor B — Root cause + permanent fix
+**Godkend Batch 1, så jeg går i gang?** Derefter tager vi Batch 2 (RLS løn-tabeller) som næste runde.
 
-**Symptom:** `create_fm_sale_items`-triggeren har korrekt SQL til at slå kampagne-specifik regel op via `adversus_campaign_mappings`, men i praksis lander Eesy marked-salg konsekvent på base-pris. Data + timestamps udelukker at `client_campaign_id` blev opdateret efter insert. Det skal afdækkes i isoleret test (jeg har ikke kunnet reproducere fra data alene), men selve fix'et er ikke afhængigt af root cause:
-
-**Fix (defense in depth — virker uanset root cause):**
-
-1. **Skriv `matched_pricing_rule_id` ind på sale_item** i både `create_fm_sale_items` og `heal_fm_missing_sale_items`. I dag sættes feltet aldrig for FM-salg → vi kan ikke se hvilken regel der vandt → bug bliver usynlig. Med ID'et på plads bliver enhver fremtidig mismatch synlig i én SQL.
-
-2. **Tilføj en `assert`-blok i `create_fm_sale_items`** der logger en `integration_logs` warning HVIS `client_campaign_id` har en `adversus_campaign_mapping`-row OG der findes en aktiv regel for produktet + mapping, men `v_rule_commission` alligevel kommer ud som NULL. Det vil fange root cause første gang det sker igen.
-
-3. **Daglig integritets-check (cron, 30 min efter midnat):** Kør samme diff-query jeg brugte ovenfor mod sidste 24t FM-salg. Send Slack/email til Mathias hvis mispriced items > 0. Stopper at en lignende bug forsvinder ind i lønkørslen.
-
-4. **(Valgfrit) Hård validering før løn:** Tilføj knap "Tjek FM-pricing-integritet" på Cancellations/Salary-siden der kører diff-query for lønperioden og blokerer eksport hvis afvigelser findes.
-
-## Rækkefølge og scope
-
-1. Spor A: rematch 395 items (read-only edge function call, ingen migration).
-2. Spor B trin 1+2: migration der ændrer `create_fm_sale_items` + `heal_fm_missing_sale_items` (RØD ZONE — pricing-motor. Beder dig bekræfte før den køres).
-3. Spor B trin 3: ny edge function `fm-pricing-integrity-check` + cron-job.
-4. Spor B trin 4: UI-knap (kan vente til efter trin 1-3 har stabiliseret sig).
-
-## Røde flag / bekræft før implementering
-
-- **Bekræft 295/385 kr ER de korrekte Eesy marked-priser** (du har bekræftet logikken tidligere — men de gælder altså bagudrettet for HELE lønperioden 15/5+, ikke kun fra i dag).
-- **Melissa-attribution (sælger-dropdown bug) er IKKE inkluderet i denne plan** — Spor B her løser kun pricing. Hvem-registrerede-salget er en separat sag og afventer din beslutning.
-- Spor B trin 1 rører pricing-motoren (rød zone). Ramme-aftalen fra de seneste kasser dækker ikke FM-triggere — beder eksplicit om go før jeg deployer migrationen.
-
-Klar til at gå i gang når du siger go. Hvis du kun vil have Spor A nu og udskyde Spor B, siger du bare det.
+Hvis du vil have alle 5 batches i ét hug uden review pr. batch, sig "kør alle" — men jeg anbefaler batch-vis, så vi kan tjekke at intet brækker mellem runderne (især TV-board og chat-attachments hvor frontend ændres).
