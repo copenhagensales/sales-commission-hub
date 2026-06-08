@@ -578,8 +578,13 @@ serve(async (req) => {
     console.log(`[rematch-pricing-rules] Loaded ${productsMap.size} products with base prices for fallback`);
 
     // Get unique campaign IDs and fetch their mapping IDs
+    // For dialer-driven sales (Adversus/Enreach) we map via dialer_campaign_id -> adversus_campaign_id.
+    // For Field Marketing sales there is no dialer_campaign_id; the campaign is stored as client_campaign_id
+    // and adversus_campaign_mappings has a client_campaign_id FK we can resolve directly.
     const campaignIds = [...new Set(saleItems.map((si: any) => (si.sales as any)?.dialer_campaign_id).filter(Boolean))];
+    const clientCampaignIds = [...new Set(saleItems.map((si: any) => (si.sales as any)?.client_campaign_id).filter(Boolean))];
     const campaignMappingsMap = new Map<string, string>();
+    const clientCampaignMappingsMap = new Map<string, string>();
 
     if (campaignIds.length > 0) {
       const { data: campaignMappings } = await supabase
@@ -590,6 +595,21 @@ serve(async (req) => {
       if (campaignMappings) {
         for (const mapping of campaignMappings) {
           campaignMappingsMap.set(mapping.adversus_campaign_id, mapping.id);
+        }
+      }
+    }
+
+    if (clientCampaignIds.length > 0) {
+      const { data: clientMappings } = await supabase
+        .from("adversus_campaign_mappings")
+        .select("id, client_campaign_id")
+        .in("client_campaign_id", clientCampaignIds);
+
+      if (clientMappings) {
+        for (const mapping of clientMappings) {
+          if (mapping.client_campaign_id) {
+            clientCampaignMappingsMap.set(mapping.client_campaign_id, mapping.id);
+          }
         }
       }
     }
