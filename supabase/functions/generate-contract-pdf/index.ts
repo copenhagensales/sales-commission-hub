@@ -47,6 +47,27 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    // AuthN/AuthZ: caller must be signed in. Contract content includes CPR + private email.
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const { data: userData, error: userErr } = await supabase.auth.getUser(
+      authHeader.replace("Bearer ", "")
+    );
+    if (userErr || !userData?.user) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const { contractId } = await req.json();
 
     if (!contractId) {
@@ -56,9 +77,29 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Authorization: caller must be the contract's employee OR a manager.
+    const { data: isManager } = await supabase.rpc("is_manager_or_above", {
+      _user_id: userData.user.id,
+    });
+    if (!isManager) {
+      const { data: callerEmp } = await supabase
+        .from("employee_master_data")
+        .select("id")
+        .eq("auth_user_id", userData.user.id)
+        .maybeSingle();
+      const { data: contractRow } = await supabase
+        .from("contracts")
+        .select("employee_id")
+        .eq("id", contractId)
+        .maybeSingle();
+      if (!callerEmp || !contractRow || callerEmp.id !== contractRow.employee_id) {
+        return new Response(
+          JSON.stringify({ error: "Forbidden" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
 
     // Fetch contract with employee and signatures
     const { data: contract, error: contractError } = await supabase

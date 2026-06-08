@@ -1,10 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireManager, sharedCorsHeaders } from "../_shared/auth.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+const corsHeaders = sharedCorsHeaders;
 
 interface CSVProduct {
   name: string;
@@ -51,9 +48,9 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const auth = await requireManager(req);
+    if (auth instanceof Response) return auth;
+    const supabase = auth.svc;
 
     const formData = await req.formData();
     const file = formData.get('file') as File;
@@ -71,6 +68,7 @@ serve(async (req) => {
     const products = parseCSV(csvText);
 
     console.log(`Parsed ${products.length} products from CSV`);
+
 
     // 1. Get or create client
     let { data: client } = await supabase

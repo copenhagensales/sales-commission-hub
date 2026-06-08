@@ -1,9 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireOwner, sharedCorsHeaders } from "../_shared/auth.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const corsHeaders = sharedCorsHeaders;
+
 
 // Map sync_frequency_minutes to cron expressions
 const frequencyToCron: Record<number, string> = {
@@ -229,11 +228,12 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const authResult = await requireOwner(req);
+    if (authResult instanceof Response) return authResult;
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabase = authResult.svc;
 
     const { integration_type, integration_id, provider, frequency_minutes, is_active, custom_schedule } = await req.json();
 
