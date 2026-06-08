@@ -63,9 +63,10 @@ export async function requireManager(req: Request): Promise<AuthOk | Response> {
  * Allow either an internal cron caller or an authenticated owner.
  *
  * Cron callers are recognized in two ways:
- *   1. `x-cron-secret` header matching the `CRON_SECRET` env var.
- *   2. Authorization Bearer header carrying the project's service-role key
- *      (pg_cron jobs currently authenticate this way).
+ *   1. `x-cron-secret` header whose value matches the project's stored cron
+ *      secret (validated via the `verify_internal_cron_secret` RPC, which is
+ *      a SECURITY DEFINER function only callable by service_role).
+ *   2. Authorization Bearer header carrying the project's service-role key.
  *
  * Suitable for scheduled maintenance/payroll/cleanup jobs.
  */
@@ -73,9 +74,14 @@ export async function requireCronOrOwner(
   req: Request,
 ): Promise<AuthOk | AuthCron | Response> {
   const cronSecret = req.headers.get("x-cron-secret");
-  const expected = Deno.env.get("CRON_SECRET");
-  if (cronSecret && expected && cronSecret === expected) {
-    return { ok: true, userId: null, svc: getServiceClient(), caller: "cron" };
+  if (cronSecret) {
+    const svc = getServiceClient();
+    const { data: ok } = await svc.rpc("verify_internal_cron_secret", {
+      _token: cronSecret,
+    });
+    if (ok === true) {
+      return { ok: true, userId: null, svc, caller: "cron" };
+    }
   }
 
   const authHeader = req.headers.get("Authorization");
@@ -86,4 +92,5 @@ export async function requireCronOrOwner(
 
   return requireOwner(req);
 }
+
 
