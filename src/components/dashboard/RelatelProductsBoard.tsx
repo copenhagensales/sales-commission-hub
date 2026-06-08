@@ -7,24 +7,6 @@ import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { DashboardPeriodSelector, getDefaultPeriod, type PeriodSelection } from "@/components/dashboard/DashboardPeriodSelector";
 import { TvKpiCard } from "@/components/dashboard/TvDashboardComponents";
 import { isTvMode, useAutoReload } from "@/utils/tvMode";
-import { getClientId } from "@/utils/clientIds";
-
-const RELATEL_CLIENT_ID = getClientId("Relatel")!;
-
-type ProductCategory = "mobile_voice" | "mobilt_bredbaand" | "switch";
-
-function categorizeProduct(name: string): ProductCategory | null {
-  const lower = name.toLowerCase();
-  if (lower.includes("fri tale")) return "mobile_voice";
-  if (lower.includes("mbb") || lower.includes("mobilt bredbånd") || lower.includes("mobilt bredbaand")) return "mobilt_bredbaand";
-  if (
-    lower.includes("contact center") ||
-    lower.includes("professionel omstilling") ||
-    lower.includes("unlimited") ||
-    lower.includes("omstilling til brugere")
-  ) return "switch";
-  return null;
-}
 
 export default function RelatelProductsBoard() {
   const tvMode = isTvMode();
@@ -35,44 +17,17 @@ export default function RelatelProductsBoard() {
   const { data: productData, isLoading } = useQuery({
     queryKey: ["relatel-products", period.from.toISOString(), period.to.toISOString()],
     queryFn: async () => {
-      // Get all client_campaign IDs for Relatel
-      const { data: campaigns } = await supabase
-        .from("client_campaigns")
-        .select("id")
-        .eq("client_id", RELATEL_CLIENT_ID);
-
-      if (!campaigns?.length) return { mobile_voice: 0, mobilt_bredbaand: 0, switch: 0 };
-
-      const campaignIds = campaigns.map((c) => c.id);
-
-      // Fetch sale_items with product names for the period
-      const { data: items } = await supabase
-        .from("sale_items")
-        .select(`
-          quantity,
-          sale_id,
-          product:products!inner(name),
-          sale:sales!inner(sale_datetime, validation_status, client_campaign_id)
-        `)
-        .in("sale.client_campaign_id", campaignIds)
-        .gte("sale.sale_datetime", period.from.toISOString())
-        .lte("sale.sale_datetime", period.to.toISOString())
-        .neq("sale.validation_status", "rejected");
-
-      const counts = { mobile_voice: 0, mobilt_bredbaand: 0, switch: 0 };
-
-      if (items) {
-        for (const item of items) {
-          const productName = (item.product as any)?.name;
-          if (!productName) continue;
-          const cat = categorizeProduct(productName);
-          if (cat) {
-            counts[cat] += item.quantity ?? 1;
-          }
-        }
-      }
-
-      return counts;
+      const { data, error } = await supabase.rpc("get_relatel_product_counts", {
+        p_from: period.from.toISOString(),
+        p_to: period.to.toISOString(),
+      });
+      if (error) throw error;
+      const row = data?.[0];
+      return {
+        mobile_voice: Number(row?.mobile_voice ?? 0),
+        mobilt_bredbaand: Number(row?.mobilt_bredbaand ?? 0),
+        switch: Number(row?.switch_count ?? 0),
+      };
     },
     refetchInterval: tvMode ? 60_000 : undefined,
   });

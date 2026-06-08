@@ -1,25 +1,21 @@
-## Ændring
+## Opdater RelatelProductsBoard.tsx
 
-I `src/components/dashboard/RelatelProductsBoard.tsx` strammes `categorizeProduct` så **Switch** kun tæller produkter hvis navn matcher én af:
+Erstat den nested PostgREST-query med kald til den nye RPC `get_relatel_product_counts`.
 
-- `contact center`
-- `professionel omstilling` (også `professional` for at fange engelske varianter? → **nej, fjernes** for at undgå støj)
-- `unlimited`
-- `omstilling til brugere`
+### Ændringer i `src/components/dashboard/RelatelProductsBoard.tsx`
 
-Resten (datakort, mbb, fri tale, generiske "switch"-tekster der ikke er i listen ovenfor) tælles ikke under Switch.
+1. Fjern `categorizeProduct`-helperen (logikken ligger nu i DB).
+2. Erstat `useQuery`-body med:
+   ```ts
+   const { data, error } = await supabase.rpc("get_relatel_product_counts", {
+     p_from: from.toISOString(),
+     p_to: to.toISOString(),
+   });
+   if (error) throw error;
+   return data?.[0] ?? { mobile_voice: 0, mobilt_bredbaand: 0, switch: 0 };
+   ```
+3. Behold periodevælger, UI-kort og query-key uændret (så cache invalidation virker som før).
+4. Fjern nu ubrugte imports (fx `RELATEL_CLIENT_ID` hvis ikke længere brugt frontend-side).
 
-### Teknisk
-
-```ts
-if (lower.includes("contact center")) return "switch";
-if (lower.includes("professionel omstilling")) return "switch";
-if (lower.includes("unlimited")) return "switch";
-if (lower.includes("omstilling til brugere")) return "switch";
-```
-
-Mobile Voice (Fri Tale) og Mobilt Bredbånd (MBB) rør ikke.
-
-### Spørgsmål før build
-
-Skal `professional` (engelsk) også matche, eller kun den danske `professionel omstilling`? Default i planen: **kun dansk**.
+### Zone
+Gul (dashboard reporting). Ingen ændringer i pricing/løn/RLS. RPC er allerede deployet i forrige migration.
