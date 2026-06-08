@@ -59,20 +59,31 @@ export async function requireManager(req: Request): Promise<AuthOk | Response> {
  * Allow either an internal cron caller (x-cron-secret header matching CRON_SECRET env)
  * or an authenticated owner. Suitable for scheduled maintenance/payroll/cleanup jobs.
  */
+/**
+ * Allow either an internal cron caller or an authenticated owner.
+ *
+ * Cron callers are recognized in two ways:
+ *   1. `x-cron-secret` header matching the `CRON_SECRET` env var.
+ *   2. Authorization Bearer header carrying the project's service-role key
+ *      (pg_cron jobs currently authenticate this way).
+ *
+ * Suitable for scheduled maintenance/payroll/cleanup jobs.
+ */
 export async function requireCronOrOwner(
   req: Request,
 ): Promise<AuthOk | AuthCron | Response> {
   const cronSecret = req.headers.get("x-cron-secret");
   const expected = Deno.env.get("CRON_SECRET");
-  if (cronSecret) {
-    if (!expected) {
-      console.error("CRON_SECRET env var not configured");
-      return jsonError(500, "Server configuration error");
-    }
-    if (cronSecret === expected) {
-      return { ok: true, userId: null, svc: getServiceClient(), caller: "cron" };
-    }
-    return jsonError(401, "Unauthorized");
+  if (cronSecret && expected && cronSecret === expected) {
+    return { ok: true, userId: null, svc: getServiceClient(), caller: "cron" };
   }
+
+  const authHeader = req.headers.get("Authorization");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (authHeader && serviceRoleKey && authHeader === `Bearer ${serviceRoleKey}`) {
+    return { ok: true, userId: null, svc: getServiceClient(), caller: "cron" };
+  }
+
   return requireOwner(req);
 }
+
