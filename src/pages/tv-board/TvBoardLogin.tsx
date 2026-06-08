@@ -38,10 +38,11 @@ export default function TvBoardLogin() {
 
       // Store code in sessionStorage for the session
       sessionStorage.setItem("tv_board_code", code.toUpperCase());
-      sessionStorage.setItem("tv_board_slug", data.dashboard_slug);
+      sessionStorage.setItem("tv_board_slug", row.dashboard_slug);
 
       toast.success("Adgang godkendt!");
-      navigate(`/tv/${data.dashboard_slug}`);
+      navigate(`/tv/${row.dashboard_slug}`);
+
     } catch (err) {
       console.error("Error verifying code:", err);
       setError("Der opstod en fejl. Prøv igen.");
