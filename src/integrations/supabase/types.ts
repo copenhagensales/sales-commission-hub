@@ -14329,6 +14329,14 @@ export type Database = {
           referral_code: string
         }[]
       }
+      get_relatel_product_counts: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          mobile_voice: number
+          mobilt_bredbaand: number
+          switch_count: number
+        }[]
+      }
       get_sales_aggregates: {
         Args: {
           p_client_id?: string
