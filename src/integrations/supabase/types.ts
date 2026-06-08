@@ -14622,6 +14622,10 @@ export type Database = {
           last_name: string
         }[]
       }
+      verify_internal_cron_secret: {
+        Args: { _token: string }
+        Returns: boolean
+      }
     }
     Enums: {
       absence_request_status: "pending" | "approved" | "rejected"
