@@ -1,47 +1,23 @@
-## Konklusion
+## Hvad jeg har fundet (read-only)
 
-Der står 0, fordi siden i TV/public mode ikke har adgang til de cache-tabeller, som Eesy TM-overblikket læser fra.
+**Thorbjørn Mindedal Weichert** — `thor@cph-relatel.dk` — lønperiode 15/5–14/6 2026:
 
-Data findes i databasen lige nu:
+- **52 salg / 104 sale_items / 136 stk**
+- **Samlet provision: 208.662,00 kr** (qty × `mapped_commission`)
+  - Heraf matchet af pricing-rule: **198.927,00 kr** (på linjer hvor `matched_pricing_rule_id IS NOT NULL` — typisk "rettet" via rematch)
+  - Uden pricing-rule (fallback til produkt-default): **9.735,00 kr**
 
-- `sales_count / today` = 4
-- `sales_count / this_week` = 54
-- `sales_count / this_month` = 340
-- `sales_count / payroll_period` = 1193
-- `total_hours / payroll_period` = 4882.5
+⚠️ **OBS:** Dette tal (208.662) er præcis ~2× det tal jeg rapporterede i tidligere session (~103.000). Forskellen skyldes sandsynligvis at jeg tidligere filtrerede på en agent-mapping der kun fangede halvdelen af linjerne, ELLER at der findes dobbelte sale_items pr. salg (52 salg → 104 items = 2 items pr. salg i snit). Værd at få verificeret før det bruges til løn.
 
-Men RLS/policies på cache-tabellerne tillader kun `authenticated`, ikke public/TV-link (`anon`). Derfor får public TV-linket tomme resultater og UI falder tilbage til 0 / “Ingen salg endnu”.
+## Hvad jeg vil levere (i build mode)
 
-## Evidens
+1. **CSV-fil** til `/mnt/documents/thorbjorn-15maj-14jun.csv` med kolonner:
+   - `dato`, `produkt`, `antal`, `pris_pr_stk`, `provision_linje`, `rettet_via_regel` (ja/nej), `regel_id`, `sale_id`
+2. **Markdown-tabel i chat** med alle 104 linjer grupperet pr. dag, totaler pr. dag, og samlet bund-total
+3. **Kort note** om de 2× duplikat-mistanken — om jeg skal grave i hvad der reelt ligger pr. salg (samme produkt to gange, eller adversus+enreach dual-import)
 
-- `src/pages/EesyTmDashboard.tsx:6-15` viser Eesy TM med client id via `ClientDashboard`.
-- `src/components/dashboard/ClientDashboard.tsx:72-75` henter KPI’er via `useClientDashboardKpis` fra cache.
-- `src/components/dashboard/ClientDashboard.tsx:83-86` henter leaderboards fra cache.
-- `src/hooks/usePrecomputedKpi.ts:151-156` læser `kpi_cached_values` for `scope_type='client'` og Eesy client id.
-- `src/hooks/useCachedLeaderboard.ts:35-52` læser `kpi_leaderboard_cache`.
-- DB-query viser aktuelle Eesy TM cache-tal er opdaterede og ikke 0.
-- DB-policy-query viser:
-  - `kpi_cached_values`: SELECT kun til `authenticated`
-  - `kpi_leaderboard_cache`: SELECT kun til `authenticated`
-  - ingen `anon` adgang
+## Ingen kode-ændringer
 
-## Plan
+Ren read-only + filudtræk. Ingen filer i `src/` eller `supabase/` ændres.
 
-1. Lav en minimal RLS-migration for public TV-read adgang til cache-tabellerne:
-   - Giv `anon` læseadgang til `kpi_cached_values`.
-   - Giv `anon` læseadgang til `kpi_leaderboard_cache`.
-   - Tilføj SELECT-policies for `anon`, begrænset til de cachedata TV-boards skal kunne vise.
-
-2. Bevar sikkerhedsgrænsen:
-   - Ingen public adgang til rå `sales`, medarbejderdata eller `tv_board_access`.
-   - TV-koden skal stadig verificeres via `verify_tv_board_code`.
-   - Public adgang gives kun til aggregeret cache/leaderboard-data, som TV-boardet allerede er designet til at vise.
-
-3. Verificér efter migration:
-   - Åbn preview/public TV-linket igen.
-   - Bekræft at KPI-kortene viser 4 / 54 / 340 / 1193 og salg/time beregnes fra timer.
-   - Bekræft at TOP-lister viser cache-leaderboard i stedet for “Ingen salg endnu”.
-
-## Bemærkning
-
-Dette løser 0-problemet. Det tidligere problem med `BNA4` på custom domain kræver stadig at den nye frontend faktisk publiceres, fordi live-siden før stadig kørte gammel kode der kaldte `tv_board_access` direkte.
+Skift til build mode hvis det er OK, så leverer jeg CSV + tabel.
