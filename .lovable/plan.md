@@ -1,23 +1,37 @@
-## Hvad jeg har fundet (read-only)
+# Fix: Switch Krydssalg bruger forkerte (gamle) provisionsregler
 
-**Thorbjørn Mindedal Weichert** — `thor@cph-relatel.dk` — lønperiode 15/5–14/6 2026:
+## Diagnose (evidens fra DB)
 
-- **52 salg / 104 sale_items / 136 stk**
-- **Samlet provision: 208.662,00 kr** (qty × `mapped_commission`)
-  - Heraf matchet af pricing-rule: **198.927,00 kr** (på linjer hvor `matched_pricing_rule_id IS NOT NULL` — typisk "rettet" via rematch)
-  - Uden pricing-rule (fallback til produkt-default): **9.735,00 kr**
+- `Cph Sales - Google` = `bbac6432-8704-4289-9bf3-0be19849f766`
+- `CPH Sales - Switch Krydssalgs kampagne` = `2a7318af-bb43-4db2-bc39-597c9cc14aaa`
+- I `product_pricing_rules` (aktive, `campaign_match_mode = 'include'`) er Switch knyttet til væsentligt flere regler end Google — fx 4 regler pr. Switch Unlimited-variant vs. 1 for Google, samt `+ Router`/`#2-#4`-varianter hvor kun Switch er med. Det er rester fra den gamle særopsætning.
+- Eksempel: regel `3f4758fa-…` (MBB 1000GB ATL, prov. 1035, kun Switch) vs. den fælles regel `163d5ac5-…` (samme produkt, prov. 1185, ~90 kampagner inkl. Google men IKKE Switch).
+- Konsekvens: pricing-motoren rammer den gamle Switch-specifikke regel før den fælles. Tilskuds-%'en er hardcodet i delt kode uden Switch-branch, så når reglerne spejles, arver Switch automatisk de 20 % via samme kodevej som Google. ✅
 
-⚠️ **OBS:** Dette tal (208.662) er præcis ~2× det tal jeg rapporterede i tidligere session (~103.000). Forskellen skyldes sandsynligvis at jeg tidligere filtrerede på en agent-mapping der kun fangede halvdelen af linjerne, ELLER at der findes dobbelte sale_items pr. salg (52 salg → 104 items = 2 items pr. salg i snit). Værd at få verificeret før det bruges til løn.
+## Mål
 
-## Hvad jeg vil levere (i build mode)
+Switch Krydssalg skal have **præcis** samme aktive provisionsregler som Google.
 
-1. **CSV-fil** til `/mnt/documents/thorbjorn-15maj-14jun.csv` med kolonner:
-   - `dato`, `produkt`, `antal`, `pris_pr_stk`, `provision_linje`, `rettet_via_regel` (ja/nej), `regel_id`, `sale_id`
-2. **Markdown-tabel i chat** med alle 104 linjer grupperet pr. dag, totaler pr. dag, og samlet bund-total
-3. **Kort note** om de 2× duplikat-mistanken — om jeg skal grave i hvad der reelt ligger pr. salg (samme produkt to gange, eller adversus+enreach dual-import)
+## Fix (data-migration, ingen kodeændring)
 
-## Ingen kode-ændringer
+På `product_pricing_rules` (kun `is_active = true`):
 
-Ren read-only + filudtræk. Ingen filer i `src/` eller `supabase/` ændres.
+1. **Fjern** Switch-id'et fra `campaign_mapping_ids` på alle regler hvor Google-id'et IKKE er med.
+2. **Tilføj** Switch-id'et til `campaign_mapping_ids` på alle regler hvor Google-id'et ER med men Switch ikke er.
+3. **Slet ingen** regel-rækker — gamle Switch-only regler bevares uden Switch-id, så historik og evt. brug i andre kampagner ikke ødelægges.
+4. **Skriv historik** til `pricing_rule_history` for hver ændret regel (audit-krav).
 
-Skift til build mode hvis det er OK, så leverer jeg CSV + tabel.
+Derefter:
+
+5. **Rematch fra 15. maj 2026** (indeværende lønperiode) for Switch-kampagnen via `rematch-pricing-rules` edge function. Opdaterer `sale_items.mapped_commission` / `mapped_revenue` for allerede registrerede Switch-salg i perioden.
+6. **Broadcast** cache-invalidation på `mg-test-sync` så MgTest/dashboards opdateres på tværs af sessions.
+
+## Verifikation
+
+- SQL-diff pr. aktivt produkt: regelmængden filtreret på Switch-id skal være identisk med regelmængden filtreret på Google-id.
+- Stikprøve på 3 nylige Switch-salg (MBB, Switch Unlimited, Omstillingsbruger) fra 15. maj — i dag: bekræft `mapped_commission`/`mapped_revenue` matcher Google-reglens værdier, og at tilskud beregnes med 20 %.
+- Tjek i MgTest → Pricing Rules at Switch står på samme regler som Google.
+
+## Zone
+
+Rød zone (`product_pricing_rules` + `pricing_rule_history` + rematch). Ingen kodefiler røres. `product_campaign_overrides` røres ikke.
