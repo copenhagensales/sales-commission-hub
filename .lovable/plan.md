@@ -1,37 +1,32 @@
-# Fix: Switch Krydssalg bruger forkerte (gamle) provisionsregler
+# Fix: "Edge Function returned a non-2xx status code" ved opret medarbejder
 
-## Diagnose (evidens fra DB)
+## Problem
+`create-employee-user` returnerer 422 `email_exists` når emailen tilhører en eksisterende auth-bruger der ligger uden for første side i `listUsers()` (default 50, Stork har 100+). Eksisterende-gren rammes aldrig → koden kalder `createUser()` og fejler.
 
-- `Cph Sales - Google` = `bbac6432-8704-4289-9bf3-0be19849f766`
-- `CPH Sales - Switch Krydssalgs kampagne` = `2a7318af-bb43-4db2-bc39-597c9cc14aaa`
-- I `product_pricing_rules` (aktive, `campaign_match_mode = 'include'`) er Switch knyttet til væsentligt flere regler end Google — fx 4 regler pr. Switch Unlimited-variant vs. 1 for Google, samt `+ Router`/`#2-#4`-varianter hvor kun Switch er med. Det er rester fra den gamle særopsætning.
-- Eksempel: regel `3f4758fa-…` (MBB 1000GB ATL, prov. 1035, kun Switch) vs. den fælles regel `163d5ac5-…` (samme produkt, prov. 1185, ~90 kampagner inkl. Google men IKKE Switch).
-- Konsekvens: pricing-motoren rammer den gamle Switch-specifikke regel før den fælles. Tilskuds-%'en er hardcodet i delt kode uden Switch-branch, så når reglerne spejles, arver Switch automatisk de 20 % via samme kodevej som Google. ✅
+Evidens: edge function-log 2026-06-15 07:21:30 + `auth.users` indeholder `floramklug@gmail.com` (oprettet 16. jan 2026).
 
-## Mål
+## Fix (variant B — grundigt)
+Erstat paginerede `listUsers()` med direkte opslag i `auth.users` via service role.
 
-Switch Krydssalg skal have **præcis** samme aktive provisionsregler som Google.
+**Fil:** `supabase/functions/create-employee-user/index.ts` (linje 75-77)
 
-## Fix (data-migration, ingen kodeændring)
+```ts
+// Check if user already exists — direct lookup (O(1), skalerer)
+const { data: existingAuthRow } = await supabase
+  .schema("auth")
+  .from("users")
+  .select("id, email")
+  .ilike("email", email)
+  .maybeSingle();
+const existingUser = existingAuthRow
+  ? { id: existingAuthRow.id as string, email: existingAuthRow.email as string }
+  : null;
+```
 
-På `product_pricing_rules` (kun `is_active = true`):
-
-1. **Fjern** Switch-id'et fra `campaign_mapping_ids` på alle regler hvor Google-id'et IKKE er med.
-2. **Tilføj** Switch-id'et til `campaign_mapping_ids` på alle regler hvor Google-id'et ER med men Switch ikke er.
-3. **Slet ingen** regel-rækker — gamle Switch-only regler bevares uden Switch-id, så historik og evt. brug i andre kampagner ikke ødelægges.
-4. **Skriv historik** til `pricing_rule_history` for hver ændret regel (audit-krav).
-
-Derefter:
-
-5. **Rematch fra 15. maj 2026** (indeværende lønperiode) for Switch-kampagnen via `rematch-pricing-rules` edge function. Opdaterer `sale_items.mapped_commission` / `mapped_revenue` for allerede registrerede Switch-salg i perioden.
-6. **Broadcast** cache-invalidation på `mg-test-sync` så MgTest/dashboards opdateres på tværs af sessions.
-
-## Verifikation
-
-- SQL-diff pr. aktivt produkt: regelmængden filtreret på Switch-id skal være identisk med regelmængden filtreret på Google-id.
-- Stikprøve på 3 nylige Switch-salg (MBB, Switch Unlimited, Omstillingsbruger) fra 15. maj — i dag: bekræft `mapped_commission`/`mapped_revenue` matcher Google-reglens værdier, og at tilskud beregnes med 20 %.
-- Tjek i MgTest → Pricing Rules at Switch står på samme regler som Google.
+Resten af eksisterende-grenen (password-update, link `auth_user_id`, opret manglende `employee_master_data`, tildel `medarbejder`-rolle) bevares uændret — den læser kun `existingUser.id`.
 
 ## Zone
+Gul. Én fil, ingen pricing/løn/RLS/skema. Service role har allerede adgang til `auth.users`.
 
-Rød zone (`product_pricing_rules` + `pricing_rule_history` + rematch). Ingen kodefiler røres. `product_campaign_overrides` røres ikke.
+## Verifikation
+Efter deploy: Mathias prøver igen at oprette Flora Klug → forventet resultat: "Adgangskode opdateret" (eksisterende-grenen) i stedet for 422.
