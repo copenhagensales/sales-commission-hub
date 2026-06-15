@@ -72,9 +72,16 @@ serve(async (req) => {
       );
     }
 
-    // Check if user already exists
-    const { data: existingUsers } = await supabase.auth.admin.listUsers();
-    const existingUser = existingUsers?.users?.find(u => u.email === email);
+    // Check if user already exists — direct lookup in auth.users (O(1), skalerer ved >50 brugere)
+    const { data: existingAuthRow } = await supabase
+      .schema("auth")
+      .from("users")
+      .select("id, email")
+      .ilike("email", email)
+      .maybeSingle();
+    const existingUser = existingAuthRow
+      ? { id: existingAuthRow.id as string, email: existingAuthRow.email as string }
+      : null;
     
     if (existingUser) {
       // Update password for existing user
