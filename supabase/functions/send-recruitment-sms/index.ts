@@ -86,7 +86,6 @@ Deno.serve(async (req) => {
     });
 
     // Log the message in communication_logs for unified tracking
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
