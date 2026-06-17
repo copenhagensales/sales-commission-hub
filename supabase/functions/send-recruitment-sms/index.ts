@@ -51,10 +51,14 @@ Deno.serve(async (req) => {
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
     const twilioAuth = btoa(`${accountSid}:${authToken}`);
 
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const statusCallbackUrl = `${supabaseUrl}/functions/v1/twilio-sms-status`;
+
     const formData = new URLSearchParams();
     formData.append('To', formattedPhone);
     formData.append('From', fromNumber);
     formData.append('Body', message);
+    formData.append('StatusCallback', statusCallbackUrl);
 
     const twilioResponse = await fetch(twilioUrl, {
       method: 'POST',
