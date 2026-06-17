@@ -51,10 +51,14 @@ Deno.serve(async (req) => {
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
     const twilioAuth = btoa(`${accountSid}:${authToken}`);
 
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const statusCallbackUrl = `${supabaseUrl}/functions/v1/twilio-sms-status`;
+
     const formData = new URLSearchParams();
     formData.append('To', formattedPhone);
     formData.append('From', fromNumber);
     formData.append('Body', message);
+    formData.append('StatusCallback', statusCallbackUrl);
 
     const twilioResponse = await fetch(twilioUrl, {
       method: 'POST',
@@ -82,7 +86,6 @@ Deno.serve(async (req) => {
     });
 
     // Log the message in communication_logs for unified tracking
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -112,6 +115,8 @@ Deno.serve(async (req) => {
         phone_number: formattedPhone,
         twilio_sid: twilioResult.sid,
         read: true, // Outbound messages are marked as read by default
+        delivery_status: twilioResult.status || 'queued',
+        delivery_updated_at: new Date().toISOString(),
       })
       .select('id')
       .single();

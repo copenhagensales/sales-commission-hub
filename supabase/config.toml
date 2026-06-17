@@ -252,3 +252,6 @@ verify_jwt = false
 
 [functions.notify-feedback-status-change]
 verify_jwt = false
+
+[functions.twilio-sms-status]
+verify_jwt = false
