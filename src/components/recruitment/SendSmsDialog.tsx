@@ -73,7 +73,7 @@ export function SendSmsDialog({ open, onOpenChange, candidate }: SendSmsDialogPr
       
       const { data, error } = await supabase
         .from("communication_logs")
-        .select("id, content, direction, created_at, phone_number, read")
+        .select("id, content, direction, created_at, phone_number, read, delivery_status, delivery_error_code, delivery_error_message")
         .eq("type", "sms")
         .or(`phone_number.ilike.%${normalizedPhone}`)
         .order("created_at", { ascending: true });
