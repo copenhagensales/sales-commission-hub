@@ -3992,6 +3992,10 @@ export type Database = {
           content: string | null
           context_type: string | null
           created_at: string
+          delivery_error_code: string | null
+          delivery_error_message: string | null
+          delivery_status: string | null
+          delivery_updated_at: string | null
           direction: string
           id: string
           outcome: string | null
@@ -4007,6 +4011,10 @@ export type Database = {
           content?: string | null
           context_type?: string | null
           created_at?: string
+          delivery_error_code?: string | null
+          delivery_error_message?: string | null
+          delivery_status?: string | null
+          delivery_updated_at?: string | null
           direction: string
           id?: string
           outcome?: string | null
@@ -4022,6 +4030,10 @@ export type Database = {
           content?: string | null
           context_type?: string | null
           created_at?: string
+          delivery_error_code?: string | null
+          delivery_error_message?: string | null
+          delivery_status?: string | null
+          delivery_updated_at?: string | null
           direction?: string
           id?: string
           outcome?: string | null
