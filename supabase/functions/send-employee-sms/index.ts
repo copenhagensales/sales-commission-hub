@@ -111,6 +111,7 @@ serve(async (req) => {
 
     // Send SMS via Twilio
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
+    const statusCallbackUrl = `${supabaseUrl}/functions/v1/twilio-sms-status`;
     const twilioResponse = await fetch(twilioUrl, {
       method: 'POST',
       headers: {
@@ -121,6 +122,7 @@ serve(async (req) => {
         From: fromNumber,
         To: toNumber,
         Body: message,
+        StatusCallback: statusCallbackUrl,
       }),
     });
 
