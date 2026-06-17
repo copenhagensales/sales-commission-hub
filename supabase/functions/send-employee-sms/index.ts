@@ -152,6 +152,8 @@ serve(async (req) => {
         target_employee_id: targetEmployee.id,
         application_id: null, // No application for employee messages
         read: true,
+        delivery_status: twilioResult.status || 'queued',
+        delivery_updated_at: new Date().toISOString(),
       })
       .select('id')
       .single();
