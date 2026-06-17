@@ -50,6 +50,9 @@ interface SmsMessage {
   created_at: string;
   phone_number: string | null;
   read: boolean;
+  delivery_status?: string | null;
+  delivery_error_code?: string | null;
+  delivery_error_message?: string | null;
 }
 
 export function SendSmsDialog({ open, onOpenChange, candidate }: SendSmsDialogProps) {
