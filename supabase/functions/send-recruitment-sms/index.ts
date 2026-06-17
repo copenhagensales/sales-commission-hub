@@ -115,6 +115,8 @@ Deno.serve(async (req) => {
         phone_number: formattedPhone,
         twilio_sid: twilioResult.sid,
         read: true, // Outbound messages are marked as read by default
+        delivery_status: twilioResult.status || 'queued',
+        delivery_updated_at: new Date().toISOString(),
       })
       .select('id')
       .single();
