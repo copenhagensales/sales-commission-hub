@@ -220,34 +220,60 @@ export function SendSmsDialog({ open, onOpenChange, candidate }: SendSmsDialogPr
                 <p className="text-sm">Start en samtale nedenfor</p>
               </div>
             ) : (
-              smsHistory.map((sms) => (
-                <div
-                  key={sms.id}
-                  className={cn(
-                    "flex",
-                    sms.direction === "outbound" ? "justify-end" : "justify-start"
-                  )}
-                >
+              smsHistory.map((sms) => {
+                const status = (sms.delivery_status || "").toLowerCase();
+                const isFailed = status === "undelivered" || status === "failed";
+                const isDelivered = status === "delivered";
+                const isPending = sms.direction === "outbound" && !isFailed && !isDelivered && status !== "";
+
+                return (
                   <div
+                    key={sms.id}
                     className={cn(
-                      "max-w-[80%] rounded-2xl px-4 py-2 text-sm",
-                      sms.direction === "outbound"
-                        ? "bg-primary text-primary-foreground rounded-br-md"
-                        : "bg-muted text-foreground rounded-bl-md"
+                      "flex",
+                      sms.direction === "outbound" ? "justify-end" : "justify-start"
                     )}
                   >
-                    <p className="whitespace-pre-wrap break-words">{sms.content}</p>
-                    <p className={cn(
-                      "text-xs mt-1",
-                      sms.direction === "outbound" 
-                        ? "text-primary-foreground/70" 
-                        : "text-muted-foreground"
-                    )}>
-                      {format(new Date(sms.created_at), "d. MMM HH:mm", { locale: da })}
-                    </p>
+                    <div className="max-w-[80%] flex flex-col items-end">
+                      <div
+                        className={cn(
+                          "rounded-2xl px-4 py-2 text-sm",
+                          sms.direction === "outbound"
+                            ? isFailed
+                              ? "bg-destructive text-destructive-foreground rounded-br-md"
+                              : "bg-primary text-primary-foreground rounded-br-md"
+                            : "bg-muted text-foreground rounded-bl-md"
+                        )}
+                      >
+                        <p className="whitespace-pre-wrap break-words">{sms.content}</p>
+                        <p className={cn(
+                          "text-xs mt-1 flex items-center gap-1",
+                          sms.direction === "outbound"
+                            ? isFailed ? "text-destructive-foreground/80" : "text-primary-foreground/70"
+                            : "text-muted-foreground"
+                        )}>
+                          <span>{format(new Date(sms.created_at), "d. MMM HH:mm", { locale: da })}</span>
+                          {sms.direction === "outbound" && (
+                            <>
+                              {isDelivered && <CheckCheck className="h-3 w-3" aria-label="Leveret" />}
+                              {isPending && <Clock className="h-3 w-3" aria-label="Afventer levering" />}
+                              {isFailed && <AlertTriangle className="h-3 w-3" aria-label="Ikke leveret" />}
+                              {!status && sms.direction === "outbound" && <Check className="h-3 w-3 opacity-50" aria-label="Sendt" />}
+                            </>
+                          )}
+                        </p>
+                      </div>
+                      {isFailed && sms.direction === "outbound" && (
+                        <p className="text-xs text-destructive mt-1 px-1 flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3" />
+                          Ikke leveret{sms.delivery_error_code ? ` (fejl ${sms.delivery_error_code})` : ""}
+                          {sms.delivery_error_message ? `: ${sms.delivery_error_message}` : ""}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
             <div ref={messagesEndRef} />
           </div>
