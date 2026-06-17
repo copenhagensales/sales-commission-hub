@@ -108,6 +108,21 @@ export function SendSmsDialog({ open, onOpenChange, candidate }: SendSmsDialogPr
           }
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'communication_logs',
+          filter: `type=eq.sms`
+        },
+        (payload) => {
+          const updated = payload.new as SmsMessage;
+          if (updated.phone_number?.includes(normalizedPhone)) {
+            queryClient.invalidateQueries({ queryKey: ["sms_history", candidate.id, normalizedPhone] });
+          }
+        }
+      )
       .subscribe();
 
     return () => {
