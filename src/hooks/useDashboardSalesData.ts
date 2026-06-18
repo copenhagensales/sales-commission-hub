@@ -325,9 +325,10 @@ export function useDashboardSalesData({
       };
 
       // Step 5: Fetch fieldmarketing sales from unified sales table
-      const fmSalesPromise = fetchAllRows<{id: string; sale_datetime: string; raw_payload: any; client_campaign_id: string | null}>(
+      // Include sale_items so we use campaign-aware mapped_commission/mapped_revenue (same source as TM).
+      const fmSalesPromise = fetchAllRows<{id: string; sale_datetime: string; raw_payload: any; client_campaign_id: string | null; sale_items: Array<{ quantity: number; mapped_commission: number; mapped_revenue: number; product_id: string | null }> | null}>(
         "sales",
-        "id, sale_datetime, raw_payload, client_campaign_id",
+        "id, sale_datetime, raw_payload, client_campaign_id, sale_items(quantity, mapped_commission, mapped_revenue, product_id)",
         (q) => {
           let filtered = q
             .eq("source", "fieldmarketing")
@@ -347,7 +348,7 @@ export function useDashboardSalesData({
       const hasDialerCampaignIds = salesData.some((sale: any) => Boolean(sale.dialer_campaign_id));
 
       // Fetch product pricing rules for commission/revenue (replaces product_campaign_overrides)
-      const [{ data: productPricingRules }, campaignMappings, allProducts] = await Promise.all([
+      const [{ data: productPricingRules }, campaignMappings] = await Promise.all([
         shouldFetchPricingRules
           ? supabase
               .from("product_pricing_rules")
@@ -357,9 +358,6 @@ export function useDashboardSalesData({
         hasDialerCampaignIds
           ? fetchAllRows<{id: string; adversus_campaign_id: string}>("adversus_campaign_mappings", "id, adversus_campaign_id")
           : Promise.resolve([] as {id: string; adversus_campaign_id: string}[]),
-        fmSalesData.length > 0
-          ? fetchAllRows<{id: string; name: string; commission_dkk: number; revenue_dkk: number}>("products", "id, name, commission_dkk, revenue_dkk")
-          : Promise.resolve([] as {id: string; name: string; commission_dkk: number; revenue_dkk: number}[]),
       ]);
 
       productPricingRules?.forEach(rule => {
@@ -409,33 +407,9 @@ export function useDashboardSalesData({
         }
       });
 
-      // Step 6: Get product commission/revenue maps for FM
+      // Step 6: FM commission/revenue now read from sale_items.mapped_* (campaign-aware,
+      // same source as TM). No product-name lookup needed.
 
-      const productCommissionMap = new Map<string, number>();
-      const productRevenueMap = new Map<string, number>();
-      const overrideByProductId = new Map<string, { commission: number; revenue: number }>();
-
-      // Use pricing rules for FM products as well
-      productPricingRules?.forEach((rule) => {
-        if (!rule.product_id) return;
-        const existing = overrideByProductId.get(rule.product_id);
-        if (!existing || (rule.commission_dkk ?? 0) > (existing.commission ?? 0)) {
-          overrideByProductId.set(rule.product_id, {
-            commission: rule.commission_dkk ?? 0,
-            revenue: rule.revenue_dkk ?? 0,
-          });
-        }
-      });
-
-      allProducts?.forEach((p) => {
-        if (p.name) {
-          const override = overrideByProductId.get(p.id);
-          const commission = override?.commission ?? p.commission_dkk ?? 0;
-          const revenue = override?.revenue ?? p.revenue_dkk ?? 0;
-          productCommissionMap.set(p.name.toLowerCase(), commission);
-          productRevenueMap.set(p.name.toLowerCase(), revenue);
-        }
-      });
 
       // Step 7: Build lookup maps used during aggregation (reduces repeated scans)
       const daysInRange = eachDayOfInterval({ start: startOfDay(startDate), end: endOfDay(endDate) });
@@ -552,9 +526,12 @@ export function useDashboardSalesData({
         const employeeId = (sale.raw_payload as any)?.fm_seller_id;
         if (!employeeId) return;
 
-        const productName = ((sale.raw_payload as any)?.fm_product_name || "").toLowerCase();
-        const saleRevenue = productRevenueMap.get(productName) || 0;
-        const saleCommission = productCommissionMap.get(productName) || 0;
+        let saleRevenue = 0;
+        let saleCommission = 0;
+        (sale.sale_items || []).forEach((item: any) => {
+          saleRevenue += Number(item.mapped_revenue) || 0;
+          saleCommission += Number(item.mapped_commission) || 0;
+        });
 
         const current = fmTotalsByEmployeeId.get(employeeId) || { sales: 0, revenue: 0, commission: 0 };
         fmTotalsByEmployeeId.set(employeeId, {
