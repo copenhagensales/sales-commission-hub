@@ -937,30 +937,36 @@ export default function DailyReports() {
             });
           });
 
-          // Add fieldmarketing sales - match commission and revenue by product_name from raw_payload
+          // Add fieldmarketing sales - sum mapped_commission/mapped_revenue from sale_items
+          // (campaign-aware, same source as dashboards). One FM sale = 1 salg, regardless of items.
           empFmSales.forEach((sale: any) => {
             salesCount += 1;
             const rawPayload = sale.raw_payload as any;
-            const productName = (rawPayload?.fm_product_name || "").toLowerCase();
-            const fmCommission = productCommissionMap.get(productName) || 0;
-            const fmRevenue = productRevenueMap.get(productName) || 0;
-            commission += fmCommission;
-            revenue += fmRevenue;
             // FM sales have client_id in raw_payload
             const clientId = rawPayload?.fm_client_id;
             if (clientId) {
               dayClientIds.add(clientId);
             }
-            // Aggregate FM product with "Fieldmarketing" as campaign
             const displayName = rawPayload?.fm_product_name || "Ukendt FM-produkt";
             const productKey = `${displayName}|||Fieldmarketing`;
+
+            const items = (sale.sale_items || []) as Array<any>;
+            let saleCommission = 0;
+            let saleRevenue = 0;
+            items.forEach((item: any) => {
+              saleCommission += Number(item.mapped_commission) || 0;
+              saleRevenue += Number(item.mapped_revenue) || 0;
+            });
+            commission += saleCommission;
+            revenue += saleRevenue;
+
             const existing = dayProductMap.get(productKey);
             if (existing) {
               existing.quantity += 1;
-              existing.commission += fmCommission;
-              existing.revenue += fmRevenue;
+              existing.commission += saleCommission;
+              existing.revenue += saleRevenue;
             } else {
-              dayProductMap.set(productKey, { quantity: 1, commission: fmCommission, revenue: fmRevenue });
+              dayProductMap.set(productKey, { quantity: 1, commission: saleCommission, revenue: saleRevenue });
             }
           });
 
