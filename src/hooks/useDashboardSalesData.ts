@@ -407,33 +407,9 @@ export function useDashboardSalesData({
         }
       });
 
-      // Step 6: Get product commission/revenue maps for FM
+      // Step 6: FM commission/revenue now read from sale_items.mapped_* (campaign-aware,
+      // same source as TM). No product-name lookup needed.
 
-      const productCommissionMap = new Map<string, number>();
-      const productRevenueMap = new Map<string, number>();
-      const overrideByProductId = new Map<string, { commission: number; revenue: number }>();
-
-      // Use pricing rules for FM products as well
-      productPricingRules?.forEach((rule) => {
-        if (!rule.product_id) return;
-        const existing = overrideByProductId.get(rule.product_id);
-        if (!existing || (rule.commission_dkk ?? 0) > (existing.commission ?? 0)) {
-          overrideByProductId.set(rule.product_id, {
-            commission: rule.commission_dkk ?? 0,
-            revenue: rule.revenue_dkk ?? 0,
-          });
-        }
-      });
-
-      allProducts?.forEach((p) => {
-        if (p.name) {
-          const override = overrideByProductId.get(p.id);
-          const commission = override?.commission ?? p.commission_dkk ?? 0;
-          const revenue = override?.revenue ?? p.revenue_dkk ?? 0;
-          productCommissionMap.set(p.name.toLowerCase(), commission);
-          productRevenueMap.set(p.name.toLowerCase(), revenue);
-        }
-      });
 
       // Step 7: Build lookup maps used during aggregation (reduces repeated scans)
       const daysInRange = eachDayOfInterval({ start: startOfDay(startDate), end: endOfDay(endDate) });
