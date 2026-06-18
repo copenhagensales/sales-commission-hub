@@ -440,38 +440,10 @@ async function testTotalRevenue(start: Date, end: Date, clientId?: string): Prom
   });
 
   // === FIELDMARKETING ===
-  const { data: allProducts } = await supabase
-    .from("products")
-    .select("id, name, revenue_dkk");
-  
-  // Get pricing rules for FM products - prefer highest revenue by priority
-  const { data: fmPricingRules } = await supabase
-    .from("product_pricing_rules")
-    .select("product_id, revenue_dkk")
-    .eq("is_active", true)
-    .order("priority", { ascending: false, nullsFirst: true });
-  
-  const overrideByProductId = new Map<string, number>();
-  fmPricingRules?.forEach(rule => {
-    if (!overrideByProductId.has(rule.product_id)) {
-      overrideByProductId.set(rule.product_id, rule.revenue_dkk ?? 0);
-    }
-  });
-  
-  const productRevenueMap = new Map<string, number>();
-  allProducts?.forEach(p => {
-    if (p.name) {
-      // Use pricing rule if available, otherwise fallback to product base price
-      const override = overrideByProductId.get(p.id);
-      const revenue = override ?? p.revenue_dkk ?? 0;
-      productRevenueMap.set(p.name.toLowerCase(), revenue);
-    }
-  });
-
-  // FM from unified sales table
-  const fmSalesRev = await fetchAllRows<{ id: string; raw_payload: any }>(
+  // Read revenue from sale_items.mapped_revenue (campaign-aware, same source as dashboards)
+  const fmSalesRev = await fetchAllRows<{ id: string; raw_payload: any; sale_items: Array<{ mapped_revenue: number }> | null }>(
     "sales",
-    "id, raw_payload",
+    "id, raw_payload, sale_items(mapped_revenue)",
     (q) => {
       let query = q.eq("source", "fieldmarketing")
         .gte("sale_datetime", `${startStr}T00:00:00`)
@@ -483,11 +455,12 @@ async function testTotalRevenue(start: Date, end: Date, clientId?: string): Prom
     },
     { orderBy: "sale_datetime", ascending: false }
   );
-  
+
   let fmRevenue = 0;
   (fmSalesRev || []).forEach((sale: any) => {
-    const productName = (sale.raw_payload?.fm_product_name || "").toLowerCase();
-    fmRevenue += productRevenueMap.get(productName) || 0;
+    (sale.sale_items || []).forEach((item: any) => {
+      fmRevenue += Number(item.mapped_revenue) || 0;
+    });
   });
 
   const totalRevenue = telesalesRevenue + fmRevenue;
