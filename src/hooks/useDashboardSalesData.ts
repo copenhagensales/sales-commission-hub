@@ -526,9 +526,12 @@ export function useDashboardSalesData({
         const employeeId = (sale.raw_payload as any)?.fm_seller_id;
         if (!employeeId) return;
 
-        const productName = ((sale.raw_payload as any)?.fm_product_name || "").toLowerCase();
-        const saleRevenue = productRevenueMap.get(productName) || 0;
-        const saleCommission = productCommissionMap.get(productName) || 0;
+        let saleRevenue = 0;
+        let saleCommission = 0;
+        (sale.sale_items || []).forEach((item: any) => {
+          saleRevenue += Number(item.mapped_revenue) || 0;
+          saleCommission += Number(item.mapped_commission) || 0;
+        });
 
         const current = fmTotalsByEmployeeId.get(employeeId) || { sales: 0, revenue: 0, commission: 0 };
         fmTotalsByEmployeeId.set(employeeId, {
