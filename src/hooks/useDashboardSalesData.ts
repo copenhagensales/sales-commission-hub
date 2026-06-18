@@ -325,9 +325,10 @@ export function useDashboardSalesData({
       };
 
       // Step 5: Fetch fieldmarketing sales from unified sales table
-      const fmSalesPromise = fetchAllRows<{id: string; sale_datetime: string; raw_payload: any; client_campaign_id: string | null}>(
+      // Include sale_items so we use campaign-aware mapped_commission/mapped_revenue (same source as TM).
+      const fmSalesPromise = fetchAllRows<{id: string; sale_datetime: string; raw_payload: any; client_campaign_id: string | null; sale_items: Array<{ quantity: number; mapped_commission: number; mapped_revenue: number; product_id: string | null }> | null}>(
         "sales",
-        "id, sale_datetime, raw_payload, client_campaign_id",
+        "id, sale_datetime, raw_payload, client_campaign_id, sale_items(quantity, mapped_commission, mapped_revenue, product_id)",
         (q) => {
           let filtered = q
             .eq("source", "fieldmarketing")
