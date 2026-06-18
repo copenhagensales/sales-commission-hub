@@ -348,7 +348,7 @@ export function useDashboardSalesData({
       const hasDialerCampaignIds = salesData.some((sale: any) => Boolean(sale.dialer_campaign_id));
 
       // Fetch product pricing rules for commission/revenue (replaces product_campaign_overrides)
-      const [{ data: productPricingRules }, campaignMappings, allProducts] = await Promise.all([
+      const [{ data: productPricingRules }, campaignMappings] = await Promise.all([
         shouldFetchPricingRules
           ? supabase
               .from("product_pricing_rules")
@@ -358,9 +358,6 @@ export function useDashboardSalesData({
         hasDialerCampaignIds
           ? fetchAllRows<{id: string; adversus_campaign_id: string}>("adversus_campaign_mappings", "id, adversus_campaign_id")
           : Promise.resolve([] as {id: string; adversus_campaign_id: string}[]),
-        fmSalesData.length > 0
-          ? fetchAllRows<{id: string; name: string; commission_dkk: number; revenue_dkk: number}>("products", "id, name, commission_dkk, revenue_dkk")
-          : Promise.resolve([] as {id: string; name: string; commission_dkk: number; revenue_dkk: number}[]),
       ]);
 
       productPricingRules?.forEach(rule => {
