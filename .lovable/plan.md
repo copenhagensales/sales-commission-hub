@@ -1,38 +1,52 @@
-## Mål
-Excel-udtræk over Relatel-salg i lønperiode **15/5–14/6 2026**, ét row pr. sale_item (linje), fuldt udspecificeret.
+## Problem
 
-## Kolonner jeg foreslår
+Konrad Dønning (15/5–14/6 2026):
+- TV-dashboard: **43.655 kr** ✓ (= `SUM(sale_items.mapped_commission)`)
+- Dagsrapport: **46.320 kr** ✗ (+2.665 kr fejl)
 
-**Det du bad om:**
-- Sælger (navn + email)
-- Vores interne kampagne (client_campaigns.name)
-- Adversus kampagne (dialer_campaign_id + navn fra adversus_campaign_mappings)
-- Produkt (display_name + products.name)
-- Tilskud (0/50/100% — fra raw_payload/normalized_data)
-- Provision (mapped_commission)
-- Timestamp (sale_datetime)
+41 Eesy marked-salg × 65 kr (diff mellem gaden-pris og marked-pris) = **2.665 kr eksakt**. Samme strukturelle bug rammer Melissa, Fanny m.fl.
 
-**Ekstra som vi har og normalt er nyttige — sig til hvis noget skal skæres væk:**
-- Team (sælgers team på salgstidspunktet)
-- Revenue (mapped_revenue) — så du kan se DB pr. linje
-- Antal (quantity)
-- Unit price
-- Status + validation_status (verified / pending / cancelled)
-- is_cancelled + cancelled_quantity (annulleringer trukket fra)
-- is_immediate_payment (straksbetaling-flag)
-- Kunde (company + phone) — kan udelades hvis du vil holde det PII-let
-- Internal reference (salgs-ID til opslag)
-- Matched pricing rule (hvilken prisregel der ramte — godt til pricing-audit)
-- needs_mapping flag (umappede salg)
-- Sale_id (til krydsreference)
+## Rod-årsag (evidens)
 
-## Format
-Én Excel-fil, to faner:
-1. **Detaljer** — én række pr. sale_item med alle kolonner ovenfor
-2. **Pr. sælger** — pivot: antal salg, sum provision, sum revenue, fordelt på tilskud-niveau
+`src/pages/reports/DailyReports.tsx`:
 
-## Afklaringer før jeg bygger
-1. Skal **kunde-felter** (company/phone) med? (PII — typisk ja til intern brug)
-2. Skal **annullerede linjer** med som egne rækker, eller skal de kun trækkes fra summerne?
-3. Provision = **mapped_commission pr. linje** (efter pricing-rules). OK?
-4. Tilskud-niveau: jeg henter fra `normalized_data` (typisk felt `subsidy` / `tilskud`). Hvis det mangler på nogle salg, viser jeg "ukendt" — OK?
+- **L944–968 — regulære salg:** læser `item.mapped_commission` direkte fra `sale_items` ✓ kampagne-korrekt.
+- **L758–769 — FM-fetch:** henter FM-salg fra `sales`-tabellen UDEN `sale_items`-join.
+- **L786–817 — `productCommissionMap`:** bygges på produkt-navn (lowercased) og vælger MAX commission på tværs af alle prisregler for samme product_id (L797). Ingen kampagne-hensyn.
+- **L971–996 — FM-salg-aggregering:** bruger `productCommissionMap.get(productName)` → vælger altid gaden-prisen (højest) for ALLE FM-salg, også marked-salg.
+
+**Verifikation i DB:** Konrads 116 FM-salg har 116 `sale_items` med `SUM(mapped_commission) = 43.655` — præcis det dashboard viser. Sale_items er allerede kampagne-korrekt prisede af `enrich_fm_sale` / pricing-motoren.
+
+To sandheder for samme tal → bryder princip 3 (én sandhed) og princip 8 (single source of truth i koden). Rød zone (rapportering af løn-relevante tal — dagsrapport bruges som sælger-overblik op til lønning).
+
+## Fix
+
+Én ændring i `src/pages/reports/DailyReports.tsx`:
+
+1. **L759–769:** Udvid FM-fetch select-clause til at inkludere `sale_items(quantity, mapped_commission, mapped_revenue, product_id, products(name, counts_as_sale))` — præcis samme join som regulære salg (L650).
+2. **L971–996:** Erstat `productCommissionMap`/`productRevenueMap`-lookup med iteration over `sale.sale_items` der summerer `Number(item.mapped_commission)` og `Number(item.mapped_revenue)` (kopi af mønstret L944–967).
+3. **Salg-count:** behold `salesCount += 1` pr. FM-sale (FM tæller én pr. registrering), men brug `item.products.counts_as_sale` hvis vi vil være konsistent med TM. Bekræft inden.
+4. **Oprydning:** Fjern `productCommissionMap`/`productRevenueMap` + `overrideByProductId` + `allProducts`-fetchen (L786–817) hvis intet andet bruger dem. (Tjek først med rg.)
+
+## Out of scope
+
+- Fanny's 4 ekstra salg (143 vs 139) — separat issue (FM dual-path attribution, kendt fra memory).
+- TV-dashboardets cache for Melissa i `payroll_period` — separat issue.
+- Ændringer i pricing-regler eller `sale_items`-data (de er korrekte).
+- Anden brug af `productCommissionMap` — verificeres før sletning.
+
+## Risiko
+
+Lav. Vi skifter dagsrapportens FM-tal fra forkert kilde (produkt-navn MAX) til allerede-verificeret kilde (`sale_items.mapped_commission`). Efter fix vil dashboard og dagsrapport vise samme provision for FM-salg. Ingen DB-ændringer, ingen edge functions, ingen pricing-regler rørt.
+
+## Verifikation efter fix
+
+- Konrad 15/5–14/6: dagsrapport skal vise 43.655 kr (= dashboard).
+- Melissa: 107.405 kr.
+- Fanny: 51.805 kr (men 143 salg pga. dual-path — separat issue).
+- TM-medarbejdere uændret (rører ikke L944–968).
+
+## Spørgsmål før implementation
+
+1. Skal `salesCount` for FM bevares som "+1 pr. sale" eller skiftes til `quantity` × `counts_as_sale` (matcher TM)?
+2. Må jeg slette `productCommissionMap`/`productRevenueMap`/`allProducts`-fetchen hvis ingen andre bruger dem, eller skal de blive stående som dead code til senere oprydning?
