@@ -123,6 +123,7 @@ export default function CarQuiz() {
   const [summaryAccepted, setSummaryAccepted] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [passed, setPassed] = useState(false);
+  const [retakeMode, setRetakeMode] = useState(false);
 
   const handleSubmit = () => {
     const allCorrect = QUESTIONS.every(q => answers[q.id] === q.correctAnswer);
@@ -246,8 +247,8 @@ export default function CarQuiz() {
     );
   }
 
-  // Quiz expired - show renewal notice
-  if (completion?.isExpired) {
+  // Quiz expired - show renewal notice (unless user clicked "Tag quizzen igen")
+  if (completion?.isExpired && !retakeMode) {
     return (
       <MainLayout>
         <div className="container mx-auto py-8 px-4 max-w-3xl space-y-8">
@@ -273,7 +274,7 @@ export default function CarQuiz() {
                   Tag quizzen igen for at fortsætte med at bruge firmabilerne.
                 </p>
               </div>
-              <Button size="lg" onClick={handleRetry} className="gap-2">
+              <Button size="lg" onClick={() => { handleRetry(); setRetakeMode(true); }} className="gap-2">
                 Tag quizzen igen
                 <ChevronRight className="h-4 w-4" />
               </Button>
