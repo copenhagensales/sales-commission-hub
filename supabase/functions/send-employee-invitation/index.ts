@@ -152,8 +152,8 @@ serve(async (req) => {
       .update({ invitation_status: "pending" })
       .eq("id", employeeId);
 
-    // Build invitation URL - use PUBLIC_APP_URL or fallback to production
-    const rawAppUrl = Deno.env.get("PUBLIC_APP_URL") || "https://40ce8d9b-c988-4d3b-a8ed-63eb5bed2204.lovableproject.com";
+    // Build invitation URL - use PUBLIC_APP_URL or fallback to Stork production domain
+    const rawAppUrl = Deno.env.get("PUBLIC_APP_URL") || "https://stork.copenhagensales.dk";
     // Remove trailing slash to prevent double slashes in URL
     const appUrl = rawAppUrl.replace(/\/+$/, "");
     const invitationUrl = `${appUrl}/onboarding?token=${token}`;
