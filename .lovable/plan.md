@@ -1,52 +1,38 @@
-## Problem
+## Konklusion
+SMS-flowet kan i dag vise en grøn “sendt” besked, selv om Twilio kun har accepteret den til kø — ikke nødvendigvis leveret den til modtageren. Derfor kan Isabella mangle SMS’en, mens Stork stadig ser ud som om alt er OK.
 
-Konrad Dønning (15/5–14/6 2026):
-- TV-dashboard: **43.655 kr** ✓ (= `SUM(sale_items.mapped_commission)`)
-- Dagsrapport: **46.320 kr** ✗ (+2.665 kr fejl)
+## Evidens fra koden
+- `supabase/functions/send-recruitment-sms/index.ts:63-80` sender SMS til Twilio og returnerer først fejl, hvis Twilio afviser selve oprettelsen.
+- `supabase/functions/send-recruitment-sms/index.ts:108-120` gemmer beskeden i `communication_logs` med `delivery_status: twilioResult.status || 'queued'`. `queued` er ikke leveret.
+- `supabase/functions/twilio-sms-status/index.ts:66-70` opdaterer `communication_logs` senere via `twilio_sid`, når Twilio melder `sent`, `delivered`, `undelivered` eller `failed`.
+- `src/components/recruitment/SendSmsDialog.tsx:238-286` viser faktisk leveringsstatus i SMS-dialogen.
+- Men screenshot’et matcher `src/pages/recruitment/Messages.tsx:649-699`, og den samtalevisning viser kun tekst + tidspunkt — ikke `delivery_status`, fejl eller “ikke leveret”.
 
-41 Eesy marked-salg × 65 kr (diff mellem gaden-pris og marked-pris) = **2.665 kr eksakt**. Samme strukturelle bug rammer Melissa, Fanny m.fl.
+## Plan
+1. **Verificér Isabella-beskeden i data/logs**
+   - Slå den konkrete udgående SMS op i `communication_logs` ud fra tidspunkt/indhold/telefon.
+   - Tjek `twilio_sid`, `delivery_status`, `delivery_error_code`, `delivery_error_message`.
+   - Tjek edge function logs for `send-recruitment-sms` og `twilio-sms-status` omkring samme tidspunkt.
 
-## Rod-årsag (evidens)
+2. **Ret hovedvisningen for rekrutterings-SMS**
+   - Udvid `Message`-typen i `src/pages/recruitment/Messages.tsx` med:
+     - `delivery_status`
+     - `delivery_error_code`
+     - `delivery_error_message`
+   - Vis samme leveringsindikator som i `SendSmsDialog` direkte i samtalen:
+     - `queued/sent` = afventer/sendt
+     - `delivered` = leveret
+     - `undelivered/failed` = ikke leveret + fejltekst/kode
 
-`src/pages/reports/DailyReports.tsx`:
+3. **Gør “Svar” mindre falsk-trygt**
+   - Efter afsendelse skal brugeren se status som “Afventer levering” i stedet for bare en grøn boble.
+   - Hvis status senere bliver `undelivered` eller `failed`, skal beskeden markeres tydeligt i samtalen.
 
-- **L944–968 — regulære salg:** læser `item.mapped_commission` direkte fra `sale_items` ✓ kampagne-korrekt.
-- **L758–769 — FM-fetch:** henter FM-salg fra `sales`-tabellen UDEN `sale_items`-join.
-- **L786–817 — `productCommissionMap`:** bygges på produkt-navn (lowercased) og vælger MAX commission på tværs af alle prisregler for samme product_id (L797). Ingen kampagne-hensyn.
-- **L971–996 — FM-salg-aggregering:** bruger `productCommissionMap.get(productName)` → vælger altid gaden-prisen (højest) for ALLE FM-salg, også marked-salg.
+4. **Valider callback-kæden**
+   - Bekræft at `twilio-sms-status` faktisk modtager status callbacks og matcher rækker via `twilio_sid`.
+   - Hvis konkrete Isabella-SMS ikke har fået callback, er næste fix at sikre status-callback URL/konfiguration — ikke UI.
 
-**Verifikation i DB:** Konrads 116 FM-salg har 116 `sale_items` med `SUM(mapped_commission) = 43.655` — præcis det dashboard viser. Sale_items er allerede kampagne-korrekt prisede af `enrich_fm_sale` / pricing-motoren.
-
-To sandheder for samme tal → bryder princip 3 (én sandhed) og princip 8 (single source of truth i koden). Rød zone (rapportering af løn-relevante tal — dagsrapport bruges som sælger-overblik op til lønning).
-
-## Fix
-
-Én ændring i `src/pages/reports/DailyReports.tsx`:
-
-1. **L759–769:** Udvid FM-fetch select-clause til at inkludere `sale_items(quantity, mapped_commission, mapped_revenue, product_id, products(name, counts_as_sale))` — præcis samme join som regulære salg (L650).
-2. **L971–996:** Erstat `productCommissionMap`/`productRevenueMap`-lookup med iteration over `sale.sale_items` der summerer `Number(item.mapped_commission)` og `Number(item.mapped_revenue)` (kopi af mønstret L944–967).
-3. **Salg-count:** behold `salesCount += 1` pr. FM-sale (FM tæller én pr. registrering), men brug `item.products.counts_as_sale` hvis vi vil være konsistent med TM. Bekræft inden.
-4. **Oprydning:** Fjern `productCommissionMap`/`productRevenueMap` + `overrideByProductId` + `allProducts`-fetchen (L786–817) hvis intet andet bruger dem. (Tjek først med rg.)
-
-## Out of scope
-
-- Fanny's 4 ekstra salg (143 vs 139) — separat issue (FM dual-path attribution, kendt fra memory).
-- TV-dashboardets cache for Melissa i `payroll_period` — separat issue.
-- Ændringer i pricing-regler eller `sale_items`-data (de er korrekte).
-- Anden brug af `productCommissionMap` — verificeres før sletning.
-
-## Risiko
-
-Lav. Vi skifter dagsrapportens FM-tal fra forkert kilde (produkt-navn MAX) til allerede-verificeret kilde (`sale_items.mapped_commission`). Efter fix vil dashboard og dagsrapport vise samme provision for FM-salg. Ingen DB-ændringer, ingen edge functions, ingen pricing-regler rørt.
-
-## Verifikation efter fix
-
-- Konrad 15/5–14/6: dagsrapport skal vise 43.655 kr (= dashboard).
-- Melissa: 107.405 kr.
-- Fanny: 51.805 kr (men 143 salg pga. dual-path — separat issue).
-- TM-medarbejdere uændret (rører ikke L944–968).
-
-## Spørgsmål før implementation
-
-1. Skal `salesCount` for FM bevares som "+1 pr. sale" eller skiftes til `quantity` × `counts_as_sale` (matcher TM)?
-2. Må jeg slette `productCommissionMap`/`productRevenueMap`/`allProducts`-fetchen hvis ingen andre bruger dem, eller skal de blive stående som dead code til senere oprydning?
+## Afgrænsning
+- Ingen ændring af SMS-templates, booking-flow eller Twilio credentials.
+- Ingen DB-skemaændring medmindre verificeringen viser, at statusfelterne mangler i aktiv database.
+- Ingen ændring af medarbejder-SMS, medmindre samme fejl bekræftes dér bagefter.
