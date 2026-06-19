@@ -76,8 +76,8 @@ export function useSubmitCarQuiz() {
         .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .maybeSingle();
 
-      if (employeeError) throw new Error("Error finding employee");
-      if (!employee) throw new Error("Employee not found");
+      if (employeeError) throw new Error(`Kunne ikke finde medarbejder: ${employeeError.message}`);
+      if (!employee) throw new Error("Din bruger er ikke koblet til en medarbejder-profil. Kontakt din leder.");
 
       // Get IP address
       let ipAddress = "Unknown";
@@ -107,16 +107,26 @@ export function useSubmitCarQuiz() {
           submitted_at: submittedAt,
         });
 
-      if (submissionError) throw submissionError;
+      if (submissionError) {
+        console.error("Quiz submission insert failed:", submissionError);
+        throw new Error(`Kunne ikke gemme svar: ${submissionError.message}`);
+      }
 
-      // If passed, also update the completions table
+      // If passed, upsert completions row (allows retake after expiry)
       if (passed) {
         const { error: completionError } = await supabase
           .from("car_quiz_completions")
-          .insert({ employee_id: employee.id });
+          .upsert(
+            { employee_id: employee.id, passed_at: submittedAt },
+            { onConflict: "employee_id" }
+          );
 
-        if (completionError) throw completionError;
+        if (completionError) {
+          console.error("Quiz completion upsert failed:", completionError);
+          throw new Error(`Kunne ikke registrere beståelse: ${completionError.message}`);
+        }
       }
+
 
       // Send email with result
       const employeeName = `${employee.first_name} ${employee.last_name}`;
