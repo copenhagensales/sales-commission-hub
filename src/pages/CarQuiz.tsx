@@ -123,6 +123,7 @@ export default function CarQuiz() {
   const [summaryAccepted, setSummaryAccepted] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [passed, setPassed] = useState(false);
+  const [retakeMode, setRetakeMode] = useState(false);
 
   const handleSubmit = () => {
     const allCorrect = QUESTIONS.every(q => answers[q.id] === q.correctAnswer);
