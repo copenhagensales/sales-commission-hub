@@ -143,8 +143,8 @@ export default function CarQuiz() {
             toast.info("Dit svar er registreret. Resultatet er sendt til din email.");
           }
         },
-        onError: () => {
-          toast.error("Der opstod en fejl. Prøv igen.");
+        onError: (err: Error) => {
+          toast.error(err?.message || "Der opstod en fejl. Prøv igen.");
         },
       }
     );
