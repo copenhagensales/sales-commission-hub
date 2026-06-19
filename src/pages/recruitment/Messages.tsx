@@ -18,7 +18,10 @@ import {
   ArrowLeft,
   Send,
   ChevronRight,
-  Filter
+  Filter,
+  Check,
+  CheckCheck,
+  AlertTriangle
 } from "lucide-react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
@@ -37,6 +40,9 @@ interface Message {
   outcome: string | null;
   application_id: string | null;
   phone_number: string | null;
+  delivery_status?: string | null;
+  delivery_error_code?: string | null;
+  delivery_error_message?: string | null;
 }
 
 interface Conversation {
@@ -649,34 +655,62 @@ export default function Messages() {
                 {/* Messages */}
                 <ScrollArea className="flex-1 p-4">
                   <div className="space-y-3">
-                    {selectedConversation.messages.map((msg) => (
-                      <div
-                        key={msg.id}
-                        className={cn(
-                          "flex",
-                          msg.direction === "outbound" ? "justify-end" : "justify-start"
-                        )}
-                      >
+                    {selectedConversation.messages.map((msg) => {
+                      const status = (msg.delivery_status || "").toLowerCase();
+                      const isOutbound = msg.direction === "outbound";
+                      const isFailed = status === "undelivered" || status === "failed";
+                      const isDelivered = status === "delivered";
+                      const isSent = status === "sent";
+                      const isPending = isOutbound && !isFailed && !isDelivered && !isSent;
+
+                      return (
                         <div
+                          key={msg.id}
                           className={cn(
-                            "max-w-[80%] rounded-2xl px-4 py-2",
-                            msg.direction === "outbound"
-                              ? "bg-primary text-primary-foreground rounded-br-md"
-                              : "bg-muted text-foreground rounded-bl-md"
+                            "flex",
+                            isOutbound ? "justify-end" : "justify-start"
                           )}
                         >
-                          <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
-                          <p className={cn(
-                            "text-xs mt-1",
-                            msg.direction === "outbound" 
-                              ? "text-primary-foreground/70" 
-                              : "text-muted-foreground"
-                          )}>
-                            {format(new Date(msg.created_at), "d. MMM HH:mm", { locale: da })}
-                          </p>
+                          <div className="max-w-[80%] flex flex-col items-end">
+                            <div
+                              className={cn(
+                                "rounded-2xl px-4 py-2",
+                                isOutbound
+                                  ? isFailed
+                                    ? "bg-destructive text-destructive-foreground rounded-br-md"
+                                    : "bg-primary text-primary-foreground rounded-br-md"
+                                  : "bg-muted text-foreground rounded-bl-md"
+                              )}
+                            >
+                              <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
+                              <p className={cn(
+                                "text-xs mt-1 flex items-center gap-1",
+                                isOutbound
+                                  ? isFailed ? "text-destructive-foreground/80" : "text-primary-foreground/70"
+                                  : "text-muted-foreground"
+                              )}>
+                                <span>{format(new Date(msg.created_at), "d. MMM HH:mm", { locale: da })}</span>
+                                {isOutbound && (
+                                  <>
+                                    {isDelivered && <CheckCheck className="h-3 w-3" aria-label="Leveret" />}
+                                    {isSent && <Check className="h-3 w-3" aria-label="Sendt" />}
+                                    {isPending && <Clock className="h-3 w-3" aria-label="Afventer levering" />}
+                                    {isFailed && <AlertTriangle className="h-3 w-3" aria-label="Ikke leveret" />}
+                                  </>
+                                )}
+                              </p>
+                            </div>
+                            {isFailed && isOutbound && (
+                              <p className="text-xs text-destructive mt-1 px-1 flex items-center gap-1">
+                                <AlertTriangle className="h-3 w-3" />
+                                Ikke leveret{msg.delivery_error_code ? ` (fejl ${msg.delivery_error_code})` : ""}
+                                {msg.delivery_error_message ? `: ${msg.delivery_error_message}` : ""}
+                              </p>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                     <div ref={messagesEndRef} />
                   </div>
                 </ScrollArea>
