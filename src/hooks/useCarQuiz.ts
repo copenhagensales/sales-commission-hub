@@ -76,8 +76,8 @@ export function useSubmitCarQuiz() {
         .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .maybeSingle();
 
-      if (employeeError) throw new Error("Error finding employee");
-      if (!employee) throw new Error("Employee not found");
+      if (employeeError) throw new Error(`Kunne ikke finde medarbejder: ${employeeError.message}`);
+      if (!employee) throw new Error("Din bruger er ikke koblet til en medarbejder-profil. Kontakt din leder.");
 
       // Get IP address
       let ipAddress = "Unknown";
