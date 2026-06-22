@@ -1,26 +1,22 @@
 ## Hvad
-Genberig den eksisterende Excel (`relatel-loenperiode-15maj-14jun-2026-pr-saelger-med-cvr.xlsx`) — denne gang ved at hente CVR direkte fra Stork-databasen i stedet for cvrapi.dk. Resten af filen holdes 1:1.
+Genberig Excel'en — denne gang ved at matche på **`internal_reference` (MG-…)** i stedet for telefonnummer. Hver Relatel-salg har en unik reference, og 564/564 Relatel-salg har CVR + Firmanavn i `masterDataFields`. Tidligere match på telefon ramte kun 17/34 fordi numrene normaliseres forskelligt og ikke alle salg har samme telefonværdi i `sales.customer_phone`.
 
 ## Hvor data ligger
-- Tabel: `public.sales`
-- Felt: `raw_payload->'masterDataFields'->>'Cvr nummer'` (CVR som tekst)
-- Felt: `raw_payload->'masterDataFields'->>'Firmanavn'` (virksomhedsnavn)
-- Match-nøgle: `sales.customer_phone` (samme felt vi allerede har i Excel-arket pr. sælger)
-- Filter: kun Relatel-kilde (`source ILIKE '%relatel%'`) for at undgå støj fra andre integrationer
+- Match-nøgle: kolonne R `internal_reference` i Excel ↔ `sales.internal_reference` i Stork
+- CVR: `sales.raw_payload->'masterDataFields'->>'Cvr nummer'`
+- Firma: `sales.raw_payload->'masterDataFields'->>'Firmanavn'`
 
 ## Fremgangsmåde
-1. Læs alle unikke `customer_phone` fra de 34 sælger-faner i den uploadede Excel.
-2. Normalisér numre (strip mellemrum, `+45`, ledende nuller) på begge sider af matchet, så `+45 12345678` matcher `12345678` i Stork.
-3. Én SQL-forespørgsel mod `sales` der returnerer pr. telefon: nyeste ikke-tomme CVR + Firmanavn (`ORDER BY sale_datetime DESC` så vi tager seneste registrering).
-4. For numre uden hit i Stork: lad cellen være tom (ingen internet-fallback — brugeren har sagt det skal komme fra Stork).
-5. Skriv ny fil til `/mnt/documents/relatel-loenperiode-15maj-14jun-2026-pr-saelger-med-cvr.xlsx` (overskriv).
+1. Læs alle unikke `internal_reference` fra de 34 sælger-faner i `relatel-loenperiode-15maj-14jun-2026-pr-saelger-med-cvr-v2.xlsx`.
+2. Én SQL-forespørgsel: `SELECT internal_reference, cvr, firma FROM sales WHERE internal_reference = ANY($1)`.
+3. Skriv kolonne S (`cvr`) og T (`virksomhed`) i hver fane fra mappingen.
+4. Hvis et `internal_reference` ikke har CVR i `masterDataFields` (sjælden case som MG-202605-03457): lad cellen være tom.
+5. Output: `/mnt/documents/relatel-loenperiode-15maj-14jun-2026-pr-saelger-med-cvr-v3.xlsx`. Alt andet 1:1 fra v2.
 
 ## Forventet dækning
-Sandsynligvis højere end de 33/34 fra cvrapi-opslaget, fordi Stork har CVR fra det faktiske salgsmoment (uafhængigt af om virksomhedens telefonnummer er offentligt registreret hos Erhvervsstyrelsen). Tomme felter vil typisk være privatkunder eller fejlregistreringer hvor `masterDataFields` ikke blev udfyldt i Adversus.
+Tæt på 100%. Kun salg uden `masterDataFields` (få stk., typisk ældre eller fejlregistrerede) vil mangle.
 
 ## Uden for scope
-- Ingen ændringer i Stork-kode, DB-skema eller edge functions.
-- Ingen ændring af eksisterende kolonner/faner i Excel-filen — kun `cvr` og `virksomhed` opdateres.
-- Ingen fallback til cvrapi.dk.
+Ingen kode-ændringer, ingen DB-ændringer, ingen ændring af andre kolonner.
 
 Godkender du, kører jeg det.
