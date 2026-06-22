@@ -1,45 +1,26 @@
-## Symptom
-Bruger trykker "Indsend svar" på bil-quiz → toast "Der opstod en fejl. Prøv igen." Ingen detalje vises. Quiz kan ikke gennemføres → bruger forbliver låst ude af systemet.
+## Hvad
+Genberig den eksisterende Excel (`relatel-loenperiode-15maj-14jun-2026-pr-saelger-med-cvr.xlsx`) — denne gang ved at hente CVR direkte fra Stork-databasen i stedet for cvrapi.dk. Resten af filen holdes 1:1.
 
-## Rod-årsager (evidens)
+## Hvor data ligger
+- Tabel: `public.sales`
+- Felt: `raw_payload->'masterDataFields'->>'Cvr nummer'` (CVR som tekst)
+- Felt: `raw_payload->'masterDataFields'->>'Firmanavn'` (virksomhedsnavn)
+- Match-nøgle: `sales.customer_phone` (samme felt vi allerede har i Excel-arket pr. sælger)
+- Filter: kun Relatel-kilde (`source ILIKE '%relatel%'`) for at undgå støj fra andre integrationer
 
-**1. UNIQUE-constraint blokerer retake/gen-indsendelse**
-`supabase/migrations/20251206095611_…sql:8` definerer `CONSTRAINT car_quiz_unique_employee UNIQUE (employee_id)` på `car_quiz_completions`.
-`src/hooks/useCarQuiz.ts:114-118` laver `.insert({ employee_id })` uden `upsert`. Anden gang (retake efter udløb, eller hvis en tidligere completion findes) fejler insert med `23505 duplicate key`. Mutation kaster → generisk toast.
+## Fremgangsmåde
+1. Læs alle unikke `customer_phone` fra de 34 sælger-faner i den uploadede Excel.
+2. Normalisér numre (strip mellemrum, `+45`, ledende nuller) på begge sider af matchet, så `+45 12345678` matcher `12345678` i Stork.
+3. Én SQL-forespørgsel mod `sales` der returnerer pr. telefon: nyeste ikke-tomme CVR + Firmanavn (`ORDER BY sale_datetime DESC` så vi tager seneste registrering).
+4. For numre uden hit i Stork: lad cellen være tom (ingen internet-fallback — brugeren har sagt det skal komme fra Stork).
+5. Skriv ny fil til `/mnt/documents/relatel-loenperiode-15maj-14jun-2026-pr-saelger-med-cvr.xlsx` (overskriv).
 
-**2. RLS-blokering hvis auth-email ikke matcher `employee_master_data`**
-RLS på begge tabeller kræver `employee_id = get_current_employee_id()` (migration `20251206102556_…sql:22`, `20251206095611_…sql:17`). `get_current_employee_id()` matcher via `auth_user_id` eller email-lookup på `private_email`/`work_email`. Hvis nyligt oprettet bruger har en email der ikke matcher 1:1 (fx kun `work_email` udfyldt og bruger logget ind med privat email, eller omvendt), returnerer den NULL → INSERT afvises af RLS.
-
-Hook'ets eget employee-lookup (`useCarQuiz.ts:73-77`) bruger `ilike` mod begge felter og kan finde employee'n — men RLS-funktionen sammenligner kun `lower(...) =` på de samme to felter, så de bør være enige. Hvis fejlen er denne, kommer den fra RLS, ikke fra hook-lookup.
-
-**3. Generisk fejl-toast skjuler diagnosen**
-`src/pages/CarQuiz.tsx:146-148` viser samme toast uanset hvad. Vi kan ikke se om det er duplicate-key, RLS, mangler employee, eller netværk.
-
-## Fix (gul zone — pages + hook + RLS-policy)
-
-### Ændring 1 — `src/hooks/useCarQuiz.ts`
-- Erstat `car_quiz_completions`-insert (linje 114-118) med `.upsert({ employee_id, passed_at: new Date().toISOString() }, { onConflict: 'employee_id' })`. Løser retake-cases og er idempotent.
-- I `mutationFn`: kast en `Error` med konkret besked (`submissionError.message`, `completionError.message`, "Employee not found") i stedet for generisk throw, så toast kan vise reel årsag.
-
-### Ændring 2 — `src/pages/CarQuiz.tsx`
-- `onError: (err) => toast.error(err.message || "Der opstod en fejl. Prøv igen.")` så brugeren (og vi) ser hvad der reelt fejler.
-
-### Ændring 3 — RLS for retake (`car_quiz_completions`)
-INSERT-policy giver ret til INSERT, men ikke UPDATE. `upsert` med eksisterende række kræver UPDATE-rettighed. Tilføj migration:
-```sql
-CREATE POLICY "Employees can update own quiz completion"
-ON public.car_quiz_completions
-FOR UPDATE
-USING (employee_id = get_current_employee_id())
-WITH CHECK (employee_id = get_current_employee_id());
-```
-
-### Verifikation
-1. Test som logget-ind FM-bruger der allerede har en completion: indsend igen → ingen duplicate-key fejl, `passed_at` opdateret.
-2. Test som ny bruger uden completion: virker som før.
-3. Hvis fejlen stadig opstår: den nye toast viser nu om det er RLS (`new row violates row-level security`), employee-mismatch, eller noget tredje — så kan vi diagnosticere præcist næste runde.
+## Forventet dækning
+Sandsynligvis højere end de 33/34 fra cvrapi-opslaget, fordi Stork har CVR fra det faktiske salgsmoment (uafhængigt af om virksomhedens telefonnummer er offentligt registreret hos Erhvervsstyrelsen). Tomme felter vil typisk være privatkunder eller fejlregistreringer hvor `masterDataFields` ikke blev udfyldt i Adversus.
 
 ## Uden for scope
-- Pricing, løn, GDPR, rolle-system.
-- At "passed" beregnes baseret på checkboxes alene (separat diskussion).
-- Lock-overlay logik (`useCarQuizLock`) — kun submit-flowet fixes her.
+- Ingen ændringer i Stork-kode, DB-skema eller edge functions.
+- Ingen ændring af eksisterende kolonner/faner i Excel-filen — kun `cvr` og `virksomhed` opdateres.
+- Ingen fallback til cvrapi.dk.
+
+Godkender du, kører jeg det.
