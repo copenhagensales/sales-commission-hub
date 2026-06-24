@@ -65,9 +65,20 @@ serve(async (req) => {
 
     console.log(`Processing password reset for employee`);
 
-    // Check if user exists in auth
-    const { data: existingUsers } = await supabase.auth.admin.listUsers();
-    const existingUser = existingUsers?.users?.find(u => u.email === email);
+    // Check if user exists in auth (paginate — listUsers default returns only 50)
+    const targetEmail = email.toLowerCase();
+    let existingUser: { id: string; email?: string } | undefined;
+    for (let page = 1; page <= 50; page++) {
+      const { data: pageData, error: listErr } = await supabase.auth.admin.listUsers({ page, perPage: 1000 });
+      if (listErr) {
+        console.error("listUsers error:", listErr);
+        break;
+      }
+      existingUser = pageData?.users?.find(u => (u.email || "").toLowerCase() === targetEmail);
+      if (existingUser) break;
+      if (!pageData?.users || pageData.users.length < 1000) break;
+    }
+
 
     if (existingUser) {
       // Update existing user's password
