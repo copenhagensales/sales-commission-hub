@@ -1,21 +1,22 @@
-## Fix: Beregn manglende R6-data for Sæson 2
 
-### Årsag
-Runde 6 blev aldrig processeret af `league-process-round`. Den havde tidligere end_date = `2026-06-22 00:00:00 UTC` og var stadig `active`, men S2 nåede status `completed` før cron'en fik nået at processere runden. Da `league-process-round` kun arbejder på sæsoner med `status='active'`, blev R6 sprunget over — derfor 0 rækker i `league_round_standings` for R6.
+Ingen kodeændringer — kun datalookup. Sælgernavn fra koden vises (kan afvige fra dit navn i listen).
 
-Min sidste ændring satte R6 til `completed` direkte uden at beregne standings, hvilket forværrede tilstanden.
+| CVR | Dato | Sælger (i system) | Produkt | Antal | Prov | Oms |
+|---|---|---|---|---|---|---|
+| 30147057 | 15-01 10:06 | Rasmus Quilding *(ikke Nørgaard)* | Switch Professionel ATL | 1 | 703 | 1.407 |
+| 45498093 | 26-02 15:00 | Rasmus Quilding *(ikke Nørgaard)* | Fri Tale – 10 GB BTL #2 | 1 | 430 | 1.085 |
+| 45498093 | 26-02 15:00 | Rasmus Quilding | Switch Contact Center #3 | 1 | 520 | 1.161 |
+| 21057347 | 12-05 07:19 | Anders Kristensen | MBB 2000GB BTL #6 + Router | 1 | 950 | 2.300 |
+| 45509443 | 28-04 14:17 | Benjamin Solberg | Fri Tale – 60 GB ATL | 1 | 875 | 2.175 |
+| 45509443 | 28-04 14:17 | Benjamin Solberg | MBB 1000GB BTL #3 + Router | 1 | 880 | 2.200 |
+| 45509443 | 28-04 14:17 | Benjamin Solberg | Switch Professionel ATL | 1 | 445 | 891 |
+| 45509443 | 28-04 14:17 | Benjamin Solberg | Fri Tale – 1000 GB BTL #2 | 1 | 950 | 2.300 |
+| 79043028 | 31-03 12:51 | Benjamin Solberg | Fri Tale – 60 GB BTL #5 | 1 | 750 | 1.875 |
+| 79043028 | 31-03 12:51 | Benjamin Solberg | MBB 1000GB BTL #4 + Router | 1 | 880 | 2.200 |
+| 43243888 | 09-04 12:07 | Frederik Kvistgaard | MBB 2000GB BTL #6 + Router | 1 | 950 | 2.300 |
+| 39992337 | 13-03 10:30 | Gustav Diebel *(ikke Damgaard)* | MBB 2000GB BTL #6 | 1 | 950 | 2.300 |
+| 39992337 | 13-03 10:30 | Gustav Diebel | Fri Tale – 1000 GB ATL | 1 | 1.100 | 2.600 |
+| 10448077 | 03-02 08:46 | Jacob Nielson | MBB 1000GB BTL #4 + Router | 1 | 730 | 2.200 |
+| 45793575 | 16-03 14:26 | Jacob Nielson | MBB 1000GB BTL #4 + Router | 1 | 730 | 2.200 |
 
-### Fix
-1. Sæt R6 tilbage til `status='active'` (data-update).
-2. Sæt S2 midlertidigt til `status='active'` (data-update).
-3. Kald edge function `league-process-round` med `{ seasonId: <S2.id> }`. Den finder R6 (nu active + end_date i fortid), beregner provision via `get_sales_aggregates_v2` for vinduet **11.–21. juni** (R6's `start_date` til `end_date 2026-06-21 21:59:59+00`), skriver `league_round_standings`, opdaterer `league_season_standings` og sætter R6 til `completed`.
-4. Sæt S2 tilbage til `status='completed'`.
-
-### Verifikation
-- `SELECT count(*) FROM league_round_standings WHERE round_id = R6` skal returnere 47 (samme som de øvrige S2-runder).
-- UI viser R6-data på `/commission-league`.
-
-### Tekniske noter
-- Ingen kodeændringer.
-- R6's end_date forbliver `2026-06-21 21:59:59+00` så salg fra 22. juni IKKE tælles med.
-- S3 berøres ikke.
+**Total provision: 11.843 kr** (omsætning 27.194 kr). Ingen linjer er markeret annulleret. Bemærk navnemismatch på Rasmus Nørgaard (system: Quilding) og Gustav Damgaard (system: Diebel) — sig til hvis jeg skal grave i hvorfor.
