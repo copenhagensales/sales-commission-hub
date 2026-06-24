@@ -1,22 +1,23 @@
-## Hvad
-Genberig Excel'en — denne gang ved at matche på **`internal_reference` (MG-…)** i stedet for telefonnummer. Hver Relatel-salg har en unik reference, og 564/564 Relatel-salg har CVR + Firmanavn i `masterDataFields`. Tidligere match på telefon ramte kun 17/34 fordi numrene normaliseres forskelligt og ikke alle salg har samme telefonværdi i `sales.customer_phone`.
+## Start Sæson 3 + luk Sæson 2 korrekt
 
-## Hvor data ligger
-- Match-nøgle: kolonne R `internal_reference` i Excel ↔ `sales.internal_reference` i Stork
-- CVR: `sales.raw_payload->'masterDataFields'->>'Cvr nummer'`
-- Firma: `sales.raw_payload->'masterDataFields'->>'Firmanavn'`
+### Problem med Sæson 2
+- S2 er markeret `completed`, men **runde 6 er stadig `active`** og slutter `2026-06-22 00:00:00 UTC` (= 02:00 dansk tid d. 22.). Salg fra d. 22. juni risikerer at blive talt med i S2's sidste runde.
 
-## Fremgangsmåde
-1. Læs alle unikke `internal_reference` fra de 34 sælger-faner i `relatel-loenperiode-15maj-14jun-2026-pr-saelger-med-cvr-v2.xlsx`.
-2. Én SQL-forespørgsel: `SELECT internal_reference, cvr, firma FROM sales WHERE internal_reference = ANY($1)`.
-3. Skriv kolonne S (`cvr`) og T (`virksomhed`) i hver fane fra mappingen.
-4. Hvis et `internal_reference` ikke har CVR i `masterDataFields` (sjælden case som MG-202605-03457): lad cellen være tom.
-5. Output: `/mnt/documents/relatel-loenperiode-15maj-14jun-2026-pr-saelger-med-cvr-v3.xlsx`. Alt andet 1:1 fra v2.
+### Fix Sæson 2 (data-update)
+- Sæt runde 6's `end_date` til `2026-06-21 21:59:59+00` (= 23:59:59 dansk tid søn 21. jun).
+- Sæt runde 6's `status = 'completed'`.
+- Bekræft S2's `end_date = 2026-06-21` (allerede korrekt).
+- Resultat: alt salg fra 22. juni og frem hører ikke længere til S2.
 
-## Forventet dækning
-Tæt på 100%. Kun salg uden `masterDataFields` (få stk., typisk ældre eller fejlregistrerede) vil mangle.
+### Opret Sæson 3 (data-insert)
+- **Provision/kvalifikation:** man 22. jun – søn 28. jun 2026
+- **Tilmeldingsperiode:** man 22. jun – søn 28. jun 2026
+- **Sæson:** man 29. jun – søn 9. aug 2026 (6 uger)
+- Indsæt række i `league_seasons` med `season_number=3`, `status='qualification'`, `config` kopieret fra S2.
+- Status skifter automatisk til `active` mandag 29. jun via cron.
 
-## Uden for scope
-Ingen kode-ændringer, ingen DB-ændringer, ingen ændring af andre kolonner.
-
-Godkender du, kører jeg det.
+### Tekniske noter
+- Ingen kodeændringer.
+- Eksekveres som `UPDATE` på `league_rounds` + `INSERT` i `league_seasons` via `supabase--insert`.
+- S2 Hall of Fame bevares uændret.
+- `league-calculate-standings` finder S3 automatisk når status er `qualification`.
