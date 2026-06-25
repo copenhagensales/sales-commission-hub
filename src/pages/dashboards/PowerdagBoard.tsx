@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Link } from "react-router-dom";
 import { TvBoardQuickGenerator } from "@/components/dashboard/TvBoardQuickGenerator";
 import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
-import { useCachedLeaderboard, formatDisplayName, getInitials } from "@/hooks/useCachedLeaderboard";
+import { useCachedLeaderboard, formatDisplayName } from "@/hooks/useCachedLeaderboard";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -191,7 +191,7 @@ export default function PowerdagBoard() {
               <div className="flex items-baseline gap-3">
                 <h2 className={`${tv ? "text-2xl" : "text-lg"} font-bold flex items-center gap-2`}>
                   <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
-                  Top 10 Sælgere
+                  Top 10
                 </h2>
                 <span className="text-xs text-muted-foreground">· i dag</span>
               </div>
@@ -281,9 +281,6 @@ function TopSellersList({ tv }: { tv: boolean }) {
           >
             <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-black text-sm ${SELLER_RANK_COLORS[idx] ?? SELLER_RANK_COLORS[3]}`}>
               {idx + 1}
-            </div>
-            <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center font-black text-sm ${SELLER_AVATAR_COLORS[idx % SELLER_AVATAR_COLORS.length]}`}>
-              {getInitials(seller.employeeName)}
             </div>
             <div className="flex-1 min-w-0">
               <p className={`font-bold truncate ${tv ? "text-lg" : "text-sm"}`}>
