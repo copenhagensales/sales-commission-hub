@@ -1,9 +1,10 @@
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
-import { useActiveEvent, useRulesForEvent, useScoresForEvent, computeStandings } from "@/hooks/usePowerdagData";
+import { useActiveEvent, useRulesForEvent, useScoresForEvent, computeStandings, useUpdateEvent } from "@/hooks/usePowerdagData";
 import { useAutoReload, isTvMode } from "@/utils/tvMode";
-import { Trophy, Medal } from "lucide-react";
+import { Trophy, Medal, Pencil } from "lucide-react";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Link } from "react-router-dom";
 import { TvBoardQuickGenerator } from "@/components/dashboard/TvBoardQuickGenerator";
 import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
@@ -11,6 +12,8 @@ import { Progress } from "@/components/ui/progress";
 import { useCachedLeaderboard, formatDisplayName, getInitials } from "@/hooks/useCachedLeaderboard";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { useState } from "react";
+import { toast } from "sonner";
 
 const PODIUM_CONFIG = [
   { emoji: "🥇", bg: "from-yellow-500/20 via-amber-500/10 to-yellow-600/5", border: "border-yellow-500/50", glow: "shadow-yellow-500/20", label: "text-yellow-400" },
@@ -40,11 +43,15 @@ export default function PowerdagBoard() {
     <DashboardShell>
       <div className={`${tv ? "p-6" : "p-4 md:p-6"} max-w-5xl mx-auto space-y-8`}>
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className={`${tv ? "text-4xl" : "text-2xl md:text-3xl"} font-black tracking-tight flex items-center gap-3`}>
-              <Trophy className="h-7 w-7 text-yellow-500" />
-              {event?.name ?? "Powerdag"}
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <h1 className={`${tv ? "text-4xl" : "text-2xl md:text-3xl"} font-black tracking-tight flex items-center gap-3 flex-wrap`}>
+              <Trophy className="h-7 w-7 text-yellow-500 flex-shrink-0" />
+              {event && !tv && hasEditAccess ? (
+                <EditableEventName event={event} large={tv} />
+              ) : (
+                <span>{event?.name ?? "Powerdag"}</span>
+              )}
               <span className="inline-flex items-center gap-1.5 ml-2 px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-semibold uppercase tracking-wider">
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
@@ -53,7 +60,15 @@ export default function PowerdagBoard() {
                 Live
               </span>
             </h1>
-            {event && <p className="text-sm text-muted-foreground mt-1">{new Date(event.event_date).toLocaleDateString("da-DK", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>}
+            {event && (
+              !tv && hasEditAccess ? (
+                <EditableEventDate event={event} />
+              ) : (
+                <p className="text-sm text-muted-foreground mt-1">
+                  {new Date(event.event_date).toLocaleDateString("da-DK", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+                </p>
+              )
+            )}
           </div>
           {!tv && hasEditAccess && (
             <div className="flex items-center gap-2">
@@ -254,5 +269,107 @@ function TopSellersSection({ tv }: { tv: boolean }) {
         ))}
       </div>
     </div>
+  );
+}
+
+function EditableEventName({ event }: { event: { id: string; name: string }; large?: boolean }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(event.name);
+  const update = useUpdateEvent();
+
+  const save = async () => {
+    const trimmed = value.trim();
+    setEditing(false);
+    if (!trimmed || trimmed === event.name) {
+      setValue(event.name);
+      return;
+    }
+    try {
+      await update.mutateAsync({ id: event.id, patch: { name: trimmed } });
+      toast.success("Titel opdateret");
+    } catch (e: any) {
+      toast.error("Kunne ikke gemme: " + (e?.message ?? "ukendt fejl"));
+      setValue(event.name);
+    }
+  };
+
+  if (editing) {
+    return (
+      <Input
+        autoFocus
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+          if (e.key === "Escape") { setValue(event.name); setEditing(false); }
+        }}
+        className="h-auto py-1 text-3xl font-black w-auto min-w-[280px]"
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      className="group inline-flex items-center gap-2 rounded-md px-1 -mx-1 hover:bg-muted/50 transition-colors"
+      title="Klik for at redigere"
+    >
+      <span>{event.name}</span>
+      <Pencil className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+    </button>
+  );
+}
+
+function EditableEventDate({ event }: { event: { id: string; event_date: string } }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(event.event_date);
+  const update = useUpdateEvent();
+
+  const formatted = new Date(event.event_date).toLocaleDateString("da-DK", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
+  const save = async () => {
+    setEditing(false);
+    if (!value || value === event.event_date) {
+      setValue(event.event_date);
+      return;
+    }
+    try {
+      await update.mutateAsync({ id: event.id, patch: { event_date: value } });
+      toast.success("Dato opdateret");
+    } catch (e: any) {
+      toast.error("Kunne ikke gemme: " + (e?.message ?? "ukendt fejl"));
+      setValue(event.event_date);
+    }
+  };
+
+  if (editing) {
+    return (
+      <Input
+        autoFocus
+        type="date"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+          if (e.key === "Escape") { setValue(event.event_date); setEditing(false); }
+        }}
+        className="h-auto py-1 text-sm w-auto mt-1"
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      className="group mt-1 inline-flex items-center gap-2 rounded px-1 -mx-1 hover:bg-muted/50 transition-colors"
+      title="Klik for at redigere"
+    >
+      <span className="text-sm text-muted-foreground">{formatted}</span>
+      <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+    </button>
   );
 }
