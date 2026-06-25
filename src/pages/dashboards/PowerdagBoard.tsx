@@ -191,7 +191,7 @@ export default function PowerdagBoard() {
               <div className="flex items-baseline gap-3">
                 <h2 className={`${tv ? "text-2xl" : "text-lg"} font-bold flex items-center gap-2`}>
                   <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
-                  Top 5 Sælgere
+                  Top 10 Sælgere
                 </h2>
                 <span className="text-xs text-muted-foreground">· i dag</span>
               </div>
@@ -263,7 +263,7 @@ function RestTeamRow({ team, rank, leaderPoints, barColor, tv, delay = 0 }: {
 }
 
 function TopSellersList({ tv }: { tv: boolean }) {
-  const { data: topSellers = [] } = useCachedLeaderboard("today", { type: "global" }, { limit: 5 });
+  const { data: topSellers = [] } = useCachedLeaderboard("today", { type: "global" }, { limit: 10 });
 
   if (topSellers.length === 0) {
     return <p className="text-sm text-muted-foreground py-8 text-center">Ingen sælgerdata endnu.</p>;
