@@ -263,7 +263,7 @@ function RestTeamRow({ team, rank, leaderPoints, barColor, tv, delay = 0 }: {
 }
 
 function TopSellersList({ tv }: { tv: boolean }) {
-  const { data: topSellers = [] } = useCachedLeaderboard("today", { type: "global" }, { limit: 5 });
+  const { data: topSellers = [] } = useCachedLeaderboard("today", { type: "global" }, { limit: 10 });
 
   if (topSellers.length === 0) {
     return <p className="text-sm text-muted-foreground py-8 text-center">Ingen sælgerdata endnu.</p>;
