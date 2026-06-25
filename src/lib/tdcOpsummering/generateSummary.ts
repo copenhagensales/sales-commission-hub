@@ -45,8 +45,10 @@ export const TRANSLATIONS: Record<string, string> = {
     "You are bound by the contract for 36 months.",
   "Abonnementet har 12 måneders binding og derefter 3 måneders opsigelse. Du modtager en ordrebekræftelse inden for 14 dage, hvori opstartsdatoerne fremgår. Vi kan ikke opsige dit nuværende internet for dig, vi anbefaler derfor at du matcher opsigelsen med vores oprettelsesdato der fremgår i ordrebekræftelsen.":
     "The subscription has a 12-month commitment period followed by 3 months' notice. You will receive an order confirmation within 14 days, which will include the start dates. We are unable to cancel your current internet service on your behalf; we therefore recommend that you align the cancellation with our activation date as stated in the order confirmation.",
-  "Inden for 7 hverdage vil i blive kontaktet af min kollega, som vil byde jer velkommen og få hjulpet med nummeroverflytning.":
-    "Within 7 business days, you will be contacted by a colleague of mine who will welcome you and assist with the number porting process.",
+  "Snarest muligt vil i blive kontaktet af min kollega, som vil byde jer velkommen og få hjulpet med nummeroverflytning. Det vi skal bruge fra jer, er simkortnumrene på de numre der skal flyttes. Hvis I har mulighed for at finde dem frem inden velkomstkaldet er det en stor hjælp.":
+    "As soon as possible, you will be contacted by my colleague, who will welcome you and help with the number transfer. What we need from you are the SIM card numbers for the numbers being transferred. If you're able to find these before the welcome call, it's a great help.",
+  "Vi har kun mulighed for at opsige de numre vi flytter over. Hvis I har produkter ved siden af, som f.eks. internet eller produkter uden et nummer tilkoblet vil i selv skulle opsige disse.":
+    "We are only able to cancel the numbers we transfer over. If you have other products on the side, such as internet or products without a number attached, you will need to cancel these yourselves.",
   "Vi har snakket om, at det som udgangspunkt er":
     "We have discussed that the starting point is",
   "(antal) eksisterende numre":
@@ -161,7 +163,9 @@ export function generateSummary(state: SummaryState): SummaryLine[] {
   lines.push({ text: "" });
 
   if (isPilot) {
-    lines.push({ text: t("Inden for 7 hverdage vil i blive kontaktet af min kollega, som vil byde jer velkommen og få hjulpet med nummeroverflytning.") });
+    lines.push({ text: t("Snarest muligt vil i blive kontaktet af min kollega, som vil byde jer velkommen og få hjulpet med nummeroverflytning. Det vi skal bruge fra jer, er simkortnumrene på de numre der skal flyttes. Hvis I har mulighed for at finde dem frem inden velkomstkaldet er det en stor hjælp.") });
+    lines.push({ text: "" });
+    lines.push({ text: t("Vi har kun mulighed for at opsige de numre vi flytter over. Hvis I har produkter ved siden af, som f.eks. internet eller produkter uden et nummer tilkoblet vil i selv skulle opsige disse.") });
     lines.push({ text: "" });
 
     if (numberChoice === "existing") {

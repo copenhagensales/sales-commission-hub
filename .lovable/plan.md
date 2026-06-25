@@ -1,22 +1,19 @@
+## Ændring
+I `src/lib/tdcOpsummering/generateSummary.ts` erstattes den eksisterende sætning i pilot-grenen (linje 164) med ny længere tekst. Bruges allerede kun når `summaryVariant === "pilot"`, så afgrænsning til TDC Opsummering → Pilot er sikret. Vises før alle valgfrie sektioner — uændret placering.
 
-Ingen kodeændringer — kun datalookup. Sælgernavn fra koden vises (kan afvige fra dit navn i listen).
+### Konkret
+- **Linje 48–49** (TRANSLATIONS-map): den gamle dansk→engelsk-mapping erstattes med ny dansk nøgle → ny engelsk oversættelse.
+- **Linje 164**: `t("...gammel tekst...")` erstattes med `t("...ny tekst...")`. Teksten pushes som én `SummaryLine` med `\n\n` mellem de to afsnit, så den vises som én sammenhængende blok med afsnitsskift.
 
-| CVR | Dato | Sælger (i system) | Produkt | Antal | Prov | Oms |
-|---|---|---|---|---|---|---|
-| 30147057 | 15-01 10:06 | Rasmus Quilding *(ikke Nørgaard)* | Switch Professionel ATL | 1 | 703 | 1.407 |
-| 45498093 | 26-02 15:00 | Rasmus Quilding *(ikke Nørgaard)* | Fri Tale – 10 GB BTL #2 | 1 | 430 | 1.085 |
-| 45498093 | 26-02 15:00 | Rasmus Quilding | Switch Contact Center #3 | 1 | 520 | 1.161 |
-| 21057347 | 12-05 07:19 | Anders Kristensen | MBB 2000GB BTL #6 + Router | 1 | 950 | 2.300 |
-| 45509443 | 28-04 14:17 | Benjamin Solberg | Fri Tale – 60 GB ATL | 1 | 875 | 2.175 |
-| 45509443 | 28-04 14:17 | Benjamin Solberg | MBB 1000GB BTL #3 + Router | 1 | 880 | 2.200 |
-| 45509443 | 28-04 14:17 | Benjamin Solberg | Switch Professionel ATL | 1 | 445 | 891 |
-| 45509443 | 28-04 14:17 | Benjamin Solberg | Fri Tale – 1000 GB BTL #2 | 1 | 950 | 2.300 |
-| 79043028 | 31-03 12:51 | Benjamin Solberg | Fri Tale – 60 GB BTL #5 | 1 | 750 | 1.875 |
-| 79043028 | 31-03 12:51 | Benjamin Solberg | MBB 1000GB BTL #4 + Router | 1 | 880 | 2.200 |
-| 43243888 | 09-04 12:07 | Frederik Kvistgaard | MBB 2000GB BTL #6 + Router | 1 | 950 | 2.300 |
-| 39992337 | 13-03 10:30 | Gustav Diebel *(ikke Damgaard)* | MBB 2000GB BTL #6 | 1 | 950 | 2.300 |
-| 39992337 | 13-03 10:30 | Gustav Diebel | Fri Tale – 1000 GB ATL | 1 | 1.100 | 2.600 |
-| 10448077 | 03-02 08:46 | Jacob Nielson | MBB 1000GB BTL #4 + Router | 1 | 730 | 2.200 |
-| 45793575 | 16-03 14:26 | Jacob Nielson | MBB 1000GB BTL #4 + Router | 1 | 730 | 2.200 |
+### Ny dansk tekst
+> Snarest muligt vil i blive kontaktet af min kollega, som vil byde jer velkommen og få hjulpet med nummeroverflytning. Det vi skal bruge fra jer, er simkortnumrene på de numre der skal flyttes. Hvis I har mulighed for at finde dem frem inden velkomstkaldet er det en stor hjælp.
+>
+> Vi har kun mulighed for at opsige de numre vi flytter over. Hvis I har produkter ved siden af, som f.eks. internet eller produkter uden et nummer tilkoblet vil i selv skulle opsige disse.
 
-**Total provision: 11.843 kr** (omsætning 27.194 kr). Ingen linjer er markeret annulleret. Bemærk navnemismatch på Rasmus Nørgaard (system: Quilding) og Gustav Damgaard (system: Diebel) — sig til hvis jeg skal grave i hvorfor.
+### Ny engelsk oversættelse
+> As soon as possible, you will be contacted by my colleague, who will welcome you and help with the number transfer. What we need from you are the SIM card numbers for the numbers being transferred. If you're able to find these before the welcome call, it's a great help.
+>
+> We are only able to cancel the numbers we transfer over. If you have other products on the side, such as internet or products without a number attached, you will need to cancel these yourselves.
+
+### Ikke berørt
+Standard- og 5g-fri-varianter, øvrige sektioner, komponenter og UI.
