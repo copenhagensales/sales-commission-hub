@@ -271,3 +271,105 @@ function TopSellersSection({ tv }: { tv: boolean }) {
     </div>
   );
 }
+
+function EditableEventName({ event }: { event: { id: string; name: string }; large?: boolean }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(event.name);
+  const update = useUpdateEvent();
+
+  const save = async () => {
+    const trimmed = value.trim();
+    setEditing(false);
+    if (!trimmed || trimmed === event.name) {
+      setValue(event.name);
+      return;
+    }
+    try {
+      await update.mutateAsync({ id: event.id, patch: { name: trimmed } });
+      toast.success("Titel opdateret");
+    } catch (e: any) {
+      toast.error("Kunne ikke gemme: " + (e?.message ?? "ukendt fejl"));
+      setValue(event.name);
+    }
+  };
+
+  if (editing) {
+    return (
+      <Input
+        autoFocus
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+          if (e.key === "Escape") { setValue(event.name); setEditing(false); }
+        }}
+        className="h-auto py-1 text-3xl font-black w-auto min-w-[280px]"
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      className="group inline-flex items-center gap-2 rounded-md px-1 -mx-1 hover:bg-muted/50 transition-colors"
+      title="Klik for at redigere"
+    >
+      <span>{event.name}</span>
+      <Pencil className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+    </button>
+  );
+}
+
+function EditableEventDate({ event }: { event: { id: string; event_date: string } }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(event.event_date);
+  const update = useUpdateEvent();
+
+  const formatted = new Date(event.event_date).toLocaleDateString("da-DK", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
+  const save = async () => {
+    setEditing(false);
+    if (!value || value === event.event_date) {
+      setValue(event.event_date);
+      return;
+    }
+    try {
+      await update.mutateAsync({ id: event.id, patch: { event_date: value } });
+      toast.success("Dato opdateret");
+    } catch (e: any) {
+      toast.error("Kunne ikke gemme: " + (e?.message ?? "ukendt fejl"));
+      setValue(event.event_date);
+    }
+  };
+
+  if (editing) {
+    return (
+      <Input
+        autoFocus
+        type="date"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+          if (e.key === "Escape") { setValue(event.event_date); setEditing(false); }
+        }}
+        className="h-auto py-1 text-sm w-auto mt-1"
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      className="group mt-1 inline-flex items-center gap-2 rounded px-1 -mx-1 hover:bg-muted/50 transition-colors"
+      title="Klik for at redigere"
+    >
+      <span className="text-sm text-muted-foreground">{formatted}</span>
+      <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+    </button>
+  );
+}
