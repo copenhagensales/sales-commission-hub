@@ -43,11 +43,15 @@ export default function PowerdagBoard() {
     <DashboardShell>
       <div className={`${tv ? "p-6" : "p-4 md:p-6"} max-w-5xl mx-auto space-y-8`}>
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className={`${tv ? "text-4xl" : "text-2xl md:text-3xl"} font-black tracking-tight flex items-center gap-3`}>
-              <Trophy className="h-7 w-7 text-yellow-500" />
-              {event?.name ?? "Powerdag"}
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <h1 className={`${tv ? "text-4xl" : "text-2xl md:text-3xl"} font-black tracking-tight flex items-center gap-3 flex-wrap`}>
+              <Trophy className="h-7 w-7 text-yellow-500 flex-shrink-0" />
+              {event && !tv && hasEditAccess ? (
+                <EditableEventName event={event} large={tv} />
+              ) : (
+                <span>{event?.name ?? "Powerdag"}</span>
+              )}
               <span className="inline-flex items-center gap-1.5 ml-2 px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-semibold uppercase tracking-wider">
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
@@ -56,7 +60,15 @@ export default function PowerdagBoard() {
                 Live
               </span>
             </h1>
-            {event && <p className="text-sm text-muted-foreground mt-1">{new Date(event.event_date).toLocaleDateString("da-DK", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>}
+            {event && (
+              !tv && hasEditAccess ? (
+                <EditableEventDate event={event} />
+              ) : (
+                <p className="text-sm text-muted-foreground mt-1">
+                  {new Date(event.event_date).toLocaleDateString("da-DK", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+                </p>
+              )
+            )}
           </div>
           {!tv && hasEditAccess && (
             <div className="flex items-center gap-2">
