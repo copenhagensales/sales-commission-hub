@@ -1,7 +1,7 @@
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useActiveEvent, useRulesForEvent, useScoresForEvent, computeStandings, useUpdateEvent } from "@/hooks/usePowerdagData";
 import { useAutoReload, isTvMode } from "@/utils/tvMode";
-import { Trophy, Crown, Star, Pencil } from "lucide-react";
+import { Trophy, Crown, Star, Pencil, Sparkles, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link } from "react-router-dom";
@@ -10,6 +10,22 @@ import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
 import { useCachedLeaderboard, formatDisplayName } from "@/hooks/useCachedLeaderboard";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+
+// Suspense window: from 15:00 on event day the points are hidden behind a
+// "???" placeholder. From 16:30 a reveal button appears (only for users with
+// edit access) — pressing it flips `is_revealed` on the event and the points
+// re-appear for everyone.
+const HIDE_HOUR = 15;
+const HIDE_MIN = 0;
+const REVEAL_HOUR = 16;
+const REVEAL_MIN = 30;
+
+function eventDayAt(eventDate: string, hour: number, minute: number): Date {
+  // event_date is "YYYY-MM-DD". Construct in local (Danish) time.
+  const [y, m, d] = eventDate.split("-").map(Number);
+  return new Date(y, (m ?? 1) - 1, d ?? 1, hour, minute, 0, 0);
+}
+
 
 const PODIUM_TONES = [
   // index 0 = 1st (gold)
