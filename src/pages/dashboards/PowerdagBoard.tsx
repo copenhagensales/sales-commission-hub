@@ -160,75 +160,91 @@ export default function PowerdagBoard() {
             <div className="lg:col-span-2 space-y-5">
               <div className="flex items-baseline gap-3">
                 <h2 className={`${tv ? "text-2xl" : "text-lg"} font-bold`}>Holdkonkurrencen</h2>
-                <span className="text-xs text-muted-foreground">· point i dag</span>
+                <span className="text-xs text-muted-foreground">
+                  {isSuspense ? "· lukket – afsløres kl. 16.30" : "· point i dag"}
+                </span>
               </div>
 
-              {/* Podium */}
-              {top3.length >= 3 && (
-                <div className="grid grid-cols-3 gap-3 md:gap-4 items-end">
-                  {PODIUM_ORDER.map((rankIdx, displayIdx) => {
-                    const team = top3[rankIdx];
-                    const cfg = PODIUM_TONES[rankIdx];
-                    const isFirst = rankIdx === 0;
-                    return (
-                      <div
-                        key={team.team_name}
-                        className={`relative rounded-2xl border ${cfg.border} bg-card/40 backdrop-blur px-4 py-6 text-center ${isFirst ? `${cfg.glow} ring-2 ${cfg.ring}` : ""}`}
-                        style={{
-                          animation: `fade-in 0.5s ease-out ${displayIdx * 0.12}s both`,
-                          minHeight: isFirst ? (tv ? 320 : 270) : (tv ? 260 : 220),
-                        }}
-                      >
-                        {isFirst && (
-                          <div className="absolute -top-7 left-1/2 -translate-x-1/2 flex flex-col items-center">
-                            <span className="text-[10px] font-black tracking-[0.25em] text-yellow-400 mb-0.5">FØRER</span>
-                            <Crown className="h-7 w-7 text-yellow-400 fill-yellow-400" />
+              {isSuspense ? (
+                <SuspensePanel
+                  teams={standings.map(s => s.team_name)}
+                  tv={tv}
+                  canRevealNow={canRevealNow}
+                  msUntilReveal={msUntilReveal}
+                  onReveal={handleReveal}
+                  isRevealing={updateEvent.isPending}
+                />
+              ) : (
+                <>
+                  {/* Podium */}
+                  {top3.length >= 3 && (
+                    <div className="grid grid-cols-3 gap-3 md:gap-4 items-end">
+                      {PODIUM_ORDER.map((rankIdx, displayIdx) => {
+                        const team = top3[rankIdx];
+                        const cfg = PODIUM_TONES[rankIdx];
+                        const isFirst = rankIdx === 0;
+                        return (
+                          <div
+                            key={team.team_name}
+                            className={`relative rounded-2xl border ${cfg.border} bg-card/40 backdrop-blur px-4 py-6 text-center ${isFirst ? `${cfg.glow} ring-2 ${cfg.ring}` : ""}`}
+                            style={{
+                              animation: `fade-in 0.5s ease-out ${displayIdx * 0.12}s both`,
+                              minHeight: isFirst ? (tv ? 320 : 270) : (tv ? 260 : 220),
+                            }}
+                          >
+                            {isFirst && (
+                              <div className="absolute -top-7 left-1/2 -translate-x-1/2 flex flex-col items-center">
+                                <span className="text-[10px] font-black tracking-[0.25em] text-yellow-400 mb-0.5">FØRER</span>
+                                <Crown className="h-7 w-7 text-yellow-400 fill-yellow-400" />
+                              </div>
+                            )}
+                            <div className={`mx-auto mb-3 h-10 w-10 rounded-full flex items-center justify-center font-black text-base ${cfg.badge} shadow-lg`}>
+                              {rankIdx + 1}
+                            </div>
+                            <p className={`font-black tabular-nums leading-none ${cfg.text} ${tv ? "text-7xl" : "text-5xl md:text-6xl"}`}>
+                              {formatPoints(team.total_points)}
+                            </p>
+                            <p className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground mt-2">Point</p>
+                            <p className={`font-bold mt-4 truncate ${tv ? "text-xl" : "text-base"}`}>{team.team_name}</p>
+                            {team.sub_entries.length > 1 && team.sub_entries.some(e => e.sub_client_name) && (
+                              <p className="text-[10px] text-muted-foreground mt-1 truncate">
+                                {team.sub_entries.map(e => e.sub_client_name ?? team.team_name).join(" · ")}
+                              </p>
+                            )}
                           </div>
-                        )}
-                        <div className={`mx-auto mb-3 h-10 w-10 rounded-full flex items-center justify-center font-black text-base ${cfg.badge} shadow-lg`}>
-                          {rankIdx + 1}
-                        </div>
-                        <p className={`font-black tabular-nums leading-none ${cfg.text} ${tv ? "text-7xl" : "text-5xl md:text-6xl"}`}>
-                          {formatPoints(team.total_points)}
-                        </p>
-                        <p className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground mt-2">Point</p>
-                        <p className={`font-bold mt-4 truncate ${tv ? "text-xl" : "text-base"}`}>{team.team_name}</p>
-                        {team.sub_entries.length > 1 && team.sub_entries.some(e => e.sub_client_name) && (
-                          <p className="text-[10px] text-muted-foreground mt-1 truncate">
-                            {team.sub_entries.map(e => e.sub_client_name ?? team.team_name).join(" · ")}
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                        );
+                      })}
+                    </div>
+                  )}
 
-              {top3.length < 3 && top3.length > 0 && (
-                <div className="space-y-3">
-                  {top3.map((team, i) => (
-                    <RestTeamRow key={team.team_name} team={team} rank={i + 1} leaderPoints={leaderPoints} barColor={REST_BAR_COLORS[i % REST_BAR_COLORS.length]} tv={tv} />
-                  ))}
-                </div>
-              )}
+                  {top3.length < 3 && top3.length > 0 && (
+                    <div className="space-y-3">
+                      {top3.map((team, i) => (
+                        <RestTeamRow key={team.team_name} team={team} rank={i + 1} leaderPoints={leaderPoints} barColor={REST_BAR_COLORS[i % REST_BAR_COLORS.length]} tv={tv} />
+                      ))}
+                    </div>
+                  )}
 
-              {/* Rest */}
-              {rest.length > 0 && (
-                <div className="space-y-3 pt-2">
-                  {rest.map((team, i) => (
-                    <RestTeamRow
-                      key={team.team_name}
-                      team={team}
-                      rank={i + 4}
-                      leaderPoints={leaderPoints}
-                      barColor={REST_BAR_COLORS[i % REST_BAR_COLORS.length]}
-                      tv={tv}
-                      delay={i * 0.08}
-                    />
-                  ))}
-                </div>
+                  {/* Rest */}
+                  {rest.length > 0 && (
+                    <div className="space-y-3 pt-2">
+                      {rest.map((team, i) => (
+                        <RestTeamRow
+                          key={team.team_name}
+                          team={team}
+                          rank={i + 4}
+                          leaderPoints={leaderPoints}
+                          barColor={REST_BAR_COLORS[i % REST_BAR_COLORS.length]}
+                          tv={tv}
+                          delay={i * 0.08}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </div>
+
 
             {/* RIGHT: Top 5 sellers */}
             <div className="space-y-5">
