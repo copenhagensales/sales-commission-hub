@@ -6,8 +6,10 @@ export interface PowerdagEvent {
   name: string;
   event_date: string;
   is_active: boolean;
+  is_revealed: boolean;
   created_at: string;
 }
+
 
 export interface PowerdagRule {
   id: string;
