@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Link } from "react-router-dom";
 import { TvBoardQuickGenerator } from "@/components/dashboard/TvBoardQuickGenerator";
 import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
-import { useCachedLeaderboard, formatDisplayName, getInitials } from "@/hooks/useCachedLeaderboard";
+import { useCachedLeaderboard, formatDisplayName } from "@/hooks/useCachedLeaderboard";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
