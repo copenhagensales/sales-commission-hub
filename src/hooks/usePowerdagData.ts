@@ -50,9 +50,11 @@ export function useActiveEvent() {
       if (error) throw error;
       return data as PowerdagEvent | null;
     },
-    staleTime: 60_000,
+    staleTime: 15_000,
+    refetchInterval: 15_000,
   });
 }
+
 
 export function useAllEvents() {
   return useQuery({
