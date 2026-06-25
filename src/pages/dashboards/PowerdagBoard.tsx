@@ -282,9 +282,6 @@ function TopSellersList({ tv }: { tv: boolean }) {
             <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-black text-sm ${SELLER_RANK_COLORS[idx] ?? SELLER_RANK_COLORS[3]}`}>
               {idx + 1}
             </div>
-            <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center font-black text-sm ${SELLER_AVATAR_COLORS[idx % SELLER_AVATAR_COLORS.length]}`}>
-              {getInitials(seller.employeeName)}
-            </div>
             <div className="flex-1 min-w-0">
               <p className={`font-bold truncate ${tv ? "text-lg" : "text-sm"}`}>
                 {formatDisplayName(seller.employeeName)}
