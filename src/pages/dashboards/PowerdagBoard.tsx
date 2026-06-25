@@ -460,3 +460,88 @@ function EditableEventDate({ event }: { event: { id: string; event_date: string 
     </button>
   );
 }
+
+function SuspensePanel({
+  teams,
+  tv,
+  canRevealNow,
+  msUntilReveal,
+  onReveal,
+  isRevealing,
+}: {
+  teams: string[];
+  tv: boolean;
+  canRevealNow: boolean;
+  msUntilReveal: number;
+  onReveal: () => void;
+  isRevealing: boolean;
+}) {
+  return (
+    <div className="space-y-5">
+      <div
+        className="relative overflow-hidden rounded-2xl border border-yellow-400/30 bg-gradient-to-br from-yellow-400/10 via-amber-500/5 to-rose-500/10 px-6 py-10 text-center"
+        style={{ animation: "fade-in 0.5s ease-out both" }}
+      >
+        <div className="absolute inset-0 pointer-events-none opacity-30">
+          <div className="absolute -top-10 -left-10 h-40 w-40 rounded-full bg-yellow-400/30 blur-3xl animate-pulse" />
+          <div className="absolute -bottom-10 -right-10 h-40 w-40 rounded-full bg-rose-400/30 blur-3xl animate-pulse" />
+        </div>
+        <div className="relative">
+          <div className="mx-auto mb-4 inline-flex items-center justify-center h-14 w-14 rounded-full bg-yellow-400/20 border border-yellow-400/40">
+            <Lock className="h-6 w-6 text-yellow-400" />
+          </div>
+          <h3 className={`font-black tracking-tight ${tv ? "text-4xl" : "text-2xl md:text-3xl"}`}>
+            Pointene er låst
+          </h3>
+          <p className={`mt-2 text-muted-foreground ${tv ? "text-xl" : "text-base"}`}>
+            Sidste heat er i gang. Vinderen afsløres kl. 16.30.
+          </p>
+
+          {canRevealNow ? (
+            <Button
+              size="lg"
+              onClick={onReveal}
+              disabled={isRevealing}
+              className="mt-6 bg-yellow-400 hover:bg-yellow-500 text-black font-black uppercase tracking-wider shadow-[0_0_40px_-5px_rgba(250,204,21,0.6)]"
+            >
+              <Sparkles className="h-5 w-5 mr-2" />
+              {isRevealing ? "Afslører…" : "Afslør vinderen"}
+            </Button>
+          ) : (
+            <div className="mt-6 inline-flex flex-col items-center gap-1">
+              <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+                Tid til afsløring
+              </span>
+              <span className={`tabular-nums font-black text-yellow-400 ${tv ? "text-5xl" : "text-4xl"}`}>
+                {formatCountdown(msUntilReveal)}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Team list without points */}
+      <div className="space-y-2.5">
+        {teams.map((name, i) => (
+          <div
+            key={name}
+            className="flex items-center gap-4 rounded-2xl border border-white/5 bg-card/40 backdrop-blur px-4 py-3.5"
+            style={{ animation: `fade-in 0.4s ease-out ${i * 0.06}s both` }}
+          >
+            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted/40 border border-white/5 flex items-center justify-center">
+              <Lock className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <p className={`flex-1 font-bold truncate ${tv ? "text-xl" : "text-base"}`}>{name}</p>
+            <p
+              className={`font-black tabular-nums text-muted-foreground/60 ${tv ? "text-3xl" : "text-2xl"}`}
+              aria-label="Skjult"
+            >
+              ???
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
