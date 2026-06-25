@@ -10181,6 +10181,7 @@ export type Database = {
           event_date: string
           id: string
           is_active: boolean
+          is_revealed: boolean
           name: string
         }
         Insert: {
@@ -10188,6 +10189,7 @@ export type Database = {
           event_date?: string
           id?: string
           is_active?: boolean
+          is_revealed?: boolean
           name: string
         }
         Update: {
@@ -10195,6 +10197,7 @@ export type Database = {
           event_date?: string
           id?: string
           is_active?: boolean
+          is_revealed?: boolean
           name?: string
         }
         Relationships: []

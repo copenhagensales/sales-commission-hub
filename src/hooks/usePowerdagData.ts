@@ -6,8 +6,10 @@ export interface PowerdagEvent {
   name: string;
   event_date: string;
   is_active: boolean;
+  is_revealed: boolean;
   created_at: string;
 }
+
 
 export interface PowerdagRule {
   id: string;
@@ -48,9 +50,11 @@ export function useActiveEvent() {
       if (error) throw error;
       return data as PowerdagEvent | null;
     },
-    staleTime: 60_000,
+    staleTime: 15_000,
+    refetchInterval: 15_000,
   });
 }
+
 
 export function useAllEvents() {
   return useQuery({
@@ -121,7 +125,7 @@ export function useUpsertScore() {
 export function useUpdateEvent() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, patch }: { id: string; patch: Partial<Pick<PowerdagEvent, "name" | "event_date">> }) => {
+    mutationFn: async ({ id, patch }: { id: string; patch: Partial<Pick<PowerdagEvent, "name" | "event_date" | "is_revealed">> }) => {
       const { error } = await supabase.from("powerdag_events").update(patch as any).eq("id", id);
       if (error) throw error;
     },
@@ -131,6 +135,7 @@ export function useUpdateEvent() {
     },
   });
 }
+
 
 /** Compute team standings from rules + scores */
 export function computeStandings(rules: PowerdagRule[], scores: PowerdagScore[]): TeamStanding[] {

@@ -1,7 +1,7 @@
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useActiveEvent, useRulesForEvent, useScoresForEvent, computeStandings, useUpdateEvent } from "@/hooks/usePowerdagData";
 import { useAutoReload, isTvMode } from "@/utils/tvMode";
-import { Trophy, Crown, Star, Pencil } from "lucide-react";
+import { Trophy, Crown, Star, Pencil, Sparkles, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link } from "react-router-dom";
@@ -10,6 +10,22 @@ import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
 import { useCachedLeaderboard, formatDisplayName } from "@/hooks/useCachedLeaderboard";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+
+// Suspense window: from 15:00 on event day the points are hidden behind a
+// "???" placeholder. From 16:30 a reveal button appears (only for users with
+// edit access) — pressing it flips `is_revealed` on the event and the points
+// re-appear for everyone.
+const HIDE_HOUR = 15;
+const HIDE_MIN = 0;
+const REVEAL_HOUR = 16;
+const REVEAL_MIN = 30;
+
+function eventDayAt(eventDate: string, hour: number, minute: number): Date {
+  // event_date is "YYYY-MM-DD". Construct in local (Danish) time.
+  const [y, m, d] = eventDate.split("-").map(Number);
+  return new Date(y, (m ?? 1) - 1, d ?? 1, hour, minute, 0, 0);
+}
+
 
 const PODIUM_TONES = [
   // index 0 = 1st (gold)
@@ -32,10 +48,18 @@ function formatPoints(n: number) {
 function useNowClock() {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 30_000);
+    const id = setInterval(() => setNow(new Date()), 15_000);
     return () => clearInterval(id);
   }, []);
   return now;
+}
+
+function formatCountdown(ms: number): string {
+  if (ms <= 0) return "00:00";
+  const total = Math.floor(ms / 1000);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
 export default function PowerdagBoard() {
@@ -48,13 +72,33 @@ export default function PowerdagBoard() {
   const { data: event } = useActiveEvent();
   const { data: rules = [] } = useRulesForEvent(event?.id);
   const { data: scores = [] } = useScoresForEvent(event?.id);
+  const updateEvent = useUpdateEvent();
 
   const standings = computeStandings(rules, scores);
   const leaderPoints = standings[0]?.total_points ?? 1;
   const top3 = standings.slice(0, 3);
   const rest = standings.slice(3);
 
+  // Suspense / reveal phase
+  const hideAt = event ? eventDayAt(event.event_date, HIDE_HOUR, HIDE_MIN) : null;
+  const revealAt = event ? eventDayAt(event.event_date, REVEAL_HOUR, REVEAL_MIN) : null;
+  const isSuspense = !!event && !event.is_revealed && !!hideAt && now >= hideAt;
+  const canRevealNow = isSuspense && !!revealAt && now >= revealAt && hasEditAccess;
+  const msUntilReveal = revealAt ? revealAt.getTime() - now.getTime() : 0;
+
+  const handleReveal = async () => {
+    if (!event) return;
+    try {
+      await updateEvent.mutateAsync({ id: event.id, patch: { is_revealed: true } });
+      toast.success("Vinderen er afsløret!");
+    } catch (e: any) {
+      toast.error("Kunne ikke afsløre: " + (e?.message ?? "ukendt fejl"));
+    }
+  };
+
   const updatedAt = now.toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" }).replace(":", ".");
+
+
 
   return (
     <DashboardShell>
@@ -116,75 +160,91 @@ export default function PowerdagBoard() {
             <div className="lg:col-span-2 space-y-5">
               <div className="flex items-baseline gap-3">
                 <h2 className={`${tv ? "text-2xl" : "text-lg"} font-bold`}>Holdkonkurrencen</h2>
-                <span className="text-xs text-muted-foreground">· point i dag</span>
+                <span className="text-xs text-muted-foreground">
+                  {isSuspense ? "· lukket – afsløres kl. 16.30" : "· point i dag"}
+                </span>
               </div>
 
-              {/* Podium */}
-              {top3.length >= 3 && (
-                <div className="grid grid-cols-3 gap-3 md:gap-4 items-end">
-                  {PODIUM_ORDER.map((rankIdx, displayIdx) => {
-                    const team = top3[rankIdx];
-                    const cfg = PODIUM_TONES[rankIdx];
-                    const isFirst = rankIdx === 0;
-                    return (
-                      <div
-                        key={team.team_name}
-                        className={`relative rounded-2xl border ${cfg.border} bg-card/40 backdrop-blur px-4 py-6 text-center ${isFirst ? `${cfg.glow} ring-2 ${cfg.ring}` : ""}`}
-                        style={{
-                          animation: `fade-in 0.5s ease-out ${displayIdx * 0.12}s both`,
-                          minHeight: isFirst ? (tv ? 320 : 270) : (tv ? 260 : 220),
-                        }}
-                      >
-                        {isFirst && (
-                          <div className="absolute -top-7 left-1/2 -translate-x-1/2 flex flex-col items-center">
-                            <span className="text-[10px] font-black tracking-[0.25em] text-yellow-400 mb-0.5">FØRER</span>
-                            <Crown className="h-7 w-7 text-yellow-400 fill-yellow-400" />
+              {isSuspense ? (
+                <SuspensePanel
+                  teams={standings.map(s => s.team_name)}
+                  tv={tv}
+                  canRevealNow={canRevealNow}
+                  msUntilReveal={msUntilReveal}
+                  onReveal={handleReveal}
+                  isRevealing={updateEvent.isPending}
+                />
+              ) : (
+                <>
+                  {/* Podium */}
+                  {top3.length >= 3 && (
+                    <div className="grid grid-cols-3 gap-3 md:gap-4 items-end">
+                      {PODIUM_ORDER.map((rankIdx, displayIdx) => {
+                        const team = top3[rankIdx];
+                        const cfg = PODIUM_TONES[rankIdx];
+                        const isFirst = rankIdx === 0;
+                        return (
+                          <div
+                            key={team.team_name}
+                            className={`relative rounded-2xl border ${cfg.border} bg-card/40 backdrop-blur px-4 py-6 text-center ${isFirst ? `${cfg.glow} ring-2 ${cfg.ring}` : ""}`}
+                            style={{
+                              animation: `fade-in 0.5s ease-out ${displayIdx * 0.12}s both`,
+                              minHeight: isFirst ? (tv ? 320 : 270) : (tv ? 260 : 220),
+                            }}
+                          >
+                            {isFirst && (
+                              <div className="absolute -top-7 left-1/2 -translate-x-1/2 flex flex-col items-center">
+                                <span className="text-[10px] font-black tracking-[0.25em] text-yellow-400 mb-0.5">FØRER</span>
+                                <Crown className="h-7 w-7 text-yellow-400 fill-yellow-400" />
+                              </div>
+                            )}
+                            <div className={`mx-auto mb-3 h-10 w-10 rounded-full flex items-center justify-center font-black text-base ${cfg.badge} shadow-lg`}>
+                              {rankIdx + 1}
+                            </div>
+                            <p className={`font-black tabular-nums leading-none ${cfg.text} ${tv ? "text-7xl" : "text-5xl md:text-6xl"}`}>
+                              {formatPoints(team.total_points)}
+                            </p>
+                            <p className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground mt-2">Point</p>
+                            <p className={`font-bold mt-4 truncate ${tv ? "text-xl" : "text-base"}`}>{team.team_name}</p>
+                            {team.sub_entries.length > 1 && team.sub_entries.some(e => e.sub_client_name) && (
+                              <p className="text-[10px] text-muted-foreground mt-1 truncate">
+                                {team.sub_entries.map(e => e.sub_client_name ?? team.team_name).join(" · ")}
+                              </p>
+                            )}
                           </div>
-                        )}
-                        <div className={`mx-auto mb-3 h-10 w-10 rounded-full flex items-center justify-center font-black text-base ${cfg.badge} shadow-lg`}>
-                          {rankIdx + 1}
-                        </div>
-                        <p className={`font-black tabular-nums leading-none ${cfg.text} ${tv ? "text-7xl" : "text-5xl md:text-6xl"}`}>
-                          {formatPoints(team.total_points)}
-                        </p>
-                        <p className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground mt-2">Point</p>
-                        <p className={`font-bold mt-4 truncate ${tv ? "text-xl" : "text-base"}`}>{team.team_name}</p>
-                        {team.sub_entries.length > 1 && team.sub_entries.some(e => e.sub_client_name) && (
-                          <p className="text-[10px] text-muted-foreground mt-1 truncate">
-                            {team.sub_entries.map(e => e.sub_client_name ?? team.team_name).join(" · ")}
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                        );
+                      })}
+                    </div>
+                  )}
 
-              {top3.length < 3 && top3.length > 0 && (
-                <div className="space-y-3">
-                  {top3.map((team, i) => (
-                    <RestTeamRow key={team.team_name} team={team} rank={i + 1} leaderPoints={leaderPoints} barColor={REST_BAR_COLORS[i % REST_BAR_COLORS.length]} tv={tv} />
-                  ))}
-                </div>
-              )}
+                  {top3.length < 3 && top3.length > 0 && (
+                    <div className="space-y-3">
+                      {top3.map((team, i) => (
+                        <RestTeamRow key={team.team_name} team={team} rank={i + 1} leaderPoints={leaderPoints} barColor={REST_BAR_COLORS[i % REST_BAR_COLORS.length]} tv={tv} />
+                      ))}
+                    </div>
+                  )}
 
-              {/* Rest */}
-              {rest.length > 0 && (
-                <div className="space-y-3 pt-2">
-                  {rest.map((team, i) => (
-                    <RestTeamRow
-                      key={team.team_name}
-                      team={team}
-                      rank={i + 4}
-                      leaderPoints={leaderPoints}
-                      barColor={REST_BAR_COLORS[i % REST_BAR_COLORS.length]}
-                      tv={tv}
-                      delay={i * 0.08}
-                    />
-                  ))}
-                </div>
+                  {/* Rest */}
+                  {rest.length > 0 && (
+                    <div className="space-y-3 pt-2">
+                      {rest.map((team, i) => (
+                        <RestTeamRow
+                          key={team.team_name}
+                          team={team}
+                          rank={i + 4}
+                          leaderPoints={leaderPoints}
+                          barColor={REST_BAR_COLORS[i % REST_BAR_COLORS.length]}
+                          tv={tv}
+                          delay={i * 0.08}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </div>
+
 
             {/* RIGHT: Top 5 sellers */}
             <div className="space-y-5">
@@ -400,3 +460,88 @@ function EditableEventDate({ event }: { event: { id: string; event_date: string 
     </button>
   );
 }
+
+function SuspensePanel({
+  teams,
+  tv,
+  canRevealNow,
+  msUntilReveal,
+  onReveal,
+  isRevealing,
+}: {
+  teams: string[];
+  tv: boolean;
+  canRevealNow: boolean;
+  msUntilReveal: number;
+  onReveal: () => void;
+  isRevealing: boolean;
+}) {
+  return (
+    <div className="space-y-5">
+      <div
+        className="relative overflow-hidden rounded-2xl border border-yellow-400/30 bg-gradient-to-br from-yellow-400/10 via-amber-500/5 to-rose-500/10 px-6 py-10 text-center"
+        style={{ animation: "fade-in 0.5s ease-out both" }}
+      >
+        <div className="absolute inset-0 pointer-events-none opacity-30">
+          <div className="absolute -top-10 -left-10 h-40 w-40 rounded-full bg-yellow-400/30 blur-3xl animate-pulse" />
+          <div className="absolute -bottom-10 -right-10 h-40 w-40 rounded-full bg-rose-400/30 blur-3xl animate-pulse" />
+        </div>
+        <div className="relative">
+          <div className="mx-auto mb-4 inline-flex items-center justify-center h-14 w-14 rounded-full bg-yellow-400/20 border border-yellow-400/40">
+            <Lock className="h-6 w-6 text-yellow-400" />
+          </div>
+          <h3 className={`font-black tracking-tight ${tv ? "text-4xl" : "text-2xl md:text-3xl"}`}>
+            Pointene er låst
+          </h3>
+          <p className={`mt-2 text-muted-foreground ${tv ? "text-xl" : "text-base"}`}>
+            Sidste heat er i gang. Vinderen afsløres kl. 16.30.
+          </p>
+
+          {canRevealNow ? (
+            <Button
+              size="lg"
+              onClick={onReveal}
+              disabled={isRevealing}
+              className="mt-6 bg-yellow-400 hover:bg-yellow-500 text-black font-black uppercase tracking-wider shadow-[0_0_40px_-5px_rgba(250,204,21,0.6)]"
+            >
+              <Sparkles className="h-5 w-5 mr-2" />
+              {isRevealing ? "Afslører…" : "Afslør vinderen"}
+            </Button>
+          ) : (
+            <div className="mt-6 inline-flex flex-col items-center gap-1">
+              <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+                Tid til afsløring
+              </span>
+              <span className={`tabular-nums font-black text-yellow-400 ${tv ? "text-5xl" : "text-4xl"}`}>
+                {formatCountdown(msUntilReveal)}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Team list without points */}
+      <div className="space-y-2.5">
+        {teams.map((name, i) => (
+          <div
+            key={name}
+            className="flex items-center gap-4 rounded-2xl border border-white/5 bg-card/40 backdrop-blur px-4 py-3.5"
+            style={{ animation: `fade-in 0.4s ease-out ${i * 0.06}s both` }}
+          >
+            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted/40 border border-white/5 flex items-center justify-center">
+              <Lock className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <p className={`flex-1 font-bold truncate ${tv ? "text-xl" : "text-base"}`}>{name}</p>
+            <p
+              className={`font-black tabular-nums text-muted-foreground/60 ${tv ? "text-3xl" : "text-2xl"}`}
+              aria-label="Skjult"
+            >
+              ???
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+

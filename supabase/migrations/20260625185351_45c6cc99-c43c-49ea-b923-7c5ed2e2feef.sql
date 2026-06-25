@@ -1,0 +1,1 @@
+ALTER TABLE public.powerdag_events ADD COLUMN IF NOT EXISTS is_revealed BOOLEAN NOT NULL DEFAULT false;
