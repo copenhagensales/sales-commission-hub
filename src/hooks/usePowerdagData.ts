@@ -118,6 +118,20 @@ export function useUpsertScore() {
   });
 }
 
+export function useUpdateEvent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, patch }: { id: string; patch: Partial<Pick<PowerdagEvent, "name" | "event_date">> }) => {
+      const { error } = await supabase.from("powerdag_events").update(patch as any).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["powerdag-active-event"] });
+      qc.invalidateQueries({ queryKey: ["powerdag-events"] });
+    },
+  });
+}
+
 /** Compute team standings from rules + scores */
 export function computeStandings(rules: PowerdagRule[], scores: PowerdagScore[]): TeamStanding[] {
   const scoreMap = new Map<string, number>();
