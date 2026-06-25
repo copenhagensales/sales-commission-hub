@@ -125,7 +125,7 @@ export function useUpsertScore() {
 export function useUpdateEvent() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, patch }: { id: string; patch: Partial<Pick<PowerdagEvent, "name" | "event_date">> }) => {
+    mutationFn: async ({ id, patch }: { id: string; patch: Partial<Pick<PowerdagEvent, "name" | "event_date" | "is_revealed">> }) => {
       const { error } = await supabase.from("powerdag_events").update(patch as any).eq("id", id);
       if (error) throw error;
     },
@@ -135,6 +135,7 @@ export function useUpdateEvent() {
     },
   });
 }
+
 
 /** Compute team standings from rules + scores */
 export function computeStandings(rules: PowerdagRule[], scores: PowerdagScore[]): TeamStanding[] {
