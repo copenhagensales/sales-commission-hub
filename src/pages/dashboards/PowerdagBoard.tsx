@@ -48,10 +48,18 @@ function formatPoints(n: number) {
 function useNowClock() {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 30_000);
+    const id = setInterval(() => setNow(new Date()), 15_000);
     return () => clearInterval(id);
   }, []);
   return now;
+}
+
+function formatCountdown(ms: number): string {
+  if (ms <= 0) return "00:00";
+  const total = Math.floor(ms / 1000);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
 export default function PowerdagBoard() {
@@ -64,13 +72,33 @@ export default function PowerdagBoard() {
   const { data: event } = useActiveEvent();
   const { data: rules = [] } = useRulesForEvent(event?.id);
   const { data: scores = [] } = useScoresForEvent(event?.id);
+  const updateEvent = useUpdateEvent();
 
   const standings = computeStandings(rules, scores);
   const leaderPoints = standings[0]?.total_points ?? 1;
   const top3 = standings.slice(0, 3);
   const rest = standings.slice(3);
 
+  // Suspense / reveal phase
+  const hideAt = event ? eventDayAt(event.event_date, HIDE_HOUR, HIDE_MIN) : null;
+  const revealAt = event ? eventDayAt(event.event_date, REVEAL_HOUR, REVEAL_MIN) : null;
+  const isSuspense = !!event && !event.is_revealed && !!hideAt && now >= hideAt;
+  const canRevealNow = isSuspense && !!revealAt && now >= revealAt && hasEditAccess;
+  const msUntilReveal = revealAt ? revealAt.getTime() - now.getTime() : 0;
+
+  const handleReveal = async () => {
+    if (!event) return;
+    try {
+      await updateEvent.mutateAsync({ id: event.id, patch: { is_revealed: true } });
+      toast.success("Vinderen er afsløret!");
+    } catch (e: any) {
+      toast.error("Kunne ikke afsløre: " + (e?.message ?? "ukendt fejl"));
+    }
+  };
+
   const updatedAt = now.toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" }).replace(":", ".");
+
+
 
   return (
     <DashboardShell>
