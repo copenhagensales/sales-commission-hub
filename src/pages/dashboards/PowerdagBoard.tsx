@@ -1,278 +1,314 @@
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useActiveEvent, useRulesForEvent, useScoresForEvent, computeStandings, useUpdateEvent } from "@/hooks/usePowerdagData";
 import { useAutoReload, isTvMode } from "@/utils/tvMode";
-import { Trophy, Medal, Pencil } from "lucide-react";
-import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
+import { Trophy, Crown, Star, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link } from "react-router-dom";
 import { TvBoardQuickGenerator } from "@/components/dashboard/TvBoardQuickGenerator";
 import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
-import { Progress } from "@/components/ui/progress";
 import { useCachedLeaderboard, formatDisplayName, getInitials } from "@/hooks/useCachedLeaderboard";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-const PODIUM_CONFIG = [
-  { emoji: "🥇", bg: "from-yellow-500/20 via-amber-500/10 to-yellow-600/5", border: "border-yellow-500/50", glow: "shadow-yellow-500/20", label: "text-yellow-400" },
-  { emoji: "🥈", bg: "from-slate-300/20 via-slate-400/10 to-slate-300/5", border: "border-slate-400/40", glow: "shadow-slate-400/15", label: "text-slate-300" },
-  { emoji: "🥉", bg: "from-orange-500/20 via-amber-600/10 to-orange-500/5", border: "border-orange-500/40", glow: "shadow-orange-500/15", label: "text-orange-400" },
+const PODIUM_TONES = [
+  // index 0 = 1st (gold)
+  { ring: "ring-yellow-400/60", text: "text-yellow-400", badge: "bg-yellow-400 text-black", glow: "shadow-[0_0_60px_-10px_rgba(250,204,21,0.45)]", border: "border-yellow-400/50" },
+  // index 1 = 2nd (silver)
+  { ring: "ring-slate-300/30", text: "text-slate-200", badge: "bg-slate-300 text-black", glow: "", border: "border-white/5" },
+  // index 2 = 3rd (bronze)
+  { ring: "ring-orange-400/30", text: "text-orange-300", badge: "bg-orange-400 text-black", glow: "", border: "border-white/5" },
 ];
 
-// Podium order: [1st place center (tall), 0th=2nd left, 2nd=3rd right]
+// Display order: 2nd, 1st (center), 3rd
 const PODIUM_ORDER = [1, 0, 2];
+
+const REST_BAR_COLORS = ["bg-emerald-400", "bg-violet-400", "bg-rose-400", "bg-sky-400", "bg-amber-400"];
+
+function formatPoints(n: number) {
+  return n.toLocaleString("da-DK", { minimumFractionDigits: n % 1 === 0 ? 0 : 1, maximumFractionDigits: 1 });
+}
+
+function useNowClock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+  return now;
+}
 
 export default function PowerdagBoard() {
   const tv = isTvMode();
   useAutoReload(tv, 5 * 60_000);
   const { canView } = useUnifiedPermissions();
   const hasEditAccess = canView("menu_powerdag_input");
+  const now = useNowClock();
 
   const { data: event } = useActiveEvent();
   const { data: rules = [] } = useRulesForEvent(event?.id);
   const { data: scores = [] } = useScoresForEvent(event?.id);
 
   const standings = computeStandings(rules, scores);
-  const maxPoints = Math.max(...standings.map(s => s.total_points), 1);
+  const leaderPoints = standings[0]?.total_points ?? 1;
   const top3 = standings.slice(0, 3);
   const rest = standings.slice(3);
 
+  const updatedAt = now.toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" }).replace(":", ".");
+
   return (
     <DashboardShell>
-      <div className={`${tv ? "p-6" : "p-4 md:p-6"} max-w-5xl mx-auto space-y-8`}>
+      <div className={`${tv ? "p-8" : "p-4 md:p-8"} max-w-[1600px] mx-auto`}>
         {/* Header */}
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1 min-w-0">
-            <h1 className={`${tv ? "text-4xl" : "text-2xl md:text-3xl"} font-black tracking-tight flex items-center gap-3 flex-wrap`}>
-              <Trophy className="h-7 w-7 text-yellow-500 flex-shrink-0" />
-              {event && !tv && hasEditAccess ? (
-                <EditableEventName event={event} large={tv} />
-              ) : (
-                <span>{event?.name ?? "Powerdag"}</span>
-              )}
-              <span className="inline-flex items-center gap-1.5 ml-2 px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-semibold uppercase tracking-wider">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+        <div className="flex items-start justify-between gap-4 mb-8">
+          <div className="flex items-start gap-4 min-w-0">
+            <div className="rounded-2xl bg-yellow-400/10 border border-yellow-400/20 p-3 flex-shrink-0">
+              <Trophy className="h-7 w-7 text-yellow-400" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-3 flex-wrap">
+                {event && !tv && hasEditAccess ? (
+                  <EditableEventName event={event} />
+                ) : (
+                  <h1 className={`${tv ? "text-5xl" : "text-3xl md:text-4xl"} font-black tracking-tight`}>{event?.name ?? "Powerdag"}</h1>
+                )}
+                <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold uppercase tracking-wider">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                  </span>
+                  Live
                 </span>
-                Live
-              </span>
-            </h1>
-            {event && (
-              !tv && hasEditAccess ? (
-                <EditableEventDate event={event} />
-              ) : (
-                <p className="text-sm text-muted-foreground mt-1">
-                  {new Date(event.event_date).toLocaleDateString("da-DK", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-                </p>
-              )
+              </div>
+              {event && (
+                !tv && hasEditAccess ? (
+                  <EditableEventDate event={event} />
+                ) : (
+                  <p className="text-sm text-muted-foreground mt-1 capitalize">
+                    {new Date(event.event_date).toLocaleDateString("da-DK", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+                  </p>
+                )
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-col items-end gap-3 flex-shrink-0">
+            <div className="text-right">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Opdateret</p>
+              <p className={`tabular-nums font-light ${tv ? "text-3xl" : "text-2xl"}`}>{updatedAt}</p>
+            </div>
+            {!tv && hasEditAccess && (
+              <div className="flex items-center gap-2">
+                <TvBoardQuickGenerator dashboardSlug="powerdag" />
+                <Link to="/dashboards/powerdag/input">
+                  <Button variant="outline" size="sm">Indtast salg</Button>
+                </Link>
+              </div>
             )}
           </div>
-          {!tv && hasEditAccess && (
-            <div className="flex items-center gap-2">
-              <TvBoardQuickGenerator dashboardSlug="powerdag" />
-              <Link to="/dashboards/powerdag/input">
-                <Button variant="outline" size="sm">Indtast salg</Button>
-              </Link>
-            </div>
-          )}
         </div>
 
         {standings.length === 0 ? (
-          <p className="text-muted-foreground text-center py-12">Ingen data endnu – start med at indtaste salg.</p>
+          <p className="text-muted-foreground text-center py-20">Ingen data endnu – start med at indtaste salg.</p>
         ) : (
-          <>
-            {/* Podium – Top 3 */}
-            {top3.length >= 3 && (
-              <div className={`grid grid-cols-3 gap-3 md:gap-4 items-end ${tv ? "gap-6" : ""}`}>
-                {PODIUM_ORDER.map((idx) => {
-                  const team = top3[idx];
-                  const cfg = PODIUM_CONFIG[idx];
-                  const isFirst = idx === 0;
-                  return (
-                    <div
-                      key={team.team_name}
-                      className={`relative rounded-2xl border-2 bg-gradient-to-b ${cfg.bg} ${cfg.border} p-4 md:p-6 text-center transition-all shadow-lg ${cfg.glow} ${isFirst ? "scale-105 md:scale-110 z-10" : ""}`}
-                      style={{
-                        animation: `fade-in 0.5s ease-out ${idx * 0.15}s both`,
-                        minHeight: isFirst ? (tv ? "260px" : "200px") : (tv ? "220px" : "170px"),
-                      }}
-                    >
-                      {/* Rank badge */}
-                      <div className={`text-3xl md:text-4xl mb-2 ${isFirst ? "animate-bounce" : ""}`} style={isFirst ? { animationDuration: "2s" } : undefined}>
-                        {cfg.emoji}
-                      </div>
-                      {/* Points */}
-                      <p className={`font-black tabular-nums ${cfg.label} ${tv ? "text-5xl md:text-6xl" : "text-3xl md:text-4xl"}`}>
-                        {team.total_points % 1 === 0 ? team.total_points : team.total_points.toFixed(1)}
-                      </p>
-                      <p className="text-[10px] uppercase tracking-widest text-muted-foreground mt-1">Point</p>
-                      {/* Team name */}
-                      <p className={`font-bold mt-3 truncate ${tv ? "text-lg" : "text-sm md:text-base"}`}>{team.team_name}</p>
-                      {/* Sub entries hint */}
-                      {team.sub_entries.length > 1 && (
-                        <p className="text-[10px] text-muted-foreground mt-0.5 truncate">
-                          {team.sub_entries.map(e => e.sub_client_name ?? team.team_name).join(" · ")}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* LEFT: team competition */}
+            <div className="lg:col-span-2 space-y-5">
+              <div className="flex items-baseline gap-3">
+                <h2 className={`${tv ? "text-2xl" : "text-lg"} font-bold`}>Holdkonkurrencen</h2>
+                <span className="text-xs text-muted-foreground">· point i dag</span>
+              </div>
+
+              {/* Podium */}
+              {top3.length >= 3 && (
+                <div className="grid grid-cols-3 gap-3 md:gap-4 items-end">
+                  {PODIUM_ORDER.map((rankIdx, displayIdx) => {
+                    const team = top3[rankIdx];
+                    const cfg = PODIUM_TONES[rankIdx];
+                    const isFirst = rankIdx === 0;
+                    return (
+                      <div
+                        key={team.team_name}
+                        className={`relative rounded-2xl border ${cfg.border} bg-card/40 backdrop-blur px-4 py-6 text-center ${isFirst ? `${cfg.glow} ring-2 ${cfg.ring}` : ""}`}
+                        style={{
+                          animation: `fade-in 0.5s ease-out ${displayIdx * 0.12}s both`,
+                          minHeight: isFirst ? (tv ? 320 : 270) : (tv ? 260 : 220),
+                        }}
+                      >
+                        {isFirst && (
+                          <div className="absolute -top-7 left-1/2 -translate-x-1/2 flex flex-col items-center">
+                            <span className="text-[10px] font-black tracking-[0.25em] text-yellow-400 mb-0.5">FØRER</span>
+                            <Crown className="h-7 w-7 text-yellow-400 fill-yellow-400" />
+                          </div>
+                        )}
+                        <div className={`mx-auto mb-3 h-10 w-10 rounded-full flex items-center justify-center font-black text-base ${cfg.badge} shadow-lg`}>
+                          {rankIdx + 1}
+                        </div>
+                        <p className={`font-black tabular-nums leading-none ${cfg.text} ${tv ? "text-7xl" : "text-5xl md:text-6xl"}`}>
+                          {formatPoints(team.total_points)}
                         </p>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                        <p className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground mt-2">Point</p>
+                        <p className={`font-bold mt-4 truncate ${tv ? "text-xl" : "text-base"}`}>{team.team_name}</p>
+                        {team.sub_entries.length > 1 && team.sub_entries.some(e => e.sub_client_name) && (
+                          <p className="text-[10px] text-muted-foreground mt-1 truncate">
+                            {team.sub_entries.map(e => e.sub_client_name ?? team.team_name).join(" · ")}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
-            {/* Fallback: if < 3 teams, show all as list */}
-            {top3.length < 3 && top3.length > 0 && (
-              <div className="space-y-3">
-                {top3.map((team, i) => (
-                  <TeamRow key={team.team_name} team={team} rank={i} maxPoints={maxPoints} tv={tv} cfg={PODIUM_CONFIG[i]} />
-                ))}
-              </div>
-            )}
+              {top3.length < 3 && top3.length > 0 && (
+                <div className="space-y-3">
+                  {top3.map((team, i) => (
+                    <RestTeamRow key={team.team_name} team={team} rank={i + 1} leaderPoints={leaderPoints} barColor={REST_BAR_COLORS[i % REST_BAR_COLORS.length]} tv={tv} />
+                  ))}
+                </div>
+              )}
 
-            {/* Rest of teams */}
-            {rest.length > 0 && (
-              <div className="space-y-2">
-                {rest.map((team, i) => (
-                  <TeamRow key={team.team_name} team={team} rank={i + 3} maxPoints={maxPoints} tv={tv} delay={i * 0.08} />
-                ))}
+              {/* Rest */}
+              {rest.length > 0 && (
+                <div className="space-y-3 pt-2">
+                  {rest.map((team, i) => (
+                    <RestTeamRow
+                      key={team.team_name}
+                      team={team}
+                      rank={i + 4}
+                      leaderPoints={leaderPoints}
+                      barColor={REST_BAR_COLORS[i % REST_BAR_COLORS.length]}
+                      tv={tv}
+                      delay={i * 0.08}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* RIGHT: Top 5 sellers */}
+            <div className="space-y-5">
+              <div className="flex items-baseline gap-3">
+                <h2 className={`${tv ? "text-2xl" : "text-lg"} font-bold flex items-center gap-2`}>
+                  <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
+                  Top 5 Sælgere
+                </h2>
+                <span className="text-xs text-muted-foreground">· i dag</span>
               </div>
-            )}
-          </>
+              <TopSellersList tv={tv} />
+            </div>
+          </div>
         )}
-
-        {/* Top 5 Sælgere */}
-        <TopSellersSection tv={tv} />
       </div>
     </DashboardShell>
   );
 }
 
-function TeamRow({ team, rank, maxPoints, tv, cfg, delay = 0 }: {
+const SELLER_AVATAR_COLORS = [
+  "bg-yellow-400 text-black",
+  "bg-emerald-400 text-black",
+  "bg-yellow-300 text-black",
+  "bg-sky-400 text-black",
+  "bg-orange-400 text-black",
+];
+
+const SELLER_RANK_COLORS = [
+  "bg-yellow-400 text-black",
+  "bg-slate-300 text-black",
+  "bg-orange-400 text-black",
+  "bg-muted text-muted-foreground",
+  "bg-muted text-muted-foreground",
+];
+
+function RestTeamRow({ team, rank, leaderPoints, barColor, tv, delay = 0 }: {
   team: ReturnType<typeof computeStandings>[number];
   rank: number;
-  maxPoints: number;
+  leaderPoints: number;
+  barColor: string;
   tv: boolean;
-  cfg?: typeof PODIUM_CONFIG[number];
   delay?: number;
 }) {
-  const pct = maxPoints > 0 ? (team.total_points / maxPoints) * 100 : 0;
-  const isComposite = team.sub_entries.length > 1 || team.sub_entries.some(e => e.sub_client_name);
+  const pct = leaderPoints > 0 ? Math.min(100, (team.total_points / leaderPoints) * 100) : 0;
+  const subs = team.sub_entries.filter(e => e.sub_client_name).map(e => e.sub_client_name!);
 
   return (
     <div
-      className={`rounded-xl border bg-gradient-to-r p-4 md:p-5 transition-all ${cfg ? `${cfg.bg} ${cfg.border} shadow-md ${cfg.glow}` : "from-card to-card border-border"}`}
+      className="rounded-2xl border border-white/5 bg-card/40 backdrop-blur px-4 py-3.5"
       style={{ animation: `fade-in 0.4s ease-out ${delay}s both` }}
     >
       <div className="flex items-center gap-4">
-        {/* Rank */}
-        <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg ${cfg ? `bg-gradient-to-br ${cfg.bg} border ${cfg.border}` : "bg-muted"}`}>
-          {cfg ? <span className="text-xl">{cfg.emoji}</span> : <span className="text-muted-foreground">{rank + 1}</span>}
+        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted/40 border border-white/5 flex items-center justify-center font-bold text-muted-foreground">
+          {rank}
         </div>
-
-        {/* Team info */}
-        <div className="flex-1 min-w-0 space-y-1.5">
-          <div className="flex items-center justify-between gap-2">
-            <p className="font-bold text-lg truncate">{team.team_name}</p>
-            <p className={`font-black tabular-nums flex-shrink-0 ${tv ? "text-3xl" : "text-2xl"} ${cfg ? cfg.label : ""}`}>
-              {team.total_points % 1 === 0 ? team.total_points : team.total_points.toFixed(1)}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline justify-between gap-2 mb-2">
+            <div className="flex items-baseline gap-2 min-w-0 flex-wrap">
+              <p className={`font-bold truncate ${tv ? "text-xl" : "text-base"}`}>{team.team_name}</p>
+              {subs.length > 0 && (
+                <p className="text-[11px] text-muted-foreground truncate">{subs.join(" · ")}</p>
+              )}
+            </div>
+            <p className={`font-black tabular-nums flex-shrink-0 ${tv ? "text-3xl" : "text-2xl"}`}>
+              {formatPoints(team.total_points)}
               <span className="text-xs font-normal text-muted-foreground ml-1">pt</span>
             </p>
           </div>
-          {/* Progress bar */}
-          <Progress value={pct} className="h-2" />
-          {isComposite && (
-            <p className="text-[10px] text-muted-foreground">
-              {team.sub_entries.map(e => e.sub_client_name ?? team.team_name).join(" · ")}
-            </p>
-          )}
+          <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+            <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
+          </div>
         </div>
       </div>
-
-      {/* Sub-entries accordion */}
-      {isComposite && !tv && (
-        <Accordion type="single" collapsible className="mt-2">
-          <AccordionItem value="details" className="border-0">
-            <AccordionTrigger className="py-1 text-xs text-muted-foreground hover:no-underline">
-              Vis detaljer
-            </AccordionTrigger>
-            <AccordionContent>
-              <div className="grid grid-cols-3 gap-1 text-xs">
-                <span className="font-medium text-muted-foreground">Klient</span>
-                <span className="font-medium text-muted-foreground text-right">Salg</span>
-                <span className="font-medium text-muted-foreground text-right">Point</span>
-                {team.sub_entries.map((e, j) => (
-                  <div key={j} className="contents">
-                    <span>{e.sub_client_name ?? team.team_name}</span>
-                    <span className="text-right tabular-nums">{e.sales_count}</span>
-                    <span className="text-right tabular-nums">{e.points % 1 === 0 ? e.points : e.points.toFixed(1)}</span>
-                  </div>
-                ))}
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
-      )}
     </div>
   );
 }
 
-const SELLER_RANK_STYLES = [
-  "bg-gradient-to-br from-yellow-500/20 to-yellow-600/10 border-yellow-500/40 text-yellow-400",
-  "bg-gradient-to-br from-slate-300/20 to-slate-400/10 border-slate-400/30 text-slate-300",
-  "bg-gradient-to-br from-orange-500/20 to-orange-600/10 border-orange-500/30 text-orange-400",
-];
-
-function TopSellersSection({ tv }: { tv: boolean }) {
+function TopSellersList({ tv }: { tv: boolean }) {
   const { data: topSellers = [] } = useCachedLeaderboard("today", { type: "global" }, { limit: 5 });
 
-  if (topSellers.length === 0) return null;
+  if (topSellers.length === 0) {
+    return <p className="text-sm text-muted-foreground py-8 text-center">Ingen sælgerdata endnu.</p>;
+  }
 
   return (
-    <div className="space-y-4">
-      <h2 className={`${tv ? "text-2xl" : "text-lg md:text-xl"} font-bold flex items-center gap-2`}>
-        <Medal className="h-5 w-5 text-primary" />
-        Top 5 Sælgere – I dag
-      </h2>
-      <div className="space-y-2">
-        {topSellers.map((seller, idx) => (
+    <div className="space-y-3">
+      {topSellers.map((seller, idx) => {
+        const isFirst = idx === 0;
+        return (
           <div
             key={seller.employeeId}
-            className="flex items-center gap-3 rounded-xl border border-border bg-card/60 p-3 md:p-4"
-            style={{ animation: `fade-in 0.4s ease-out ${idx * 0.1}s both` }}
+            className={`flex items-center gap-3 rounded-2xl border bg-card/40 backdrop-blur px-3.5 py-3 ${isFirst ? "border-yellow-400/40 ring-1 ring-yellow-400/30 shadow-[0_0_40px_-15px_rgba(250,204,21,0.5)]" : "border-white/5"}`}
+            style={{ animation: `fade-in 0.4s ease-out ${idx * 0.08}s both` }}
           >
-            {/* Rank */}
-            <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm border ${idx < 3 ? SELLER_RANK_STYLES[idx] : "bg-muted text-muted-foreground"}`}>
+            <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-black text-sm ${SELLER_RANK_COLORS[idx] ?? SELLER_RANK_COLORS[3]}`}>
               {idx + 1}
             </div>
-            {/* Name + team */}
+            <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center font-black text-sm ${SELLER_AVATAR_COLORS[idx % SELLER_AVATAR_COLORS.length]}`}>
+              {getInitials(seller.employeeName)}
+            </div>
             <div className="flex-1 min-w-0">
-              <p className={`font-semibold truncate ${tv ? "text-lg" : "text-sm"}`}>
+              <p className={`font-bold truncate ${tv ? "text-lg" : "text-sm"}`}>
                 {formatDisplayName(seller.employeeName)}
               </p>
               {seller.teamName && (
-                <Badge variant="outline" className="text-[10px] mt-0.5 px-1.5 py-0">
+                <span className="inline-block mt-0.5 text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-muted-foreground">
                   {seller.teamName}
-                </Badge>
+                </span>
               )}
             </div>
-            {/* Stats */}
             <div className="text-right flex-shrink-0">
-              <p className={`font-black tabular-nums ${tv ? "text-2xl" : "text-lg"}`}>
+              <p className={`font-black tabular-nums ${isFirst ? "text-yellow-400" : ""} ${tv ? "text-2xl" : "text-xl"}`}>
                 {seller.commission.toLocaleString("da-DK")}
                 <span className="text-xs font-normal text-muted-foreground ml-1">kr.</span>
               </p>
             </div>
           </div>
-        ))}
-      </div>
+        );
+      })}
     </div>
   );
 }
 
-function EditableEventName({ event }: { event: { id: string; name: string }; large?: boolean }) {
+function EditableEventName({ event }: { event: { id: string; name: string } }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(event.name);
   const update = useUpdateEvent();
@@ -280,10 +316,7 @@ function EditableEventName({ event }: { event: { id: string; name: string }; lar
   const save = async () => {
     const trimmed = value.trim();
     setEditing(false);
-    if (!trimmed || trimmed === event.name) {
-      setValue(event.name);
-      return;
-    }
+    if (!trimmed || trimmed === event.name) { setValue(event.name); return; }
     try {
       await update.mutateAsync({ id: event.id, patch: { name: trimmed } });
       toast.success("Titel opdateret");
@@ -304,7 +337,7 @@ function EditableEventName({ event }: { event: { id: string; name: string }; lar
           if (e.key === "Enter") (e.target as HTMLInputElement).blur();
           if (e.key === "Escape") { setValue(event.name); setEditing(false); }
         }}
-        className="h-auto py-1 text-3xl font-black w-auto min-w-[280px]"
+        className="h-auto py-1 text-3xl md:text-4xl font-black w-auto min-w-[280px]"
       />
     );
   }
@@ -316,7 +349,7 @@ function EditableEventName({ event }: { event: { id: string; name: string }; lar
       className="group inline-flex items-center gap-2 rounded-md px-1 -mx-1 hover:bg-muted/50 transition-colors"
       title="Klik for at redigere"
     >
-      <span>{event.name}</span>
+      <h1 className="text-3xl md:text-4xl font-black tracking-tight">{event.name}</h1>
       <Pencil className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
     </button>
   );
@@ -331,10 +364,7 @@ function EditableEventDate({ event }: { event: { id: string; event_date: string 
 
   const save = async () => {
     setEditing(false);
-    if (!value || value === event.event_date) {
-      setValue(event.event_date);
-      return;
-    }
+    if (!value || value === event.event_date) { setValue(event.event_date); return; }
     try {
       await update.mutateAsync({ id: event.id, patch: { event_date: value } });
       toast.success("Dato opdateret");
@@ -368,7 +398,7 @@ function EditableEventDate({ event }: { event: { id: string; event_date: string 
       className="group mt-1 inline-flex items-center gap-2 rounded px-1 -mx-1 hover:bg-muted/50 transition-colors"
       title="Klik for at redigere"
     >
-      <span className="text-sm text-muted-foreground">{formatted}</span>
+      <span className="text-sm text-muted-foreground capitalize">{formatted}</span>
       <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
     </button>
   );
