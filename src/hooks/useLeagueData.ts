@@ -151,9 +151,27 @@ export function useQualificationStandings(seasonId: string | undefined) {
         .order("overall_rank", { ascending: true });
 
       if (error) throw error;
-      
+
+      // Filtrér tilskuere fra: deres standings-rækker er frosset af
+      // league-calculate-standings (skipper is_spectator=true), så de
+      // ville ellers vises med stale rank/provision.
+      const { data: enrollments } = await supabase
+        .from("league_enrollments")
+        .select("employee_id, is_spectator")
+        .eq("season_id", seasonId);
+
+      const spectatorIds = new Set(
+        (enrollments || [])
+          .filter((e: any) => e.is_spectator)
+          .map((e: any) => e.employee_id as string)
+      );
+
+      const filtered = (data || []).filter(
+        s => !spectatorIds.has(s.employee_id)
+      );
+
       // Fetch team names for all employees via team_members junction
-      const employeeIds = (data || [])
+      const employeeIds = filtered
         .map(s => s.employee?.id)
         .filter(Boolean) as string[];
       
@@ -176,9 +194,11 @@ export function useQualificationStandings(seasonId: string | undefined) {
         }
       }
       
-      // Transform data with team_name
-      const transformedData = (data || []).map(standing => ({
+      // Transform data with team_name + renummerér overall_rank
+      // visuelt, så ranks bliver sammenhængende efter filteret.
+      const transformedData = filtered.map((standing, idx) => ({
         ...standing,
+        overall_rank: idx + 1,
         employee: standing.employee ? {
           ...standing.employee,
           team_name: teamMap[standing.employee.id] || null,
