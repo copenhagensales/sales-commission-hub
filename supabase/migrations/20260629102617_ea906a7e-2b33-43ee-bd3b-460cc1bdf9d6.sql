@@ -1,0 +1,1 @@
+UPDATE public.league_enrollments SET is_spectator = false WHERE season_id = '13772ad2-a6b5-49ce-a112-75e0f02e2499' AND is_spectator = true;
