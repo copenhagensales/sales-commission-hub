@@ -43,17 +43,11 @@ function useEmployeeId() {
 
   useMemo(() => {
     if (!user?.id) return;
-    import("@/integrations/supabase/client").then(({ supabase }) => {
-      supabase
-        .from("employee_master_data")
-        .select("id")
-        .eq("auth_user_id", user.id)
-        .maybeSingle()
-        .then(({ data }) => {
-          if (data) setEmployeeId(data.id);
-        });
+    findEmployeeByAuth<{ id: string }>(user, "id").then(({ data }) => {
+      if (data) setEmployeeId(data.id);
     });
-  }, [user?.id]);
+  }, [user?.id, user?.email]);
+
 
   return employeeId;
 }
