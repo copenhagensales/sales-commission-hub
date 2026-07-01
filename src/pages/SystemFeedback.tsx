@@ -54,11 +54,11 @@ function useCurrentEmployeeId() {
     queryKey: ["current-employee-id", user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
-      const { data } = await supabase
-        .from("employee_master_data")
-        .select("id, first_name, last_name")
-        .eq("auth_user_id", user.id)
-        .maybeSingle();
+      const { data } = await findEmployeeByAuth<{ id: string; first_name: string | null; last_name: string | null }>(
+        user,
+        "id, first_name, last_name"
+      );
+
       return data ? { id: data.id, name: `${data.first_name || ""} ${data.last_name || ""}`.trim() } : null;
     },
     enabled: !!user?.id,
