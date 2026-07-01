@@ -16,6 +16,7 @@ import { da } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { findEmployeeByAuth } from "@/lib/employeeLookup";
 import { toast } from "sonner";
 import {
   useFmChecklistTemplates,
