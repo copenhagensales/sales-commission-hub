@@ -1,40 +1,98 @@
-## Problem
+## Ny retning: automatisk tilmelding
 
-Noah Juul B vises som #2 med 800 kr fordi:
+I stedet for både A (frys) og B (rullende sync) laver vi det simple: **alle relevante medarbejdere er automatisk med i den aktive sæson.** Tilmeldings-UI'et beholdes kun til opt-out (spectator).
 
-1. Han er tilmeldt sæsonen som **tilskuer** (`league_enrollments.is_spectator = true`).
-2. Edge functionen `league-calculate-standings` skipper tilskuere (`.eq("is_spectator", false)` i `index.ts:96`), så hans `league_qualification_standings`-række er frosset fra 24. juni kl. 06:50 (hvor han faktisk var nr. 2 blandt de få med salg på det tidspunkt).
-3. Frontend sorterer på `overall_rank ASC` i `useQualificationStandings`, så han bliver hængende på rank 2 selvom alle andre i dag har langt højere provision.
+## Hvad "alle relevante" betyder — kræver din stillingtagen
 
-Hans reelle kvalifikation (22.–28. juni) er 26 salg / 2.600 kr — han hører ikke til i top 3.
+Vi har disse aktive `job_title`-værdier i dag:
 
-## Løsning (valgt: skjul tilskuere i UI)
+| Job title | Forslag | Note |
+|---|---|---|
+| Salgskonsulent | ✅ med | sælger TM |
+| Fieldmarketing | ✅ med | sælger FM |
+| Teamleder | ❌ ude | leder |
+| Assisterende Teamleder | ❌ ude | leder |
+| Assisterende Teamleder TM | ❌ ude | leder |
+| Fieldmarketing leder | ❌ ude | leder |
+| Ejer | ❌ ude | leder |
+| Backoffice | ❌ ude | stab |
+| Rekruttering | ❌ ude | stab |
+| SOME | ❌ ude | stab |
+| (null) | ❌ ude | ukendt titel — sikrest at holde ude |
 
-Filtrér tilskuer-rækker fra i selve standings-listen, og renummerér visningen så ranks bliver sammenhængende.
+**Spørgsmål 1:** Er listen ovenfor korrekt? Særligt "assisterende teamledere" — nogle steder sælger de også. Skal de med?
 
-### Ændringer
+## Plan
 
-**`src/hooks/useLeagueData.ts`** (grøn zone — data-hook, ingen DB-skema, ingen pricing/løn)
+### 1. Ny helper: `isLeagueEligible(employee)`
 
-- I `useQualificationStandings(seasonId)`:
-  - Efter standings-fetch, hent `league_enrollments` for sæsonen med `employee_id, is_spectator`.
-  - Byg `Set<string>` af `employee_id` hvor `is_spectator = true`.
-  - Filtrér standings: behold kun rækker hvis `employee_id` IKKE er i tilskuer-sættet.
-  - Renummerér `overall_rank` baseret på array-position (1-indexed) efter filter, så `CompactLeagueView` og medaljer/badges (Top 3, Playoff, Nedrykker) fortsat virker korrekt. Behold `current_provision` urørt.
-- Samme filter + renummerering i `useQualificationStandingsRealtime` (linje 465) så realtime-varianten matcher.
+Én kilde til sandhed for hvem der er med. Placeres i `src/lib/leagueEligibility.ts` + spejles i `supabase/functions/_shared/leagueEligibility.ts`.
 
-`useMyQualificationStanding` rører vi ikke — hvis en tilskuer selv åbner siden, må de gerne se deres egen (stale) status. `CompactLeagueView` bruger ikke den hook.
+Regel (v1):
+```
+eligible = is_active = true
+        AND job_title IN ('Salgskonsulent','salgskonsulent','Fieldmarketing','fieldmarketing')
+```
 
-### Ingen ændringer til
+### 2. Auto-enroll for aktiv sæson
 
-- `league-calculate-standings` edge function (uændret — fortsætter med at springe tilskuere over).
-- DB-skema (ingen migration).
-- Noahs eksisterende række i `league_qualification_standings` (lades stå; den vises bare ikke længere).
+Ny funktion `syncLeagueEnrollments(seasonId)` i `supabase/functions/league-calculate-standings/index.ts`:
 
-### Verifikation
+- Hent alle `is_active = true`-medarbejdere.
+- Filtrér med `isLeagueEligible`.
+- Upsert `league_enrollments (season_id, employee_id, is_active=true, is_spectator=false)` for hver.
+- Rør IKKE eksisterende rækker hvor `is_spectator=true` (brugerens eget opt-out bevares) — vi bruger `onConflict: season_id,employee_id, ignoreDuplicates: true`.
+- Kaldes:
+  - Ved sæson-overgang `qualification → active` (i `calculate-kpi-values/autoTransitionSeasonStatuses`).
+  - Ved hver kørsel af `league-calculate-standings` mens sæson er `qualification` eller `active` (fanger nye ansættelser løbende).
 
-Efter ændring: åbn `/commission-league` og bekræft at Noah Juul B (United) ikke længere er synlig i Superligaen, og at ranks går 1, 2, 3, … uden huller. Bekræft at de andre 9 synlige spillere matcher rækkefølgen efter `current_provision DESC`.
+### 3. Sync late enrollees til `season_standings`
 
-### Bivirkning at være opmærksom på
+Samme problem som før (Frederik Donner): nye eligible medarbejdere skal også ind i `season_standings` når sæsonen er aktiv.
 
-Hvis en tilskuer senere konverteres til fuld deltager (`is_spectator = false`), starter de uden standings-række indtil næste edge function-kørsel — det er allerede status quo og uændret.
+Ny funktion `syncLateEnrollmentsToSeasonStandings(seasonId)`:
+- Diff `league_enrollments` (aktive, ikke-spectator) vs `season_standings.employee_id`.
+- Manglende → indsæt i **laveste division**, rank efter sidste, 0 point / 0 provision / 0 rounds_played.
+- Kaldes efter hver qual-beregning når sæson er `active`.
+
+**Spørgsmål 2:** Skal late-comers ind i laveste division (fair — de har ikke kvalificeret sig), eller placeres efter deres qual-provision i den relevante division?
+→ **Anbefaling: laveste division.** Simpelt, retfærdigt over for dem der har spillet siden start.
+
+### 4. Datafix for S3 (aktiv sæson nu)
+
+Ét-gangs-kørsel af de to sync-funktioner mod S3:
+- Tilmelder de sælgere der ikke er med (ud af 47 tilmeldte i dag — vi tjekker hvor mange eligible mangler).
+- Indsætter de 5 manglende i `season_standings` (inkl. Frederik Donner) i laveste division.
+
+**Spørgsmål 3:** Skal S3's division 3 (18 spillere, burde være 10) **omfordeles** nu, eller **bevares som den er** til næste sæson?
+→ **Anbefaling: bevares.** Omfordeling midt i sæsonen ændrer folks division og påvirker point-formlen for allerede spillede runder. Læringen tages med til S4.
+
+### 5. UI-oprydning
+
+- `MyEnrollment` / tilmeldingsknap: skjul "Tilmeld"-knappen når brugeren allerede er auto-tilmeldt. Vis kun "Deltag som tilskuer"/"Deltag som spiller"-toggle.
+- Ledere/stab ser en besked: "Ligaen er kun for sælgere."
+
+### 6. Ude af scope
+
+- Pricing, løn, RLS. Ingen ændringer der.
+- Historiske sæsoner (S1, S2). Rører ikke deres data.
+
+## Åbne spørgsmål (svar før jeg går i gang)
+
+1. **Job-title-listen** — er tabellen ovenfor korrekt? Særligt: skal "Assisterende Teamleder" / "Assisterende Teamleder TM" med?
+2. **Late-comer division** — laveste (anbefalet) eller efter qual-provision?
+3. **S3 division 3-fix** — bevares (anbefalet) eller omfordeles nu?
+4. **Opt-out** — skal medarbejdere kunne fravælge sig ligaen (spectator-toggle), eller er auto-tilmelding tvungen?
+
+## Filer der berøres
+
+- `src/lib/leagueEligibility.ts` (ny, grøn zone)
+- `supabase/functions/_shared/leagueEligibility.ts` (ny, gul zone)
+- `supabase/functions/league-calculate-standings/index.ts` (gul/rød — liga-motor)
+- `supabase/functions/calculate-kpi-values/index.ts` linje 259–430 (rød — sæson-init)
+- `src/hooks/useLeagueData.ts` (gul — UI-hooks)
+- `src/components/league/*` — kun visning af enrollment-status (grøn)
+
+Rød zone: godkendelse krævet for edge functions. Grøn zone kan jeg lave umiddelbart.
+
+Sig svar på 1–4, så bygger jeg.

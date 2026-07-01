@@ -1,9 +1,118 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { isLeagueEligible } from "../_shared/leagueEligibility.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// Auto-enroll alle eligible medarbejdere i sæsonen.
+// - Rører IKKE eksisterende rækker (ignoreDuplicates), så manuelt satte
+//   is_spectator=true / is_active=false bevares.
+// - Deaktiverer eksisterende enrollments for medarbejdere der er blevet
+//   in-eligible (fx opsagt / rolleskift til leder).
+async function syncLeagueEnrollments(supabase: any, seasonId: string) {
+  const { data: employees, error } = await supabase
+    .from("employee_master_data")
+    .select("id, is_active, job_title")
+    .eq("is_active", true);
+
+  if (error) {
+    console.error("[sync-enrollments] Failed to fetch employees:", error);
+    return;
+  }
+
+  const eligible = (employees || []).filter(isLeagueEligible);
+  console.log(`[sync-enrollments] ${eligible.length} eligible employees found for season ${seasonId}`);
+
+  if (eligible.length === 0) return;
+
+  const rows = eligible.map((e: any) => ({
+    season_id: seasonId,
+    employee_id: e.id,
+    is_active: true,
+    is_spectator: false,
+  }));
+
+  const { error: upsertErr } = await supabase
+    .from("league_enrollments")
+    .upsert(rows, { onConflict: "season_id,employee_id", ignoreDuplicates: true });
+
+  if (upsertErr) {
+    console.error("[sync-enrollments] Upsert failed:", upsertErr);
+  } else {
+    console.log(`[sync-enrollments] Upserted ${rows.length} enrollments (existing rows preserved)`);
+  }
+}
+
+// Sync late-comers til season_standings for aktive sæsoner.
+// Nye eligible medarbejdere placeres i laveste division med sidste rank
+// og 0 point/provision/rounds_played. Historiske runder påvirkes ikke.
+async function syncLateEnrollmentsToSeasonStandings(supabase: any, seasonId: string) {
+  const { data: enrollments, error: enrollErr } = await supabase
+    .from("league_enrollments")
+    .select("employee_id")
+    .eq("season_id", seasonId)
+    .eq("is_active", true)
+    .eq("is_spectator", false);
+
+  if (enrollErr || !enrollments) {
+    console.error("[sync-season-standings] Failed enrollments fetch:", enrollErr);
+    return;
+  }
+
+  const { data: existing, error: exErr } = await supabase
+    .from("league_season_standings")
+    .select("employee_id, current_division, division_rank, overall_rank")
+    .eq("season_id", seasonId);
+
+  if (exErr) {
+    console.error("[sync-season-standings] Failed existing fetch:", exErr);
+    return;
+  }
+
+  const existingIds = new Set((existing || []).map((r: any) => r.employee_id));
+  const missing = enrollments.filter((e: any) => !existingIds.has(e.employee_id));
+
+  if (missing.length === 0) return;
+
+  const lowestDivision = (existing || []).reduce(
+    (max: number, r: any) => Math.max(max, r.current_division || 1),
+    1
+  );
+  const lowestDivRows = (existing || []).filter((r: any) => r.current_division === lowestDivision);
+  const lowestDivMaxRank = lowestDivRows.reduce(
+    (max: number, r: any) => Math.max(max, r.division_rank || 0),
+    0
+  );
+  const overallMax = (existing || []).reduce(
+    (max: number, r: any) => Math.max(max, r.overall_rank || 0),
+    0
+  );
+
+  const rows = missing.map((m: any, i: number) => ({
+    season_id: seasonId,
+    employee_id: m.employee_id,
+    current_division: lowestDivision,
+    total_points: 0,
+    total_provision: 0,
+    rounds_played: 0,
+    overall_rank: overallMax + i + 1,
+    division_rank: lowestDivMaxRank + i + 1,
+    previous_division: null,
+    updated_at: new Date().toISOString(),
+  }));
+
+  const { error: insErr } = await supabase
+    .from("league_season_standings")
+    .insert(rows);
+
+  if (insErr) {
+    console.error("[sync-season-standings] Insert failed:", insErr);
+  } else {
+    console.log(`[sync-season-standings] Added ${rows.length} late-comers to div ${lowestDivision}`);
+  }
+}
 
 interface StandingResult {
   employee_id: string;
@@ -86,6 +195,17 @@ Deno.serve(async (req) => {
     const playersPerDivision = season.config?.players_per_division || 14;
 
     console.log(`[league-calculate-standings] Qualification period: ${sourceStart} to ${sourceEnd}`);
+
+    // Auto-enroll alle eligible medarbejdere (kører altid — også midt i aktiv sæson).
+    // Fanger nyansatte og folk der har fået job_title=Salgskonsulent/Fieldmarketing.
+    if (season.status === "qualification" || season.status === "active") {
+      await syncLeagueEnrollments(supabase, seasonId);
+    }
+
+    // Sync late-comers til season_standings hvis sæsonen er aktiv.
+    if (season.status === "active") {
+      await syncLateEnrollmentsToSeasonStandings(supabase, seasonId);
+    }
 
     // 2. Get all active enrollments (exclude spectators)
     const { data: enrollments, error: enrollError } = await supabase
