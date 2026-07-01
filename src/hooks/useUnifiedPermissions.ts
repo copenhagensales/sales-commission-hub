@@ -98,11 +98,12 @@ function useCurrentUserRole() {
       
       // Primary: Use system_role_key from job_positions via employee
       const { data: employee } = await supabase
-        .from('employee_master_data')
-        .select('job_title, position_id')
-        .eq('auth_user_id', user.id)
-        .eq('is_active', true)
-        .maybeSingle();
+      const { data: employee } = await findEmployeeByAuth<{ job_title: string | null; position_id: string | null }>(
+        user,
+        'job_title, position_id',
+        { activeOnly: true }
+      );
+
       
       if (employee?.position_id) {
         const { data: position } = await supabase
