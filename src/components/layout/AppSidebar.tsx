@@ -1947,11 +1947,11 @@ function FeedbackNavLink({ handleNavClick }: { handleNavClick: () => void }) {
       const { data: ownerCheck } = await supabase.rpc("is_owner", { _user_id: user.id });
       if (ownerCheck) return true;
       // Check access table
-      const { data: emp } = await supabase
-        .from("employee_master_data")
-        .select("id")
-        .eq("auth_user_id", user.id)
-        .maybeSingle();
+      const { data: emp } = await findEmployeeByAuth<{ id: string }>(
+        user,
+        "id"
+      );
+
       if (!emp?.id) return false;
       const { data: access } = await supabase
         .from("system_feedback_access" as any)
