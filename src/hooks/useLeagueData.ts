@@ -101,14 +101,28 @@ export function useMyEnrollment(seasonId: string | undefined) {
     queryFn: async () => {
       if (!seasonId || !user?.id) return null;
       
-      // Get employee_id for current user
-      const { data: employee } = await supabase
+      // Get employee_id for current user (tolerant to duplicate auth accounts)
+      let employee: { id: string } | null = null;
+      const primary = await supabase
         .from("employee_master_data")
         .select("id")
         .eq("auth_user_id", user.id)
         .maybeSingle();
-      
+      employee = primary.data;
+      if (!employee && user.email) {
+        const email = user.email.toLowerCase();
+        const fallback = await supabase
+          .from("employee_master_data")
+          .select("id")
+          .or(`private_email.ilike.${email},work_email.ilike.${email}`)
+          .order("is_active", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        employee = fallback.data;
+      }
+
       if (!employee) return null;
+
       
       // Defensive: order + limit(1) so duplicate rows never trigger
       // PostgREST PGRST116 ("Cannot coerce the result to a single JSON object")
