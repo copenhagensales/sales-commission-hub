@@ -275,8 +275,9 @@ export function useMyQualificationStanding(seasonId: string | undefined) {
   });
 }
 
-// Helper: resolve current user's employee_id (tolerant to RLS / dupes)
+// Helper: resolve current user's employee_id (tolerant to RLS / dupes / duplicate auth users)
 async function resolveEmployeeId(userId: string): Promise<string> {
+  // Primary: match by auth_user_id
   const { data, error } = await supabase
     .from("employee_master_data")
     .select("id")
@@ -285,9 +286,27 @@ async function resolveEmployeeId(userId: string): Promise<string> {
     .limit(1)
     .maybeSingle();
   if (error) throw error;
-  if (!data) throw new Error("Din medarbejderprofil kunne ikke findes. Kontakt en administrator.");
-  return data.id;
+  if (data) return data.id;
+
+  // Fallback: some users have duplicate auth accounts (work + private email).
+  // Look up the currently signed-in auth user's email and match against
+  // private_email / work_email on the employee record.
+  const { data: userRes } = await supabase.auth.getUser();
+  const email = userRes?.user?.email?.toLowerCase();
+  if (email) {
+    const { data: byEmail } = await supabase
+      .from("employee_master_data")
+      .select("id")
+      .or(`private_email.ilike.${email},work_email.ilike.${email}`)
+      .order("is_active", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (byEmail) return byEmail.id;
+  }
+
+  throw new Error("Din medarbejderprofil kunne ikke findes. Kontakt en administrator.");
 }
+
 
 // Helper: find latest enrollment row for (season, employee) regardless of is_active
 async function findLatestEnrollment(seasonId: string, employeeId: string) {
