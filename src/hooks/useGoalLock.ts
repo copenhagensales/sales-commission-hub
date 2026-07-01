@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { findEmployeeByAuth } from "@/lib/employeeLookup";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { calculatePayrollPeriod } from "@/lib/calculations";
@@ -36,11 +37,11 @@ export function useGoalLock() {
       if (!user?.id) return { isLocked: false, employeeId: null, payrollPeriod: null };
       
       // Get employee data to check salary type
-      const { data: employee, error: empError } = await supabase
-        .from("employee_master_data")
-        .select("id, salary_type")
-        .eq("auth_user_id", user.id)
-        .maybeSingle();
+      const { data: employee, error: empError } = await findEmployeeByAuth<{ id: string; salary_type: string | null }>(
+        user,
+        "id, salary_type"
+      );
+
       
       if (empError) throw empError;
       if (!employee) return { isLocked: false, employeeId: null, payrollPeriod: null };

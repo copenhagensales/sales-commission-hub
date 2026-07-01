@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { findEmployeeByAuth } from "@/lib/employeeLookup";
 
 export async function logContractAccess(
   contractId: string,
@@ -10,11 +11,10 @@ export async function logContractAccess(
     if (!userData.user) return;
 
     // Don't log if the user is viewing their own contract
-    const { data: emp } = await supabase
-      .from("employee_master_data")
-      .select("id")
-      .eq("auth_user_id", userData.user.id)
-      .maybeSingle();
+    const { data: emp } = await findEmployeeByAuth<{ id: string }>(
+      userData.user,
+      "id"
+    );
 
     if (emp?.id === employeeId) return;
 

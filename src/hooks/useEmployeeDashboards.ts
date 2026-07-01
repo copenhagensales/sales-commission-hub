@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { findEmployeeByAuth } from "@/lib/employeeLookup";
 import { useToast } from "@/hooks/use-toast";
 import { Json } from "@/integrations/supabase/types";
 
@@ -59,22 +60,11 @@ export function useEmployeeDashboards() {
         return;
       }
 
-      // First try by auth_user_id
-      let { data: employee } = await supabase
-        .from("employee_master_data")
-        .select("id")
-        .eq("auth_user_id", user.id)
-        .maybeSingle();
+      const { data: employee } = await findEmployeeByAuth<{ id: string }>(
+        user,
+        "id"
+      );
 
-      // Fallback: try by email
-      if (!employee) {
-        const { data: employeeByEmail } = await supabase
-          .from("employee_master_data")
-          .select("id")
-          .eq("private_email", user.email)
-          .maybeSingle();
-        employee = employeeByEmail;
-      }
 
       if (employee) {
         setCurrentEmployeeId(employee.id);

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Send, Loader2, Paperclip, X, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { findEmployeeByAuth } from "@/lib/employeeLookup";
 import { useQuery } from "@tanstack/react-query";
 import { MessageBubble } from "./MessageBubble";
 import { MessageSearch } from "./MessageSearch";
@@ -22,11 +23,11 @@ async function fetchCurrentEmployee(): Promise<{ id: string; full_name: string }
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
   
-  const { data } = await supabase
-    .from("employee_master_data")
-    .select("id, first_name, last_name")
-    .eq("auth_user_id", user.id)
-    .maybeSingle();
+  const { data } = await findEmployeeByAuth<{ id: string; first_name: string | null; last_name: string | null }>(
+    user,
+    "id, first_name, last_name"
+  );
+
   
   return data ? { 
     id: data.id, 

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { findEmployeeByAuth } from "@/lib/employeeLookup";
 import { useAuth } from "./useAuth";
 
 export interface LeagueRound {
@@ -197,11 +198,11 @@ export function useMySeasonStanding(seasonId: string | undefined) {
     queryFn: async () => {
       if (!seasonId || !user?.id) return null;
       
-      const { data: employee } = await supabase
-        .from("employee_master_data")
-        .select("id")
-        .eq("auth_user_id", user.id)
-        .maybeSingle();
+      const { data: employee } = await findEmployeeByAuth<{ id: string }>(
+        user,
+        "id"
+      );
+
       
       if (!employee) return null;
       
