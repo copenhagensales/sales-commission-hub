@@ -452,17 +452,21 @@ async function autoTransitionSeasonStatuses(supabase: SupabaseClient) {
         }
       }
 
-      // Idempotent recovery: if season is already active but missing init data
-      // (e.g. qualification_standings were not yet populated when transition fired),
-      // re-run initializeActiveSeasonData. Safe because it upserts standings and
-      // only inserts round 1 if it does not already exist (handled below).
+      // Idempotent recovery: hvis sæsonen er aktiv men mangler runder eller
+      // season_standings er ude af sync med qualification_standings (fx fordi
+      // init kørte for tidligt før alle tilmeldinger var registreret), så
+      // re-kør initializeActiveSeasonData. Funktionen selv bevarer point/division
+      // for spillere der allerede har spillet runder.
       if (season.status === "active" && !newStatus) {
-        const { count: roundCount } = await supabase
-          .from("league_rounds")
-          .select("*", { count: "exact", head: true })
-          .eq("season_id", season.id);
-        if ((roundCount ?? 0) === 0) {
-          console.log(`[auto-transition] Active season S${season.season_number} missing rounds — re-initializing`);
+        const [{ count: roundCount }, { count: seasonCount }, { count: qualCount }] = await Promise.all([
+          supabase.from("league_rounds").select("*", { count: "exact", head: true }).eq("season_id", season.id),
+          supabase.from("league_season_standings").select("*", { count: "exact", head: true }).eq("season_id", season.id),
+          supabase.from("league_qualification_standings").select("*", { count: "exact", head: true }).eq("season_id", season.id),
+        ]);
+        const noRounds = (roundCount ?? 0) === 0;
+        const outOfSync = (qualCount ?? 0) > (seasonCount ?? 0);
+        if (noRounds || outOfSync) {
+          console.log(`[auto-transition] Active season S${season.season_number} needs re-init (noRounds=${noRounds}, outOfSync=${outOfSync}, qual=${qualCount}, season=${seasonCount})`);
           await initializeActiveSeasonData(supabase, season.id, season.start_date, season.config);
         }
       }
