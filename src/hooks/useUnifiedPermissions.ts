@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { findEmployeeByAuth } from "@/lib/employeeLookup";
 import { useAuth } from "@/hooks/useAuth";
 import { permissionKeyLabels as centralPermissionKeyLabels, type PermissionKey } from "@/config/permissionKeys";
 import { fetchAllRows } from "@/utils/supabasePagination";
