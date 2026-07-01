@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { findEmployeeByAuth } from "@/lib/employeeLookup";
 import { useAuth } from "./useAuth";
 
 export interface LeagueRound {
