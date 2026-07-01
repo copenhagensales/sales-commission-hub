@@ -181,12 +181,12 @@ export function useAccessibleDashboards() {
       if (!user?.id) return [];
       
       // 1. Hent employee_id for nuværende bruger
-      const { data: employee } = await supabase
-        .from("employee_master_data")
-        .select("id")
-        .eq("auth_user_id", user.id)
-        .eq("is_active", true)
-        .maybeSingle();
+      const { data: employee } = await findEmployeeByAuth<{ id: string }>(
+        user,
+        "id",
+        { activeOnly: true }
+      );
+
       
       if (!employee?.id) return [];
       const employeeId = employee.id;
