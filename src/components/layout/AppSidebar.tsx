@@ -10,6 +10,7 @@ import {
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { findEmployeeByAuth } from "@/lib/employeeLookup";
 import { useToast } from "@/hooks/use-toast";
 import cphSalesLogo from "@/assets/cph-sales-logo.png";
 import { useState, useMemo, useEffect } from "react";
