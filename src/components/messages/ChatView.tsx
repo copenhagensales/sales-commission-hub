@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Send, Loader2, Paperclip, X, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { findEmployeeByAuth } from "@/lib/employeeLookup";
 import { useQuery } from "@tanstack/react-query";
 import { MessageBubble } from "./MessageBubble";
 import { MessageSearch } from "./MessageSearch";
