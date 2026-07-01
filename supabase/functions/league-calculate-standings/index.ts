@@ -196,6 +196,17 @@ Deno.serve(async (req) => {
 
     console.log(`[league-calculate-standings] Qualification period: ${sourceStart} to ${sourceEnd}`);
 
+    // Auto-enroll alle eligible medarbejdere (kører altid — også midt i aktiv sæson).
+    // Fanger nyansatte og folk der har fået job_title=Salgskonsulent/Fieldmarketing.
+    if (season.status === "qualification" || season.status === "active") {
+      await syncLeagueEnrollments(supabase, seasonId);
+    }
+
+    // Sync late-comers til season_standings hvis sæsonen er aktiv.
+    if (season.status === "active") {
+      await syncLateEnrollmentsToSeasonStandings(supabase, seasonId);
+    }
+
     // 2. Get all active enrollments (exclude spectators)
     const { data: enrollments, error: enrollError } = await supabase
       .from("league_enrollments")
