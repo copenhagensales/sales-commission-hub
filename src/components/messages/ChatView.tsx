@@ -23,11 +23,11 @@ async function fetchCurrentEmployee(): Promise<{ id: string; full_name: string }
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
   
-  const { data } = await supabase
-    .from("employee_master_data")
-    .select("id, first_name, last_name")
-    .eq("auth_user_id", user.id)
-    .maybeSingle();
+  const { data } = await findEmployeeByAuth<{ id: string; first_name: string | null; last_name: string | null }>(
+    user,
+    "id, first_name, last_name"
+  );
+
   
   return data ? { 
     id: data.id, 
