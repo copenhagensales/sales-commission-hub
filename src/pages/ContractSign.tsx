@@ -198,14 +198,26 @@ export default function ContractSign() {
     queryFn: async () => {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) return null;
-      
+
+      // Primary lookup: auth_user_id (robust mod email-typos)
+      const { data: byAuthId, error: authIdError } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name, private_email")
+        .eq("auth_user_id", userData.user.id)
+        .maybeSingle();
+
+      if (authIdError) throw authIdError;
+      if (byAuthId) return byAuthId;
+
+      // Fallback: email match
       const lowerEmail = userData.user.email?.toLowerCase() || '';
+      if (!lowerEmail) return null;
       const { data, error } = await supabase
         .from("employee_master_data")
         .select("id, first_name, last_name, private_email")
         .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .maybeSingle();
-      
+
       if (error) throw error;
       return data;
     },
