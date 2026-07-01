@@ -258,12 +258,10 @@ async function saveKpiValuesBatch(supabase: SupabaseClient, values: CachedValue[
 
 async function initializeActiveSeasonData(supabase: SupabaseClient, seasonId: string, startDate: string, config: any) {
   try {
-    const playersPerDivision = config?.players_per_division || 10;
-
-    // 1. Copy qualification standings → season standings
+    // 1. Load final qualification placement + eventuelle eksisterende season standings
     const { data: qualStandings } = await supabase
       .from("league_qualification_standings")
-      .select("employee_id, projected_division, projected_rank")
+      .select("employee_id, projected_division, projected_rank, overall_rank")
       .eq("season_id", seasonId)
       .order("overall_rank", { ascending: true });
 
@@ -272,28 +270,68 @@ async function initializeActiveSeasonData(supabase: SupabaseClient, seasonId: st
       return;
     }
 
-    const seasonStandings = qualStandings.map((q, i) => ({
-      season_id: seasonId,
-      employee_id: q.employee_id,
-      current_division: q.projected_division,
-      total_points: 0,
-      total_provision: 0,
-      rounds_played: 0,
-      overall_rank: i + 1,
-      division_rank: q.projected_rank,
-      previous_division: null,
-      updated_at: new Date().toISOString(),
-    }));
-
-    const { error: ssError } = await supabase
+    const { data: existingSeason } = await supabase
       .from("league_season_standings")
-      .upsert(seasonStandings, { onConflict: "season_id,employee_id" });
+      .select("employee_id, rounds_played, total_points, current_division, division_rank, overall_rank")
+      .eq("season_id", seasonId);
 
-    if (ssError) {
-      console.error("[season-init] Failed to create season standings:", ssError);
-      return;
+    const existing = existingSeason || [];
+    const existingIds = new Set(existing.map((r: any) => r.employee_id));
+
+    // Er der spillet nogen runder endnu? Hvis nej, kan vi trygt genopbygge
+    // hele season_standings fra kvalifikationens slutstilling (så division +
+    // rank matcher præcis, også hvis init første gang kørte for tidligt).
+    // Hvis ja, må vi ikke overskrive point/division på eksisterende spillere —
+    // vi tilføjer kun manglende spillere med deres kvalifikationsplacering.
+    const anyRoundsPlayed = existing.some((r: any) => (r.rounds_played || 0) > 0 || Number(r.total_points || 0) > 0);
+
+    let rowsToUpsert: any[] = [];
+    if (!anyRoundsPlayed) {
+      rowsToUpsert = qualStandings.map((q: any, i: number) => ({
+        season_id: seasonId,
+        employee_id: q.employee_id,
+        current_division: q.projected_division,
+        total_points: 0,
+        total_provision: 0,
+        rounds_played: 0,
+        overall_rank: i + 1,
+        division_rank: q.projected_rank,
+        previous_division: null,
+        updated_at: new Date().toISOString(),
+      }));
+      console.log(`[season-init] Full rebuild from qualification (${rowsToUpsert.length} players)`);
+    } else {
+      const missing = qualStandings.filter((q: any) => !existingIds.has(q.employee_id));
+      if (missing.length > 0) {
+        const maxOverall = existing.reduce((m: number, r: any) => Math.max(m, r.overall_rank || 0), 0);
+        rowsToUpsert = missing.map((q: any, i: number) => ({
+          season_id: seasonId,
+          employee_id: q.employee_id,
+          current_division: q.projected_division,
+          total_points: 0,
+          total_provision: 0,
+          rounds_played: 0,
+          overall_rank: maxOverall + i + 1,
+          division_rank: q.projected_rank,
+          previous_division: null,
+          updated_at: new Date().toISOString(),
+        }));
+        console.log(`[season-init] Rounds already played — adding ${rowsToUpsert.length} missing qualification players (existing preserved)`);
+      } else {
+        console.log("[season-init] Rounds already played, no missing players — nothing to sync");
+      }
     }
-    console.log(`[season-init] Created ${seasonStandings.length} season standings`);
+
+    if (rowsToUpsert.length > 0) {
+      const { error: ssError } = await supabase
+        .from("league_season_standings")
+        .upsert(rowsToUpsert, { onConflict: "season_id,employee_id" });
+
+      if (ssError) {
+        console.error("[season-init] Failed to upsert season standings:", ssError);
+        return;
+      }
+    }
 
     // 2. Create first round (idempotent — skip if any round already exists)
     const { count: existingRounds } = await supabase
@@ -414,17 +452,21 @@ async function autoTransitionSeasonStatuses(supabase: SupabaseClient) {
         }
       }
 
-      // Idempotent recovery: if season is already active but missing init data
-      // (e.g. qualification_standings were not yet populated when transition fired),
-      // re-run initializeActiveSeasonData. Safe because it upserts standings and
-      // only inserts round 1 if it does not already exist (handled below).
+      // Idempotent recovery: hvis sæsonen er aktiv men mangler runder eller
+      // season_standings er ude af sync med qualification_standings (fx fordi
+      // init kørte for tidligt før alle tilmeldinger var registreret), så
+      // re-kør initializeActiveSeasonData. Funktionen selv bevarer point/division
+      // for spillere der allerede har spillet runder.
       if (season.status === "active" && !newStatus) {
-        const { count: roundCount } = await supabase
-          .from("league_rounds")
-          .select("*", { count: "exact", head: true })
-          .eq("season_id", season.id);
-        if ((roundCount ?? 0) === 0) {
-          console.log(`[auto-transition] Active season S${season.season_number} missing rounds — re-initializing`);
+        const [{ count: roundCount }, { count: seasonCount }, { count: qualCount }] = await Promise.all([
+          supabase.from("league_rounds").select("*", { count: "exact", head: true }).eq("season_id", season.id),
+          supabase.from("league_season_standings").select("*", { count: "exact", head: true }).eq("season_id", season.id),
+          supabase.from("league_qualification_standings").select("*", { count: "exact", head: true }).eq("season_id", season.id),
+        ]);
+        const noRounds = (roundCount ?? 0) === 0;
+        const outOfSync = (qualCount ?? 0) > (seasonCount ?? 0);
+        if (noRounds || outOfSync) {
+          console.log(`[auto-transition] Active season S${season.season_number} needs re-init (noRounds=${noRounds}, outOfSync=${outOfSync}, qual=${qualCount}, season=${seasonCount})`);
           await initializeActiveSeasonData(supabase, season.id, season.start_date, season.config);
         }
       }
