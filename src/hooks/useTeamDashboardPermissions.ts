@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { findEmployeeByAuth } from "@/lib/employeeLookup";
 import { useAuth } from "@/hooks/useAuth";
 import { useUnifiedPermissions, usePagePermissions } from "@/hooks/useUnifiedPermissions";
 import { useTeamAssistantLeaders } from "@/hooks/useTeamAssistantLeaders";
