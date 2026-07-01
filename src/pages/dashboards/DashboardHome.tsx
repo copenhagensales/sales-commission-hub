@@ -24,12 +24,12 @@ export default function DashboardHome() {
     queryKey: ["employee-name", user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
-      const { data } = await supabase
-        .from("employee_master_data")
-        .select("first_name")
-        .eq("auth_user_id", user.id)
-        .maybeSingle();
+      const { data } = await findEmployeeByAuth<{ first_name: string | null }>(
+        user,
+        "first_name"
+      );
       return data;
+
     },
     enabled: !!user?.id,
   });
