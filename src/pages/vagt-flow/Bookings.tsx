@@ -143,14 +143,14 @@ export default function VagtBookings() {
 
   // Use fieldmarketingClients directly - no need to map to brands
 
-  // Fetch Fieldmarketing employee IDs first
+  // Fetch Fieldmarketing employee IDs first (job_title=Fieldmarketing OR opt-in via can_work_fm)
   const { data: fieldmarketingEmployeeIds } = useQuery({
     queryKey: ["fieldmarketing-employee-ids"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employee_master_data")
         .select("id")
-        .eq("job_title", "Fieldmarketing")
+        .or("job_title.eq.Fieldmarketing,can_work_fm.eq.true")
         .eq("is_active", true);
       if (error) throw error;
       return data?.map(e => e.id) || [];
@@ -226,14 +226,14 @@ export default function VagtBookings() {
     },
   });
 
-  // Fetch Fieldmarketing employees from employee_master_data
+  // Fetch Fieldmarketing employees (job_title=Fieldmarketing OR opt-in via can_work_fm)
   const { data: employees } = useQuery({
     queryKey: ["vagt-employees-active-master"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employee_master_data")
         .select("id, first_name, last_name, department")
-        .eq("job_title", "Fieldmarketing")
+        .or("job_title.eq.Fieldmarketing,can_work_fm.eq.true")
         .eq("is_active", true)
         .order("first_name");
       if (error) throw error;
