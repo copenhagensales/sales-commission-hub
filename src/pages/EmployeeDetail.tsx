@@ -1253,6 +1253,7 @@ export default function EmployeeDetail() {
                         signed: "Underskrevet",
                         rejected: "Afvist",
                         expired: "Udløbet",
+                        cancelled: "Annulleret",
                       };
                       const statusColors: Record<string, string> = {
                         draft: "bg-muted text-muted-foreground",
@@ -1261,6 +1262,7 @@ export default function EmployeeDetail() {
                         signed: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
                         rejected: "bg-destructive/10 text-destructive",
                         expired: "bg-muted text-muted-foreground",
+                        cancelled: "bg-muted text-muted-foreground line-through",
                       };
                       return (
                         <div
