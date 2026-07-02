@@ -144,7 +144,7 @@ export default function MarketsContent() {
     },
   });
 
-  // Employees for EditBookingDialog (Fieldmarketing team)
+  // Employees for EditBookingDialog (Fieldmarketing team members + opt-in via can_work_fm)
   const { data: employees = [] } = useQuery({
     queryKey: ["vagt-employees-for-markets-fieldmarketing"],
     queryFn: async () => {
@@ -154,20 +154,39 @@ export default function MarketsContent() {
         .ilike("name", "Fieldmarketing")
         .maybeSingle();
 
-      if (!teamData) return [];
+      const teamMembers = teamData
+        ? (await supabase
+            .from("team_members")
+            .select(`employee_id, employee:employee_id(id, first_name, last_name, is_active)`)
+            .eq("team_id", teamData.id)).data || []
+        : [];
 
-      const { data } = await supabase
-        .from("team_members")
-        .select(`employee_id, employee:employee_id(id, first_name, last_name, is_active)`)
-        .eq("team_id", teamData.id);
+      const { data: optInMembers = [] } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name, is_active")
+        .eq("can_work_fm", true)
+        .eq("is_active", true);
 
-      return (data || [])
-        .filter((tm: any) => tm.employee?.is_active)
-        .map((tm: any) => ({
-          id: tm.employee.id,
-          full_name: `${tm.employee.first_name} ${tm.employee.last_name}`,
-          team: teamData.name,
-        }));
+      const merged = new Map<string, { id: string; full_name: string; team: string }>();
+      for (const tm of teamMembers as any[]) {
+        if (tm.employee?.is_active) {
+          merged.set(tm.employee.id, {
+            id: tm.employee.id,
+            full_name: `${tm.employee.first_name} ${tm.employee.last_name}`,
+            team: teamData?.name || "Fieldmarketing",
+          });
+        }
+      }
+      for (const emp of optInMembers as any[]) {
+        if (!merged.has(emp.id)) {
+          merged.set(emp.id, {
+            id: emp.id,
+            full_name: `${emp.first_name} ${emp.last_name}`,
+            team: "Fieldmarketing",
+          });
+        }
+      }
+      return Array.from(merged.values());
     },
   });
 
