@@ -6096,6 +6096,7 @@ export type Database = {
           avatar_url: string | null
           bank_account_number: string | null
           bank_reg_number: string | null
+          can_work_fm: boolean
           contract_id: string | null
           contract_version: string | null
           cpr_number: string | null
@@ -6157,6 +6158,7 @@ export type Database = {
           avatar_url?: string | null
           bank_account_number?: string | null
           bank_reg_number?: string | null
+          can_work_fm?: boolean
           contract_id?: string | null
           contract_version?: string | null
           cpr_number?: string | null
@@ -6218,6 +6220,7 @@ export type Database = {
           avatar_url?: string | null
           bank_account_number?: string | null
           bank_reg_number?: string | null
+          can_work_fm?: boolean
           contract_id?: string | null
           contract_version?: string | null
           cpr_number?: string | null

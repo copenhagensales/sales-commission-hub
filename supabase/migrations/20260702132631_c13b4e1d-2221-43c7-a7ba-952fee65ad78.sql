@@ -1,0 +1,1 @@
+ALTER TABLE public.employee_master_data ADD COLUMN IF NOT EXISTS can_work_fm boolean NOT NULL DEFAULT false;

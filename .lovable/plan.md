@@ -1,30 +1,46 @@
-## Diagnose
+## Løsning B — permanent opt-in flag
 
-De 3 salg du rettede for Julie Bonde Jensen 2/7 kl. 10:54 (phones 42264270, 51298175, 51859861, kampagne "Eesy gaden", produkt "Eesy uden første måned (Nuuday)") har korrekt opdateret `raw_payload.fm_product_name` = "Eesy uden første måned (Nuuday)", MEN deres `sale_items`-rækker er slettet og ikke genskabt. Derfor viser UI 0 kr i provi/oms — det er kun disse 3, der mangler.
+### 1. Migration
+Tilføj kolonne på `employee_master_data`:
+```sql
+ALTER TABLE public.employee_master_data
+  ADD COLUMN can_work_fm boolean NOT NULL DEFAULT false;
+```
+Ingen RLS-ændringer (kolonnen arver eksisterende policies). Ingen backfill — kun opt-in.
 
-De øvrige 9 salg samme dag har intakte `sale_items` med korrekt 360 kr / 1000 kr og er ikke rørt.
+### 2. Udvid FM-medarbejder-filtre (3 filer)
 
-## Fix (kirurgisk — kun de 3 salg)
+Erstat `.eq("job_title", "Fieldmarketing")` med `.or("job_title.eq.Fieldmarketing,can_work_fm.eq.true")` i:
 
-Kør DB-funktionen `heal_fm_missing_sale_items` scoped til de 3 sale-id'er:
+- `src/pages/vagt-flow/Bookings.tsx` linje 153 (`fieldmarketing-employee-ids` query)
+- `src/pages/vagt-flow/Bookings.tsx` linje 236 (`vagt-employees-active-master` query)
+- `src/pages/vagt-flow/MarketsContent.tsx` linje ~154 (EditBookingDialog employees)
 
-- `2ec6bfa0-6de7-4e05-b154-73f2c746b3c3`
-- `227f423c-045d-4dd3-89d6-d6def878debb`
-- `33323090-7876-4c77-8239-acc26e14f49b`
+`useVagtEmployees()` i `src/hooks/useVagtEmployee.ts` filtrerer via team_members på Fieldmarketing-teamet — den lader vi være (kræver reelt team-medlemskab, hvilket Thorbjørn ikke har og ikke skal have).
 
-Funktionen findes allerede (`enrich_fm_sale` / `create_fm_sale_items` / `heal_fm_missing_sale_items`) og bruges netop til at genskabe manglende FM sale_items ud fra `raw_payload` og pricing-motoren. Den rører ikke andre salg.
+### 3. Checkbox på medarbejder-profilen
 
-## Verifikation
+I `src/pages/EmployeeDetail.tsx` under grundoplysninger tilføjes en Switch/Checkbox "Kan bookes på FM-vagter" der læser/skriver `can_work_fm`. Kun synlig for brugere der kan redigere medarbejderen (samme gate som resten af redigerings-felterne).
 
-Efter kørsel: tjek at de 3 sale_items eksisterer med `mapped_commission=360`, `mapped_revenue=1000` og produkt "Eesy uden første måned (Nuuday)" — samme værdier som de andre 9 salg samme dag. Bekræft i UI at Julies totaler for 2/7 nu viser fuld provi/oms inkl. de 3.
+### 4. Ingen påvirkning af beregninger
 
-## Rod-årsag (rapporteres, fixes ikke i denne omgang)
+Alle løn-, DB- og FM Shift Scope-beregninger scoper på `job_title`, ikke `can_work_fm`. Thorbjørn forbliver TM-sælger i alle rapporter — han optræder kun som "bookbar" i FM-booking-UI'en. Salg han taster på Eesy FM-vagter tilfalder Eesy FM-klienten via `client_campaign_id` på salget (som allerede sker for alle FM-salg), ikke via hans job_title.
 
-FM-redigeringsflowet sletter tilsyneladende `sale_items` uden at genkalde `create_fm_sale_items` når produktnavn ændres. Det er den underliggende bug og ligger i rød zone (pricing/lønberegning) — bør fixes separat med eksplicit godkendelse, ikke bundlet med denne hotfix.
+### 5. Aktivér for Thorbjørn
 
-## Scope
+Efter deploy: `UPDATE employee_master_data SET can_work_fm = true WHERE id = 'a5698dd5-c4e3-4438-94c3-bc8a1837ef61';`
 
-- Ingen kodeændringer.
-- Ingen ændring af de øvrige 9 salg.
-- Ét kald til `heal_fm_missing_sale_items` med de 3 sale-id'er.
-- Én commit-fri hotfix (data-only).
+Eller — endnu bedre — du klikker checkboxen på hans profil selv. Så tester vi UI'en samtidig.
+
+### Rækkefølge
+1. Migration (kræver din godkendelse i næste skærm)
+2. Kode-ændringer i de 4 filer
+3. Du tjekker checkboxen på Thorbjørns profil
+4. FM-lederen booker ham på en Eesy FM-vagt via `/vagt-flow/booking`
+5. Thorbjørn åbner `/vagt-flow/sales-registration` og taster salg
+
+### Scope-bekræftelse
+- 1 migration (1 kolonne, ingen data-migration)
+- 4 filændringer
+- Ingen ændring af pricing, løn, rapport-logik
+- Ingen ændring af hans Relatel-arbejde
