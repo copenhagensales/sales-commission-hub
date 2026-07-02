@@ -81,6 +81,7 @@ interface EmployeeMasterDataRecord {
   freelance_company_name: string | null;
   freelance_cvr: string | null;
   freelance_company_address: string | null;
+  can_work_fm: boolean | null;
 }
 
 export default function EmployeeDetail() {
