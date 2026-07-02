@@ -815,6 +815,21 @@ export default function EmployeeDetail() {
                     <td className="py-2.5 pr-4 text-sm text-muted-foreground w-1/3">Leder</td>
                     <td className="py-2.5 text-sm font-medium">{manager ? `${manager.first_name} ${manager.last_name}` : "-"}</td>
                   </tr>
+                  <tr className="border-b border-border/50 last:border-0">
+                    <td className="py-2.5 pr-4 text-sm text-muted-foreground w-1/3">Kan bookes på FM-vagter</td>
+                    <td className="py-2.5">
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={employee.can_work_fm ?? false}
+                          onCheckedChange={(checked) => handleSave("can_work_fm", checked)}
+                          disabled={!canEditEmployees}
+                        />
+                        <span className="text-sm text-muted-foreground">
+                          {employee.can_work_fm ? "Ja" : "Nej"}
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
                 </TableSection>
 
                 <TableSection title="Ansættelse">
