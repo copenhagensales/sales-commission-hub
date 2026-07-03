@@ -207,10 +207,12 @@ export default function BookingsContent() {
     },
   });
 
-  // Fetch Fieldmarketing employees via team_members (has public RLS for authenticated users)
+  // Fetch Fieldmarketing employees via team_members + opt-in via can_work_fm
   const { data: employees = [] } = useQuery({
     queryKey: ["vagt-employees-for-booking-fieldmarketing"],
     queryFn: async () => {
+      const employeeMap = new Map<string, { id: string; full_name: string; team: string }>();
+
       // First get the Fieldmarketing team ID
       const { data: teamData, error: teamError } = await supabase
         .from("teams")
@@ -219,31 +221,54 @@ export default function BookingsContent() {
         .maybeSingle();
 
       if (teamError) throw teamError;
-      if (!teamData) return [];
 
-      // Get all employees who are members of the Fieldmarketing team via team_members
-      const { data, error } = await supabase
-        .from("team_members")
-        .select(`
-          employee_id,
-          employee:employee_id(
-            id,
-            first_name,
-            last_name,
-            is_active
-          )
-        `)
-        .eq("team_id", teamData.id);
+      if (teamData) {
+        const { data, error } = await supabase
+          .from("team_members")
+          .select(`
+            employee_id,
+            employee:employee_id(
+              id,
+              first_name,
+              last_name,
+              is_active
+            )
+          `)
+          .eq("team_id", teamData.id);
 
-      if (error) throw error;
-      
-      return (data || [])
-        .filter((tm: any) => tm.employee && tm.employee.is_active)
-        .map((tm: any) => ({
-          id: tm.employee.id,
-          full_name: `${tm.employee.first_name} ${tm.employee.last_name}`,
-          team: teamData.name,
-        })) || [];
+        if (error) throw error;
+
+        (data || [])
+          .filter((tm: any) => tm.employee && tm.employee.is_active)
+          .forEach((tm: any) => {
+            employeeMap.set(tm.employee.id, {
+              id: tm.employee.id,
+              full_name: `${tm.employee.first_name} ${tm.employee.last_name}`,
+              team: teamData.name,
+            });
+          });
+      }
+
+      // Opt-in employees via can_work_fm flag
+      const { data: optIn, error: optInError } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name")
+        .eq("can_work_fm", true)
+        .eq("is_active", true);
+
+      if (optInError) throw optInError;
+
+      (optIn || []).forEach((e: any) => {
+        if (!employeeMap.has(e.id)) {
+          employeeMap.set(e.id, {
+            id: e.id,
+            full_name: `${e.first_name} ${e.last_name}`,
+            team: "Fieldmarketing",
+          });
+        }
+      });
+
+      return Array.from(employeeMap.values());
     },
   });
 
