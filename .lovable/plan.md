@@ -1,46 +1,25 @@
-## Løsning B — permanent opt-in flag
+## Problem
 
-### 1. Migration
-Tilføj kolonne på `employee_master_data`:
-```sql
-ALTER TABLE public.employee_master_data
-  ADD COLUMN can_work_fm boolean NOT NULL DEFAULT false;
-```
-Ingen RLS-ændringer (kolonnen arver eksisterende policies). Ingen backfill — kun opt-in.
+Checkboxen "Kan bookes på FM-vagter" på Thorbjørns profil er sat, men han dukker ikke op i dropdown'en når man redigerer en booking (screenshot: "Rediger booking → Medarbejder 1 (valgfri)").
 
-### 2. Udvid FM-medarbejder-filtre (3 filer)
+Rod-årsag: EditBookingDialog i det weekly booking-view får sin `employees`-prop fra `src/pages/vagt-flow/BookingsContent.tsx:211-248`, som kun henter medlemmer af Fieldmarketing-teamet via `team_members`. Denne query blev IKKE opdateret i forrige runde — kun `Bookings.tsx` og `MarketsContent.tsx` fik `can_work_fm`-fallback.
 
-Erstat `.eq("job_title", "Fieldmarketing")` med `.or("job_title.eq.Fieldmarketing,can_work_fm.eq.true")` i:
+## Fix (én fil, én query)
 
-- `src/pages/vagt-flow/Bookings.tsx` linje 153 (`fieldmarketing-employee-ids` query)
-- `src/pages/vagt-flow/Bookings.tsx` linje 236 (`vagt-employees-active-master` query)
-- `src/pages/vagt-flow/MarketsContent.tsx` linje ~154 (EditBookingDialog employees)
+`src/pages/vagt-flow/BookingsContent.tsx` linje 210-248: erstat den nuværende team_members-only query med samme mønster som `MarketsContent.tsx` — kør to queries og merge dem:
 
-`useVagtEmployees()` i `src/hooks/useVagtEmployee.ts` filtrerer via team_members på Fieldmarketing-teamet — den lader vi være (kræver reelt team-medlemskab, hvilket Thorbjørn ikke har og ikke skal have).
+1. Hent team_members på Fieldmarketing-teamet (som i dag).
+2. Hent `employee_master_data` hvor `can_work_fm = true AND is_active = true`.
+3. Merge til en unik liste (Map på `id` for at undgå dubletter).
 
-### 3. Checkbox på medarbejder-profilen
+Returnér samme shape som før: `{ id, full_name, team }`. For opt-in-medarbejdere sættes `team` til "Fieldmarketing" så resten af UI'en fungerer.
 
-I `src/pages/EmployeeDetail.tsx` under grundoplysninger tilføjes en Switch/Checkbox "Kan bookes på FM-vagter" der læser/skriver `can_work_fm`. Kun synlig for brugere der kan redigere medarbejderen (samme gate som resten af redigerings-felterne).
+## Scope
 
-### 4. Ingen påvirkning af beregninger
+- 1 fil, 1 query
+- Ingen ændring af `EditBookingDialog`, pricing, løn eller rapport-logik
+- Cache-key `vagt-employees-for-booking-fieldmarketing` genbruges (invalideres automatisk ved refresh)
 
-Alle løn-, DB- og FM Shift Scope-beregninger scoper på `job_title`, ikke `can_work_fm`. Thorbjørn forbliver TM-sælger i alle rapporter — han optræder kun som "bookbar" i FM-booking-UI'en. Salg han taster på Eesy FM-vagter tilfalder Eesy FM-klienten via `client_campaign_id` på salget (som allerede sker for alle FM-salg), ikke via hans job_title.
+## Efter deploy
 
-### 5. Aktivér for Thorbjørn
-
-Efter deploy: `UPDATE employee_master_data SET can_work_fm = true WHERE id = 'a5698dd5-c4e3-4438-94c3-bc8a1837ef61';`
-
-Eller — endnu bedre — du klikker checkboxen på hans profil selv. Så tester vi UI'en samtidig.
-
-### Rækkefølge
-1. Migration (kræver din godkendelse i næste skærm)
-2. Kode-ændringer i de 4 filer
-3. Du tjekker checkboxen på Thorbjørns profil
-4. FM-lederen booker ham på en Eesy FM-vagt via `/vagt-flow/booking`
-5. Thorbjørn åbner `/vagt-flow/sales-registration` og taster salg
-
-### Scope-bekræftelse
-- 1 migration (1 kolonne, ingen data-migration)
-- 4 filændringer
-- Ingen ændring af pricing, løn, rapport-logik
-- Ingen ændring af hans Relatel-arbejde
+Thorbjørn skulle dukke op i "Tilføj medarbejder"-dropdown i Rediger booking → Medarbejdere.
