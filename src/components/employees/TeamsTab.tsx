@@ -36,6 +36,7 @@ interface Employee {
   job_title: string | null;
   team_id: string | null;
   is_staff_employee: boolean;
+  employment_start_date?: string | null;
 }
 
 interface Client {
