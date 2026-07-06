@@ -795,6 +795,7 @@ export default function EmployeeMasterData() {
           staffCount={staffCount}
           teamCount={teamCount}
           positionCount={positionCount}
+          pendingStartCount={notStartedYetCount}
         />
 
         {/* Employee Form Dialog */}
