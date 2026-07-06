@@ -26,6 +26,7 @@ export function EmployeeKpiCards({
       border: "border-blue-500/20",
       iconColor: "text-blue-500",
       valueColor: "text-blue-600 dark:text-blue-400",
+      subline: pendingStartCount > 0 ? `+${pendingStartCount} starter senere` : null,
     },
     {
       label: "Stab / Backoffice",
