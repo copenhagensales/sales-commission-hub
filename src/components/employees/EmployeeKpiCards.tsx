@@ -7,13 +7,15 @@ interface EmployeeKpiCardsProps {
   staffCount: number;
   teamCount: number;
   positionCount: number;
+  pendingStartCount?: number;
 }
 
 export function EmployeeKpiCards({ 
   activeCount, 
   staffCount, 
   teamCount, 
-  positionCount 
+  positionCount,
+  pendingStartCount = 0,
 }: EmployeeKpiCardsProps) {
   const kpis = [
     {
@@ -24,6 +26,7 @@ export function EmployeeKpiCards({
       border: "border-blue-500/20",
       iconColor: "text-blue-500",
       valueColor: "text-blue-600 dark:text-blue-400",
+      subline: pendingStartCount > 0 ? `+${pendingStartCount} starter senere` : null,
     },
     {
       label: "Stab / Backoffice",
@@ -74,6 +77,9 @@ export function EmployeeKpiCards({
                 <p className={cn("text-3xl font-bold tracking-tight", kpi.valueColor)}>
                   {kpi.value.toLocaleString("da-DK")}
                 </p>
+                {"subline" in kpi && kpi.subline && (
+                  <p className="text-xs text-muted-foreground">{kpi.subline}</p>
+                )}
               </div>
               <div className={cn(
                 "rounded-xl p-2.5 bg-background/80 backdrop-blur-sm shadow-sm",

@@ -755,8 +755,13 @@ export default function EmployeeMasterData() {
     });
 
   // Use cached KPI values (fallback to local count if cache not yet populated)
+  const today = new Date().toISOString().split("T")[0];
+  const isNotStartedYet = (e: EmployeeMasterDataRecord) =>
+    !!e.is_active && !!e.employment_start_date && e.employment_start_date > today;
+  const notStartedYetCount = employees.filter(isNotStartedYet).length;
   const localActiveCount = employees.filter((e) => e.is_active).length;
-  const activeCount = cachedActiveCount > 0 ? cachedActiveCount : localActiveCount;
+  const rawActiveCount = cachedActiveCount > 0 ? cachedActiveCount : localActiveCount;
+  const activeCount = Math.max(0, rawActiveCount - notStartedYetCount);
   const staffCount = cachedStaffCount;
   const teamCount = cachedTeamCount;
   const positionCount = cachedPositionCount > 0 ? cachedPositionCount : jobPositions.length;
@@ -790,6 +795,7 @@ export default function EmployeeMasterData() {
           staffCount={staffCount}
           teamCount={teamCount}
           positionCount={positionCount}
+          pendingStartCount={notStartedYetCount}
         />
 
         {/* Employee Form Dialog */}
@@ -972,6 +978,16 @@ export default function EmployeeMasterData() {
                                   <TooltipContent>{getContractStatus(employee.id) === 'signed' ? t("employees.table.contractSigned") : getContractStatus(employee.id) === 'pending' ? "Afventer underskrift" : getContractStatus(employee.id) === 'rejected' ? "Kontrakt afvist" : t("employees.table.noContractSigned")}</TooltipContent>
                                 </Tooltip>
                                 <span>{employee.first_name} {employee.last_name}</span>
+                                {isNotStartedYet(employee) && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Badge variant="outline" className="text-xs font-normal border-amber-500/40 text-amber-600 dark:text-amber-400">
+                                        Starter {new Date(employee.employment_start_date!).toLocaleDateString("da-DK", { day: "numeric", month: "short" })}
+                                      </Badge>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Ikke startet endnu — tælles ikke som aktiv medarbejder</TooltipContent>
+                                  </Tooltip>
+                                )}
                               </div>
                             </TableCell>
                             <TableCell className="py-3 text-sm">{employee.job_title || <span className="text-muted-foreground/50">-</span>}</TableCell>
