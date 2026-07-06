@@ -1,32 +1,19 @@
-## Mål
-Medarbejdere der ligger i `/employees`-oversigten, men hvis `employment_start_date` er i fremtiden, skal:
-1. Vises med et tydeligt tag ("Ikke startet endnu") i rækken.
-2. Ikke tælle med i "Aktive medarbejdere"-KPI'en, selv om `is_active = true`.
+## Udtræk: Eesy FM numre sidste uge
 
-Grøn zone — kun UI/præsentation i `src/pages/EmployeeMasterData.tsx`. Ingen DB-ændringer, ingen ændring af `is_active`-logik (så løn, RLS, permissions etc. er urørt).
+**Data der findes:** 414 salg, 388 unikke telefonnumre i uge 27 (29. juni – 5. juli 2026). Kundenavn/firma er tomme felter (Eesy FM får ikke kundedata fra dialeren i dag), men vi har telefon, dato/tid, sælger og status.
 
-## Ændringer
+**Leverance:** CSV-fil i `/mnt/documents/eesy-fm-numre-uge27.csv` med kolonnerne:
+- `sale_datetime` (dansk tid)
+- `customer_phone`
+- `agent_name`
+- `agent_email`
+- `status`
+- `internal_reference` (MG-nummer)
 
-**1. Helper i `EmployeeMasterData.tsx`**
-- `isNotStartedYet(employee)` = `employee.is_active && employee.employment_start_date && employment_start_date > i dag` (dansk tid, sammenlign som `YYYY-MM-DD`).
+Sorteret efter dato. Ingen dedup — hvis samme nummer optræder to gange får du begge rækker (så du kan se dubletter).
 
-**2. Badge i tabelrækken (linje ~974, ved siden af navnet)**
-- Hvis `isNotStartedYet(employee)`: vis `<Badge variant="outline">Starter d. {formateret dato}</Badge>` efter navnet.
-- Tooltip: "Ikke startet endnu — tælles ikke som aktiv medarbejder".
+**Scope:** Kun læsning + CSV-eksport. Ingen kode-, DB- eller schema-ændringer. Grøn zone.
 
-**3. KPI-tælling af aktive**
-- Beregn lokalt: `notStartedYetCount = employees.filter(isNotStartedYet).length`.
-- `displayActiveCount = activeCount - notStartedYetCount` (både for cached og lokal fallback).
-- Send `displayActiveCount` til `EmployeeKpiCards` som `activeCount`.
-- Under KPI-tallet vises lille undertekst: "+{notStartedYetCount} starter senere" hvis > 0. (Kan implementeres via ny prop eller ved at læse `notStartedYetCount` direkte i `EmployeeKpiCards` — jeg vælger den mindst invasive: passer en ekstra prop `pendingStartCount`.)
-
-**4. Filter (valgfrit, medtages)**
-- I "Aktiv/Inaktiv"-filteret bevares nuværende opførsel ("Aktive" viser stadig alle med `is_active=true` inkl. ikke-startede — så listen matcher badge-visningen). Ingen ny filterværdi tilføjes for at holde ændringen minimal.
-
-## Filer der berøres
-- `src/pages/EmployeeMasterData.tsx` (helper, badge, KPI-tælling)
-- `src/components/employees/EmployeeKpiCards.tsx` (ny valgfri prop `pendingStartCount` + undertekst)
-
-## Uden for scope
-- Cached KPI-tabellen (`dashboard_kpis`) opdateres ikke — vi subtraherer i frontend for at undgå backend-ændring. Hvis andre steder i systemet også skal ekskludere ikke-startede, laves det som separat opgave.
-- Ingen ændring af `is_active`, roller, permissions, løn eller shift-planlægning.
+**Åbne valg:**
+1. Skal dubletter fjernes (388 rækker) eller beholdes (414 rækker)?
+2. Vil du have kun godkendte salg (`validation_status='approved'`) eller alle inkl. pending/cancelled?
