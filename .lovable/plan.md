@@ -1,37 +1,25 @@
-## Konklusion
+## Problem
+`booking.end_date` sættes én gang ved oprettelse i "Book uge"-flowet ud fra de valgte dage. Når du bagefter udvider bookingen — enten ved at klikke flere dage på (opdaterer `booked_days` i `BookingsContent.tsx:595/620`) eller ved at tildele en medarbejder på en dato udenfor bookingens interval — bliver `end_date`/`start_date` ikke opdateret. Leverandørrapporten klipper på `[start_date, end_date]`, så alle assignments/booked_days udenfor det oprindelige interval forsvinder ud af faktureringen.
 
-Thorbjørn har `can_work_fm = true` og har en bekræftet Eesy FM-vagt, men adgangen til selve menupunktet/ruten “Salgsregistrering” styres stadig primært af rolle/permissions.
+Konkret i dag: Asnæs uge 27 har `booked_days=[0,1,2,3,4]` og assignments på Tor 2/7 + Fre 3/7, men `end_date=2026-07-01`, så juli-rapporten viser kun 1 dag i stedet for 3.
 
-Evidens:
-- `employee_master_data`: Thorbjørn Mindedal Weichert har `job_title = Salgskonsulent`, `can_work_fm = true`, aktiv bruger og booking på Eesy FM 2026-07-04/05.
-- `src/pages/vagt-flow/Bookings.tsx:146-154` og `src/pages/vagt-flow/BookingsContent.tsx:210-269` inkluderer allerede `can_work_fm = true` når man skal kunne bookes på FM-vagter.
-- `src/routes/config.tsx:242-245` beskytter `/vagt-flow/sales-registration` med `menu_fm_sales_registration`.
-- `src/components/layout/AppSidebar.tsx:432-437` kræver også `menu_section_fieldmarketing`, og rollen `medarbejder` har `menu_section_fieldmarketing = false` i databasen.
+## Fix — to trin
 
-## Plan
+**Trin 1: Punktvis data-rettelse nu** (insert-tool UPDATE)
+```sql
+UPDATE booking SET end_date = '2026-07-03'
+WHERE id = 'e4a21a47-40d2-45c7-bae5-c06f0d9cde59';
+```
+Efter dette viser juli-rapporten Ons/Tor/Fre for Asnæs uge 27 (3 dage, 2.838 kr før rabat).
 
-1. **Lav én samlet FM-opt-in-regel**
-   - Udvid den eksisterende `useIsFieldmarketingEmployee`-hook, så den returnerer `true` når medarbejderen enten:
-     - har `job_title = Fieldmarketing`, eller
-     - har `can_work_fm = true`.
-   - Det matcher allerede booking-logikken, så “kan bookes på FM-vagter” betyder det samme på tværs af systemet.
+**Trin 2: Rod-fix i selve booking-flowet** (gul zone — kræver separat plan)
+Én DB-trigger på `booking_assignment` og på `booking.booked_days` der automatisk holder `start_date`/`end_date` konsistent:
+- Ved INSERT/UPDATE på `booking_assignment`: hvis `date < booking.start_date` eller `> booking.end_date`, udvid parent-bookingens interval.
+- Ved UPDATE af `booking.booked_days`: recompute `start_date`/`end_date` som (uge-mandag + min/max booked_day).
 
-2. **Åbn salgsregistrering-ruten for FM-opt-in**
-   - Justér route guard for netop `/vagt-flow/sales-registration`, så adgang gives hvis brugeren enten har permission `menu_fm_sales_registration` eller er FM-opt-in via `can_work_fm`.
-   - Behold alle andre FM-admin-sider bag nuværende permissions.
+Dette fanger fejlen i data-laget uanset hvilken UI-vej der bruges (dag-toggle, assign-medarbejder, drag/drop). Jeg vil først liste alle bookinger hvor tilstanden allerede er inkonsistent, så du kan se omfanget før vi ruller triggeren ud.
 
-3. **Vis salgsregistrering i menuen for FM-opt-in**
-   - Justér sidebarens Fieldmarketing-sektion, så `Salgsregistrering` vises for FM-opt-in-brugere, uden at give dem adgang til booking management, lokationer, fakturering osv.
-
-4. **Sørg for at dagens/tidligere booking stadig styrer salgsformularen**
-   - `SalesRegistration.tsx` skal fortsat kræve en faktisk booking_assignment for dagens dato eller callback-dato.
-   - Der ændres ikke på pricing, løn, sale_items eller RLS.
-
-5. **Verificér**
-   - Bekræft i preview/logik at Thorbjørn kan se/åbne Salgsregistrering.
-   - Bekræft at formularen finder hans Eesy FM-booking ved callback-dato 2026-07-05.
-   - Bekræft at andre FM-admin-sider ikke åbnes af `can_work_fm` alene.
-
-## Zone
-
-Dette er gul zone: sidebar/navigation + FM-booking/salgsregistrering UI/adgang. Ingen rød-zone filer, ingen DB-skemaændring, ingen løn/pricing-ændring.
+## Ikke inkluderet nu
+- Ingen kodeændringer i denne runde — kun data-fixet i trin 1.
+- Trin 2 kræver din godkendelse som separat plan (rører booking-flow, gul zone).
+- Ingen ændring til `booked_days` på Asnæs uge 27 (allerede korrekt: [0,1,2,3,4]).
