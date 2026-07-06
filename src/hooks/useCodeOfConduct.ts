@@ -679,13 +679,15 @@ export function useSubmitCodeOfConduct() {
       if (!user?.email) throw new Error("Not authenticated");
 
       const lowerEmail = user.email.toLowerCase();
-      const { data: employee, error: employeeError } = await supabase
+      const { data: employees, error: employeeError } = await supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name, private_email")
+        .select("id, first_name, last_name, private_email, is_active, created_at")
         .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
-        .maybeSingle();
+        .order("is_active", { ascending: false })
+        .order("created_at", { ascending: false });
 
       if (employeeError) throw new Error("Error finding employee");
+      const employee = employees?.[0];
       if (!employee) throw new Error("Employee not found");
 
       let ipAddress = "Unknown";
