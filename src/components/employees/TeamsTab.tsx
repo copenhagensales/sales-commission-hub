@@ -110,7 +110,7 @@ export function TeamsTab() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name, job_title, team_id, is_staff_employee")
+        .select("id, first_name, last_name, job_title, team_id, is_staff_employee, employment_start_date")
         .eq("is_active", true)
         .order("first_name");
       if (error) throw error;
