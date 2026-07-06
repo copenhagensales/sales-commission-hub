@@ -1,25 +1,32 @@
-## Problem
-`booking.end_date` sættes én gang ved oprettelse i "Book uge"-flowet ud fra de valgte dage. Når du bagefter udvider bookingen — enten ved at klikke flere dage på (opdaterer `booked_days` i `BookingsContent.tsx:595/620`) eller ved at tildele en medarbejder på en dato udenfor bookingens interval — bliver `end_date`/`start_date` ikke opdateret. Leverandørrapporten klipper på `[start_date, end_date]`, så alle assignments/booked_days udenfor det oprindelige interval forsvinder ud af faktureringen.
+## Mål
+Medarbejdere der ligger i `/employees`-oversigten, men hvis `employment_start_date` er i fremtiden, skal:
+1. Vises med et tydeligt tag ("Ikke startet endnu") i rækken.
+2. Ikke tælle med i "Aktive medarbejdere"-KPI'en, selv om `is_active = true`.
 
-Konkret i dag: Asnæs uge 27 har `booked_days=[0,1,2,3,4]` og assignments på Tor 2/7 + Fre 3/7, men `end_date=2026-07-01`, så juli-rapporten viser kun 1 dag i stedet for 3.
+Grøn zone — kun UI/præsentation i `src/pages/EmployeeMasterData.tsx`. Ingen DB-ændringer, ingen ændring af `is_active`-logik (så løn, RLS, permissions etc. er urørt).
 
-## Fix — to trin
+## Ændringer
 
-**Trin 1: Punktvis data-rettelse nu** (insert-tool UPDATE)
-```sql
-UPDATE booking SET end_date = '2026-07-03'
-WHERE id = 'e4a21a47-40d2-45c7-bae5-c06f0d9cde59';
-```
-Efter dette viser juli-rapporten Ons/Tor/Fre for Asnæs uge 27 (3 dage, 2.838 kr før rabat).
+**1. Helper i `EmployeeMasterData.tsx`**
+- `isNotStartedYet(employee)` = `employee.is_active && employee.employment_start_date && employment_start_date > i dag` (dansk tid, sammenlign som `YYYY-MM-DD`).
 
-**Trin 2: Rod-fix i selve booking-flowet** (gul zone — kræver separat plan)
-Én DB-trigger på `booking_assignment` og på `booking.booked_days` der automatisk holder `start_date`/`end_date` konsistent:
-- Ved INSERT/UPDATE på `booking_assignment`: hvis `date < booking.start_date` eller `> booking.end_date`, udvid parent-bookingens interval.
-- Ved UPDATE af `booking.booked_days`: recompute `start_date`/`end_date` som (uge-mandag + min/max booked_day).
+**2. Badge i tabelrækken (linje ~974, ved siden af navnet)**
+- Hvis `isNotStartedYet(employee)`: vis `<Badge variant="outline">Starter d. {formateret dato}</Badge>` efter navnet.
+- Tooltip: "Ikke startet endnu — tælles ikke som aktiv medarbejder".
 
-Dette fanger fejlen i data-laget uanset hvilken UI-vej der bruges (dag-toggle, assign-medarbejder, drag/drop). Jeg vil først liste alle bookinger hvor tilstanden allerede er inkonsistent, så du kan se omfanget før vi ruller triggeren ud.
+**3. KPI-tælling af aktive**
+- Beregn lokalt: `notStartedYetCount = employees.filter(isNotStartedYet).length`.
+- `displayActiveCount = activeCount - notStartedYetCount` (både for cached og lokal fallback).
+- Send `displayActiveCount` til `EmployeeKpiCards` som `activeCount`.
+- Under KPI-tallet vises lille undertekst: "+{notStartedYetCount} starter senere" hvis > 0. (Kan implementeres via ny prop eller ved at læse `notStartedYetCount` direkte i `EmployeeKpiCards` — jeg vælger den mindst invasive: passer en ekstra prop `pendingStartCount`.)
 
-## Ikke inkluderet nu
-- Ingen kodeændringer i denne runde — kun data-fixet i trin 1.
-- Trin 2 kræver din godkendelse som separat plan (rører booking-flow, gul zone).
-- Ingen ændring til `booked_days` på Asnæs uge 27 (allerede korrekt: [0,1,2,3,4]).
+**4. Filter (valgfrit, medtages)**
+- I "Aktiv/Inaktiv"-filteret bevares nuværende opførsel ("Aktive" viser stadig alle med `is_active=true` inkl. ikke-startede — så listen matcher badge-visningen). Ingen ny filterværdi tilføjes for at holde ændringen minimal.
+
+## Filer der berøres
+- `src/pages/EmployeeMasterData.tsx` (helper, badge, KPI-tælling)
+- `src/components/employees/EmployeeKpiCards.tsx` (ny valgfri prop `pendingStartCount` + undertekst)
+
+## Uden for scope
+- Cached KPI-tabellen (`dashboard_kpis`) opdateres ikke — vi subtraherer i frontend for at undgå backend-ændring. Hvis andre steder i systemet også skal ekskludere ikke-startede, laves det som separat opgave.
+- Ingen ændring af `is_active`, roller, permissions, løn eller shift-planlægning.
