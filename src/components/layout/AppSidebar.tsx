@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
-import { useIsFieldmarketingEmployee } from "@/hooks/useFieldmarketingEmployee";
+import { useCanWorkFieldmarketing, useIsFieldmarketingEmployee } from "@/hooks/useFieldmarketingEmployee";
 import { useEmployeeSmsUnreadCount } from "@/hooks/useEmployeeSmsConversations";
 import { useShouldShowPulseSurvey } from "@/hooks/usePulseSurvey";
 import { useCarQuizCompletion } from "@/hooks/useCarQuiz";
@@ -51,6 +51,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   const { isPreviewMode } = useRolePreview();
   
   const { data: isFieldmarketing } = useIsFieldmarketingEmployee();
+  const { data: canWorkFieldmarketing } = useCanWorkFieldmarketing();
   const { data: carQuizCompletion } = useCarQuizCompletion();
   const { data: isSalgskonsulent } = useIsSalgskonsulent();
   const { isRequired: codeOfConductRequired } = useCodeOfConductLock();
@@ -429,7 +430,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   // Check if any MG menu items are visible (requires section permission)
   const showMgMenu = !isMenuHidden('section_mg') && p.canView("menu_section_mg") && p.canViewMgTest;
   
-  const canAccessFmSalesRegistration = p.canViewFmSalesRegistration || !!isFieldmarketing;
+  const canAccessFmSalesRegistration = p.canViewFmSalesRegistration || !!canWorkFieldmarketing;
 
   // Check if any Fieldmarketing items are visible. FM opt-in only opens Salgsregistrering.
   const showFieldmarketingMenu = !isMenuHidden('section_fieldmarketing') && (

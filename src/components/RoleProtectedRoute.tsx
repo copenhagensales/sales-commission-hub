@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePositionPermissions";
-import { useIsFieldmarketingEmployee } from "@/hooks/useFieldmarketingEmployee";
+import { useCanWorkFieldmarketing } from "@/hooks/useFieldmarketingEmployee";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,7 +23,7 @@ export function RoleProtectedRoute({
   const { user, loading: authLoading } = useAuth();
   const { isLoading: permLoading, isReady, canView, permissions, position } = usePermissions();
   const isFmSalesRegistrationRoute = positionPermission === "menu_fm_sales_registration";
-  const { data: isFieldmarketingEmployee = false, isLoading: fmEmployeeLoading } = useIsFieldmarketingEmployee();
+  const { data: canWorkFieldmarketing = false, isLoading: fmEmployeeLoading } = useCanWorkFieldmarketing();
   
   // CRITICAL: Wait until BOTH auth is done AND permissions are READY (fully fetched)
   // Using isReady prevents premature redirects during browser refresh
@@ -36,7 +36,7 @@ export function RoleProtectedRoute({
       positionPermission,
       position: position?.name,
       permissions,
-      isFieldmarketingEmployee,
+      canWorkFieldmarketing,
       isLoading,
       isReady,
     });
@@ -86,7 +86,7 @@ export function RoleProtectedRoute({
     });
   }
   
-  if (hasAccess || (isFmSalesRegistrationRoute && isFieldmarketingEmployee)) {
+  if (hasAccess || (isFmSalesRegistrationRoute && canWorkFieldmarketing)) {
     if (import.meta.env.DEV) console.log("RoleProtectedRoute: GRANTED via position permission");
     return <>{children}</>;
   }
