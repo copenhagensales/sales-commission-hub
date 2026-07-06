@@ -978,6 +978,16 @@ export default function EmployeeMasterData() {
                                   <TooltipContent>{getContractStatus(employee.id) === 'signed' ? t("employees.table.contractSigned") : getContractStatus(employee.id) === 'pending' ? "Afventer underskrift" : getContractStatus(employee.id) === 'rejected' ? "Kontrakt afvist" : t("employees.table.noContractSigned")}</TooltipContent>
                                 </Tooltip>
                                 <span>{employee.first_name} {employee.last_name}</span>
+                                {isNotStartedYet(employee) && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Badge variant="outline" className="text-xs font-normal border-amber-500/40 text-amber-600 dark:text-amber-400">
+                                        Starter {new Date(employee.employment_start_date!).toLocaleDateString("da-DK", { day: "numeric", month: "short" })}
+                                      </Badge>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Ikke startet endnu — tælles ikke som aktiv medarbejder</TooltipContent>
+                                  </Tooltip>
+                                )}
                               </div>
                             </TableCell>
                             <TableCell className="py-3 text-sm">{employee.job_title || <span className="text-muted-foreground/50">-</span>}</TableCell>
