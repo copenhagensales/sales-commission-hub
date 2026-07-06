@@ -7,13 +7,15 @@ interface EmployeeKpiCardsProps {
   staffCount: number;
   teamCount: number;
   positionCount: number;
+  pendingStartCount?: number;
 }
 
 export function EmployeeKpiCards({ 
   activeCount, 
   staffCount, 
   teamCount, 
-  positionCount 
+  positionCount,
+  pendingStartCount = 0,
 }: EmployeeKpiCardsProps) {
   const kpis = [
     {
