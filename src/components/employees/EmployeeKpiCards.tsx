@@ -77,6 +77,9 @@ export function EmployeeKpiCards({
                 <p className={cn("text-3xl font-bold tracking-tight", kpi.valueColor)}>
                   {kpi.value.toLocaleString("da-DK")}
                 </p>
+                {"subline" in kpi && kpi.subline && (
+                  <p className="text-xs text-muted-foreground">{kpi.subline}</p>
+                )}
               </div>
               <div className={cn(
                 "rounded-xl p-2.5 bg-background/80 backdrop-blur-sm shadow-sm",
