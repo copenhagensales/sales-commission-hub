@@ -767,6 +767,48 @@ export function TeamsTab() {
               </div>
             </div>
           )}
+
+          {/* Upcoming starters (not started yet) */}
+          {upcomingStarters.length > 0 && (
+            <div className="rounded-xl border-2 border-dashed border-amber-500/30 bg-amber-500/5 p-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                  <CalendarIcon className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground">
+                    Kommende opstartere ({upcomingStarters.length})
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Er tildelt/oprettet, men er endnu ikke startet ifølge kontrakt
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {upcomingStarters.map((emp) => {
+                  const teamId = teamMembers.find(tm => tm.employee_id === emp.id)?.team_id;
+                  const teamName = teamId ? teams.find(t => t.id === teamId)?.name : null;
+                  return (
+                    <div
+                      key={emp.id}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 transition-all cursor-pointer"
+                      onClick={() => navigate(`/employees/${emp.id}`)}
+                    >
+                      <span className="text-sm font-medium text-foreground">
+                        {emp.first_name} {emp.last_name}
+                      </span>
+                      <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] px-1.5 py-0">
+                        {formatStartDate(emp.employment_start_date)}
+                      </Badge>
+                      {teamName && (
+                        <span className="text-[10px] text-muted-foreground">· {teamName}</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </>
       )}
 
