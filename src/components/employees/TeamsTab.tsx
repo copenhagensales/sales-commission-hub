@@ -756,6 +756,11 @@ export function TeamsTab() {
                     <span className="text-sm font-medium text-foreground">
                       {emp.first_name} {emp.last_name}
                     </span>
+                    {isNotStartedYet(emp) && (
+                      <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] px-1.5 py-0">
+                        Starter {formatStartDate(emp.employment_start_date)}
+                      </Badge>
+                    )}
                     <ArrowRightLeft className="h-3 w-3 text-primary/50" />
                   </div>
                 ))}
