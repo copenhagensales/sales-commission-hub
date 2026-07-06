@@ -513,12 +513,6 @@ export function TeamsTab() {
     }));
   };
 
-  // Calculate employees without team
-  const employeeIdsWithTeam = new Set(teamMembers.map((tm) => tm.employee_id));
-  const employeesWithoutTeam = employees.filter(
-    (emp) => !employeeIdsWithTeam.has(emp.id)
-  );
-
   // Helper: employee has future start date (not started yet)
   const todayStr = format(new Date(), "yyyy-MM-dd");
   const isNotStartedYet = (emp: Employee) =>
@@ -528,10 +522,17 @@ export function TeamsTab() {
     try { return format(new Date(d), "d. MMM yyyy", { locale: da }); } catch { return d; }
   };
 
+  // Calculate employees without team — exclude upcoming starters (they show in own box)
+  const employeeIdsWithTeam = new Set(teamMembers.map((tm) => tm.employee_id));
+  const employeesWithoutTeam = employees.filter(
+    (emp) => !employeeIdsWithTeam.has(emp.id) && !isNotStartedYet(emp)
+  );
+
   // All upcoming starters (across teams + uden team)
   const upcomingStarters = employees
     .filter(isNotStartedYet)
     .sort((a, b) => (a.employment_start_date || "").localeCompare(b.employment_start_date || ""));
+
 
   // Open move dialog
   const openMoveDialog = (emp?: Employee) => {
