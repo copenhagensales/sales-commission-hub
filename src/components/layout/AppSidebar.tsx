@@ -429,12 +429,17 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   // Check if any MG menu items are visible (requires section permission)
   const showMgMenu = !isMenuHidden('section_mg') && p.canView("menu_section_mg") && p.canViewMgTest;
   
-  // Check if any Fieldmarketing items are visible (requires section permission)
-  const showFieldmarketingMenu = !isMenuHidden('section_fieldmarketing') && p.canView("menu_section_fieldmarketing") && 
-    (p.canViewFmMySchedule || p.canViewFmOverview || p.canViewFmBookWeek || 
-     p.canViewFmBookings || p.canViewFmLocations || p.canViewFmVehicles ||
-     p.canViewFmBilling || p.canViewFmTimeOff || p.canViewFmSalesRegistration ||
-     false);
+  const canAccessFmSalesRegistration = p.canViewFmSalesRegistration || !!isFieldmarketing;
+
+  // Check if any Fieldmarketing items are visible. FM opt-in only opens Salgsregistrering.
+  const showFieldmarketingMenu = !isMenuHidden('section_fieldmarketing') && (
+    (p.canView("menu_section_fieldmarketing") && 
+      (p.canViewFmMySchedule || p.canViewFmOverview || p.canViewFmBookWeek || 
+       p.canViewFmBookings || p.canViewFmLocations || p.canViewFmVehicles ||
+       p.canViewFmBilling || p.canViewFmTimeOff || p.canViewFmSalesRegistration ||
+       false)) ||
+    canAccessFmSalesRegistration
+  );
   
   // Check if any Shift Planning items are visible (requires section permission)
   const showShiftPlanningMenu = !isMenuHidden('section_vagtplan') && p.canView("menu_section_vagtplan") && 
@@ -1191,7 +1196,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                     {t("sidebar.vehicles")}
                   </NavLink>
                 )}
-                {p.canViewFmSalesRegistration && (
+                {canAccessFmSalesRegistration && (
                   <NavLink to="/vagt-flow/sales-registration" onClick={handleNavClick} className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
                     location.pathname === "/vagt-flow/sales-registration" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"

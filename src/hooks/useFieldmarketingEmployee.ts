@@ -13,7 +13,7 @@ export function useIsFieldmarketingEmployee() {
       const lowerEmail = user.email.toLowerCase();
       const { data, error } = await supabase
         .from("employee_master_data")
-        .select("job_title")
+        .select("job_title, can_work_fm")
         .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .eq("is_active", true)
         .maybeSingle();
@@ -23,7 +23,7 @@ export function useIsFieldmarketingEmployee() {
         return false;
       }
 
-      return data?.job_title === "Fieldmarketing";
+      return data?.job_title === "Fieldmarketing" || data?.can_work_fm === true;
     },
     enabled: !!user?.email,
     staleTime: 60000,
