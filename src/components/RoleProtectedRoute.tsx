@@ -23,7 +23,7 @@ export function RoleProtectedRoute({
   const { user, loading: authLoading } = useAuth();
   const { isLoading: permLoading, isReady, canView, permissions, position } = usePermissions();
   const isFmSalesRegistrationRoute = positionPermission === "menu_fm_sales_registration";
-  const { data: canWorkFieldmarketing = false, isLoading: fmEmployeeLoading } = useCanWorkFieldmarketing();
+  const { data: canWorkFieldmarketing = false, isLoading: fmEmployeeLoading } = useCanWorkFieldmarketing(isFmSalesRegistrationRoute);
   
   // CRITICAL: Wait until BOTH auth is done AND permissions are READY (fully fetched)
   // Using isReady prevents premature redirects during browser refresh

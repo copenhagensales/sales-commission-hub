@@ -30,7 +30,7 @@ export function useIsFieldmarketingEmployee() {
   });
 }
 
-export function useCanWorkFieldmarketing() {
+export function useCanWorkFieldmarketing(enabled = true) {
   const { user } = useAuth();
 
   return useQuery({
@@ -53,7 +53,7 @@ export function useCanWorkFieldmarketing() {
 
       return data?.job_title === "Fieldmarketing" || data?.can_work_fm === true;
     },
-    enabled: !!user?.email,
+    enabled: enabled && !!user?.email,
     staleTime: 60000,
   });
 }
