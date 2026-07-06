@@ -755,8 +755,13 @@ export default function EmployeeMasterData() {
     });
 
   // Use cached KPI values (fallback to local count if cache not yet populated)
+  const today = new Date().toISOString().split("T")[0];
+  const isNotStartedYet = (e: EmployeeMasterDataRecord) =>
+    !!e.is_active && !!e.employment_start_date && e.employment_start_date > today;
+  const notStartedYetCount = employees.filter(isNotStartedYet).length;
   const localActiveCount = employees.filter((e) => e.is_active).length;
-  const activeCount = cachedActiveCount > 0 ? cachedActiveCount : localActiveCount;
+  const rawActiveCount = cachedActiveCount > 0 ? cachedActiveCount : localActiveCount;
+  const activeCount = Math.max(0, rawActiveCount - notStartedYetCount);
   const staffCount = cachedStaffCount;
   const teamCount = cachedTeamCount;
   const positionCount = cachedPositionCount > 0 ? cachedPositionCount : jobPositions.length;
