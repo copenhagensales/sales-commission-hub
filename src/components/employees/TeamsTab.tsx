@@ -862,7 +862,11 @@ export function TeamsTab() {
                                 <p className="text-sm font-medium truncate">
                                   {emp.first_name} {emp.last_name}
                                 </p>
-                                {emp.job_title && (
+                                {isNotStartedYet(emp) ? (
+                                  <p className="text-[10px] text-amber-600 dark:text-amber-400 truncate">
+                                    Starter {formatStartDate(emp.employment_start_date)}
+                                  </p>
+                                ) : emp.job_title && (
                                   <p className="text-xs text-muted-foreground truncate">
                                     {emp.job_title}
                                   </p>
