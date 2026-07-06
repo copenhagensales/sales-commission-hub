@@ -519,6 +519,20 @@ export function TeamsTab() {
     (emp) => !employeeIdsWithTeam.has(emp.id)
   );
 
+  // Helper: employee has future start date (not started yet)
+  const todayStr = format(new Date(), "yyyy-MM-dd");
+  const isNotStartedYet = (emp: Employee) =>
+    !!emp.employment_start_date && emp.employment_start_date > todayStr;
+  const formatStartDate = (d?: string | null) => {
+    if (!d) return "";
+    try { return format(new Date(d), "d. MMM yyyy", { locale: da }); } catch { return d; }
+  };
+
+  // All upcoming starters (across teams + uden team)
+  const upcomingStarters = employees
+    .filter(isNotStartedYet)
+    .sort((a, b) => (a.employment_start_date || "").localeCompare(b.employment_start_date || ""));
+
   // Open move dialog
   const openMoveDialog = (emp?: Employee) => {
     setEmployeeToMove(emp || null);
