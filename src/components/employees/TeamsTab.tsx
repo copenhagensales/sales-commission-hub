@@ -36,6 +36,7 @@ interface Employee {
   job_title: string | null;
   team_id: string | null;
   is_staff_employee: boolean;
+  employment_start_date?: string | null;
 }
 
 interface Client {
@@ -109,7 +110,7 @@ export function TeamsTab() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name, job_title, team_id, is_staff_employee")
+        .select("id, first_name, last_name, job_title, team_id, is_staff_employee, employment_start_date")
         .eq("is_active", true)
         .order("first_name");
       if (error) throw error;
@@ -518,6 +519,20 @@ export function TeamsTab() {
     (emp) => !employeeIdsWithTeam.has(emp.id)
   );
 
+  // Helper: employee has future start date (not started yet)
+  const todayStr = format(new Date(), "yyyy-MM-dd");
+  const isNotStartedYet = (emp: Employee) =>
+    !!emp.employment_start_date && emp.employment_start_date > todayStr;
+  const formatStartDate = (d?: string | null) => {
+    if (!d) return "";
+    try { return format(new Date(d), "d. MMM yyyy", { locale: da }); } catch { return d; }
+  };
+
+  // All upcoming starters (across teams + uden team)
+  const upcomingStarters = employees
+    .filter(isNotStartedYet)
+    .sort((a, b) => (a.employment_start_date || "").localeCompare(b.employment_start_date || ""));
+
   // Open move dialog
   const openMoveDialog = (emp?: Employee) => {
     setEmployeeToMove(emp || null);
@@ -741,9 +756,56 @@ export function TeamsTab() {
                     <span className="text-sm font-medium text-foreground">
                       {emp.first_name} {emp.last_name}
                     </span>
+                    {isNotStartedYet(emp) && (
+                      <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] px-1.5 py-0">
+                        Starter {formatStartDate(emp.employment_start_date)}
+                      </Badge>
+                    )}
                     <ArrowRightLeft className="h-3 w-3 text-primary/50" />
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Upcoming starters (not started yet) */}
+          {upcomingStarters.length > 0 && (
+            <div className="rounded-xl border-2 border-dashed border-amber-500/30 bg-amber-500/5 p-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                  <CalendarIcon className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground">
+                    Kommende opstartere ({upcomingStarters.length})
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Er tildelt/oprettet, men er endnu ikke startet ifølge kontrakt
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {upcomingStarters.map((emp) => {
+                  const teamId = teamMembers.find(tm => tm.employee_id === emp.id)?.team_id;
+                  const teamName = teamId ? teams.find(t => t.id === teamId)?.name : null;
+                  return (
+                    <div
+                      key={emp.id}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 transition-all cursor-pointer"
+                      onClick={() => navigate(`/employees/${emp.id}`)}
+                    >
+                      <span className="text-sm font-medium text-foreground">
+                        {emp.first_name} {emp.last_name}
+                      </span>
+                      <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] px-1.5 py-0">
+                        {formatStartDate(emp.employment_start_date)}
+                      </Badge>
+                      {teamName && (
+                        <span className="text-[10px] text-muted-foreground">· {teamName}</span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -800,7 +862,11 @@ export function TeamsTab() {
                                 <p className="text-sm font-medium truncate">
                                   {emp.first_name} {emp.last_name}
                                 </p>
-                                {emp.job_title && (
+                                {isNotStartedYet(emp) ? (
+                                  <p className="text-[10px] text-amber-600 dark:text-amber-400 truncate">
+                                    Starter {formatStartDate(emp.employment_start_date)}
+                                  </p>
+                                ) : emp.job_title && (
                                   <p className="text-xs text-muted-foreground truncate">
                                     {emp.job_title}
                                   </p>
@@ -857,7 +923,11 @@ export function TeamsTab() {
                             <p className="text-sm font-medium truncate">
                               {emp.first_name} {emp.last_name}
                             </p>
-                            {emp.job_title && (
+                            {isNotStartedYet(emp) ? (
+                              <p className="text-[10px] text-amber-600 dark:text-amber-400 truncate">
+                                Starter {formatStartDate(emp.employment_start_date)}
+                              </p>
+                            ) : emp.job_title && (
                               <p className="text-xs text-muted-foreground truncate">
                                 {emp.job_title}
                               </p>
