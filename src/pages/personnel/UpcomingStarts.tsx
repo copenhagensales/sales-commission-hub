@@ -541,7 +541,7 @@ export default function UpcomingStarts() {
                       ? `${member.employee.first_name} ${member.employee.last_name}`
                       : "Ukendt";
                   const position = member.candidate?.applied_position;
-                  const canRemove = canEdit && cohort.status === "planned" && member.status !== "started";
+                  const canRemove = canEdit && cohort.status !== "completed" && cohort.status !== "cancelled";
                   
                   return (
                     <div 
