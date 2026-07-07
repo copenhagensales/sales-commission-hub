@@ -580,7 +580,7 @@ export default function UpcomingStarts() {
                         <Badge variant="outline" className="text-xs shrink-0">
                           {memberStatusLabels[member.status]}
                         </Badge>
-                        {canEdit && cohort.status === "planned" && (
+                        {canEdit && cohort.status !== "completed" && cohort.status !== "cancelled" && (
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
