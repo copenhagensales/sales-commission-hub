@@ -103,6 +103,7 @@ export default function UpcomingStarts() {
     teamId: string | null;
     clientId: string | null;
     agentEmail: string | null;
+    employeeId: string | null;
   } | null>(null);
   const [editCohortDialogOpen, setEditCohortDialogOpen] = useState(false);
   const [selectedCohortForEdit, setSelectedCohortForEdit] = useState<{
@@ -230,6 +231,44 @@ export default function UpcomingStarts() {
     },
     onError: () => {
       toast({ title: "Kunne ikke fjerne deltager", variant: "destructive" });
+    },
+  });
+
+  // Delete an entire cohort (and reset candidate assignment status)
+  const deleteCohortMutation = useMutation({
+    mutationFn: async (cohort: Cohort) => {
+      const candidateIds = cohort.members
+        .map((m) => m.candidate_id)
+        .filter((id): id is string => !!id);
+
+      // Delete members first (in case no cascade)
+      const { error: memberError } = await supabase
+        .from("cohort_members")
+        .delete()
+        .eq("cohort_id", cohort.id);
+      if (memberError) throw memberError;
+
+      // Reset candidates so they can be reassigned
+      if (candidateIds.length > 0) {
+        await supabase
+          .from("candidates")
+          .update({ cohort_assignment_status: null })
+          .in("id", candidateIds);
+      }
+
+      const { error } = await supabase
+        .from("onboarding_cohorts")
+        .delete()
+        .eq("id", cohort.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["onboarding-cohorts"] });
+      queryClient.invalidateQueries({ queryKey: ["unassigned-hired-candidates"] });
+      toast({ title: "Hold slettet" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Kunne ikke slette hold", description: error.message, variant: "destructive" });
     },
   });
 
@@ -498,6 +537,38 @@ export default function UpcomingStarts() {
                     <Pencil className="h-4 w-4" />
                   </Button>
                 )}
+                {canEdit && cohort.status !== "completed" && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Slet opstartshold?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          {cohort.name} slettes permanent. Deltagere fjernes fra holdet
+                          {cohort.members.some((m) => m.candidate_id) && " og kandidater kan tildeles et andet hold"}.
+                          {cohort.members.some((m) => m.employee_id) && " Bemærk: allerede oprettede medarbejdere bevares."}
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Annuller</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => deleteCohortMutation.mutate(cohort)}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Slet hold
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
                 <Badge className={statusColors[cohort.status]}>
                   {statusLabels[cohort.status]}
                 </Badge>
@@ -595,6 +666,7 @@ export default function UpcomingStarts() {
                                       teamId: cohort.team_id,
                                       clientId: member.daily_bonus_client_id,
                                       agentEmail: member.agent_email,
+                                      employeeId: member.employee_id,
                                     });
                                     setEditMemberDialogOpen(true);
                                   }}
@@ -861,6 +933,7 @@ export default function UpcomingStarts() {
           teamId={selectedMemberForEdit.teamId}
           currentClientId={selectedMemberForEdit.clientId}
           currentAgentEmail={selectedMemberForEdit.agentEmail}
+          employeeId={selectedMemberForEdit.employeeId}
         />
       )}
 
