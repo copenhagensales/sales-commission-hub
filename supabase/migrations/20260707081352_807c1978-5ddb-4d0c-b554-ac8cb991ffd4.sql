@@ -1,0 +1,1 @@
+UPDATE public.employee_master_data SET auth_user_id = NULL WHERE id = 'a30e5992-3545-424c-9b4a-bc429b035ff6' AND is_active = false;
