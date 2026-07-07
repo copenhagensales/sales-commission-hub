@@ -234,6 +234,44 @@ export default function UpcomingStarts() {
     },
   });
 
+  // Delete an entire cohort (and reset candidate assignment status)
+  const deleteCohortMutation = useMutation({
+    mutationFn: async (cohort: Cohort) => {
+      const candidateIds = cohort.members
+        .map((m) => m.candidate_id)
+        .filter((id): id is string => !!id);
+
+      // Delete members first (in case no cascade)
+      const { error: memberError } = await supabase
+        .from("cohort_members")
+        .delete()
+        .eq("cohort_id", cohort.id);
+      if (memberError) throw memberError;
+
+      // Reset candidates so they can be reassigned
+      if (candidateIds.length > 0) {
+        await supabase
+          .from("candidates")
+          .update({ cohort_assignment_status: null })
+          .in("id", candidateIds);
+      }
+
+      const { error } = await supabase
+        .from("onboarding_cohorts")
+        .delete()
+        .eq("id", cohort.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["onboarding-cohorts"] });
+      queryClient.invalidateQueries({ queryKey: ["unassigned-hired-candidates"] });
+      toast({ title: "Hold slettet" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Kunne ikke slette hold", description: error.message, variant: "destructive" });
+    },
+  });
+
   // Start cohort and send invitations mutation
   const startCohortAndInviteMutation = useMutation({
     mutationFn: async (cohort: Cohort) => {
