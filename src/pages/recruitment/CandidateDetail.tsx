@@ -344,7 +344,7 @@ export default function CandidateDetail() {
       const { data: existingEmployee } = await supabase
         .from("employee_master_data")
         .select("id")
-        .eq("email", candidate.email.toLowerCase())
+        .or(`private_email.ilike.${candidate.email},work_email.ilike.${candidate.email}`)
         .maybeSingle();
 
       let employeeId = existingEmployee?.id;
@@ -360,8 +360,8 @@ export default function CandidateDetail() {
           .insert({
             first_name: candidate.first_name,
             last_name: candidate.last_name,
-            email: candidate.email.toLowerCase(),
-            phone: candidate.phone || null,
+            private_email: candidate.email.toLowerCase(),
+            private_phone: candidate.phone || null,
             is_active: false, // Will be activated after onboarding
             job_title: jobTitle,
             team_id: candidate.team_id,
