@@ -596,6 +596,7 @@ export default function UpcomingStarts() {
                                       teamId: cohort.team_id,
                                       clientId: member.daily_bonus_client_id,
                                       agentEmail: member.agent_email,
+                                      employeeId: member.employee_id,
                                     });
                                     setEditMemberDialogOpen(true);
                                   }}
