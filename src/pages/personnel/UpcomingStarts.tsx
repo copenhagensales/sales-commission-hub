@@ -103,6 +103,7 @@ export default function UpcomingStarts() {
     teamId: string | null;
     clientId: string | null;
     agentEmail: string | null;
+    employeeId: string | null;
   } | null>(null);
   const [editCohortDialogOpen, setEditCohortDialogOpen] = useState(false);
   const [selectedCohortForEdit, setSelectedCohortForEdit] = useState<{
