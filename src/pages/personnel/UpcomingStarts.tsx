@@ -863,6 +863,7 @@ export default function UpcomingStarts() {
           teamId={selectedMemberForEdit.teamId}
           currentClientId={selectedMemberForEdit.clientId}
           currentAgentEmail={selectedMemberForEdit.agentEmail}
+          employeeId={selectedMemberForEdit.employeeId}
         />
       )}
 
