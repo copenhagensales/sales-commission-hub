@@ -29,6 +29,7 @@ interface EditMemberClientDialogProps {
   teamId: string | null;
   currentClientId: string | null;
   currentAgentEmail: string | null;
+  employeeId?: string | null;
 }
 
 export function EditMemberClientDialog({
@@ -39,6 +40,7 @@ export function EditMemberClientDialog({
   teamId,
   currentClientId,
   currentAgentEmail,
+  employeeId,
 }: EditMemberClientDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -71,17 +73,63 @@ export function EditMemberClientDialog({
 
   const updateMutation = useMutation({
     mutationFn: async () => {
+      const normalizedEmail = agentEmail.trim().toLowerCase() || null;
+
       const { error } = await supabase
         .from("cohort_members")
-        .update({ 
+        .update({
           daily_bonus_client_id: selectedClientId,
-          agent_email: agentEmail.trim() || null,
+          agent_email: normalizedEmail,
         })
         .eq("id", memberId);
       if (error) throw error;
+
+      // If the member is already tied to an employee and we now have an agent email,
+      // ensure the agent + mapping exist and the employee's work_email is set.
+      if (employeeId && normalizedEmail && normalizedEmail !== (currentAgentEmail || "").toLowerCase()) {
+        // Update employee work_email
+        await supabase
+          .from("employee_master_data")
+          .update({ work_email: normalizedEmail })
+          .eq("id", employeeId);
+
+        // Find or create agent
+        const { data: existingAgent } = await supabase
+          .from("agents")
+          .select("id")
+          .eq("email", normalizedEmail)
+          .maybeSingle();
+
+        let agentId: string | null = existingAgent?.id ?? null;
+        if (!agentId) {
+          const { data: newAgent, error: agentError } = await supabase
+            .from("agents")
+            .insert({
+              email: normalizedEmail,
+              name: memberName,
+              is_active: true,
+              source: "cohort_onboarding",
+            })
+            .select()
+            .single();
+          if (agentError) throw agentError;
+          agentId = newAgent.id;
+        }
+
+        // Create employee_agent_mapping (ignore duplicate)
+        const { error: mappingError } = await supabase
+          .from("employee_agent_mapping")
+          .insert({
+            employee_id: employeeId,
+            agent_id: agentId!,
+          });
+        if (mappingError && !mappingError.message.toLowerCase().includes("duplicate")) {
+          throw mappingError;
+        }
+      }
     },
     onSuccess: () => {
-      toast({ title: "Kunde opdateret" });
+      toast({ title: "Deltager opdateret" });
       queryClient.invalidateQueries({ queryKey: ["onboarding-cohorts"] });
       onOpenChange(false);
     },
