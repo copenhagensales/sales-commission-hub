@@ -30,6 +30,7 @@ import { useFmBookingConflicts } from "@/hooks/useFmBookingConflicts";
 import { useHasActiveTimeClock } from "@/hooks/useHasActiveTimeClock";
 import { useTranslation } from "react-i18next";
 import { useSidebarMenuConfig, type MenuConfigItem } from "@/hooks/useSidebarMenuConfig";
+import { useIsUnitedMember } from "@/hooks/useIsUnitedMember";
 
 type NavItem = { name: string; href: string; icon: typeof Users; badgeKey?: string };
 
@@ -63,6 +64,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
 
   // Menu config from database - controls sort_order and visibility
   const { data: menuConfig } = useSidebarMenuConfig();
+  const { data: isUnitedMember } = useIsUnitedMember();
   
   // Helper: check if a menu item is hidden via the menu editor
   const isMenuHidden = useMemo(() => {
@@ -1567,7 +1569,21 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
             </NavLink>
           )}
 
-          {/* Løn menu */}
+          {/* Tast selv salg (team United) */}
+          {isUnitedMember && (
+            <NavLink
+              to="/tast-selv-salg"
+              onClick={handleNavClick}
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                location.pathname === "/tast-selv-salg" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+              )}
+            >
+              <Pencil className="h-5 w-5" />
+              Tast selv salg
+            </NavLink>
+          )}
+
           {showSalaryMenu && (
             <Collapsible open={salaryOpen} onOpenChange={setSalaryOpen}>
               <CollapsibleTrigger className={cn(
