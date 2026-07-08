@@ -5,8 +5,10 @@ import { sharedCorsHeaders } from "../_shared/auth.ts";
 const corsHeaders = sharedCorsHeaders;
 
 const TEAM_UNITED_ID = "ed095592-cc72-4dc5-b4d7-cc4a65250cac";
-const CLIENT_NAME = "Lederne";
-const CAMPAIGN_NAME = "Standard";
+const CLIENT_NAME = "Tryg";
+const CAMPAIGN_NAME = "Tryg Products";
+// Only these product names are selectable in Tast selv salg
+const ALLOWED_PRODUCT_NAMES = ["Lederne"];
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), {
