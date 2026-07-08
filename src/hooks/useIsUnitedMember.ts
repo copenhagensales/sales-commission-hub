@@ -2,7 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
-const TEAM_UNITED_ID = "ed095592-cc72-4dc5-b4d7-cc4a65250cac";
+const MANUAL_SALES_TEAM_IDS = [
+  "ed095592-cc72-4dc5-b4d7-cc4a65250cac", // United (Lederne)
+  "0cb1b854-e7b5-4f49-8fdf-30e54e7d2f95", // Eesy TM (Hiper)
+];
 
 /**
  * True if the current user is a member of team United (or an owner/manager
@@ -34,7 +37,7 @@ export function useIsUnitedMember() {
         .select("team_id")
         .eq("employee_id", employee.id);
 
-      if ((memberships ?? []).some((m) => m.team_id === TEAM_UNITED_ID)) return true;
+      if ((memberships ?? []).some((m) => MANUAL_SALES_TEAM_IDS.includes(m.team_id))) return true;
 
       // Fallback: owners/managers always see the entry
       if (employee.auth_user_id) {

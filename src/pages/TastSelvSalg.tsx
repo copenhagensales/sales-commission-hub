@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,18 +30,27 @@ import { format, parseISO, startOfWeek, isAfter } from "date-fns";
 import { da } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import {
-  useCreateLederneSale,
-  useDeleteLederneSale,
-  useLederneProducts,
-  useMyLederneSales,
+  useManualChannels,
+  useManualProducts,
+  useMyManualSales,
+  useCreateManualSale,
+  useDeleteManualSale,
+  type ManualChannel,
 } from "@/hooks/useLederneSales";
 
 export default function TastSelvSalg() {
   const { toast } = useToast();
-  const { data: products, isLoading: productsLoading, error: productsError } = useLederneProducts();
-  const { data: mySales, isLoading: salesLoading } = useMyLederneSales();
-  const createSale = useCreateLederneSale();
-  const deleteSale = useDeleteLederneSale();
+  const { data: channels, isLoading: channelsLoading, error: channelsError } = useManualChannels();
+  const { data: mySales, isLoading: salesLoading } = useMyManualSales();
+  const deleteSale = useDeleteManualSale();
+
+  const [activeChannel, setActiveChannel] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!activeChannel && channels && channels.length > 0) {
+      setActiveChannel(channels[0].key);
+    }
+  }, [channels, activeChannel]);
 
   const handleDelete = async (saleId: string) => {
     try {
@@ -49,28 +59,6 @@ export default function TastSelvSalg() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Ukendt fejl";
       toast({ title: "Kunne ikke fjerne salg", description: msg, variant: "destructive" });
-    }
-  };
-
-  const [productId, setProductId] = useState<string>("");
-  const [phone, setPhone] = useState<string>("");
-
-  const disabled = createSale.isPending || !productId || phone.trim().length < 4;
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (disabled) return;
-    try {
-      await createSale.mutateAsync({
-        product_id: productId,
-        customer_phone: phone.trim(),
-      });
-      toast({ title: "Salg registreret", description: "Klar til næste salg." });
-      setPhone("");
-      // keep product selected for fast repeat entry
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Ukendt fejl";
-      toast({ title: "Kunne ikke registrere salg", description: msg, variant: "destructive" });
     }
   };
 
@@ -95,17 +83,22 @@ export default function TastSelvSalg() {
     return { today, week, commission };
   }, [mySales]);
 
+  const channelLabels = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of channels ?? []) m.set(c.key, c.label);
+    return m;
+  }, [channels]);
+
   return (
     <MainLayout>
       <div className="mx-auto max-w-4xl space-y-6 p-4 md:p-6">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Tast selv salg</h1>
           <p className="text-muted-foreground">
-            Registrér manuelle Lederne-salg. Salget tæller straks med i din løn og team-rapporter.
+            Registrér manuelle salg. Salget tæller straks med i din løn og team-rapporter.
           </p>
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <StatCard label="I dag" value={stats.today} suffix="salg" />
           <StatCard label="Denne uge" value={stats.week} suffix="salg" />
@@ -116,75 +109,44 @@ export default function TastSelvSalg() {
           />
         </div>
 
-        {/* Form */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <PackagePlus className="h-5 w-5" />
-              Nyt salg
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {productsError ? (
-              <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
-                <Info className="mt-0.5 h-4 w-4 shrink-0" />
-                <div>{productsError instanceof Error ? productsError.message : "Kunne ikke hente produkter"}</div>
-              </div>
-            ) : productsLoading ? (
-              <div className="space-y-3">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-40" />
-              </div>
-            ) : !products || products.length === 0 ? (
-              <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
-                <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                <div>
-                  Ingen produkter oprettet under Lederne / Standard endnu. Bed en admin oprette produkterne i MgTest først.
-                </div>
-              </div>
-            ) : (
-              <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-[2fr,1fr,auto] md:items-end">
-                <div className="space-y-1.5">
-                  <Label htmlFor="product">Produkt</Label>
-                  <Select value={productId} onValueChange={setProductId}>
-                    <SelectTrigger id="product">
-                      <SelectValue placeholder="Vælg produkt" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {products.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="phone">Kundens telefonnummer</Label>
-                  <Input
-                    id="phone"
-                    inputMode="tel"
-                    autoComplete="off"
-                    placeholder="fx 12345678"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                  />
-                </div>
-                <Button type="submit" disabled={disabled} className="md:w-auto">
-                  {createSale.isPending ? "Registrerer…" : "Registrér salg"}
-                </Button>
-              </form>
-            )}
-          </CardContent>
-        </Card>
+        {channelsError ? (
+          <Card>
+            <CardContent className="p-4 text-sm text-destructive">
+              {channelsError instanceof Error ? channelsError.message : "Kunne ikke hente kanaler"}
+            </CardContent>
+          </Card>
+        ) : channelsLoading || !channels ? (
+          <Skeleton className="h-40 w-full" />
+        ) : channels.length === 0 ? (
+          <Card>
+            <CardContent className="p-4 text-sm text-muted-foreground">
+              Du har ikke adgang til at taste manuelle salg.
+            </CardContent>
+          </Card>
+        ) : channels.length === 1 ? (
+          <ChannelForm channel={channels[0]} />
+        ) : (
+          <Tabs value={activeChannel ?? channels[0].key} onValueChange={setActiveChannel}>
+            <TabsList>
+              {channels.map((c) => (
+                <TabsTrigger key={c.key} value={c.key}>
+                  {c.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            {channels.map((c) => (
+              <TabsContent key={c.key} value={c.key} className="mt-4">
+                <ChannelForm channel={c} />
+              </TabsContent>
+            ))}
+          </Tabs>
+        )}
 
-        {/* Recent */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <PhoneCall className="h-5 w-5" />
-              Mine seneste Lederne-salg
+              Mine seneste salg
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -202,12 +164,18 @@ export default function TastSelvSalg() {
                   const item = s.sale_items?.[0];
                   const name = item?.display_name ?? s.raw_payload?.product_name ?? "Ukendt produkt";
                   const commission = Number(item?.mapped_commission ?? 0);
+                  const chLabel = s.channel_key ? channelLabels.get(s.channel_key) : null;
                   return (
                     <div key={s.id} className="flex items-center justify-between gap-3 py-2.5">
                       <div className="flex min-w-0 items-center gap-2">
                         <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
                         <div className="min-w-0">
-                          <div className="truncate text-sm font-medium">{name}</div>
+                          <div className="flex items-center gap-2">
+                            <div className="truncate text-sm font-medium">{name}</div>
+                            {chLabel && channels && channels.length > 1 && (
+                              <Badge variant="outline" className="text-xs">{chLabel}</Badge>
+                            )}
+                          </div>
                           <div className="text-xs text-muted-foreground">
                             {s.customer_phone} · {format(parseISO(s.sale_datetime), "d. MMM HH:mm", { locale: da })}
                           </div>
@@ -255,6 +223,99 @@ export default function TastSelvSalg() {
         </Card>
       </div>
     </MainLayout>
+  );
+}
+
+function ChannelForm({ channel }: { channel: ManualChannel }) {
+  const { toast } = useToast();
+  const { data: products, isLoading: productsLoading, error: productsError } = useManualProducts(channel.key);
+  const createSale = useCreateManualSale();
+
+  const [productId, setProductId] = useState<string>("");
+  const [phone, setPhone] = useState<string>("");
+
+  const disabled = createSale.isPending || !productId || phone.trim().length < 4;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (disabled) return;
+    try {
+      await createSale.mutateAsync({
+        channel_key: channel.key,
+        product_id: productId,
+        customer_phone: phone.trim(),
+      });
+      toast({ title: "Salg registreret", description: "Klar til næste salg." });
+      setPhone("");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Ukendt fejl";
+      toast({ title: "Kunne ikke registrere salg", description: msg, variant: "destructive" });
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <PackagePlus className="h-5 w-5" />
+          Nyt salg — {channel.label}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {productsError ? (
+          <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+            <Info className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>{productsError instanceof Error ? productsError.message : "Kunne ikke hente produkter"}</div>
+          </div>
+        ) : productsLoading ? (
+          <div className="space-y-3">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-40" />
+          </div>
+        ) : !products || products.length === 0 ? (
+          <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+            <div>
+              Ingen produkter tilgængelige for {channel.label}. Bed en admin oprette dem i MgTest først.
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-[2fr,1fr,auto] md:items-end">
+            <div className="space-y-1.5">
+              <Label htmlFor={`product-${channel.key}`}>Produkt</Label>
+              <Select value={productId} onValueChange={setProductId}>
+                <SelectTrigger id={`product-${channel.key}`}>
+                  <SelectValue placeholder="Vælg produkt" />
+                </SelectTrigger>
+                <SelectContent>
+                  {products.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                      {typeof p.commission_dkk === "number" ? ` (${p.commission_dkk} kr)` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor={`phone-${channel.key}`}>Kundens telefonnummer</Label>
+              <Input
+                id={`phone-${channel.key}`}
+                inputMode="tel"
+                autoComplete="off"
+                placeholder="fx 12345678"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+              />
+            </div>
+            <Button type="submit" disabled={disabled} className="md:w-auto">
+              {createSale.isPending ? "Registrerer…" : "Registrér salg"}
+            </Button>
+          </form>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
