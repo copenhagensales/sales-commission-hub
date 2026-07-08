@@ -30,6 +30,7 @@ import { useFmBookingConflicts } from "@/hooks/useFmBookingConflicts";
 import { useHasActiveTimeClock } from "@/hooks/useHasActiveTimeClock";
 import { useTranslation } from "react-i18next";
 import { useSidebarMenuConfig, type MenuConfigItem } from "@/hooks/useSidebarMenuConfig";
+import { useIsUnitedMember } from "@/hooks/useIsUnitedMember";
 
 type NavItem = { name: string; href: string; icon: typeof Users; badgeKey?: string };
 
