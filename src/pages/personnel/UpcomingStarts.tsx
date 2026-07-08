@@ -28,6 +28,7 @@ import { EditMemberClientDialog } from "@/components/personnel/EditMemberClientD
 import { EditCohortDialog } from "@/components/personnel/EditCohortDialog";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { useToast } from "@/hooks/use-toast";
+import { processCohortMember, type ProcessResults } from "@/lib/cohortMemberProcessing";
 
 interface CohortMember {
   id: string;
