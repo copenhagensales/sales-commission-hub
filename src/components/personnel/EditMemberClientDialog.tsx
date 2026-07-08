@@ -84,52 +84,72 @@ export function EditMemberClientDialog({
         .eq("id", memberId);
       if (error) throw error;
 
+      let agentWarning: string | null = null;
+
       // If the member is already tied to an employee and we now have an agent email,
       // ensure the agent + mapping exist and the employee's work_email is set.
       if (employeeId && normalizedEmail && normalizedEmail !== (currentAgentEmail || "").toLowerCase()) {
-        // Update employee work_email
-        await supabase
+        // Update employee work_email (non-fatal if RLS blocks)
+        const { error: workEmailError } = await supabase
           .from("employee_master_data")
           .update({ work_email: normalizedEmail })
           .eq("id", employeeId);
-
-        // Find or create agent
-        const { data: existingAgent } = await supabase
-          .from("agents")
-          .select("id")
-          .eq("email", normalizedEmail)
-          .maybeSingle();
-
-        let agentId: string | null = existingAgent?.id ?? null;
-        if (!agentId) {
-          const { data: newAgent, error: agentError } = await supabase
-            .from("agents")
-            .insert({
-              email: normalizedEmail,
-              name: memberName,
-              is_active: true,
-              source: "cohort_onboarding",
-            })
-            .select()
-            .single();
-          if (agentError) throw agentError;
-          agentId = newAgent.id;
+        if (workEmailError) {
+          console.warn("Kunne ikke opdatere work_email:", workEmailError);
+          agentWarning = "Kunne ikke sætte arbejdsemail — kræver admin-adgang.";
         }
 
-        // Create employee_agent_mapping (ignore duplicate)
-        const { error: mappingError } = await supabase
-          .from("employee_agent_mapping")
-          .insert({
-            employee_id: employeeId,
-            agent_id: agentId!,
-          });
-        if (mappingError && !mappingError.message.toLowerCase().includes("duplicate")) {
-          throw mappingError;
+        // Agent + mapping creation is admin-only (RLS on agents). Wrap in try/catch
+        // so the main update (client + email) still succeeds for non-admins.
+        // Same non-fatal pattern som "Start hold og send invitationer" bruger.
+        try {
+          const { data: existingAgent, error: findError } = await supabase
+            .from("agents")
+            .select("id")
+            .eq("email", normalizedEmail)
+            .maybeSingle();
+          if (findError) throw findError;
+
+          let agentId: string | null = existingAgent?.id ?? null;
+          if (!agentId) {
+            const { data: newAgent, error: agentError } = await supabase
+              .from("agents")
+              .insert({
+                email: normalizedEmail,
+                name: memberName,
+                is_active: true,
+                source: "cohort_onboarding",
+              })
+              .select()
+              .single();
+            if (agentError) throw agentError;
+            agentId = newAgent.id;
+          }
+
+          const { error: mappingError } = await supabase
+            .from("employee_agent_mapping")
+            .insert({
+              employee_id: employeeId,
+              agent_id: agentId!,
+            });
+          if (mappingError && !mappingError.message.toLowerCase().includes("duplicate")) {
+            throw mappingError;
+          }
+        } catch (agentErr: any) {
+          console.warn("Agent-mapping ikke oprettet:", agentErr);
+          agentWarning =
+            "Email gemt, men agent-mapping kunne ikke oprettes automatisk (kræver admin). En admin kan tilføje den senere.";
         }
       }
+
+      return { agentWarning };
     },
-    onSuccess: () => {
-      toast({ title: "Deltager opdateret" });
+    onSuccess: ({ agentWarning }) => {
+      if (agentWarning) {
+        toast({ title: "Deltager opdateret", description: agentWarning });
+      } else {
+        toast({ title: "Deltager opdateret" });
+      }
       queryClient.invalidateQueries({ queryKey: ["onboarding-cohorts"] });
       onOpenChange(false);
     },
