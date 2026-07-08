@@ -64,6 +64,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
 
   // Menu config from database - controls sort_order and visibility
   const { data: menuConfig } = useSidebarMenuConfig();
+  const { data: isUnitedMember } = useIsUnitedMember();
   
   // Helper: check if a menu item is hidden via the menu editor
   const isMenuHidden = useMemo(() => {
