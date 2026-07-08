@@ -146,8 +146,12 @@ serve(async (req) => {
         .eq("id", body.product_id)
         .maybeSingle();
       if (pErr || !product) return json(400, { error: "Produkt ikke fundet" });
-      if (product.client_campaign_id !== campaignId || !product.is_active) {
-        return json(400, { error: "Produkt hører ikke til Lederne-kampagnen" });
+      if (
+        product.client_campaign_id !== campaignId ||
+        !product.is_active ||
+        !ALLOWED_PRODUCT_NAMES.includes(product.name)
+      ) {
+        return json(400, { error: "Produktet kan ikke tastes manuelt" });
       }
 
       const agentName = `${employee.first_name ?? ""} ${employee.last_name ?? ""}`.trim();
