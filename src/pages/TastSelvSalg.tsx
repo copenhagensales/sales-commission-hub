@@ -213,9 +213,39 @@ export default function TastSelvSalg() {
                           </div>
                         </div>
                       </div>
-                      <Badge variant="secondary" className="shrink-0">
-                        {new Intl.NumberFormat("da-DK", { maximumFractionDigits: 0 }).format(commission)} kr
-                      </Badge>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Badge variant="secondary">
+                          {new Intl.NumberFormat("da-DK", { maximumFractionDigits: 0 }).format(commission)} kr
+                        </Badge>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                              disabled={deleteSale.isPending}
+                              aria-label="Fjern salg"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Fjern salg?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Dette fjerner salget permanent fra din løn og team-rapporter. Kan ikke fortrydes.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Annullér</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDelete(s.id)}>
+                                Fjern salg
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
                     </div>
                   );
                 })}
