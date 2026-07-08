@@ -161,6 +161,7 @@ import {
   ShortLinkRedirect,
   PublicUnsubscribe,
   MenuEditor,
+  TastSelvSalg,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
