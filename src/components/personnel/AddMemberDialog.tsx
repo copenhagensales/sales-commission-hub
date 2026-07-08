@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Search, User } from "lucide-react";
+import { processCohortMember } from "@/lib/cohortMemberProcessing";
 
 interface AddMemberDialogProps {
   open: boolean;
