@@ -4,11 +4,33 @@ import { sharedCorsHeaders } from "../_shared/auth.ts";
 
 const corsHeaders = sharedCorsHeaders;
 
-const TEAM_UNITED_ID = "ed095592-cc72-4dc5-b4d7-cc4a65250cac";
-const CLIENT_NAME = "Tryg";
-const CAMPAIGN_NAME = "Tryg Products";
-// Only these product names are selectable in Tast selv salg
-const ALLOWED_PRODUCT_NAMES = ["Lederne"];
+type Channel = {
+  key: string;
+  label: string;
+  team_id: string;
+  client_name: string;
+  campaign_name: string;
+  allowed_products: string[];
+};
+
+const CHANNELS: Channel[] = [
+  {
+    key: "lederne",
+    label: "Lederne",
+    team_id: "ed095592-cc72-4dc5-b4d7-cc4a65250cac",
+    client_name: "Tryg",
+    campaign_name: "Tryg Products",
+    allowed_products: ["Lederne"],
+  },
+  {
+    key: "hiper",
+    label: "Hiper Bredbånd",
+    team_id: "0cb1b854-e7b5-4f49-8fdf-30e54e7d2f95",
+    client_name: "Hiper",
+    campaign_name: "Hiper Bredbånd",
+    allowed_products: ["Hiper Viderestilling", "Hiper Lukning"],
+  },
+];
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), {
@@ -24,7 +46,20 @@ function svcClient() {
   );
 }
 
-async function getCallerContext(req: Request) {
+type CallerContext = {
+  svc: ReturnType<typeof svcClient>;
+  employee: {
+    id: string;
+    first_name: string | null;
+    last_name: string | null;
+    work_email: string | null;
+    is_active: boolean;
+    auth_user_id: string | null;
+  };
+  allowedChannels: Channel[];
+};
+
+async function getCallerContext(req: Request): Promise<CallerContext | null> {
   const authHeader = req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) return null;
   const token = authHeader.replace("Bearer ", "");
@@ -34,7 +69,6 @@ async function getCallerContext(req: Request) {
 
   const authUserId = userRes.user.id;
 
-  // Look up employee
   const { data: employee } = await svc
     .from("employee_master_data")
     .select("id, first_name, last_name, work_email, is_active, auth_user_id")
@@ -43,30 +77,33 @@ async function getCallerContext(req: Request) {
 
   if (!employee || !employee.is_active) return null;
 
-  // Check team membership OR owner/manager
   const { data: teamMemberships } = await svc
     .from("team_members")
     .select("team_id")
     .eq("employee_id", employee.id);
 
-  const onUnited = (teamMemberships || []).some((m) => m.team_id === TEAM_UNITED_ID);
+  const teamIds = new Set((teamMemberships ?? []).map((m) => m.team_id));
 
-  let isManager = false;
-  if (!onUnited) {
-    const { data: mgr } = await svc.rpc("is_manager_or_above", { _user_id: authUserId });
-    isManager = !!mgr;
-  }
+  const { data: mgr } = await svc.rpc("is_manager_or_above", { _user_id: authUserId });
+  const isManager = !!mgr;
 
-  if (!onUnited && !isManager) return null;
+  const allowedChannels = CHANNELS.filter(
+    (c) => isManager || teamIds.has(c.team_id),
+  );
 
-  return { svc, employee };
+  if (allowedChannels.length === 0) return null;
+
+  return { svc, employee, allowedChannels };
 }
 
-async function resolveCampaignId(svc: ReturnType<typeof svcClient>) {
+async function resolveChannel(
+  svc: ReturnType<typeof svcClient>,
+  channel: Channel,
+): Promise<{ campaign_id: string } | null> {
   const { data: client } = await svc
     .from("clients")
     .select("id")
-    .ilike("name", CLIENT_NAME)
+    .ilike("name", channel.client_name)
     .maybeSingle();
   if (!client) return null;
 
@@ -74,10 +111,11 @@ async function resolveCampaignId(svc: ReturnType<typeof svcClient>) {
     .from("client_campaigns")
     .select("id")
     .eq("client_id", client.id)
-    .ilike("name", CAMPAIGN_NAME)
+    .ilike("name", channel.campaign_name)
     .maybeSingle();
 
-  return campaign?.id ?? null;
+  if (!campaign) return null;
+  return { campaign_id: campaign.id };
 }
 
 serve(async (req) => {
@@ -88,17 +126,58 @@ serve(async (req) => {
   try {
     const ctx = await getCallerContext(req);
     if (!ctx) return json(401, { error: "Unauthorized" });
-    const { svc, employee } = ctx;
+    const { svc, employee, allowedChannels } = ctx;
 
     const url = new URL(req.url);
     const action = url.searchParams.get("action") ?? (req.method === "POST" ? "create" : "list");
+    const channelKey = url.searchParams.get("channel") ?? "lederne";
 
-    const campaignId = await resolveCampaignId(svc);
-    if (!campaignId) {
-      return json(400, {
-        error: `Klient '${CLIENT_NAME}' med kampagne '${CAMPAIGN_NAME}' er ikke oprettet endnu. Opret den i MgTest først.`,
+    // channels action: list allowed channels for caller
+    if (action === "channels") {
+      return json(200, {
+        channels: allowedChannels.map((c) => ({ key: c.key, label: c.label })),
       });
     }
+
+    // list action: return all caller's manual sales across allowed channels
+    if (action === "list") {
+      const channelCampaigns: Array<{ channel_key: string; campaign_id: string }> = [];
+      for (const c of allowedChannels) {
+        const resolved = await resolveChannel(svc, c);
+        if (resolved) channelCampaigns.push({ channel_key: c.key, campaign_id: resolved.campaign_id });
+      }
+      if (channelCampaigns.length === 0) return json(200, { sales: [] });
+
+      const campaignIds = channelCampaigns.map((c) => c.campaign_id);
+      const { data: sales, error } = await svc
+        .from("sales")
+        .select("id, sale_datetime, customer_phone, validation_status, raw_payload, client_campaign_id, sale_items(display_name, mapped_commission, mapped_revenue)")
+        .eq("source", "manual_entry")
+        .in("client_campaign_id", campaignIds)
+        .ilike("agent_email", employee.work_email ?? "")
+        .order("sale_datetime", { ascending: false })
+        .limit(200);
+      if (error) return json(500, { error: error.message });
+
+      const campaignToChannel = new Map(channelCampaigns.map((c) => [c.campaign_id, c.channel_key]));
+      const enriched = (sales ?? []).map((s: any) => ({
+        ...s,
+        channel_key: campaignToChannel.get(s.client_campaign_id) ?? null,
+      }));
+      return json(200, { sales: enriched });
+    }
+
+    // For channel-scoped actions: validate channel
+    const channel = allowedChannels.find((c) => c.key === channelKey);
+    if (!channel) return json(403, { error: "Ingen adgang til denne kanal" });
+
+    const resolved = await resolveChannel(svc, channel);
+    if (!resolved) {
+      return json(400, {
+        error: `Klient '${channel.client_name}' med kampagne '${channel.campaign_name}' er ikke oprettet endnu.`,
+      });
+    }
+    const campaignId = resolved.campaign_id;
 
     if (action === "products") {
       const { data: products, error } = await svc
@@ -106,23 +185,10 @@ serve(async (req) => {
         .select("id, name, commission_dkk, revenue_dkk")
         .eq("client_campaign_id", campaignId)
         .eq("is_active", true)
-        .in("name", ALLOWED_PRODUCT_NAMES)
+        .in("name", channel.allowed_products)
         .order("name", { ascending: true });
       if (error) return json(500, { error: error.message });
       return json(200, { products: products ?? [] });
-    }
-
-    if (action === "list") {
-      const { data: sales, error } = await svc
-        .from("sales")
-        .select("id, sale_datetime, customer_phone, validation_status, raw_payload, sale_items(display_name, mapped_commission, mapped_revenue)")
-        .eq("source", "manual_entry")
-        .eq("client_campaign_id", campaignId)
-        .ilike("agent_email", employee.work_email ?? "")
-        .order("sale_datetime", { ascending: false })
-        .limit(200);
-      if (error) return json(500, { error: error.message });
-      return json(200, { sales: sales ?? [] });
     }
 
     if (action === "create" && req.method === "POST") {
@@ -139,7 +205,6 @@ serve(async (req) => {
       const phone = String(body.customer_phone).trim();
       if (phone.length < 4) return json(400, { error: "Ugyldigt telefonnummer" });
 
-      // Fetch product
       const { data: product, error: pErr } = await svc
         .from("products")
         .select("id, name, commission_dkk, revenue_dkk, client_campaign_id, is_active")
@@ -149,7 +214,7 @@ serve(async (req) => {
       if (
         product.client_campaign_id !== campaignId ||
         !product.is_active ||
-        !ALLOWED_PRODUCT_NAMES.includes(product.name)
+        !channel.allowed_products.includes(product.name)
       ) {
         return json(400, { error: "Produktet kan ikke tastes manuelt" });
       }
@@ -157,7 +222,6 @@ serve(async (req) => {
       const agentName = `${employee.first_name ?? ""} ${employee.last_name ?? ""}`.trim();
       const saleDatetime = body.sale_datetime ?? new Date().toISOString();
 
-      // Insert sale
       const { data: sale, error: sErr } = await svc
         .from("sales")
         .insert({
@@ -173,13 +237,13 @@ serve(async (req) => {
             manual_entry: true,
             entered_by_employee_id: employee.id,
             product_name: product.name,
+            channel_key: channel.key,
           },
         })
         .select("id")
         .single();
       if (sErr || !sale) return json(500, { error: sErr?.message ?? "Kunne ikke oprette salg" });
 
-      // Insert sale_item (pricing from product baseline; pricing-rules can rematch later)
       const { error: siErr } = await svc.from("sale_items").insert({
         sale_id: sale.id,
         product_id: product.id,
@@ -189,7 +253,6 @@ serve(async (req) => {
         mapped_revenue: product.revenue_dkk ?? 0,
       });
       if (siErr) {
-        // roll back sale
         await svc.from("sales").delete().eq("id", sale.id);
         return json(500, { error: siErr.message });
       }
@@ -202,7 +265,6 @@ serve(async (req) => {
       const saleId = body?.sale_id;
       if (!saleId) return json(400, { error: "sale_id er påkrævet" });
 
-      // Verify ownership: sale must be manual_entry, on this campaign, and agent_email matches
       const { data: sale, error: fErr } = await svc
         .from("sales")
         .select("id, source, client_campaign_id, agent_email")
@@ -210,9 +272,16 @@ serve(async (req) => {
         .maybeSingle();
       if (fErr) return json(500, { error: fErr.message });
       if (!sale) return json(404, { error: "Salg ikke fundet" });
+
+      const allowedCampaignIds = new Set<string>();
+      for (const c of allowedChannels) {
+        const r = await resolveChannel(svc, c);
+        if (r) allowedCampaignIds.add(r.campaign_id);
+      }
+
       if (
         sale.source !== "manual_entry" ||
-        sale.client_campaign_id !== campaignId ||
+        !allowedCampaignIds.has(sale.client_campaign_id) ||
         (sale.agent_email ?? "").toLowerCase() !== (employee.work_email ?? "").toLowerCase()
       ) {
         return json(403, { error: "Du kan kun fjerne dine egne manuelle salg" });

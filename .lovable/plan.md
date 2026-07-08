@@ -1,106 +1,90 @@
+# Tast selv salg — udvid med Hiper-kanal
 
-## Baggrund
+Genbruger eksisterende infrastruktur (`src/pages/TastSelvSalg.tsx` + `supabase/functions/manual-sales/index.ts`). Ingen ny side, ingen ny DB-migration (Hiper-klient/kampagne/produkter/pricing rules blev oprettet i forrige migration).
 
-**Kilden** (Eesy TM portal, projekt `607bef78`) har kun én tabel: `hiper_leaderboard_entries` med aggregerede tal pr. sælger — `name`, `viderestillinger` (antal), `lukninger` (antal), `provision` (total kr.), `rank`. Ingen dato pr. salg, intet trin pr. salg (kun total-provision). Payout-satserne er hardkodet i kildens kode: trin 0 = 400/200 kr, trin 1 = 375/175, trin 2 = 350/150.
+Bekræftet: identisk formular (produkt + telefonnummer påkrævet). To separate salg pr. handel — viderestiller og lukker registrerer hver deres. Én sælger vælger ét produkt (Hiper Viderestilling ELLER Hiper Lukning) pr. salg.
 
-**Stork** har ingen Hiper-klient, kampagne eller produkter i dag. 17 aktive Eesy TM-sælgere er identificeret.
+## Ændringer
 
-**Periode** (lønperiode 15/6 → 14/7 2026): kildens tabel indeholder præcis denne periode, fordi kilden filtrerer på pay period før upload og genskaber tabellen ved hver upload.
+### 1. Edge function `supabase/functions/manual-sales/index.ts`
 
----
+Erstat de tre hardkodede konstanter (`TEAM_UNITED_ID`, `CLIENT_NAME`, `CAMPAIGN_NAME`, `ALLOWED_PRODUCT_NAMES`) med en channels-liste:
 
-## Rød zone-varsel
-
-Denne import indsætter rækker i `sales` og skaber `sale_items` med `mapped_commission > 0`. Det påvirker **løn** direkte (Eesy TM-sælgernes provision for juli-perioden). Jeg indsætter **intet** før du godkender både (a) schema-migrationen og (b) den konkrete navne-mapping.
-
----
-
-## Faser (rækkefølge, hver med separat godkendelse)
-
-### Fase 1 — Schema i Stork (migration, kræver din godkendelse)
-
-Opret:
-- `clients`-række: **Hiper** (client_type = ekstern, brand-farve TBD)
-- `client_campaigns`-række: **Hiper Bredbånd** under Hiper
-- 2 `products`:
-  - **Hiper Viderestilling** (default provision 400 kr)
-  - **Hiper Lukning** (default provision 200 kr)
-- 2 `product_pricing_rules` med `priority = 100`, faste priser 400/200 (så evt. senere `rematch-pricing-rules` ikke overskriver til 0)
-- Tildeling af Hiper-klient til Eesy TM's team via `team_clients` — så salget vises hos det rette team
-
-Ingen ændring i eksisterende tabeller. Ingen adversus_campaign_mappings (data kommer ikke fra dialer).
-
-### Fase 2 — Fremskaffelse af kilde-data (kræver dig)
-
-RLS på `hiper_leaderboard_entries` tillader kun `authenticated` (ikke anon), og jeg har ikke direkte DB-adgang til kilde-projektet. Du skal enten:
-
-- (a) Køre denne query i kilde-projektets SQL editor og paste resultatet i chatten:
-  ```sql
-  SELECT name, viderestillinger, lukninger, provision, rank
-  FROM hiper_leaderboard_entries
-  ORDER BY rank;
-  ```
-- (b) Eller eksportere som CSV og uploade
-
-### Fase 3 — Navne-mapping preview (kræver din godkendelse)
-
-Jeg genbruger kildens egen normalisering (lowercase, fjern accenter, first+last-token match) og matcher hvert kilde-navn mod Stork's 17 aktive Eesy TM-sælgere. Du får en tabel som:
-
-```text
-Kilde-navn              Match i Stork                   Sikkerhed
-──────────────────────  ──────────────────────────────  ─────────
-Julius                  Julius Rødsø Langkilde          entydig fornavn
-Casper Andersen         Casper Haaber Løje Andersen     first+last
-Lucas P                 IKKE ENTYDIG (2 Lucas'er)       ⚠ afklares
-Ukendt Navn             IKKE FUNDET                     ⚠ afklares
+```ts
+const CHANNELS = [
+  { key: "lederne", label: "Lederne",
+    team_id: "ed095592-cc72-4dc5-b4d7-cc4a65250cac",
+    client_name: "Tryg", campaign_name: "Tryg Products",
+    allowed_products: ["Lederne"] },
+  { key: "hiper", label: "Hiper Bredbånd",
+    team_id: "0cb1b854-e7b5-4f49-8fdf-30e54e7d2f95",
+    client_name: "Hiper", campaign_name: "Hiper Bredbånd",
+    allowed_products: ["Hiper Viderestilling", "Hiper Lukning"] },
+];
 ```
 
-Ingen indsats sker før du bekræfter mappingen række for række. Uafklarede navne springes over (ikke gætte).
+`getCallerContext` returnerer nu også `allowed_channel_keys: string[]` beregnet ud fra `team_members` (managers/ejer får alle kanaler via `is_manager_or_above`).
 
-### Fase 4 — Data-indsats (via supabase--insert, én transaktion)
+`resolveCampaignId` bliver `resolveChannel(svc, channelKey)` og returnerer `{ campaign_id, allowed_products, label }` for den valgte kanal — 404 hvis kanalen ikke findes eller caller ikke har adgang.
 
-Pr. bekræftet sælger genereres:
-- `viderestillinger` stk. sales-rækker med:
-  - `agent_email` = sælgerens `work_email`
-  - `client_campaign_id` = Hiper Bredbånd
-  - `sale_datetime` = **2026-07-14 23:59** (sidste dag i perioden, samme timestamp for alle — ærligt: vi har ikke bedre dato)
-  - `source` = `'manual_import'`, `integration_type` = `'manual_hiper'`
-  - `validation_status` = `'validated'`, `status` = `'success'`
-  - `internal_reference` = `hiper-2026-07-{employee_id}-forwarder-{i}` (idempotens-nøgle — genindsats duplikerer ikke)
-  - `raw_payload` = `{source:"hiper_portal_import", period:"2026-06-15..2026-07-14", role:"forwarder", trin_assumption:0}`
-- Tilsvarende `lukninger` stk. sales-rækker med rolle `closer`
-- Én `sale_items`-række pr. sale med `mapped_commission` = 400 (forwarder) / 200 (closer), `product_id` = det rette produkt
+Actions bliver channel-scoped via querystring `?channel=hiper`:
 
-### Fase 5 — Verifikation
+- `products?channel=<key>` → produkter for den kanals kampagne, filtreret på `allowed_products`.
+- `list` → uden channel: returnerer alle callers manuelle salg på tværs af tilladte kanaler. Hver række beriges med `channel_key` (baseret på `client_campaign_id → channel`) så UI kan gruppere.
+- `create?channel=<key>` → validerer at valgte produkt tilhører den kanals kampagne + står på `allowed_products`.
+- `delete` → uændret; ejerskabs-tjek er allerede pr. sale-id og source=`manual_entry`.
 
-Efter indsats kører jeg:
-- Total antal sales pr. sælger vs. kildens `viderestillinger + lukninger` (skal matche)
-- Total commission pr. sælger vs. kildens `provision`-felt (kan afvige hvis trin ≠ 0 i den originale Excel; jeg rapporterer differencen pr. sælger så du kan beslutte om vi skal justere)
-- Bekræftelse af at Eesy TM's team ejer Hiper via `team_clients`
+Adgangs-gate: hvis `channel` er angivet i action og callers `allowed_channel_keys` ikke indeholder den → 403.
 
-### Fase 6 — Rollback-nøgle
+Kompatibilitet: hvis `channel` mangler i eksisterende kald falder default tilbage til `lederne` (bevarer nuværende UI indtil frontend er opdateret).
 
-Alle indsatte rækker har `source = 'manual_import' AND integration_type = 'manual_hiper'`. Én DELETE-query kan rense hele importen hvis noget går galt. Query dokumenteres i chatten efter indsats.
+`channels` action tilføjes: `GET /manual-sales?action=channels` → `{ channels: [{ key, label }] }` for caller. Bruges af UI til at rendere det rette antal sektioner uden hardkodning.
 
----
+### 2. Frontend
 
-## Antagelser jeg gør (ret mig hvis noget er galt)
+`src/hooks/useLederneSales.ts` omdøbes internt til `useManualSales.ts` (behold gammel fil som re-export for at undgå breakage), tilføjer:
 
-1. **Trin 0 antages** for hele importen (400/200 kr sats). Kildens aggregerede DB har mistet trin-info, så det kan ikke rekonstrueres eksakt. Difference mellem beregnet total og kildens `provision`-felt viser hvor meget trin har afveget — rapporteres i Fase 5.
-2. **Sale_datetime = periode-slut (2026-07-14 23:59)** for alle rækker. Ugents-/dags-rapportering vil vise hele Hiper-produktionen på én dag. Alternativ: spred kunstigt over perioden, men det er en løgn. Jeg foretrækker den ærlige version.
-3. **Sælger uden `work_email`** (fx Carl Filt Beyer, Lucas Baz Uttrup i den nuværende liste) kan ikke få attribution. De springes over medmindre du udpeger en email.
-4. **Ingen kobling til `commission_transactions`.** Sale_items med mapped_commission er nok til at Stork's løn-hooks ser provision. `commission_transactions` skabes normalt af `rematch-pricing-rules` — vi indsætter direkte for at undgå at motoren nulstiller vores hardkodede satser.
+- `useManualChannels()` → henter tilladte kanaler for caller.
+- `useManualProducts(channelKey)` → produkter pr. kanal.
+- `useMyManualSales()` → alle callers salg med `channel_key` pr. række.
+- `useCreateManualSale()` mutation: `{ channel_key, product_id, customer_phone }`.
+- `useDeleteManualSale()` uændret.
 
----
+`src/pages/TastSelvSalg.tsx` refactores:
 
-## Teknisk noter (til dig, ikke slutbruger)
+- Fjerner ord "Lederne" fra overskrifter/tekster — bliver dynamisk (kanalens label).
+- Hvis caller kun har 1 kanal → nuværende layout, men med kanalens label.
+- Hvis caller har flere kanaler → tabs (shadcn `Tabs`) med én per kanal. Hver tab har egen produktvælger + form + "seneste salg" list.
+- "Mine seneste salg" viser alle på tværs af kanaler i sin egen tab-uafhængige sektion, med `Badge` for kanal.
 
-- Migrations- og insert-tools bruges i to separate kald (schema først, data efter godkendt mapping)
-- Ingen ændring i `product_pricing_rules`-motoren, `pricing-service`, `rematch-pricing-rules` eller andre rød-zone kode-filer
-- `sales.raw_payload` bruges til at markere importen så vi kan filtrere/slette den igen
-- `internal_reference`-mønsteret er idempotent (unique constraint findes)
-- Ingen ændring i frontend — Hiper vil dukke op automatisk i dashboards der grupperer på `client_id` (fx TV-board, CS Top 20, sælger-lønside)
+Formular og validering bevares 1:1: produkt påkrævet, telefon påkrævet (`>=4` tegn), toast ved success/fejl.
 
----
+### 3. Adgang for Eesy TM-teamet
 
-**Godkender du planen, eller vil du justere noget først (fx sale_datetime-strategi, trin-antagelse, produkt-navne)?**
+Eesy TM-teamet (`0cb1b854-...`) har allerede route-adgang til `/tast-selv-salg` — verificér i `src/routes/config.tsx` at siden ikke er begrænset til United. Hvis den er: udvid `allowedTeamIds` eller tilsvarende til også at inkludere Eesy TM. (Bekræftes ved implementation — ingen ændring hvis siden er åben for alle authenticated.)
+
+### 4. Verifikation
+
+- Ejer-bruger på United: ser begge kanaler som tabs, kan taste Lederne og Hiper.
+- Eesy TM-sælger: ser kun Hiper-kanal, kan taste Viderestilling eller Lukning, ser telefon-input.
+- United-sælger: ser kun Lederne-kanal (uændret UX).
+- Salget lander i `sales` med `source='manual_entry'`, `client_campaign_id`=Hiper Bredbånd, korrekt `agent_email`, og `sale_items` med `mapped_commission=400` eller `200` fra produktets `commission_dkk` (som allerede står i produkt-rækkerne fra forrige migration).
+- Slet virker for Hiper-salg (ejerskabs-tjek: `source=manual_entry` + `agent_email` match).
+
+## Rød-zone tjek
+
+- Ingen ændringer i pricing-motor, `hours.ts`, `useSellerSalariesCached.ts`, webhooks eller SECURITY DEFINER-funktioner.
+- Ingen DB-migration.
+- Ny logik er isoleret i `manual-sales` edge function + `TastSelvSalg.tsx` + hook.
+- Bruger produkt-baseline priser (`products.commission_dkk`) — samme mønster som eksisterende Lederne-flow. Pricing rules (som ligger klar i DB) rammer først når rematch kører; da rules er låst til 400/200 for de to Hiper-produkter er der ingen drift.
+
+## Filer der ændres
+
+- `supabase/functions/manual-sales/index.ts` (refactor til channels)
+- `src/hooks/useLederneSales.ts` (udvidet + re-export fra ny fil, eller in-place rename)
+- `src/pages/TastSelvSalg.tsx` (tabs når >1 kanal, dynamiske labels)
+- evt. `src/routes/config.tsx` hvis siden er team-restricted
+
+## Ét åbent punkt
+
+`is_manager_or_above` giver i dag managers adgang til Lederne-kanalen. Skal samme bypass gælde Hiper — dvs. skal ejere/teamledere kunne taste Hiper-salg på egne vegne? Default: ja (bevarer eksisterende mønster). Sig til hvis Hiper skal være strengt kun for Eesy TM-teammedlemmer.
