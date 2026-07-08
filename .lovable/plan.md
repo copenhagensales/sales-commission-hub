@@ -1,41 +1,51 @@
-## Diagnose
+## Mål
+På "Ansøgninger pr. uge" skal vi ikke kun se volumen, men også kvaliteten: hvor mange af ugens ansøgere endte som ansat, og hvad er konverteringsraten.
 
-Carl (`employee_master_data.id = a62fb220…`, `auth_user_id = 581875a3…`) har:
-- `is_active = false` ❌
-- `team_id` sat til Eesy TM, men ingen `team_members`-række
-- Ingen `candidates`-record — oprettet manuelt direkte som employee EFTER "Start hold og send invitationer"
+## Anbefalet løsning — ComposedChart med bar + linje
 
-**Hvorfor blank skærm:** `usePositionPermissions` og `useAuth` slår employee op med `.eq("is_active", true)`. Da is_active=false returneres ingen employee → tomme permissions, ingen `default_landing_page`, ingen menu → blank skærm. Loginnet lykkes (auth-logs viser 200), men appen har intet at rendere.
+Én graf, to lag:
 
-Din mistanke er korrekt: efter-tilføjede deltagere kører ikke det aktiverings-/team-flow som cohort-starten gør.
+1. **Bar (venstre y-akse):** Ansøgninger pr. uge. Beholder nuværende grønne bar, men splittes visuelt:
+   - Mørkegrøn nederst = antal fra ugen der blev `hired`
+   - Lysegrøn ovenpå = resten (ikke-ansatte endnu)
+   - Label ovenpå viser stadig totalen (fx `34`)
+2. **Linje (højre y-akse, 0–100%):** Konverteringsrate = `hired / total` for ugen. Vises som en tynd linje med prikker og procent-label.
+3. **Tooltip:** Uge X · Ansøgninger: 34 · Ansat: 3 · Konvertering: 8,8%
 
-## Ændringer
+Hvorfor denne form:
+- Bevarer den visuelle volumen-læsning brugerne allerede kender.
+- Konverteringslinjen gør det tydeligt når mange ansøgninger ≠ god kvalitet (høj bar, lav linje = advarsel).
+- Ingen ekstra graf, ingen ekstra klik.
 
-### 1. Straks-fix for Carl (data)
+### Modning-advarsel
+Nyere uger har naturligt lavere konvertering, fordi kandidaterne ikke har nået at gennemgå flowet endnu. Derfor:
+- De sidste 2 uger markeres visuelt (stiplet linje-segment + lille "i" tooltip: "Kandidater er stadig i proces — konvertering kan stige").
+- Konverteringen beregnes stadig, men brugerne advares mod at drage konklusioner for tidligt.
 
-```sql
-UPDATE employee_master_data
-SET is_active = true, invitation_status = 'accepted'
-WHERE id = 'a62fb220-0062-4910-bc95-4af4983c310c';
+### Periodevalg
+Beholder 5/10/25/50 uger som i dag. Ingen ændring.
 
-INSERT INTO team_members (team_id, employee_id)
-VALUES ('0cb1b854-e7b5-4f49-8fdf-30e54e7d2f95', 'a62fb220-0062-4910-bc95-4af4983c310c')
-ON CONFLICT DO NOTHING;
-```
+## Tekniske detaljer
 
-Kører via insert-tool.
+**Fil:** `src/pages/recruitment/RecruitmentDashboard.tsx`
 
-### 2. Rod-årsagen (kode)
+**Data (`weeklyChartData`, linje 306–332):** Udvid map så hver uge også indeholder:
+- `hired` = antal `candidates` med `created_at` i ugen OG `status === 'hired'`
+- `conversionRate` = `total > 0 ? (hired/total)*100 : null` (null så linjen ikke rammer 0 for tomme uger)
+- `isRecent` = ugen er en af de 2 seneste (til stiplet segment)
 
-Find den funktion "Start hold og send invitationer" allerede kalder for at aktivere medarbejdere + oprette `team_members`. Genbrug den fra `AddMemberDialog.tsx` (og evt. UpcomingStarts hvis der er en efter-tilføj-vej der), så efter-tilføjede deltagere til et allerede-startet hold får:
+**Chart:** Skift fra `BarChart` til `ComposedChart` fra recharts. Tilføj:
+- `<YAxis yAxisId="left">` (volumen) og `<YAxis yAxisId="right" orientation="right" domain={[0, 100]} unit="%">`
+- `<Bar dataKey="hired" stackId="a" yAxisId="left">` (mørkegrøn, `hsl(var(--primary))`)
+- `<Bar dataKey="notHired" stackId="a" yAxisId="left">` (lysegrøn, `hsl(var(--primary) / 0.35)`)
+- `<Line dataKey="conversionRate" yAxisId="right" stroke="hsl(var(--accent-foreground))" strokeWidth={2} dot />` med `strokeDasharray` betinget via segment
+- LabelList på total (top af stack) og procent på linje-prikker
 
-- `is_active = true`
-- Ny række i `team_members`
-- Samme invitation-flow som de oprindelige (SMS/email registreringslink) — men KUN hvis holdet allerede er startet; ellers venter det som i dag
+**chartConfig:** Tilføj `hired`, `notHired`, `conversionRate` entries.
 
-Bevarer §8 (én sandhed) — ingen duplikeret logik. Én commit til data-fix, én til kode-fix.
+**Ingen ændringer** i backend, RLS, hooks eller andre komponenter. Ren frontend/præsentation. Grøn zone.
 
-## Filer
-
-- Data: 1 UPDATE + 1 INSERT via insert-tool
-- Kode (gul zone): `src/components/personnel/AddMemberDialog.tsx` + evt. hjælper i samme mappe. Rører ikke pricing/løn/RLS.
+## Alternativer (fravalgt)
+- **Separat linjegraf under:** Kræver dobbelt så meget plads og tvinger øjet til at hoppe. Fravalgt.
+- **Kun tal i tooltip:** Skjuler indsigten — brugeren skal hovere for at se problemet. Fravalgt.
+- **Farvekodede bars efter konverteringsrate (rød/gul/grøn):** Blander to dimensioner i én farve og bliver svær at læse. Fravalgt.
