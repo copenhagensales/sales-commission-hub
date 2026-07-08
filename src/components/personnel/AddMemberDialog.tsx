@@ -102,6 +102,14 @@ export function AddMemberDialog({ open, onOpenChange, cohortId }: AddMemberDialo
 
   const addMembersMutation = useMutation({
     mutationFn: async (candidateIds: string[]) => {
+      // Fetch cohort details up-front so we know whether it has already started
+      const { data: cohortRow, error: cohortErr } = await supabase
+        .from("onboarding_cohorts")
+        .select("id, team_id, start_date, status")
+        .eq("id", cohortId!)
+        .single();
+      if (cohortErr) throw cohortErr;
+
       const members = candidateIds.map(candidateId => ({
         cohort_id: cohortId!,
         candidate_id: candidateId,
@@ -109,7 +117,10 @@ export function AddMemberDialog({ open, onOpenChange, cohortId }: AddMemberDialo
         daily_bonus_client_id: selectedClientId,
       }));
 
-      const { error: insertError } = await supabase.from("cohort_members").insert(members);
+      const { data: insertedMembers, error: insertError } = await supabase
+        .from("cohort_members")
+        .insert(members)
+        .select("id, candidate_id, daily_bonus_client_id, agent_email");
       if (insertError) throw insertError;
 
       // Update candidates' cohort_assignment_status to 'assigned'
@@ -118,9 +129,49 @@ export function AddMemberDialog({ open, onOpenChange, cohortId }: AddMemberDialo
         .update({ cohort_assignment_status: "assigned" })
         .in("id", candidateIds);
       if (updateError) throw updateError;
+
+      // If the cohort has already been started, run the same activation flow
+      // ("Start hold og send invitationer") for the newly-added members so they
+      // don't get stuck as inactive without an invitation. Bibel §8 — single source.
+      if (cohortRow.status === "in_progress" && insertedMembers?.length) {
+        const { data: candidatesData } = await supabase
+          .from("candidates")
+          .select("id, first_name, last_name, applied_position, email, phone")
+          .in("id", candidateIds);
+
+        const results = { sent: 0, skipped: 0, errors: [] as string[] };
+        for (const m of insertedMembers) {
+          const candidate = candidatesData?.find(c => c.id === m.candidate_id);
+          if (!candidate) continue;
+          await processCohortMember(
+            {
+              id: m.id,
+              daily_bonus_client_id: m.daily_bonus_client_id,
+              agent_email: m.agent_email,
+              candidate,
+            },
+            { id: cohortRow.id, team_id: cohortRow.team_id, start_date: cohortRow.start_date },
+            results,
+          );
+        }
+        return { activated: true, results };
+      }
+
+      return { activated: false as const };
     },
-    onSuccess: () => {
-      toast({ title: "Deltagere tilføjet" });
+    onSuccess: (res) => {
+      if (res.activated) {
+        const { sent, skipped, errors } = res.results;
+        toast({
+          title: `Deltagere tilføjet — ${sent} invitation${sent === 1 ? "" : "er"} sendt`,
+          description: errors.length
+            ? `${skipped} sprunget over. ${errors.join(", ")}`
+            : undefined,
+          variant: errors.length && sent === 0 ? "destructive" : "default",
+        });
+      } else {
+        toast({ title: "Deltagere tilføjet" });
+      }
       queryClient.invalidateQueries({ queryKey: ["onboarding-cohorts"] });
       queryClient.invalidateQueries({ queryKey: ["available-candidates-for-cohort"] });
       onOpenChange(false);
