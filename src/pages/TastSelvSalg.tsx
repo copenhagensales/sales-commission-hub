@@ -40,6 +40,17 @@ export default function TastSelvSalg() {
   const { data: products, isLoading: productsLoading, error: productsError } = useLederneProducts();
   const { data: mySales, isLoading: salesLoading } = useMyLederneSales();
   const createSale = useCreateLederneSale();
+  const deleteSale = useDeleteLederneSale();
+
+  const handleDelete = async (saleId: string) => {
+    try {
+      await deleteSale.mutateAsync(saleId);
+      toast({ title: "Salg fjernet" });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Ukendt fejl";
+      toast({ title: "Kunne ikke fjerne salg", description: msg, variant: "destructive" });
+    }
+  };
 
   const [productId, setProductId] = useState<string>("");
   const [phone, setPhone] = useState<string>("");
