@@ -680,8 +680,8 @@ export default function RecruitmentDashboard() {
           </div>
         </CardHeader>
         <CardContent>
-          <ChartContainer config={chartConfig} className="h-[200px] sm:h-[300px] w-full">
-            <ComposedChart data={weeklyChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+          <ChartContainer config={chartConfig} className="h-[400px] sm:h-[560px] w-full">
+            <ComposedChart data={weeklyChartData} margin={{ top: 30, right: 10, left: -20, bottom: 0 }}>
               <XAxis
                 dataKey="weekLabel"
                 axisLine={false}
@@ -766,44 +766,53 @@ export default function RecruitmentDashboard() {
                 stroke="transparent"
                 strokeWidth={0}
                 connectNulls
-                dot={(props: any) => {
-                  const { cx, cy, payload, index } = props;
-                  if (cy == null || payload?.conversionRate == null) return <g key={`dot-${index}`} />;
-                  return (
-                    <circle
-                      key={`dot-${index}`}
-                      cx={cx}
-                      cy={cy}
-                      r={3}
-                      fill="hsl(var(--accent-foreground))"
-                      stroke={payload.isRecent ? "hsl(var(--muted-foreground))" : "hsl(var(--accent-foreground))"}
-                      strokeDasharray={payload.isRecent ? "2 2" : undefined}
-                    />
-                  );
-                }}
+                dot={false}
+                activeDot={false}
+                isAnimationActive={false}
               >
                 <LabelList
                   dataKey="conversionRate"
                   position="top"
-                  offset={12}
+                  offset={16}
                   content={(props: any) => {
                     const { x, y, value, index } = props;
                     if (value == null) return null;
                     const d = weeklyChartData[index];
+                    const hired = d?.hired ?? 0;
+                    const text = `${value}% (${hired})`;
+                    const padX = 5;
+                    const padY = 2;
+                    const charW = 6;
+                    const w = text.length * charW + padX * 2;
+                    const h = 16;
                     return (
-                      <text
-                        x={x}
-                        y={y}
-                        textAnchor="middle"
-                        style={{ fontSize: 9, fontWeight: 600, fill: "hsl(var(--accent-foreground))" }}
-                      >
-                        {`${value}% (${d?.hired ?? 0})`}
-                      </text>
+                      <g>
+                        <rect
+                          x={x - w / 2}
+                          y={y - h / 2}
+                          width={w}
+                          height={h}
+                          rx={4}
+                          ry={4}
+                          fill="hsl(var(--background))"
+                          fillOpacity={0.85}
+                          stroke="hsl(var(--border))"
+                          strokeWidth={0.5}
+                        />
+                        <text
+                          x={x}
+                          y={y + 3}
+                          textAnchor="middle"
+                          style={{ fontSize: 10, fontWeight: 600, fill: "hsl(var(--foreground))" }}
+                        >
+                          {text}
+                        </text>
+                      </g>
                     );
                   }}
                 />
-
               </Line>
+
             </ComposedChart>
           </ChartContainer>
         </CardContent>
