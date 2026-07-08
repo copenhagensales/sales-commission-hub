@@ -13,12 +13,24 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CheckCircle2, PhoneCall, PackagePlus, Info } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { CheckCircle2, PhoneCall, PackagePlus, Info, Trash2 } from "lucide-react";
 import { format, parseISO, startOfWeek, isAfter } from "date-fns";
 import { da } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import {
   useCreateLederneSale,
+  useDeleteLederneSale,
   useLederneProducts,
   useMyLederneSales,
 } from "@/hooks/useLederneSales";
