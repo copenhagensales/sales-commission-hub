@@ -680,8 +680,8 @@ export default function RecruitmentDashboard() {
           </div>
         </CardHeader>
         <CardContent>
-          <ChartContainer config={chartConfig} className="h-[200px] sm:h-[300px] w-full">
-            <ComposedChart data={weeklyChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+          <ChartContainer config={chartConfig} className="h-[400px] sm:h-[560px] w-full">
+            <ComposedChart data={weeklyChartData} margin={{ top: 30, right: 10, left: -20, bottom: 0 }}>
               <XAxis
                 dataKey="weekLabel"
                 axisLine={false}
