@@ -483,5 +483,9 @@ export const routes: RouteConfig[] = [
   // Menu Editor (owner only)
   { path: "/admin/menu-editor", component: MenuEditor, access: "role", positionPermission: "menu_permissions" },
 
+  // Manual sales entry (team United — enforced in the edge function)
+  { path: "/tast-selv-salg", component: TastSelvSalg, access: "protected" },
+
+
   { path: "*", component: NotFound, access: "public" },
 ];
