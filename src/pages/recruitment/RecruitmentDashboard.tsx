@@ -26,13 +26,25 @@ import {
   ChartTooltip, 
   ChartTooltipContent 
 } from "@/components/ui/chart";
-import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, BarChart, Bar, Cell, Tooltip, LabelList } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, BarChart, Bar, Cell, Tooltip, LabelList, ComposedChart, Line } from "recharts";
 import { Link } from "react-router-dom";
 
 const chartConfig = {
   count: {
     label: "Ansøgninger",
     color: "hsl(var(--primary))",
+  },
+  hired: {
+    label: "Ansat",
+    color: "hsl(var(--primary))",
+  },
+  notHired: {
+    label: "Ikke ansat",
+    color: "hsl(var(--primary) / 0.35)",
+  },
+  conversionRate: {
+    label: "Konvertering %",
+    color: "hsl(var(--accent-foreground))",
   },
 };
 
@@ -311,13 +323,18 @@ export default function RecruitmentDashboard() {
       { weekStartsOn: 1 }
     );
 
-    return weekStarts.map(weekStart => {
+    return weekStarts.map((weekStart, idx) => {
       const wStart = startOfISOWeek(weekStart);
       const wEnd = endOfISOWeek(weekStart);
-      const count = candidates.filter(c => {
+      const inWeek = candidates.filter(c => {
         const created = new Date(c.created_at);
         return created >= wStart && created <= wEnd;
-      }).length;
+      });
+      const count = inWeek.length;
+      const hired = inWeek.filter(c => c.status === "hired").length;
+      const notHired = Math.max(0, count - hired);
+      const conversionRate = count > 0 ? Math.round((hired / count) * 1000) / 10 : null;
+      const isRecent = idx >= weekStarts.length - 2;
 
       return {
         weekKey: `${getISOWeekYear(wStart)}-W${getISOWeek(wStart)}`,
@@ -327,9 +344,14 @@ export default function RecruitmentDashboard() {
         weekStart: wStart.toISOString(),
         weekEnd: wEnd.toISOString(),
         count,
+        hired,
+        notHired,
+        conversionRate,
+        isRecent,
       };
     });
   }, [candidates, weeklyPeriod]);
+
 
   return (
     <MainLayout>
@@ -659,7 +681,7 @@ export default function RecruitmentDashboard() {
         </CardHeader>
         <CardContent>
           <ChartContainer config={chartConfig} className="h-[200px] sm:h-[300px] w-full">
-            <BarChart data={weeklyChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <ComposedChart data={weeklyChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <XAxis
                 dataKey="weekLabel"
                 axisLine={false}
@@ -668,11 +690,22 @@ export default function RecruitmentDashboard() {
                 interval={weeklyChartData.length > 20 ? Math.floor(weeklyChartData.length / 10) : 0}
               />
               <YAxis
+                yAxisId="left"
                 axisLine={false}
                 tickLine={false}
                 tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
                 allowDecimals={false}
                 width={30}
+              />
+              <YAxis
+                yAxisId="right"
+                orientation="right"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
+                domain={[0, 100]}
+                tickFormatter={(v) => `${v}%`}
+                width={35}
               />
               <ChartTooltip
                 content={({ active, payload }) => {
@@ -689,13 +722,33 @@ export default function RecruitmentDashboard() {
                       <p className="text-foreground mt-1">
                         <span className="font-semibold">{d.count}</span> ansøgninger
                       </p>
+                      <p className="text-foreground">
+                        <span className="font-semibold">{d.hired}</span> ansat
+                      </p>
+                      <p className="text-foreground">
+                        Konvertering: <span className="font-semibold">{d.conversionRate === null ? "–" : `${d.conversionRate}%`}</span>
+                      </p>
+                      {d.isRecent && (
+                        <p className="text-muted-foreground mt-1 italic">
+                          Kandidater er stadig i proces — konvertering kan stige
+                        </p>
+                      )}
                     </div>
                   );
                 }}
               />
               <Bar
-                dataKey="count"
+                yAxisId="left"
+                dataKey="hired"
+                stackId="a"
                 fill="hsl(var(--primary))"
+                maxBarSize={48}
+              />
+              <Bar
+                yAxisId="left"
+                dataKey="notHired"
+                stackId="a"
+                fill="hsl(var(--primary) / 0.35)"
                 radius={[4, 4, 0, 0]}
                 maxBarSize={48}
               >
@@ -706,7 +759,38 @@ export default function RecruitmentDashboard() {
                   formatter={(value: number) => (value > 0 ? value : "")}
                 />
               </Bar>
-            </BarChart>
+              <Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="conversionRate"
+                stroke="hsl(var(--accent-foreground))"
+                strokeWidth={2}
+                connectNulls
+                dot={(props: any) => {
+                  const { cx, cy, payload, index } = props;
+                  if (cy == null || payload?.conversionRate == null) return <g key={`dot-${index}`} />;
+                  return (
+                    <circle
+                      key={`dot-${index}`}
+                      cx={cx}
+                      cy={cy}
+                      r={3}
+                      fill="hsl(var(--accent-foreground))"
+                      stroke={payload.isRecent ? "hsl(var(--muted-foreground))" : "hsl(var(--accent-foreground))"}
+                      strokeDasharray={payload.isRecent ? "2 2" : undefined}
+                    />
+                  );
+                }}
+              >
+                <LabelList
+                  dataKey="conversionRate"
+                  position="top"
+                  offset={12}
+                  style={{ fontSize: 9, fontWeight: 600, fill: "hsl(var(--accent-foreground))" }}
+                  formatter={(value: number | null) => (value == null ? "" : `${value}%`)}
+                />
+              </Line>
+            </ComposedChart>
           </ChartContainer>
         </CardContent>
       </Card>
