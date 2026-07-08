@@ -106,6 +106,7 @@ serve(async (req) => {
         .select("id, name, commission_dkk, revenue_dkk")
         .eq("client_campaign_id", campaignId)
         .eq("is_active", true)
+        .in("name", ALLOWED_PRODUCT_NAMES)
         .order("name", { ascending: true });
       if (error) return json(500, { error: error.message });
       return json(200, { products: products ?? [] });
