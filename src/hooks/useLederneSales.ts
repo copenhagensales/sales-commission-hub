@@ -21,19 +21,7 @@ export interface LederneSale {
   }>;
 }
 
-async function invoke<T>(action: string, method: "GET" | "POST", body?: unknown): Promise<T> {
-  const { data, error } = await supabase.functions.invoke("manual-sales", {
-    method,
-    body,
-    // Query param via method-specific path is not supported by invoke; use body flag instead
-  });
-  if (error) throw error;
-  if (data?.error) throw new Error(data.error);
-  return data as T;
-}
-
-// Because supabase.functions.invoke doesn't expose query params easily, we send `action` in body/headers.
-// The edge function reads url.searchParams for action — so we call fetch directly.
+// The edge function reads `action` from url.searchParams — call fetch directly to attach it.
 async function callFn<T>(action: string, method: "GET" | "POST", body?: unknown): Promise<T> {
   const { data: sessionData } = await supabase.auth.getSession();
   const token = sessionData.session?.access_token;
