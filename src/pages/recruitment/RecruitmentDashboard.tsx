@@ -26,13 +26,25 @@ import {
   ChartTooltip, 
   ChartTooltipContent 
 } from "@/components/ui/chart";
-import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, BarChart, Bar, Cell, Tooltip, LabelList } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, BarChart, Bar, Cell, Tooltip, LabelList, ComposedChart, Line } from "recharts";
 import { Link } from "react-router-dom";
 
 const chartConfig = {
   count: {
     label: "Ansøgninger",
     color: "hsl(var(--primary))",
+  },
+  hired: {
+    label: "Ansat",
+    color: "hsl(var(--primary))",
+  },
+  notHired: {
+    label: "Ikke ansat",
+    color: "hsl(var(--primary) / 0.35)",
+  },
+  conversionRate: {
+    label: "Konvertering %",
+    color: "hsl(var(--accent-foreground))",
   },
 };
 
