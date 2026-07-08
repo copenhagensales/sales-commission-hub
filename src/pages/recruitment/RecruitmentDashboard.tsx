@@ -323,13 +323,18 @@ export default function RecruitmentDashboard() {
       { weekStartsOn: 1 }
     );
 
-    return weekStarts.map(weekStart => {
+    return weekStarts.map((weekStart, idx) => {
       const wStart = startOfISOWeek(weekStart);
       const wEnd = endOfISOWeek(weekStart);
-      const count = candidates.filter(c => {
+      const inWeek = candidates.filter(c => {
         const created = new Date(c.created_at);
         return created >= wStart && created <= wEnd;
-      }).length;
+      });
+      const count = inWeek.length;
+      const hired = inWeek.filter(c => c.status === "hired").length;
+      const notHired = Math.max(0, count - hired);
+      const conversionRate = count > 0 ? Math.round((hired / count) * 1000) / 10 : null;
+      const isRecent = idx >= weekStarts.length - 2;
 
       return {
         weekKey: `${getISOWeekYear(wStart)}-W${getISOWeek(wStart)}`,
@@ -339,9 +344,14 @@ export default function RecruitmentDashboard() {
         weekStart: wStart.toISOString(),
         weekEnd: wEnd.toISOString(),
         count,
+        hired,
+        notHired,
+        conversionRate,
+        isRecent,
       };
     });
   }, [candidates, weeklyPeriod]);
+
 
   return (
     <MainLayout>
