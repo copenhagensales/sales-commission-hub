@@ -786,9 +786,23 @@ export default function RecruitmentDashboard() {
                   dataKey="conversionRate"
                   position="top"
                   offset={12}
-                  style={{ fontSize: 9, fontWeight: 600, fill: "hsl(var(--accent-foreground))" }}
-                  formatter={(value: number | null) => (value == null ? "" : `${value}%`)}
+                  content={(props: any) => {
+                    const { x, y, value, index } = props;
+                    if (value == null) return null;
+                    const d = weeklyChartData[index];
+                    return (
+                      <text
+                        x={x}
+                        y={y}
+                        textAnchor="middle"
+                        style={{ fontSize: 9, fontWeight: 600, fill: "hsl(var(--accent-foreground))" }}
+                      >
+                        {`${value}% (${d?.hired ?? 0})`}
+                      </text>
+                    );
+                  }}
                 />
+
               </Line>
             </ComposedChart>
           </ChartContainer>
