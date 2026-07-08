@@ -28,6 +28,7 @@ import { EditMemberClientDialog } from "@/components/personnel/EditMemberClientD
 import { EditCohortDialog } from "@/components/personnel/EditCohortDialog";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { useToast } from "@/hooks/use-toast";
+import { processCohortMember, type ProcessResults } from "@/lib/cohortMemberProcessing";
 
 interface CohortMember {
   id: string;
@@ -275,131 +276,24 @@ export default function UpcomingStarts() {
   // Start cohort and send invitations mutation
   const startCohortAndInviteMutation = useMutation({
     mutationFn: async (cohort: Cohort) => {
-      const results = { sent: 0, skipped: 0, errors: [] as string[] };
-      
+      const results: ProcessResults = { sent: 0, skipped: 0, errors: [] };
+
       // Get members that have a candidate but no employee yet
       const membersToProcess = cohort.members.filter(
         m => m.candidate && !m.employee_id && m.status !== "cancelled"
       );
 
       for (const member of membersToProcess) {
-        const candidate = member.candidate!;
-        
-        // Skip if no email
-        if (!candidate.email) {
-          results.skipped++;
-          results.errors.push(`${candidate.first_name} ${candidate.last_name} mangler email`);
-          continue;
-        }
-
-        try {
-          // 1. Create employee record with daily_bonus_client_id
-          const { data: employee, error: empError } = await supabase
-            .from("employee_master_data")
-            .insert({
-              first_name: candidate.first_name,
-              last_name: candidate.last_name,
-              private_email: candidate.email,
-              private_phone: candidate.phone,
-              job_title: candidate.applied_position,
-              employment_start_date: cohort.start_date,
-              team_id: cohort.team_id,
-              is_active: true,
-              invitation_status: "pending",
-              daily_bonus_client_id: member.daily_bonus_client_id,
-            })
-            .select()
-            .single();
-
-          if (empError) throw empError;
-
-          // 2. Update cohort member with employee_id
-          const { error: memberError } = await supabase
-            .from("cohort_members")
-            .update({ 
-              employee_id: employee.id,
-              status: "confirmed" 
-            })
-            .eq("id", member.id);
-
-          if (memberError) throw memberError;
-
-          // 3. Send invitation email
-          const { error: inviteError } = await supabase.functions.invoke(
-            "send-employee-invitation",
-            {
-              body: {
-                employeeId: employee.id,
-                email: candidate.email,
-                firstName: candidate.first_name,
-                lastName: candidate.last_name,
-              },
-            }
-          );
-
-          if (inviteError) throw inviteError;
-
-          // 4. Update candidate status
-          const { error: candError } = await supabase
-            .from("candidates")
-            .update({ 
-              status: "onboarding",
-              cohort_assignment_status: "started" 
-            })
-            .eq("id", candidate.id);
-
-          if (candError) throw candError;
-
-          // 5. Create agent + mapping if agent_email is set
-          if (member.agent_email) {
-            try {
-              // Create or find agent by email
-              const { data: existingAgent } = await supabase
-                .from("agents")
-                .select("id")
-                .eq("email", member.agent_email.toLowerCase())
-                .maybeSingle();
-
-              let agentId: string;
-              if (existingAgent) {
-                agentId = existingAgent.id;
-              } else {
-                const { data: newAgent, error: agentError } = await supabase
-                  .from("agents")
-                  .insert({
-                    email: member.agent_email.toLowerCase(),
-                    name: `${candidate.first_name} ${candidate.last_name}`,
-                    is_active: true,
-                    source: "cohort_onboarding",
-                  })
-                  .select()
-                  .single();
-                if (agentError) throw agentError;
-                agentId = newAgent.id;
-              }
-
-              // Create employee_agent_mapping
-              const { error: mappingError } = await supabase
-                .from("employee_agent_mapping")
-                .insert({
-                  employee_id: employee.id,
-                  agent_id: agentId,
-                })
-                .select()
-                .single();
-              if (mappingError && !mappingError.message.includes("duplicate")) {
-                console.error("Agent mapping error:", mappingError);
-              }
-            } catch (agentErr) {
-              console.error("Agent creation error:", agentErr);
-              // Don't fail the whole process for agent mapping
-            }
-          }
-
-          results.sent++;
-        } catch (err: any) {
-          results.errors.push(`Fejl ved ${candidate.first_name}: ${err.message}`);
-        }
+        await processCohortMember(
+          {
+            id: member.id,
+            daily_bonus_client_id: member.daily_bonus_client_id,
+            agent_email: member.agent_email,
+            candidate: member.candidate!,
+          },
+          { id: cohort.id, team_id: cohort.team_id, start_date: cohort.start_date },
+          results,
+        );
       }
 
       // 5. Update cohort status to in_progress
