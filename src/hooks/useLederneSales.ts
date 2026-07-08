@@ -68,3 +68,16 @@ export function useCreateLederneSale() {
     },
   });
 }
+
+export function useDeleteLederneSale() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (sale_id: string) =>
+      callFn<{ ok: true }>("delete", "POST", { sale_id }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["lederne-sales-mine"] });
+      qc.invalidateQueries({ queryKey: ["sales"] });
+      qc.invalidateQueries({ queryKey: ["sales-aggregates"] });
+    },
+  });
+}

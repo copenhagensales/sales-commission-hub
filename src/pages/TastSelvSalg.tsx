@@ -13,12 +13,24 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CheckCircle2, PhoneCall, PackagePlus, Info } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { CheckCircle2, PhoneCall, PackagePlus, Info, Trash2 } from "lucide-react";
 import { format, parseISO, startOfWeek, isAfter } from "date-fns";
 import { da } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import {
   useCreateLederneSale,
+  useDeleteLederneSale,
   useLederneProducts,
   useMyLederneSales,
 } from "@/hooks/useLederneSales";
@@ -28,6 +40,17 @@ export default function TastSelvSalg() {
   const { data: products, isLoading: productsLoading, error: productsError } = useLederneProducts();
   const { data: mySales, isLoading: salesLoading } = useMyLederneSales();
   const createSale = useCreateLederneSale();
+  const deleteSale = useDeleteLederneSale();
+
+  const handleDelete = async (saleId: string) => {
+    try {
+      await deleteSale.mutateAsync(saleId);
+      toast({ title: "Salg fjernet" });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Ukendt fejl";
+      toast({ title: "Kunne ikke fjerne salg", description: msg, variant: "destructive" });
+    }
+  };
 
   const [productId, setProductId] = useState<string>("");
   const [phone, setPhone] = useState<string>("");
@@ -190,9 +213,39 @@ export default function TastSelvSalg() {
                           </div>
                         </div>
                       </div>
-                      <Badge variant="secondary" className="shrink-0">
-                        {new Intl.NumberFormat("da-DK", { maximumFractionDigits: 0 }).format(commission)} kr
-                      </Badge>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Badge variant="secondary">
+                          {new Intl.NumberFormat("da-DK", { maximumFractionDigits: 0 }).format(commission)} kr
+                        </Badge>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                              disabled={deleteSale.isPending}
+                              aria-label="Fjern salg"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Fjern salg?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Dette fjerner salget permanent fra din løn og team-rapporter. Kan ikke fortrydes.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Annullér</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDelete(s.id)}>
+                                Fjern salg
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
                     </div>
                   );
                 })}

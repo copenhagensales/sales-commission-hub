@@ -197,6 +197,33 @@ serve(async (req) => {
       return json(200, { ok: true, sale_id: sale.id });
     }
 
+    if (action === "delete" && (req.method === "POST" || req.method === "DELETE")) {
+      const body = await req.json().catch(() => null) as { sale_id?: string } | null;
+      const saleId = body?.sale_id;
+      if (!saleId) return json(400, { error: "sale_id er påkrævet" });
+
+      // Verify ownership: sale must be manual_entry, on this campaign, and agent_email matches
+      const { data: sale, error: fErr } = await svc
+        .from("sales")
+        .select("id, source, client_campaign_id, agent_email")
+        .eq("id", saleId)
+        .maybeSingle();
+      if (fErr) return json(500, { error: fErr.message });
+      if (!sale) return json(404, { error: "Salg ikke fundet" });
+      if (
+        sale.source !== "manual_entry" ||
+        sale.client_campaign_id !== campaignId ||
+        (sale.agent_email ?? "").toLowerCase() !== (employee.work_email ?? "").toLowerCase()
+      ) {
+        return json(403, { error: "Du kan kun fjerne dine egne manuelle salg" });
+      }
+
+      await svc.from("sale_items").delete().eq("sale_id", saleId);
+      const { error: dErr } = await svc.from("sales").delete().eq("id", saleId);
+      if (dErr) return json(500, { error: dErr.message });
+      return json(200, { ok: true });
+    }
+
     return json(400, { error: "Ukendt action" });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";
