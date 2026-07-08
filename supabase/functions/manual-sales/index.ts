@@ -5,8 +5,10 @@ import { sharedCorsHeaders } from "../_shared/auth.ts";
 const corsHeaders = sharedCorsHeaders;
 
 const TEAM_UNITED_ID = "ed095592-cc72-4dc5-b4d7-cc4a65250cac";
-const CLIENT_NAME = "Lederne";
-const CAMPAIGN_NAME = "Standard";
+const CLIENT_NAME = "Tryg";
+const CAMPAIGN_NAME = "Tryg Products";
+// Only these product names are selectable in Tast selv salg
+const ALLOWED_PRODUCT_NAMES = ["Lederne"];
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), {
@@ -104,6 +106,7 @@ serve(async (req) => {
         .select("id, name, commission_dkk, revenue_dkk")
         .eq("client_campaign_id", campaignId)
         .eq("is_active", true)
+        .in("name", ALLOWED_PRODUCT_NAMES)
         .order("name", { ascending: true });
       if (error) return json(500, { error: error.message });
       return json(200, { products: products ?? [] });
@@ -143,8 +146,12 @@ serve(async (req) => {
         .eq("id", body.product_id)
         .maybeSingle();
       if (pErr || !product) return json(400, { error: "Produkt ikke fundet" });
-      if (product.client_campaign_id !== campaignId || !product.is_active) {
-        return json(400, { error: "Produkt hører ikke til Lederne-kampagnen" });
+      if (
+        product.client_campaign_id !== campaignId ||
+        !product.is_active ||
+        !ALLOWED_PRODUCT_NAMES.includes(product.name)
+      ) {
+        return json(400, { error: "Produktet kan ikke tastes manuelt" });
       }
 
       const agentName = `${employee.first_name ?? ""} ${employee.last_name ?? ""}`.trim();
