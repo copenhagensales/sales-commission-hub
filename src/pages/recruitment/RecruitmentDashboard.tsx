@@ -763,8 +763,8 @@ export default function RecruitmentDashboard() {
                 yAxisId="right"
                 type="monotone"
                 dataKey="conversionRate"
-                stroke="hsl(var(--accent-foreground))"
-                strokeWidth={2}
+                stroke="transparent"
+                strokeWidth={0}
                 connectNulls
                 dot={(props: any) => {
                   const { cx, cy, payload, index } = props;
