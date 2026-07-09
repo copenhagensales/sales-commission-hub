@@ -202,7 +202,7 @@ export default function EesyTmDashboard() {
                 <span className="text-sm font-bold text-rose-500 tracking-widest">HIPER</span>
               </div>
               <div>
-                <h1 className="text-3xl lg:text-4xl font-bold tracking-tight">Team board</h1>
+                <h1 className="text-3xl lg:text-4xl font-bold tracking-tight">Team</h1>
                 <p className="text-sm text-slate-400 mt-1">Lønperiode {periodLabel} · opdateres live</p>
               </div>
             </div>
