@@ -99,10 +99,56 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
     { enabled: useCached && isAggregated, limit: 30 }
   );
 
-  const cachedSellersToday = isAggregated ? aggregatedLeaderboards.sellersToday : singleScopeLeaderboards.sellersToday;
-  const cachedSellersWeek = isAggregated ? aggregatedLeaderboards.sellersWeek : singleScopeLeaderboards.sellersWeek;
-  const cachedSellersPayroll = isAggregated ? aggregatedLeaderboards.sellersPayroll : singleScopeLeaderboards.sellersPayroll;
-  const leaderboardsLoading = isAggregated ? aggregatedLeaderboards.isLoading : singleScopeLeaderboards.isLoading;
+  const primarySellersToday = isAggregated ? aggregatedLeaderboards.sellersToday : singleScopeLeaderboards.sellersToday;
+  const primarySellersWeek = isAggregated ? aggregatedLeaderboards.sellersWeek : singleScopeLeaderboards.sellersWeek;
+  const primarySellersPayroll = isAggregated ? aggregatedLeaderboards.sellersPayroll : singleScopeLeaderboards.sellersPayroll;
+  const primaryLoading = isAggregated ? aggregatedLeaderboards.isLoading : singleScopeLeaderboards.isLoading;
+
+  // ========== SECONDARY CLIENTS (commissions merged, sales split) ==========
+  const secondaryClientIds = config.features?.secondaryClientIds;
+  const hasSecondary = !!(secondaryClientIds && secondaryClientIds.length > 0);
+  const secondaryLabel = config.features?.secondaryLabel ?? "Ekstra";
+
+  const secondaryLeaderboards = useAggregatedClientLeaderboards(
+    hasSecondary ? secondaryClientIds : undefined,
+    { enabled: useCached && hasSecondary, limit: 30 }
+  );
+  const { data: secondaryKpis } = useAggregatedClientKpis(
+    hasSecondary && useCached ? secondaryClientIds : undefined
+  );
+
+  // Merge primary + secondary leaderboards: commissions summed, secondary sales
+  // count exposed via `crossSaleCount` so it renders as its own column.
+  const mergeWithSecondary = (
+    primary: LeaderboardEntry[],
+    secondary: LeaderboardEntry[]
+  ): LeaderboardEntry[] => {
+    if (!hasSecondary) return primary;
+    const map = new Map<string, LeaderboardEntry>();
+    for (const e of primary) {
+      map.set(e.employeeId, { ...e, crossSaleCount: 0 });
+    }
+    for (const s of secondary) {
+      const existing = map.get(s.employeeId);
+      if (existing) {
+        existing.commission += s.commission || 0;
+        existing.crossSaleCount = (existing.crossSaleCount || 0) + (s.salesCount || 0);
+      } else {
+        map.set(s.employeeId, {
+          ...s,
+          salesCount: 0,
+          crossSaleCount: s.salesCount || 0,
+        });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.commission - a.commission);
+  };
+
+  const cachedSellersToday = mergeWithSecondary(primarySellersToday, secondaryLeaderboards.sellersToday);
+  const cachedSellersWeek = mergeWithSecondary(primarySellersWeek, secondaryLeaderboards.sellersWeek);
+  const cachedSellersPayroll = mergeWithSecondary(primarySellersPayroll, secondaryLeaderboards.sellersPayroll);
+  const leaderboardsLoading = primaryLoading || (hasSecondary && secondaryLeaderboards.isLoading);
+
 
   // ========== LIVE DATA (optional, for custom periods) ==========
   const { data: liveData, isLoading: liveLoading } = useSalesAggregatesExtended({
