@@ -207,8 +207,11 @@ export default function EesyTmDashboard() {
                 <p className="text-sm text-slate-400 mt-1">Lønperiode {periodLabel} · opdateres live</p>
               </div>
             </div>
-            <div className="rounded-full bg-emerald-400 px-5 py-2 text-sm font-semibold text-slate-950">
-              Lønperiode
+            <div className="flex items-center gap-3">
+              {!tvMode && <TvBoardQuickGenerator dashboardSlug="eesy-tm" />}
+              <div className="rounded-full bg-emerald-400 px-5 py-2 text-sm font-semibold text-slate-950">
+                Lønperiode
+              </div>
             </div>
           </div>
 
