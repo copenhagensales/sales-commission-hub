@@ -119,8 +119,8 @@ function KpiCard({
 }
 
 export default function EesyTmDashboard() {
-  const { canView, isLoading: accessLoading } = useRequireDashboardAccess("eesy-tm");
   const tvMode = isTvMode();
+  const { canView, isLoading: accessLoading } = useRequireDashboardAccess("eesy-tm", { skip: tvMode });
   useAutoReload(tvMode);
 
   const payrollPeriod = useMemo(() => calculatePayrollPeriod(), []);
