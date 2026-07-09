@@ -128,7 +128,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`Found ${eligibleContracts.length} contracts eligible for reminder`);
 
-    const baseUrl = Deno.env.get("PUBLIC_APP_URL") || "https://jwlimmeijpfmaksvmuru.lovable.app";
+    const baseUrl = "https://stork.copenhagensales.dk";
     let sentCount = 0;
     let accessToken: string | null = null;
 

@@ -152,10 +152,9 @@ serve(async (req) => {
       .update({ invitation_status: "pending" })
       .eq("id", employeeId);
 
-    // Build invitation URL - use PUBLIC_APP_URL or fallback to Stork production domain
-    const rawAppUrl = Deno.env.get("PUBLIC_APP_URL") || "https://stork.copenhagensales.dk";
-    // Remove trailing slash to prevent double slashes in URL
-    const appUrl = rawAppUrl.replace(/\/+$/, "");
+    // Build invitation URL - hardcoded to Stork production domain to prevent
+    // a misconfigured PUBLIC_APP_URL from sending users to Lovable login.
+    const appUrl = "https://stork.copenhagensales.dk";
     const invitationUrl = `${appUrl}/onboarding?token=${token}`;
     
     console.log("Invitation URL created for employee:", employeeId);
