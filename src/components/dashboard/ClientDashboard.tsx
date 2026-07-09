@@ -339,7 +339,8 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
                 sellers={sortedPayrollSellers}
                 isLoading={isLoading}
                 tvMode={tvMode}
-                showCrossSales={showCrossSales}
+                showCrossSales={showCrossSales || hasSecondary}
+                crossSalesLabel={hasSecondary ? secondaryLabel : undefined}
                 maxRows={tvMode ? 10 : undefined}
               />
               <TvLeaderboardTable
@@ -347,7 +348,8 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
                 sellers={sortedWeeklySellers}
                 isLoading={isLoading}
                 tvMode={tvMode}
-                showCrossSales={showCrossSales}
+                showCrossSales={showCrossSales || hasSecondary}
+                crossSalesLabel={hasSecondary ? secondaryLabel : undefined}
                 maxRows={tvMode ? 10 : undefined}
               />
               <TvLeaderboardTable
@@ -355,10 +357,12 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
                 sellers={sortedDailySellers}
                 isLoading={isLoading}
                 tvMode={tvMode}
-                showCrossSales={showCrossSales}
+                showCrossSales={showCrossSales || hasSecondary}
+                crossSalesLabel={hasSecondary ? secondaryLabel : undefined}
                 maxRows={tvMode ? 10 : undefined}
               />
             </div>
+
           </>
         )}
 
