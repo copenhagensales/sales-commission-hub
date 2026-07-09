@@ -234,7 +234,11 @@ function ChannelForm({ channel }: { channel: ManualChannel }) {
   const [productId, setProductId] = useState<string>("");
   const [phone, setPhone] = useState<string>("");
 
-  const disabled = createSale.isPending || !productId || phone.trim().length < 4;
+  const isHiper = channel.key === "hiper";
+  const fieldLabel = isHiper ? "Ordrenummer" : "Kundens telefonnummer";
+  const fieldPlaceholder = isHiper ? "fx 100234567" : "fx 12345678";
+  const minLen = isHiper ? 3 : 4;
+  const disabled = createSale.isPending || !productId || phone.trim().length < minLen;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
