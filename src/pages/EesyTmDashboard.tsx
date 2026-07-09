@@ -260,20 +260,20 @@ export default function EesyTmDashboard() {
                     </Avatar>
                     <div className="text-base font-semibold text-slate-100 truncate">{r.displayName}</div>
                     <div className="text-center">
-                      <div className="text-[9px] font-semibold tracking-widest text-slate-500 uppercase">I dag</div>
-                      <div className="text-base font-bold text-slate-100 tabular-nums leading-tight">
+                      <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase">I dag</div>
+                      <div className="text-xl font-bold text-slate-100 tabular-nums leading-tight">
                         {r.todaySales > 0 ? r.todaySales : "–"}
                       </div>
-                      <div className="text-[10px] text-slate-500 tabular-nums">
+                      <div className="text-sm font-medium text-slate-400 tabular-nums">
                         {r.todayCommission > 0 ? formatCurrency(r.todayCommission) : "–"}
                       </div>
                     </div>
                     <div className="text-center">
-                      <div className="text-[9px] font-semibold tracking-widest text-slate-500 uppercase">Uge</div>
-                      <div className="text-base font-bold text-slate-100 tabular-nums leading-tight">
+                      <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase">Uge</div>
+                      <div className="text-xl font-bold text-slate-100 tabular-nums leading-tight">
                         {r.weekSales > 0 ? r.weekSales : "–"}
                       </div>
-                      <div className="text-[10px] text-slate-500 tabular-nums">
+                      <div className="text-sm font-medium text-slate-400 tabular-nums">
                         {r.weekCommission > 0 ? formatCurrency(r.weekCommission) : "–"}
                       </div>
                     </div>
