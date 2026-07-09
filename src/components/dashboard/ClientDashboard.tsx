@@ -39,7 +39,16 @@ export interface ClientDashboardConfig {
      * Used by United dashboard.
      */
     aggregateClientIds?: string[];
+    /**
+     * Optional secondary client IDs whose commissions are merged into sellers'
+     * provision, while their sales counts are shown as a separate column and
+     * as separate KPI cards at the top. Used for Eesy TM + Hiper.
+     */
+    secondaryClientIds?: string[];
+    /** Label shown for the secondary sales column and KPI cards (e.g. "Hiper"). */
+    secondaryLabel?: string;
   };
+
   /** Extra content rendered between KPIs and leaderboards (e.g. client breakdown) */
   extraContent?: React.ReactNode;
 }
