@@ -148,21 +148,21 @@ export function TvBoardQuickGenerator({ dashboardSlug }: TvBoardQuickGeneratorPr
       return ok;
     };
 
-    // In Lovable preview/custom iframes, async Clipboard can exist but be blocked.
-    // Try the synchronous user-gesture path first, then native Clipboard as fallback.
+    try {
+      if (!navigator.clipboard || !window.isSecureContext) throw new Error("Clipboard API unavailable");
+      await navigator.clipboard.writeText(text);
+      toast.success(`${label} kopieret`);
+      return;
+    } catch {
+      // Continue to iframe/legacy fallback below.
+    }
+
     try {
       if (copyWithSelection()) {
         toast.success(`${label} kopieret`);
         return;
       }
-    } catch {
-      // Continue to async Clipboard fallback below.
-    }
-
-    try {
-      if (!navigator.clipboard || !window.isSecureContext) throw new Error("Clipboard API unavailable");
-      await navigator.clipboard.writeText(text);
-      toast.success(`${label} kopieret`);
+      throw new Error("Legacy copy failed");
     } catch {
       window.prompt(`Kopier ${label.toLowerCase()} manuelt:`, text);
     }
@@ -198,6 +198,19 @@ export function TvBoardQuickGenerator({ dashboardSlug }: TvBoardQuickGeneratorPr
           <span className="text-xs font-mono text-muted-foreground">
             {code.access_code}
           </span>
+          {isActive && (
+            <Input
+              readOnly
+              value={getTvUrl(code.access_code)}
+              aria-label={`TV-link ${code.access_code}`}
+              className="mt-1 h-7 w-full cursor-copy truncate px-2 font-mono text-[11px] text-muted-foreground"
+              onFocus={(event) => event.currentTarget.select()}
+              onClick={(event) => {
+                event.currentTarget.select();
+                copyToClipboard(event.currentTarget.value, "Link");
+              }}
+            />
+          )}
           <div className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5 flex-wrap">
             <span className="flex items-center gap-1">
               <Eye className="h-3 w-3" />
