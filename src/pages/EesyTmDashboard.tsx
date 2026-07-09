@@ -3,6 +3,7 @@ import { format, differenceInCalendarDays } from "date-fns";
 import { da } from "date-fns/locale";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { TvBoardQuickGenerator } from "@/components/dashboard/TvBoardQuickGenerator";
 import { useClientDashboardKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
 import { useCachedLeaderboards, type LeaderboardEntry, getInitials, formatDisplayName } from "@/hooks/useCachedLeaderboard";
 import { useRequireDashboardAccess } from "@/hooks/useRequireDashboardAccess";
@@ -206,8 +207,11 @@ export default function EesyTmDashboard() {
                 <p className="text-sm text-slate-400 mt-1">Lønperiode {periodLabel} · opdateres live</p>
               </div>
             </div>
-            <div className="rounded-full bg-emerald-400 px-5 py-2 text-sm font-semibold text-slate-950">
-              Lønperiode
+            <div className="flex items-center gap-3">
+              {!tvMode && <TvBoardQuickGenerator dashboardSlug="eesy-tm" />}
+              <div className="rounded-full bg-emerald-400 px-5 py-2 text-sm font-semibold text-slate-950">
+                Lønperiode
+              </div>
             </div>
           </div>
 
