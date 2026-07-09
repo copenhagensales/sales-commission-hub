@@ -1,10 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { format, subMonths, startOfMonth, endOfMonth, parseISO, differenceInDays } from "date-fns";
 import { da } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ChurnChartStats } from "./ChurnChartStats";
 
 const normalizeTeamName = (name: string | null): string => {
   if (!name) return "Ukendt";
@@ -133,77 +134,103 @@ export function ChurnTrendChartCombined() {
     );
   }
 
+  const rows = chartData ?? [];
+  // Build stats view using 60-day series (primary metric)
+  const statsData = rows.map(r => ({ churnRate: r.churnRate60, cohortSize: r.cohortSize }));
+  // Add moving averages per series
+  const withMA = rows.map((d, i) => {
+    const window = rows.slice(Math.max(0, i - 2), i + 1);
+    const ma30 = window.reduce((s, x) => s + x.churnRate30, 0) / window.length;
+    const ma60 = window.reduce((s, x) => s + x.churnRate60, 0) / window.length;
+    return { ...d, ma30: Math.round(ma30 * 10) / 10, ma60: Math.round(ma60 * 10) / 10 };
+  });
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Churn Udvikling – United & Eesy TM</CardTitle>
         <CardDescription>
-          Andel af nye medarbejdere der stoppede inden for 30 og 60 dage
+          Andel af nye medarbejdere der stoppede inden for 30 og 60 dage (nøgletal for 60-dages)
         </CardDescription>
       </CardHeader>
       <CardContent>
+        <ChurnChartStats data={statsData} label="60-dages churn" />
         <div className="h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
+            <ComposedChart data={withMA} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
+              <defs>
+                <linearGradient id="churn30Fill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.18} />
+                  <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="churn60Fill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="hsl(25, 95%, 53%)" stopOpacity={0.18} />
+                  <stop offset="100%" stopColor="hsl(25, 95%, 53%)" stopOpacity={0} />
+                </linearGradient>
+              </defs>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis 
-                dataKey="month" 
-                tick={{ fontSize: 12 }}
-                className="text-muted-foreground"
-              />
-              <YAxis 
+              <XAxis dataKey="month" tick={{ fontSize: 12 }} className="text-muted-foreground" />
+              <YAxis
                 tickFormatter={(value) => `${value}%`}
                 tick={{ fontSize: 12 }}
                 className="text-muted-foreground"
                 domain={[0, 'auto']}
               />
-              <Tooltip 
+              <Tooltip
                 content={({ active, payload, label }) => {
                   if (!active || !payload || payload.length === 0) return null;
                   const data = payload[0].payload;
                   return (
-                    <div className="bg-popover border border-border rounded-lg p-3 shadow-lg">
+                    <div className="bg-popover border border-border rounded-lg p-3 shadow-lg space-y-1">
                       <p className="font-medium text-foreground">{label}</p>
-                      <p className="text-sm mt-1" style={{ color: "hsl(var(--primary))" }}>
+                      <p className="text-sm" style={{ color: "hsl(var(--primary))" }}>
                         30-dages: <span className="font-semibold">{data.churnRate30}%</span>
-                        <span className="text-xs text-muted-foreground ml-1">
-                          ({data.exits30Days}/{data.cohortSize})
-                        </span>
+                        <span className="text-xs text-muted-foreground ml-1">(3-mdr: {data.ma30}%)</span>
                       </p>
-                      <p className="text-sm mt-1" style={{ color: "hsl(25, 95%, 53%)" }}>
+                      <p className="text-sm" style={{ color: "hsl(25, 95%, 53%)" }}>
                         60-dages: <span className="font-semibold">{data.churnRate60}%</span>
-                        <span className="text-xs text-muted-foreground ml-1">
-                          ({data.exits60Days}/{data.cohortSize})
-                        </span>
+                        <span className="text-xs text-muted-foreground ml-1">(3-mdr: {data.ma60}%)</span>
+                      </p>
+                      <p className="text-xs text-muted-foreground pt-1 border-t border-border">
+                        {data.exits60Days} af {data.cohortSize} nye stoppede inden 60 dage
                       </p>
                     </div>
                   );
                 }}
               />
-              <Legend 
-                verticalAlign="top" 
-                height={36}
-                formatter={(value) => value === "churnRate30" ? "30-dages churn" : "60-dages churn"}
+              <Legend
+                verticalAlign="top"
+                height={28}
+                iconType="line"
+                formatter={(v) =>
+                  v === "churnRate30" ? "30-dages" :
+                  v === "churnRate60" ? "60-dages" :
+                  v === "ma30" ? "30d snit (3 mdr)" : "60d snit (3 mdr)"
+                }
               />
-              <Line 
-                type="monotone" 
-                dataKey="churnRate30" 
-                name="churnRate30"
-                stroke="hsl(var(--primary))"
-                strokeWidth={2}
-                dot={{ fill: "hsl(var(--primary))", strokeWidth: 2, r: 4 }}
-                activeDot={{ r: 6, fill: "hsl(var(--primary))" }}
+              <Area
+                type="monotone" dataKey="churnRate30" name="churnRate30"
+                stroke="hsl(var(--primary))" strokeOpacity={0.3} strokeWidth={1.5}
+                fill="url(#churn30Fill)"
+                dot={{ fill: "hsl(var(--primary))", r: 2, fillOpacity: 0.5 }}
+                activeDot={{ r: 5 }}
               />
-              <Line 
-                type="monotone" 
-                dataKey="churnRate60" 
-                name="churnRate60"
-                stroke="hsl(25, 95%, 53%)"
-                strokeWidth={2}
-                dot={{ fill: "hsl(25, 95%, 53%)", strokeWidth: 2, r: 4 }}
-                activeDot={{ r: 6, fill: "hsl(25, 95%, 53%)" }}
+              <Area
+                type="monotone" dataKey="churnRate60" name="churnRate60"
+                stroke="hsl(25, 95%, 53%)" strokeOpacity={0.3} strokeWidth={1.5}
+                fill="url(#churn60Fill)"
+                dot={{ fill: "hsl(25, 95%, 53%)", r: 2, fillOpacity: 0.5 }}
+                activeDot={{ r: 5 }}
               />
-            </LineChart>
+              <Line
+                type="monotone" dataKey="ma30" name="ma30"
+                stroke="hsl(var(--primary))" strokeWidth={3} dot={false}
+              />
+              <Line
+                type="monotone" dataKey="ma60" name="ma60"
+                stroke="hsl(25, 95%, 53%)" strokeWidth={3} dot={false}
+              />
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       </CardContent>
