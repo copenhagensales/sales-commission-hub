@@ -39,7 +39,16 @@ export interface ClientDashboardConfig {
      * Used by United dashboard.
      */
     aggregateClientIds?: string[];
+    /**
+     * Optional secondary client IDs whose commissions are merged into sellers'
+     * provision, while their sales counts are shown as a separate column and
+     * as separate KPI cards at the top. Used for Eesy TM + Hiper.
+     */
+    secondaryClientIds?: string[];
+    /** Label shown for the secondary sales column and KPI cards (e.g. "Hiper"). */
+    secondaryLabel?: string;
   };
+
   /** Extra content rendered between KPIs and leaderboards (e.g. client breakdown) */
   extraContent?: React.ReactNode;
 }
@@ -90,10 +99,56 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
     { enabled: useCached && isAggregated, limit: 30 }
   );
 
-  const cachedSellersToday = isAggregated ? aggregatedLeaderboards.sellersToday : singleScopeLeaderboards.sellersToday;
-  const cachedSellersWeek = isAggregated ? aggregatedLeaderboards.sellersWeek : singleScopeLeaderboards.sellersWeek;
-  const cachedSellersPayroll = isAggregated ? aggregatedLeaderboards.sellersPayroll : singleScopeLeaderboards.sellersPayroll;
-  const leaderboardsLoading = isAggregated ? aggregatedLeaderboards.isLoading : singleScopeLeaderboards.isLoading;
+  const primarySellersToday = isAggregated ? aggregatedLeaderboards.sellersToday : singleScopeLeaderboards.sellersToday;
+  const primarySellersWeek = isAggregated ? aggregatedLeaderboards.sellersWeek : singleScopeLeaderboards.sellersWeek;
+  const primarySellersPayroll = isAggregated ? aggregatedLeaderboards.sellersPayroll : singleScopeLeaderboards.sellersPayroll;
+  const primaryLoading = isAggregated ? aggregatedLeaderboards.isLoading : singleScopeLeaderboards.isLoading;
+
+  // ========== SECONDARY CLIENTS (commissions merged, sales split) ==========
+  const secondaryClientIds = config.features?.secondaryClientIds;
+  const hasSecondary = !!(secondaryClientIds && secondaryClientIds.length > 0);
+  const secondaryLabel = config.features?.secondaryLabel ?? "Ekstra";
+
+  const secondaryLeaderboards = useAggregatedClientLeaderboards(
+    hasSecondary ? secondaryClientIds : undefined,
+    { enabled: useCached && hasSecondary, limit: 30 }
+  );
+  const { data: secondaryKpis } = useAggregatedClientKpis(
+    hasSecondary && useCached ? secondaryClientIds : undefined
+  );
+
+  // Merge primary + secondary leaderboards: commissions summed, secondary sales
+  // count exposed via `crossSaleCount` so it renders as its own column.
+  const mergeWithSecondary = (
+    primary: LeaderboardEntry[],
+    secondary: LeaderboardEntry[]
+  ): LeaderboardEntry[] => {
+    if (!hasSecondary) return primary;
+    const map = new Map<string, LeaderboardEntry>();
+    for (const e of primary) {
+      map.set(e.employeeId, { ...e, crossSaleCount: 0 });
+    }
+    for (const s of secondary) {
+      const existing = map.get(s.employeeId);
+      if (existing) {
+        existing.commission += s.commission || 0;
+        existing.crossSaleCount = (existing.crossSaleCount || 0) + (s.salesCount || 0);
+      } else {
+        map.set(s.employeeId, {
+          ...s,
+          salesCount: 0,
+          crossSaleCount: s.salesCount || 0,
+        });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.commission - a.commission);
+  };
+
+  const cachedSellersToday = mergeWithSecondary(primarySellersToday, secondaryLeaderboards.sellersToday);
+  const cachedSellersWeek = mergeWithSecondary(primarySellersWeek, secondaryLeaderboards.sellersWeek);
+  const cachedSellersPayroll = mergeWithSecondary(primarySellersPayroll, secondaryLeaderboards.sellersPayroll);
+  const leaderboardsLoading = primaryLoading || (hasSecondary && secondaryLeaderboards.isLoading);
+
 
   // ========== LIVE DATA (optional, for custom periods) ==========
   const { data: liveData, isLoading: liveLoading } = useSalesAggregatesExtended({
@@ -209,13 +264,32 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
     kpiCards.push({ label: "Salg/time (løn)", value: payrollSalesPerHour.toFixed(2), sub: `${payrollHours.toFixed(1)} timer`, icon: TrendingUp });
   }
 
+  // Secondary client KPI cards (e.g. Hiper on Eesy TM)
+  if (hasSecondary) {
+    kpiCards.push({
+      label: `${secondaryLabel} i dag`,
+      value: secondaryKpis?.today.sales_count ?? 0,
+      sub: format(today, "d. MMMM", { locale: da }),
+      icon: CalendarDays,
+    });
+    kpiCards.push({
+      label: `${secondaryLabel} lønperiode`,
+      value: secondaryKpis?.payroll_period.sales_count ?? 0,
+      sub: periodLabel,
+      icon: Calendar,
+    });
+  }
+
   // Tailwind needs static classes – map col counts to full class strings
   const colsMap: Record<number, { tv: string; normal: string }> = {
     3: { tv: "grid grid-cols-3 gap-4", normal: "grid grid-cols-3 gap-4" },
     4: { tv: "grid grid-cols-4 gap-4", normal: "grid grid-cols-2 gap-4 md:grid-cols-4" },
     5: { tv: "grid grid-cols-5 gap-4", normal: "grid grid-cols-2 gap-4 md:grid-cols-5" },
+    6: { tv: "grid grid-cols-6 gap-4", normal: "grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6" },
+    7: { tv: "grid grid-cols-7 gap-4", normal: "grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-7" },
   };
   const kpiGridClass = colsMap[kpiCards.length] || colsMap[5];
+
   const liveSalesCount = liveData?.totals.sales ?? 0;
 
   return (
@@ -265,7 +339,8 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
                 sellers={sortedPayrollSellers}
                 isLoading={isLoading}
                 tvMode={tvMode}
-                showCrossSales={showCrossSales}
+                showCrossSales={showCrossSales || hasSecondary}
+                crossSalesLabel={hasSecondary ? secondaryLabel : undefined}
                 maxRows={tvMode ? 10 : undefined}
               />
               <TvLeaderboardTable
@@ -273,7 +348,8 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
                 sellers={sortedWeeklySellers}
                 isLoading={isLoading}
                 tvMode={tvMode}
-                showCrossSales={showCrossSales}
+                showCrossSales={showCrossSales || hasSecondary}
+                crossSalesLabel={hasSecondary ? secondaryLabel : undefined}
                 maxRows={tvMode ? 10 : undefined}
               />
               <TvLeaderboardTable
@@ -281,10 +357,12 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
                 sellers={sortedDailySellers}
                 isLoading={isLoading}
                 tvMode={tvMode}
-                showCrossSales={showCrossSales}
+                showCrossSales={showCrossSales || hasSecondary}
+                crossSalesLabel={hasSecondary ? secondaryLabel : undefined}
                 maxRows={tvMode ? 10 : undefined}
               />
             </div>
+
           </>
         )}
 
