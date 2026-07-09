@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -125,33 +126,45 @@ export function TvBoardQuickGenerator({ dashboardSlug }: TvBoardQuickGeneratorPr
   });
 
   const copyToClipboard = async (text: string, label: string) => {
+    const copyWithSelection = () => {
+      const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.top = "0";
+      ta.style.left = "0";
+      ta.style.width = "1px";
+      ta.style.height = "1px";
+      ta.style.opacity = "0";
+      ta.style.pointerEvents = "none";
+      document.body.appendChild(ta);
+      ta.focus({ preventScroll: true });
+      ta.select();
+      ta.setSelectionRange(0, ta.value.length);
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      activeElement?.focus({ preventScroll: true });
+      return ok;
+    };
+
+    // In Lovable preview/custom iframes, async Clipboard can exist but be blocked.
+    // Try the synchronous user-gesture path first, then native Clipboard as fallback.
     try {
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(text);
+      if (copyWithSelection()) {
         toast.success(`${label} kopieret`);
         return;
       }
-      throw new Error("Clipboard API unavailable");
     } catch {
-      // Fallback for iframes/blocked clipboard: legacy execCommand
-      try {
-        const ta = document.createElement("textarea");
-        ta.value = text;
-        ta.style.position = "fixed";
-        ta.style.opacity = "0";
-        document.body.appendChild(ta);
-        ta.focus();
-        ta.select();
-        const ok = document.execCommand("copy");
-        document.body.removeChild(ta);
-        if (ok) {
-          toast.success(`${label} kopieret`);
-        } else {
-          toast.error(`Kunne ikke kopiere ${label.toLowerCase()} — kopier manuelt: ${text}`);
-        }
-      } catch {
-        toast.error(`Kunne ikke kopiere ${label.toLowerCase()} — kopier manuelt: ${text}`);
-      }
+      // Continue to async Clipboard fallback below.
+    }
+
+    try {
+      if (!navigator.clipboard || !window.isSecureContext) throw new Error("Clipboard API unavailable");
+      await navigator.clipboard.writeText(text);
+      toast.success(`${label} kopieret`);
+    } catch {
+      window.prompt(`Kopier ${label.toLowerCase()} manuelt:`, text);
     }
   };
 
@@ -255,6 +268,9 @@ export function TvBoardQuickGenerator({ dashboardSlug }: TvBoardQuickGeneratorPr
             <Monitor className="h-5 w-5" />
             TV Link til "{dashboardName}"
           </DialogTitle>
+          <DialogDescription>
+            Opret, kopier og administrér adgangskoder til TV-visning.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
