@@ -3,7 +3,6 @@ import { format, differenceInCalendarDays } from "date-fns";
 import { da } from "date-fns/locale";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
-import { TvBoardQuickGenerator } from "@/components/dashboard/TvBoardQuickGenerator";
 import { useClientDashboardKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
 import { useCachedLeaderboards, type LeaderboardEntry, getInitials, formatDisplayName } from "@/hooks/useCachedLeaderboard";
 import { useRequireDashboardAccess } from "@/hooks/useRequireDashboardAccess";
@@ -120,8 +119,8 @@ function KpiCard({
 }
 
 export default function EesyTmDashboard() {
+  const { canView, isLoading: accessLoading } = useRequireDashboardAccess("eesy-tm");
   const tvMode = isTvMode();
-  const { canView, isLoading: accessLoading } = useRequireDashboardAccess("eesy-tm", { skip: tvMode });
   useAutoReload(tvMode);
 
   const payrollPeriod = useMemo(() => calculatePayrollPeriod(), []);
@@ -203,15 +202,12 @@ export default function EesyTmDashboard() {
                 <span className="text-sm font-bold text-rose-500 tracking-widest">HIPER</span>
               </div>
               <div>
-                <h1 className="text-3xl lg:text-4xl font-bold tracking-tight">Team</h1>
+                <h1 className="text-3xl lg:text-4xl font-bold tracking-tight">Hvem fører feltet?</h1>
                 <p className="text-sm text-slate-400 mt-1">Lønperiode {periodLabel} · opdateres live</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              {!tvMode && <TvBoardQuickGenerator dashboardSlug="eesy-tm" />}
-              <div className="rounded-full bg-emerald-400 px-5 py-2 text-sm font-semibold text-slate-950">
-                Lønperiode
-              </div>
+            <div className="rounded-full bg-emerald-400 px-5 py-2 text-sm font-semibold text-slate-950">
+              Lønperiode
             </div>
           </div>
 
@@ -260,20 +256,20 @@ export default function EesyTmDashboard() {
                     </Avatar>
                     <div className="text-base font-semibold text-slate-100 truncate">{r.displayName}</div>
                     <div className="text-center">
-                      <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase">I dag</div>
-                      <div className="text-xl font-bold text-slate-100 tabular-nums leading-tight">
+                      <div className="text-[9px] font-semibold tracking-widest text-slate-500 uppercase">I dag</div>
+                      <div className="text-base font-bold text-slate-100 tabular-nums leading-tight">
                         {r.todaySales > 0 ? r.todaySales : "–"}
                       </div>
-                      <div className="text-sm font-medium text-slate-400 tabular-nums">
+                      <div className="text-[10px] text-slate-500 tabular-nums">
                         {r.todayCommission > 0 ? formatCurrency(r.todayCommission) : "–"}
                       </div>
                     </div>
                     <div className="text-center">
-                      <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase">Uge</div>
-                      <div className="text-xl font-bold text-slate-100 tabular-nums leading-tight">
+                      <div className="text-[9px] font-semibold tracking-widest text-slate-500 uppercase">Uge</div>
+                      <div className="text-base font-bold text-slate-100 tabular-nums leading-tight">
                         {r.weekSales > 0 ? r.weekSales : "–"}
                       </div>
-                      <div className="text-sm font-medium text-slate-400 tabular-nums">
+                      <div className="text-[10px] text-slate-500 tabular-nums">
                         {r.weekCommission > 0 ? formatCurrency(r.weekCommission) : "–"}
                       </div>
                     </div>
