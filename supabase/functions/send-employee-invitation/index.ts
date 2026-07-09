@@ -165,40 +165,78 @@ serve(async (req) => {
     const logoUrl = "https://stork.copenhagensales.dk/__l5e/assets-v1/19da5a49-decf-478f-bd35-bc6b761c0488/cphsales-logo.png";
 
     const emailHtml = `<!DOCTYPE html>
-<html lang="da">
+<html lang="da" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
   <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="format-detection" content="telephone=no,address=no,email=no,date=no,url=no">
+  <meta name="color-scheme" content="light">
+  <meta name="supported-color-schemes" content="light">
   <title>Velkommen til Copenhagen Sales</title>
+  <!--[if mso]>
+  <noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript>
+  <style>* { font-family: Arial, sans-serif !important; }</style>
+  <![endif]-->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <style>
+    /* Client resets */
+    html, body { margin:0 !important; padding:0 !important; width:100% !important; }
+    body { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
+    table { border-collapse:collapse !important; mso-table-lspace:0pt; mso-table-rspace:0pt; }
+    img { -ms-interpolation-mode:bicubic; border:0; outline:none; text-decoration:none; display:block; }
+    a { text-decoration:none; }
+    /* Prevent iOS auto-linking */
+    a[x-apple-data-detectors] { color:inherit !important; text-decoration:none !important; font-size:inherit !important; font-family:inherit !important; font-weight:inherit !important; line-height:inherit !important; }
+
+    /* Mobile styles */
+    @media only screen and (max-width: 620px) {
+      .container { width:100% !important; max-width:100% !important; border-radius:0 !important; }
+      .outer { padding:0 !important; }
+      .px { padding-left:24px !important; padding-right:24px !important; }
+      .py-hero { padding-top:32px !important; padding-bottom:8px !important; }
+      .py-section { padding-top:20px !important; padding-bottom:8px !important; }
+      .py-logo { padding:32px 24px 24px 24px !important; }
+      .py-footer { padding:20px 24px !important; }
+      .py-steps-inner { padding:20px 20px !important; }
+      .h1 { font-size:26px !important; line-height:1.2 !important; }
+      .body-text { font-size:15px !important; }
+      .cta a { display:block !important; padding:16px 24px !important; font-size:16px !important; }
+      .cta table { width:100% !important; }
+      .logo { width:120px !important; height:auto !important; }
+    }
+  </style>
 </head>
 <body style="margin:0;padding:0;background-color:#e6f0f1;font-family:'Figtree',-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#2e3136;-webkit-font-smoothing:antialiased;">
-  <div style="display:none;max-height:0;overflow:hidden;opacity:0;">Velkommen til Copenhagen Sales — opret din profil på 2 minutter.</div>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#e6f0f1;padding:40px 16px;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;">Velkommen til Copenhagen Sales — opret din profil på 2 minutter.</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#e6f0f1;">
     <tr>
-      <td align="center">
-        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(46,49,54,0.08);">
+      <td align="center" class="outer" style="padding:32px 16px;">
+        <!--[if mso]>
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"><tr><td>
+        <![endif]-->
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" class="container" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(46,49,54,0.08);">
           <!-- Logo band -->
           <tr>
-            <td align="center" style="background-color:#e6f0f1;padding:40px 40px 32px 40px;">
-              <img src="${logoUrl}" alt="Copenhagen Sales" width="140" style="display:block;width:140px;height:auto;border:0;outline:none;text-decoration:none;">
+            <td align="center" class="py-logo" style="background-color:#e6f0f1;padding:40px 40px 32px 40px;">
+              <img src="${logoUrl}" alt="Copenhagen Sales" width="140" class="logo" style="width:140px;height:auto;">
             </td>
           </tr>
 
           <!-- Hero -->
           <tr>
-            <td style="padding:48px 48px 8px 48px;">
+            <td class="px py-hero" style="padding:40px 40px 8px 40px;">
               <p style="margin:0 0 8px 0;font-family:'Figtree',Arial,sans-serif;font-size:14px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:#3BE086;">Velkommen ombord</p>
-              <h1 style="margin:0;font-family:'Figtree',Arial,sans-serif;font-size:32px;line-height:1.15;font-weight:800;color:#2e3136;letter-spacing:-0.01em;">Hej ${firstName}${lastName ? " " + lastName : ""},</h1>
+              <h1 class="h1" style="margin:0;font-family:'Figtree',Arial,sans-serif;font-size:30px;line-height:1.15;font-weight:800;color:#2e3136;letter-spacing:-0.01em;">Hej ${firstName}${lastName ? " " + lastName : ""},</h1>
             </td>
           </tr>
 
           <!-- Intro -->
           <tr>
-            <td style="padding:20px 48px 8px 48px;">
-              <p style="margin:0;font-family:'Figtree',Arial,sans-serif;font-size:16px;line-height:1.6;font-weight:400;color:#2e3136;">
+            <td class="px py-section" style="padding:20px 40px 8px 40px;">
+              <p class="body-text" style="margin:0;font-family:'Figtree',Arial,sans-serif;font-size:16px;line-height:1.6;font-weight:400;color:#2e3136;">
                 Du er blevet tilføjet som medarbejder hos Copenhagen Sales. Klik nedenfor for at oprette din profil og få adgang til systemet.
               </p>
             </td>
@@ -206,12 +244,12 @@ serve(async (req) => {
 
           <!-- CTA -->
           <tr>
-            <td align="center" style="padding:32px 48px 8px 48px;">
-              <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+            <td align="center" class="px cta" style="padding:28px 40px 8px 40px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;">
                 <tr>
-                  <td align="center" style="border-radius:10px;background-color:#3BE086;">
-                    <a href="${invitationUrl}" style="display:inline-block;padding:16px 32px;font-family:'Figtree',Arial,sans-serif;font-size:16px;font-weight:700;color:#2e3136;text-decoration:none;border-radius:10px;letter-spacing:0.01em;">
-                      Start registrering →
+                  <td align="center" style="border-radius:10px;background-color:#3BE086;mso-padding-alt:16px 32px;">
+                    <a href="${invitationUrl}" style="display:inline-block;padding:16px 32px;font-family:'Figtree',Arial,sans-serif;font-size:16px;font-weight:700;color:#2e3136;text-decoration:none;border-radius:10px;letter-spacing:0.01em;mso-hide:false;">
+                      Start registrering &rarr;
                     </a>
                   </td>
                 </tr>
@@ -221,7 +259,7 @@ serve(async (req) => {
 
           <!-- Fallback link -->
           <tr>
-            <td align="center" style="padding:12px 48px 32px 48px;">
+            <td align="center" class="px" style="padding:12px 40px 28px 40px;">
               <p style="margin:0;font-family:'Figtree',Arial,sans-serif;font-size:13px;line-height:1.5;color:#6b6f76;">
                 Virker knappen ikke? Kopiér linket:<br>
                 <a href="${invitationUrl}" style="color:#2e3136;word-break:break-all;text-decoration:underline;">${invitationUrl}</a>
@@ -231,18 +269,18 @@ serve(async (req) => {
 
           <!-- Steps card -->
           <tr>
-            <td style="padding:0 48px 16px 48px;">
+            <td class="px" style="padding:0 40px 16px 40px;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#e6f0f1;border-radius:12px;">
                 <tr>
-                  <td style="padding:24px 28px;">
+                  <td class="py-steps-inner" style="padding:24px 28px;">
                     <p style="margin:0 0 16px 0;font-family:'Figtree',Arial,sans-serif;font-size:13px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#2e3136;">
                       Sådan kommer du i gang
                     </p>
                     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-family:'Figtree',Arial,sans-serif;font-size:15px;line-height:1.55;color:#2e3136;">
-                      <tr><td style="padding:6px 0;"><span style="display:inline-block;width:22px;font-weight:800;color:#3BE086;">01</span> Klik på knappen ovenfor</td></tr>
-                      <tr><td style="padding:6px 0;"><span style="display:inline-block;width:22px;font-weight:800;color:#3BE086;">02</span> Udfyld personlige oplysninger (CPR, adresse, bank)</td></tr>
-                      <tr><td style="padding:6px 0;"><span style="display:inline-block;width:22px;font-weight:800;color:#3BE086;">03</span> Opret din adgangskode</td></tr>
-                      <tr><td style="padding:6px 0;"><span style="display:inline-block;width:22px;font-weight:800;color:#3BE086;">04</span> Log ind og kom i gang</td></tr>
+                      <tr><td style="padding:6px 0;"><span style="display:inline-block;width:26px;font-weight:800;color:#3BE086;">01</span> Klik på knappen ovenfor</td></tr>
+                      <tr><td style="padding:6px 0;"><span style="display:inline-block;width:26px;font-weight:800;color:#3BE086;">02</span> Udfyld personlige oplysninger (CPR, adresse, bank)</td></tr>
+                      <tr><td style="padding:6px 0;"><span style="display:inline-block;width:26px;font-weight:800;color:#3BE086;">03</span> Opret din adgangskode</td></tr>
+                      <tr><td style="padding:6px 0;"><span style="display:inline-block;width:26px;font-weight:800;color:#3BE086;">04</span> Log ind og kom i gang</td></tr>
                     </table>
                   </td>
                 </tr>
@@ -252,7 +290,7 @@ serve(async (req) => {
 
           <!-- Notice -->
           <tr>
-            <td style="padding:16px 48px 8px 48px;">
+            <td class="px" style="padding:16px 40px 8px 40px;">
               <p style="margin:0;font-family:'Figtree',Arial,sans-serif;font-size:14px;line-height:1.55;color:#2e3136;">
                 <strong style="font-weight:700;">Vigtigt:</strong> Linket er gyldigt i 48 timer.
               </p>
@@ -261,7 +299,7 @@ serve(async (req) => {
 
           <!-- Sign-off -->
           <tr>
-            <td style="padding:20px 48px 48px 48px;">
+            <td class="px" style="padding:20px 40px 40px 40px;">
               <p style="margin:0 0 6px 0;font-family:'Figtree',Arial,sans-serif;font-size:14px;line-height:1.6;color:#6b6f76;">
                 Har du spørgsmål? Skriv til os — vi er glade for at hjælpe.
               </p>
@@ -274,13 +312,16 @@ serve(async (req) => {
 
           <!-- Footer -->
           <tr>
-            <td style="background-color:#2e3136;padding:24px 48px;text-align:center;">
-              <p style="margin:0;font-family:'Figtree',Arial,sans-serif;font-size:12px;line-height:1.5;color:#e6f0f1;opacity:0.7;">
+            <td class="py-footer" style="background-color:#2e3136;padding:24px 40px;text-align:center;">
+              <p style="margin:0;font-family:'Figtree',Arial,sans-serif;font-size:12px;line-height:1.5;color:#e6f0f1;">
                 Denne email er sendt automatisk. Svar venligst ikke på denne email.
               </p>
             </td>
           </tr>
         </table>
+        <!--[if mso]>
+        </td></tr></table>
+        <![endif]-->
       </td>
     </tr>
   </table>
