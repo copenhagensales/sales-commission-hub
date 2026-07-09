@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -125,33 +126,45 @@ export function TvBoardQuickGenerator({ dashboardSlug }: TvBoardQuickGeneratorPr
   });
 
   const copyToClipboard = async (text: string, label: string) => {
+    const copyWithSelection = () => {
+      const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.top = "0";
+      ta.style.left = "0";
+      ta.style.width = "1px";
+      ta.style.height = "1px";
+      ta.style.opacity = "0";
+      ta.style.pointerEvents = "none";
+      document.body.appendChild(ta);
+      ta.focus({ preventScroll: true });
+      ta.select();
+      ta.setSelectionRange(0, ta.value.length);
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      activeElement?.focus({ preventScroll: true });
+      return ok;
+    };
+
     try {
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(text);
+      if (!navigator.clipboard || !window.isSecureContext) throw new Error("Clipboard API unavailable");
+      await navigator.clipboard.writeText(text);
+      toast.success(`${label} kopieret`);
+      return;
+    } catch {
+      // Continue to iframe/legacy fallback below.
+    }
+
+    try {
+      if (copyWithSelection()) {
         toast.success(`${label} kopieret`);
         return;
       }
-      throw new Error("Clipboard API unavailable");
+      throw new Error("Legacy copy failed");
     } catch {
-      // Fallback for iframes/blocked clipboard: legacy execCommand
-      try {
-        const ta = document.createElement("textarea");
-        ta.value = text;
-        ta.style.position = "fixed";
-        ta.style.opacity = "0";
-        document.body.appendChild(ta);
-        ta.focus();
-        ta.select();
-        const ok = document.execCommand("copy");
-        document.body.removeChild(ta);
-        if (ok) {
-          toast.success(`${label} kopieret`);
-        } else {
-          toast.error(`Kunne ikke kopiere ${label.toLowerCase()} — kopier manuelt: ${text}`);
-        }
-      } catch {
-        toast.error(`Kunne ikke kopiere ${label.toLowerCase()} — kopier manuelt: ${text}`);
-      }
+      window.prompt(`Kopier ${label.toLowerCase()} manuelt:`, text);
     }
   };
 
@@ -185,6 +198,19 @@ export function TvBoardQuickGenerator({ dashboardSlug }: TvBoardQuickGeneratorPr
           <span className="text-xs font-mono text-muted-foreground">
             {code.access_code}
           </span>
+          {isActive && (
+            <Input
+              readOnly
+              value={getTvUrl(code.access_code)}
+              aria-label={`TV-link ${code.access_code}`}
+              className="mt-1 h-7 w-full cursor-copy truncate px-2 font-mono text-[11px] text-muted-foreground"
+              onFocus={(event) => event.currentTarget.select()}
+              onClick={(event) => {
+                event.currentTarget.select();
+                copyToClipboard(event.currentTarget.value, "Link");
+              }}
+            />
+          )}
           <div className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5 flex-wrap">
             <span className="flex items-center gap-1">
               <Eye className="h-3 w-3" />
@@ -255,6 +281,9 @@ export function TvBoardQuickGenerator({ dashboardSlug }: TvBoardQuickGeneratorPr
             <Monitor className="h-5 w-5" />
             TV Link til "{dashboardName}"
           </DialogTitle>
+          <DialogDescription>
+            Opret, kopier og administrér adgangskoder til TV-visning.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
