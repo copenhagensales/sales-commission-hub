@@ -124,9 +124,35 @@ export function TvBoardQuickGenerator({ dashboardSlug }: TvBoardQuickGeneratorPr
     },
   });
 
-  const copyToClipboard = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success(`${label} kopieret`);
+  const copyToClipboard = async (text: string, label: string) => {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        toast.success(`${label} kopieret`);
+        return;
+      }
+      throw new Error("Clipboard API unavailable");
+    } catch {
+      // Fallback for iframes/blocked clipboard: legacy execCommand
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+        if (ok) {
+          toast.success(`${label} kopieret`);
+        } else {
+          toast.error(`Kunne ikke kopiere ${label.toLowerCase()} — kopier manuelt: ${text}`);
+        }
+      } catch {
+        toast.error(`Kunne ikke kopiere ${label.toLowerCase()} — kopier manuelt: ${text}`);
+      }
+    }
   };
 
   const getTvUrl = (code: string) => getTvBoardUrl(code);
