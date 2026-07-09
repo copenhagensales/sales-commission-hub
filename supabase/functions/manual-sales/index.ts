@@ -28,7 +28,7 @@ const CHANNELS: Channel[] = [
     team_id: "0cb1b854-e7b5-4f49-8fdf-30e54e7d2f95",
     client_name: "Hiper",
     campaign_name: "Hiper Bredbånd",
-    allowed_products: ["Hiper Viderestilling", "Hiper Lukning"],
+    allowed_products: [],
   },
 ];
 
@@ -180,13 +180,15 @@ serve(async (req) => {
     const campaignId = resolved.campaign_id;
 
     if (action === "products") {
-      const { data: products, error } = await svc
+      let query = svc
         .from("products")
         .select("id, name, commission_dkk, revenue_dkk")
         .eq("client_campaign_id", campaignId)
-        .eq("is_active", true)
-        .in("name", channel.allowed_products)
-        .order("name", { ascending: true });
+        .eq("is_active", true);
+      if (channel.allowed_products.length > 0) {
+        query = query.in("name", channel.allowed_products);
+      }
+      const { data: products, error } = await query.order("name", { ascending: true });
       if (error) return json(500, { error: error.message });
       return json(200, { products: products ?? [] });
     }
@@ -214,7 +216,7 @@ serve(async (req) => {
       if (
         product.client_campaign_id !== campaignId ||
         !product.is_active ||
-        !channel.allowed_products.includes(product.name)
+        (channel.allowed_products.length > 0 && !channel.allowed_products.includes(product.name))
       ) {
         return json(400, { error: "Produktet kan ikke tastes manuelt" });
       }
