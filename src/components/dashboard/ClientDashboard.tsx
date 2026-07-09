@@ -264,13 +264,32 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
     kpiCards.push({ label: "Salg/time (løn)", value: payrollSalesPerHour.toFixed(2), sub: `${payrollHours.toFixed(1)} timer`, icon: TrendingUp });
   }
 
+  // Secondary client KPI cards (e.g. Hiper on Eesy TM)
+  if (hasSecondary) {
+    kpiCards.push({
+      label: `${secondaryLabel} i dag`,
+      value: secondaryKpis?.today.sales_count ?? 0,
+      sub: format(today, "d. MMMM", { locale: da }),
+      icon: CalendarDays,
+    });
+    kpiCards.push({
+      label: `${secondaryLabel} lønperiode`,
+      value: secondaryKpis?.payroll_period.sales_count ?? 0,
+      sub: periodLabel,
+      icon: Calendar,
+    });
+  }
+
   // Tailwind needs static classes – map col counts to full class strings
   const colsMap: Record<number, { tv: string; normal: string }> = {
     3: { tv: "grid grid-cols-3 gap-4", normal: "grid grid-cols-3 gap-4" },
     4: { tv: "grid grid-cols-4 gap-4", normal: "grid grid-cols-2 gap-4 md:grid-cols-4" },
     5: { tv: "grid grid-cols-5 gap-4", normal: "grid grid-cols-2 gap-4 md:grid-cols-5" },
+    6: { tv: "grid grid-cols-6 gap-4", normal: "grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6" },
+    7: { tv: "grid grid-cols-7 gap-4", normal: "grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-7" },
   };
   const kpiGridClass = colsMap[kpiCards.length] || colsMap[5];
+
   const liveSalesCount = liveData?.totals.sales ?? 0;
 
   return (
