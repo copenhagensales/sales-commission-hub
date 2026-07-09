@@ -1,10 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
+import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Legend, defs } from "recharts";
 import { format, subMonths, startOfMonth, endOfMonth, parseISO, differenceInDays } from "date-fns";
 import { da } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ChurnChartStats, withMovingAverage } from "./ChurnChartStats";
 
 const normalizeTeamName = (name: string | null): string => {
   if (!name) return "Ukendt";
