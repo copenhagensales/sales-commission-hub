@@ -17,9 +17,11 @@ export const CLIENT_IDS: Record<string, string> = {
   "Finansforbundet": "ae556b33-276a-41d6-ab3d-b6752b201eb0",
   "Business DK": "a1386026-d01a-46ae-88ca-a120cc5789c0",
   "A&Til": "ff77fd2a-6aa3-4275-bbb0-291e692ab389",
+  "Hiper": "a3ce329d-fc31-45e5-97fb-0c831fa7d93d",
   // FM (Fieldmarketing) clients
   "Eesy FM": "9a92ea4c-6404-4b58-be08-065e7552d552",
 };
+
 
 /**
  * Get the client ID for a given client name.
