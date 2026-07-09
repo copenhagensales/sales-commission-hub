@@ -162,59 +162,130 @@ serve(async (req) => {
     // Get M365 access token and send email
     const accessToken = await getM365AccessToken();
 
-    const emailHtml = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background: #f5f5f5; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: #1a365d; color: white; padding: 30px 20px; text-align: center; border-radius: 8px 8px 0 0; }
-          .header h1 { margin: 0; font-size: 28px; font-weight: bold; letter-spacing: 1px; }
-          .header p { margin: 10px 0 0 0; font-size: 18px; font-weight: normal; opacity: 0.9; }
-          .content { padding: 30px; background: #ffffff; }
-          .button { display: inline-block; background: #2563eb; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: 500; }
-          .footer { padding: 20px; text-align: center; color: #666; font-size: 12px; background: #f9f9f9; border-radius: 0 0 8px 8px; }
-          .steps { background: #f0f9ff; border-radius: 8px; padding: 16px; margin: 20px 0; }
-          .steps h3 { margin: 0 0 12px 0; color: #1e40af; }
-          .steps ol { margin: 0; padding-left: 20px; }
-          .steps li { margin: 8px 0; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>COPENHAGEN SALES</h1>
-            <p>Velkommen!</p>
-          </div>
-          <div class="content">
-            <p>Hej ${firstName}${lastName ? " " + lastName : ""},</p>
-            <p>Du er blevet tilføjet som medarbejder hos Copenhagen Sales. For at få adgang til systemet skal du:</p>
-            
-            <div class="steps">
-              <h3>Sådan kommer du i gang:</h3>
-              <ol>
-                <li>Klik på knappen nedenfor</li>
-                <li>Udfyld dine personlige oplysninger (CPR, adresse, bankoplysninger)</li>
-                <li>Opret din adgangskode</li>
-                <li>Log ind og begynd at bruge systemet</li>
-              </ol>
-            </div>
-            
-            <a href="${invitationUrl}" class="button">Start registrering</a>
-            
-            <p><strong>Vigtigt:</strong> Linket er gyldigt i 48 timer.</p>
-            <p>Hvis du har spørgsmål, er du velkommen til at kontakte os.</p>
-            <p>Med venlig hilsen,<br>Copenhagen Sales</p>
-          </div>
-          <div class="footer">
-            <p>Denne email er sendt automatisk. Svar venligst ikke på denne email.</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
+    const logoUrl = "https://stork.copenhagensales.dk/__l5e/assets-v1/19da5a49-decf-478f-bd35-bc6b761c0488/cphsales-logo.png";
+
+    const emailHtml = `<!DOCTYPE html>
+<html lang="da">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Velkommen til Copenhagen Sales</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;700;800&display=swap" rel="stylesheet">
+</head>
+<body style="margin:0;padding:0;background-color:#e6f0f1;font-family:'Figtree',-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#2e3136;-webkit-font-smoothing:antialiased;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;">Velkommen til Copenhagen Sales — opret din profil på 2 minutter.</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#e6f0f1;padding:40px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(46,49,54,0.08);">
+          <!-- Logo band -->
+          <tr>
+            <td align="center" style="background-color:#e6f0f1;padding:40px 40px 32px 40px;">
+              <img src="${logoUrl}" alt="Copenhagen Sales" width="140" style="display:block;width:140px;height:auto;border:0;outline:none;text-decoration:none;">
+            </td>
+          </tr>
+
+          <!-- Hero -->
+          <tr>
+            <td style="padding:48px 48px 8px 48px;">
+              <p style="margin:0 0 8px 0;font-family:'Figtree',Arial,sans-serif;font-size:14px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:#3BE086;">Velkommen ombord</p>
+              <h1 style="margin:0;font-family:'Figtree',Arial,sans-serif;font-size:32px;line-height:1.15;font-weight:800;color:#2e3136;letter-spacing:-0.01em;">Hej ${firstName}${lastName ? " " + lastName : ""},</h1>
+            </td>
+          </tr>
+
+          <!-- Intro -->
+          <tr>
+            <td style="padding:20px 48px 8px 48px;">
+              <p style="margin:0;font-family:'Figtree',Arial,sans-serif;font-size:16px;line-height:1.6;font-weight:400;color:#2e3136;">
+                Du er blevet tilføjet som medarbejder hos Copenhagen Sales. Klik nedenfor for at oprette din profil og få adgang til systemet.
+              </p>
+            </td>
+          </tr>
+
+          <!-- CTA -->
+          <tr>
+            <td align="center" style="padding:32px 48px 8px 48px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td align="center" style="border-radius:10px;background-color:#3BE086;">
+                    <a href="${invitationUrl}" style="display:inline-block;padding:16px 32px;font-family:'Figtree',Arial,sans-serif;font-size:16px;font-weight:700;color:#2e3136;text-decoration:none;border-radius:10px;letter-spacing:0.01em;">
+                      Start registrering →
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Fallback link -->
+          <tr>
+            <td align="center" style="padding:12px 48px 32px 48px;">
+              <p style="margin:0;font-family:'Figtree',Arial,sans-serif;font-size:13px;line-height:1.5;color:#6b6f76;">
+                Virker knappen ikke? Kopiér linket:<br>
+                <a href="${invitationUrl}" style="color:#2e3136;word-break:break-all;text-decoration:underline;">${invitationUrl}</a>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Steps card -->
+          <tr>
+            <td style="padding:0 48px 16px 48px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#e6f0f1;border-radius:12px;">
+                <tr>
+                  <td style="padding:24px 28px;">
+                    <p style="margin:0 0 16px 0;font-family:'Figtree',Arial,sans-serif;font-size:13px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#2e3136;">
+                      Sådan kommer du i gang
+                    </p>
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-family:'Figtree',Arial,sans-serif;font-size:15px;line-height:1.55;color:#2e3136;">
+                      <tr><td style="padding:6px 0;"><span style="display:inline-block;width:22px;font-weight:800;color:#3BE086;">01</span> Klik på knappen ovenfor</td></tr>
+                      <tr><td style="padding:6px 0;"><span style="display:inline-block;width:22px;font-weight:800;color:#3BE086;">02</span> Udfyld personlige oplysninger (CPR, adresse, bank)</td></tr>
+                      <tr><td style="padding:6px 0;"><span style="display:inline-block;width:22px;font-weight:800;color:#3BE086;">03</span> Opret din adgangskode</td></tr>
+                      <tr><td style="padding:6px 0;"><span style="display:inline-block;width:22px;font-weight:800;color:#3BE086;">04</span> Log ind og kom i gang</td></tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Notice -->
+          <tr>
+            <td style="padding:16px 48px 8px 48px;">
+              <p style="margin:0;font-family:'Figtree',Arial,sans-serif;font-size:14px;line-height:1.55;color:#2e3136;">
+                <strong style="font-weight:700;">Vigtigt:</strong> Linket er gyldigt i 48 timer.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Sign-off -->
+          <tr>
+            <td style="padding:20px 48px 48px 48px;">
+              <p style="margin:0 0 6px 0;font-family:'Figtree',Arial,sans-serif;font-size:14px;line-height:1.6;color:#6b6f76;">
+                Har du spørgsmål? Skriv til os — vi er glade for at hjælpe.
+              </p>
+              <p style="margin:16px 0 0 0;font-family:'Figtree',Arial,sans-serif;font-size:14px;line-height:1.6;color:#2e3136;">
+                Med venlig hilsen,<br>
+                <strong style="font-weight:700;">Copenhagen Sales</strong>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color:#2e3136;padding:24px 48px;text-align:center;">
+              <p style="margin:0;font-family:'Figtree',Arial,sans-serif;font-size:12px;line-height:1.5;color:#e6f0f1;opacity:0.7;">
+                Denne email er sendt automatisk. Svar venligst ikke på denne email.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
 
     // Send to employee
     await sendEmail(
