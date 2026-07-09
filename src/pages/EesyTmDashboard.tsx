@@ -3,6 +3,7 @@ import { format, differenceInCalendarDays } from "date-fns";
 import { da } from "date-fns/locale";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { TvBoardQuickGenerator } from "@/components/dashboard/TvBoardQuickGenerator";
 import { useClientDashboardKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
 import { useCachedLeaderboards, type LeaderboardEntry, getInitials, formatDisplayName } from "@/hooks/useCachedLeaderboard";
 import { useRequireDashboardAccess } from "@/hooks/useRequireDashboardAccess";
