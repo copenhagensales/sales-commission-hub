@@ -28,7 +28,7 @@ const CHANNELS: Channel[] = [
     team_id: "0cb1b854-e7b5-4f49-8fdf-30e54e7d2f95",
     client_name: "Hiper",
     campaign_name: "Hiper Bredbånd",
-    allowed_products: ["Hiper Viderestilling", "Hiper Lukning"],
+    allowed_products: [],
   },
 ];
 
