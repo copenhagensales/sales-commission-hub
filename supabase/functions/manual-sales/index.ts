@@ -216,7 +216,7 @@ serve(async (req) => {
       if (
         product.client_campaign_id !== campaignId ||
         !product.is_active ||
-        !channel.allowed_products.includes(product.name)
+        (channel.allowed_products.length > 0 && !channel.allowed_products.includes(product.name))
       ) {
         return json(400, { error: "Produktet kan ikke tastes manuelt" });
       }
