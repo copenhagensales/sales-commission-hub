@@ -177,7 +177,7 @@ export default function TastSelvSalg() {
                             )}
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            {s.customer_phone} · {format(parseISO(s.sale_datetime), "d. MMM HH:mm", { locale: da })}
+                            {s.channel_key === "hiper" ? `Ordre ${s.customer_phone}` : s.customer_phone} · {format(parseISO(s.sale_datetime), "d. MMM HH:mm", { locale: da })}
                           </div>
                         </div>
                       </div>
