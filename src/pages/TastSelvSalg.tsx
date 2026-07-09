@@ -177,7 +177,7 @@ export default function TastSelvSalg() {
                             )}
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            {s.customer_phone} · {format(parseISO(s.sale_datetime), "d. MMM HH:mm", { locale: da })}
+                            {s.channel_key === "hiper" ? `Ordre ${s.customer_phone}` : s.customer_phone} · {format(parseISO(s.sale_datetime), "d. MMM HH:mm", { locale: da })}
                           </div>
                         </div>
                       </div>
@@ -234,7 +234,11 @@ function ChannelForm({ channel }: { channel: ManualChannel }) {
   const [productId, setProductId] = useState<string>("");
   const [phone, setPhone] = useState<string>("");
 
-  const disabled = createSale.isPending || !productId || phone.trim().length < 4;
+  const isHiper = channel.key === "hiper";
+  const fieldLabel = isHiper ? "Ordrenummer" : "Kundens telefonnummer";
+  const fieldPlaceholder = isHiper ? "fx 100234567" : "fx 12345678";
+  const minLen = isHiper ? 3 : 4;
+  const disabled = createSale.isPending || !productId || phone.trim().length < minLen;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -299,12 +303,12 @@ function ChannelForm({ channel }: { channel: ManualChannel }) {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor={`phone-${channel.key}`}>Kundens telefonnummer</Label>
+              <Label htmlFor={`phone-${channel.key}`}>{fieldLabel}</Label>
               <Input
                 id={`phone-${channel.key}`}
-                inputMode="tel"
+                inputMode={isHiper ? "text" : "tel"}
                 autoComplete="off"
-                placeholder="fx 12345678"
+                placeholder={fieldPlaceholder}
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
               />
