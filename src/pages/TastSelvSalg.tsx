@@ -303,12 +303,12 @@ function ChannelForm({ channel }: { channel: ManualChannel }) {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor={`phone-${channel.key}`}>Kundens telefonnummer</Label>
+              <Label htmlFor={`phone-${channel.key}`}>{fieldLabel}</Label>
               <Input
                 id={`phone-${channel.key}`}
-                inputMode="tel"
+                inputMode={isHiper ? "text" : "tel"}
                 autoComplete="off"
-                placeholder="fx 12345678"
+                placeholder={fieldPlaceholder}
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
               />
