@@ -580,7 +580,3 @@
   margin-top: 0;
   margin-bottom: 0;
 }
-@keyframes marquee {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
-}
