@@ -13,6 +13,12 @@ const getInitials = (name: string) => {
   return name.substring(0, 2).toUpperCase();
 };
 
+const formatFiberPoints = (value: number) => {
+  if (Number.isInteger(value)) return String(value);
+  return value.toFixed(1).replace(".", ",");
+};
+
+
 // ==================== TV KPI CARD ====================
 
 interface TvKpiCardProps {
