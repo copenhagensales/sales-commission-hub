@@ -184,12 +184,12 @@ export function TvLeaderboardTable({
                     {showFiber && (
                       <>
                         <TableCell className={tvMode 
-                          ? 'text-right py-[12px] text-primary font-bold text-[22px] tabular-nums w-[100px]' 
-                          : 'text-right py-2 text-primary font-semibold'
+                          ? 'text-right py-[12px] text-muted-foreground font-bold text-[22px] tabular-nums w-[100px]' 
+                          : 'text-right py-2 text-muted-foreground font-semibold'
                         }>{formatFiberPoints(seller.fiberPoints || 0)}</TableCell>
                         <TableCell className={tvMode 
-                          ? 'text-right py-[12px] font-semibold text-[20px] text-foreground tabular-nums w-[130px]' 
-                          : 'text-right py-2'
+                          ? 'text-right py-[12px] font-semibold text-[20px] text-muted-foreground tabular-nums w-[130px]' 
+                          : 'text-right py-2 text-muted-foreground'
                         }>{formatCurrency(seller.fiberCommission || 0)}</TableCell>
                       </>
                     )}
