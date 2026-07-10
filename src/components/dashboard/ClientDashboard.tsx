@@ -16,6 +16,7 @@ import { useSalesAggregatesExtended } from "@/hooks/useSalesAggregatesExtended";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAggregatedClientKpis, useAggregatedClientLeaderboards } from "@/hooks/useAggregatedClientCache";
+import { useFiberBoardStats, type FiberStatsMap } from "@/hooks/useFiberBoardStats";
 
 export interface ClientDashboardConfig {
   slug: string;
