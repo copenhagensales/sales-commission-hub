@@ -11,7 +11,9 @@ export type FiberStatsMap = Record<string, FiberEmployeeStats>;
 
 /**
  * Aggregerer fiber-point og fiber-provision pr. sælger for en given periode.
- * Læser `sale_items` (ekskl. annullerede) joinet med `sales.sale_datetime`.
+ * `sales` har ingen employee_id — vi resolver `agent_email` via
+ * `employee_agent_mapping` (samme mønster som useSalesAggregatesExtended,
+ * så nøglen matcher cached leaderboard).
  */
 export function useFiberBoardStats(
   periodStart: Date,
@@ -27,41 +29,58 @@ export function useFiberBoardStats(
     staleTime: 60_000,
     refetchInterval: 120_000,
     queryFn: async () => {
+      const [itemsResult, mappingResult] = await Promise.all([
+        (async () => {
+          const rows: any[] = [];
+          const pageSize = 1000;
+          let from = 0;
+          while (true) {
+            const { data, error } = await supabase
+              .from("sale_items")
+              .select(
+                "product_id, quantity, mapped_commission, is_cancelled, sales!inner(agent_email, sale_datetime)",
+              )
+              .in("product_id", FIBER_PRODUCT_IDS)
+              .gte("sales.sale_datetime", startIso)
+              .lt("sales.sale_datetime", endIso)
+              .range(from, from + pageSize - 1);
+            if (error) throw error;
+            if (!data || data.length === 0) break;
+            rows.push(...data);
+            if (data.length < pageSize) break;
+            from += pageSize;
+          }
+          return rows;
+        })(),
+        supabase
+          .from("employee_agent_mapping")
+          .select("employee_id, agents!inner(email)")
+          .then((r) => r.data || []),
+      ]);
+
+      // email (lowercased) -> employee_id
+      const emailToEmployeeId: Record<string, string> = {};
+      for (const m of mappingResult as any[]) {
+        const email = m.agents?.email?.toLowerCase();
+        if (email && m.employee_id) emailToEmployeeId[email] = m.employee_id;
+      }
+
       const result: FiberStatsMap = {};
-      const pageSize = 1000;
-      let from = 0;
+      for (const row of itemsResult) {
+        if (row.is_cancelled) continue;
+        const rawEmail: string | undefined = row.sales?.agent_email;
+        if (!rawEmail) continue;
+        const email = rawEmail.toLowerCase();
+        const key = emailToEmployeeId[email] || email;
 
-      while (true) {
-        const { data, error } = await supabase
-          .from("sale_items")
-          .select(
-            "product_id, quantity, mapped_commission, is_cancelled, sales!inner(employee_id, sale_datetime)",
-          )
-          .in("product_id", FIBER_PRODUCT_IDS)
-          .gte("sales.sale_datetime", startIso)
-          .lt("sales.sale_datetime", endIso)
-          .range(from, from + pageSize - 1);
+        const qty = Number(row.quantity ?? 0);
+        const commission = Number(row.mapped_commission ?? 0);
+        const pointsPerUnit = FIBER_BOARD_POINTS[row.product_id] ?? 0;
 
-        if (error) throw error;
-        if (!data || data.length === 0) break;
-
-        for (const row of data as any[]) {
-          if (row.is_cancelled) continue;
-          const employeeId: string | null = row.sales?.employee_id ?? null;
-          if (!employeeId) continue;
-          const productId: string = row.product_id;
-          const qty = Number(row.quantity ?? 0);
-          const commission = Number(row.mapped_commission ?? 0);
-          const pointsPerUnit = FIBER_BOARD_POINTS[productId] ?? 0;
-
-          const entry = result[employeeId] ?? { points: 0, commission: 0 };
-          entry.points += pointsPerUnit * qty;
-          entry.commission += commission;
-          result[employeeId] = entry;
-        }
-
-        if (data.length < pageSize) break;
-        from += pageSize;
+        const entry = result[key] ?? { points: 0, commission: 0 };
+        entry.points += pointsPerUnit * qty;
+        entry.commission += commission;
+        result[key] = entry;
       }
 
       return result;
