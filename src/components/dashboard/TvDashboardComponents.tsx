@@ -26,14 +26,13 @@ interface TvKpiCardProps {
   value: string | number;
   sub: string;
   tvMode: boolean;
-  icon?: React.ComponentType<{ className?: string }>;
-  /** Extra content after the value (e.g. switch count) */
+  icon?: any;
   suffix?: React.ReactNode;
-  /** Card className override for non-TV mode */
+  tvSuffix?: React.ReactNode;
   className?: string;
 }
 
-export function TvKpiCard({ label, value, sub, tvMode, icon: Icon, suffix, className }: TvKpiCardProps) {
+export function TvKpiCard({ label, value, sub, tvMode, icon: Icon, suffix, tvSuffix, className }: TvKpiCardProps) {
   return (
     <Card className={tvMode 
       ? 'border border-border/[0.14] shadow-2xl bg-card' 
@@ -57,6 +56,11 @@ export function TvKpiCard({ label, value, sub, tvMode, icon: Icon, suffix, class
           {value}
           {!tvMode && suffix}
         </div>
+        {tvMode && tvSuffix && (
+          <div className="text-[24px] font-normal text-muted-foreground mt-1 leading-tight">
+            {tvSuffix}
+          </div>
+        )}
         <p className={tvMode 
           ? 'text-[17px] text-muted-foreground mt-2' 
           : 'text-xs text-muted-foreground mt-1'
