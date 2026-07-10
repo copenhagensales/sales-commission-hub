@@ -13,3 +13,14 @@ export const FIBER_BOARD_POINTS: Record<string, number> = {
 };
 
 export const FIBER_PRODUCT_IDS = Object.keys(FIBER_BOARD_POINTS);
+
+/**
+ * Fiber-produkter der TÆLLES som fiber-salg i KPI-suffix "(+ N fiber)".
+ * Ekskluderer "Lead Provi"-varianter — kun rigtige salg (Lukket/Fuldt HAP+VOK).
+ */
+export const FIBER_SALE_PRODUCT_IDS: string[] = [
+  "ed0ea287-4e34-417a-98fc-de4e9aecc3bc", // Lukket salg HAP
+  "c63708fc-2f10-42a8-82dc-2728979908d9", // Fuldt salg HAP
+  "34518fa2-0d01-41f5-9cf4-be8aeda803ff", // Lukket salg VOK
+  "25e393c0-95ea-4508-925e-0449c79cb023", // Fuldt salg VOK
+];

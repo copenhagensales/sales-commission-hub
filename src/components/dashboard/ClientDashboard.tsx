@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, addDays } from "date-fns";
+import React, { useMemo, useState } from "react";
+import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays } from "date-fns";
 import { da } from "date-fns/locale";
 import { CalendarDays, Calendar, CalendarRange, TrendingUp } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
@@ -17,6 +17,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAggregatedClientKpis, useAggregatedClientLeaderboards } from "@/hooks/useAggregatedClientCache";
 import { useFiberBoardStats, type FiberStatsMap } from "@/hooks/useFiberBoardStats";
+import { useFiberSalesCount } from "@/hooks/useFiberSalesCount";
 
 export interface ClientDashboardConfig {
   slug: string;
@@ -208,6 +209,14 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
   const { data: fiberWeek } = useFiberBoardStats(weekStart, weekEnd, showFiber);
   const { data: fiberPayroll } = useFiberBoardStats(payrollStart, payrollEnd, showFiber);
 
+  // Fiber sales counts (excl. Lead Provi) for KPI-card suffix
+  const monthStart = startOfMonth(today);
+  const monthEnd = addDays(endOfMonth(today), 1);
+  const { data: fiberCountToday = 0 } = useFiberSalesCount(todayStart, todayEnd, showFiber);
+  const { data: fiberCountWeek = 0 } = useFiberSalesCount(weekStart, weekEnd, showFiber);
+  const { data: fiberCountMonth = 0 } = useFiberSalesCount(monthStart, monthEnd, showFiber);
+  const { data: fiberCountPayroll = 0 } = useFiberSalesCount(payrollStart, payrollEnd, showFiber);
+
   const mergeFiber = (sellers: LeaderboardSeller[], stats?: FiberStatsMap): LeaderboardSeller[] => {
     if (!showFiber || !stats) return sellers;
     const seen = new Set<string>();
@@ -303,15 +312,24 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
   const switchSuffix = (count: number) =>
     count > 0 ? <span className="text-lg font-normal text-muted-foreground ml-2">(+{count} switch)</span> : null;
 
+  const fiberSuffix = (count: number) =>
+    showFiber && count > 0 ? <span className="text-lg font-normal text-muted-foreground ml-2">(+{count} fiber)</span> : null;
+
+  const combineSuffix = (...nodes: React.ReactNode[]) => {
+    const filtered = nodes.filter(Boolean);
+    if (filtered.length === 0) return null;
+    return <>{filtered.map((n, i) => <React.Fragment key={i}>{n}</React.Fragment>)}</>;
+  };
+
   // Build KPI cards
   const kpiCards: Array<{ label: string; value: string | number; sub: string; icon: any; suffix?: React.ReactNode }> = [
-    { label: "Salg i dag", value: salesToday, sub: format(today, "d. MMMM", { locale: da }), icon: CalendarDays, suffix: switchSuffix(todaySwitch) },
-    { label: "Salg denne uge", value: salesWeek, sub: `Uge ${format(today, "w", { locale: da })}`, icon: CalendarRange, suffix: switchSuffix(weekSwitch) },
+    { label: "Salg i dag", value: salesToday, sub: format(today, "d. MMMM", { locale: da }), icon: CalendarDays, suffix: combineSuffix(switchSuffix(todaySwitch), fiberSuffix(fiberCountToday)) },
+    { label: "Salg denne uge", value: salesWeek, sub: `Uge ${format(today, "w", { locale: da })}`, icon: CalendarRange, suffix: combineSuffix(switchSuffix(weekSwitch), fiberSuffix(fiberCountWeek)) },
   ];
   if (showMonth) {
-    kpiCards.push({ label: "Salg denne måned", value: salesMonth, sub: format(today, "MMMM", { locale: da }), icon: Calendar });
+    kpiCards.push({ label: "Salg denne måned", value: salesMonth, sub: format(today, "MMMM", { locale: da }), icon: Calendar, suffix: fiberSuffix(fiberCountMonth) });
   }
-  kpiCards.push({ label: "Salg lønperiode", value: salesPayroll, sub: periodLabel, icon: Calendar, suffix: switchSuffix(payrollSwitch) });
+  kpiCards.push({ label: "Salg lønperiode", value: salesPayroll, sub: periodLabel, icon: Calendar, suffix: combineSuffix(switchSuffix(payrollSwitch), fiberSuffix(fiberCountPayroll)) });
   if (showSalesPerHour) {
     kpiCards.push({ label: "Salg/time (løn)", value: payrollSalesPerHour.toFixed(2), sub: `${payrollHours.toFixed(1)} timer`, icon: TrendingUp });
   }
