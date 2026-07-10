@@ -136,7 +136,7 @@ export function TvLeaderboardTable({
                   )}
                   {showFiber && (
                     <>
-                      <TableHead className={tvMode ? 'text-right text-[18px] font-bold py-3 w-[100px] text-foreground/80' : 'text-right'}>Fiber point</TableHead>
+                      <TableHead className={tvMode ? 'text-right text-[18px] font-bold py-3 w-[100px] text-foreground/80' : 'text-right'}>Fiber salg</TableHead>
                       <TableHead className={tvMode ? 'text-right text-[18px] font-bold py-3 w-[130px] text-foreground/80' : 'text-right'}>Fiber provi</TableHead>
                     </>
                   )}
