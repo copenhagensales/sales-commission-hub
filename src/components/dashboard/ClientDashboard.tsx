@@ -195,9 +195,56 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
     crossSales: entry.crossSaleCount || 0,
   });
 
-  const sortedPayrollSellers = useMemo(() => cachedSellersPayroll.map(mapToSeller), [cachedSellersPayroll]);
-  const sortedWeeklySellers = useMemo(() => cachedSellersWeek.map(mapToSeller), [cachedSellersWeek]);
-  const sortedDailySellers = useMemo(() => cachedSellersToday.map(mapToSeller), [cachedSellersToday]);
+
+  // ========== FIBER STATS (TDC Erhverv only) ==========
+  const todayStart = today;
+  const todayEnd = endOfDay(today);
+  const weekStart = startOfWeek(today, { weekStartsOn: 1 });
+  const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
+  const payrollStart = payrollPeriod.start;
+  const payrollEnd = addDays(payrollPeriod.end, 1); // exclusive upper bound
+
+  const { data: fiberToday } = useFiberBoardStats(todayStart, todayEnd, showFiber);
+  const { data: fiberWeek } = useFiberBoardStats(weekStart, weekEnd, showFiber);
+  const { data: fiberPayroll } = useFiberBoardStats(payrollStart, payrollEnd, showFiber);
+
+  const mergeFiber = (sellers: LeaderboardSeller[], stats?: FiberStatsMap): LeaderboardSeller[] => {
+    if (!showFiber || !stats) return sellers;
+    const seen = new Set<string>();
+    const merged = sellers.map((s) => {
+      seen.add(s.id);
+      const f = stats[s.id];
+      return f ? { ...s, fiberPoints: f.points, fiberCommission: f.commission } : s;
+    });
+    // Add fiber-only sellers that aren't already in the cached leaderboard
+    for (const [empId, f] of Object.entries(stats)) {
+      if (seen.has(empId)) continue;
+      merged.push({
+        id: empId,
+        name: empId,
+        displayName: empId,
+        avatarUrl: null,
+        salesCount: 0,
+        commission: f.commission,
+        fiberPoints: f.points,
+        fiberCommission: f.commission,
+      });
+    }
+    return merged;
+  };
+
+  const sortedPayrollSellers = useMemo(
+    () => mergeFiber(cachedSellersPayroll.map(mapToSeller), fiberPayroll),
+    [cachedSellersPayroll, fiberPayroll, showFiber],
+  );
+  const sortedWeeklySellers = useMemo(
+    () => mergeFiber(cachedSellersWeek.map(mapToSeller), fiberWeek),
+    [cachedSellersWeek, fiberWeek, showFiber],
+  );
+  const sortedDailySellers = useMemo(
+    () => mergeFiber(cachedSellersToday.map(mapToSeller), fiberToday),
+    [cachedSellersToday, fiberToday, showFiber],
+  );
 
   // Live sellers (only used in live mode)
   const liveSellers: LeaderboardSeller[] = useMemo(() => {
