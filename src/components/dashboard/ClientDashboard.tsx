@@ -397,6 +397,7 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
                   tvMode={tvMode}
                   icon={kpi.icon}
                   suffix={kpi.suffix}
+                  tvSuffix={kpi.tvSuffix}
                 />
               ))}
             </div>
