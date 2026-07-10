@@ -230,6 +230,34 @@ Deno.serve(async (req) => {
       return await handleCsTop20Data(supabase, corsHeaders, cacheKey);
     }
 
+    // Fiber sales count (for KPI suffix "(+N fiber)") - TV bypass RLS
+    if (action === "fiber-sales-count") {
+      const start = url.searchParams.get("start") || "";
+      const end = url.searchParams.get("end") || "";
+      const cacheKey = `fiber-sales-count-${start}-${end}`;
+      const cached = getCached<any>(cacheKey);
+      if (cached) {
+        return new Response(JSON.stringify(cached), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return await handleFiberSalesCount(supabase, start, end, corsHeaders, cacheKey);
+    }
+
+    // Fiber board stats (per-seller points/commission) - TV bypass RLS
+    if (action === "fiber-board-stats") {
+      const start = url.searchParams.get("start") || "";
+      const end = url.searchParams.get("end") || "";
+      const cacheKey = `fiber-board-stats-${start}-${end}`;
+      const cached = getCached<any>(cacheKey);
+      if (cached) {
+        return new Response(JSON.stringify(cached), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return await handleFiberBoardStats(supabase, start, end, corsHeaders, cacheKey);
+    }
+
     // Verify access code if provided
     if (accessCode) {
       const { data: accessData, error: accessError } = await supabase
