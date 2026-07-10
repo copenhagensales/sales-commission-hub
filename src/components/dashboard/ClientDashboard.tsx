@@ -208,6 +208,14 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
   const { data: fiberWeek } = useFiberBoardStats(weekStart, weekEnd, showFiber);
   const { data: fiberPayroll } = useFiberBoardStats(payrollStart, payrollEnd, showFiber);
 
+  // Fiber sales counts (excl. Lead Provi) for KPI-card suffix
+  const monthStart = startOfMonth(today);
+  const monthEnd = addDays(endOfMonth(today), 1);
+  const { data: fiberCountToday = 0 } = useFiberSalesCount(todayStart, todayEnd, showFiber);
+  const { data: fiberCountWeek = 0 } = useFiberSalesCount(weekStart, weekEnd, showFiber);
+  const { data: fiberCountMonth = 0 } = useFiberSalesCount(monthStart, monthEnd, showFiber);
+  const { data: fiberCountPayroll = 0 } = useFiberSalesCount(payrollStart, payrollEnd, showFiber);
+
   const mergeFiber = (sellers: LeaderboardSeller[], stats?: FiberStatsMap): LeaderboardSeller[] => {
     if (!showFiber || !stats) return sellers;
     const seen = new Set<string>();
