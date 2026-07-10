@@ -1,25 +1,39 @@
-## Årsag
+## Problem
 
-I `src/components/dashboard/TvDashboardComponents.tsx` linje 58 renderer `TvKpiCard` kun `suffix` når `!tvMode`. Derfor er `(+X fiber)` (og `(+X switch)`) skjult på TV, selvom data hentes korrekt.
+Almindelige sælgere ser 0/tomme værdier i kolonnerne **Fiber salg** og **Fiber provi** på TDC Erhverv-dashboardet, mens totalprovisionen stemmer.
 
-## Fix — kun TDC Erhverv fiber
+## Rod-årsag (evidens)
 
-For at undgå at Relatels `(+X switch)` også begynder at dukke op på TV, tilføjer vi en ny, separat prop i stedet for at åbne den eksisterende `suffix`:
+RLS på `sale_items` tillader kun sælgeren at læse egne rækker:
+- `supabase/migrations/20260114135306_...sql:48` — policy `"Employees can view own sale_items"`
 
-### 1. `src/components/dashboard/TvDashboardComponents.tsx`
-- Tilføj ny valgfri prop `tvSuffix?: React.ReactNode` på `TvKpiCard`.
-- Bevar `{!tvMode && suffix}` uændret (så switch fortsat kun vises i normal mode).
-- Under værdi-blokken: hvis `tvMode && tvSuffix` → render `tvSuffix` som en separat linje under det store tal (fx `text-[28px] font-normal text-muted-foreground -mt-1`).
+`src/hooks/useFiberBoardStats.ts` og `src/hooks/useFiberSalesCount.ts` læser `sale_items` direkte i auth-mode. Derfor:
+- Sælger A ser kun egne fiber-tal → andre sælgere står med 0
+- Totalprovisionen kommer fra cached leaderboard (SECURITY DEFINER RPC) → bypass RLS → stemmer
+- TV-mode virker allerede, fordi den kalder `tv-dashboard-data` edge function (service role)
 
-### 2. `src/components/dashboard/ClientDashboard.tsx`
-- Behold nuværende `suffix: combineSuffix(switchSuffix(...), fiberSuffix(...))` på alle KPI-kort (uændret opførsel i normal mode).
-- Tilføj `tvSuffix: fiberSuffix(fiberCount…)` KUN på de fire fiber-relevante kort ("Salg i dag", "Salg denne uge", "Salg denne måned", "Salg lønperiode"). Ingen `tvSuffix` på "Salg/time".
-- `fiberSuffix` returnerer allerede kun noget når `showFiber === true`, så Relatel/Eesy/andre klienter får automatisk `undefined` → ingen ændring på deres TV-boards.
+## Fix
 
-Ingen ændringer i hooks, edge functions, config, RLS eller data-lag. Kun præsentation. Grøn zone.
+Rut auth-mode gennem samme edge function som TV-mode i de to fiber-hooks. Hooksne bruges kun når `config.features.fiberBoard === true`, hvilket kun er sat på TDC Erhverv-dashboardet (`src/pages/TdcErhvervDashboard.tsx`). Alle TDC-sælgere ser dermed samme fiber-tal for alle sælgere på boardet — som ønsket. Ingen andre dashboards/teams eller data påvirkes. RLS ændres ikke.
 
-## Verifikation
+## Ændringer
 
-- TV-link TDC Erhverv → `(+X fiber)` vises under tallet på de 4 salgs-kort (ikke Salg/time).
-- TV-link Relatel → uændret, ingen `(+X switch)` dukker op.
-- Normal (auth) visning af alle klient-dashboards → uændret.
+**1. `src/hooks/useFiberBoardStats.ts`**
+- Fjern `isTvMode()`-gate. Kald altid `tv-dashboard-data?action=fiber-board-stats`.
+- Fjern direkte `sale_items` + `employee_agent_mapping` + `employee_master_data`-blok.
+- Forenkl `queryKey` (drop `"tv"|"auth"` variant — cachen kan deles).
+
+**2. `src/hooks/useFiberSalesCount.ts`**
+- Samme: fjern `isTvMode()`-gate, kald altid `tv-dashboard-data?action=fiber-sales-count`.
+
+**3. Edge function `supabase/functions/tv-dashboard-data/index.ts`**
+- Ingen ændring. Endpointsne findes allerede (linjer 234, 248) og bruger service role.
+
+Ingen ændring i: `TvDashboardComponents.tsx`, `ClientDashboard.tsx`, RLS-policies, KPI-suffix-logik.
+
+## Verificering
+
+1. Log ind som almindelig TDC-sælger → `/dashboards/tdc-erhverv` → leaderboard viser fiber-point og fiber-provi for alle sælgere.
+2. Total-provision uændret.
+3. TV-board uændret.
+4. Relatel/Eesy/øvrige dashboards uændrede (`fiberBoard` ikke sat).
