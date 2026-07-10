@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { FIBER_BOARD_POINTS, FIBER_PRODUCT_IDS } from "@/config/fiberBoardPoints";
+import { isTvMode } from "@/utils/tvMode";
 
 export interface FiberEmployeeStats {
   points: number;
@@ -16,6 +17,9 @@ export type FiberStatsMap = Record<string, FiberEmployeeStats>;
  * `sales` har ingen employee_id — vi resolver `agent_email` via
  * `employee_agent_mapping` (samme mønster som useSalesAggregatesExtended,
  * så nøglen matcher cached leaderboard).
+ *
+ * TV-mode: kaldes via `tv-dashboard-data` edge function (service role,
+ * bypass RLS) — anon-brugere kan ikke læse sale_items direkte.
  */
 export function useFiberBoardStats(
   periodStart: Date,
@@ -24,13 +28,25 @@ export function useFiberBoardStats(
 ) {
   const startIso = periodStart.toISOString();
   const endIso = periodEnd.toISOString();
+  const tv = isTvMode();
 
   return useQuery<FiberStatsMap>({
-    queryKey: ["fiber-board-stats", startIso, endIso],
+    queryKey: ["fiber-board-stats", startIso, endIso, tv ? "tv" : "auth"],
     enabled,
     staleTime: 60_000,
     refetchInterval: 120_000,
     queryFn: async () => {
+      if (tv) {
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const res = await fetch(
+          `${supabaseUrl}/functions/v1/tv-dashboard-data?action=fiber-board-stats&start=${encodeURIComponent(
+            startIso,
+          )}&end=${encodeURIComponent(endIso)}`,
+        );
+        if (!res.ok) throw new Error(`fiber-board-stats TV fetch failed: ${res.status}`);
+        return (await res.json()) as FiberStatsMap;
+      }
+
       const [itemsResult, mappingResult] = await Promise.all([
         (async () => {
           const rows: any[] = [];

@@ -230,6 +230,34 @@ Deno.serve(async (req) => {
       return await handleCsTop20Data(supabase, corsHeaders, cacheKey);
     }
 
+    // Fiber sales count (for KPI suffix "(+N fiber)") - TV bypass RLS
+    if (action === "fiber-sales-count") {
+      const start = url.searchParams.get("start") || "";
+      const end = url.searchParams.get("end") || "";
+      const cacheKey = `fiber-sales-count-${start}-${end}`;
+      const cached = getCached<any>(cacheKey);
+      if (cached) {
+        return new Response(JSON.stringify(cached), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return await handleFiberSalesCount(supabase, start, end, corsHeaders, cacheKey);
+    }
+
+    // Fiber board stats (per-seller points/commission) - TV bypass RLS
+    if (action === "fiber-board-stats") {
+      const start = url.searchParams.get("start") || "";
+      const end = url.searchParams.get("end") || "";
+      const cacheKey = `fiber-board-stats-${start}-${end}`;
+      const cached = getCached<any>(cacheKey);
+      if (cached) {
+        return new Response(JSON.stringify(cached), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return await handleFiberBoardStats(supabase, start, end, corsHeaders, cacheKey);
+    }
+
     // Verify access code if provided
     if (accessCode) {
       const { data: accessData, error: accessError } = await supabase
@@ -2433,3 +2461,156 @@ async function handleCachedKpis(
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
+
+// ============= FIBER (TDC) =============
+// Keep in sync with src/config/fiberBoardPoints.ts
+const FIBER_BOARD_POINTS_EF: Record<string, number> = {
+  "ed0ea287-4e34-417a-98fc-de4e9aecc3bc": 0.5, // Lukket salg HAP
+  "c63708fc-2f10-42a8-82dc-2728979908d9": 1.0, // Fuldt salg HAP
+  "e63c9da4-3862-49e6-97df-ce5ca9ecc2e6": 0.5, // Lead Provi HAP
+  "34518fa2-0d01-41f5-9cf4-be8aeda803ff": 0.5, // Lukket salg VOK
+  "25e393c0-95ea-4508-925e-0449c79cb023": 1.0, // Fuldt salg VOK
+  "bd6ae50b-1516-4692-be9e-09b2317bf612": 0.5, // Lead Provi VOK
+};
+const FIBER_PRODUCT_IDS_EF = Object.keys(FIBER_BOARD_POINTS_EF);
+const FIBER_SALE_PRODUCT_IDS_EF = [
+  "ed0ea287-4e34-417a-98fc-de4e9aecc3bc",
+  "c63708fc-2f10-42a8-82dc-2728979908d9",
+  "34518fa2-0d01-41f5-9cf4-be8aeda803ff",
+  "25e393c0-95ea-4508-925e-0449c79cb023",
+];
+
+async function handleFiberSalesCount(
+  supabase: any,
+  startIso: string,
+  endIso: string,
+  corsHeaders: Record<string, string>,
+  cacheKey?: string,
+) {
+  let total = 0;
+  const pageSize = 1000;
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from("sale_items")
+      .select("quantity, is_cancelled, sales!inner(sale_datetime)")
+      .in("product_id", FIBER_SALE_PRODUCT_IDS_EF)
+      .gte("sales.sale_datetime", startIso)
+      .lt("sales.sale_datetime", endIso)
+      .range(from, from + pageSize - 1);
+    if (error) {
+      console.error("[handleFiberSalesCount] error:", error);
+      return new Response(JSON.stringify({ error: error.message }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (!data || data.length === 0) break;
+    for (const row of data as any[]) {
+      if (row.is_cancelled) continue;
+      total += Number(row.quantity ?? 0);
+    }
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  const result = { count: total };
+  if (cacheKey) setCache(cacheKey, result);
+  return new Response(JSON.stringify(result), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+async function handleFiberBoardStats(
+  supabase: any,
+  startIso: string,
+  endIso: string,
+  corsHeaders: Record<string, string>,
+  cacheKey?: string,
+) {
+  try {
+    const rows: any[] = [];
+    const pageSize = 1000;
+    let from = 0;
+    while (true) {
+      const { data, error } = await supabase
+        .from("sale_items")
+        .select(
+          "product_id, quantity, mapped_commission, is_cancelled, sales!inner(agent_email, sale_datetime)",
+        )
+        .in("product_id", FIBER_PRODUCT_IDS_EF)
+        .gte("sales.sale_datetime", startIso)
+        .lt("sales.sale_datetime", endIso)
+        .range(from, from + pageSize - 1);
+      if (error) throw error;
+      if (!data || data.length === 0) break;
+      rows.push(...data);
+      if (data.length < pageSize) break;
+      from += pageSize;
+    }
+
+    const { data: mappingData } = await supabase
+      .from("employee_agent_mapping")
+      .select("employee_id, agents!inner(email)");
+
+    const emailToEmployeeId: Record<string, string> = {};
+    for (const m of (mappingData || []) as any[]) {
+      const email = m.agents?.email?.toLowerCase();
+      if (email && m.employee_id) emailToEmployeeId[email] = m.employee_id;
+    }
+
+    const result: Record<string, { points: number; commission: number; name?: string; avatarUrl?: string | null }> = {};
+    const emailByKey: Record<string, string> = {};
+
+    for (const row of rows) {
+      if (row.is_cancelled) continue;
+      const rawEmail: string | undefined = row.sales?.agent_email;
+      if (!rawEmail) continue;
+      const email = rawEmail.toLowerCase();
+      const key = emailToEmployeeId[email] || email;
+      emailByKey[key] = email;
+
+      const qty = Number(row.quantity ?? 0);
+      const commission = Number(row.mapped_commission ?? 0);
+      const pointsPerUnit = FIBER_BOARD_POINTS_EF[row.product_id] ?? 0;
+
+      const entry = result[key] ?? { points: 0, commission: 0 };
+      entry.points += pointsPerUnit * qty;
+      entry.commission += commission;
+      result[key] = entry;
+    }
+
+    const uuidKeys = Object.keys(result).filter((k) =>
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(k),
+    );
+    if (uuidKeys.length > 0) {
+      const { data: employees } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name, avatar_url")
+        .in("id", uuidKeys);
+      for (const emp of (employees || []) as any[]) {
+        const entry = result[emp.id];
+        if (!entry) continue;
+        entry.name = `${emp.first_name ?? ""} ${emp.last_name ?? ""}`.trim();
+        entry.avatarUrl = emp.avatar_url;
+      }
+    }
+
+    for (const [key, entry] of Object.entries(result)) {
+      if (entry.name) continue;
+      const email = emailByKey[key] || key;
+      entry.name = email.split("@")[0];
+    }
+
+    if (cacheKey) setCache(cacheKey, result);
+    return new Response(JSON.stringify(result), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (err: any) {
+    console.error("[handleFiberBoardStats] error:", err);
+    return new Response(JSON.stringify({ error: err?.message || "unknown" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+}
+
