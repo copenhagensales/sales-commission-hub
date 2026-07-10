@@ -70,6 +70,7 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
   const showSalesPerHour = config.features?.salesPerHour === true;
   const showCrossSales = config.features?.crossSales === true;
   const useLiveMode = config.features?.liveMode === true;
+  const showFiber = config.features?.fiberBoard === true;
 
   // Determine scope
   const aggregateClientIds = config.features?.aggregateClientIds;
