@@ -219,11 +219,12 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
     // Add fiber-only sellers that aren't already in the cached leaderboard
     for (const [empId, f] of Object.entries(stats)) {
       if (seen.has(empId)) continue;
+      const name = f.name || empId;
       merged.push({
         id: empId,
-        name: empId,
-        displayName: empId,
-        avatarUrl: null,
+        name,
+        displayName: getDisplayName(name),
+        avatarUrl: f.avatarUrl ?? null,
         salesCount: 0,
         commission: f.commission,
         fiberPoints: f.points,

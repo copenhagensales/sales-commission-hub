@@ -1,20 +1,23 @@
 ## Rod-årsag
 
-`sales` har ingen `employee_id` — kun `agent_email` og `agent_external_id`. `useFiberBoardStats` blev skrevet under antagelse af at `sales.employee_id` findes. Resultat: joinet returnerer intet nyttigt (feltet er null/undefined), og alle fiber-rækker droppes i `if (!employeeId) continue`.
+August P. og en anden sælger har fiber-salg men ingen "almindelige" salg i dag. De findes derfor ikke i `cachedSellersToday` (cached leaderboard filtrerer på `counts_as_sale`). `mergeFiber` i `ClientDashboard.tsx` tilføjer dem som "orphan"-rækker, men sætter `name` og `displayName` = employee_id UUID fordi hook'en kun returnerer id + tal.
 
-Bevis: `information_schema.columns` for `public.sales` viser ingen `employee_id`-kolonne. `useSalesAggregatesExtended.ts:257-272` resolver via `employee_agent_mapping` joined med `agents.email`, hvilket er samme resolver som cached leaderboard bruger for `employeeId`-nøglen.
+August P. rammer sandsynligvis mapping (email → employee_id), mens den anden ikke har mapping → nøglen bliver rå email. UUID-rækken viser en mappet employee vi ikke har navn på.
 
 ## Fix
 
-Opdatér `src/hooks/useFiberBoardStats.ts`:
+Berig `useFiberBoardStats` så den også returnerer sælgerens navn og avatar:
 
-1. Vælg `sales.agent_email` i stedet for `employee_id`.
-2. Hent `employee_agent_mapping` (employee_id, agents.email) parallelt.
-3. Byg lookup `email.toLowerCase() → employee_id`.
-4. For hver `sale_item`: slå employee_id op ud fra `agent_email`. Fallback-key = `agent_email.toLowerCase()` (samme mønster som `useSalesAggregatesExtended`) så sælgere uden mapping stadig aggregeres — de matcher bare ikke ind i cached leaderboard-rækken, men vises som "orphan"-række (allerede understøttet af mergeFiber i ClientDashboard).
+1. Efter aggregering: saml alle employee_id UUIDs fra resultatet.
+2. Slå dem op i `employee_master_data` (`id, first_name, last_name, avatar_url`).
+3. Udvid `FiberEmployeeStats` med `name?: string` og `avatarUrl?: string | null`.
+4. For nøgler der er en email (ingen mapping): brug email-prefixet som fallback-navn (samme mønster som `useSalesAggregatesExtended`).
 
-Ingen andre filer røres. Ingen DB-migration.
+Opdatér `mergeFiber` i `ClientDashboard.tsx` til at bruge `f.name` / `f.avatarUrl` når orphan-række tilføjes, og også opdatere navn/avatar på eksisterende rækker hvis de mangler.
 
-## Zone
+## Filer
 
-Gul (dashboard/hook). Read-only mod `sales`, `sale_items`, `employee_agent_mapping`.
+- `src/hooks/useFiberBoardStats.ts` (udvid returtype + lookup)
+- `src/components/dashboard/ClientDashboard.tsx` (brug navn/avatar i mergeFiber)
+
+Ingen DB-ændring. Gul zone.
