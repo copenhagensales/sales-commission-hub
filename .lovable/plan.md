@@ -1,23 +1,16 @@
-## Rod-årsag
+Flyt "Fiber point" og "Fiber provi" kolonnerne så de vises MELLEM "Salg" og "Provision" i alle tre leaderboards (Top løn periode, Top uge, Top dag) på TDC Erhverv – Overblik boardet.
 
-August P. og en anden sælger har fiber-salg men ingen "almindelige" salg i dag. De findes derfor ikke i `cachedSellersToday` (cached leaderboard filtrerer på `counts_as_sale`). `mergeFiber` i `ClientDashboard.tsx` tilføjer dem som "orphan"-rækker, men sætter `name` og `displayName` = employee_id UUID fordi hook'en kun returnerer id + tal.
+## Ændring
 
-August P. rammer sandsynligvis mapping (email → employee_id), mens den anden ikke har mapping → nøglen bliver rå email. UUID-rækken viser en mappet employee vi ikke har navn på.
+**Fil:** `src/components/dashboard/TvDashboardComponents.tsx`
 
-## Fix
+I `TvLeaderboardTable`-komponenten flyttes fiber-kolonnerne (både `TableHead` og `TableCell` blokke) fra deres nuværende placering (før Salg) til efter Salg og før Provision.
 
-Berig `useFiberBoardStats` så den også returnerer sælgerens navn og avatar:
+Ny kolonnerækkefølge:
+```
+# | Navn | Salg | (Switch hvis showCrossSales) | Fiber point | Fiber provi | Provision
+```
 
-1. Efter aggregering: saml alle employee_id UUIDs fra resultatet.
-2. Slå dem op i `employee_master_data` (`id, first_name, last_name, avatar_url`).
-3. Udvid `FiberEmployeeStats` med `name?: string` og `avatarUrl?: string | null`.
-4. For nøgler der er en email (ingen mapping): brug email-prefixet som fallback-navn (samme mønster som `useSalesAggregatesExtended`).
+Ingen ændringer i data, hooks, props eller styling — kun rækkefølge af `<TableHead>` og `<TableCell>` blokke inde i header og body.
 
-Opdatér `mergeFiber` i `ClientDashboard.tsx` til at bruge `f.name` / `f.avatarUrl` når orphan-række tilføjes, og også opdatere navn/avatar på eksisterende rækker hvis de mangler.
-
-## Filer
-
-- `src/hooks/useFiberBoardStats.ts` (udvid returtype + lookup)
-- `src/components/dashboard/ClientDashboard.tsx` (brug navn/avatar i mergeFiber)
-
-Ingen DB-ændring. Gul zone.
+Grøn zone (præsentation).

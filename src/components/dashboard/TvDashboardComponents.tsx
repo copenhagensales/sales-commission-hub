@@ -130,15 +130,15 @@ export function TvLeaderboardTable({
                 <TableRow className={tvMode ? 'border-b-2 border-border/70' : 'border-b border-border/50'}>
                   <TableHead className={tvMode ? 'w-[40px] text-center text-[18px] font-bold py-3 text-foreground/80' : 'w-10'}></TableHead>
                   <TableHead className={tvMode ? 'text-[18px] font-bold py-3 text-foreground/80' : ''}>Navn</TableHead>
+                  <TableHead className={tvMode ? 'text-right text-[18px] font-bold py-3 w-[90px] text-foreground/80' : 'text-right'}>Salg</TableHead>
+                  {showCrossSales && (
+                    <TableHead className={tvMode ? 'text-right text-[18px] font-bold py-3 w-[90px] text-foreground/80' : 'text-right'}>{crossSalesLabel}</TableHead>
+                  )}
                   {showFiber && (
                     <>
                       <TableHead className={tvMode ? 'text-right text-[18px] font-bold py-3 w-[100px] text-foreground/80' : 'text-right'}>Fiber point</TableHead>
                       <TableHead className={tvMode ? 'text-right text-[18px] font-bold py-3 w-[130px] text-foreground/80' : 'text-right'}>Fiber provi</TableHead>
                     </>
-                  )}
-                  <TableHead className={tvMode ? 'text-right text-[18px] font-bold py-3 w-[90px] text-foreground/80' : 'text-right'}>Salg</TableHead>
-                  {showCrossSales && (
-                    <TableHead className={tvMode ? 'text-right text-[18px] font-bold py-3 w-[90px] text-foreground/80' : 'text-right'}>{crossSalesLabel}</TableHead>
                   )}
                   <TableHead className={tvMode ? 'text-right text-[18px] font-bold py-3 w-[140px] text-foreground/80' : 'text-right'}>Provision</TableHead>
                 </TableRow>
@@ -171,6 +171,16 @@ export function TvLeaderboardTable({
                         }>{seller.displayName}</span>
                       </div>
                     </TableCell>
+                    <TableCell className={tvMode 
+                      ? 'text-right py-[12px] text-primary font-bold text-[22px] tabular-nums w-[90px]' 
+                      : 'text-right py-2 text-primary font-semibold'
+                    }>{seller.salesCount}</TableCell>
+                    {showCrossSales && (
+                      <TableCell className={tvMode 
+                        ? 'text-right py-[12px] text-primary font-bold text-[22px] tabular-nums w-[90px]' 
+                        : 'text-right py-2 text-primary font-semibold'
+                      }>{seller.crossSales || 0}</TableCell>
+                    )}
                     {showFiber && (
                       <>
                         <TableCell className={tvMode 
@@ -182,16 +192,6 @@ export function TvLeaderboardTable({
                           : 'text-right py-2'
                         }>{formatCurrency(seller.fiberCommission || 0)}</TableCell>
                       </>
-                    )}
-                    <TableCell className={tvMode 
-                      ? 'text-right py-[12px] text-primary font-bold text-[22px] tabular-nums w-[90px]' 
-                      : 'text-right py-2 text-primary font-semibold'
-                    }>{seller.salesCount}</TableCell>
-                    {showCrossSales && (
-                      <TableCell className={tvMode 
-                        ? 'text-right py-[12px] text-primary font-bold text-[22px] tabular-nums w-[90px]' 
-                        : 'text-right py-2 text-primary font-semibold'
-                      }>{seller.crossSales || 0}</TableCell>
                     )}
                     <TableCell className={tvMode 
                       ? 'text-right py-[12px] font-semibold text-[20px] text-foreground tabular-nums w-[140px]' 
