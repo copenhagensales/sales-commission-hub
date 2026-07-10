@@ -70,6 +70,8 @@ export interface LeaderboardSeller {
   salesCount: number;
   commission: number;
   crossSales?: number;
+  fiberPoints?: number;
+  fiberCommission?: number;
 }
 
 interface TvLeaderboardTableProps {
@@ -79,6 +81,7 @@ interface TvLeaderboardTableProps {
   tvMode: boolean;
   showCrossSales?: boolean;
   crossSalesLabel?: string;
+  showFiber?: boolean;
   maxRows?: number;
 }
 
@@ -89,6 +92,7 @@ export function TvLeaderboardTable({
   tvMode,
   showCrossSales = false,
   crossSalesLabel = "Switch",
+  showFiber = false,
   maxRows,
 }: TvLeaderboardTableProps) {
   const displaySellers = maxRows ? sellers.slice(0, maxRows) : sellers;
