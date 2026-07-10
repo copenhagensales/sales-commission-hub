@@ -47,6 +47,8 @@ export interface ClientDashboardConfig {
     secondaryClientIds?: string[];
     /** Label shown for the secondary sales column and KPI cards (e.g. "Hiper"). */
     secondaryLabel?: string;
+    /** Show fiber-point and fiber-provi columns (TDC Erhverv only). */
+    fiberBoard?: boolean;
   };
 
   /** Extra content rendered between KPIs and leaderboards (e.g. client breakdown) */
