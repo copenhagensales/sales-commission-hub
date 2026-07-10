@@ -5,6 +5,8 @@ import { FIBER_BOARD_POINTS, FIBER_PRODUCT_IDS } from "@/config/fiberBoardPoints
 export interface FiberEmployeeStats {
   points: number;
   commission: number;
+  name?: string;
+  avatarUrl?: string | null;
 }
 
 export type FiberStatsMap = Record<string, FiberEmployeeStats>;
@@ -66,12 +68,15 @@ export function useFiberBoardStats(
       }
 
       const result: FiberStatsMap = {};
+      const emailByKey: Record<string, string> = {};
+
       for (const row of itemsResult) {
         if (row.is_cancelled) continue;
         const rawEmail: string | undefined = row.sales?.agent_email;
         if (!rawEmail) continue;
         const email = rawEmail.toLowerCase();
         const key = emailToEmployeeId[email] || email;
+        emailByKey[key] = email;
 
         const qty = Number(row.quantity ?? 0);
         const commission = Number(row.mapped_commission ?? 0);
@@ -81,6 +86,30 @@ export function useFiberBoardStats(
         entry.points += pointsPerUnit * qty;
         entry.commission += commission;
         result[key] = entry;
+      }
+
+      // Lookup navn/avatar for employee-id nøgler
+      const uuidKeys = Object.keys(result).filter((k) =>
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(k),
+      );
+      if (uuidKeys.length > 0) {
+        const { data: employees } = await supabase
+          .from("employee_master_data")
+          .select("id, first_name, last_name, avatar_url")
+          .in("id", uuidKeys);
+        for (const emp of employees || []) {
+          const entry = result[emp.id];
+          if (!entry) continue;
+          entry.name = `${emp.first_name ?? ""} ${emp.last_name ?? ""}`.trim();
+          entry.avatarUrl = emp.avatar_url;
+        }
+      }
+
+      // Fallback-navn for email-nøgler (ingen mapping)
+      for (const [key, entry] of Object.entries(result)) {
+        if (entry.name) continue;
+        const email = emailByKey[key] || key;
+        entry.name = email.split("@")[0];
       }
 
       return result;
