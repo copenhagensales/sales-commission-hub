@@ -392,6 +392,7 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
                 tvMode={tvMode}
                 showCrossSales={showCrossSales || hasSecondary}
                 crossSalesLabel={hasSecondary ? secondaryLabel : undefined}
+                showFiber={showFiber}
                 maxRows={tvMode ? 10 : undefined}
               />
               <TvLeaderboardTable
@@ -401,6 +402,7 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
                 tvMode={tvMode}
                 showCrossSales={showCrossSales || hasSecondary}
                 crossSalesLabel={hasSecondary ? secondaryLabel : undefined}
+                showFiber={showFiber}
                 maxRows={tvMode ? 10 : undefined}
               />
               <TvLeaderboardTable
@@ -410,6 +412,7 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
                 tvMode={tvMode}
                 showCrossSales={showCrossSales || hasSecondary}
                 crossSalesLabel={hasSecondary ? secondaryLabel : undefined}
+                showFiber={showFiber}
                 maxRows={tvMode ? 10 : undefined}
               />
             </div>
