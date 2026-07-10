@@ -11,6 +11,7 @@ export default function TdcErhvervDashboard() {
         features: {
           salesPerHour: true,
           showMonth: true,
+          fiberBoard: true,
         },
       }}
     />
