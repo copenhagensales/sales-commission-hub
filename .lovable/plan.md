@@ -1,16 +1,11 @@
-Flyt "Fiber point" og "Fiber provi" kolonnerne så de vises MELLEM "Salg" og "Provision" i alle tre leaderboards (Top løn periode, Top uge, Top dag) på TDC Erhverv – Overblik boardet.
+Ændr farven på "Fiber point" og "Fiber provi" celler i leaderboard-tabellerne fra primær (grøn) og foreground (hvid) til muted-foreground (grå).
 
 ## Ændring
 
 **Fil:** `src/components/dashboard/TvDashboardComponents.tsx`
 
-I `TvLeaderboardTable`-komponenten flyttes fiber-kolonnerne (både `TableHead` og `TableCell` blokke) fra deres nuværende placering (før Salg) til efter Salg og før Provision.
+I `TvLeaderboardTable` body-cellerne for fiber-kolonnerne:
+- Fiber point-cellen: erstat `text-primary` med `text-muted-foreground` (både tvMode og ikke-tvMode)
+- Fiber provi-cellen: erstat `text-foreground` med `text-muted-foreground` i tvMode; tilføj `text-muted-foreground` i ikke-tvMode
 
-Ny kolonnerækkefølge:
-```
-# | Navn | Salg | (Switch hvis showCrossSales) | Fiber point | Fiber provi | Provision
-```
-
-Ingen ændringer i data, hooks, props eller styling — kun rækkefølge af `<TableHead>` og `<TableCell>` blokke inde i header og body.
-
-Grøn zone (præsentation).
+Headers bevares uændret. Grøn zone (kun styling-tokens).
