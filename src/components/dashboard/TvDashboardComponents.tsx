@@ -124,6 +124,12 @@ export function TvLeaderboardTable({
                 <TableRow className={tvMode ? 'border-b-2 border-border/70' : 'border-b border-border/50'}>
                   <TableHead className={tvMode ? 'w-[40px] text-center text-[18px] font-bold py-3 text-foreground/80' : 'w-10'}></TableHead>
                   <TableHead className={tvMode ? 'text-[18px] font-bold py-3 text-foreground/80' : ''}>Navn</TableHead>
+                  {showFiber && (
+                    <>
+                      <TableHead className={tvMode ? 'text-right text-[18px] font-bold py-3 w-[100px] text-foreground/80' : 'text-right'}>Fiber point</TableHead>
+                      <TableHead className={tvMode ? 'text-right text-[18px] font-bold py-3 w-[130px] text-foreground/80' : 'text-right'}>Fiber provi</TableHead>
+                    </>
+                  )}
                   <TableHead className={tvMode ? 'text-right text-[18px] font-bold py-3 w-[90px] text-foreground/80' : 'text-right'}>Salg</TableHead>
                   {showCrossSales && (
                     <TableHead className={tvMode ? 'text-right text-[18px] font-bold py-3 w-[90px] text-foreground/80' : 'text-right'}>{crossSalesLabel}</TableHead>
