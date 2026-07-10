@@ -322,14 +322,14 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
   };
 
   // Build KPI cards
-  const kpiCards: Array<{ label: string; value: string | number; sub: string; icon: any; suffix?: React.ReactNode }> = [
-    { label: "Salg i dag", value: salesToday, sub: format(today, "d. MMMM", { locale: da }), icon: CalendarDays, suffix: combineSuffix(switchSuffix(todaySwitch), fiberSuffix(fiberCountToday)) },
-    { label: "Salg denne uge", value: salesWeek, sub: `Uge ${format(today, "w", { locale: da })}`, icon: CalendarRange, suffix: combineSuffix(switchSuffix(weekSwitch), fiberSuffix(fiberCountWeek)) },
+  const kpiCards: Array<{ label: string; value: string | number; sub: string; icon: any; suffix?: React.ReactNode; tvSuffix?: React.ReactNode }> = [
+    { label: "Salg i dag", value: salesToday, sub: format(today, "d. MMMM", { locale: da }), icon: CalendarDays, suffix: combineSuffix(switchSuffix(todaySwitch), fiberSuffix(fiberCountToday)), tvSuffix: fiberSuffix(fiberCountToday) },
+    { label: "Salg denne uge", value: salesWeek, sub: `Uge ${format(today, "w", { locale: da })}`, icon: CalendarRange, suffix: combineSuffix(switchSuffix(weekSwitch), fiberSuffix(fiberCountWeek)), tvSuffix: fiberSuffix(fiberCountWeek) },
   ];
   if (showMonth) {
-    kpiCards.push({ label: "Salg denne måned", value: salesMonth, sub: format(today, "MMMM", { locale: da }), icon: Calendar, suffix: fiberSuffix(fiberCountMonth) });
+    kpiCards.push({ label: "Salg denne måned", value: salesMonth, sub: format(today, "MMMM", { locale: da }), icon: Calendar, suffix: fiberSuffix(fiberCountMonth), tvSuffix: fiberSuffix(fiberCountMonth) });
   }
-  kpiCards.push({ label: "Salg lønperiode", value: salesPayroll, sub: periodLabel, icon: Calendar, suffix: combineSuffix(switchSuffix(payrollSwitch), fiberSuffix(fiberCountPayroll)) });
+  kpiCards.push({ label: "Salg lønperiode", value: salesPayroll, sub: periodLabel, icon: Calendar, suffix: combineSuffix(switchSuffix(payrollSwitch), fiberSuffix(fiberCountPayroll)), tvSuffix: fiberSuffix(fiberCountPayroll) });
   if (showSalesPerHour) {
     kpiCards.push({ label: "Salg/time (løn)", value: payrollSalesPerHour.toFixed(2), sub: `${payrollHours.toFixed(1)} timer`, icon: TrendingUp });
   }
