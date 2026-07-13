@@ -1,39 +1,31 @@
-## Problem
+# Hvorfor Lucas' Hiper-salg ikke vises
 
-Almindelige sælgere ser 0/tomme værdier i kolonnerne **Fiber salg** og **Fiber provi** på TDC Erhverv-dashboardet, mens totalprovisionen stemmer.
+## Root cause (bekræftet i DB)
 
-## Rod-årsag (evidens)
+`manual-sales` edge function (linje 235) sætter `agent_email = employee.work_email` ved oprettelse. Lucas Baz Uttrup (`fe4d5dff-…`) har `work_email = NULL` i `employee_master_data`, så alle 9 Hiper-salg fra i dag er gemt med **tom `agent_email`**.
 
-RLS på `sale_items` tillader kun sælgeren at læse egne rækker:
-- `supabase/migrations/20260114135306_...sql:48` — policy `"Employees can view own sale_items"`
+Tavle og dagsrapporter attribuerer salg via `agent_email` (join mod `employee_agent_mapping` / `work_email`). Uden email findes salgene, men de kobles ikke til Lucas → dukker ikke op på Hiper-tavlen eller i dagsrapporter.
 
-`src/hooks/useFiberBoardStats.ts` og `src/hooks/useFiberSalesCount.ts` læser `sale_items` direkte i auth-mode. Derfor:
-- Sælger A ser kun egne fiber-tal → andre sælgere står med 0
-- Totalprovisionen kommer fra cached leaderboard (SECURITY DEFINER RPC) → bypass RLS → stemmer
-- TV-mode virker allerede, fordi den kalder `tv-dashboard-data` edge function (service role)
+Til sammenligning: Lucas' Adversus-salg (Eesy TM) har `agent_email = lubu@copenhagensales.dk` og virker fint.
 
-## Fix
+## Fix (2 dele — data + guard)
 
-Rut auth-mode gennem samme edge function som TV-mode i de to fiber-hooks. Hooksne bruges kun når `config.features.fiberBoard === true`, hvilket kun er sat på TDC Erhverv-dashboardet (`src/pages/TdcErhvervDashboard.tsx`). Alle TDC-sælgere ser dermed samme fiber-tal for alle sælgere på boardet — som ønsket. Ingen andre dashboards/teams eller data påvirkes. RLS ændres ikke.
+### 1. Data-fix (én gang)
+- Sæt `employee_master_data.work_email = 'lubu@copenhagensales.dk'` for Lucas (samme email som Adversus bruger).
+- Backfill de 9 eksisterende manual Hiper-salg: `UPDATE sales SET agent_email = 'lubu@copenhagensales.dk' WHERE source='manual_entry' AND agent_name='Lucas Baz Uttrup' AND (agent_email IS NULL OR agent_email='')`.
 
-## Ændringer
+### 2. Guard i `manual-sales` edge function (forhindrer at det gentager sig)
+I `supabase/functions/manual-sales/index.ts`, i create-flowet før insert: hvis `employee.work_email` er null/tom → returnér `400` med besked `"Din work_email mangler i medarbejder-master. Bed en admin udfylde den før du kan taste salg."`. Ingen ændring i eksisterende happy-path.
 
-**1. `src/hooks/useFiberBoardStats.ts`**
-- Fjern `isTvMode()`-gate. Kald altid `tv-dashboard-data?action=fiber-board-stats`.
-- Fjern direkte `sale_items` + `employee_agent_mapping` + `employee_master_data`-blok.
-- Forenkl `queryKey` (drop `"tv"|"auth"` variant — cachen kan deles).
-
-**2. `src/hooks/useFiberSalesCount.ts`**
-- Samme: fjern `isTvMode()`-gate, kald altid `tv-dashboard-data?action=fiber-sales-count`.
-
-**3. Edge function `supabase/functions/tv-dashboard-data/index.ts`**
-- Ingen ændring. Endpointsne findes allerede (linjer 234, 248) og bruger service role.
-
-Ingen ændring i: `TvDashboardComponents.tsx`, `ClientDashboard.tsx`, RLS-policies, KPI-suffix-logik.
+## Uden for scope
+- Ingen ændring af tavle-/rapport-hooks (attribuering via `agent_email` bevares som i dag).
+- Ingen ændring af pricing, sale_items eller commission (allerede korrekte — kun attribution er brudt).
+- Andre medarbejdere uden work_email er ikke tjekket her; kan gøres i særskilt sweep hvis ønsket.
 
 ## Verificering
+- Efter data-fix: Lucas' 9 Hiper-salg vises på Hiper-tavlen og i dagsrapport for i dag.
+- Efter guard: nyt manuelt salg fra en medarbejder uden work_email returnerer klar 400-fejl i stedet for at oprette et "usynligt" salg.
 
-1. Log ind som almindelig TDC-sælger → `/dashboards/tdc-erhverv` → leaderboard viser fiber-point og fiber-provi for alle sælgere.
-2. Total-provision uændret.
-3. TV-board uændret.
-4. Relatel/Eesy/øvrige dashboards uændrede (`fiberBoard` ikke sat).
+## Zone
+- Data-fix: gul (rører `employee_master_data` og `sales`, men kun 1 række + 9 salg for én sælger; ingen løn-/prisberegning ændres).
+- Guard: gul (edge function, ingen ændring i eksisterende adfærd).
