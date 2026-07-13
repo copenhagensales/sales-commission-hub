@@ -224,6 +224,12 @@ serve(async (req) => {
       const agentName = `${employee.first_name ?? ""} ${employee.last_name ?? ""}`.trim();
       const saleDatetime = body.sale_datetime ?? new Date().toISOString();
 
+      if (!employee.work_email || employee.work_email.trim() === "") {
+        return json(400, {
+          error: "Din work_email mangler i medarbejder-master. Bed en admin udfylde den før du kan taste salg.",
+        });
+      }
+
       const { data: sale, error: sErr } = await svc
         .from("sales")
         .insert({
