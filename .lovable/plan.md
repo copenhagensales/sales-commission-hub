@@ -1,47 +1,38 @@
-# Relatel Produkt-oversigt (Excel-artefakt)
+# Regenerér Relatel Excel-fil (v2)
 
-## Mål
-Enkeltstående Excel-fil leveret via `/mnt/documents/`. Ingen kodeændringer i projektet.
+## Problem
+Første fil manglede produkter fordi jeg joinede via `clients → client_campaigns → products`. Produkter som "Fri Tale - 1000 GB BTL #4" har `client_campaign_id = NULL` og røg dermed ud af filtret. Dine rettelser fra 14/7 findes — de sidder bare på produkter uden formel klient-kobling.
 
-## Indhold (én fane: "Relatel produkter")
+## Ny udvælgelses-strategi
 
-Kolonner:
-1. **Produkt** – `products.name`
-2. **Kampagne** – `client_campaigns.name`
-3. **Aktiv** – `products.is_active`
-4. **Base provision (kr)** – `products.commission_dkk`
-5. **Base omsætning (kr)** – `products.revenue_dkk`
-6. **Base gældende fra** – `products.updated_at` (senest ændret) / `created_at` som fallback
-7. **Regel-navn** – `product_pricing_rules.name` (den regel der matcher "tilskud = 0")
-8. **Provision v. tilskud=0 (kr)** – regel-`commission_dkk`
-9. **Omsætning v. tilskud=0 (kr)** – regel-`revenue_dkk`
-10. **Regel gældende fra** – `product_pricing_rules.effective_from`
-11. **Regel gældende til** – `product_pricing_rules.effective_to`
-12. **Prioritet** – `product_pricing_rules.priority`
+Da `client_campaign_id` ikke er pålidelig til at identificere Relatel-produkter, samler jeg dem via bredere kriterier:
 
-## Logik for "tilskud = 0"-satsen
+1. **Alle produkter** hvor `client_campaigns → clients.name ILIKE '%relatel%'` (de 68 fra før), PLUS
+2. **Alle produkter** hvor navnet matcher Relatel-mønstre: `Fri Tale%`, `MBB%`, `M2M%`, `5 Timers%`, `Contact Center%`, `Bruger +MV%`, `Professional (ATL)%`, samt navne der figurerer på Relatel-dashboardet.
 
-For hvert Relatel-produkt vælges den aktive prisregel hvor:
-- `is_active = true`
-- `conditions` matcher subsidy/tilskud = 0 (fx `{"subsidy_percent": 0}` eller ingen subsidy-restriktion — universel regel gælder også)
-- Højeste `priority` vinder
-- Effektiv på "nu" (`effective_from <= now`, `effective_to null eller >= now`)
+**Sikkerhedscheck inden bygning:** Jeg lister først kandidat-produkter til dig (navn + id + har-regel-fra-14/7) så du kan bekræfte omfanget — eller sige "tag alle 87 produkter der fik regler 14/7-2026 med".
 
-Hvis intet regel-match: felterne 7–12 er tomme, og base-satsen (kol. 4–5) er den gældende afregning.
+## Nye kolonner (samme som før + historik)
 
-## Formatering
-- Header fed, mørk baggrund
-- Beløb med `#,##0` (kr)
-- Datoer som `dd-mm-yyyy`
-- Kolonnebredde auto-justeret
-- Sortering: produktnavn A–Å
+Fane 1 – **Relatel produkter (aktuelle satser)**:
+1. Produkt
+2. Base provision (kr) + Base omsætning (kr) *(fra `products`)*
+3. **Aktuel regel-navn**
+4. **Provision v. tilskud=0 (kr)** *(fra aktive regel der matcher tilskud=0)*
+5. **Omsætning v. tilskud=0 (kr)**
+6. **Gældende fra**
+7. **Gældende til** (blank = åben)
+8. Prioritet
+9. Har "tilskud"-differentiering (Ja/Nej — findes særskilt regel med `subsidy_percent > 0`?)
+
+Fane 2 – **Historik (alle regler)**:
+Én række pr. regel (aktiv + udløbet), sorteret pr. produkt → efter `effective_from` DESC. Kolonner: produkt, regel-navn, provision, omsætning, betingelser (tekst), gældende fra, gældende til, prioritet, oprettet-dato, status (aktiv/udløbet).
 
 ## Fremgangsmåde
-1. Query products + client_campaigns for Relatel
-2. Query product_pricing_rules pr. produkt, filtrér på tilskud=0-conditions, vælg højest priority
-3. Byg xlsx med `openpyxl`/`ExcelJS` via Python-skript
-4. Skriv til `/mnt/documents/relatel-produkter.xlsx`
-5. Åbn og verificér indhold visuelt før levering
+1. Jeg lister kandidat-produkter til bekræftelse.
+2. Efter du bekræfter, bygger jeg xlsx'en direkte i `/mnt/documents/relatel-produkter-v2.xlsx`.
+3. Verificerer indhold ved genindlæsning før levering.
 
-## Åbne spørgsmål inden bygning
-Ingen — jeg tolker "tilskud = 0-satsen" som den prisregel der gælder når `subsidy_percent = 0` (eller universel regel uden subsidy-krav). Sig til hvis du vil have flere satser med (fx 10%, 20% tilskud-varianter) eller kun MBB/Fri Tale-produkter i stedet for alle.
+## Åbne spørgsmål
+1. Skal jeg tage **alle 87 produkter med regel-ændring 14/7-2026** med, eller kun dem der matcher "Relatel-lignende" navne?
+2. Skal historik-fanen inkludere `pricing_rule_history` (revisions-log), eller kun de nuværende regler (aktive + udløbne varianter)?
