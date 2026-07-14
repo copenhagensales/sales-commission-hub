@@ -50,6 +50,8 @@ interface PricingRule {
   priority: number;
   name: string | null;
   is_active: boolean;
+  effective_from?: string | null;
+  effective_to?: string | null;
 }
 
 interface CampaignMapping {
@@ -596,85 +598,124 @@ export function ProductPricingRulesDialog({
               {rulesLoading ? (
                 <p className="text-sm text-muted-foreground">Indlæser regler...</p>
               ) : rules && rules.length > 0 ? (
-                <div className="space-y-3">
-                  {rules.map((rule) => (
-                    <div
-                      key={rule.id}
-                      className={`border rounded-lg p-3 ${
-                        rule.is_active ? "bg-background" : "bg-muted/30 opacity-60"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-medium">
-                              {rule.name || "Unavngivet regel"}
-                            </span>
-                            <Badge variant="outline" className="text-xs">
-                              Prioritet: {rule.priority}
-                            </Badge>
-                            {!rule.is_active && (
-                              <Badge variant="secondary" className="text-xs">
-                                Inaktiv
+                (() => {
+                  const todayStart = startOfDay(new Date());
+                  const isExpired = (r: PricingRule) =>
+                    !!r.effective_to && isBefore(startOfDay(new Date(r.effective_to)), todayStart);
+                  const activeRules = rules.filter((r) => !isExpired(r));
+                  const expiredRules = rules.filter((r) => isExpired(r));
+
+                  const renderRule = (rule: PricingRule) => {
+                    const expired = isExpired(rule);
+                    return (
+                      <div
+                        key={rule.id}
+                        className={`border rounded-lg p-3 ${
+                          expired
+                            ? "border-l-4 border-l-destructive bg-destructive/5"
+                            : rule.is_active
+                            ? "bg-background"
+                            : "bg-muted/30 opacity-60"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <span className="font-medium">
+                                {rule.name || "Unavngivet regel"}
+                              </span>
+                              <Badge variant="outline" className="text-xs">
+                                Prioritet: {rule.priority}
                               </Badge>
+                              {expired && (
+                                <Badge variant="destructive" className="text-xs">
+                                  Udløbet
+                                </Badge>
+                              )}
+                              {!rule.is_active && (
+                                <Badge variant="secondary" className="text-xs">
+                                  Inaktiv
+                                </Badge>
+                              )}
+                            </div>
+
+                            {expired && rule.effective_to && (
+                              <div className="text-xs text-destructive mb-1 font-medium">
+                                Udløb: {format(new Date(rule.effective_to), "d. MMMM yyyy", { locale: da })}
+                              </div>
                             )}
+
+                            <div className="text-xs text-muted-foreground mb-1">
+                              {(() => {
+                                const ids = rule.campaign_mapping_ids;
+                                const mode = rule.campaign_match_mode === "exclude" ? "exclude" : "include";
+                                if (!ids || ids.length === 0) return "Kampagner: Alle";
+                                const names = getCampaignNames(ids);
+                                return mode === "exclude"
+                                  ? `Alle undtagen: ${names}`
+                                  : `Kampagner: ${names}`;
+                              })()}
+                            </div>
+
+                            <div className="bg-muted/50 rounded p-2 text-sm mb-2">
+                              <span className="text-muted-foreground">Betingelser: </span>
+                              {Object.keys(rule.conditions).length > 0 ? (
+                                formatConditions(rule.conditions)
+                              ) : (
+                                <span className="italic">Ingen betingelser (matcher altid)</span>
+                              )}
+                            </div>
+
+                            <div className={`text-sm ${expired ? "line-through text-muted-foreground" : ""}`}>
+                              <span className={expired ? "font-medium" : "text-green-600 font-medium"}>
+                                → {rule.commission_dkk} kr prov
+                              </span>
+                              <span className="text-muted-foreground mx-2">/</span>
+                              <span className={expired ? "font-medium" : "text-blue-600 font-medium"}>
+                                {rule.revenue_dkk} kr oms
+                              </span>
+                            </div>
                           </div>
 
-                          <div className="text-xs text-muted-foreground mb-1">
-                            {(() => {
-                              const ids = rule.campaign_mapping_ids;
-                              const mode = rule.campaign_match_mode === "exclude" ? "exclude" : "include";
-                              if (!ids || ids.length === 0) return "Kampagner: Alle";
-                              const names = getCampaignNames(ids);
-                              return mode === "exclude"
-                                ? `Alle undtagen: ${names}`
-                                : `Kampagner: ${names}`;
-                            })()}
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setEditingRule(rule)}
+                              title="Rediger"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDelete(rule.id)}
+                              title="Slet"
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
-
-                          <div className="bg-muted/50 rounded p-2 text-sm mb-2">
-                            <span className="text-muted-foreground">Betingelser: </span>
-                            {Object.keys(rule.conditions).length > 0 ? (
-                              formatConditions(rule.conditions)
-                            ) : (
-                              <span className="italic">Ingen betingelser (matcher altid)</span>
-                            )}
-                          </div>
-
-                          <div className="text-sm">
-                            <span className="text-green-600 font-medium">
-                              → {rule.commission_dkk} kr prov
-                            </span>
-                            <span className="text-muted-foreground mx-2">/</span>
-                            <span className="text-blue-600 font-medium">
-                              {rule.revenue_dkk} kr oms
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setEditingRule(rule)}
-                            title="Rediger"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDelete(rule.id)}
-                            title="Slet"
-                            className="text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
                         </div>
                       </div>
+                    );
+                  };
+
+                  return (
+                    <div className="space-y-3">
+                      {activeRules.map(renderRule)}
+                      {expiredRules.length > 0 && (
+                        <div className="pt-2 pb-1">
+                          <div className="text-xs uppercase tracking-wide text-muted-foreground font-medium border-t pt-3">
+                            Udløbne regler ({expiredRules.length})
+                          </div>
+                        </div>
+                      )}
+                      {expiredRules.map(renderRule)}
                     </div>
-                  ))}
-                </div>
+                  );
+                })()
+
               ) : (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
                   <AlertCircle className="h-4 w-4" />
