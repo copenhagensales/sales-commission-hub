@@ -1,29 +1,47 @@
+# Relatel Produkt-oversigt (Excel-artefakt)
+
 ## Mål
-På MG Test → produkt → "Regler" tab: gør det tydeligt hvilke regler der er udløbet (`effective_to` overskredet), og placer dem nederst under de stadigt gyldige.
+Enkeltstående Excel-fil leveret via `/mnt/documents/`. Ingen kodeændringer i projektet.
 
-## Ændringer
+## Indhold (én fane: "Relatel produkter")
 
-**Fil:** `src/components/mg-test/ProductPricingRulesDialog.tsx` (grøn zone – kun visuel/præsentation, ingen ændring af pricing-logik).
+Kolonner:
+1. **Produkt** – `products.name`
+2. **Kampagne** – `client_campaigns.name`
+3. **Aktiv** – `products.is_active`
+4. **Base provision (kr)** – `products.commission_dkk`
+5. **Base omsætning (kr)** – `products.revenue_dkk`
+6. **Base gældende fra** – `products.updated_at` (senest ændret) / `created_at` som fallback
+7. **Regel-navn** – `product_pricing_rules.name` (den regel der matcher "tilskud = 0")
+8. **Provision v. tilskud=0 (kr)** – regel-`commission_dkk`
+9. **Omsætning v. tilskud=0 (kr)** – regel-`revenue_dkk`
+10. **Regel gældende fra** – `product_pricing_rules.effective_from`
+11. **Regel gældende til** – `product_pricing_rules.effective_to`
+12. **Prioritet** – `product_pricing_rules.priority`
 
-### 1. Sortering
-I "Regler"-tab, før `.map()`:
-- Split `rules` i to grupper:
-  - **Gyldige:** `effective_to === null` ELLER `effective_to >= today`
-  - **Udløbne:** `effective_to !== null` OG `effective_to < today`
-- Behold eksisterende rækkefølge inden for hver gruppe (priority DESC som RPC'en leverer).
-- Render gyldige først, derefter udløbne.
+## Logik for "tilskud = 0"-satsen
 
-### 2. Visuel markering af udløbne regler
-På kortet for udløbne regler:
-- Rød venstre-border + svag rød baggrund (`border-l-4 border-l-destructive bg-destructive/5`) – tydeligere end nuværende `opacity-60` for inaktive.
-- Ny badge `Udløbet` (destructive variant) ved siden af "Prioritet"-badge.
-- Lille linje under navnet: `Udløb: {format(effective_to, "d. MMMM yyyy", { locale: da })}`.
-- Provision/omsætning-tal får `line-through text-muted-foreground` så det er visuelt klart at reglen ikke længere anvendes.
+For hvert Relatel-produkt vælges den aktive prisregel hvor:
+- `is_active = true`
+- `conditions` matcher subsidy/tilskud = 0 (fx `{"subsidy_percent": 0}` eller ingen subsidy-restriktion — universel regel gælder også)
+- Højeste `priority` vinder
+- Effektiv på "nu" (`effective_from <= now`, `effective_to null eller >= now`)
 
-### 3. Sektionsopdeling (kun hvis der findes udløbne regler)
-Lille header mellem grupperne: `— Udløbne regler —` (muted, small caps) så adskillelsen er læsbar.
+Hvis intet regel-match: felterne 7–12 er tomme, og base-satsen (kol. 4–5) er den gældende afregning.
 
-## Uden for scope
-- Ingen ændring i `pricingRuleMatching.ts`, `rematch-pricing-rules` eller RPC. Motoren håndterer allerede `effective_to`.
-- Ingen ændring af "Hovedside"/"Historik"-tabs.
-- Ingen sortering ændret for aktive regler (priority-rangorden bevares).
+## Formatering
+- Header fed, mørk baggrund
+- Beløb med `#,##0` (kr)
+- Datoer som `dd-mm-yyyy`
+- Kolonnebredde auto-justeret
+- Sortering: produktnavn A–Å
+
+## Fremgangsmåde
+1. Query products + client_campaigns for Relatel
+2. Query product_pricing_rules pr. produkt, filtrér på tilskud=0-conditions, vælg højest priority
+3. Byg xlsx med `openpyxl`/`ExcelJS` via Python-skript
+4. Skriv til `/mnt/documents/relatel-produkter.xlsx`
+5. Åbn og verificér indhold visuelt før levering
+
+## Åbne spørgsmål inden bygning
+Ingen — jeg tolker "tilskud = 0-satsen" som den prisregel der gælder når `subsidy_percent = 0` (eller universel regel uden subsidy-krav). Sig til hvis du vil have flere satser med (fx 10%, 20% tilskud-varianter) eller kun MBB/Fri Tale-produkter i stedet for alle.
