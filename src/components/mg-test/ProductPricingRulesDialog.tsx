@@ -50,6 +50,8 @@ interface PricingRule {
   priority: number;
   name: string | null;
   is_active: boolean;
+  effective_from?: string | null;
+  effective_to?: string | null;
 }
 
 interface CampaignMapping {
