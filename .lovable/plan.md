@@ -1,22 +1,34 @@
 ## Problem
-Den seneste `relatel-produkter-v2.xlsx` inkluderer alle Relatel-produkter — også dem med `is_hidden = true`. Filen har kun en "Aktiv"-kolonne (som er `is_active`), så skjulte produkter ligger blandet med synlige uden markering.
+v3-filen bruger et bredt navnefilter (`Fri Tale`, `MBB`, `M2M`, …) fordi jeg antog Relatel-produkter uden `client_campaign_id` ikke kunne findes ellers. Det var forkert:
 
-## Løsning
-Regenerér filen med samme udvælgelses-strategi (klient ILIKE '%relatel%' + kendte Relatel-navnemønstre), men **tilføj filter `is_hidden = false`** på både fane 1 og fane 2.
+- Filen indeholder **12 Eesy TM** og **6 TDC Erhverv** produkter der ikke er Relatel
+- Filen mangler Relatel-produkter der ikke matcher navnefiltret
+
+## Korrekt afgrænsning (samme logik som MgTest bruger)
+MgTest's `get_aggregated_product_types` RPC grupperer et produkt under en klient via:
+`COALESCE(products.client_campaign_id → clients, sales.client_campaign_id → clients)`
+
+Dvs. et produkt tilhører Relatel hvis:
+1. `products.client_campaign_id` peger på en Relatel-kampagne, **ELLER**
+2. Produktet er brugt i mindst ét `sale_item` hvor `sales.client_campaign_id` peger på en Relatel-kampagne
+
+Relatel client_id: `0ff8476d-16d8-4150-aee9-48ac90ec962d` (fra `src/utils/clientIds.ts`)
+
+**Resultat:** 190 produkter i alt, **96 med `is_hidden = false`**.
 
 ## Output
-Ny fil: `/mnt/documents/relatel-produkter-v3.xlsx`
+Ny fil: `/mnt/documents/relatel-produkter-v4.xlsx`
 
-**Fane 1 – Aktuelle satser** (uændret struktur, kun filter tilføjet):
-Produkt, Klient, Kampagne, Aktiv, Base provision, Base omsætning, Aktuel regel, Provision v. tilskud=0, Omsætning v. tilskud=0, Gældende fra, Gældende til, Prioritet, Har tilskud-diff.
+Samme struktur som v3:
+- **Fane 1 – Aktuelle satser:** 96 produkter (kun `is_hidden = false`, kun Relatel via MgTest-definitionen)
+- **Fane 2 – Historik:** alle pricing-regler for de 96 produkter, sorteret pr. produkt → `effective_from` DESC
 
-**Fane 2 – Historik (alle regler)** (uændret struktur, kun filter på produkter):
-Produkt, Regel-navn, Provision, Omsætning, Betingelser, Kampagne-filter, Gældende fra, Gældende til, Prioritet, Aktiv, Status, Oprettet, Sidst opdateret.
+Kolonner uændret fra v3.
 
 ## Verifikation
-1. Efter generering: tæl rækker på fane 1 og bekræft alle har `is_hidden = false` i DB.
-2. Sammenlign med v2 (155 rækker) — forventet fald svarende til antallet af skjulte Relatel-produkter (~66+).
-3. Rapportér til dig: antal produkter i v3 vs. v2, og eksempler på hvilke produkter der er fjernet.
+1. Bekræft alle 96 produkter matcher MgTest's Relatel-visning (via RPC-logikken).
+2. Bekræft ingen produkter fra Eesy TM eller TDC Erhverv er med.
+3. Rapportér diff til dig: hvilke produkter der er nye vs. v3, og hvilke der er fjernet.
 
 ## Ingen kode-ændringer
-Dette er en engangs-eksport til `/mnt/documents/` — ingen ændringer i repo eller DB.
+Engangs-eksport til `/mnt/documents/`.
