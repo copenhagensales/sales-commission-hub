@@ -97,7 +97,7 @@ interface PricingRule {
   product_id: string;
   campaign_mapping_ids: string[] | null;
   campaign_match_mode?: "include" | "exclude" | null;
-  conditions: Record<string, string | NumericConditionValue>;
+  conditions: Record<string, string | NumericConditionValue | CompanionConditionValue>;
   commission_dkk: number;
   revenue_dkk: number;
   priority: number;
@@ -125,6 +125,8 @@ interface PricingRuleEditorProps {
   existingRule?: PricingRule | null;
   onSave: () => void;
   onCancel: () => void;
+  /** Client the product belongs to. Controls which condition keys are available. */
+  clientId?: string | null;
 }
 
 // Inline multi-value input for "in" operator
