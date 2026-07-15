@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Trash2, Plus, ChevronDown, CalendarIcon, Loader2, X } from "lucide-react";
+import { Trash2, Plus, ChevronDown, CalendarIcon, Loader2, X, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
@@ -31,6 +31,7 @@ import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useMgTestMutationSync } from "@/hooks/useMgTestMutationSync";
+import { CLIENT_IDS } from "@/utils/clientIds";
 
 // Available condition keys and their possible values
 const CONDITION_OPTIONS: Record<string, string[]> = {
@@ -52,6 +53,9 @@ const CONDITION_OPTIONS: Record<string, string[]> = {
 // Keys that use numeric comparison instead of dropdown
 const NUMERIC_CONDITION_KEYS = ["Dækningssum"];
 
+// Companion-product condition key. Only shown for Relatel products.
+const COMPANION_CONDITION_KEY = "Solgt sammen med";
+
 // Operators for numeric conditions
 const NUMERIC_OPERATORS = [
   { value: "gte", label: "Over eller lig med (≥)" },
@@ -70,17 +74,30 @@ interface NumericConditionValue {
   values?: number[];
 }
 
+// Type for companion-product condition value.
+// mode is always "any_of" (OR between selected products) in v1.
+interface CompanionConditionValue {
+  __companion__: true;
+  product_ids: string[];
+}
+
 // Check if a condition value is numeric
 function isNumericCondition(value: unknown): value is NumericConditionValue {
   return typeof value === 'object' && value !== null && 'operator' in value && 'value' in value;
 }
+
+// Check if a condition value is a companion-product condition
+function isCompanionCondition(value: unknown): value is CompanionConditionValue {
+  return typeof value === 'object' && value !== null && (value as any).__companion__ === true;
+}
+
 
 interface PricingRule {
   id: string;
   product_id: string;
   campaign_mapping_ids: string[] | null;
   campaign_match_mode?: "include" | "exclude" | null;
-  conditions: Record<string, string | NumericConditionValue>;
+  conditions: Record<string, string | NumericConditionValue | CompanionConditionValue>;
   commission_dkk: number;
   revenue_dkk: number;
   priority: number;
@@ -108,6 +125,8 @@ interface PricingRuleEditorProps {
   existingRule?: PricingRule | null;
   onSave: () => void;
   onCancel: () => void;
+  /** Client the product belongs to. Controls which condition keys are available. */
+  clientId?: string | null;
 }
 
 // Inline multi-value input for "in" operator
@@ -149,6 +168,76 @@ function InMultiValueInput({ values, onAdd, onRemove }: { values: number[]; onAd
   );
 }
 
+// Searchable multi-select for companion products.
+function CompanionProductPicker({
+  products,
+  selectedIds,
+  onToggle,
+}: {
+  products: Array<{ id: string; name: string }>;
+  selectedIds: string[];
+  onToggle: (productId: string) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const selectedSet = new Set(selectedIds);
+  const filtered = products.filter((p) =>
+    p.name.toLowerCase().includes(search.trim().toLowerCase()),
+  );
+  const selectedProducts = products.filter((p) => selectedSet.has(p.id));
+
+  return (
+    <div className="space-y-2">
+      {selectedProducts.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {selectedProducts.map((p) => (
+            <Badge
+              key={p.id}
+              variant="secondary"
+              className="gap-1 cursor-pointer"
+              onClick={() => onToggle(p.id)}
+            >
+              {p.name}
+              <X className="h-3 w-3" />
+            </Badge>
+          ))}
+        </div>
+      )}
+      <div className="relative">
+        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Søg produkt..."
+          className="pl-8 h-9"
+        />
+      </div>
+      <div className="border rounded-md max-h-56 overflow-y-auto">
+        {filtered.length === 0 ? (
+          <p className="p-3 text-xs text-muted-foreground italic">
+            Ingen produkter fundet
+          </p>
+        ) : (
+          filtered.map((p) => (
+            <div
+              key={p.id}
+              className="flex items-center gap-2 hover:bg-muted/50 p-2 cursor-pointer"
+              onClick={() => onToggle(p.id)}
+            >
+              <Checkbox
+                checked={selectedSet.has(p.id)}
+                onCheckedChange={() => onToggle(p.id)}
+              />
+              <span className="text-sm">{p.name}</span>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+
+
 export function PricingRuleEditor({
   productId,
   productName,
@@ -158,6 +247,7 @@ export function PricingRuleEditor({
   existingRule,
   onSave,
   onCancel,
+  clientId,
 }: PricingRuleEditorProps) {
   const [name, setName] = useState(existingRule?.name || "");
   const [priority, setPriority] = useState(existingRule?.priority || 0);
@@ -168,9 +258,9 @@ export function PricingRuleEditor({
     existingRule?.campaign_match_mode === "exclude" ? "exclude" : "include"
   );
   const [campaignsOpen, setCampaignsOpen] = useState(false);
-  const [conditions, setConditions] = useState<Record<string, string | NumericConditionValue>>(
-    existingRule?.conditions || {}
-  );
+  const [conditions, setConditions] = useState<
+    Record<string, string | NumericConditionValue | CompanionConditionValue>
+  >(existingRule?.conditions || {});
   const [commission, setCommission] = useState(
     existingRule?.commission_dkk?.toString() || baseCommission.toString()
   );
@@ -204,9 +294,37 @@ export function PricingRuleEditor({
   // Centralized post-mutation sync (invalidation + rematch + KPI + realtime)
   const { sync } = useMgTestMutationSync();
 
-  // Get available condition keys (not already used) - include numeric keys
+  // Relatel is the only client that currently supports the companion-product condition.
+  const isRelatelProduct = !!clientId && clientId === CLIENT_IDS["Relatel"];
+
+  // Fetch Relatel products for the companion-product picker (only when relevant).
+  const { data: relatelProducts } = useQuery({
+    queryKey: ["relatel-products-for-companion"],
+    enabled: isRelatelProduct,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, name, client_campaigns!inner(client_id)")
+        .eq("client_campaigns.client_id", CLIENT_IDS["Relatel"])
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      // Dedupe by product id (a product can join through multiple campaigns)
+      const seen = new Map<string, { id: string; name: string }>();
+      for (const row of (data || []) as Array<{ id: string; name: string | null }>) {
+        if (!seen.has(row.id)) seen.set(row.id, { id: row.id, name: row.name || "" });
+      }
+      return Array.from(seen.values());
+    },
+  });
+
+  // Get available condition keys (not already used) - include numeric keys and companion key
   const usedKeys = Object.keys(conditions);
-  const allAvailableKeys = [...Object.keys(CONDITION_OPTIONS), ...NUMERIC_CONDITION_KEYS];
+  const allAvailableKeys = [
+    ...Object.keys(CONDITION_OPTIONS),
+    ...NUMERIC_CONDITION_KEYS,
+    ...(isRelatelProduct ? [COMPANION_CONDITION_KEY] : []),
+  ];
   const availableKeys = allAvailableKeys.filter(
     (key) => !usedKeys.includes(key)
   );
@@ -229,8 +347,15 @@ export function PricingRuleEditor({
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      // Guard: companion-condition must have at least one product selected.
+      for (const [k, v] of Object.entries(conditions)) {
+        if (isCompanionCondition(v) && v.product_ids.length === 0) {
+          throw new Error(`Betingelsen "${k}" skal have mindst ét produkt valgt`);
+        }
+      }
       // Convert conditions to JSON-compatible format for Supabase
       const conditionsJson = JSON.parse(JSON.stringify(conditions));
+
 
       const ruleData = {
         product_id: productId,
@@ -317,11 +442,16 @@ export function PricingRuleEditor({
   });
 
   const addCondition = (key: string) => {
-    if (NUMERIC_CONDITION_KEYS.includes(key)) {
+    if (key === COMPANION_CONDITION_KEY) {
+      setConditions((prev) => ({
+        ...prev,
+        [key]: { __companion__: true, product_ids: [] } satisfies CompanionConditionValue,
+      }));
+    } else if (NUMERIC_CONDITION_KEYS.includes(key)) {
       // Add numeric condition with default values
-      setConditions((prev) => ({ 
-        ...prev, 
-        [key]: { operator: 'gte' as const, value: 0 } 
+      setConditions((prev) => ({
+        ...prev,
+        [key]: { operator: 'gte' as const, value: 0 }
       }));
     } else {
       const defaultValue = CONDITION_OPTIONS[key]?.[0] || "";
@@ -329,8 +459,23 @@ export function PricingRuleEditor({
     }
   };
 
-  const updateCondition = (key: string, value: string | NumericConditionValue) => {
+  const updateCondition = (key: string, value: string | NumericConditionValue | CompanionConditionValue) => {
     setConditions((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const toggleCompanionProduct = (key: string, productId: string) => {
+    setConditions((prev) => {
+      const current = prev[key];
+      if (!isCompanionCondition(current)) return prev;
+      const exists = current.product_ids.includes(productId);
+      const next: CompanionConditionValue = {
+        __companion__: true,
+        product_ids: exists
+          ? current.product_ids.filter((id) => id !== productId)
+          : [...current.product_ids, productId],
+      };
+      return { ...prev, [key]: next };
+    });
   };
 
   const updateNumericCondition = (key: string, field: 'operator' | 'value' | 'value2', newValue: string | number) => {
@@ -544,87 +689,122 @@ export function PricingRuleEditor({
             {Object.entries(conditions).map(([key, value]) => (
               <div
                 key={key}
-                className="flex items-center gap-2 bg-muted/30 p-2 rounded"
+                className={
+                  isCompanionCondition(value)
+                    ? "bg-muted/30 p-3 rounded space-y-2"
+                    : "flex items-center gap-2 bg-muted/30 p-2 rounded"
+                }
               >
-                <span className="flex-shrink-0 font-medium text-sm">{key}</span>
-                
-                {isNumericCondition(value) ? (
-                  // Numeric condition UI: operator dropdown + number input
+                {isCompanionCondition(value) ? (
                   <>
-                    <Select
-                      value={value.operator}
-                      onValueChange={(op) => updateNumericCondition(key, 'operator', op)}
-                    >
-                      <SelectTrigger className="w-44">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {NUMERIC_OPERATORS.map((op) => (
-                          <SelectItem key={op.value} value={op.value}>
-                            {op.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {value.operator !== 'in' && (
-                      <Input
-                        type="number"
-                        className="w-28"
-                        value={value.value}
-                        onChange={(e) => updateNumericCondition(key, 'value', e.target.value)}
-                        placeholder={value.operator === 'between' ? 'Fra' : 'Beløb'}
-                      />
-                    )}
-                    {value.operator === 'between' && (
-                      <>
-                        <span className="text-muted-foreground text-sm">og</span>
-                        <Input
-                          type="number"
-                          className="w-28"
-                          value={value.value2 ?? 0}
-                          onChange={(e) => updateNumericCondition(key, 'value2', e.target.value)}
-                          placeholder="Til"
-                        />
-                      </>
-                    )}
-                    {value.operator === 'in' && (
-                      <InMultiValueInput
-                        values={value.values ?? []}
-                        onAdd={(v) => addNumericValue(key, v)}
-                        onRemove={(v) => removeNumericValue(key, v)}
-                      />
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium text-sm">{key}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeCondition(key)}
+                        className="text-destructive hover:text-destructive h-8 w-8"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Reglen matcher kun hvis salget også indeholder mindst ét af de valgte produkter. Samme CVR og ordre er garanteret, fordi et salg altid er én ordre til én kunde.
+                    </p>
+                    <CompanionProductPicker
+                      products={relatelProducts || []}
+                      selectedIds={value.product_ids}
+                      onToggle={(pid) => toggleCompanionProduct(key, pid)}
+                    />
+                    {value.product_ids.length === 0 && (
+                      <p className="text-xs text-destructive">
+                        Vælg mindst ét produkt.
+                      </p>
                     )}
                   </>
                 ) : (
-                  // String condition UI: equals + dropdown
                   <>
-                    <span className="text-muted-foreground">=</span>
-                    <Select
-                      value={value as string}
-                      onValueChange={(newValue) => updateCondition(key, newValue)}
+                    <span className="flex-shrink-0 font-medium text-sm">{key}</span>
+
+                    {isNumericCondition(value) ? (
+                      // Numeric condition UI: operator dropdown + number input
+                      <>
+                        <Select
+                          value={value.operator}
+                          onValueChange={(op) => updateNumericCondition(key, 'operator', op)}
+                        >
+                          <SelectTrigger className="w-44">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {NUMERIC_OPERATORS.map((op) => (
+                              <SelectItem key={op.value} value={op.value}>
+                                {op.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {value.operator !== 'in' && (
+                          <Input
+                            type="number"
+                            className="w-28"
+                            value={value.value}
+                            onChange={(e) => updateNumericCondition(key, 'value', e.target.value)}
+                            placeholder={value.operator === 'between' ? 'Fra' : 'Beløb'}
+                          />
+                        )}
+                        {value.operator === 'between' && (
+                          <>
+                            <span className="text-muted-foreground text-sm">og</span>
+                            <Input
+                              type="number"
+                              className="w-28"
+                              value={value.value2 ?? 0}
+                              onChange={(e) => updateNumericCondition(key, 'value2', e.target.value)}
+                              placeholder="Til"
+                            />
+                          </>
+                        )}
+                        {value.operator === 'in' && (
+                          <InMultiValueInput
+                            values={value.values ?? []}
+                            onAdd={(v) => addNumericValue(key, v)}
+                            onRemove={(v) => removeNumericValue(key, v)}
+                          />
+                        )}
+                      </>
+                    ) : (
+                      // String condition UI: equals + dropdown
+                      <>
+                        <span className="text-muted-foreground">=</span>
+                        <Select
+                          value={value as string}
+                          onValueChange={(newValue) => updateCondition(key, newValue)}
+                        >
+                          <SelectTrigger className="w-32">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {CONDITION_OPTIONS[key]?.map((option) => (
+                              <SelectItem key={option} value={option}>
+                                {option}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </>
+                    )}
+
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeCondition(key)}
+                      className="text-destructive hover:text-destructive"
                     >
-                      <SelectTrigger className="w-32">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {CONDITION_OPTIONS[key]?.map((option) => (
-                          <SelectItem key={option} value={option}>
-                            {option}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </>
                 )}
-                
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => removeCondition(key)}
-                  className="text-destructive hover:text-destructive"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
               </div>
             ))}
           </div>
@@ -633,6 +813,7 @@ export function PricingRuleEditor({
             Ingen betingelser tilføjet - reglen matcher alle salg
           </p>
         )}
+
 
         {availableKeys.length > 0 && (
           <Select onValueChange={(key) => addCondition(key)}>

@@ -114,6 +114,19 @@ function isNumericCondition(value: unknown): value is NumericCondition {
   return typeof value === "object" && value !== null && "operator" in value && "value" in value;
 }
 
+interface CompanionCondition {
+  __companion__: true;
+  product_ids: string[];
+}
+
+function isCompanionCondition(value: unknown): value is CompanionCondition {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    (value as { __companion__?: unknown }).__companion__ === true
+  );
+}
+
 function evaluateNumericCondition(condition: NumericCondition, leadValue: string | undefined): boolean {
   const numericLeadValue = parseFloat(leadValue || "0");
   if (isNaN(numericLeadValue)) return false;
@@ -197,7 +210,8 @@ function matchPricingRule(
   pricingRulesMap: Map<string, PricingRule[]>,
   rawPayloadData: Record<string, unknown> | undefined,
   campaignMappingId?: string | null,
-  saleDate?: string | null // ISO date string for date-based filtering
+  saleDate?: string | null, // ISO date string for date-based filtering
+  siblingProductIds?: Set<string> | null,
 ): { commission: number; revenue: number; ruleId: string; ruleName: string; allowsImmediatePayment: boolean; immediatePaymentCommission: number | null; immediatePaymentRevenue: number | null; displayName: string | null } | null {
   const rules = pricingRulesMap.get(productId);
   if (!rules || rules.length === 0) return null;
@@ -257,8 +271,30 @@ function matchPricingRule(
     const conditions = rule.conditions || {};
     const conditionKeys = Object.keys(conditions);
     let allConditionsMet = true;
+    // Companion-product conditions must NEVER trigger the "empty lead data" campaign
+    // fallback below (that fallback is for missing Adversus lead fields, not for
+    // structural checks against the sale itself). Track separately.
+    let companionFailed = false;
 
     for (const [condKey, condValue] of Object.entries(conditions)) {
+      if (isCompanionCondition(condValue)) {
+        const required = condValue.product_ids || [];
+        if (required.length === 0) {
+          // Empty companion list = misconfigured rule → treat as no match.
+          allConditionsMet = false;
+          companionFailed = true;
+          break;
+        }
+        const siblings = siblingProductIds || new Set<string>();
+        const matches = required.some((pid) => siblings.has(pid));
+        if (!matches) {
+          allConditionsMet = false;
+          companionFailed = true;
+          break;
+        }
+        continue;
+      }
+
       const leadField = allFields.find((f) => f.label === condKey);
 
       if (isNumericCondition(condValue)) {
@@ -274,8 +310,9 @@ function matchPricingRule(
       }
     }
 
-    // Campaign fallback logic
-    if (!allConditionsMet && conditionKeys.length > 0 && hasEmptyLeadData && campaignMatches) {
+    // Campaign fallback logic — only for empty lead data, and never when the
+    // companion-product structural check failed.
+    if (!allConditionsMet && !companionFailed && conditionKeys.length > 0 && hasEmptyLeadData && campaignMatches) {
       return {
         commission: rule.commission_dkk,
         revenue: rule.revenue_dkk,
@@ -494,46 +531,8 @@ serve(async (req) => {
       );
     }
 
-    // Prefetch sibling sale_items metadata (needed to detect and prevent duplicate ASE Lønsikring)
-    const saleIdsForContext = [...new Set(saleItems.map((si: any) => si.sale_id).filter(Boolean))] as string[];
-
-    type SaleItemMeta = {
-      id: string;
-      sale_id: string;
-      product_id: string | null;
-      adversus_product_title: string | null;
-      adversus_external_id: string | null;
-    };
-
-    const saleItemMetaById = new Map<string, SaleItemMeta>();
-    const saleItemsBySaleId = new Map<string, SaleItemMeta[]>();
-
-    // Sibling prefetch is only needed for ASE ghost-item / duplicate-Lønsikring detection.
-    // Skip it for non-ASE rematches to save significant CPU and DB time.
-    const needsSiblingContext = !source || source === "ase" || saleItems.some((si: any) => (si.sales as any)?.source === "ase");
-    if (needsSiblingContext && saleIdsForContext.length > 0) {
-      const saleIdChunkSize = 500;
-      for (let i = 0; i < saleIdsForContext.length; i += saleIdChunkSize) {
-        const chunk = saleIdsForContext.slice(i, i + saleIdChunkSize);
-        const { data: siblings, error: siblingsError } = await supabase
-          .from("sale_items")
-          .select("id, sale_id, product_id, adversus_product_title, adversus_external_id")
-          .in("sale_id", chunk);
-
-        if (siblingsError) {
-          console.error("[rematch-pricing-rules] Error fetching sibling sale_items:", siblingsError);
-        }
-
-        for (const si of (siblings || []) as SaleItemMeta[]) {
-          saleItemMetaById.set(si.id, si);
-          const existing = saleItemsBySaleId.get(si.sale_id) || [];
-          existing.push(si);
-          saleItemsBySaleId.set(si.sale_id, existing);
-        }
-      }
-    }
-
-    // Fetch all active pricing rules (include effective dates and immediate payment rates)
+    // Fetch all active pricing rules FIRST — we need to know if any rule uses
+    // companion-product conditions before deciding whether to prefetch siblings.
     const { data: pricingRules, error: rulesError } = await supabase
       .from("product_pricing_rules")
       .select("id, product_id, name, conditions, commission_dkk, revenue_dkk, priority, is_active, campaign_mapping_ids, campaign_match_mode, allows_immediate_payment, effective_from, effective_to, immediate_payment_commission_dkk, immediate_payment_revenue_dkk, use_rule_name_as_display")
@@ -555,6 +554,79 @@ serve(async (req) => {
     }
 
     console.log(`[rematch-pricing-rules] Loaded ${pricingRules?.length || 0} active pricing rules for ${pricingRulesMap.size} products`);
+
+    // Detect whether any active rule uses a companion-product condition.
+    // If so, we must prefetch siblings even for non-ASE runs.
+    const hasCompanionRules = (pricingRules || []).some((r: any) => {
+      const cs = r.conditions || {};
+      for (const v of Object.values(cs)) {
+        if (v && typeof v === "object" && (v as any).__companion__ === true) return true;
+      }
+      return false;
+    });
+    if (hasCompanionRules) {
+      console.log(`[rematch-pricing-rules] Companion-product rules detected — sibling prefetch enabled`);
+    }
+
+    // Prefetch sibling sale_items metadata:
+    //   - Needed for ASE ghost-item / duplicate-Lønsikring detection.
+    //   - Needed whenever any active rule has a companion-product condition
+    //     (companion evaluation checks other product_ids on the same sale).
+    const saleIdsForContext = [...new Set(saleItems.map((si: any) => si.sale_id).filter(Boolean))] as string[];
+
+    type SaleItemMeta = {
+      id: string;
+      sale_id: string;
+      product_id: string | null;
+      adversus_product_title: string | null;
+      adversus_external_id: string | null;
+      quantity: number | null;
+      cancelled_quantity: number | null;
+    };
+
+    const saleItemMetaById = new Map<string, SaleItemMeta>();
+    const saleItemsBySaleId = new Map<string, SaleItemMeta[]>();
+    // Map<sale_id, Set<product_id>> of net-active companion products on the sale.
+    const activeProductIdsBySaleId = new Map<string, Set<string>>();
+
+    const needsSiblingContext =
+      hasCompanionRules ||
+      !source ||
+      source === "ase" ||
+      saleItems.some((si: any) => (si.sales as any)?.source === "ase");
+
+    if (needsSiblingContext && saleIdsForContext.length > 0) {
+      const saleIdChunkSize = 500;
+      for (let i = 0; i < saleIdsForContext.length; i += saleIdChunkSize) {
+        const chunk = saleIdsForContext.slice(i, i + saleIdChunkSize);
+        const { data: siblings, error: siblingsError } = await supabase
+          .from("sale_items")
+          .select("id, sale_id, product_id, adversus_product_title, adversus_external_id, quantity, cancelled_quantity")
+          .in("sale_id", chunk);
+
+        if (siblingsError) {
+          console.error("[rematch-pricing-rules] Error fetching sibling sale_items:", siblingsError);
+        }
+
+        for (const si of (siblings || []) as SaleItemMeta[]) {
+          saleItemMetaById.set(si.id, si);
+          const existing = saleItemsBySaleId.get(si.sale_id) || [];
+          existing.push(si);
+          saleItemsBySaleId.set(si.sale_id, existing);
+
+          if (si.product_id) {
+            const qty = si.quantity ?? 1;
+            const cancelled = si.cancelled_quantity ?? 0;
+            if (qty - cancelled > 0) {
+              const set = activeProductIdsBySaleId.get(si.sale_id) || new Set<string>();
+              set.add(si.product_id);
+              activeProductIdsBySaleId.set(si.sale_id, set);
+            }
+          }
+        }
+      }
+    }
+
 
     // Fetch all products with base prices for fallback
     const { data: products, error: productsError } = await supabase
@@ -726,8 +798,25 @@ serve(async (req) => {
       // Get sale date for date-based rule filtering
       const saleDate = sale?.sale_datetime || null;
 
+      // Build sibling product-id set for companion-condition evaluation.
+      // Excludes the current line's own product (and net-cancelled lines, already
+      // filtered when the map was built above).
+      const allSiblingProducts = activeProductIdsBySaleId.get(item.sale_id);
+      let siblingProductIds: Set<string> | null = null;
+      if (allSiblingProducts) {
+        siblingProductIds = new Set(allSiblingProducts);
+        if (item.product_id) siblingProductIds.delete(item.product_id);
+      }
+
       // Try to match a pricing rule with the correct product ID and sale date
-      const matchedRule = matchPricingRule(correctProductId, pricingRulesMap, rawPayloadData, campaignMappingId, saleDate);
+      const matchedRule = matchPricingRule(
+        correctProductId,
+        pricingRulesMap,
+        rawPayloadData,
+        campaignMappingId,
+        saleDate,
+        siblingProductIds,
+      );
 
       if (matchedRule) {
         const qty = item.quantity || 1;

@@ -365,9 +365,21 @@ export function ProductPricingRulesDialog({
     }
   };
 
-  const formatConditions = (conditions: Record<string, string>) => {
+  const formatConditions = (conditions: Record<string, unknown>) => {
     return Object.entries(conditions)
-      .map(([key, value]) => `${key}=${value}`)
+      .map(([key, value]) => {
+        if (value && typeof value === "object" && (value as any).__companion__ === true) {
+          const ids = (value as any).product_ids as string[] | undefined;
+          const count = ids?.length ?? 0;
+          return `${key} (${count} produkt${count === 1 ? "" : "er"})`;
+        }
+        if (value && typeof value === "object" && "operator" in (value as any)) {
+          const op = (value as any).operator;
+          const v = (value as any).value;
+          return `${key} ${op} ${v}`;
+        }
+        return `${key}=${value}`;
+      })
       .join(", ");
   };
 
@@ -404,6 +416,7 @@ export function ProductPricingRulesDialog({
             baseRevenue={parseFloat(localRevenue.replace(",", ".")) || 0}
             campaigns={campaigns || []}
             existingRule={editingRule}
+            clientId={clientId}
             onSave={handleSaveComplete}
             onCancel={() => {
               setEditingRule(null);
