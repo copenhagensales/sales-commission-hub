@@ -2580,7 +2580,7 @@ export default function MgTest() {
                                                   baseRevenue: row.product?.revenue_dkk ?? 0,
                                                   countsAsSale: row.product?.counts_as_sale ?? true,
                                                   countsAsCrossSale: row.product?.counts_as_cross_sale ?? false,
-                                                  clientId: clientCampaigns?.find(c => c.id === row.product?.client_campaign_id)?.client_id,
+                                                  clientId: (row as any).campaignId ?? clientCampaigns?.find(c => c.id === row.product?.client_campaign_id)?.client_id,
                                                 })}
                                                 title="Administrer prissætning"
                                               >
