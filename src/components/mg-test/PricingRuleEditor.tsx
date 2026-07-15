@@ -619,87 +619,122 @@ export function PricingRuleEditor({
             {Object.entries(conditions).map(([key, value]) => (
               <div
                 key={key}
-                className="flex items-center gap-2 bg-muted/30 p-2 rounded"
+                className={
+                  isCompanionCondition(value)
+                    ? "bg-muted/30 p-3 rounded space-y-2"
+                    : "flex items-center gap-2 bg-muted/30 p-2 rounded"
+                }
               >
-                <span className="flex-shrink-0 font-medium text-sm">{key}</span>
-                
-                {isNumericCondition(value) ? (
-                  // Numeric condition UI: operator dropdown + number input
+                {isCompanionCondition(value) ? (
                   <>
-                    <Select
-                      value={value.operator}
-                      onValueChange={(op) => updateNumericCondition(key, 'operator', op)}
-                    >
-                      <SelectTrigger className="w-44">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {NUMERIC_OPERATORS.map((op) => (
-                          <SelectItem key={op.value} value={op.value}>
-                            {op.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {value.operator !== 'in' && (
-                      <Input
-                        type="number"
-                        className="w-28"
-                        value={value.value}
-                        onChange={(e) => updateNumericCondition(key, 'value', e.target.value)}
-                        placeholder={value.operator === 'between' ? 'Fra' : 'Beløb'}
-                      />
-                    )}
-                    {value.operator === 'between' && (
-                      <>
-                        <span className="text-muted-foreground text-sm">og</span>
-                        <Input
-                          type="number"
-                          className="w-28"
-                          value={value.value2 ?? 0}
-                          onChange={(e) => updateNumericCondition(key, 'value2', e.target.value)}
-                          placeholder="Til"
-                        />
-                      </>
-                    )}
-                    {value.operator === 'in' && (
-                      <InMultiValueInput
-                        values={value.values ?? []}
-                        onAdd={(v) => addNumericValue(key, v)}
-                        onRemove={(v) => removeNumericValue(key, v)}
-                      />
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium text-sm">{key}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeCondition(key)}
+                        className="text-destructive hover:text-destructive h-8 w-8"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Reglen matcher kun hvis salget også indeholder mindst ét af de valgte produkter. Samme CVR og ordre er garanteret, fordi et salg altid er én ordre til én kunde.
+                    </p>
+                    <CompanionProductPicker
+                      products={relatelProducts || []}
+                      selectedIds={value.product_ids}
+                      onToggle={(pid) => toggleCompanionProduct(key, pid)}
+                    />
+                    {value.product_ids.length === 0 && (
+                      <p className="text-xs text-destructive">
+                        Vælg mindst ét produkt.
+                      </p>
                     )}
                   </>
                 ) : (
-                  // String condition UI: equals + dropdown
                   <>
-                    <span className="text-muted-foreground">=</span>
-                    <Select
-                      value={value as string}
-                      onValueChange={(newValue) => updateCondition(key, newValue)}
+                    <span className="flex-shrink-0 font-medium text-sm">{key}</span>
+
+                    {isNumericCondition(value) ? (
+                      // Numeric condition UI: operator dropdown + number input
+                      <>
+                        <Select
+                          value={value.operator}
+                          onValueChange={(op) => updateNumericCondition(key, 'operator', op)}
+                        >
+                          <SelectTrigger className="w-44">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {NUMERIC_OPERATORS.map((op) => (
+                              <SelectItem key={op.value} value={op.value}>
+                                {op.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {value.operator !== 'in' && (
+                          <Input
+                            type="number"
+                            className="w-28"
+                            value={value.value}
+                            onChange={(e) => updateNumericCondition(key, 'value', e.target.value)}
+                            placeholder={value.operator === 'between' ? 'Fra' : 'Beløb'}
+                          />
+                        )}
+                        {value.operator === 'between' && (
+                          <>
+                            <span className="text-muted-foreground text-sm">og</span>
+                            <Input
+                              type="number"
+                              className="w-28"
+                              value={value.value2 ?? 0}
+                              onChange={(e) => updateNumericCondition(key, 'value2', e.target.value)}
+                              placeholder="Til"
+                            />
+                          </>
+                        )}
+                        {value.operator === 'in' && (
+                          <InMultiValueInput
+                            values={value.values ?? []}
+                            onAdd={(v) => addNumericValue(key, v)}
+                            onRemove={(v) => removeNumericValue(key, v)}
+                          />
+                        )}
+                      </>
+                    ) : (
+                      // String condition UI: equals + dropdown
+                      <>
+                        <span className="text-muted-foreground">=</span>
+                        <Select
+                          value={value as string}
+                          onValueChange={(newValue) => updateCondition(key, newValue)}
+                        >
+                          <SelectTrigger className="w-32">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {CONDITION_OPTIONS[key]?.map((option) => (
+                              <SelectItem key={option} value={option}>
+                                {option}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </>
+                    )}
+
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeCondition(key)}
+                      className="text-destructive hover:text-destructive"
                     >
-                      <SelectTrigger className="w-32">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {CONDITION_OPTIONS[key]?.map((option) => (
-                          <SelectItem key={option} value={option}>
-                            {option}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </>
                 )}
-                
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => removeCondition(key)}
-                  className="text-destructive hover:text-destructive"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
               </div>
             ))}
           </div>
@@ -708,6 +743,7 @@ export function PricingRuleEditor({
             Ingen betingelser tilføjet - reglen matcher alle salg
           </p>
         )}
+
 
         {availableKeys.length > 0 && (
           <Select onValueChange={(key) => addCondition(key)}>
