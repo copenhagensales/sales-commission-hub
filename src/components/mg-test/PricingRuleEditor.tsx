@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Trash2, Plus, ChevronDown, CalendarIcon, Loader2, X } from "lucide-react";
+import { Trash2, Plus, ChevronDown, CalendarIcon, Loader2, X, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
@@ -31,6 +31,7 @@ import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useMgTestMutationSync } from "@/hooks/useMgTestMutationSync";
+import { CLIENT_IDS } from "@/utils/clientIds";
 
 // Available condition keys and their possible values
 const CONDITION_OPTIONS: Record<string, string[]> = {
