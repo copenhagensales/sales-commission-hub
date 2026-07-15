@@ -1,34 +1,21 @@
 ## Problem
-v3-filen bruger et bredt navnefilter (`Fri Tale`, `MBB`, `M2M`, …) fordi jeg antog Relatel-produkter uden `client_campaign_id` ikke kunne findes ellers. Det var forkert:
+I `relatel-produkter-v4.xlsx` er kolonnerne **"Provision v. tilskud=0 (kr)"** og **"Omsætning v. tilskud=0 (kr)"** tomme for alle produkter, selvom der findes aktive regler med `conditions = {"Tilskud": "0%"}` (fx `Uden tilskud`, `Tilskud`, `Ny tilskud`).
 
-- Filen indeholder **12 Eesy TM** og **6 TDC Erhverv** produkter der ikke er Relatel
-- Filen mangler Relatel-produkter der ikke matcher navnefiltret
+## Rod-årsag
+Filter-funktionen `has_subsidy_zero(r)` i `/tmp/build_relatel_v3.py` (linje 44-53) sammenligner værdien mod `('0', '0.0', 'false', 'False')`.
 
-## Korrekt afgrænsning (samme logik som MgTest bruger)
-MgTest's `get_aggregated_product_types` RPC grupperer et produkt under en klient via:
-`COALESCE(products.client_campaign_id → clients, sales.client_campaign_id → clients)`
+DB gemmer værdien som **`"0%"`** (string med procent-tegn) — ingen af de fire strenge matcher. Resultat: `subsidy_zero_rule` er altid `None`, og de to kolonner + `Har tilskud-diff.` er tomme.
 
-Dvs. et produkt tilhører Relatel hvis:
-1. `products.client_campaign_id` peger på en Relatel-kampagne, **ELLER**
-2. Produktet er brugt i mindst ét `sale_item` hvor `sales.client_campaign_id` peger på en Relatel-kampagne
+## Fix
+Opdatér `has_subsidy_zero`:
+- Strip `%` og whitespace fra værdien før sammenligning.
+- Match hvis den normaliserede værdi er `"0"`, `"0.0"`, `"false"` (case-insensitive).
 
-Relatel client_id: `0ff8476d-16d8-4150-aee9-48ac90ec962d` (fra `src/utils/clientIds.ts`)
-
-**Resultat:** 190 produkter i alt, **96 med `is_hidden = false`**.
-
-## Output
-Ny fil: `/mnt/documents/relatel-produkter-v4.xlsx`
-
-Samme struktur som v3:
-- **Fane 1 – Aktuelle satser:** 96 produkter (kun `is_hidden = false`, kun Relatel via MgTest-definitionen)
-- **Fane 2 – Historik:** alle pricing-regler for de 96 produkter, sorteret pr. produkt → `effective_from` DESC
-
-Kolonner uændret fra v3.
+Regenerér `/mnt/documents/relatel-produkter-v4.xlsx` (overskriv — samme filnavn, da den nuværende v4 er fejlbehæftet).
 
 ## Verifikation
-1. Bekræft alle 96 produkter matcher MgTest's Relatel-visning (via RPC-logikken).
-2. Bekræft ingen produkter fra Eesy TM eller TDC Erhverv er med.
-3. Rapportér diff til dig: hvilke produkter der er nye vs. v3, og hvilke der er fjernet.
+- Åbn xlsx og bekræft at fx `5 GB - 1 Time BTL` nu viser Provision 250 / Omsætning 565 i tilskud=0-kolonnerne (matcher regel `Tilskud` i DB'en).
+- Tæl hvor mange af de 96 produkter der har tilskud=0-regel udfyldt, og rapportér tallet.
 
 ## Ingen kode-ændringer
-Engangs-eksport til `/mnt/documents/`.
+Engangs-rettelse af eksport-scriptet i `/tmp` + ny xlsx til `/mnt/documents/`.
