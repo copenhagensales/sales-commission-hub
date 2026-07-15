@@ -404,6 +404,7 @@ export function ProductPricingRulesDialog({
             baseRevenue={parseFloat(localRevenue.replace(",", ".")) || 0}
             campaigns={campaigns || []}
             existingRule={editingRule}
+            clientId={clientId}
             onSave={handleSaveComplete}
             onCancel={() => {
               setEditingRule(null);
