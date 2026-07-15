@@ -365,11 +365,16 @@ export function PricingRuleEditor({
   });
 
   const addCondition = (key: string) => {
-    if (NUMERIC_CONDITION_KEYS.includes(key)) {
+    if (key === COMPANION_CONDITION_KEY) {
+      setConditions((prev) => ({
+        ...prev,
+        [key]: { __companion__: true, product_ids: [] } satisfies CompanionConditionValue,
+      }));
+    } else if (NUMERIC_CONDITION_KEYS.includes(key)) {
       // Add numeric condition with default values
-      setConditions((prev) => ({ 
-        ...prev, 
-        [key]: { operator: 'gte' as const, value: 0 } 
+      setConditions((prev) => ({
+        ...prev,
+        [key]: { operator: 'gte' as const, value: 0 }
       }));
     } else {
       const defaultValue = CONDITION_OPTIONS[key]?.[0] || "";
@@ -377,8 +382,23 @@ export function PricingRuleEditor({
     }
   };
 
-  const updateCondition = (key: string, value: string | NumericConditionValue) => {
+  const updateCondition = (key: string, value: string | NumericConditionValue | CompanionConditionValue) => {
     setConditions((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const toggleCompanionProduct = (key: string, productId: string) => {
+    setConditions((prev) => {
+      const current = prev[key];
+      if (!isCompanionCondition(current)) return prev;
+      const exists = current.product_ids.includes(productId);
+      const next: CompanionConditionValue = {
+        __companion__: true,
+        product_ids: exists
+          ? current.product_ids.filter((id) => id !== productId)
+          : [...current.product_ids, productId],
+      };
+      return { ...prev, [key]: next };
+    });
   };
 
   const updateNumericCondition = (key: string, field: 'operator' | 'value' | 'value2', newValue: string | number) => {
