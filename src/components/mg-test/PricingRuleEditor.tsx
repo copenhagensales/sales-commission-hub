@@ -277,8 +277,15 @@ export function PricingRuleEditor({
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      // Guard: companion-condition must have at least one product selected.
+      for (const [k, v] of Object.entries(conditions)) {
+        if (isCompanionCondition(v) && v.product_ids.length === 0) {
+          throw new Error(`Betingelsen "${k}" skal have mindst ét produkt valgt`);
+        }
+      }
       // Convert conditions to JSON-compatible format for Supabase
       const conditionsJson = JSON.parse(JSON.stringify(conditions));
+
 
       const ruleData = {
         product_id: productId,
