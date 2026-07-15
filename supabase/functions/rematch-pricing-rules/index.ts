@@ -114,6 +114,19 @@ function isNumericCondition(value: unknown): value is NumericCondition {
   return typeof value === "object" && value !== null && "operator" in value && "value" in value;
 }
 
+interface CompanionCondition {
+  __companion__: true;
+  product_ids: string[];
+}
+
+function isCompanionCondition(value: unknown): value is CompanionCondition {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    (value as { __companion__?: unknown }).__companion__ === true
+  );
+}
+
 function evaluateNumericCondition(condition: NumericCondition, leadValue: string | undefined): boolean {
   const numericLeadValue = parseFloat(leadValue || "0");
   if (isNaN(numericLeadValue)) return false;
