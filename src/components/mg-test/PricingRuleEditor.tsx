@@ -168,6 +168,76 @@ function InMultiValueInput({ values, onAdd, onRemove }: { values: number[]; onAd
   );
 }
 
+// Searchable multi-select for companion products.
+function CompanionProductPicker({
+  products,
+  selectedIds,
+  onToggle,
+}: {
+  products: Array<{ id: string; name: string }>;
+  selectedIds: string[];
+  onToggle: (productId: string) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const selectedSet = new Set(selectedIds);
+  const filtered = products.filter((p) =>
+    p.name.toLowerCase().includes(search.trim().toLowerCase()),
+  );
+  const selectedProducts = products.filter((p) => selectedSet.has(p.id));
+
+  return (
+    <div className="space-y-2">
+      {selectedProducts.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {selectedProducts.map((p) => (
+            <Badge
+              key={p.id}
+              variant="secondary"
+              className="gap-1 cursor-pointer"
+              onClick={() => onToggle(p.id)}
+            >
+              {p.name}
+              <X className="h-3 w-3" />
+            </Badge>
+          ))}
+        </div>
+      )}
+      <div className="relative">
+        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Søg produkt..."
+          className="pl-8 h-9"
+        />
+      </div>
+      <div className="border rounded-md max-h-56 overflow-y-auto">
+        {filtered.length === 0 ? (
+          <p className="p-3 text-xs text-muted-foreground italic">
+            Ingen produkter fundet
+          </p>
+        ) : (
+          filtered.map((p) => (
+            <div
+              key={p.id}
+              className="flex items-center gap-2 hover:bg-muted/50 p-2 cursor-pointer"
+              onClick={() => onToggle(p.id)}
+            >
+              <Checkbox
+                checked={selectedSet.has(p.id)}
+                onCheckedChange={() => onToggle(p.id)}
+              />
+              <span className="text-sm">{p.name}</span>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+
+
 export function PricingRuleEditor({
   productId,
   productName,
