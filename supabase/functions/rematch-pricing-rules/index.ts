@@ -798,8 +798,25 @@ serve(async (req) => {
       // Get sale date for date-based rule filtering
       const saleDate = sale?.sale_datetime || null;
 
+      // Build sibling product-id set for companion-condition evaluation.
+      // Excludes the current line's own product (and net-cancelled lines, already
+      // filtered when the map was built above).
+      const allSiblingProducts = activeProductIdsBySaleId.get(item.sale_id);
+      let siblingProductIds: Set<string> | null = null;
+      if (allSiblingProducts) {
+        siblingProductIds = new Set(allSiblingProducts);
+        if (item.product_id) siblingProductIds.delete(item.product_id);
+      }
+
       // Try to match a pricing rule with the correct product ID and sale date
-      const matchedRule = matchPricingRule(correctProductId, pricingRulesMap, rawPayloadData, campaignMappingId, saleDate);
+      const matchedRule = matchPricingRule(
+        correctProductId,
+        pricingRulesMap,
+        rawPayloadData,
+        campaignMappingId,
+        saleDate,
+        siblingProductIds,
+      );
 
       if (matchedRule) {
         const qty = item.quantity || 1;
