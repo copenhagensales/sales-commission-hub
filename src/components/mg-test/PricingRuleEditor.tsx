@@ -53,6 +53,9 @@ const CONDITION_OPTIONS: Record<string, string[]> = {
 // Keys that use numeric comparison instead of dropdown
 const NUMERIC_CONDITION_KEYS = ["Dækningssum"];
 
+// Companion-product condition key. Only shown for Relatel products.
+const COMPANION_CONDITION_KEY = "Solgt sammen med";
+
 // Operators for numeric conditions
 const NUMERIC_OPERATORS = [
   { value: "gte", label: "Over eller lig med (≥)" },
@@ -71,10 +74,23 @@ interface NumericConditionValue {
   values?: number[];
 }
 
+// Type for companion-product condition value.
+// mode is always "any_of" (OR between selected products) in v1.
+interface CompanionConditionValue {
+  __companion__: true;
+  product_ids: string[];
+}
+
 // Check if a condition value is numeric
 function isNumericCondition(value: unknown): value is NumericConditionValue {
   return typeof value === 'object' && value !== null && 'operator' in value && 'value' in value;
 }
+
+// Check if a condition value is a companion-product condition
+function isCompanionCondition(value: unknown): value is CompanionConditionValue {
+  return typeof value === 'object' && value !== null && (value as any).__companion__ === true;
+}
+
 
 interface PricingRule {
   id: string;
