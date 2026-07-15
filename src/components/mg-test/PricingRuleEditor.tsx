@@ -177,6 +177,7 @@ export function PricingRuleEditor({
   existingRule,
   onSave,
   onCancel,
+  clientId,
 }: PricingRuleEditorProps) {
   const [name, setName] = useState(existingRule?.name || "");
   const [priority, setPriority] = useState(existingRule?.priority || 0);
@@ -187,9 +188,9 @@ export function PricingRuleEditor({
     existingRule?.campaign_match_mode === "exclude" ? "exclude" : "include"
   );
   const [campaignsOpen, setCampaignsOpen] = useState(false);
-  const [conditions, setConditions] = useState<Record<string, string | NumericConditionValue>>(
-    existingRule?.conditions || {}
-  );
+  const [conditions, setConditions] = useState<
+    Record<string, string | NumericConditionValue | CompanionConditionValue>
+  >(existingRule?.conditions || {});
   const [commission, setCommission] = useState(
     existingRule?.commission_dkk?.toString() || baseCommission.toString()
   );
@@ -223,9 +224,37 @@ export function PricingRuleEditor({
   // Centralized post-mutation sync (invalidation + rematch + KPI + realtime)
   const { sync } = useMgTestMutationSync();
 
-  // Get available condition keys (not already used) - include numeric keys
+  // Relatel is the only client that currently supports the companion-product condition.
+  const isRelatelProduct = !!clientId && clientId === CLIENT_IDS["Relatel"];
+
+  // Fetch Relatel products for the companion-product picker (only when relevant).
+  const { data: relatelProducts } = useQuery({
+    queryKey: ["relatel-products-for-companion"],
+    enabled: isRelatelProduct,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, name, client_campaigns!inner(client_id)")
+        .eq("client_campaigns.client_id", CLIENT_IDS["Relatel"])
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      // Dedupe by product id (a product can join through multiple campaigns)
+      const seen = new Map<string, { id: string; name: string }>();
+      for (const row of (data || []) as Array<{ id: string; name: string | null }>) {
+        if (!seen.has(row.id)) seen.set(row.id, { id: row.id, name: row.name || "" });
+      }
+      return Array.from(seen.values());
+    },
+  });
+
+  // Get available condition keys (not already used) - include numeric keys and companion key
   const usedKeys = Object.keys(conditions);
-  const allAvailableKeys = [...Object.keys(CONDITION_OPTIONS), ...NUMERIC_CONDITION_KEYS];
+  const allAvailableKeys = [
+    ...Object.keys(CONDITION_OPTIONS),
+    ...NUMERIC_CONDITION_KEYS,
+    ...(isRelatelProduct ? [COMPANION_CONDITION_KEY] : []),
+  ];
   const availableKeys = allAvailableKeys.filter(
     (key) => !usedKeys.includes(key)
   );
