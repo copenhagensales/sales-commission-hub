@@ -531,46 +531,8 @@ serve(async (req) => {
       );
     }
 
-    // Prefetch sibling sale_items metadata (needed to detect and prevent duplicate ASE Lønsikring)
-    const saleIdsForContext = [...new Set(saleItems.map((si: any) => si.sale_id).filter(Boolean))] as string[];
-
-    type SaleItemMeta = {
-      id: string;
-      sale_id: string;
-      product_id: string | null;
-      adversus_product_title: string | null;
-      adversus_external_id: string | null;
-    };
-
-    const saleItemMetaById = new Map<string, SaleItemMeta>();
-    const saleItemsBySaleId = new Map<string, SaleItemMeta[]>();
-
-    // Sibling prefetch is only needed for ASE ghost-item / duplicate-Lønsikring detection.
-    // Skip it for non-ASE rematches to save significant CPU and DB time.
-    const needsSiblingContext = !source || source === "ase" || saleItems.some((si: any) => (si.sales as any)?.source === "ase");
-    if (needsSiblingContext && saleIdsForContext.length > 0) {
-      const saleIdChunkSize = 500;
-      for (let i = 0; i < saleIdsForContext.length; i += saleIdChunkSize) {
-        const chunk = saleIdsForContext.slice(i, i + saleIdChunkSize);
-        const { data: siblings, error: siblingsError } = await supabase
-          .from("sale_items")
-          .select("id, sale_id, product_id, adversus_product_title, adversus_external_id")
-          .in("sale_id", chunk);
-
-        if (siblingsError) {
-          console.error("[rematch-pricing-rules] Error fetching sibling sale_items:", siblingsError);
-        }
-
-        for (const si of (siblings || []) as SaleItemMeta[]) {
-          saleItemMetaById.set(si.id, si);
-          const existing = saleItemsBySaleId.get(si.sale_id) || [];
-          existing.push(si);
-          saleItemsBySaleId.set(si.sale_id, existing);
-        }
-      }
-    }
-
-    // Fetch all active pricing rules (include effective dates and immediate payment rates)
+    // Fetch all active pricing rules FIRST — we need to know if any rule uses
+    // companion-product conditions before deciding whether to prefetch siblings.
     const { data: pricingRules, error: rulesError } = await supabase
       .from("product_pricing_rules")
       .select("id, product_id, name, conditions, commission_dkk, revenue_dkk, priority, is_active, campaign_mapping_ids, campaign_match_mode, allows_immediate_payment, effective_from, effective_to, immediate_payment_commission_dkk, immediate_payment_revenue_dkk, use_rule_name_as_display")
@@ -592,6 +554,79 @@ serve(async (req) => {
     }
 
     console.log(`[rematch-pricing-rules] Loaded ${pricingRules?.length || 0} active pricing rules for ${pricingRulesMap.size} products`);
+
+    // Detect whether any active rule uses a companion-product condition.
+    // If so, we must prefetch siblings even for non-ASE runs.
+    const hasCompanionRules = (pricingRules || []).some((r: any) => {
+      const cs = r.conditions || {};
+      for (const v of Object.values(cs)) {
+        if (v && typeof v === "object" && (v as any).__companion__ === true) return true;
+      }
+      return false;
+    });
+    if (hasCompanionRules) {
+      console.log(`[rematch-pricing-rules] Companion-product rules detected — sibling prefetch enabled`);
+    }
+
+    // Prefetch sibling sale_items metadata:
+    //   - Needed for ASE ghost-item / duplicate-Lønsikring detection.
+    //   - Needed whenever any active rule has a companion-product condition
+    //     (companion evaluation checks other product_ids on the same sale).
+    const saleIdsForContext = [...new Set(saleItems.map((si: any) => si.sale_id).filter(Boolean))] as string[];
+
+    type SaleItemMeta = {
+      id: string;
+      sale_id: string;
+      product_id: string | null;
+      adversus_product_title: string | null;
+      adversus_external_id: string | null;
+      quantity: number | null;
+      cancelled_quantity: number | null;
+    };
+
+    const saleItemMetaById = new Map<string, SaleItemMeta>();
+    const saleItemsBySaleId = new Map<string, SaleItemMeta[]>();
+    // Map<sale_id, Set<product_id>> of net-active companion products on the sale.
+    const activeProductIdsBySaleId = new Map<string, Set<string>>();
+
+    const needsSiblingContext =
+      hasCompanionRules ||
+      !source ||
+      source === "ase" ||
+      saleItems.some((si: any) => (si.sales as any)?.source === "ase");
+
+    if (needsSiblingContext && saleIdsForContext.length > 0) {
+      const saleIdChunkSize = 500;
+      for (let i = 0; i < saleIdsForContext.length; i += saleIdChunkSize) {
+        const chunk = saleIdsForContext.slice(i, i + saleIdChunkSize);
+        const { data: siblings, error: siblingsError } = await supabase
+          .from("sale_items")
+          .select("id, sale_id, product_id, adversus_product_title, adversus_external_id, quantity, cancelled_quantity")
+          .in("sale_id", chunk);
+
+        if (siblingsError) {
+          console.error("[rematch-pricing-rules] Error fetching sibling sale_items:", siblingsError);
+        }
+
+        for (const si of (siblings || []) as SaleItemMeta[]) {
+          saleItemMetaById.set(si.id, si);
+          const existing = saleItemsBySaleId.get(si.sale_id) || [];
+          existing.push(si);
+          saleItemsBySaleId.set(si.sale_id, existing);
+
+          if (si.product_id) {
+            const qty = si.quantity ?? 1;
+            const cancelled = si.cancelled_quantity ?? 0;
+            if (qty - cancelled > 0) {
+              const set = activeProductIdsBySaleId.get(si.sale_id) || new Set<string>();
+              set.add(si.product_id);
+              activeProductIdsBySaleId.set(si.sale_id, set);
+            }
+          }
+        }
+      }
+    }
+
 
     // Fetch all products with base prices for fallback
     const { data: products, error: productsError } = await supabase
