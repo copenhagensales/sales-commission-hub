@@ -210,7 +210,8 @@ function matchPricingRule(
   pricingRulesMap: Map<string, PricingRule[]>,
   rawPayloadData: Record<string, unknown> | undefined,
   campaignMappingId?: string | null,
-  saleDate?: string | null // ISO date string for date-based filtering
+  saleDate?: string | null, // ISO date string for date-based filtering
+  siblingProductIds?: Set<string> | null,
 ): { commission: number; revenue: number; ruleId: string; ruleName: string; allowsImmediatePayment: boolean; immediatePaymentCommission: number | null; immediatePaymentRevenue: number | null; displayName: string | null } | null {
   const rules = pricingRulesMap.get(productId);
   if (!rules || rules.length === 0) return null;
@@ -270,8 +271,30 @@ function matchPricingRule(
     const conditions = rule.conditions || {};
     const conditionKeys = Object.keys(conditions);
     let allConditionsMet = true;
+    // Companion-product conditions must NEVER trigger the "empty lead data" campaign
+    // fallback below (that fallback is for missing Adversus lead fields, not for
+    // structural checks against the sale itself). Track separately.
+    let companionFailed = false;
 
     for (const [condKey, condValue] of Object.entries(conditions)) {
+      if (isCompanionCondition(condValue)) {
+        const required = condValue.product_ids || [];
+        if (required.length === 0) {
+          // Empty companion list = misconfigured rule → treat as no match.
+          allConditionsMet = false;
+          companionFailed = true;
+          break;
+        }
+        const siblings = siblingProductIds || new Set<string>();
+        const matches = required.some((pid) => siblings.has(pid));
+        if (!matches) {
+          allConditionsMet = false;
+          companionFailed = true;
+          break;
+        }
+        continue;
+      }
+
       const leadField = allFields.find((f) => f.label === condKey);
 
       if (isNumericCondition(condValue)) {
@@ -287,8 +310,9 @@ function matchPricingRule(
       }
     }
 
-    // Campaign fallback logic
-    if (!allConditionsMet && conditionKeys.length > 0 && hasEmptyLeadData && campaignMatches) {
+    // Campaign fallback logic — only for empty lead data, and never when the
+    // companion-product structural check failed.
+    if (!allConditionsMet && !companionFailed && conditionKeys.length > 0 && hasEmptyLeadData && campaignMatches) {
       return {
         commission: rule.commission_dkk,
         revenue: rule.revenue_dkk,
