@@ -1,10 +1,3 @@
-## Fix: Inkludér FM i omsætning pr. medarbejder
-
-**Problem:** `get_monthly_revenue` RPC filtrerer FM fra (`source != 'fieldmarketing'`), men nævneren (headcount) inkluderer FM-medarbejdere. Resultat: skæv graf.
-
-**Ændring:** Fjern FM-filteret i RPC'en, så tæller og nævner matcher.
-
-```sql
 CREATE OR REPLACE FUNCTION public.get_monthly_revenue(p_start timestamptz, p_end timestamptz)
 RETURNS TABLE(month_start date, revenue numeric)
 LANGUAGE sql STABLE SECURITY DEFINER
@@ -20,8 +13,3 @@ AS $$
   GROUP BY 1
   ORDER BY 1;
 $$;
-```
-
-Ingen frontend-ændringer nødvendige — RPC-signaturen er uændret.
-
-**Note:** Dette er samlet TM+FM omsætning pr. medarbejder. Hvis du hellere vil have to separate linjer (TM/FM), sig til — så laver jeg det i stedet.
