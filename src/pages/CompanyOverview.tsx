@@ -402,6 +402,7 @@ export default function CompanyOverview() {
           <HistoricalTenureStats />
           <ChurnTrendChart />
           <ChurnTrendChartCombined />
+          <HeadcountTrendChart />
         </div>
       </div>
     </MainLayout>
