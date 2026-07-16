@@ -14322,6 +14322,13 @@ export type Database = {
           status: string
         }[]
       }
+      get_monthly_revenue: {
+        Args: { p_end: string; p_start: string }
+        Returns: {
+          month_start: string
+          revenue: number
+        }[]
+      }
       get_personal_daily_commission: {
         Args: {
           p_employee_id: string
