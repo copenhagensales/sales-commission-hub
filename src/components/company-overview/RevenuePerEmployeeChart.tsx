@@ -88,32 +88,38 @@ export function RevenuePerEmployeeChart() {
     },
   });
 
-  // Månedlig omsætning — én RPC pr. måned, parallelt.
+  // Månedlig omsætning — ét RPC-kald returnerer alle måneder samlet.
+  const rangeStart = months[0]?.monthStart;
+  const rangeEnd = months[months.length - 1]?.monthEnd;
   const { data: revenueByMonth, isLoading: loadingRevenue } = useQuery({
-    queryKey: ["revenue-per-employee-monthly", months.map((m) => m.label).join("|")],
+    queryKey: [
+      "revenue-per-employee-monthly",
+      rangeStart?.toISOString(),
+      rangeEnd?.toISOString(),
+    ],
+    enabled: !!rangeStart && !!rangeEnd,
     queryFn: async () => {
-      const results = await Promise.all(
-        months.map(async (m) => {
-          // For nuværende måned: cut off ved dags dato.
-          const end = m.monthEnd > today ? today : m.monthEnd;
-          const { data, error } = await supabase.rpc("get_sales_aggregates", {
-            p_start: m.monthStart.toISOString(),
-            p_end: end.toISOString(),
-            p_team_id: null,
-            p_employee_id: null,
-            p_client_id: null,
-          });
-          if (error) throw error;
-          const row = (data as any)?.[0];
-          return {
-            label: m.label,
-            revenue: Number(row?.total_revenue) || 0,
-          };
-        })
-      );
-      return results;
+      // p_end er eksklusiv i RPC'en — brug dagen efter sidste månedsslut.
+      const end = new Date(rangeEnd!);
+      end.setDate(end.getDate() + 1);
+      const { data, error } = await supabase.rpc("get_monthly_revenue", {
+        p_start: rangeStart!.toISOString(),
+        p_end: end.toISOString(),
+      });
+      if (error) throw error;
+      const byMonth = new Map<string, number>();
+      ((data as any[]) || []).forEach((r) => {
+        // month_start kommer som 'YYYY-MM-DD' — brug 'YYYY-MM' som nøgle.
+        const key = String(r.month_start).slice(0, 7);
+        byMonth.set(key, Number(r.revenue) || 0);
+      });
+      return months.map((m) => {
+        const key = format(m.monthStart, "yyyy-MM");
+        return { label: m.label, revenue: byMonth.get(key) ?? 0 };
+      });
     },
   });
+
 
   const isLoading = loadingRevenue || !currentEmployees || !historicalEmployees;
 
