@@ -102,7 +102,7 @@ export function RevenuePerEmployeeChart() {
       // p_end er eksklusiv i RPC'en — brug dagen efter sidste månedsslut.
       const end = new Date(rangeEnd!);
       end.setDate(end.getDate() + 1);
-      const { data, error } = await supabase.rpc("get_monthly_revenue", {
+      const { data, error } = await (supabase.rpc as any)("get_monthly_revenue", {
         p_start: rangeStart!.toISOString(),
         p_end: end.toISOString(),
       });
