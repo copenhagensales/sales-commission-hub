@@ -10,6 +10,7 @@ import { HistoricalTenureStats } from "@/components/company-overview/HistoricalT
 import { ChurnTrendChart } from "@/components/company-overview/ChurnTrendChart";
 import { ChurnTrendChartCombined } from "@/components/company-overview/ChurnTrendChartCombined";
 import { HeadcountTrendChart } from "@/components/company-overview/HeadcountTrendChart";
+import { RevenuePerEmployeeChart } from "@/components/company-overview/RevenuePerEmployeeChart";
 import { ChurnCalculator } from "@/components/company-overview/ChurnCalculator";
 
 // Normalize team names to handle variations
