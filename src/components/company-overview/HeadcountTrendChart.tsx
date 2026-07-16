@@ -77,13 +77,24 @@ export function HeadcountTrendChart() {
     ];
 
     const today = new Date();
-    const months = Array.from({ length: 12 }, (_, i) => {
-      const monthDate = subMonths(today, 11 - i);
+    // Trustworthy start: employee_master_data blev først oprettet december 2025.
+    // Måneder før det er rekonstrueret ud fra bagudfyldte datoer og vises ikke.
+    const TRUSTWORTHY_START = new Date(2025, 11, 1); // 1. dec 2025
+    const twelveMonthsAgo = startOfMonth(subMonths(today, 11));
+    const startMonth = twelveMonthsAgo > TRUSTWORTHY_START ? twelveMonthsAgo : TRUSTWORTHY_START;
+    const monthsBack = Math.max(
+      0,
+      (today.getFullYear() - startMonth.getFullYear()) * 12 +
+        (today.getMonth() - startMonth.getMonth())
+    );
+    const months = Array.from({ length: monthsBack + 1 }, (_, i) => {
+      const monthDate = subMonths(today, monthsBack - i);
       return {
         label: format(monthDate, "MMM yy", { locale: da }),
         monthEnd: endOfMonth(monthDate),
       };
     });
+
 
     return months.map(({ label, monthEnd }) => {
       // For nuværende måned: sammenlign med dags dato (ikke månedsslut i fremtiden).
