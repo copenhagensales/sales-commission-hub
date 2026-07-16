@@ -122,9 +122,9 @@ export function HeadcountTrendChart() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-xl">Antal ansatte – sidste 12 måneder</CardTitle>
+        <CardTitle className="text-xl">Antal ansatte – siden dec 2025</CardTitle>
         <p className="text-sm text-muted-foreground">
-          Reelt antal ansatte pr. månedsslut (ekskl. Stab).
+          Reelt antal ansatte pr. månedsslut (ekskl. Stab). Vises fra dec 2025, hvor data begyndte at blive registreret løbende.
           {!isLoading && chartData.length > 0 && (
             <>
               {" "}Nu: <span className="font-medium text-foreground">{latest}</span>
