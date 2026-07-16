@@ -404,6 +404,7 @@ export default function CompanyOverview() {
           <ChurnTrendChart />
           <ChurnTrendChartCombined />
           <HeadcountTrendChart />
+          <RevenuePerEmployeeChart />
         </div>
       </div>
     </MainLayout>
