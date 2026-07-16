@@ -102,19 +102,7 @@ export function HeadcountTrendChart() {
     });
   }, [currentEmployees, historicalEmployees]);
 
-        if (isStab(e.team_name)) return false;
-        if (!e.start_date) return false;
-        const start = parseISO(e.start_date);
-        if (start > monthEnd) return false;
-        if (e.end_date) {
-          const end = parseISO(e.end_date);
-          if (end < monthEnd) return false;
-        }
-        return true;
-      }).length;
-      return { month: label, count };
-    });
-  }, [currentEmployees, historicalEmployees]);
+
 
   const latest = chartData[chartData.length - 1]?.count ?? 0;
   const first = chartData[0]?.count ?? 0;
