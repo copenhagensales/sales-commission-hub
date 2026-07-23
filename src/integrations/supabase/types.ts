@@ -14413,6 +14413,7 @@ export type Database = {
               commission: number
               customer_company: string
               customer_phone: string
+              cvr_number: string
               employee_name: string
               internal_reference: string
               location_name: string
@@ -14437,6 +14438,7 @@ export type Database = {
               commission: number
               customer_company: string
               customer_phone: string
+              cvr_number: string
               employee_name: string
               internal_reference: string
               location_name: string
