@@ -22,6 +22,7 @@ interface RawRow {
   status: string;
   internal_reference: string;
   adversus_opp_number: string;
+  cvr_number?: string | null;
 }
 
 interface RawSalesTableProps {
@@ -75,6 +76,7 @@ export function RawSalesTable({ data, isLoading, isError, error }: RawSalesTable
             <TableHead>Status</TableHead>
             <TableHead>Reference</TableHead>
             <TableHead>OPP-nummer</TableHead>
+            <TableHead>CVR-nummer</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -107,6 +109,7 @@ export function RawSalesTable({ data, isLoading, isError, error }: RawSalesTable
               <TableCell>{r.status ?? ""}</TableCell>
               <TableCell>{r.internal_reference ?? ""}</TableCell>
               <TableCell>{r.adversus_opp_number ?? ""}</TableCell>
+              <TableCell>{r.cvr_number ?? ""}</TableCell>
             </TableRow>
           ))}
         </TableBody>
