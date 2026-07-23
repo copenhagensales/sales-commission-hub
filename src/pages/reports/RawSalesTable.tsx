@@ -109,6 +109,7 @@ export function RawSalesTable({ data, isLoading, isError, error }: RawSalesTable
               <TableCell>{r.status ?? ""}</TableCell>
               <TableCell>{r.internal_reference ?? ""}</TableCell>
               <TableCell>{r.adversus_opp_number ?? ""}</TableCell>
+              <TableCell>{r.cvr_number ?? ""}</TableCell>
             </TableRow>
           ))}
         </TableBody>
