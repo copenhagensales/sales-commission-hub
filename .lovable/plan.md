@@ -1,22 +1,28 @@
 ## Mål
-Vis Switch/Omstilling-produkter i Rådata-fanen på Rapporter Ledelse → Relatel uden at påvirke Opsummering, dashboards eller løn.
+Éngangs Excel-fil med oversigt over alle Relatel-omstillingsprodukter, deres aktuelle provision/omsætning + eventuel tilskud=0-regel.
 
-## Ændring
-Migration: drop og recreate begge overloads af `get_sales_report_raw`:
-- `(p_client_id uuid, p_start text, p_end text)`
-- `(p_client_id uuid, p_start text, p_end text, p_limit int, p_offset int)`
+## Scope
+- 33 aktive Relatel-produkter under kampagnen "Relatel Products" hvis navn starter med "Omstilling" (inkl. varianter: MV, Contact Center, Pro, Uden MV, Unlimited, Premium, Starter — Trin 1–5, ATL, 36 mdr.).
+- Ingen kodeændringer. Ingen DB-ændringer. Ren SQL-udtræk → xlsx i `/mnt/documents/`.
 
-Eneste forskel fra nuværende version: linjen `AND COALESCE(p2.counts_as_sale, true) = true` fjernes fra WHERE. Alt andet (kolonner, joins, CVR, Tilskud, OPP-udtræk, sortering) er identisk.
+## Kolonner i arket
+1. Produktnavn
+2. Basis provision (fra `products.commission_amount` eller aktiv "hovedside"-regel uden betingelser)
+3. Basis omsætning (`products.revenue_amount` / aktiv regel)
+4. Gældende fra (basis)
+5. Tilskud=0 provision (fra `product_pricing_rules` med betingelse tilskud=0, aktiv pr. dato)
+6. Tilskud=0 omsætning
+7. Tilskud=0 gældende fra
+8. Note (fx hvis flere aktive regler / manglende sats)
 
-`get_sales_report_detailed` røres ikke — Opsummering beholder filtret.
+Sorteres alfabetisk på produktnavn.
 
-## Ikke rørt
-- UI: `RawSalesTable.tsx` og `ReportsManagement.tsx` — ingen ændringer.
-- Andre RPC'er, hooks, dashboards, KPI'er, leaderboards, løn.
-- `sale_items`, `products`, `counts_as_sale`-værdier.
+## Fremgangsmåde
+1. Hent produkter + basis-satser + aktive prisregler via ét SQL-query mod `products` + `product_pricing_rules` (filtreret på `effective_from <= today` og `effective_to IS NULL OR effective_to >= today`).
+2. Klassificér regler: "basis" = ingen betingelser, "tilskud=0" = betingelse på tilskud-feltet.
+3. Byg xlsx med openpyxl, kør recalculate, gem som `/mnt/documents/relatel-omstilling-produkter.xlsx`.
+4. Præsentér via `<presentation-artifact>`.
 
-## Verifikation
-Efter migration: opslag på Relatel for en periode med kendte Omstilling-salg skal returnere disse rækker med korrekt produktnavn, provision og revenue fra `sale_items`.
-
-## Zone
-Gul — kun rapport-RPC.
+## Åbne spørgsmål (svar før build hvis relevant)
+- Skal både aktive OG udløbne regler med? → Antager **kun aktive pr. i dag** medmindre andet siges.
+- Skal jeg også inkludere Omstilling Premium/Starter/36 mdr.-varianter uden Trin? → Antager **ja, alle 33**.
