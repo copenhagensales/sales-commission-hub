@@ -78,6 +78,7 @@ export function RawSalesTable({ data, isLoading, isError, error }: RawSalesTable
             <TableHead>Reference</TableHead>
             <TableHead>OPP-nummer</TableHead>
             <TableHead>CVR-nummer</TableHead>
+            <TableHead>Tilskud</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
