@@ -1,28 +1,17 @@
-## Mål
-Éngangs Excel-fil med oversigt over alle Relatel-omstillingsprodukter, deres aktuelle provision/omsætning + eventuel tilskud=0-regel.
+## Problem
+Forrige Excel (`relatel-omstilling-produkter.xlsx`) sagde "ingen aktive Tilskud=0-regler". Det er forkert. Min filtrering fangede ikke `Omstillingsbruger*`-produkterne, som netop har mange tilskudsregler — inkl. de nye satser fra 15/6-2026 (`Uden tilskud`).
 
-## Scope
-- 33 aktive Relatel-produkter under kampagnen "Relatel Products" hvis navn starter med "Omstilling" (inkl. varianter: MV, Contact Center, Pro, Uden MV, Unlimited, Premium, Starter — Trin 1–5, ATL, 36 mdr.).
-- Ingen kodeændringer. Ingen DB-ændringer. Ren SQL-udtræk → xlsx i `/mnt/documents/`.
+## Plan (kun ny Excel — ingen kodeændringer)
 
-## Kolonner i arket
-1. Produktnavn
-2. Basis provision (fra `products.commission_amount` eller aktiv "hovedside"-regel uden betingelser)
-3. Basis omsætning (`products.revenue_amount` / aktiv regel)
-4. Gældende fra (basis)
-5. Tilskud=0 provision (fra `product_pricing_rules` med betingelse tilskud=0, aktiv pr. dato)
-6. Tilskud=0 omsætning
-7. Tilskud=0 gældende fra
-8. Note (fx hvis flere aktive regler / manglende sats)
+1. Bredere produkt-udvælgelse: alle aktive Relatel-produkter hvis navn matcher `%omstilling%` ELLER `%omstillingsbruger%` (case-insensitive), inkl. varianter #1–#N og trin-varianter.
+2. For hvert produkt hentes:
+   - Basis: `commission_dkk` / `revenue_dkk` fra `products`
+   - Alle aktive prisregler fra `product_pricing_rules` (også dem med `effective_to` i fremtiden), sorteret på `effective_from DESC`
+   - Særskilt kolonne for aktuelt gældende "Tilskud=0%"-regel pr. i dag (`effective_from <= today AND (effective_to IS NULL OR effective_to >= today)`)
+   - Kolonne for kommende/historiske "Tilskud=0%"-regler med gyldighedsperiode
+3. Genererer `relatel-omstilling-produkter-v2.xlsx` med to ark:
+   - **Oversigt**: én række pr. produkt — basis prov/oms + aktuel Tilskud=0-sats + `effective_from`/`effective_to`
+   - **Alle regler**: alle regler pr. produkt (rule name, betingelser, prov, oms, gyldighedsperiode, prioritet) så du kan se historikken
+4. QA: åbn filen, tjek at fx `Omstillingsbruger ATL`s regel "Uden tilskud" (405/734,45) og `Omstillingsbruger #1`s (410/746,55) er med.
 
-Sorteres alfabetisk på produktnavn.
-
-## Fremgangsmåde
-1. Hent produkter + basis-satser + aktive prisregler via ét SQL-query mod `products` + `product_pricing_rules` (filtreret på `effective_from <= today` og `effective_to IS NULL OR effective_to >= today`).
-2. Klassificér regler: "basis" = ingen betingelser, "tilskud=0" = betingelse på tilskud-feltet.
-3. Byg xlsx med openpyxl, kør recalculate, gem som `/mnt/documents/relatel-omstilling-produkter.xlsx`.
-4. Præsentér via `<presentation-artifact>`.
-
-## Åbne spørgsmål (svar før build hvis relevant)
-- Skal både aktive OG udløbne regler med? → Antager **kun aktive pr. i dag** medmindre andet siges.
-- Skal jeg også inkludere Omstilling Premium/Starter/36 mdr.-varianter uden Trin? → Antager **ja, alle 33**.
+Ingen kode eller DB røres — kun ny artefakt i `/mnt/documents/`.
