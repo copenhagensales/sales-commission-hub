@@ -56,6 +56,7 @@ interface RawRow {
   internal_reference: string;
   adversus_opp_number: string;
   cvr_number?: string | null;
+  tilskud?: string | null;
 }
 
 interface EmployeeRow {
