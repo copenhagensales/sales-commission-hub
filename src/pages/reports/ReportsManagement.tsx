@@ -56,6 +56,7 @@ interface RawRow {
   internal_reference: string;
   adversus_opp_number: string;
   cvr_number?: string | null;
+  tilskud?: string | null;
 }
 
 interface EmployeeRow {
@@ -204,13 +205,14 @@ export default function ReportsManagement() {
       Reference: r.internal_reference ?? "",
       "OPP-nummer": r.adversus_opp_number ?? "",
       "CVR-nummer": r.cvr_number ?? "",
+      "Tilskud": r.tilskud ?? "",
     }));
 
     await downloadExcel(
       `${clientLabel.toLowerCase().replace(/\s+/g, "-")}-salg-${periodLabel}.xlsx`,
       [
         { name: "Opsummering", rows: summaryRows, columnWidths: summaryWidths },
-        { name: "Rådata", rows: rawRows, columnWidths: [20, 25, 20, 22, 22, 8, 14, 14, 14, 20, 12, 18, 18, 14] },
+        { name: "Rådata", rows: rawRows, columnWidths: [20, 25, 20, 22, 22, 8, 14, 14, 14, 20, 12, 18, 18, 14, 10] },
       ]
     );
   };

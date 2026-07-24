@@ -14422,6 +14422,7 @@ export type Database = {
               revenue: number
               sale_datetime: string
               status: string
+              tilskud: string
             }[]
           }
         | {
@@ -14447,6 +14448,7 @@ export type Database = {
               revenue: number
               sale_datetime: string
               status: string
+              tilskud: string
             }[]
           }
       get_sales_with_unknown_products: {
