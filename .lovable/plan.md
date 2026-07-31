@@ -1,28 +1,39 @@
-## Formål
-Excel-fil med alle 270 salg fra Vorbasse-markedspladserne (16.–18. juli 2026), så du kan se hvilken sats de fik og hvilken de burde have fået.
+# Start et nyt Powerdag-spil
 
-## Scope
-- Kun de tre markedspladser: `Vorbasse kræmmermarked (plads 1/2/3)`. Den faste `Vorbasse (Yousee plads)` er ikke med (andet setup).
-- Kilde: `sales` + `sale_items` hvor `source='fieldmarketing'` og `fm_location_id` matcher de tre pladser.
+## Hvorfor tavlen er låst nu
 
-## Kolonner i arket "Salg" (én række pr. sale_item, 270 rækker)
-1. Dato (sale_datetime, Europe/Copenhagen)
-2. Sælger (agent_name)
-3. Plads (location.name)
-4. Produkt (products.name)
-5. Antal (quantity)
-6. Fik – provision pr. stk (mapped_commission)
-7. Fik – omsætning pr. stk (mapped_revenue)
-8. Burde – provision pr. stk (products.commission_dkk = marked-sats)
-9. Burde – omsætning pr. stk (products.revenue_dkk)
-10. Diff prov pr. stk (burde − fik)
-11. Diff prov total (diff × antal)
+Der findes kun ét Powerdag-event i systemet: "Powerdag 2026" med datoen 26. juni 2026, som stadig er markeret aktivt og ikke afsløret. Tavlen låser automatisk point kl. 15.00 på eventets dato og viser "Pointene er låst" indtil vinderen afsløres. Da eventdatoen for længst er passeret, står tavlen permanent i låst tilstand.
 
-## Kolonner i arket "Opsummering"
-Én række pr. produkt: antal, fik total prov/oms, burde total prov/oms, samlet diff. Plus totalrække.
+Eventet har 10 pointregler og 10 registrerede scorer.
 
-## Antagelse jeg gerne vil have bekræftet
-Jeg bruger **`products.commission_dkk` / `revenue_dkk` som "burde have fået"**, fordi det er marked-basesatserne (Nuuday 360/1000, IKKE Nuuday 450/1000, 5G Internet 300/650). Hvis den korrekte marked-sats er en anden end produktets basesats, så sig det — så bruger jeg den i stedet.
+## Hvad jeg bygger
 
-## Leverance
-`/mnt/documents/vorbasse-marked-satser.xlsx` — ingen kode- eller DB-ændringer.
+En "Start nyt spil"-funktion på Powerdag Admin, så du selv kan starte forfra uden hjælp:
+
+1. **Knap: "Start nyt spil"**
+   - Du vælger navn og dato (dato foreslås som i dag).
+   - Systemet opretter et nyt event, aktiverer det, og deaktiverer det gamle.
+   - Point-reglerne (hold, sub-klient, point pr. salg) kopieres automatisk over fra det nuværende event, så du ikke skal opsætte dem igen.
+   - Det nye event starter med 0 salg på alle regler og ulåst tavle.
+
+2. **Knap: "Nulstil point"** på det aktive event
+   - Sætter alle salgstal til 0 uden at røre reglerne.
+   - Bekræftelsesdialog, så det ikke sker ved et uheld.
+
+3. **Knap: "Lås op igen"**
+   - Sætter eventet tilbage til ikke-afsløret, hvis I vil køre suspense-fasen igen.
+
+4. **Historik bevares**
+   - Gamle events, regler og scorer slettes ikke. De deaktiveres blot, så tavlen viser det nye spil.
+
+## Efter implementering
+
+Du går til Powerdag Admin, trykker "Start nyt spil", og tavlen viser med det samme det nye spil med 0 point og uden lås.
+
+## Teknisk
+
+- Berører `src/components/powerdag/PowerdagSettings.tsx`, `src/pages/dashboards/PowerdagAdmin.tsx` og `src/hooks/usePowerdagData.ts`.
+- Nye mutationer: opret event med kopierede regler, nulstil scorer for event, sæt `is_revealed` tilbage til false.
+- Ingen ændringer i låselogikken på selve tavlen (`PowerdagBoard.tsx`) — den fungerer korrekt for et event med korrekt dato.
+- Ingen databaseændringer nødvendige; eksisterende tabeller `powerdag_events`, `powerdag_point_rules`, `powerdag_scores` dækker behovet.
+- Grøn/gul zone: Powerdag-tabeller, ingen løn-, pricing- eller persondatapåvirkning.
