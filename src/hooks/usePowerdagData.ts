@@ -136,6 +136,90 @@ export function useUpdateEvent() {
   });
 }
 
+/**
+ * Start et nyt spil: opretter et nyt event, kopierer pointreglerne fra et
+ * eksisterende event (hvis angivet), aktiverer det nye event og deaktiverer
+ * alle andre. Historik bevares — intet slettes.
+ */
+export function useStartNewGame() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      name,
+      eventDate,
+      copyRulesFromEventId,
+    }: {
+      name: string;
+      eventDate: string;
+      copyRulesFromEventId?: string;
+    }) => {
+      const { data: created, error: createError } = await supabase
+        .from("powerdag_events")
+        .insert({ name, event_date: eventDate, is_active: false, is_revealed: false } as any)
+        .select("*")
+        .single();
+      if (createError) throw createError;
+      const newEvent = created as PowerdagEvent;
+
+      if (copyRulesFromEventId) {
+        const { data: sourceRules, error: rulesError } = await supabase
+          .from("powerdag_point_rules")
+          .select("team_name, sub_client_name, points_per_sale, display_order")
+          .eq("event_id", copyRulesFromEventId)
+          .order("display_order");
+        if (rulesError) throw rulesError;
+
+        if (sourceRules && sourceRules.length > 0) {
+          const { error: insertRulesError } = await supabase
+            .from("powerdag_point_rules")
+            .insert(sourceRules.map((r: any) => ({ ...r, event_id: newEvent.id })) as any);
+          if (insertRulesError) throw insertRulesError;
+        }
+      }
+
+      // Deaktiver alle andre events, aktiver det nye
+      const { error: deactivateError } = await supabase
+        .from("powerdag_events")
+        .update({ is_active: false } as any)
+        .neq("id", newEvent.id);
+      if (deactivateError) throw deactivateError;
+
+      const { error: activateError } = await supabase
+        .from("powerdag_events")
+        .update({ is_active: true } as any)
+        .eq("id", newEvent.id);
+      if (activateError) throw activateError;
+
+      return newEvent;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["powerdag-active-event"] });
+      qc.invalidateQueries({ queryKey: ["powerdag-events"] });
+      qc.invalidateQueries({ queryKey: ["powerdag-rules"] });
+      qc.invalidateQueries({ queryKey: ["powerdag-scores"] });
+    },
+  });
+}
+
+/** Nulstil alle salgstal på et event til 0 (regler bevares) */
+export function useResetScores() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ eventId }: { eventId: string }) => {
+      const { error } = await supabase
+        .from("powerdag_scores")
+        .update({ sales_count: 0, updated_at: new Date().toISOString() } as any)
+        .eq("event_id", eventId);
+      if (error) throw error;
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["powerdag-scores", vars.eventId] });
+      qc.invalidateQueries({ queryKey: ["powerdag-scores"] });
+    },
+  });
+}
+
+
 
 /** Compute team standings from rules + scores */
 export function computeStandings(rules: PowerdagRule[], scores: PowerdagScore[]): TeamStanding[] {
