@@ -103,9 +103,12 @@ export function PowerdagSettings() {
   };
 
   const createEvent = async () => {
-    if (!newName || !newDate) return;
+    if (!newName || !newDate) {
+      toast.error("Udfyld navn og dato");
+      return;
+    }
     const { error } = await supabase.from("powerdag_events").insert({ name: newName, event_date: newDate, is_active: false } as any);
-    if (error) { toast.error("Fejl"); return; }
+    if (error) { toast.error("Kunne ikke oprette event: " + error.message); return; }
     toast.success("Event oprettet");
     setNewName(""); setNewDate("");
     refetchEvents();
@@ -113,8 +116,10 @@ export function PowerdagSettings() {
 
   const toggleActive = async (ev: PowerdagEvent) => {
     // Deactivate all first, then activate this one
-    await supabase.from("powerdag_events").update({ is_active: false } as any).neq("id", "00000000-0000-0000-0000-000000000000");
-    await supabase.from("powerdag_events").update({ is_active: !ev.is_active } as any).eq("id", ev.id);
+    const { error: deErr } = await supabase.from("powerdag_events").update({ is_active: false } as any).neq("id", "00000000-0000-0000-0000-000000000000");
+    if (deErr) { toast.error("Kunne ikke opdatere events: " + deErr.message); return; }
+    const { error: actErr } = await supabase.from("powerdag_events").update({ is_active: !ev.is_active } as any).eq("id", ev.id);
+    if (actErr) { toast.error("Kunne ikke opdatere event: " + actErr.message); return; }
     refetchEvents();
     qc.invalidateQueries({ queryKey: ["powerdag-active-event"] });
     toast.success(ev.is_active ? "Deaktiveret" : "Aktiveret");
@@ -122,7 +127,10 @@ export function PowerdagSettings() {
 
 
   const addRule = async () => {
-    if (!activeEvent || !newTeam) return;
+    if (!activeEvent || !newTeam) {
+      toast.error("Vælg et event og udfyld team");
+      return;
+    }
     const { error } = await supabase.from("powerdag_point_rules").insert({
       event_id: activeEvent.id,
       team_name: newTeam,
@@ -130,20 +138,22 @@ export function PowerdagSettings() {
       points_per_sale: parseFloat(newPts) || 1,
       display_order: rules.length,
     } as any);
-    if (error) { toast.error("Fejl"); return; }
+    if (error) { toast.error("Kunne ikke tilføje regel: " + error.message); return; }
     setNewTeam(""); setNewSub(""); setNewPts("1");
     refetchRules();
     toast.success("Regel tilføjet");
   };
 
   const deleteRule = async (id: string) => {
-    await supabase.from("powerdag_point_rules").delete().eq("id", id);
+    const { error } = await supabase.from("powerdag_point_rules").delete().eq("id", id);
+    if (error) { toast.error("Kunne ikke slette regel: " + error.message); return; }
     refetchRules();
     toast.success("Regel slettet");
   };
 
   const updatePoints = async (id: string, val: string) => {
-    await supabase.from("powerdag_point_rules").update({ points_per_sale: parseFloat(val) || 0 } as any).eq("id", id);
+    const { error } = await supabase.from("powerdag_point_rules").update({ points_per_sale: parseFloat(val) || 0 } as any).eq("id", id);
+    if (error) { toast.error("Kunne ikke opdatere point: " + error.message); return; }
     refetchRules();
   };
 
