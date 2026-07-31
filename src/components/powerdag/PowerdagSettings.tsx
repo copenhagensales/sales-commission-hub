@@ -149,9 +149,62 @@ export function PowerdagSettings() {
 
   return (
     <div className="space-y-8">
+      {/* Start nyt spil */}
+      <section className="space-y-4 rounded-xl border border-primary/30 bg-primary/5 p-4">
+        <div>
+          <h2 className="text-lg font-bold">Start nyt spil</h2>
+          <p className="text-sm text-muted-foreground">
+            Opretter et nyt Powerdag-event med 0 point og ulåst tavle. Pointreglerne kopieres fra
+            {currentActive ? ` "${currentActive.name}"` : " det aktive event"}. Historik bevares – intet slettes.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2 items-end">
+          <div>
+            <Label>Navn på nyt spil</Label>
+            <Input value={gameName} onChange={e => setGameName(e.target.value)} placeholder="Powerdag august" />
+          </div>
+          <div>
+            <Label>Dato</Label>
+            <Input type="date" value={gameDate} onChange={e => setGameDate(e.target.value)} />
+          </div>
+          <Button onClick={handleStartNewGame} disabled={startNewGame.isPending}>
+            <Play className="h-4 w-4 mr-1" />
+            {startNewGame.isPending ? "Starter…" : "Start nyt spil"}
+          </Button>
+        </div>
+        {currentActive && (
+          <div className="flex flex-wrap gap-2 pt-2 border-t border-border/50">
+            <Button variant="outline" size="sm" onClick={() => setConfirmReset(true)} disabled={resetScores.isPending}>
+              <RotateCcw className="h-4 w-4 mr-1" />Nulstil point på "{currentActive.name}"
+            </Button>
+            {currentActive.is_revealed && (
+              <Button variant="outline" size="sm" onClick={handleUnlock} disabled={updateEvent.isPending}>
+                <Unlock className="h-4 w-4 mr-1" />Sæt tilbage til ikke-afsløret
+              </Button>
+            )}
+          </div>
+        )}
+      </section>
+
+      <AlertDialog open={confirmReset} onOpenChange={setConfirmReset}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Nulstil alle point?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Alle salgstal på "{currentActive?.name}" sættes til 0. Pointreglerne bevares. Handlingen kan ikke fortrydes.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annullér</AlertDialogCancel>
+            <AlertDialogAction onClick={handleResetScores}>Nulstil point</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Events */}
       <section className="space-y-4">
         <h2 className="text-lg font-bold">Powerdag Events</h2>
+
         <div className="flex gap-2 items-end">
           <div>
             <Label>Navn</Label>
