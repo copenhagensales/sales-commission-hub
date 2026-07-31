@@ -147,6 +147,10 @@ export default function PowerdagBoard() {
                 <Link to="/dashboards/powerdag/input">
                   <Button variant="outline" size="sm">Indtast salg</Button>
                 </Link>
+                <Link to="/dashboards/powerdag/admin">
+                  <Button size="sm">Start nyt spil</Button>
+                </Link>
+
               </div>
             )}
           </div>
