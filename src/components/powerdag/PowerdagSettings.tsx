@@ -1,13 +1,36 @@
 import { useState } from "react";
-import { useAllEvents, useRulesForEvent, type PowerdagEvent, type PowerdagRule } from "@/hooks/usePowerdagData";
+import {
+  useAllEvents,
+  useRulesForEvent,
+  useStartNewGame,
+  useResetScores,
+  useUpdateEvent,
+  type PowerdagEvent,
+  type PowerdagRule,
+} from "@/hooks/usePowerdagData";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Play, RotateCcw, Unlock } from "lucide-react";
+
+function todayIso(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 export function PowerdagSettings() {
   const qc = useQueryClient();
@@ -15,6 +38,16 @@ export function PowerdagSettings() {
   const [selectedEventId, setSelectedEventId] = useState<string | undefined>();
   const activeEvent = events.find(e => e.id === selectedEventId) ?? events[0];
   const { data: rules = [], refetch: refetchRules } = useRulesForEvent(activeEvent?.id);
+
+  const currentActive = events.find(e => e.is_active);
+  const startNewGame = useStartNewGame();
+  const resetScores = useResetScores();
+  const updateEvent = useUpdateEvent();
+
+  // Start nyt spil form
+  const [gameName, setGameName] = useState("");
+  const [gameDate, setGameDate] = useState(todayIso());
+  const [confirmReset, setConfirmReset] = useState(false);
 
   // New event form
   const [newName, setNewName] = useState("");
@@ -24,6 +57,50 @@ export function PowerdagSettings() {
   const [newTeam, setNewTeam] = useState("");
   const [newSub, setNewSub] = useState("");
   const [newPts, setNewPts] = useState("1");
+
+  const handleStartNewGame = async () => {
+    if (!gameName.trim() || !gameDate) {
+      toast.error("Udfyld navn og dato");
+      return;
+    }
+    try {
+      const created = await startNewGame.mutateAsync({
+        name: gameName.trim(),
+        eventDate: gameDate,
+        copyRulesFromEventId: currentActive?.id,
+      });
+      setGameName("");
+      setGameDate(todayIso());
+      setSelectedEventId(created.id);
+      await refetchEvents();
+      toast.success("Nyt spil startet – tavlen er nulstillet og ulåst");
+    } catch (e: any) {
+      toast.error("Kunne ikke starte nyt spil: " + (e?.message ?? "ukendt fejl"));
+    }
+  };
+
+  const handleResetScores = async () => {
+    if (!currentActive) return;
+    try {
+      await resetScores.mutateAsync({ eventId: currentActive.id });
+      toast.success("Alle point er nulstillet");
+    } catch (e: any) {
+      toast.error("Kunne ikke nulstille point: " + (e?.message ?? "ukendt fejl"));
+    } finally {
+      setConfirmReset(false);
+    }
+  };
+
+  const handleUnlock = async () => {
+    if (!currentActive) return;
+    try {
+      await updateEvent.mutateAsync({ id: currentActive.id, patch: { is_revealed: false } });
+      await refetchEvents();
+      toast.success("Spillet er sat tilbage til ikke-afsløret");
+    } catch (e: any) {
+      toast.error("Kunne ikke låse op: " + (e?.message ?? "ukendt fejl"));
+    }
+  };
 
   const createEvent = async () => {
     if (!newName || !newDate) return;
@@ -42,6 +119,7 @@ export function PowerdagSettings() {
     qc.invalidateQueries({ queryKey: ["powerdag-active-event"] });
     toast.success(ev.is_active ? "Deaktiveret" : "Aktiveret");
   };
+
 
   const addRule = async () => {
     if (!activeEvent || !newTeam) return;
