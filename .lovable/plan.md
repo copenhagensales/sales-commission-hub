@@ -2,37 +2,37 @@
 
 ## Rod-årsag (verificeret)
 
-Det er ikke callback-flowet der er galt. Callback bruger samme produktforespørgsel som normal registrering (`src/pages/vagt-flow/SalesRegistration.tsx:252-273`), som siden sidste ændring filtrerer på `.eq("is_active", true)`.
+Det er ikke callback-flowet. Callback bruger samme produktforespørgsel som normal registrering (`src/pages/vagt-flow/SalesRegistration.tsx:252-273`), som nu filtrerer på `.eq("is_active", true)`.
 
-Bookingen i skærmbilledet (Vildsund Kræmmermarked, Eesy FM) hænger på kampagnen **Eesy marked**. Databasen viser at 8 af 9 produkter på den kampagne står med `is_active = false`:
+Bookingen i skærmbilledet (Vildsund Kræmmermarked, Eesy FM) hænger på kampagnen **Eesy marked**. Der er 9 produkter på kampagnen, og kun 1 er aktivt:
 
 ```text
-Eesy marked (9 produkter, 1 aktivt)
-  aktiv:   5G Internet
-  inaktiv: Eesy 99 med/uden første måned (Nuuday / IKKE Nuuday)   (4 stk)
-  inaktiv: Eesy med/uden første måned (Nuuday / IKKE Nuuday)      (4 stk)
+Eesy marked
+  aktiv:   5G Internet                                    (updated 15/5-2026)
+  inaktiv: Eesy 99 med/uden første måned (Nuuday/IKKE)    (4 stk — dine, bevidst udgået)
+  inaktiv: Eesy med/uden første måned (Nuuday/IKKE)       (4 stk — updated_at 11/3-2026)
 ```
 
-Til sammenligning har **Eesy gaden** de samme fire "Eesy med/uden første måned"-produkter aktive.
+De fire "Eesy med/uden første måned" på **Eesy marked** blev sat inaktive **11. marts 2026** — altså ikke af dig i dag. Det er efter alt at dømme en produktfletning der deaktiverede marked-varianterne, mens de identisk navngivne varianter på **Eesy gaden** blev holdt aktive. Det er derfor du i MG Test ser navne-par hvor den ene har "Inaktiv"-badge og den anden ikke har.
 
-Det er præcis de samme inaktive produkter som gav Vorbasse-problemet: DB-triggeren `create_fm_sale_items` matcher kun produkter med `is_active = true`, så salg på Eesy marked fik ingen/forkerte `sale_items`. Filtret i UI'et gør nu blot problemet synligt i stedet for stille.
+Så ja — din antagelse holder: sælgerne har indtil nu kunnet vælge produkter der i databasen var inaktive. Konsekvensen var ikke kun kosmetisk: DB-triggeren `create_fm_sale_items` matcher kun på `is_active = true`, så marked-salg blev matchet mod **gaden**-varianten og fik gaden/COOP-satser i stedet for markedssatser. Det er præcis Vorbasse-fejlen.
 
 ## Løsning
 
-Fix i data, ikke i kode. Filtret virker som aftalt — produkterne er fejlagtigt inaktive.
+Fix i data, ikke i kode. Filtret virker som aftalt.
 
-1. Sæt `is_active = true` på de 8 produkter på kampagnen **Eesy marked** (id `0835d092-2504-43e4-b818-55d4dd7ddedb`):
+1. Sæt `is_active = true` på de fire produkter på kampagnen **Eesy marked** (id `0835d092-2504-43e4-b818-55d4dd7ddedb`):
    - Eesy med første måned (Nuuday) / (IKKE Nuuday)
    - Eesy uden første måned (Nuuday) / (IKKE Nuuday)
-   - Eesy 99 med første måned (Nuuday) / (IKKE Nuuday)
-   - Eesy 99 uden første måned (Nuuday) / (IKKE Nuuday)
-2. Ingen ændring af priser, regler eller eksisterende `sale_items` — kun `is_active`-flaget.
-3. Derefter kan sælgere igen vælge produkterne både i normal registrering og i callback-mode, og triggeren kan matche nye salg korrekt.
+2. De fire "Eesy 99"-produkter forbliver inaktive — de skal ikke sælges længere.
+3. Ingen ændring af priser, prisregler eller eksisterende `sale_items`. Kun `is_active`-flaget.
 
-## Åbent spørgsmål inden udførelse
+Derefter kan sælgere igen vælge de fire produkter — både i normal registrering og i callback-mode — og triggeren matcher nye marked-salg mod de rigtige marked-satser i stedet for gaden/COOP.
 
-Skal alle 8 reaktiveres, eller er "Eesy 99"-varianterne (4 stk) bevidst udgået? Hvis de er udgået, reaktiverer vi kun de fire "Eesy med/uden første måned".
+## Bemærkning til opfølgning
+
+Nye salg bliver først korrekte fra reaktiveringen. Gamle Vorbasse-salg kræver stadig den separat aftalte backfill af `mapped_commission`/`mapped_revenue`.
 
 ## Zone
 
-Gul: dataændring på `products.is_active` (ikke pricing-regler, ikke løn, intet slettes). Ingen kodeændringer nødvendige.
+Gul: dataændring på `products.is_active` (ikke prisregler, ikke løn, intet slettes). Ingen kodeændringer nødvendige.
