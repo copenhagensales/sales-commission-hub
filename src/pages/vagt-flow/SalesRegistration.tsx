@@ -257,6 +257,7 @@ const SalesRegistration = () => {
         .from("products")
         .select("id, name")
         .eq("client_campaign_id", activeBooking.campaign.id)
+        .eq("is_active", true)
         .neq("name", "Lokation")
         .order("name");
       if (error) throw error;
