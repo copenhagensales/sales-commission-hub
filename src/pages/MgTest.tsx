@@ -452,6 +452,21 @@ export default function MgTest() {
     },
   });
 
+  // Produkter markeret som inaktive (kan ikke vælges af sælgere)
+  const { data: inactiveProductIds } = useQuery({
+    queryKey: ["mg-inactive-product-ids"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("id")
+        .eq("is_active", false);
+      if (error) throw error;
+      return new Set((data ?? []).map((p) => p.id));
+    },
+  });
+
+
+
   // Fetch sale_items with needs_mapping=true in last 30 days (full rows for dialog + grouped UI)
   const { data: needsMappingItems } = useQuery({
     queryKey: ["mg-needs-mapping-items"],
