@@ -99,6 +99,7 @@ export function ProductPricingRulesDialog({
   const [localRevenue, setLocalRevenue] = useState(String(baseRevenue));
   const [localCountsAsSale, setLocalCountsAsSale] = useState(countsAsSale);
   const [localCountsAsCrossSale, setLocalCountsAsCrossSale] = useState(countsAsCrossSale);
+  const [localIsActive, setLocalIsActive] = useState(true);
 
   // Update local state when props change
   useEffect(() => {
@@ -107,6 +108,7 @@ export function ProductPricingRulesDialog({
     setLocalCountsAsSale(countsAsSale);
     setLocalCountsAsCrossSale(countsAsCrossSale);
   }, [baseCommission, baseRevenue, countsAsSale, countsAsCrossSale]);
+
 
   // Fetch existing rules for this product
   const { data: rules, isLoading: rulesLoading } = useQuery({
@@ -173,13 +175,13 @@ export function ProductPricingRulesDialog({
     enabled: open,
   });
 
-  // Fetch product creation date for baseline
+  // Fetch product creation date + active status
   const { data: productInfo } = useQuery({
     queryKey: ["product-info-for-history", productId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("created_at")
+        .select("created_at, is_active")
         .eq("id", productId)
         .single();
 
@@ -188,6 +190,38 @@ export function ProductPricingRulesDialog({
     },
     enabled: open,
   });
+
+  // Keep local active-flag in sync with the loaded product
+  useEffect(() => {
+    if (productInfo) {
+      setLocalIsActive((productInfo as { is_active: boolean | null }).is_active ?? true);
+    }
+  }, [productInfo]);
+
+  // Mutation to update is_active (controls whether sellers can register the product)
+  const updateIsActive = useMutation({
+    mutationFn: async (isActive: boolean) => {
+      const { error } = await supabase
+        .from("products")
+        .update({ is_active: isActive })
+        .eq("id", productId);
+
+      if (error) throw error;
+    },
+    onSuccess: (_, isActive) => {
+      toast.success(isActive ? "Produkt sat til aktiv" : "Produkt sat til inaktiv");
+      queryClient.invalidateQueries({ queryKey: ["product-info-for-history", productId] });
+      queryClient.invalidateQueries({ queryKey: ["campaign-products"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-inactive-product-ids"] });
+
+      sync({ invalidate: ["products"], label: "aktiv-status" });
+      onBaseValuesChange?.();
+    },
+    onError: (error) => {
+      toast.error("Kunne ikke opdatere aktiv-status: " + error.message);
+    },
+  });
+
 
   // Mutation to update base values (commission + revenue)
   const updateBaseValues = useMutation({
@@ -275,8 +309,15 @@ export function ProductPricingRulesDialog({
     const revenue = parseFloat(localRevenue.replace(",", ".")) || 0;
     
     setIsRematching(true);
-    
+
     try {
+      // Aktiv-status gælder altid fra nu (ikke datostyret) — gemmes kun ved reel ændring
+      const currentIsActive = (productInfo as { is_active?: boolean | null } | undefined)?.is_active ?? true;
+      if (localIsActive !== currentIsActive) {
+        await updateIsActive.mutateAsync(localIsActive);
+      }
+
+
       if (isToday || isRetroactive) {
         // Immediate or retroactive change - update products table directly
         await updateBaseValues.mutateAsync({ commission, revenue });
@@ -344,6 +385,8 @@ export function ProductPricingRulesDialog({
     setLocalRevenue(String(baseRevenue));
     setLocalCountsAsSale(countsAsSale);
     setLocalCountsAsCrossSale(countsAsCrossSale);
+    setLocalIsActive((productInfo as { is_active?: boolean | null } | undefined)?.is_active ?? true);
+
     setIsEditingBase(false);
     setEffectiveDate(new Date());
   };
@@ -490,8 +533,24 @@ export function ProductPricingRulesDialog({
                       )}
                       <span className="text-sm">Tæl som bisalg</span>
                     </div>
+                    <div className="flex items-center gap-2">
+                      {localIsActive ? (
+                        <CheckCircle className="h-5 w-5 text-green-500" />
+                      ) : (
+                        <XCircle className="h-5 w-5 text-destructive" />
+                      )}
+                      <span className={`text-sm ${localIsActive ? "" : "text-destructive font-medium"}`}>
+                        {localIsActive ? "Aktiv" : "Inaktiv"}
+                      </span>
+                    </div>
                   </div>
+                  {!localIsActive && (
+                    <p className="text-xs text-destructive">
+                      Produktet kan ikke vælges i sælgernes salgsregistrering. Historiske salg og satser er bevaret.
+                    </p>
+                  )}
                 </>
+
               ) : (
                 <>
                   <div>
@@ -551,6 +610,23 @@ export function ProductPricingRulesDialog({
                   <p className="text-xs text-muted-foreground">
                     Kun én kan være valgt ad gangen
                   </p>
+
+                  <div className="flex items-center gap-2 pt-2 border-t">
+                    <Checkbox
+                      id="product-is-active"
+                      checked={localIsActive}
+                      onCheckedChange={(checked) => setLocalIsActive(checked === true)}
+                    />
+                    <Label htmlFor="product-is-active" className="text-sm cursor-pointer">
+                      Aktiv
+                    </Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Fjern fluebenet for at gøre produktet inaktivt. Inaktive produkter kan ikke vælges i
+                    sælgernes salgsregistrering. Historiske salg og satser bevares. Ændringen gælder straks —
+                    uafhængigt af ikrafttrædelsesdatoen nedenfor.
+                  </p>
+
 
                   {/* Date picker */}
                   <div className="space-y-2 pt-2">
