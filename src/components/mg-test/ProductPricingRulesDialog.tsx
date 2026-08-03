@@ -307,8 +307,15 @@ export function ProductPricingRulesDialog({
     const revenue = parseFloat(localRevenue.replace(",", ".")) || 0;
     
     setIsRematching(true);
-    
+
     try {
+      // Aktiv-status gælder altid fra nu (ikke datostyret) — gemmes kun ved reel ændring
+      const currentIsActive = (productInfo as { is_active?: boolean | null } | undefined)?.is_active ?? true;
+      if (localIsActive !== currentIsActive) {
+        await updateIsActive.mutateAsync(localIsActive);
+      }
+
+
       if (isToday || isRetroactive) {
         // Immediate or retroactive change - update products table directly
         await updateBaseValues.mutateAsync({ commission, revenue });
