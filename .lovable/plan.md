@@ -80,9 +80,10 @@ Efter dette ser en sælger på Eesy marked de 5 relevante produkter (5G Internet
 - Sammenlign listen for Eesy marked og Eesy gaden: begge skal vise 5 hhv. 6 produkter, ingen navnedubletter.
 - Test-salg på en marked-booking skal give 385/1000 på "Eesy uden første måned (IKKE Nuuday)", ikke 450/1000.
 
-## Bemærkning
+## Påvirkning af historiske salg
 
-Kun nye salg bliver korrekte. Gamle Vorbasse-salg kræver stadig den separat aftalte backfill af `mapped_commission`/`mapped_revenue`.
+Ingen. Ændringen rører kun hvilke produkter sælgeren kan vælge i registreringen. Der ændres ikke i `sale_items`, i prisregler, i `products.is_active` eller i triggeren, og intet genberegnes bagudrettet — alle historiske salg beholder deres gemte `mapped_commission`/`mapped_revenue`, så dagsrapporter, lønperioder og ledelsesrapporter for tidligere perioder står præcis som i dag. Kun salg registreret efter ændringen påvirkes.
+
 
 ## Zone
 
