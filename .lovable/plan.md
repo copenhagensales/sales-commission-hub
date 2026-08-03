@@ -30,6 +30,31 @@ De 8 produkter på kampagnen **Eesy marked** har **ingen prisregler overhovedet*
 
 Opsætningen var altså bevidst. Problemet er at `is_active` derved bærer to betydninger, og produktlisten til sælgerne er hårdt bundet til bookingens kampagne (`SalesRegistration.tsx:252-273`: `client_campaign_id = booking.campaign.id` + `is_active = true`). Resultatet er at en marked-booking kun har én aktiv række tilbage: 5G Internet.
 
+## Afstemning mod din liste — 3 satser stemmer ikke
+
+Ændringen flytter kun hvilke produkter sælgeren kan vælge; den ændrer ingen satser. Reglerne i dag giver:
+
+```text
+Produkt                                  COOP/gaden          Marked
+                                         DB    liste         DB    liste
+Ikke nuuday uden første måned            450   450  ok       385   385  ok
+Ikke nuuday med første måned             430   430  ok       355   365  AFVIGER -10
+Nuuday uden første måned                 360   360  ok       295   295  ok
+Nuuday med første måned                  335   340  AFVIGER  280   275  AFVIGER +5
+                                                     -5
+5G Internet                              300   300  ok       300   300  ok
+Fri 20 - 89 (KUN IKKE NUUDAY)            300   300  ok       300   (ingen i listen)
+```
+
+Tre afvigelser skal rettes i prisreglerne, uafhængigt af denne ændring:
+
+- "Eesy med første måned (IKKE Nuuday)", marked-regel: 355 -> 365
+- "Eesy med første måned (Nuuday)", gaden-regel: 335 -> 340
+- "Eesy med første måned (Nuuday)", marked-regel: 280 -> 275
+
+Desuden: "Fri 20 - 89 (KUN IKKE NUUDAY)" har slet ingen prisregler, kun basispris 300. Den giver derfor 300 på både gaden og marked. Din liste nævner kun 89 under COOP — skal produktet overhovedet kunne sælges på marked, og med hvilken sats? Sig til, så tager jeg satsrettelserne med som ét separat trin (nye regler med `effective_from`, gamle lukkes med `effective_to`, så historikken bevares).
+
+
 ## Løsning: gør produktlisten regel-bevidst i stedet for kampagne-bundet
 
 De inaktive marked-dubletter bliver **ikke** genaktiveret — det ville genindføre Vorbasse-fejlen. Sælgerne skal i stedet se de aktive gaden-rækker, når de står på en marked-booking, fordi det er dem der bærer markedssatsen.
