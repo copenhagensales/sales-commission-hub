@@ -191,6 +191,35 @@ export function ProductPricingRulesDialog({
     enabled: open,
   });
 
+  // Keep local active-flag in sync with the loaded product
+  useEffect(() => {
+    if (productInfo) {
+      setLocalIsActive((productInfo as { is_active: boolean | null }).is_active ?? true);
+    }
+  }, [productInfo]);
+
+  // Mutation to update is_active (controls whether sellers can register the product)
+  const updateIsActive = useMutation({
+    mutationFn: async (isActive: boolean) => {
+      const { error } = await supabase
+        .from("products")
+        .update({ is_active: isActive })
+        .eq("id", productId);
+
+      if (error) throw error;
+    },
+    onSuccess: (_, isActive) => {
+      toast.success(isActive ? "Produkt sat til aktiv" : "Produkt sat til inaktiv");
+      queryClient.invalidateQueries({ queryKey: ["product-info-for-history", productId] });
+      queryClient.invalidateQueries({ queryKey: ["campaign-products"] });
+      sync({ invalidate: ["products"], label: "aktiv-status" });
+      onBaseValuesChange?.();
+    },
+    onError: (error) => {
+      toast.error("Kunne ikke opdatere aktiv-status: " + error.message);
+    },
+  });
+
 
   // Mutation to update base values (commission + revenue)
   const updateBaseValues = useMutation({
