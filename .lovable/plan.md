@@ -83,6 +83,7 @@ Efter dette ser en sælger på Eesy marked de 5 relevante produkter (5G Internet
 ## Kontrol efter implementering
 
 - Sammenlign listen for Eesy marked og Eesy gaden: begge skal vise 5 hhv. 6 produkter, ingen navnedubletter.
+- Yousee-booking: produktlisten skal være 100% identisk før og efter ændringen (samme antal, samme navne).
 - Test-salg på en marked-booking skal give 385/1000 på "Eesy uden første måned (IKKE Nuuday)", ikke 450/1000.
 
 ## Påvirkning af historiske salg
