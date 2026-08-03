@@ -607,6 +607,23 @@ export function ProductPricingRulesDialog({
                     Kun én kan være valgt ad gangen
                   </p>
 
+                  <div className="flex items-center gap-2 pt-2 border-t">
+                    <Checkbox
+                      id="product-is-active"
+                      checked={localIsActive}
+                      onCheckedChange={(checked) => setLocalIsActive(checked === true)}
+                    />
+                    <Label htmlFor="product-is-active" className="text-sm cursor-pointer">
+                      Aktiv
+                    </Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Fjern fluebenet for at gøre produktet inaktivt. Inaktive produkter kan ikke vælges i
+                    sælgernes salgsregistrering. Historiske salg og satser bevares. Ændringen gælder straks —
+                    uafhængigt af ikrafttrædelsesdatoen nedenfor.
+                  </p>
+
+
                   {/* Date picker */}
                   <div className="space-y-2 pt-2">
                     <Label>Ikrafttrædelsesdato</Label>
