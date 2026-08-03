@@ -173,13 +173,13 @@ export function ProductPricingRulesDialog({
     enabled: open,
   });
 
-  // Fetch product creation date for baseline
+  // Fetch product creation date + active status
   const { data: productInfo } = useQuery({
     queryKey: ["product-info-for-history", productId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("created_at")
+        .select("created_at, is_active")
         .eq("id", productId)
         .single();
 
@@ -188,6 +188,7 @@ export function ProductPricingRulesDialog({
     },
     enabled: open,
   });
+
 
   // Mutation to update base values (commission + revenue)
   const updateBaseValues = useMutation({
