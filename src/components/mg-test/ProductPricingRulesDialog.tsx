@@ -212,6 +212,8 @@ export function ProductPricingRulesDialog({
       toast.success(isActive ? "Produkt sat til aktiv" : "Produkt sat til inaktiv");
       queryClient.invalidateQueries({ queryKey: ["product-info-for-history", productId] });
       queryClient.invalidateQueries({ queryKey: ["campaign-products"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-inactive-product-ids"] });
+
       sync({ invalidate: ["products"], label: "aktiv-status" });
       onBaseValuesChange?.();
     },
