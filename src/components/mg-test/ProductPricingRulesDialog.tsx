@@ -529,8 +529,24 @@ export function ProductPricingRulesDialog({
                       )}
                       <span className="text-sm">Tæl som bisalg</span>
                     </div>
+                    <div className="flex items-center gap-2">
+                      {localIsActive ? (
+                        <CheckCircle className="h-5 w-5 text-green-500" />
+                      ) : (
+                        <XCircle className="h-5 w-5 text-destructive" />
+                      )}
+                      <span className={`text-sm ${localIsActive ? "" : "text-destructive font-medium"}`}>
+                        {localIsActive ? "Aktiv" : "Inaktiv"}
+                      </span>
+                    </div>
                   </div>
+                  {!localIsActive && (
+                    <p className="text-xs text-destructive">
+                      Produktet kan ikke vælges i sælgernes salgsregistrering. Historiske salg og satser er bevaret.
+                    </p>
+                  )}
                 </>
+
               ) : (
                 <>
                   <div>
