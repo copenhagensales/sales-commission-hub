@@ -1,60 +1,61 @@
-# Hvorfor kun "5G Internet" kan vælges — og hvorfor opsætningen var lavet så inaktive produkter blev solgt
+# Hvorfor kun "5G Internet" vises på Eesy marked — og hvordan satsen faktisk findes
 
-## Rod-årsag (verificeret i DB)
+## Sådan finder Stork satsen (verificeret)
 
-`is_active` på `products` har aldrig været brugt som "synlig for sælgere". Den har været brugt som **navne-tiebreaker for FM-triggeren**.
-
-Triggeren `create_fm_sale_items()` matcher udelukkende på produktNAVN:
+FM-salg gemmer kun produktets **navn** i `raw_payload.fm_product_name`. Triggeren `create_fm_sale_items()` gør så tre ting:
 
 ```text
-FROM products
-WHERE LOWER(TRIM(name)) = LOWER(TRIM(v_product_name))
-  AND is_active = true
-ORDER BY priority DESC NULLS LAST, created_at DESC, id DESC
-LIMIT 1
+1. Find produkt:   WHERE lower(trim(name)) = lower(trim(fm_product_name)) AND is_active = true
+                   (ingen filtrering på kampagne)
+2. Find prisregel: product_pricing_rules for det produkt-id, hvor salgets kampagne-mapping
+                   findes i campaign_mapping_ids   -> kampagnespecifik sats
+3. Fallback:       universel regel uden kampagne, ellers produktets basispris
 ```
 
-Der er ingen filtrering på `client_campaign_id`. FM-salg gemmer kun produktets navn i `raw_payload.fm_product_name` — ikke produkt-id.
-
-Konsekvensen: to identisk navngivne produkter på **Eesy gaden** og **Eesy marked** kan ikke skelnes af triggeren. Den eneste måde at gøre navnet entydigt var at sætte den ene række inaktiv. Det skete 11. marts 2026 for de fire marked-varianter:
+Satsforskellen mellem gaden og marked ligger altså i **prisregler på gaden-produkterne**, ikke i to sæt produkter. Hver af de aktive Eesy gaden-rækker har præcis to regler:
 
 ```text
-Eesy marked (0835d092-…)
-  aktiv:   5G Internet                                 (updated 15/5-2026)
-  inaktiv: Eesy 99 med/uden første måned (Nuuday/IKKE)  (dine, bevidst udgået)
-  inaktiv: Eesy med/uden første måned (Nuuday/IKKE)     (updated_at 11/3-2026 — ikke dig)
+Eesy uden første måned (IKKE Nuuday)   regel -> Eesy gaden mapping   450 / 1000
+                                       regel -> Eesy marked mapping  385 / 1000
+Eesy med første måned (IKKE Nuuday)    regel -> gaden 430 / marked 355
+Eesy med første måned (Nuuday)         regel -> gaden 335 / marked 280
+Eesy uden første måned (Nuuday)        regel -> gaden 360 / marked 295
+5G Internet                            regel -> gaden 300 / marked 300
 ```
 
-Samtidig listede salgsregistreringen ALLE produkter på bookingens kampagne uden hensyn til `is_active`, og der fandtes ingen UI-kontrol for flaget. Så:
+De 8 produkter på kampagnen **Eesy marked** har **ingen prisregler overhovedet**, og deres basispriser er identiske med gaden-satserne (430/335/450/360). Derfor:
 
-- Sælgerne kunne stadig vælge de inaktive marked-produkter.
-- Triggeren slog navnet op globalt og landede på den aktive **gaden**-række → gaden/COOP-satser på markedssalg. Det er Vorbasse-fejlen.
-- Da jeg tilføjede `is_active`-filtret i salgsregistreringen, forsvandt 8 af 9 produkter fra Eesy marked, og kun 5G Internet blev tilbage.
+- Da marked-rækkerne var aktive, kunne triggeren ramme dem via navneopslaget. Uden regler faldt den tilbage på basisprisen = gadesatsen. Det er præcis Vorbasse-fejlen ("COOP provi i stedet for markedsprovi").
+- Den 11. marts 2026 blev de fire marked-rækker sat inaktive. Det var ikke tilfældigt — det var fixet: det tvinger navneopslaget over på gaden-rækken, som har den kampagnestyrede markedssats.
 
-Kort sagt: opsætningen var ikke bevidst designet til at sælge inaktive produkter. Det var en utilsigtet konsekvens af at `is_active` blev brugt til to formål på én gang — dedublering for prismotoren og (nu) synlighed for sælgere.
+Opsætningen var altså bevidst. Problemet er at `is_active` derved bærer to betydninger, og produktlisten til sælgerne er hårdt bundet til bookingens kampagne (`SalesRegistration.tsx:252-273`: `client_campaign_id = booking.campaign.id` + `is_active = true`). Resultatet er at en marked-booking kun har én aktiv række tilbage: 5G Internet.
 
-## Løsning
+## Løsning: gør produktlisten regel-bevidst i stedet for kampagne-bundet
 
-Ren reaktivering er ikke nok: to aktive rækker med samme navn gør triggeren tilfældig igen (priority/created_at afgør). Rækkefølgen skal derfor være: gør triggeren kampagne-bevidst FØRST, derefter reaktiver.
+De inaktive marked-dubletter bliver **ikke** genaktiveret — det ville genindføre Vorbasse-fejlen. Sælgerne skal i stedet se de aktive gaden-rækker, når de står på en marked-booking, fordi det er dem der bærer markedssatsen.
 
-1. **Migration — kampagne-bevidst produktmatch i `create_fm_sale_items()`**
-   Tilføj et første opslag der matcher navn **og** `client_campaign_id = NEW.client_campaign_id`. Kun hvis det ikke giver et hit, falder den tilbage til det nuværende globale navneopslag. Ingen ændring af prisregel-logikken (trin 2 og 3 i funktionen) og ingen ændring af eksisterende `sale_items`.
+1. **Ny RPC (SECURITY DEFINER), `get_fm_registration_products(p_campaign_id uuid)`**
+   Returnerer `id, name` for produkter der er relevante for bookingens kampagne:
+   - aktive produkter hvor `client_campaign_id = p_campaign_id`, **plus**
+   - aktive produkter der har en aktiv prisregel hvis `campaign_mapping_ids` indeholder kampagnens mapping-id (`adversus_campaign_mappings.client_campaign_id = p_campaign_id`)
+   - dedupliker på `lower(trim(name))` og foretræk rækken der har en regel for kampagnen. Én række pr. navn — sælgeren ser aldrig dubletter.
+   - `GRANT EXECUTE` til `authenticated`.
 
-2. **Dataændring — reaktiver de fire marked-produkter**
-   `is_active = true` på kampagnen Eesy marked for:
-   - Eesy med første måned (Nuuday) / (IKKE Nuuday)
-   - Eesy uden første måned (Nuuday) / (IKKE Nuuday)
+2. **`SalesRegistration.tsx`** — erstat den direkte `products`-query med et kald til RPC'en via en ny hook `useFmRegistrationProducts(campaignId)`. Samme returform (`{id, name}[]`), så resten af siden er uændret. Gælder både normal registrering og callback-mode, da de deler listen.
 
-   De fire "Eesy 99" forbliver inaktive — de skal ikke sælges længere.
+3. **Ingen ændring** af `products.is_active`, af prisregler, af triggeren eller af eksisterende `sale_items`.
 
-3. **Ingen kodeændring i salgsregistreringen.** `is_active`-filtret bliver som det er og betyder fremover kun "synlig for sælgere", nu hvor triggeren ikke længere er afhængig af flaget for at skelne navne.
+Efter dette ser en sælger på Eesy marked de 5 relevante produkter (5G Internet + de fire Eesy-varianter, uden dubletter), salget gemmes med navnet, og triggeren giver markedssatsen via kampagnereglen. "Eesy 99"-varianterne forbliver skjulte, fordi gaden-rækkerne for dem også er inaktive.
 
-Efter dette kan sælgerne igen vælge de fire produkter — også i callback-mode — og nye marked-salg får markedssatser i stedet for gaden/COOP.
+## Kontrol efter implementering
 
-## Bemærkning til opfølgning
+- Sammenlign listen for Eesy marked og Eesy gaden: begge skal vise 5 hhv. 6 produkter, ingen navnedubletter.
+- Test-salg på en marked-booking skal give 385/1000 på "Eesy uden første måned (IKKE Nuuday)", ikke 450/1000.
+
+## Bemærkning
 
 Kun nye salg bliver korrekte. Gamle Vorbasse-salg kræver stadig den separat aftalte backfill af `mapped_commission`/`mapped_revenue`.
 
 ## Zone
 
-Rød: `create_fm_sale_items()` er en del af pricing-motoren. Kræver din eksplicitte godkendelse af planen ovenfor. Trin 2 er en dataændring på `products.is_active`; intet slettes, ingen prisregler røres.
+Rød: ny funktion i pricing-/FM-kæden. Trigger og prisregler røres ikke — kun produktudvælgelsen til sælgerens UI. Kræver din godkendelse.
