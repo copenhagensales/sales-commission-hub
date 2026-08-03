@@ -2499,9 +2499,15 @@ export default function MgTest() {
                                     <TableRow key={row.key} className={row.product?.is_hidden ? 'opacity-50' : ''}>
                                       <TableCell>
                                         <div className="flex flex-col gap-1">
-                                          <span className="font-medium">
+                                          <span className="font-medium flex items-center gap-2">
                                             {row.product?.name || row.adversus_product_title || t("mgTest.noTitle")}
+                                            {row.product?.id && inactiveProductIds?.has(row.product.id) && (
+                                              <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                                                Inaktiv
+                                              </Badge>
+                                            )}
                                           </span>
+
                                           {row.mappingCount && row.mappingCount > 1 && (
                                             <span className="text-xs text-muted-foreground">
                                               {row.mappingCount} mappings samlet
