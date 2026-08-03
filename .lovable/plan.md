@@ -9,16 +9,22 @@ Der er ingen knap i MG Test til at sætte et produkt inaktivt.
 
 Da FM-salgsregistreringen nu filtrerer på `is_active` (ændringen fra sidste opgave), mangler der en knap til at styre det manuelt.
 
+## Ingen data ændres
+
+Vi rører ikke `is_active` på et enkelt produkt. Ingen migration, ingen SQL-opdatering, ingen masse-ændring. Alle produkter beholder præcis den status de har i dag — opgaven bygger kun knappen, så du selv kan skifte status manuelt bagefter.
+
 ## Det der skal bygges
 
 ### 1. Aktiv/Inaktiv-kontrol i produktdialogen
 
 `src/components/mg-test/ProductPricingRulesDialog.tsx`, fanen **Hovedside** (blokken "Basis-indstillinger", linje 448-494):
 
-- Visningstilstand: vis status "Aktiv" / "Inaktiv" ved siden af "Tæl som salg" / "Tæl som bisalg", med tydelig markering når produktet er inaktivt.
-- Redigeringstilstand (linje 529-553): tilføj et checkbox-felt **"Aktiv (kan vælges af sælgere)"** ved siden af de to eksisterende felter, som skriver `is_active` på produktet sammen med de øvrige basis-indstillinger.
-- Hjælpetekst: "Inaktive produkter kan ikke længere registreres af sælgere. Historiske salg og satser bevares."
+- Visningstilstand: vis status **"Aktiv"** / **"Inaktiv"** ved siden af "Tæl som salg" / "Tæl som bisalg", med tydelig markering når produktet er inaktivt.
+- Redigeringstilstand (linje 529-553): tilføj et checkbox-felt **"Aktiv"** ved siden af de to eksisterende felter, som skriver `is_active` på produktet sammen med de øvrige basis-indstillinger. Checkboksen er en administrator-kontrol i MG Test — sælgerne ser den ikke.
+- Hjælpetekst: "Inaktive produkter kan ikke længere vælges i sælgernes salgsregistrering. Historiske salg og satser bevares."
+- Sælgersiden ændres ikke i denne opgave: FM-salgsregistreringen filtrerer allerede på `is_active = true`, så et inaktivt produkt er slet ikke i deres liste — hverken synligt eller valgbart.
 - `is_active` skal med i produkt-select og i mutationen der opdaterer `counts_as_sale`/`counts_as_cross_sale` (linje 212-220), så alt gemmes i én handling.
+
 
 ### 2. Synlig markering i produkttabellen
 
