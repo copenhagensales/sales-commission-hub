@@ -43,7 +43,7 @@ Nuuday uden første måned                 360   360  ok       295   295  ok
 Nuuday med første måned                  335   340  AFVIGER  280   275  AFVIGER +5
                                                      -5
 5G Internet                              300   300  ok       300   300  ok
-Fri 20 - 89 (KUN IKKE NUUDAY)            300   300  ok       300   (ingen i listen)
+Fri 20 - 89 (KUN IKKE NUUDAY)            300   300  ok       må ikke sælges
 ```
 
 Tre afvigelser skal rettes i prisreglerne, uafhængigt af denne ændring:
@@ -52,7 +52,10 @@ Tre afvigelser skal rettes i prisreglerne, uafhængigt af denne ændring:
 - "Eesy med første måned (Nuuday)", gaden-regel: 335 -> 340
 - "Eesy med første måned (Nuuday)", marked-regel: 280 -> 275
 
-Desuden: "Fri 20 - 89 (KUN IKKE NUUDAY)" har slet ingen prisregler, kun basispris 300. Den giver derfor 300 på både gaden og marked. Din liste nævner kun 89 under COOP — skal produktet overhovedet kunne sælges på marked, og med hvilken sats? Sig til, så tager jeg satsrettelserne med som ét separat trin (nye regler med `effective_from`, gamle lukkes med `effective_to`, så historikken bevares).
+Satsrettelserne tages som ét separat trin: nye regler med `effective_from`, de gamle lukkes med `effective_to`, så historikken bevares.
+
+"Fri 20 - 89 (KUN IKKE NUUDAY)" hører kun til gaden. Den har ingen prisregler (kun basispris 300) og ligger på gaden-kampagnen, så den bliver med den nye løsning **ikke** vist på en marked-booking — ingen ekstra ændring nødvendig.
+
 
 
 ## Løsning: gør produktlisten regel-bevidst i stedet for kampagne-bundet
