@@ -383,6 +383,8 @@ export function ProductPricingRulesDialog({
     setLocalRevenue(String(baseRevenue));
     setLocalCountsAsSale(countsAsSale);
     setLocalCountsAsCrossSale(countsAsCrossSale);
+    setLocalIsActive((productInfo as { is_active?: boolean | null } | undefined)?.is_active ?? true);
+
     setIsEditingBase(false);
     setEffectiveDate(new Date());
   };
