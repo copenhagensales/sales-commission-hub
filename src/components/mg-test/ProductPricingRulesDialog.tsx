@@ -99,6 +99,7 @@ export function ProductPricingRulesDialog({
   const [localRevenue, setLocalRevenue] = useState(String(baseRevenue));
   const [localCountsAsSale, setLocalCountsAsSale] = useState(countsAsSale);
   const [localCountsAsCrossSale, setLocalCountsAsCrossSale] = useState(countsAsCrossSale);
+  const [localIsActive, setLocalIsActive] = useState(true);
 
   // Update local state when props change
   useEffect(() => {
@@ -107,6 +108,7 @@ export function ProductPricingRulesDialog({
     setLocalCountsAsSale(countsAsSale);
     setLocalCountsAsCrossSale(countsAsCrossSale);
   }, [baseCommission, baseRevenue, countsAsSale, countsAsCrossSale]);
+
 
   // Fetch existing rules for this product
   const { data: rules, isLoading: rulesLoading } = useQuery({
