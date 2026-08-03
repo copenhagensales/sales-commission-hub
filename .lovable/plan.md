@@ -69,15 +69,21 @@ De inaktive marked-dubletter bliver **ikke** genaktiveret — det ville genindf�
    - dedupliker på `lower(trim(name))` og foretræk rækken der har en regel for kampagnen. Én række pr. navn — sælgeren ser aldrig dubletter.
    - `GRANT EXECUTE` til `authenticated`.
 
-2. **`SalesRegistration.tsx`** — erstat den direkte `products`-query med et kald til RPC'en via en ny hook `useFmRegistrationProducts(campaignId)`. Samme returform (`{id, name}[]`), så resten af siden er uændret. Gælder både normal registrering og callback-mode, da de deler listen.
+2. **Isolering til Eesy — Yousee og øvrige FM-klienter påvirkes ikke**
+   Udvidelsen (punkt 2 i RPC'en) begrænses eksplicit til Eesy FM-klienten: for alle andre kampagner returnerer RPC'en præcis samme resultat som i dag (aktive produkter på kampagnen). Konkret får RPC'en et guard, så cross-kampagne-udvidelsen kun gælder når kampagnen tilhører Eesy FM.
+   Yousee har i dag ingen prisregler med `campaign_mapping_ids`, så resultatet ville alligevel være identisk — guarden gør det garanteret frem for antaget, også hvis der senere oprettes kampagneregler på Yousee.
 
-3. **Ingen ændring** af `products.is_active`, af prisregler, af triggeren eller af eksisterende `sale_items`.
+3. **`SalesRegistration.tsx`** — erstat den direkte `products`-query med et kald til RPC'en via en ny hook `useFmRegistrationProducts(campaignId)`. Samme returform (`{id, name}[]`), så resten af siden er uændret. Gælder både normal registrering og callback-mode, da de deler listen.
+
+4. **Ingen ændring** af `products.is_active`, af prisregler, af triggeren eller af eksisterende `sale_items`.
+
 
 Efter dette ser en sælger på Eesy marked de 5 relevante produkter (5G Internet + de fire Eesy-varianter, uden dubletter), salget gemmes med navnet, og triggeren giver markedssatsen via kampagnereglen. "Eesy 99"-varianterne forbliver skjulte, fordi gaden-rækkerne for dem også er inaktive.
 
 ## Kontrol efter implementering
 
 - Sammenlign listen for Eesy marked og Eesy gaden: begge skal vise 5 hhv. 6 produkter, ingen navnedubletter.
+- Yousee-booking: produktlisten skal være 100% identisk før og efter ændringen (samme antal, samme navne).
 - Test-salg på en marked-booking skal give 385/1000 på "Eesy uden første måned (IKKE Nuuday)", ikke 450/1000.
 
 ## Påvirkning af historiske salg
