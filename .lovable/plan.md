@@ -1,32 +1,40 @@
-# Svar: er det kun aktive produkter der vises og registreres nu?
+# Fix: "Unauthorized" på Tast selv salg (Eesy TM)
 
-Ja. Verificeret i både kode og database.
+## Diagnose (verificeret)
 
-## Visning (Eesy FM: marked, coop/gaden og callbacks)
+David og Thomas har hver **to auth-konti** — en på privat-email og en på arbejds-email — og `employee_master_data.auth_user_id` peger på den forkerte:
 
-Salgsregistreringen henter listen via RPC'en `get_fm_registration_products(p_campaign_id)`, som kun returnerer produkter med `is_active = true`, og dedupliker på navn. Callback-mode bruger samme liste som normal registrering — der er ikke to kodestier. Så en inaktiv række kan ikke vælges af en sælger nogen steder.
+| Medarbejder | auth_user_id i master | Konto de faktisk logger ind med |
+|---|---|---|
+| David Krygier | `47a1119c…` (davidbergmankrygier@hotmail.com, sidst logget ind 24/7) | `76731f77…` (dakr@copenhagensales.dk, logget ind 4/8 11:40) |
+| Thomas Wehage | `cb0eb55a…` (thomaswehage@hotmail.com, sidst 1/6) | `596f3dac…` (thwe@copenhagensales.dk, logget ind 4/8 09:25) |
 
-## Registrering (satsen på salget)
+`supabase/functions/manual-sales/index.ts:72-78` slår kun medarbejderen op på `auth_user_id` og returnerer `null` → `401 Unauthorized`, når der ikke er match. Begge er aktive og medlem af Eesy TM (`0cb1b854…`), som er Hiper-kanalens team — så adgangen er reelt korrekt, opslaget fejler blot.
 
-Triggeren `create_fm_sale_items()` slår produktet op med:
+Frontend har allerede fallback-mønstret for præcis dette problem: `src/lib/employeeLookup.ts` (auth_user_id → work_email/private_email). Edge-funktionen mangler det.
 
-```text
-WHERE lower(trim(name)) = lower(trim(fm_product_name)) AND is_active = true
-```
+## Løsning
 
-Filteret `is_active = true` betyder at en inaktiv række heller ikke kan rammes af navneopslaget — heller ikke ved navnesammenfald. Prisreglerne læses derefter kun på den aktive række, der blev fundet.
+**1. Fallback-opslag i `manual-sales` (kodefix, dækker alle nuværende og fremtidige tilfælde)**
 
-## Har de inaktive produkter en funktion nu?
+I `getCallerContext`: hvis opslag på `auth_user_id` ikke giver en række, slå op på token-brugerens email mod `work_email` / `private_email` (case-insensitivt, kun `is_active = true`). Fejler stadig med 401 hvis intet match. Samme semantik som `employeeLookup.ts`, så ét mønster i hele systemet.
 
-Nej, ud over historik:
+**2. Datarettelse (én migration, kun disse to rækker)**
 
-- De er stadig `product_id` på eksisterende `sale_items`. Dagsrapporter, lønperioder og ledelsesrapporter for tidligere perioder læser dem. Derfor må de aldrig slettes.
-- De kan ikke vælges af sælgere.
-- De kan ikke rammes af trigger-matchingen på nye salg.
-- Deres eventuelle prisregler er dermed uden effekt fremadrettet (reglerne ligger stadig på rækken, men rækken bliver ikke matchet).
+Peg `auth_user_id` på den konto de faktisk bruger:
+- David: `ca295579…` → `76731f77…`
+- Thomas: `cb135e08…` → `596f3dac…`
 
-Den tidligere funktion — at deaktivering blev brugt som tie-breaker, så navneopslaget ramte den "rigtige" række — er nu erstattet af at listen og matchingen begge er `is_active`-bevidste. `is_active` betyder derfor kun én ting igen: "må ikke sælges mere".
+Dette retter samtidig alle *andre* steder i systemet der kun matcher på `auth_user_id` (rettigheder, mine sider, tidsregistrering), hvor de kan have samme problem uden at have rapporteret det.
 
-## Eneste undtagelse i data i dag
+## Ikke i scope
 
-"5G Internet" findes stadig aktiv på både Eesy gaden og Eesy marked. Begge har basispris 300/650, og gaden-rækkens regler giver også 300/650 for begge kampagner, så satsen er identisk uanset hvilken række der rammes. Ingen fejlpriser — men det er den ene dublet der stadig er aktiv to steder. Du har valgt kun analyse på den, så der er ikke ændret noget.
+- Ingen sletning eller sammenlægning af de dobbelte auth-konti (separat beslutning).
+- Ingen ændring af kanal-/team-logik i `manual-sales`.
+- Ingen ændring af eksisterende salg.
+
+## Verifikation
+
+- Kald `manual-sales?action=channels` med David's arbejds-email-session → forventet `{ channels: [Hiper] }`, ikke 401.
+- Bekræft at én-konto-medarbejdere fortsat rammer det primære `auth_user_id`-opslag (uændret sti).
+- Tjek at ingen anden medarbejder har `auth_user_id` peget på en konto med nyere login på en anden konto (rapportér fund, ret ikke).
