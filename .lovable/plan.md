@@ -24,9 +24,9 @@
 | Marked – provision | fra reglen mappet til "Eesy marked", ellers grundsats |
 | Marked – CPO | samme logik |
 | Marked – kilde | Regel / Grundsats (fallback) |
-| Note | fx "ingen regler", "inaktivt produkt" |
+| Note | fx "ingen regler — grundsats" |
 
-Rækker sorteres med aktive produkter først, derefter alfabetisk. Inaktive produkter markeres visuelt, så det er tydeligt hvad sælgerne faktisk kan vælge.
+Rækker sorteres alfabetisk pr. kampagne.
 
 ## Teknisk
 - Read-only SQL mod `products`, `client_campaigns`, `clients`, `product_pricing_rules` og `adversus_campaign_mappings` (regel→kampagne via `campaign_mapping_ids`).
