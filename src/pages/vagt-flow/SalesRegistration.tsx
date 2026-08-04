@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { useCreateFieldmarketingSale } from "@/hooks/useFieldmarketingSales";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePositionPermissions";
+import { useFmRegistrationProducts } from "@/hooks/useFmRegistrationProducts";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
