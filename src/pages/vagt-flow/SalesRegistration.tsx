@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { useCreateFieldmarketingSale } from "@/hooks/useFieldmarketingSales";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePositionPermissions";
+import { useFmRegistrationProducts } from "@/hooks/useFmRegistrationProducts";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -246,31 +247,12 @@ const SalesRegistration = () => {
     },
   });
 
-  // Hent produkter for bookingens kampagne. Hvis bookingen mangler kampagne,
-  // returneres en tom liste — UI viser så en advarsel om at lederen skal
-  // udfylde booking. Korrekt brand bestemmes 100% af bookingen.
-  const { data: products, isLoading: productsLoading } = useQuery({
-    queryKey: ["campaign-products", activeBooking?.campaign?.id],
-    queryFn: async () => {
-      if (!activeBooking?.campaign?.id) return [];
-      const { data, error } = await supabase
-        .from("products")
-        .select("id, name")
-        .eq("client_campaign_id", activeBooking.campaign.id)
-        .eq("is_active", true)
-        .neq("name", "Lokation")
-        .order("name");
-      if (error) throw error;
+  // Hent produkter for bookingens kampagne via RPC. Hvis bookingen mangler
+  // kampagne, returneres en tom liste — UI viser så en advarsel om at lederen
+  // skal udfylde booking. Korrekt brand bestemmes 100% af bookingen.
+  const { data: products, isLoading: productsLoading } =
+    useFmRegistrationProducts(activeBooking?.campaign?.id);
 
-      const seen = new Set<string>();
-      return (data || []).filter((p) => {
-        if (seen.has(p.name)) return false;
-        seen.add(p.name);
-        return true;
-      });
-    },
-    enabled: !!activeBooking?.campaign?.id,
-  });
 
   const bookingMissingCampaign = !!activeBooking && !activeBooking?.campaign?.id;
 
