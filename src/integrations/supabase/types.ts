@@ -14297,6 +14297,13 @@ export type Database = {
           roles: Database["public"]["Enums"]["system_role"][]
         }[]
       }
+      get_fm_registration_products: {
+        Args: { p_campaign_id: string }
+        Returns: {
+          id: string
+          name: string
+        }[]
+      }
       get_invitation_by_token: {
         Args: { _token: string }
         Returns: {
