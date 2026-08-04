@@ -29,6 +29,6 @@
 Rækker sorteres alfabetisk pr. kampagne.
 
 ## Teknisk
-- Read-only SQL mod `products`, `client_campaigns`, `clients`, `product_pricing_rules` og `adversus_campaign_mappings` (regel→kampagne via `campaign_mapping_ids`).
+- Read-only SQL mod `products` (filtreret på `is_active = true`), `client_campaigns`, `clients`, `product_pricing_rules` og `adversus_campaign_mappings` (regel→kampagne via `campaign_mapping_ids`).
 - Filen genereres med openpyxl og lægges i `/mnt/documents/eesy-fm-satser.xlsx`.
 - Ingen ændringer i kode eller data.
