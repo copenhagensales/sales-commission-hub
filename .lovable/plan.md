@@ -1,25 +1,29 @@
-# Selvbetjent skift af adgangskode i Min Profil
+# Excel-udtræk: HAP/VOK-salg på TDC Erhverv, juli 2026
 
-## Nuværende situation
-En indlogget bruger kan ikke selv skifte adgangskode. De tre eksisterende veje er:
+## Hvad der laves
+En Excel-fil med alle TDC Erhverv-salg i perioden 1/7–31/7 2026, hvor der på salget er registreret mindst én HAP- eller VOK-linje.
 
-1. "Glemt adgangskode?" på `/auth` — token-mail via `initiate-password-reset`, ny kode sættes på `/reset-password`.
-2. Tvungent skift ved første login (`mustChangePassword` i `Auth.tsx`).
-3. Leder sætter kode manuelt på medarbejderkortet (`EmployeeDetail.tsx` → `set-user-password`).
+## Datagrundlag (verificeret)
+HAP/VOK findes som selvstændige produktlinjer i Adversus-payloaden på TDC Erhverv-kampagnen (`TDC Erhverv Products`). I juli 2026 findes disse linjer:
 
-`MyProfile.tsx` har ingen password-sektion.
+| Produktlinje | Antal salg | Samlet antal |
+| --- | --- | --- |
+| Lead Provi HAP | 11 | 12 |
+| Lukket salg HAP | 11 | 12 |
+| Fuldt salg HAP | 8 | 8 |
+| Fuldt salg VOK | 5 | 5 |
+| Lead Provi VOK | 3 | 3 |
+| Lukket salg VOK | 3 | 3 |
 
-## Hvad der bygges
-En "Skift adgangskode"-sektion på Min Profil:
+Alle tre typer (lead, lukket salg, fuldt salg) er altså med — for både HAP og VOK.
 
-- Felter: nuværende adgangskode, ny adgangskode, bekræft ny adgangskode.
-- Nuværende kode verificeres først med `signInWithPassword` mod brugerens egen email (fejl → "Nuværende adgangskode er forkert").
-- Ny kode valideres med den eksisterende `validatePassword` og vises med `PasswordStrengthIndicator`.
-- Gem via `supabase.auth.updateUser({ password })`, toast ved succes/fejl.
-- Knappen er deaktiveret indtil kravene er opfyldt og de to nye felter matcher.
+## Kolonner i filen
+- **Sælgernavn** — `sales.agent_name`
+- **Salgsdato** — `sale_datetime` konverteret til dansk tid
+- **Produkter (inkl. antal)** — samtlige produktlinjer på salget i formatet `2 × Lukket salg HAP; 1 × 5G - 50/10 - TDC Erhverv` (så du kan se, hvad HAP/VOK er solgt sammen med)
+- **OPP nummer** — `leadResultFields."OPP nr"`
+
+Der tilføjes en ekstra kolonne **HAP/VOK-linjer**, så du hurtigt kan filtrere på kun de relevante linjer. Annullerede salg (`validation_status = cancelled`) markeres i egen kolonne frem for at fjernes lydløst.
 
 ## Teknisk
-- Ny komponent `src/components/profile/ChangePasswordCard.tsx`, indsat i `src/pages/MyProfile.tsx`.
-- Genbruger `src/lib/password-validation.ts` og `src/components/password/PasswordStrengthIndicator.tsx`.
-- Ingen DB-migration, ingen edge function, ingen ændring af login- eller reset-flow.
-- Zone: grøn/gul (UI + auth-selvbetjening), ingen ændring i `permissionKeys.ts` eller RLS.
+Ét SELECT mod `sales` + `jsonb_array_elements(raw_payload->'lines')`, filtreret på kampagne-id og periode, hvor der findes en linje med titel indeholdende `HAP` eller `VOK`. Filen genereres med openpyxl og lægges i `/mnt/documents`. Ingen ændringer i kodebasen eller databasen.
