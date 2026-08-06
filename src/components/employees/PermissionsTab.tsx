@@ -12,7 +12,7 @@ import {
   HeartHandshake, MessageSquare, UserCheck, Target, Sparkles, Gift, Swords, 
   Trophy, Building2, Mail, Clock, Timer, LayoutDashboard, Receipt, CreditCard, 
   BarChart3, Database, UserPlus, BookOpen, CalendarDays, Globe, Users2, UserCircle,
-  ChevronDown, ChevronRight
+  ChevronDown, ChevronRight, AlertTriangle
 } from "lucide-react";
 import { 
   useRoleDefinitions, 
