@@ -127,15 +127,18 @@ export default function EesyFmDeviations() {
             </Card>
           </TabsContent>
 
-          {TABS.filter((t) => t.value !== "upload").map((tab) => (
-            <TabsContent key={tab.value} value={tab.value}>
-              <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
-                <CardContent className="py-16 text-center text-sm text-muted-foreground">
-                  Indhold tilføjes her.
-                </CardContent>
-              </Card>
-            </TabsContent>
-          ))}
+          <TabsContent value="overview">
+            <OverviewTab />
+          </TabsContent>
+
+          <TabsContent value="raw">
+            <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+              <CardContent className="py-16 text-center text-sm text-muted-foreground">
+                Indhold tilføjes her.
+              </CardContent>
+            </Card>
+          </TabsContent>
+
         </Tabs>
       </div>
     </VagtFlowLayout>
