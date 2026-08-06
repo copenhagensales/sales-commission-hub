@@ -1,4 +1,5 @@
-import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, ShieldCheck, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, ClipboardCheck, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity, Swords, Mail, Gift, FileBarChart, CreditCard, Pencil, Trophy, Wrench, BookOpen, TrendingUp, TrendingDown, PanelLeft, XCircle, List, Inbox, Bug, Menu as MenuIcon } from "lucide-react";
+import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, ShieldCheck, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, ClipboardCheck, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity, Swords, Mail, Gift, FileBarChart, CreditCard, Pencil, Trophy, Wrench, BookOpen, TrendingUp, TrendingDown, PanelLeft, XCircle, List, Inbox, Bug, AlertTriangle, Menu as MenuIcon } from "lucide-react";
+import { useEesyFmDeviationAccess } from "@/config/eesyFmDeviationAccess";
 import { EnvironmentSwitcher } from "./EnvironmentSwitcher";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,6 +50,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const p = usePermissions(); // Position permissions - THE ONLY source of truth
+  const hasEesyFmDeviationAccess = useEesyFmDeviationAccess();
   const { isPreviewMode } = useRolePreview();
   
   const { data: isFieldmarketing } = useIsFieldmarketingEmployee();
@@ -1233,6 +1235,15 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                   )}>
                     <Pencil className="h-4 w-4" />
                     Ret salgsregistrering (Leder)
+                  </NavLink>
+                )}
+                {hasEesyFmDeviationAccess && (
+                  <NavLink to="/vagt-flow/eesy-fm-deviations" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/vagt-flow/eesy-fm-deviations" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <AlertTriangle className="h-4 w-4" />
+                    Eesy FM afvigelser (Leder)
                   </NavLink>
                 )}
               </CollapsibleContent>
