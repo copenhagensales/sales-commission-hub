@@ -332,6 +332,12 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
         hasEditOption: true,
       },
       {
+        key: "menu_fm_eesy_deviations",
+        label: "Eesy FM afvigelser (Leder)",
+        description: "Adgang til afstemning af automatiske Eesy FM salg",
+        hasEditOption: false,
+      },
+      {
         key: "menu_fm_travel_expenses",
         label: "Rejsekort og diæter",
         description: "Adgang til rejsekort og diætregler",
