@@ -249,7 +249,7 @@ export const routes: RouteConfig[] = [
   { path: "/vagt-flow/billing", component: VagtBilling, access: "role", positionPermission: "menu_fm_billing" },
   { path: "/vagt-flow/travel-expenses", component: VagtTravelExpenses, access: "role", positionPermission: "menu_fm_travel_expenses" },
   { path: "/vagt-flow/edit-sales", component: VagtEditSalesRegistrations, access: "role", positionPermission: "menu_fm_edit_sales" },
-  { path: "/vagt-flow/eesy-fm-deviations", component: VagtEesyFmDeviations, access: "protected" },
+  { path: "/vagt-flow/eesy-fm-deviations", component: VagtEesyFmDeviations, access: "role", positionPermission: "menu_fm_eesy_deviations" },
 
   { path: "/shift-planning", component: ShiftOverview, access: "role", positionPermission: "menu_shift_overview" },
   { path: "/shift-planning/my-schedule", component: MySchedule, access: "protected" },

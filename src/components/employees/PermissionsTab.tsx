@@ -12,7 +12,7 @@ import {
   HeartHandshake, MessageSquare, UserCheck, Target, Sparkles, Gift, Swords, 
   Trophy, Building2, Mail, Clock, Timer, LayoutDashboard, Receipt, CreditCard, 
   BarChart3, Database, UserPlus, BookOpen, CalendarDays, Globe, Users2, UserCircle,
-  ChevronDown, ChevronRight
+  ChevronDown, ChevronRight, AlertTriangle
 } from "lucide-react";
 import { 
   useRoleDefinitions, 
@@ -115,6 +115,7 @@ const permissionIconMap: Record<string, React.ReactNode> = {
   menu_fm_billing: <Receipt className="h-4 w-4" />,
   menu_fm_travel_expenses: <CreditCard className="h-4 w-4" />,
   menu_fm_edit_sales: <Pencil className="h-4 w-4" />,
+  menu_fm_eesy_deviations: <AlertTriangle className="h-4 w-4" />,
   menu_fm_time_off: <Clock className="h-4 w-4" />,
   menu_fm_book_week: <CalendarDays className="h-4 w-4" />,
   menu_fm_bookings: <Calendar className="h-4 w-4" />,
@@ -238,7 +239,7 @@ const sectionChildren: Record<string, string[]> = {
   menu_section_fieldmarketing: [
     'menu_fm_overview', 'menu_fm_booking', 'menu_fm_vehicles', 'menu_fm_dashboard',
     'menu_fm_sales_registration', 'menu_fm_billing', 'menu_fm_travel_expenses',
-    'menu_fm_edit_sales', 'menu_fm_time_off', 'menu_fm_book_week',
+    'menu_fm_edit_sales', 'menu_fm_eesy_deviations', 'menu_fm_time_off', 'menu_fm_book_week',
     'menu_fm_bookings', 'menu_fm_locations', 'menu_fm_vagtplan_fm'
   ],
   menu_section_mg: [
