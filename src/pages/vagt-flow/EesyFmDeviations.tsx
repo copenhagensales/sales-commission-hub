@@ -1,10 +1,31 @@
 import { useState } from "react";
 import { useDropzone } from "react-dropzone";
-import { FileSpreadsheet, Upload, X } from "lucide-react";
+import { FileSpreadsheet, Upload, X, Search, CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { da } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VagtFlowLayout } from "@/components/vagt-flow/VagtFlowLayout";
+import { cn } from "@/lib/utils";
 
 const TABS = [
   { value: "upload", label: "Upload" },
@@ -12,9 +33,131 @@ const TABS = [
   { value: "raw", label: "Rådata" },
 ] as const;
 
+const OVERVIEW_COLUMNS = [
+  "Salgsdato",
+  "Sælger",
+  "Mobil",
+  "Afvigelse",
+  "Tastselv",
+  "PowerBI",
+  "Type",
+] as const;
+
 const XLSX_ACCEPT = {
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
 };
+
+function DateFilter({
+  label,
+  date,
+  onSelect,
+}: {
+  label: string;
+  date: Date | undefined;
+  onSelect: (date: Date | undefined) => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <label className="text-sm font-medium">{label}</label>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            className={cn(
+              "w-full justify-start text-left font-normal",
+              !date && "text-muted-foreground",
+            )}
+          >
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            {date ? format(date, "dd/MM/yyyy", { locale: da }) : <span>Vælg dato...</span>}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <Calendar
+            mode="single"
+            selected={date}
+            onSelect={onSelect}
+            locale={da}
+            initialFocus
+            className={cn("p-3 pointer-events-auto")}
+          />
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
+function OverviewTab() {
+  const [fromDate, setFromDate] = useState<Date | undefined>();
+  const [toDate, setToDate] = useState<Date | undefined>();
+  const [search, setSearch] = useState("");
+  const [employee, setEmployee] = useState<string>("all");
+
+  return (
+    <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+      <CardHeader>
+        <CardTitle className="text-xl">Afvigelser — oversigt</CardTitle>
+        <CardDescription>
+          Sammenholdte salg mellem Tastselv og PowerBI med afvigelser markeret.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <DateFilter label="Fra dato" date={fromDate} onSelect={setFromDate} />
+          <DateFilter label="Til dato" date={toDate} onSelect={setToDate} />
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Søg (alle felter)</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Søg..."
+                className="pl-9"
+              />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Vælg medarbejder</label>
+            <Select value={employee} onValueChange={setEmployee}>
+              <SelectTrigger>
+                <SelectValue placeholder="Alle medarbejdere" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Alle medarbejdere</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-border/50 overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                {OVERVIEW_COLUMNS.map((col) => (
+                  <TableHead key={col} className="whitespace-nowrap">
+                    {col}
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow>
+                <TableCell
+                  colSpan={OVERVIEW_COLUMNS.length}
+                  className="py-16 text-center text-sm text-muted-foreground"
+                >
+                  Ingen data endnu.
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 
 function FileDropzone({
   label,
