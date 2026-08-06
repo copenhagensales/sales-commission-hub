@@ -49,6 +49,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const p = usePermissions(); // Position permissions - THE ONLY source of truth
+  const hasEesyFmDeviationAccess = useEesyFmDeviationAccess();
   const { isPreviewMode } = useRolePreview();
   
   const { data: isFieldmarketing } = useIsFieldmarketingEmployee();
