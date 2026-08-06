@@ -1,8 +1,6 @@
-import { Navigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VagtFlowLayout } from "@/components/vagt-flow/VagtFlowLayout";
-import { useEesyFmDeviationAccess } from "@/config/eesyFmDeviationAccess";
 
 const TABS = [
   { value: "upload", label: "Upload" },
@@ -11,10 +9,6 @@ const TABS = [
 ] as const;
 
 export default function EesyFmDeviations() {
-  const hasAccess = useEesyFmDeviationAccess();
-
-  if (!hasAccess) return <Navigate to="/home" replace />;
-
   return (
     <VagtFlowLayout>
       <div className="space-y-6">
