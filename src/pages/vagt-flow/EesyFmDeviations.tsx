@@ -100,11 +100,65 @@ function DateFilter({
   );
 }
 
+const QUICK_RANGES: { value: string; label: string; range: () => { from: Date; to: Date } }[] = [
+  { value: "today", label: "I dag", range: () => ({ from: startOfDay(new Date()), to: endOfDay(new Date()) }) },
+  {
+    value: "yesterday",
+    label: "I går",
+    range: () => ({ from: startOfDay(subDays(new Date(), 1)), to: endOfDay(subDays(new Date(), 1)) }),
+  },
+  {
+    value: "this-week",
+    label: "Denne uge",
+    range: () => ({
+      from: startOfWeek(new Date(), { weekStartsOn: 1 }),
+      to: endOfWeek(new Date(), { weekStartsOn: 1 }),
+    }),
+  },
+  {
+    value: "last-week",
+    label: "Sidste uge",
+    range: () => ({
+      from: startOfWeek(subWeeks(new Date(), 1), { weekStartsOn: 1 }),
+      to: endOfWeek(subWeeks(new Date(), 1), { weekStartsOn: 1 }),
+    }),
+  },
+  {
+    value: "this-month",
+    label: "Denne måned",
+    range: () => ({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) }),
+  },
+  {
+    value: "last-month",
+    label: "Sidste måned",
+    range: () => ({
+      from: startOfMonth(subMonths(new Date(), 1)),
+      to: endOfMonth(subMonths(new Date(), 1)),
+    }),
+  },
+  {
+    value: "this-year",
+    label: "I år",
+    range: () => ({ from: startOfYear(new Date()), to: endOfYear(new Date()) }),
+  },
+];
+
 function OverviewTab() {
   const [fromDate, setFromDate] = useState<Date | undefined>();
   const [toDate, setToDate] = useState<Date | undefined>();
   const [search, setSearch] = useState("");
   const [employee, setEmployee] = useState<string>("all");
+  const [quickRange, setQuickRange] = useState<string>("custom");
+
+  const handleQuickRange = (value: string) => {
+    setQuickRange(value);
+    const preset = QUICK_RANGES.find((r) => r.value === value);
+    if (preset) {
+      const { from, to } = preset.range();
+      setFromDate(from);
+      setToDate(to);
+    }
+  };
 
   return (
     <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
@@ -115,9 +169,39 @@ function OverviewTab() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <DateFilter label="Fra dato" date={fromDate} onSelect={setFromDate} />
-          <DateFilter label="Til dato" date={toDate} onSelect={setToDate} />
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Hurtig valg</label>
+            <Select value={quickRange} onValueChange={handleQuickRange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Vælg periode" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="custom">Brugerdefineret</SelectItem>
+                {QUICK_RANGES.map((r) => (
+                  <SelectItem key={r.value} value={r.value}>
+                    {r.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DateFilter
+            label="Fra dato"
+            date={fromDate}
+            onSelect={(d) => {
+              setFromDate(d);
+              setQuickRange("custom");
+            }}
+          />
+          <DateFilter
+            label="Til dato"
+            date={toDate}
+            onSelect={(d) => {
+              setToDate(d);
+              setQuickRange("custom");
+            }}
+          />
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Søg (alle felter)</label>
             <div className="relative">
@@ -130,6 +214,7 @@ function OverviewTab() {
               />
             </div>
           </div>
+
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Vælg medarbejder</label>
             <Select value={employee} onValueChange={setEmployee}>
