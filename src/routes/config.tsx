@@ -29,6 +29,7 @@ import {
   VagtSalesRegistration,
   VagtTravelExpenses,
   VagtEditSalesRegistrations,
+  VagtEesyFmDeviations,
   MyBookingSchedule,
   ShiftOverview,
   MySchedule,
