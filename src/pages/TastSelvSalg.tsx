@@ -334,9 +334,11 @@ function toIsoDatetime(v: unknown): string | null {
 function BulkUploadCard({ onErrors }: { onErrors: (errors: BulkUploadError[]) => void }) {
   const { toast } = useToast();
   const bulkImport = useBulkImportManualSales();
+  const bulkCheck = useBulkImportManualSales();
   const [file, setFile] = useState<File | null>(null);
   const [isOver, setIsOver] = useState(false);
   const [rows, setRows] = useState<BulkRow[] | null>(null);
+  const [preview, setPreview] = useState<{ wouldCreate: number; skipped: number } | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [parsing, setParsing] = useState(false);
 
@@ -345,6 +347,7 @@ function BulkUploadCard({ onErrors }: { onErrors: (errors: BulkUploadError[]) =>
     if (!f.name.toLowerCase().endsWith(".xlsx")) return;
     setFile(f);
     setRows(null);
+    setPreview(null);
     setParseError(null);
     onErrors([]);
     setParsing(true);
@@ -359,8 +362,21 @@ function BulkUploadCard({ onErrors }: { onErrors: (errors: BulkUploadError[]) =>
         emne_id: String(pickCol(r, ["emne-id", "emne id", "emneid"]) ?? "").trim() || null,
         sale_datetime: toIsoDatetime(pickCol(r, ["sidste kontakttidspunkt", "sidst kontaktet"])),
       }));
-      if (mapped.length === 0) setParseError("Filen indeholder ingen rækker");
+      if (mapped.length === 0) {
+        setParseError("Filen indeholder ingen rækker");
+        setRows(mapped);
+        return;
+      }
       setRows(mapped);
+      const res = await bulkCheck.mutateAsync({
+        channel_key: "lederne",
+        rows: mapped,
+        dry_run: true,
+      });
+      setPreview({ wouldCreate: res.would_create ?? 0, skipped: res.skipped });
+      onErrors(
+        res.errors.map((e) => ({ reason: e.reason, seller: e.seller, subjectId: e.subject_id })),
+      );
     } catch (err) {
       setParseError(err instanceof Error ? err.message : "Kunne ikke læse filen");
     } finally {
@@ -380,12 +396,14 @@ function BulkUploadCard({ onErrors }: { onErrors: (errors: BulkUploadError[]) =>
         description: res.skipped > 0 ? `${res.skipped} rækker sprunget over — se "Fejl i upload"` : undefined,
       });
       setRows(null);
+      setPreview(null);
       setFile(null);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Ukendt fejl";
       toast({ title: "Import fejlede", description: msg, variant: "destructive" });
     }
   };
+
 
   return (
     <Card>
@@ -429,22 +447,31 @@ function BulkUploadCard({ onErrors }: { onErrors: (errors: BulkUploadError[]) =>
               <div className="truncate font-medium">{file.name}</div>
               <div className="text-xs text-muted-foreground">
                 {parsing
-                  ? "Læser fil…"
+                  ? bulkCheck.isPending
+                    ? "Kontrollerer…"
+                    : "Læser fil…"
                   : parseError
                     ? parseError
-                    : rows
-                      ? `${rows.length} rækker klar til import`
-                      : ""}
+                    : preview
+                      ? `${preview.wouldCreate} salg klar · ${preview.skipped} fejl`
+                      : rows
+                        ? `${rows.length} rækker læst`
+                        : ""}
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <Button
                 type="button"
                 size="sm"
-                disabled={!rows || rows.length === 0 || bulkImport.isPending || parsing}
+                disabled={
+                  !preview ||
+                  preview.wouldCreate === 0 ||
+                  bulkImport.isPending ||
+                  parsing
+                }
                 onClick={handleImport}
               >
-                {bulkImport.isPending ? "Importerer…" : "Importér salg"}
+                {bulkImport.isPending ? "Registrerer…" : "Registrer salg"}
               </Button>
               <Button
                 type="button"
@@ -453,9 +480,12 @@ function BulkUploadCard({ onErrors }: { onErrors: (errors: BulkUploadError[]) =>
                 onClick={() => {
                   setFile(null);
                   setRows(null);
+                  setPreview(null);
                   setParseError(null);
+                  onErrors([]);
                 }}
               >
+
                 Fjern
               </Button>
             </div>

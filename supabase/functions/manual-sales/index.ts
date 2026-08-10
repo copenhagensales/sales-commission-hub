@@ -207,6 +207,7 @@ serve(async (req) => {
       if (!ctx.isManager) return json(403, { error: "Kun ledere kan bulk-importere salg" });
 
       const body = await req.json().catch(() => null) as {
+        dry_run?: boolean;
         rows?: Array<{
           mobil?: unknown;
           kampagne?: string | null;
@@ -216,6 +217,9 @@ serve(async (req) => {
           sale_datetime?: string | null;
         }>;
       } | null;
+
+      const dryRun = body?.dry_run === true;
+
 
       const rows = body?.rows ?? [];
       if (!Array.isArray(rows) || rows.length === 0) {
@@ -267,6 +271,8 @@ serve(async (req) => {
       const errors: Array<{ reason: string; seller: string; subject_id: string }> = [];
       const seenPhones = new Set<string>();
       let created = 0;
+      let wouldCreate = 0;
+
 
       for (const r of rows) {
         const seller = String(r.saelger ?? "").trim();
@@ -307,9 +313,18 @@ serve(async (req) => {
           continue;
         }
 
+        if (dryRun) {
+          existingPhones.add(phone);
+          seenPhones.add(phone);
+          if (subjectId) existingSubjects.add(subjectId);
+          wouldCreate += 1;
+          continue;
+        }
+
         const saleDatetime = r.sale_datetime && !Number.isNaN(Date.parse(r.sale_datetime))
           ? new Date(r.sale_datetime).toISOString()
           : new Date().toISOString();
+
 
         const { data: sale, error: sErr } = await svc
           .from("sales")
@@ -360,7 +375,14 @@ serve(async (req) => {
         created += 1;
       }
 
-      return json(200, { ok: true, created, skipped: errors.length, errors });
+      return json(200, {
+        ok: true,
+        created,
+        would_create: wouldCreate,
+        skipped: errors.length,
+        errors,
+      });
+
     }
 
 
