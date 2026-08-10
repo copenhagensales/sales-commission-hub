@@ -57,6 +57,8 @@ type CallerContext = {
     auth_user_id: string | null;
   };
   allowedChannels: Channel[];
+  isManager: boolean;
+
 };
 
 async function getCallerContext(req: Request): Promise<CallerContext | null> {
@@ -93,7 +95,7 @@ async function getCallerContext(req: Request): Promise<CallerContext | null> {
 
   if (allowedChannels.length === 0) return null;
 
-  return { svc, employee, allowedChannels };
+  return { svc, employee, allowedChannels, isManager };
 }
 
 async function resolveChannel(
@@ -117,6 +119,14 @@ async function resolveChannel(
   if (!campaign) return null;
   return { campaign_id: campaign.id };
 }
+
+function normalizePhone(raw: unknown): string {
+  let d = String(raw ?? "").replace(/\D/g, "");
+  if (d.startsWith("0045")) d = d.slice(4);
+  else if (d.length > 8 && d.startsWith("45")) d = d.slice(2);
+  return d;
+}
+
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -192,6 +202,168 @@ serve(async (req) => {
       if (error) return json(500, { error: error.message });
       return json(200, { products: products ?? [] });
     }
+
+    if (action === "bulk_import" && req.method === "POST") {
+      if (!ctx.isManager) return json(403, { error: "Kun ledere kan bulk-importere salg" });
+
+      const body = await req.json().catch(() => null) as {
+        rows?: Array<{
+          mobil?: unknown;
+          kampagne?: string | null;
+          saelger?: string | null;
+          status?: string | null;
+          emne_id?: string | null;
+          sale_datetime?: string | null;
+        }>;
+      } | null;
+
+      const rows = body?.rows ?? [];
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return json(400, { error: "Ingen rækker i filen" });
+      }
+      if (rows.length > 5000) return json(400, { error: "For mange rækker (max 5000)" });
+
+      // Product for this channel
+      let pq = svc
+        .from("products")
+        .select("id, name, commission_dkk, revenue_dkk")
+        .eq("client_campaign_id", campaignId)
+        .eq("is_active", true);
+      if (channel.allowed_products.length > 0) pq = pq.in("name", channel.allowed_products);
+      const { data: prodList } = await pq.order("name", { ascending: true });
+      const product = prodList?.[0];
+      if (!product) return json(400, { error: "Produktet for denne kanal findes ikke" });
+
+      // Existing sales for dedupe (all time, this channel campaign, manual entries)
+      const { data: existing, error: exErr } = await svc
+        .from("sales")
+        .select("customer_phone, raw_payload")
+        .eq("source", "manual_entry")
+        .eq("client_campaign_id", campaignId)
+        .limit(20000);
+      if (exErr) return json(500, { error: exErr.message });
+
+      const existingPhones = new Set<string>();
+      const existingSubjects = new Set<string>();
+      for (const s of existing ?? []) {
+        const p = normalizePhone((s as any).customer_phone);
+        if (p) existingPhones.add(p);
+        const sid = (s as any).raw_payload?.subject_id;
+        if (sid) existingSubjects.add(String(sid));
+      }
+
+      // Employee lookup by full name
+      const { data: employees } = await svc
+        .from("employee_master_data")
+        .select("id, first_name, last_name, work_email, is_active")
+        .eq("is_active", true);
+      const norm = (v: string) => v.toLowerCase().replace(/\s+/g, " ").trim();
+      const byName = new Map<string, { name: string; email: string | null }>();
+      for (const e of employees ?? []) {
+        const full = norm(`${e.first_name ?? ""} ${e.last_name ?? ""}`);
+        if (full) byName.set(full, { name: full, email: e.work_email });
+      }
+
+      const errors: Array<{ reason: string; seller: string; subject_id: string }> = [];
+      const seenPhones = new Set<string>();
+      let created = 0;
+
+      for (const r of rows) {
+        const seller = String(r.saelger ?? "").trim();
+        const subjectId = String(r.emne_id ?? "").trim();
+        const push = (reason: string) => errors.push({ reason, seller, subject_id: subjectId });
+
+        const status = String(r.status ?? "").trim().toLowerCase();
+        if (status && status !== "succes" && status !== "success") {
+          push(`Status er "${r.status}" — ikke Succes`);
+          continue;
+        }
+
+        const phone = normalizePhone(r.mobil);
+        if (phone.length < 8) {
+          push("Mobil mangler eller er ugyldig");
+          continue;
+        }
+        if (subjectId && existingSubjects.has(subjectId)) {
+          push("Emne-ID er allerede importeret");
+          continue;
+        }
+        if (existingPhones.has(phone)) {
+          push("Dublet: mobilnummeret er allerede registreret");
+          continue;
+        }
+        if (seenPhones.has(phone)) {
+          push("Dublet i filen: mobilnummeret optræder flere gange");
+          continue;
+        }
+
+        const match = seller ? byName.get(norm(seller)) : undefined;
+        if (!match) {
+          push("Sælger findes ikke eller er inaktiv");
+          continue;
+        }
+        if (!match.email) {
+          push("Sælger mangler arbejdsmail");
+          continue;
+        }
+
+        const saleDatetime = r.sale_datetime && !Number.isNaN(Date.parse(r.sale_datetime))
+          ? new Date(r.sale_datetime).toISOString()
+          : new Date().toISOString();
+
+        const { data: sale, error: sErr } = await svc
+          .from("sales")
+          .insert({
+            source: "manual_entry",
+            integration_type: "manual",
+            sale_datetime: saleDatetime,
+            customer_phone: phone,
+            agent_name: seller,
+            agent_email: match.email,
+            client_campaign_id: campaignId,
+            validation_status: "pending",
+            raw_payload: {
+              manual_entry: true,
+              bulk_import: true,
+              imported_by_employee_id: employee.id,
+              product_name: product.name,
+              channel_key: channel.key,
+              subject_id: subjectId || null,
+              campaign_name: r.kampagne ?? null,
+            },
+          })
+          .select("id")
+          .single();
+
+        if (sErr || !sale) {
+          push(sErr?.message ?? "Kunne ikke oprette salg");
+          continue;
+        }
+
+        const { error: siErr } = await svc.from("sale_items").insert({
+          sale_id: sale.id,
+          product_id: product.id,
+          display_name: product.name,
+          quantity: 1,
+          mapped_commission: product.commission_dkk ?? 0,
+          mapped_revenue: product.revenue_dkk ?? 0,
+        });
+        if (siErr) {
+          await svc.from("sales").delete().eq("id", sale.id);
+          push(siErr.message);
+          continue;
+        }
+
+        existingPhones.add(phone);
+        seenPhones.add(phone);
+        if (subjectId) existingSubjects.add(subjectId);
+        created += 1;
+      }
+
+      return json(200, { ok: true, created, skipped: errors.length, errors });
+    }
+
+
 
     if (action === "create" && req.method === "POST") {
       const body = await req.json().catch(() => null) as {
