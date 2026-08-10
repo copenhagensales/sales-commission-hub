@@ -39,14 +39,18 @@ import { da } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 
+import { parseExcelFile } from "@/utils/excel";
+
 import {
   useManualChannels,
   useManualProducts,
   useMyManualSales,
   useCreateManualSale,
   useDeleteManualSale,
+  useBulkImportManualSales,
   type ManualChannel,
 } from "@/hooks/useLederneSales";
+
 
 const BULK_TAB = "__bulk_leder__";
 
