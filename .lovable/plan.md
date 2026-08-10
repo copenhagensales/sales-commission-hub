@@ -1,20 +1,22 @@
-# Verifikation: Balders 3 fejlrækker i bulk-uploaden
+# Verifikation: dubletter i bulk-uploaden (Balder og Flora)
 
-Konklusion: de 3 rækker blev **ikke** importeret, og der er ingen dobbelttælling. Ingen ændringer nødvendige.
+Konklusion: ingen af de afviste rækker er kommet ind. Ingen dobbelttælling på tavlen. Ingen ændringer nødvendige.
 
-## Evidens
+## Balder
 
-Balder har i alt 1.293 salg i perioden fra 15/7 og frem, fordelt sådan:
+I alt 1.293 salg i perioden fra 15/7:
 
-- 1.290 salg oprettet i dag (10/8) — bulk-uploaden
-- 3 salg oprettet 17/7 med `source = Lovablecph` (Adversus-integrationen)
+- 1.290 oprettet i dag (10/8) — bulk-uploaden
+- 3 oprettet 17/7 med kilde `Lovablecph` (Adversus-integrationen): numrene 40802671, 22257130 og 51374010
 
-De 3 gamle salg har numrene 40802671, 22257130 og 51374010 og kom automatisk ind fra dialeren tilbage i juli. Da de samme tre numre også lå i Excel-filen, blev filens rækker afvist som dubletter — netop derfor står de under "Fejl i upload".
+De 3 var altså allerede registreret automatisk fra dialeren i juli. Derfor blev filens tilsvarende rækker afvist som dubletter. Excel havde 1.293 rækker, systemet har 1.293 salg — hvert salg findes kun én gang.
 
-## Hvorfor tallet stemmer alligevel
+## Flora
 
-Excel-filen indeholdt 1.293 rækker på Balder. Systemet har 1.293 salg. Det er 1.290 nye plus de 3, der allerede var registreret via Adversus. Hvert salg findes altså kun én gang — dubletsikringen gjorde præcis sit arbejde.
+Samme billede. I dag er der oprettet 28 manuelle salg på hende plus 4 fra dialeren. Kontrol af alle hendes salg i perioden viser **nul** telefonnumre der optræder mere end én gang (de eneste gentagelser er dialer-salg helt uden nummer, som ikke stammer fra uploaden).
+
+Hendes ~20 dubletfejl var derfor rækker, der allerede fandtes i systemet — typisk fordi salget var kommet ind via dialeren eller via "Tast selv" tidligere. De blev sprunget over og er ikke tilføjet igen.
 
 ## Ingen handling
 
-Der er intet at rette. Hvis du vil, kan jeg lave et lille udtræk af de 3 salg (dato, nummer, produkt, provision), så du kan se dem sammenlignet med filens rækker.
+Dubletsikringen virker som tilsigtet: den matcher på mobilnummer og Emne-ID og afviser rækker der allerede findes. Sig til hvis du vil have et udtræk over de afviste rækker med angivelse af, hvor det oprindelige salg kom fra.
