@@ -95,7 +95,7 @@ async function getCallerContext(req: Request): Promise<CallerContext | null> {
 
   if (allowedChannels.length === 0) return null;
 
-  return { svc, employee, allowedChannels };
+  return { svc, employee, allowedChannels, isManager };
 }
 
 async function resolveChannel(
