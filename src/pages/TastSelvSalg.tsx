@@ -205,8 +205,9 @@ export default function TastSelvSalg() {
 
         {activeChannel === BULK_TAB && isOwner ? (
           <>
-            <BulkUploadCard />
-            <BulkUploadErrorsCard />
+            <BulkUploadCard onErrors={setBulkErrors} />
+            <BulkUploadErrorsCard errors={bulkErrors} />
+
           </>
         ) : (
         <Card>
