@@ -566,7 +566,7 @@ function BulkUploadErrorsCard({ errors }: { errors: BulkUploadError[] }) {
                 </TableCell>
               </TableRow>
             ) : (
-              errors.map((e, i) => (
+              sorted.map((e, i) => (
                 <TableRow key={`${e.subjectId}-${i}`}>
                   <TableCell>{e.reason}</TableCell>
                   <TableCell>{e.seller}</TableCell>
