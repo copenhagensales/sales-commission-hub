@@ -12,14 +12,24 @@ Bulk-importen bygger navnet som `first_name + " " + last_name` og sammenligner d
 
 Det er altså ikke en manglende eller inaktiv medarbejder — kun bindestregen som efternavn der bryder matchet.
 
+## Omfang: 13 medarbejdere, ikke kun Balder
+
+Samme mønster findes på 13 rækker — fulde navn i `first_name` og "-" eller tomt i `last_name`. Heraf 3 aktive:
+
+- Balder Møller Nørgaard ("-")
+- Lucas Vico Petersen ("-")
+- Emillio Pedersen (blank)
+
+De øvrige 10 er inaktive (bl.a. Nicholas Kilde, Gabriell Liliefrost, Oscar Køhler, Max Ammitzbøll Andersen, Tobias Esmark Hansen). Flere er oprettet i samme minut (30/3-2026 kl. 07:34), hvilket peger på en oprettelses-/importfejl hvor hele navnet blev tastet i fornavn-feltet og "-" brugt som pladsholder for et påkrævet efternavn — ikke en bevidst konvention.
+
 ## Løsning
 
 To dele:
 
 1. **Robust navne-match i importen.** Normaliseringen udvides, så tegn der ikke er bogstaver/tal (bindestreg, punktum, komma) fjernes, og dobbelte mellemrum kollapses — både for systemnavnet og filnavnet. Så matcher "Balder Møller Nørgaard -" og "Balder Møller Nørgaard" hinanden. Samtidig indekseres hver medarbejder også under sit rene navn uden tomme/tegn-kun navnedele.
-2. **Ryd op i data.** Balders `last_name` er reelt en pladsholder. Anbefaling: flyt "Nørgaard" til `last_name` og lad `first_name` være "Balder Møller" — eller som minimum fjern "-". Dette gøres manuelt under Alle medarbejdere, så vi ikke ændrer navnedata bag om jer. Fortæl til om jeg skal rette det i stedet.
+2. **Ryd op i data (valgfrit, separat).** De 3 aktive kan rettes manuelt under Alle medarbejdere, så efternavnet står korrekt. Sig til hvis jeg skal rette dem. De inaktive lades urørt af historik-hensyn.
 
-Punkt 1 alene løser uploaden nu og fremover, også for andre medarbejdere med "-" eller tomme navnefelter.
+Punkt 1 alene løser uploaden nu og fremover for alle 13 og for fremtidige tilfælde.
 
 ## Teknisk
 
