@@ -25,7 +25,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { CheckCircle2, PhoneCall, PackagePlus, Info, Trash2 } from "lucide-react";
+import { CheckCircle2, PhoneCall, PackagePlus, Info, Trash2, Upload } from "lucide-react";
 import { format, parseISO, startOfWeek, isAfter } from "date-fns";
 import { da } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
