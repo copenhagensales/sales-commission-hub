@@ -38,6 +38,8 @@ import { format, parseISO, startOfWeek, isAfter } from "date-fns";
 import { da } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePositionPermissions";
+import { useAuth } from "@/hooks/useAuth";
+import { isBulkSalesEmail } from "@/config/bulkSalesAccess";
 
 import { parseExcelFile } from "@/utils/excel";
 
@@ -57,6 +59,8 @@ const BULK_TAB = "__bulk_leder__";
 export default function TastSelvSalg() {
   const { toast } = useToast();
   const { isOwner } = usePermissions();
+  const { user } = useAuth();
+  const canBulkImport = isOwner || isBulkSalesEmail(user?.email);
   const { data: channels, isLoading: channelsLoading, error: channelsError } = useManualChannels();
 
   const { data: mySales, isLoading: salesLoading } = useMyManualSales();
@@ -143,7 +147,7 @@ export default function TastSelvSalg() {
               Du har ikke adgang til at taste manuelle salg.
             </CardContent>
           </Card>
-        ) : channels.length === 1 && !isOwner ? (
+        ) : channels.length === 1 && !canBulkImport ? (
           <ChannelForm channel={channels[0]} />
         ) : (
           <Tabs value={activeChannel ?? channels[0].key} onValueChange={setActiveChannel}>
@@ -155,7 +159,7 @@ export default function TastSelvSalg() {
                   </TabsTrigger>
                 ))}
               </TabsList>
-              {isOwner && (
+              {canBulkImport && (
                 <TabsList>
                   <TabsTrigger value={BULK_TAB}>Bulk Salg (Leder)</TabsTrigger>
                 </TabsList>
@@ -166,7 +170,7 @@ export default function TastSelvSalg() {
                 <ChannelForm channel={c} />
               </TabsContent>
             ))}
-            {isOwner && (
+            {canBulkImport && (
               <TabsContent value={BULK_TAB} className="mt-4">
                 <Card>
                   <CardHeader>
@@ -209,7 +213,7 @@ export default function TastSelvSalg() {
           </Tabs>
         )}
 
-        {activeChannel === BULK_TAB && isOwner ? (
+        {activeChannel === BULK_TAB && canBulkImport ? (
           <>
             <BulkUploadCard onErrors={setBulkErrors} />
             <BulkUploadErrorsCard errors={bulkErrors} />
