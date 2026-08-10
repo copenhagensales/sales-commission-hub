@@ -1,24 +1,20 @@
-# Balders 460 salg vs. ~1.300 i Excel — forklaring
+# Verifikation: Balders 3 fejlrækker i bulk-uploaden
 
-Der er ingen fejl i importen. Tallet 460 på skærmbilledet var et **cachet tal fra før opdateringen**. Ingen ændringer nødvendige.
+Konklusion: de 3 rækker blev **ikke** importeret, og der er ingen dobbelttælling. Ingen ændringer nødvendige.
 
 ## Evidens
 
-**Excel-filen:** 1.379 rækker i alt, heraf 1.293 på Balder Møller Nørgaard (alle med status "Succes"), 1.291 unikke numre, 1.293 unikke Emne-ID'er.
+Balder har i alt 1.293 salg i perioden fra 15/7 og frem, fordelt sådan:
 
-**Databasen (`sales`, `agent_email = bamn@copenhagensales.dk`):**
-- 1.290 salg oprettet i dag (10/8) — resten af afvigelsen er 2 dubletnumre og 3 rækker med ugyldigt/manglende mobilnummer.
-- I lønperioden 15/7–14/8: **1.293 salg** fordelt over 19 salgsdage (15/7: 96, 16/7: 90 … 10/8: 7).
-- Alle 1.290 nye salg har provisionslinjer (`sale_items`) — ingen ligger uden sats.
+- 1.290 salg oprettet i dag (10/8) — bulk-uploaden
+- 3 salg oprettet 17/7 med `source = Lovablecph` (Adversus-integrationen)
 
-**Tavlen (`kpi_leaderboard_cache`, `payroll_period` / `global`):**
-- Rækken beregnet 08:30 (før registreringen) havde de gamle tal — det er den, skærmbilledet viser (460 × 75 kr = 34.500 kr, præcis som billedet).
-- Rækken beregnet 09:24 viser nu: `salesCount: 1293`, `commission: 96975` for Balder.
+De 3 gamle salg har numrene 40802671, 22257130 og 51374010 og kom automatisk ind fra dialeren tilbage i juli. Da de samme tre numre også lå i Excel-filen, blev filens rækker afvist som dubletter — netop derfor står de under "Fejl i upload".
 
-## Konklusion
+## Hvorfor tallet stemmer alligevel
 
-Tavlen opdateres af `calculate-leaderboard-incremental` ca. hvert 2. minut. Skærmbilledet blev taget i vinduet mellem registrering og næste genberegning. Efter genberegningen står Balder korrekt med 1.293 salg og 96.975 kr i provision i lønperioden.
+Excel-filen indeholdt 1.293 rækker på Balder. Systemet har 1.293 salg. Det er 1.290 nye plus de 3, der allerede var registreret via Adversus. Hvert salg findes altså kun én gang — dubletsikringen gjorde præcis sit arbejde.
 
-## Restpunkt (ingen handling nu)
+## Ingen handling
 
-3 rækker i filen blev afvist på ugyldigt mobilnummer og 2 på dublet — de fremgår i "Fejl i upload". Sig til hvis du vil have en liste over dem, så de kan rettes og uploades igen.
+Der er intet at rette. Hvis du vil, kan jeg lave et lille udtræk af de 3 salg (dato, nummer, produkt, provision), så du kan se dem sammenlignet med filens rækker.
