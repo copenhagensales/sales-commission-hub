@@ -271,6 +271,8 @@ serve(async (req) => {
       const errors: Array<{ reason: string; seller: string; subject_id: string }> = [];
       const seenPhones = new Set<string>();
       let created = 0;
+      let wouldCreate = 0;
+
 
       for (const r of rows) {
         const seller = String(r.saelger ?? "").trim();
