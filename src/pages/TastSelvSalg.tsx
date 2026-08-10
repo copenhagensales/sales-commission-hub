@@ -59,6 +59,8 @@ export default function TastSelvSalg() {
   const deleteSale = useDeleteManualSale();
 
   const [activeChannel, setActiveChannel] = useState<string | null>(null);
+  const [bulkErrors, setBulkErrors] = useState<BulkUploadError[]>([]);
+
 
   useEffect(() => {
     if (!activeChannel && channels && channels.length > 0) {
