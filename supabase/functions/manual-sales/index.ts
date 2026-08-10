@@ -118,6 +118,14 @@ async function resolveChannel(
   return { campaign_id: campaign.id };
 }
 
+function normalizePhone(raw: unknown): string {
+  let d = String(raw ?? "").replace(/\D/g, "");
+  if (d.startsWith("0045")) d = d.slice(4);
+  else if (d.length > 8 && d.startsWith("45")) d = d.slice(2);
+  return d;
+}
+
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
