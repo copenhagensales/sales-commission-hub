@@ -38,9 +38,13 @@ import {
   type ManualChannel,
 } from "@/hooks/useLederneSales";
 
+const BULK_TAB = "__bulk_leder__";
+
 export default function TastSelvSalg() {
   const { toast } = useToast();
+  const { isOwner } = usePositionPermissions();
   const { data: channels, isLoading: channelsLoading, error: channelsError } = useManualChannels();
+
   const { data: mySales, isLoading: salesLoading } = useMyManualSales();
   const deleteSale = useDeleteManualSale();
 
