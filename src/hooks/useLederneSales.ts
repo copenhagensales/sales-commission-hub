@@ -131,6 +131,7 @@ export interface BulkImportRow {
 export interface BulkImportResult {
   ok: true;
   created: number;
+  would_create?: number;
   skipped: number;
   errors: Array<{ reason: string; seller: string; subject_id: string }>;
 }
@@ -138,15 +139,28 @@ export interface BulkImportResult {
 export function useBulkImportManualSales() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ channel_key, rows }: { channel_key: string; rows: BulkImportRow[] }) =>
-      callFn<BulkImportResult>("bulk_import", "POST", { channel: channel_key, body: { rows } }),
-    onSuccess: () => {
+    mutationFn: ({
+      channel_key,
+      rows,
+      dry_run,
+    }: {
+      channel_key: string;
+      rows: BulkImportRow[];
+      dry_run?: boolean;
+    }) =>
+      callFn<BulkImportResult>("bulk_import", "POST", {
+        channel: channel_key,
+        body: dry_run ? { rows, dry_run: true } : { rows },
+      }),
+    onSuccess: (_data, variables) => {
+      if (variables.dry_run) return;
       qc.invalidateQueries({ queryKey: ["manual-sales-mine"] });
       qc.invalidateQueries({ queryKey: ["sales"] });
       qc.invalidateQueries({ queryKey: ["sales-aggregates"] });
     },
   });
 }
+
 
 
 
