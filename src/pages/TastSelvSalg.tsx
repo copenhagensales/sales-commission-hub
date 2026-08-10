@@ -157,16 +157,17 @@ export default function TastSelvSalg() {
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      <PackagePlus className="h-5 w-5" />
-                      Bulk Salg (Leder)
+                      <Info className="h-5 w-5" />
+                      Info
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="text-sm text-muted-foreground">
-                    Bulk-registrering kommer her.
+                    Beskrivelse indsættes her.
                   </CardContent>
                 </Card>
               </TabsContent>
             )}
+
           </Tabs>
         )}
 
