@@ -161,9 +161,31 @@ export default function TastSelvSalg() {
                       Info
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="text-sm text-muted-foreground">
-                    Beskrivelse indsættes her.
+                  <CardContent className="space-y-4 text-sm text-muted-foreground">
+                    <div className="space-y-1.5">
+                      <p className="font-medium text-foreground">I Adversus under filtre:</p>
+                      <ul className="list-disc space-y-1 pl-5">
+                        <li>Vælg Status = Succes</li>
+                        <li>For Datobegrænsning brug "Sidste Kontakttidspunkt" (valgfrit)</li>
+                      </ul>
+                    </div>
+                    <div className="space-y-1.5">
+                      <p className="font-medium text-foreground">
+                        I Adversus under kolonner vælg i denne rækkefølge:
+                      </p>
+                      <ol className="list-decimal space-y-1 pl-5">
+                        <li>Sidst kontaktet af</li>
+                        <li>Mobil</li>
+                        <li>Kampagne</li>
+                        <li>Status</li>
+                      </ol>
+                    </div>
+                    <p>
+                      Rækkefølgen i listen bestemmer kolonnernes rækkefølge i excel-filen. Ikonerne til
+                      højre for hvert felt bruges til at redigere, låse og fjerne kolonnen.
+                    </p>
                   </CardContent>
+
                 </Card>
               </TabsContent>
             )}
