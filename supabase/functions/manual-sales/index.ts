@@ -307,14 +307,16 @@ serve(async (req) => {
 
       const errors: Array<{ reason: string; seller: string; subject_id: string }> = [];
       const seenPhones = new Set<string>();
+      const validIndices: number[] = [];
       let created = 0;
       let wouldCreate = 0;
 
-
-      for (const r of rows) {
+      for (let idx = 0; idx < rows.length; idx++) {
+        const r = rows[idx];
         const seller = String(r.saelger ?? "").trim();
         const subjectId = String(r.emne_id ?? "").trim();
         const push = (reason: string) => errors.push({ reason, seller, subject_id: subjectId });
+
 
         const status = String(r.status ?? "").trim().toLowerCase();
         if (status && status !== "succes" && status !== "success") {
