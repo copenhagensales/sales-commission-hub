@@ -29,6 +29,8 @@ import { CheckCircle2, PhoneCall, PackagePlus, Info, Trash2 } from "lucide-react
 import { format, parseISO, startOfWeek, isAfter } from "date-fns";
 import { da } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
+import { usePermissions } from "@/hooks/usePositionPermissions";
+
 import {
   useManualChannels,
   useManualProducts,
@@ -38,9 +40,13 @@ import {
   type ManualChannel,
 } from "@/hooks/useLederneSales";
 
+const BULK_TAB = "__bulk_leder__";
+
 export default function TastSelvSalg() {
   const { toast } = useToast();
+  const { isOwner } = usePermissions();
   const { data: channels, isLoading: channelsLoading, error: channelsError } = useManualChannels();
+
   const { data: mySales, isLoading: salesLoading } = useMyManualSales();
   const deleteSale = useDeleteManualSale();
 
@@ -123,24 +129,47 @@ export default function TastSelvSalg() {
               Du har ikke adgang til at taste manuelle salg.
             </CardContent>
           </Card>
-        ) : channels.length === 1 ? (
+        ) : channels.length === 1 && !isOwner ? (
           <ChannelForm channel={channels[0]} />
         ) : (
           <Tabs value={activeChannel ?? channels[0].key} onValueChange={setActiveChannel}>
-            <TabsList>
-              {channels.map((c) => (
-                <TabsTrigger key={c.key} value={c.key}>
-                  {c.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <TabsList>
+                {channels.map((c) => (
+                  <TabsTrigger key={c.key} value={c.key}>
+                    {c.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+              {isOwner && (
+                <TabsList>
+                  <TabsTrigger value={BULK_TAB}>Bulk Salg (Leder)</TabsTrigger>
+                </TabsList>
+              )}
+            </div>
             {channels.map((c) => (
               <TabsContent key={c.key} value={c.key} className="mt-4">
                 <ChannelForm channel={c} />
               </TabsContent>
             ))}
+            {isOwner && (
+              <TabsContent value={BULK_TAB} className="mt-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <PackagePlus className="h-5 w-5" />
+                      Bulk Salg (Leder)
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-sm text-muted-foreground">
+                    Bulk-registrering kommer her.
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            )}
           </Tabs>
         )}
+
 
         <Card>
           <CardHeader>
