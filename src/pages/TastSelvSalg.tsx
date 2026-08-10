@@ -29,7 +29,7 @@ import { CheckCircle2, PhoneCall, PackagePlus, Info, Trash2 } from "lucide-react
 import { format, parseISO, startOfWeek, isAfter } from "date-fns";
 import { da } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
-import { usePositionPermissions } from "@/hooks/usePositionPermissions";
+import { usePermissions } from "@/hooks/usePositionPermissions";
 
 import {
   useManualChannels,
@@ -44,7 +44,7 @@ const BULK_TAB = "__bulk_leder__";
 
 export default function TastSelvSalg() {
   const { toast } = useToast();
-  const { isOwner } = usePositionPermissions();
+  const { isOwner } = usePermissions();
   const { data: channels, isLoading: channelsLoading, error: channelsError } = useManualChannels();
 
   const { data: mySales, isLoading: salesLoading } = useMyManualSales();
