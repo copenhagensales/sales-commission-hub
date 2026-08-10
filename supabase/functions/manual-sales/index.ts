@@ -311,9 +311,18 @@ serve(async (req) => {
           continue;
         }
 
+        if (dryRun) {
+          existingPhones.add(phone);
+          seenPhones.add(phone);
+          if (subjectId) existingSubjects.add(subjectId);
+          wouldCreate += 1;
+          continue;
+        }
+
         const saleDatetime = r.sale_datetime && !Number.isNaN(Date.parse(r.sale_datetime))
           ? new Date(r.sale_datetime).toISOString()
           : new Date().toISOString();
+
 
         const { data: sale, error: sErr } = await svc
           .from("sales")
