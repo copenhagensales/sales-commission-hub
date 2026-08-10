@@ -260,6 +260,64 @@ export default function TastSelvSalg() {
   );
 }
 
+function BulkUploadCard() {
+  const [file, setFile] = useState<File | null>(null);
+  const [isOver, setIsOver] = useState(false);
+
+  const pick = (f: File | null | undefined) => {
+    if (!f) return;
+    if (!f.name.toLowerCase().endsWith(".xlsx")) return;
+    setFile(f);
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Upload className="h-5 w-5" />
+          Upload bulk-fil
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <label
+          onDragOver={(e) => {
+            e.preventDefault();
+            setIsOver(true);
+          }}
+          onDragLeave={() => setIsOver(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setIsOver(false);
+            pick(e.dataTransfer.files?.[0]);
+          }}
+          className={`flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed p-10 text-center transition-colors ${
+            isOver ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
+          }`}
+        >
+          <input
+            type="file"
+            accept=".xlsx"
+            className="hidden"
+            onChange={(e) => pick(e.target.files?.[0])}
+          />
+          <Upload className="mb-1 h-7 w-7 text-muted-foreground" />
+          <div className="text-xs uppercase tracking-wide text-muted-foreground">Bulk-fil</div>
+          <div className="text-base font-medium">Træk og slip Excel-fil</div>
+          <div className="text-xs text-muted-foreground">eller klik for at vælge (.xlsx)</div>
+        </label>
+        {file && (
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-md border p-3 text-sm">
+            <span className="truncate">{file.name}</span>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setFile(null)}>
+              Fjern
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function ChannelForm({ channel }: { channel: ManualChannel }) {
   const { toast } = useToast();
   const { data: products, isLoading: productsLoading, error: productsError } = useManualProducts(channel.key);
