@@ -57,6 +57,8 @@ type CallerContext = {
     auth_user_id: string | null;
   };
   allowedChannels: Channel[];
+  isManager: boolean;
+
 };
 
 async function getCallerContext(req: Request): Promise<CallerContext | null> {
