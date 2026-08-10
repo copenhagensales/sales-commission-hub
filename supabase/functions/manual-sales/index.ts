@@ -420,9 +420,11 @@ serve(async (req) => {
         ok: true,
         created,
         would_create: wouldCreate,
+        valid_indices: dryRun ? validIndices : undefined,
         skipped: errors.length,
         errors,
       });
+
 
     }
 
