@@ -207,6 +207,7 @@ serve(async (req) => {
       if (!ctx.isManager) return json(403, { error: "Kun ledere kan bulk-importere salg" });
 
       const body = await req.json().catch(() => null) as {
+        dry_run?: boolean;
         rows?: Array<{
           mobil?: unknown;
           kampagne?: string | null;
@@ -216,6 +217,9 @@ serve(async (req) => {
           sale_datetime?: string | null;
         }>;
       } | null;
+
+      const dryRun = body?.dry_run === true;
+
 
       const rows = body?.rows ?? [];
       if (!Array.isArray(rows) || rows.length === 0) {
