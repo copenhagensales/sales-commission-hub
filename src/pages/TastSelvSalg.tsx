@@ -521,11 +521,27 @@ function BulkUploadCard({ onErrors }: { onErrors: (errors: BulkUploadError[]) =>
   );
 }
 
+// Sorteringsvægt pr. fejltype: mobil øverst, derefter sælger-fejl, øvrige, dubletter nederst.
+function errorSortWeight(reason: string): number {
+  const r = reason.toLowerCase();
+  if (r.includes("mobil mangler")) return 0;
+  if (r.includes("dublet") || r.includes("allerede importeret") || r.includes("allerede registreret")) return 3;
+  if (r.includes("sælger")) return 1;
+  return 2;
+}
+
 function BulkUploadErrorsCard({ errors }: { errors: BulkUploadError[] }) {
-
-
+  const sorted = useMemo(
+    () =>
+      errors
+        .map((e, i) => ({ e, i }))
+        .sort((a, b) => errorSortWeight(a.e.reason) - errorSortWeight(b.e.reason) || a.i - b.i)
+        .map(({ e }) => e),
+    [errors],
+  );
 
   return (
+
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
@@ -550,7 +566,7 @@ function BulkUploadErrorsCard({ errors }: { errors: BulkUploadError[] }) {
                 </TableCell>
               </TableRow>
             ) : (
-              errors.map((e, i) => (
+              sorted.map((e, i) => (
                 <TableRow key={`${e.subjectId}-${i}`}>
                   <TableCell>{e.reason}</TableCell>
                   <TableCell>{e.seller}</TableCell>
