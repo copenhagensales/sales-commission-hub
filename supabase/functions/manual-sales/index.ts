@@ -375,7 +375,14 @@ serve(async (req) => {
         created += 1;
       }
 
-      return json(200, { ok: true, created, skipped: errors.length, errors });
+      return json(200, {
+        ok: true,
+        created,
+        would_create: wouldCreate,
+        skipped: errors.length,
+        errors,
+      });
+
     }
 
 
