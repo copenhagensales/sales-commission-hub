@@ -1,42 +1,63 @@
-# Laura: rekruttering-rolle som løsning?
+# Løsning B: SOME-rollen får Lauras fire ønsker
 
-Kort svar: **delvist — men det løser ikke begivenheder, og det giver hende markant mere adgang end hun har brug for.**
+Ja — B dækker alle fire ønsker. Punkt 1 er ren rettighedsopsætning; punkt 2 og 3 kræver ændring af databasens sikkerhedsregler (rød zone), fordi selve gem-handlingen ellers stadig afvises.
 
-## Hvad rollebyttet faktisk løser
+| Ønske | Dækkes af | Resultat |
+|---|---|---|
+| Kommende opstarter | Trin 1 | Menupunktet bliver synligt (parent-nøglen åbnes) |
+| Ansættelser | Trin 1 | Se + redigere |
+| Oprette begivenheder | Trin 1 + 2 | Gem virker |
+| Svare på beskeder | Trin 1 + 3 | Kan læse tråde og sende svar |
 
-| Ønske | Med rollen `rekruttering` |
-|---|---|
-| Kommende opstarter | Ja — `menu_section_personale` + `menu_employees` er åbne for rekruttering |
-| Ansættelser | Ja — `menu_upcoming_hires` view + edit |
-| Svare på beskeder | Ja — `menu_messages` edit + alle `tab_messages_*`, og RLS på `messages` tillader `is_rekruttering()` |
-| Oprette begivenheder | **Nej** — policyen på `company_events` kræver `is_teamleder_or_above()`; rekruttering er ikke leder, så gem fejler fortsat |
+## Trin 1 — rettighedsflag for rollen `some`
 
-## Bivirkninger hun ikke har bedt om
+Sættes i Personale → Medarbejdere → Rettigheder (eller som migration, hvis det skal dokumenteres):
 
-Rekruttering har (som SOME ikke har) view/edit på bl.a.:
-- Personale: medarbejderkort, stillinger, **rettighedsfanen**, dialer-mapping, deaktivering af medarbejdere
-- Teams, vagtoversigt, tidsregistrering, fravær, lukkevagter
-- Alle salgsdashboards + Salgsoversigt (alle) med edit, leaderboard, TDC-opsummering
-- Softphone ind/udgående, medarbejder-SMS
+- `menu_section_personale`: view = ja (ellers skjules Kommende opstarter)
+- `menu_upcoming_starts`: visibility = Alle
+- `menu_upcoming_hires`: edit = ja, visibility = Alle
+- `menu_messages` + `menu_messages_recruitment`: edit = ja
+- `tab_messages_all`, `tab_messages_sms`, `tab_messages_email`, `tab_messages_sent`: view = ja (`tab_messages_call` udelades)
+- Ny nøgle `action_manage_company_events`: view + edit = ja for `some` (og for teamleder/ejer, så nuværende adfærd bevares)
+- Ny nøgle `action_manage_candidate_messages`: view + edit = ja for `some` og `rekruttering`
 
-Og hun **mister** edit på `menu_some` (SOME-sektionen), `menu_h2h`, `menu_my_goals`, `menu_my_feedback`, spil-sektionen.
+Bemærk: `menu_section_personale` åbner sektionen Personale i sidebaren. Kun de underpunkter hun har view på vises — så hun får ikke medarbejderkort, teams eller rettighedsfanen.
 
-## Tre veje
+## Trin 2 — begivenheder (RØD ZONE, migration)
 
-**A. Rollebyt til `rekruttering`** — hurtigst, ingen kodeændring. Men Laura får adgang til personaledata og rettighedsstyring, og begivenheder virker stadig ikke. Kan delvist afbødes med individuelle deny-overrides i `user_menu_permissions` (samme mønster Oscar bruger) — men det bliver lappearbejde.
+`company_events` har i dag ALL-policyen `Managers can manage events` med `is_manager_or_above(auth.uid())`. Den erstattes af en policy der også accepterer permission-nøglen:
 
-**B. Udvid SOME-rollen (anbefalet)**
-1. Rettighedsfanen for `some`: `menu_section_personale` view = ja, `menu_upcoming_hires` edit = ja, `menu_messages` edit = ja, `tab_messages_*` view = ja, `menu_upcoming_starts` visibility = alle.
-2. Ny permission-nøgle `action_manage_company_events` + policy på `company_events` der bruger den eksisterende `has_edit_permission()` i stedet for `is_manager_or_above()`. Så styres begivenheder fremover fra rettighedsfanen for alle roller.
-3. Samme mønster på `messages` hvis vi vil have SOME til at skrive uden at hardkode `is_some()`.
+```
+using (is_manager_or_above(auth.uid())
+    or has_edit_permission(auth.uid(), 'action_manage_company_events'))
+with check (samme udtryk)
+```
 
-Punkt 2-3 er **rød zone** (RLS/auth) og kræver migration + godkendelse.
+`has_edit_permission()` findes allerede som SECURITY DEFINER og slår op i `role_page_permissions` via stillingens `system_role_key`. Ejere er indbygget i funktionen. `event_attendees` og `event_team_invitations` kræver ingen ændring — de er allerede åbne for authenticated.
 
-**C. Kun det grønne nu** — lav punkt 1 i B med det samme, så hun får opstarter, ansættelser og læsning af beskeder. Begivenheder + gem-beskeder venter til RLS-ændringen.
+## Trin 3 — beskeder (RØD ZONE, migration)
+
+To tabeller er involveret:
+
+- `messages`: ALL-policy `Rekruttering and owners can manage messages` (`is_owner OR is_rekruttering`) udvides med `has_edit_permission(auth.uid(), 'action_manage_candidate_messages')`.
+- `communication_logs`: SELECT-policyen `Context-aware read access` tillader kun rekruttering/ejer at læse kandidat-tråde. Samme permission-tjek tilføjes på `context_type = 'candidate'`-grenen, ellers kan hun sende men ikke se historikken. INSERT er allerede åben for alle authenticated.
+
+## Hvad B ikke gør
+
+- Ændrer ikke `is_manager_or_above()` eller `is_rekruttering()` — eksisterende adgang er uberørt, vi tilføjer kun en ekstra vej ind.
+- Giver ikke Laura personale-, team- eller lønadgang (i modsætning til at bytte hendes rolle til `rekruttering`).
+- Rører ikke de øvrige hardkodede rolle-referencer i systemet; det er en separat oprydning.
+
+## Verifikation efter implementering
+
+1. Rollepreview som `some`: Kommende opstarter og Ansættelser vises i menuen.
+2. Log ind som Laura (eller preview + faktisk test): opret en begivenhed → gem lykkes.
+3. Åbn en kandidat-tråd under Beskeder → historik vises, svar kan sendes.
+4. Kontroltest med rollen `medarbejder`: gem af begivenhed skal fortsat afvises.
 
 ## Teknisk
 
-- Rolle bestemmes af stillingens `system_role_key` i `job_positions` (SOME → `some`)
-- Diff verificeret mod `role_page_permissions` for `role_key in ('some','rekruttering')`
-- Policies: `company_events` ALL → `is_manager_or_above()`; `messages` ALL → `is_owner() OR is_rekruttering()`
-- `has_edit_permission()` findes allerede som SECURITY DEFINER-funktion
+- Rolleopslag: stillingens `system_role_key` i `job_positions` (SOME → `some`)
+- Nøgler registreres i `src/config/permissionKeys.ts` + rækker i `role_page_permissions`
+- Sidebar-synlighed afhænger af parent-nøgle: `src/components/layout/AppSidebar.tsx`
+- Event-gem: `src/pages/Home.tsx` insert i `company_events`
