@@ -251,6 +251,8 @@ export default function TastSelvSalg() {
             )}
           </CardContent>
         </Card>
+        )}
+
       </div>
     </MainLayout>
   );
