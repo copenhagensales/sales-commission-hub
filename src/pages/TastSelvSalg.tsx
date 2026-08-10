@@ -171,7 +171,9 @@ export default function TastSelvSalg() {
           </Tabs>
         )}
 
-
+        {activeChannel === BULK_TAB && isOwner ? (
+          <BulkUploadCard />
+        ) : (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
