@@ -356,9 +356,11 @@ serve(async (req) => {
           existingPhones.add(phone);
           seenPhones.add(phone);
           if (subjectId) existingSubjects.add(subjectId);
+          validIndices.push(idx);
           wouldCreate += 1;
           continue;
         }
+
 
         const saleDatetime = r.sale_datetime && !Number.isNaN(Date.parse(r.sale_datetime))
           ? new Date(r.sale_datetime).toISOString()
