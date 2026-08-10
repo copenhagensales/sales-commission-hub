@@ -25,7 +25,15 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { CheckCircle2, PhoneCall, PackagePlus, Info, Trash2, Upload } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { CheckCircle2, PhoneCall, PackagePlus, Info, Trash2, Upload, AlertTriangle } from "lucide-react";
 import { format, parseISO, startOfWeek, isAfter } from "date-fns";
 import { da } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
@@ -196,7 +204,10 @@ export default function TastSelvSalg() {
         )}
 
         {activeChannel === BULK_TAB && isOwner ? (
-          <BulkUploadCard />
+          <>
+            <BulkUploadCard />
+            <BulkUploadErrorsCard />
+          </>
         ) : (
         <Card>
           <CardHeader>
@@ -341,6 +352,53 @@ function BulkUploadCard() {
     </Card>
   );
 }
+
+type BulkUploadError = { reason: string; seller: string; subjectId: string };
+
+function BulkUploadErrorsCard() {
+  const errors: BulkUploadError[] = [];
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <AlertTriangle className="h-5 w-5" />
+          Fejl i upload
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Årsag</TableHead>
+              <TableHead>Sælger</TableHead>
+              <TableHead>Emne-id</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {errors.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={3} className="text-center text-sm text-muted-foreground">
+                  Ingen fejl
+                </TableCell>
+              </TableRow>
+            ) : (
+              errors.map((e, i) => (
+                <TableRow key={`${e.subjectId}-${i}`}>
+                  <TableCell>{e.reason}</TableCell>
+                  <TableCell>{e.seller}</TableCell>
+                  <TableCell>{e.subjectId}</TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+
 
 function ChannelForm({ channel }: { channel: ManualChannel }) {
   const { toast } = useToast();
