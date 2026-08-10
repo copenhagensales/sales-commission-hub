@@ -261,7 +261,14 @@ serve(async (req) => {
         .from("employee_master_data")
         .select("id, first_name, last_name, work_email, is_active")
         .eq("is_active", true);
-      const norm = (v: string) => v.toLowerCase().replace(/\s+/g, " ").trim();
+      // Normaliser navne: fjern alt der ikke er bogstav/ciffer/mellemrum (fx "-" som
+      // pladsholder-efternavn), kollaps mellemrum. Unicode-sikkert, så æøå bevares.
+      const norm = (v: string) =>
+        v
+          .toLowerCase()
+          .replace(/[^\p{L}\p{N}\s]+/gu, " ")
+          .replace(/\s+/g, " ")
+          .trim();
       const byName = new Map<string, { name: string; email: string | null }>();
       for (const e of employees ?? []) {
         const full = norm(`${e.first_name ?? ""} ${e.last_name ?? ""}`);
