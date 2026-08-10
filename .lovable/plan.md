@@ -24,12 +24,13 @@ De øvrige 10 er inaktive (bl.a. Nicholas Kilde, Gabriell Liliefrost, Oscar Køh
 
 ## Løsning
 
-To dele:
+**Kun robust navne-match i bulk-importen.** Normaliseringen udvides, så tegn der ikke er bogstaver/tal (bindestreg, punktum, komma) fjernes, og dobbelte mellemrum kollapses — både for systemnavnet og filnavnet. Så matcher "Balder Møller Nørgaard -" og "Balder Møller Nørgaard" hinanden.
 
-1. **Robust navne-match i importen.** Normaliseringen udvides, så tegn der ikke er bogstaver/tal (bindestreg, punktum, komma) fjernes, og dobbelte mellemrum kollapses — både for systemnavnet og filnavnet. Så matcher "Balder Møller Nørgaard -" og "Balder Møller Nørgaard" hinanden. Samtidig indekseres hver medarbejder også under sit rene navn uden tomme/tegn-kun navnedele.
-2. **Ryd op i data (valgfrit, separat).** De 3 aktive kan rettes manuelt under Alle medarbejdere, så efternavnet står korrekt. Sig til hvis jeg skal rette dem. De inaktive lades urørt af historik-hensyn.
+Ingen oprydning i navnedata i denne omgang. De 13 rækker lades urørt.
 
-Punkt 1 alene løser uploaden nu og fremover for alle 13 og for fremtidige tilfælde.
+### Afgrænsning
+
+`norm()` og `byName` er lokale variabler inde i `bulk_import`-handleren (`supabase/functions/manual-sales/index.ts:264-268` og `:306`) og bruges ingen andre steder i filen. Ændringen påvirker derfor udelukkende bulk-salgsregistreringen — ikke "Tast selv"-enkeltoprettelsen, ikke lønberegning, ikke rapporter eller øvrige navne-opslag i systemet.
 
 ## Teknisk
 
