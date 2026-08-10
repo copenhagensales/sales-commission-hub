@@ -463,7 +463,8 @@ function BulkUploadCard({ onErrors }: { onErrors: (errors: BulkUploadError[]) =>
 }
 
 function BulkUploadErrorsCard({ errors }: { errors: BulkUploadError[] }) {
-  const errors: BulkUploadError[] = [];
+
+
 
   return (
     <Card>
