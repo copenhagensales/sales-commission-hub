@@ -1,24 +1,24 @@
-# Verifikation: går Balder og Flora ind på den rigtige medarbejder?
+# Balders 460 salg vs. ~1.300 i Excel — forklaring
 
-Ja — verificeret i data og kode. Ingen ændringer nødvendige.
+Der er ingen fejl i importen. Tallet 460 på skærmbilledet var et **cachet tal fra før opdateringen**. Ingen ændringer nødvendige.
 
 ## Evidens
 
-**Balder** (`employee_master_data`): `first_name = "Balder Møller Nørgaard"`, `last_name = "-"`, aktiv, `work_email = bamn@copenhagensales.dk`.
-Normaliseringen i bulk-importen fjerner ikke-alfanumeriske tegn og kollapser mellemrum (`manual-sales/index.ts:288-293`), så "Balder Møller Nørgaard -" bliver "balder møller nørgaard" og matcher filnavnet.
+**Excel-filen:** 1.379 rækker i alt, heraf 1.293 på Balder Møller Nørgaard (alle med status "Succes"), 1.291 unikke numre, 1.293 unikke Emne-ID'er.
 
-**Flora**: to rækker med samme arbejdsmail `flk@copenhagensales.dk` — aktiv "Flora Klug" og inaktiv "Flora Frederikke Mwikali Lauritsen Klug". Alias-logikken (`:296-306`) accepterer det historiske navn, men mapper altid til den **aktive** mail. Salget får derfor `agent_email = flk@copenhagensales.dk`.
+**Databasen (`sales`, `agent_email = bamn@copenhagensales.dk`):**
+- 1.290 salg oprettet i dag (10/8) — resten af afvigelsen er 2 dubletnumre og 3 rækker med ugyldigt/manglende mobilnummer.
+- I lønperioden 15/7–14/8: **1.293 salg** fordelt over 19 salgsdage (15/7: 96, 16/7: 90 … 10/8: 7).
+- Alle 1.290 nye salg har provisionslinjer (`sale_items`) — ingen ligger uden sats.
 
-**Ingen risiko for forkert person:** kontrol af alle rækker med `work_email` viser 0 tilfælde hvor samme normaliserede navn peger på to forskellige mails. Der er altså ingen navne-kollision der kan sende salget til en anden medarbejder.
+**Tavlen (`kpi_leaderboard_cache`, `payroll_period` / `global`):**
+- Rækken beregnet 08:30 (før registreringen) havde de gamle tal — det er den, skærmbilledet viser (460 × 75 kr = 34.500 kr, præcis som billedet).
+- Rækken beregnet 09:24 viser nu: `salesCount: 1293`, `commission: 96975` for Balder.
 
-**Attribution virker allerede på disse mails:** `sales` indeholder 602 salg på `bamn@` og 707 på `flk@`, dvs. begge mails er de identiteter tavle, dagsrapport og løn i forvejen bruger.
+## Konklusion
 
-## Hvad der sker ved upload
+Tavlen opdateres af `calculate-leaderboard-incremental` ca. hvert 2. minut. Skærmbilledet blev taget i vinduet mellem registrering og næste genberegning. Efter genberegningen står Balder korrekt med 1.293 salg og 96.975 kr i provision i lønperioden.
 
-1. Kontrol-fasen (dry-run) markerer rækkerne som "klar" — kun disse sendes videre.
-2. Ved "Registrer salg" oprettes salget med `agent_email` = medarbejderens aktive arbejdsmail (`:378`), produktet `Lederne` under kampagnen Tryg Products.
-3. Salget indgår derefter i Trygs dagsrapport, dashboard og sælgerens løn på lige fod med øvrige manuelle salg.
+## Restpunkt (ingen handling nu)
 
-## Anbefaling (ikke del af denne opgave)
-
-Navnedata bør ryddes op på sigt: 13 rækker har hele navnet i `first_name` og "-"/blank i `last_name`. Matchet er robust nu, men data er stadig forkert. Sig til hvis det skal planlægges separat.
+3 rækker i filen blev afvist på ugyldigt mobilnummer og 2 på dublet — de fremgår i "Fejl i upload". Sig til hvis du vil have en liste over dem, så de kan rettes og uploades igen.
