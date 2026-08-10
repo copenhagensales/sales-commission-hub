@@ -29,6 +29,8 @@ import { CheckCircle2, PhoneCall, PackagePlus, Info, Trash2 } from "lucide-react
 import { format, parseISO, startOfWeek, isAfter } from "date-fns";
 import { da } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
+import { usePositionPermissions } from "@/hooks/usePositionPermissions";
+
 import {
   useManualChannels,
   useManualProducts,
