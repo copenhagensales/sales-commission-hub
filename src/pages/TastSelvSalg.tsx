@@ -174,10 +174,12 @@ export default function TastSelvSalg() {
                         I Adversus under kolonner vælg i denne rækkefølge:
                       </p>
                       <ol className="list-decimal space-y-1 pl-5">
-                        <li>Sidst kontaktet af</li>
                         <li>Mobil</li>
                         <li>Kampagne</li>
+                        <li>Sidst kontaktet af</li>
                         <li>Status</li>
+                        <li>Emne-ID</li>
+                        <li>Sidste kontakttidspunkt</li>
                       </ol>
                     </div>
                     <p>
