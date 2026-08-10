@@ -447,22 +447,31 @@ function BulkUploadCard({ onErrors }: { onErrors: (errors: BulkUploadError[]) =>
               <div className="truncate font-medium">{file.name}</div>
               <div className="text-xs text-muted-foreground">
                 {parsing
-                  ? "Læser fil…"
+                  ? bulkCheck.isPending
+                    ? "Kontrollerer…"
+                    : "Læser fil…"
                   : parseError
                     ? parseError
-                    : rows
-                      ? `${rows.length} rækker klar til import`
-                      : ""}
+                    : preview
+                      ? `${preview.wouldCreate} salg klar · ${preview.skipped} fejl`
+                      : rows
+                        ? `${rows.length} rækker læst`
+                        : ""}
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <Button
                 type="button"
                 size="sm"
-                disabled={!rows || rows.length === 0 || bulkImport.isPending || parsing}
+                disabled={
+                  !preview ||
+                  preview.wouldCreate === 0 ||
+                  bulkImport.isPending ||
+                  parsing
+                }
                 onClick={handleImport}
               >
-                {bulkImport.isPending ? "Importerer…" : "Importér salg"}
+                {bulkImport.isPending ? "Registrerer…" : "Registrer salg"}
               </Button>
               <Button
                 type="button"
@@ -471,9 +480,12 @@ function BulkUploadCard({ onErrors }: { onErrors: (errors: BulkUploadError[]) =>
                 onClick={() => {
                   setFile(null);
                   setRows(null);
+                  setPreview(null);
                   setParseError(null);
+                  onErrors([]);
                 }}
               >
+
                 Fjern
               </Button>
             </div>
