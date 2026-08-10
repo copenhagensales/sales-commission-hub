@@ -277,11 +277,12 @@ serve(async (req) => {
         if (sid) existingSubjects.add(String(sid));
       }
 
-      // Employee lookup by full name
+      // Employee lookup by current and historical full names. Historical names are
+      // only accepted when their work email still belongs to an active employee.
       const { data: employees } = await svc
         .from("employee_master_data")
         .select("id, first_name, last_name, work_email, is_active")
-        .eq("is_active", true);
+        .not("work_email", "is", null);
       // Normaliser navne: fjern alt der ikke er bogstav/ciffer/mellemrum (fx "-" som
       // pladsholder-efternavn), kollaps mellemrum. Unicode-sikkert, så æøå bevares.
       const norm = (v: string) =>
@@ -291,9 +292,17 @@ serve(async (req) => {
           .replace(/\s+/g, " ")
           .trim();
       const byName = new Map<string, { name: string; email: string | null }>();
+      const activeEmails = new Map<string, string>();
       for (const e of employees ?? []) {
+        const email = e.work_email?.trim();
+        if (e.is_active && email) activeEmails.set(email.toLowerCase(), email);
+      }
+      for (const e of employees ?? []) {
+        const email = e.work_email?.trim();
+        const activeEmail = email ? activeEmails.get(email.toLowerCase()) : undefined;
+        if (!activeEmail) continue;
         const full = norm(`${e.first_name ?? ""} ${e.last_name ?? ""}`);
-        if (full) byName.set(full, { name: full, email: e.work_email });
+        if (full) byName.set(full, { name: full, email: activeEmail });
       }
 
       const errors: Array<{ reason: string; seller: string; subject_id: string }> = [];
