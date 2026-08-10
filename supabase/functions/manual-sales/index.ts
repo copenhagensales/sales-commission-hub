@@ -13,6 +13,13 @@ type Channel = {
   allowed_products: string[];
 };
 
+// Eksplicit allowlist for bulk-import. Samme liste som src/config/bulkSalesAccess.ts
+const BULK_SALES_EMAILS = ["fk@copenhagensales.dk", "filipkirketerp@gmail.com"];
+function isBulkSalesEmail(email?: string | null): boolean {
+  if (!email) return false;
+  return BULK_SALES_EMAILS.includes(email.trim().toLowerCase());
+}
+
 const CHANNELS: Channel[] = [
   {
     key: "lederne",
@@ -58,6 +65,7 @@ type CallerContext = {
   };
   allowedChannels: Channel[];
   isManager: boolean;
+  canBulkImport: boolean;
 
 };
 
@@ -89,13 +97,26 @@ async function getCallerContext(req: Request): Promise<CallerContext | null> {
   const { data: mgr } = await svc.rpc("is_manager_or_above", { _user_id: authUserId });
   const isManager = !!mgr;
 
+  const { data: owner } = await svc.rpc("is_owner", { _user_id: authUserId });
+  const { data: emails } = await svc
+    .from("employee_master_data")
+    .select("work_email, private_email")
+    .eq("id", employee.id)
+    .maybeSingle();
+  const candidateEmails = [
+    userRes.user.email,
+    emails?.work_email,
+    emails?.private_email,
+  ];
+  const canBulkImport = !!owner || candidateEmails.some(isBulkSalesEmail);
+
   const allowedChannels = CHANNELS.filter(
     (c) => isManager || teamIds.has(c.team_id),
   );
 
   if (allowedChannels.length === 0) return null;
 
-  return { svc, employee, allowedChannels, isManager };
+  return { svc, employee, allowedChannels, isManager, canBulkImport };
 }
 
 async function resolveChannel(
@@ -204,7 +225,7 @@ serve(async (req) => {
     }
 
     if (action === "bulk_import" && req.method === "POST") {
-      if (!ctx.isManager) return json(403, { error: "Kun ledere kan bulk-importere salg" });
+      if (!ctx.canBulkImport) return json(403, { error: "Kun ledere kan bulk-importere salg" });
 
       const body = await req.json().catch(() => null) as {
         dry_run?: boolean;
