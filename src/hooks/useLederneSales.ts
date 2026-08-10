@@ -132,9 +132,12 @@ export interface BulkImportResult {
   ok: true;
   created: number;
   would_create?: number;
+  /** Indeks (i den afsendte rows-array) på rækker der bestod kontrollen. Kun ved dry_run. */
+  valid_indices?: number[];
   skipped: number;
   errors: Array<{ reason: string; seller: string; subject_id: string }>;
 }
+
 
 export function useBulkImportManualSales() {
   const qc = useQueryClient();

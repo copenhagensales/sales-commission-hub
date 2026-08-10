@@ -342,7 +342,11 @@ function BulkUploadCard({ onErrors }: { onErrors: (errors: BulkUploadError[]) =>
   const [file, setFile] = useState<File | null>(null);
   const [isOver, setIsOver] = useState(false);
   const [rows, setRows] = useState<BulkRow[] | null>(null);
+  const [validRows, setValidRows] = useState<BulkRow[] | null>(null);
+  const [checkErrors, setCheckErrors] = useState<BulkUploadError[]>([]);
+
   const [preview, setPreview] = useState<{ wouldCreate: number; skipped: number } | null>(null);
+
   const [parseError, setParseError] = useState<string | null>(null);
   const [parsing, setParsing] = useState(false);
 
@@ -351,6 +355,7 @@ function BulkUploadCard({ onErrors }: { onErrors: (errors: BulkUploadError[]) =>
     if (!f.name.toLowerCase().endsWith(".xlsx")) return;
     setFile(f);
     setRows(null);
+    setValidRows(null);
     setPreview(null);
     setParseError(null);
     onErrors([]);
@@ -377,7 +382,15 @@ function BulkUploadCard({ onErrors }: { onErrors: (errors: BulkUploadError[]) =>
         rows: mapped,
         dry_run: true,
       });
-      setPreview({ wouldCreate: res.would_create ?? 0, skipped: res.skipped });
+      // Kun rækker der bestod kontrollen sendes videre ved endelig registrering.
+      const ok = res.valid_indices
+        ? res.valid_indices.map((i) => mapped[i]).filter(Boolean)
+        : mapped;
+      setValidRows(ok);
+      setPreview({ wouldCreate: res.would_create ?? ok.length, skipped: res.skipped });
+      setCheckErrors(
+        res.errors.map((e) => ({ reason: e.reason, seller: e.seller, subjectId: e.subject_id })),
+      );
       onErrors(
         res.errors.map((e) => ({ reason: e.reason, seller: e.seller, subjectId: e.subject_id })),
       );
@@ -389,17 +402,24 @@ function BulkUploadCard({ onErrors }: { onErrors: (errors: BulkUploadError[]) =>
   };
 
   const handleImport = async () => {
-    if (!rows || rows.length === 0) return;
+    if (!validRows || validRows.length === 0) return;
     try {
-      const res = await bulkImport.mutateAsync({ channel_key: "lederne", rows });
-      onErrors(
-        res.errors.map((e) => ({ reason: e.reason, seller: e.seller, subjectId: e.subject_id })),
-      );
+      const res = await bulkImport.mutateAsync({ channel_key: "lederne", rows: validRows });
+      const importErrors = res.errors.map((e) => ({
+        reason: e.reason,
+        seller: e.seller,
+        subjectId: e.subject_id,
+      }));
+      onErrors([...checkErrors, ...importErrors]);
       toast({
         title: `${res.created} salg oprettet`,
-        description: res.skipped > 0 ? `${res.skipped} rækker sprunget over — se "Fejl i upload"` : undefined,
+        description:
+          res.created < validRows.length
+            ? `${validRows.length - res.created} af de klargjorte rækker blev afvist — se "Fejl i upload"`
+            : undefined,
       });
       setRows(null);
+      setValidRows(null);
       setPreview(null);
       setFile(null);
     } catch (err) {
@@ -407,6 +427,7 @@ function BulkUploadCard({ onErrors }: { onErrors: (errors: BulkUploadError[]) =>
       toast({ title: "Import fejlede", description: msg, variant: "destructive" });
     }
   };
+
 
 
   return (
