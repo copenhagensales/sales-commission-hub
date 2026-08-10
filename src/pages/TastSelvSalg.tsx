@@ -298,14 +298,89 @@ export default function TastSelvSalg() {
   );
 }
 
-function BulkUploadCard() {
+type BulkUploadError = { reason: string; seller: string; subjectId: string };
+
+type BulkRow = {
+  mobil: string;
+  kampagne: string | null;
+  saelger: string | null;
+  status: string | null;
+  emne_id: string | null;
+  sale_datetime: string | null;
+};
+
+function pickCol(row: Record<string, unknown>, candidates: string[]): unknown {
+  const keys = Object.keys(row);
+  for (const c of candidates) {
+    const hit = keys.find((k) => k.toLowerCase().trim() === c);
+    if (hit !== undefined) return row[hit];
+  }
+  return undefined;
+}
+
+function toIsoDatetime(v: unknown): string | null {
+  if (!v) return null;
+  if (v instanceof Date) return v.toISOString();
+  const s = String(v).trim();
+  if (!s) return null;
+  const d = new Date(s.replace(" ", "T"));
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+function BulkUploadCard({ onErrors }: { onErrors: (errors: BulkUploadError[]) => void }) {
+  const { toast } = useToast();
+  const bulkImport = useBulkImportManualSales();
   const [file, setFile] = useState<File | null>(null);
   const [isOver, setIsOver] = useState(false);
+  const [rows, setRows] = useState<BulkRow[] | null>(null);
+  const [parseError, setParseError] = useState<string | null>(null);
+  const [parsing, setParsing] = useState(false);
 
-  const pick = (f: File | null | undefined) => {
+  const pick = async (f: File | null | undefined) => {
     if (!f) return;
     if (!f.name.toLowerCase().endsWith(".xlsx")) return;
     setFile(f);
+    setRows(null);
+    setParseError(null);
+    onErrors([]);
+    setParsing(true);
+    try {
+      const buf = await f.arrayBuffer();
+      const { rows: raw } = await parseExcelFile(buf);
+      const mapped: BulkRow[] = raw.map((r) => ({
+        mobil: String(pickCol(r, ["mobil", "mobilnummer", "telefon"]) ?? "").trim(),
+        kampagne: (pickCol(r, ["kampagne"]) as string | undefined) ?? null,
+        saelger: String(pickCol(r, ["sidst kontaktet af", "sælger", "saelger"]) ?? "").trim() || null,
+        status: (pickCol(r, ["status"]) as string | undefined) ?? null,
+        emne_id: String(pickCol(r, ["emne-id", "emne id", "emneid"]) ?? "").trim() || null,
+        sale_datetime: toIsoDatetime(pickCol(r, ["sidste kontakttidspunkt", "sidst kontaktet"])),
+      }));
+      if (mapped.length === 0) setParseError("Filen indeholder ingen rækker");
+      setRows(mapped);
+    } catch (err) {
+      setParseError(err instanceof Error ? err.message : "Kunne ikke læse filen");
+    } finally {
+      setParsing(false);
+    }
+  };
+
+  const handleImport = async () => {
+    if (!rows || rows.length === 0) return;
+    try {
+      const res = await bulkImport.mutateAsync({ channel_key: "lederne", rows });
+      onErrors(
+        res.errors.map((e) => ({ reason: e.reason, seller: e.seller, subjectId: e.subject_id })),
+      );
+      toast({
+        title: `${res.created} salg oprettet`,
+        description: res.skipped > 0 ? `${res.skipped} rækker sprunget over — se "Fejl i upload"` : undefined,
+      });
+      setRows(null);
+      setFile(null);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Ukendt fejl";
+      toast({ title: "Import fejlede", description: msg, variant: "destructive" });
+    }
   };
 
   return (
@@ -326,7 +401,7 @@ function BulkUploadCard() {
           onDrop={(e) => {
             e.preventDefault();
             setIsOver(false);
-            pick(e.dataTransfer.files?.[0]);
+            void pick(e.dataTransfer.files?.[0]);
           }}
           className={`flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed p-10 text-center transition-colors ${
             isOver ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
@@ -336,19 +411,50 @@ function BulkUploadCard() {
             type="file"
             accept=".xlsx"
             className="hidden"
-            onChange={(e) => pick(e.target.files?.[0])}
+            onChange={(e) => void pick(e.target.files?.[0])}
           />
           <Upload className="mb-1 h-7 w-7 text-muted-foreground" />
           <div className="text-xs uppercase tracking-wide text-muted-foreground">Bulk-fil</div>
           <div className="text-base font-medium">Træk og slip Excel-fil</div>
           <div className="text-xs text-muted-foreground">eller klik for at vælge (.xlsx)</div>
         </label>
+
         {file && (
           <div className="mt-3 flex items-center justify-between gap-3 rounded-md border p-3 text-sm">
-            <span className="truncate">{file.name}</span>
-            <Button type="button" variant="ghost" size="sm" onClick={() => setFile(null)}>
-              Fjern
-            </Button>
+            <div className="min-w-0">
+              <div className="truncate font-medium">{file.name}</div>
+              <div className="text-xs text-muted-foreground">
+                {parsing
+                  ? "Læser fil…"
+                  : parseError
+                    ? parseError
+                    : rows
+                      ? `${rows.length} rækker klar til import`
+                      : ""}
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                disabled={!rows || rows.length === 0 || bulkImport.isPending || parsing}
+                onClick={handleImport}
+              >
+                {bulkImport.isPending ? "Importerer…" : "Importér salg"}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setFile(null);
+                  setRows(null);
+                  setParseError(null);
+                }}
+              >
+                Fjern
+              </Button>
+            </div>
           </div>
         )}
       </CardContent>
@@ -356,9 +462,7 @@ function BulkUploadCard() {
   );
 }
 
-type BulkUploadError = { reason: string; seller: string; subjectId: string };
-
-function BulkUploadErrorsCard() {
+function BulkUploadErrorsCard({ errors }: { errors: BulkUploadError[] }) {
   const errors: BulkUploadError[] = [];
 
   return (
