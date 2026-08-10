@@ -343,6 +343,8 @@ function BulkUploadCard({ onErrors }: { onErrors: (errors: BulkUploadError[]) =>
   const [isOver, setIsOver] = useState(false);
   const [rows, setRows] = useState<BulkRow[] | null>(null);
   const [validRows, setValidRows] = useState<BulkRow[] | null>(null);
+  const [checkErrors, setCheckErrors] = useState<BulkUploadError[]>([]);
+
   const [preview, setPreview] = useState<{ wouldCreate: number; skipped: number } | null>(null);
 
   const [parseError, setParseError] = useState<string | null>(null);
