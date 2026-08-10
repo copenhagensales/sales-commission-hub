@@ -119,6 +119,37 @@ export function useDeleteManualSale() {
   });
 }
 
+export interface BulkImportRow {
+  mobil: string;
+  kampagne: string | null;
+  saelger: string | null;
+  status: string | null;
+  emne_id: string | null;
+  sale_datetime: string | null;
+}
+
+export interface BulkImportResult {
+  ok: true;
+  created: number;
+  skipped: number;
+  errors: Array<{ reason: string; seller: string; subject_id: string }>;
+}
+
+export function useBulkImportManualSales() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ channel_key, rows }: { channel_key: string; rows: BulkImportRow[] }) =>
+      callFn<BulkImportResult>("bulk_import", "POST", { channel: channel_key, body: { rows } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["manual-sales-mine"] });
+      qc.invalidateQueries({ queryKey: ["sales"] });
+      qc.invalidateQueries({ queryKey: ["sales-aggregates"] });
+    },
+  });
+}
+
+
+
 // Backwards-compatible aliases (previous API)
 export type LederneProduct = ManualProduct;
 export type LederneSale = ManualSale;
