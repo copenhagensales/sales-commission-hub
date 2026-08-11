@@ -18,10 +18,18 @@ Sættes i Personale → Medarbejdere → Rettigheder (eller som migration, hvis 
 - `menu_upcoming_hires`: edit = ja, visibility = Alle
 - `menu_messages` + `menu_messages_recruitment`: edit = ja
 - `tab_messages_all`, `tab_messages_sms`, `tab_messages_email`, `tab_messages_sent`: view = ja (`tab_messages_call` udelades)
-- Ny nøgle `action_manage_company_events`: view + edit = ja for `some` (og for teamleder/ejer, så nuværende adfærd bevares)
-- Ny nøgle `action_manage_candidate_messages`: view + edit = ja for `some` og `rekruttering`
+- Ny nøgle `action_manage_company_events`: view + edit = ja **kun for `some`** (teamledere/ejere beholder adgang via den eksisterende leder-gren i policyen, så der tilføjes ingen rækker for dem)
+- Ny nøgle `action_manage_candidate_messages`: view + edit = ja **kun for `some`** (rekruttering/ejer beholder adgang via de eksisterende grene)
 
 Bemærk: `menu_section_personale` åbner sektionen Personale i sidebaren. Kun de underpunkter hun har view på vises — så hun får ikke medarbejderkort, teams eller rettighedsfanen.
+
+## Ingen andre påvirkes — verificeret
+
+- **Kun én aktiv medarbejder har rollen `some`:** Laura Brund Skov (stilling SOME). Alfred Rud står også med rollen, men er inaktiv — og `has_edit_permission()` kræver `is_active = true`, så han får intet.
+- **Alle rettighedsændringer i trin 1 sker på `role_key = 'some'`** — ingen andre rolle-rækker røres.
+- **Policy-ændringerne er rent tilføjende:** de eksisterende betingelser (`is_manager_or_above`, `is_owner`, `is_rekruttering`, egne employee-tråde) bevares uændret og får kun et `OR`-led. Ingen mister adgang.
+- **Ingen individuelle overrides berøres** — Laura har ingen i dag.
+
 
 ## Trin 2 — begivenheder (RØD ZONE, migration)
 
