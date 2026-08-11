@@ -182,7 +182,7 @@ Deno.serve(async (req) => {
     // Auto-enroll alle eligible medarbejdere (kører altid — også midt i aktiv sæson).
     // Fanger nyansatte og folk der har fået job_title=Salgskonsulent/Fieldmarketing.
     if (season.status === "qualification" || season.status === "active") {
-      await syncLeagueEnrollments(supabase, seasonId);
+      await syncLeagueEnrollments(supabase, seasonId, sourceStart);
     }
 
     // Sync late-comers til season_standings hvis sæsonen er aktiv.
