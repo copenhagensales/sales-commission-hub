@@ -54,10 +54,13 @@ export function cphToUtc(
   second = 0,
   ms = 0,
 ): Date {
-  const naive = Date.UTC(year, month - 1, day, hour, minute, second, ms);
+  // Offsets måles på sekund-opløsning (formatToParts har ingen ms),
+  // så ms lægges på til sidst for at undgå afrundingsdrift.
+  const naive = Date.UTC(year, month - 1, day, hour, minute, second, 0);
   const firstGuess = new Date(naive - tzOffsetMs(new Date(naive)));
   const offset = tzOffsetMs(firstGuess);
-  return new Date(naive - offset);
+  return new Date(naive - offset + ms);
+
 }
 
 /** Monday 00:00 CPH for a `YYYY-MM-DD` season/round start date. */
