@@ -74,6 +74,8 @@ export const PERMISSION_KEYS = {
 
   // ==================== MIT HJEM (under menu_section_personal) ====================
   menu_home: { label: 'Hjem', section: 'mit_hjem', parent: 'menu_section_personal' },
+  action_manage_company_events: { label: 'Opret/redigér begivenheder', section: 'mit_hjem', parent: 'menu_home' },
+
   menu_home_goals: { label: 'Hjem mål', section: 'mit_hjem', parent: 'menu_section_personal' },
   menu_h2h: { label: 'Head-to-Head', section: 'mit_hjem', parent: 'menu_section_personal' },
   menu_commission_league: { label: 'Superligaen', section: 'mit_hjem', parent: 'menu_section_personal' },
