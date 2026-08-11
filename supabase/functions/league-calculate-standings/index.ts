@@ -356,27 +356,21 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 8. Delete standings for unenrolled players
-    const { data: inactiveEnrollments } = await supabase
-      .from("league_enrollments")
-      .select("employee_id")
-      .eq("season_id", seasonId)
-      .eq("is_active", false);
-
-    if (inactiveEnrollments && inactiveEnrollments.length > 0) {
-      const inactiveIds = inactiveEnrollments.map((e) => e.employee_id);
-      const { error: deleteError } = await supabase
+    // 8. Delete standings for anyone without an active enrollment (incl. deleted enrollments)
+    if (employeeIds.length > 0) {
+      const { error: deleteError, count: deletedCount } = await supabase
         .from("league_qualification_standings")
-        .delete()
+        .delete({ count: "exact" })
         .eq("season_id", seasonId)
-        .in("employee_id", inactiveIds);
+        .not("employee_id", "in", `(${employeeIds.join(",")})`);
 
       if (deleteError) {
-        console.error("[league-calculate-standings] Failed to delete inactive standings:", deleteError);
+        console.error("[league-calculate-standings] Failed to delete stale standings:", deleteError);
       } else {
-        console.log(`[league-calculate-standings] Deleted standings for ${inactiveIds.length} unenrolled players`);
+        console.log(`[league-calculate-standings] Deleted ${deletedCount ?? 0} stale standings without active enrollment`);
       }
     }
+
 
     console.log(`[league-calculate-standings] Successfully updated ${upsertData.length} standings`);
 
