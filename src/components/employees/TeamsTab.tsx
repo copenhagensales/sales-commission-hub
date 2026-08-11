@@ -1307,7 +1307,7 @@ export function TeamsTab() {
                         </SelectContent>
                       </Select>
                       <p className="text-xs text-muted-foreground">
-                        Kun backoffice medarbejdere vises her
+                        Stab og medarbejdere med lederstilling vises her
                       </p>
                     </div>
                     
