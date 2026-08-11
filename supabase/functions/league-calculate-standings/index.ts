@@ -1,49 +1,32 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { isLeagueEligible } from "../_shared/leagueEligibility.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Auto-enroll alle eligible medarbejdere i sæsonen.
-// - Rører IKKE eksisterende rækker (ignoreDuplicates), så manuelt satte
-//   is_spectator=true / is_active=false bevares.
-// - Deaktiverer eksisterende enrollments for medarbejdere der er blevet
-//   in-eligible (fx opsagt / rolleskift til leder).
-async function syncLeagueEnrollments(supabase: any, seasonId: string) {
-  const { data: employees, error } = await supabase
-    .from("employee_master_data")
-    .select("id, is_active, job_title")
-    .eq("is_active", true);
+// Auto-enroll: tilmelding sker ved SALG, ikke ud fra jobtitel.
+// Triggeren trg_league_enroll_on_sale tilmelder ved hvert nyt salg;
+// dette kald er opsamling, hvis en trigger-indsættelse skulle fejle.
+// Rører IKKE eksisterende rækker, så manuel afmelding / fan-status bevares.
+async function syncLeagueEnrollments(
+  supabase: any,
+  seasonId: string,
+  sourceStart: string
+) {
+  const { data, error } = await supabase.rpc("league_enroll_from_sales", {
+    p_season_id: seasonId,
+    p_from: sourceStart,
+  });
 
   if (error) {
-    console.error("[sync-enrollments] Failed to fetch employees:", error);
+    console.error("[sync-enrollments] league_enroll_from_sales failed:", error);
     return;
   }
 
-  const eligible = (employees || []).filter(isLeagueEligible);
-  console.log(`[sync-enrollments] ${eligible.length} eligible employees found for season ${seasonId}`);
-
-  if (eligible.length === 0) return;
-
-  const rows = eligible.map((e: any) => ({
-    season_id: seasonId,
-    employee_id: e.id,
-    is_active: true,
-    is_spectator: false,
-  }));
-
-  const { error: upsertErr } = await supabase
-    .from("league_enrollments")
-    .upsert(rows, { onConflict: "season_id,employee_id", ignoreDuplicates: true });
-
-  if (upsertErr) {
-    console.error("[sync-enrollments] Upsert failed:", upsertErr);
-  } else {
-    console.log(`[sync-enrollments] Upserted ${rows.length} enrollments (existing rows preserved)`);
-  }
+  console.log(`[sync-enrollments] ${data ?? 0} nye tilmeldinger fra salg (sæson ${seasonId})`);
 }
+
 
 // Sync late-comers til season_standings for aktive sæsoner.
 // Nye eligible medarbejdere placeres i laveste division med sidste rank
