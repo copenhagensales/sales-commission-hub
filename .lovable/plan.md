@@ -27,8 +27,8 @@ Alt der oprettes af den nye salgs-trigger eller manuelt bagefter, står urørt. 
 
 ## Teknisk
 
-1. **Kobling mail → medarbejder** (ny hjælpefunktion, samme rækkefølge som resten af systemet):
-   `employee_agent_mapping` → `employee_master_data.work_email` → `private_email`.
+1. **Ingen ny mail-kobling.** Vi genbruger præcis den kobling systemet allerede bruger i rapporter og ligastillinger (`get_sales_aggregates_v2`): `agents.email` → `employee_agent_mapping` → medarbejder, med fallback til `employee_master_data.work_email`. Kan et salg ikke kobles i dag, kan det heller ikke tilmeldes — det logges, intet nyt matchningslag opfindes.
+
 2. **Databasetrigger** `AFTER INSERT ON public.sales` → `public.league_enroll_on_sale()` (SECURITY DEFINER, `set search_path = public`):
    - finder aktiv sæson (`status in ('qualification','active')`) hvor salgets dato ligger inden for sæsonens periode
    - løser `agent_email` til `employee_id`
