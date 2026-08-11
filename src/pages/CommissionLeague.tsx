@@ -440,7 +440,7 @@ export default function CommissionLeague() {
                     </div>
                     <span className="text-xs text-muted-foreground/60">Formand: Oscar Belcher</span>
                     <div className="flex items-center gap-2 flex-wrap justify-center">
-                      <LeagueRulesSheet compact />
+                      <LeagueRulesSheet compact playersPerDivision={playersPerDivision} />
                       {selectableSeasons.length > 1 && (
                         <Select
                           value={season.id}
