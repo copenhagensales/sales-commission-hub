@@ -7,7 +7,14 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
-export function LeagueRulesSheet({ compact = false }: { compact?: boolean }) {
+export function LeagueRulesSheet({
+  compact = false,
+  playersPerDivision = 10,
+}: {
+  compact?: boolean;
+  playersPerDivision?: number;
+}) {
+
   return (
     <Dialog>
       <DialogTrigger asChild>
