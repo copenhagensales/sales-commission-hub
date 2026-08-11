@@ -6,7 +6,10 @@ export interface LeagueSeasonConfig {
   division_bonus_base?: number;
   division_bonus_step?: number;
   round_end_hour?: number;
+  round_end_minute?: number;
+  round_multipliers?: number[];
   players_per_division?: number;
+
 }
 
 export interface LeagueSeason {

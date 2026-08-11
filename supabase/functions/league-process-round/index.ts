@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { nextRoundStart, resolveRoundEndTime, roundEndForStart } from "../_shared/league-round-time.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,8 +9,10 @@ const corsHeaders = {
 interface SeasonConfig {
   players_per_division?: number;
   round_end_hour?: number;
+  round_end_minute?: number;
   round_multipliers?: number[];
 }
+
 
 const DEFAULT_ROUND_MULTIPLIERS = [1, 1.2, 1.4, 1.6, 1.8, 2.0];
 
@@ -371,13 +374,15 @@ Deno.serve(async (req) => {
       .eq("id", expiredRound.id);
 
     // --- Create next round ---
-    // expiredRound.end_date = Sunday 21:59:59 UTC (= Sunday 23:59:59 CPH).
-    // Next round starts 1 second later (Monday 00:00 CPH = Sunday 22:00 UTC)
-    // and ends 7 days minus 1 second after start (next Sunday 23:59:59 CPH).
+    // Runden lukker på søndagen kl. round_end_hour:round_end_minute:59 CPH
+    // (default 23:55). Næste runde starter mandag 00:00 CPH og slutter
+    // søndagen efter på samme klokkeslæt. DST håndteres i helperen.
+    const { hour: endHour, minute: endMinute } = resolveRoundEndTime(config);
     const nextRoundNumber = expiredRound.round_number + 1;
     const expiredEnd = new Date(expiredRound.end_date);
-    const nextStart = new Date(expiredEnd.getTime() + 1000); // +1s -> Mon 00:00 CPH
-    const nextEnd = new Date(nextStart.getTime() + 7 * 24 * 60 * 60 * 1000 - 1000); // Sun 23:59:59 CPH
+    const nextStart = nextRoundStart(expiredEnd);
+    const nextEnd = roundEndForStart(nextStart, endHour, endMinute);
+
 
     // Antal planlagte runder = antal multipliers i config (fallback til 6).
     // Forretningsregel: spillet kører N runder uanset om sidste runde overlapper sæsonens end_date med få dage.
