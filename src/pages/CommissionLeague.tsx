@@ -546,6 +546,11 @@ export default function CommissionLeague() {
                       Kæmp mod dine kolleger i et spændende liga-system baseret på din provision.
                       Op- og nedrykning hver uge – og der kan vindes fede præmier!
                     </p>
+                    <p className="text-sm text-muted-foreground mb-6">
+                      Du bliver automatisk tilmeldt, så snart du lægger dit første salg op i sæsonen.
+                      Vil du ikke vente, kan du tilmelde dig manuelt herunder.
+                    </p>
+
 
                     <div className="space-y-3 mb-6">
                       <div className="flex items-center gap-2">

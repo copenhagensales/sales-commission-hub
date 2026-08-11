@@ -14577,6 +14577,38 @@ export type Database = {
       is_vagt_admin_or_planner: { Args: { _user_id: string }; Returns: boolean }
       jsonb_object_keys_array: { Args: { p_json: Json }; Returns: Json }
       league_auto_advance_seasons: { Args: never; Returns: Json }
+      league_current_open_season: {
+        Args: never
+        Returns: {
+          config: Json | null
+          created_at: string | null
+          end_date: string | null
+          id: string
+          is_active: boolean | null
+          qualification_end_at: string
+          qualification_source_end: string
+          qualification_source_start: string
+          qualification_start_at: string
+          season_number: number
+          start_date: string
+          status: string | null
+          updated_at: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "league_seasons"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      league_enroll_from_sales: {
+        Args: { p_from: string; p_season_id: string }
+        Returns: number
+      }
+      league_resolve_employee_from_agent_email: {
+        Args: { p_agent_email: string }
+        Returns: string
+      }
       recalculate_coaching_due_dates_for_employee: {
         Args: { p_employee_id: string }
         Returns: number
