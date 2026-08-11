@@ -344,9 +344,10 @@ async function initializeActiveSeasonData(supabase: SupabaseClient, seasonId: st
       return;
     }
 
-    const roundStart = new Date(startDate);
-    const roundEnd = new Date(roundStart);
-    roundEnd.setDate(roundEnd.getDate() + 7);
+    const { hour: endHour, minute: endMinute } = resolveRoundEndTime(config);
+    const roundStart = roundStartFromDateString(String(startDate));
+    const roundEnd = roundEndForStart(roundStart, endHour, endMinute);
+
 
     const { error: roundError } = await supabase
       .from("league_rounds")
