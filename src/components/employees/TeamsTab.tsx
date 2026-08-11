@@ -39,6 +39,16 @@ interface Employee {
   employment_start_date?: string | null;
 }
 
+// Stillinger der kvalificerer til teamleder/ass. teamleder-valg (ud over stab)
+const LEADER_JOB_TITLES = [
+  "Teamleder",
+  "Assisterende Teamleder TM",
+  "Assisterende Teamleder FM",
+  "Fieldmarketing leder",
+  "Ejer",
+] as const;
+
+
 interface Client {
   id: string;
   name: string;
