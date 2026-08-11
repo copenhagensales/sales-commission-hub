@@ -200,6 +200,8 @@ export const PERMISSION_KEYS = {
   tab_messages_email: { label: 'Fane: Email', section: 'rekruttering', parent: 'menu_messages' },
   tab_messages_call: { label: 'Fane: Opkald', section: 'rekruttering', parent: 'menu_messages' },
   tab_messages_sent: { label: 'Fane: Sendt', section: 'rekruttering', parent: 'menu_messages' },
+  action_manage_candidate_messages: { label: 'Besvar kandidat-beskeder', section: 'rekruttering', parent: 'menu_messages' },
+
 
   // ==================== LØN (under menu_section_salary) ====================
   menu_salary_types: { label: 'Løntyper', section: 'salary', parent: 'menu_section_salary' },
