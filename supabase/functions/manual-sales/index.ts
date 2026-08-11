@@ -259,23 +259,30 @@ serve(async (req) => {
       const product = prodList?.[0];
       if (!product) return json(400, { error: "Produktet for denne kanal findes ikke" });
 
-      // Existing sales for dedupe (all time, this channel campaign, manual entries)
-      const { data: existing, error: exErr } = await svc
-        .from("sales")
-        .select("customer_phone, raw_payload")
-        .eq("source", "manual_entry")
-        .eq("client_campaign_id", campaignId)
-        .limit(20000);
-      if (exErr) return json(500, { error: exErr.message });
-
+      // Existing sales for dedupe (all time, this channel campaign, manual entries).
+      // Hentes pagineret: PostgREST skærer ét enkelt kald ved max-rows (1.000).
       const existingPhones = new Set<string>();
       const existingSubjects = new Set<string>();
-      for (const s of existing ?? []) {
-        const p = normalizePhone((s as any).customer_phone);
-        if (p) existingPhones.add(p);
-        const sid = (s as any).raw_payload?.subject_id;
-        if (sid) existingSubjects.add(String(sid));
+      const PAGE = 1000;
+      const MAX_ROWS = 100000;
+      for (let offset = 0; offset < MAX_ROWS; offset += PAGE) {
+        const { data: page, error: exErr } = await svc
+          .from("sales")
+          .select("customer_phone, raw_payload")
+          .eq("source", "manual_entry")
+          .eq("client_campaign_id", campaignId)
+          .order("id", { ascending: true })
+          .range(offset, offset + PAGE - 1);
+        if (exErr) return json(500, { error: exErr.message });
+        for (const s of page ?? []) {
+          const p = normalizePhone((s as any).customer_phone);
+          if (p) existingPhones.add(p);
+          const sid = (s as any).raw_payload?.subject_id;
+          if (sid) existingSubjects.add(String(sid));
+        }
+        if (!page || page.length < PAGE) break;
       }
+
 
       // Employee lookup by current and historical full names. Historical names are
       // only accepted when their work email still belongs to an active employee.
