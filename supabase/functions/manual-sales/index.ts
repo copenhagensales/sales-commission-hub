@@ -336,14 +336,15 @@ serve(async (req) => {
           push("Mobil mangler eller er ugyldig");
           continue;
         }
-        if (subjectId && existingSubjects.has(subjectId)) {
-          push("Emne-ID er allerede importeret");
-          continue;
-        }
         if (existingPhones.has(phone)) {
           push("Dublet: mobilnummeret er allerede registreret");
           continue;
         }
+        if (subjectId && existingSubjects.has(subjectId)) {
+          push("Emne-ID er allerede importeret");
+          continue;
+        }
+
         if (seenPhones.has(phone)) {
           push("Dublet i filen: mobilnummeret optræder flere gange");
           continue;
