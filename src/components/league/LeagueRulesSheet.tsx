@@ -7,7 +7,14 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
-export function LeagueRulesSheet({ compact = false }: { compact?: boolean }) {
+export function LeagueRulesSheet({
+  compact = false,
+  playersPerDivision = 10,
+}: {
+  compact?: boolean;
+  playersPerDivision?: number;
+}) {
+
   return (
     <Dialog>
       <DialogTrigger asChild>
@@ -83,7 +90,7 @@ export function LeagueRulesSheet({ compact = false }: { compact?: boolean }) {
           <div>
             <h4 className="font-semibold mb-1.5 text-primary">📅 Runder</h4>
             <p className="text-sm text-muted-foreground">
-              Sæsonen består af 1 kvalifikationsuge + 6 aktive runder. Hver uge er én runde. Din provision i ugen bestemmer din placering inden for divisionen. 14 spillere pr. division.
+              Sæsonen består af 1 kvalifikationsuge + 6 aktive runder. Hver uge er én runde. Din provision i ugen bestemmer din placering inden for divisionen. {playersPerDivision} spillere pr. division.
             </p>
             <p className="text-sm text-muted-foreground mt-1.5">
               Kvalifikationsugen sætter startdivisionerne – derefter begynder point at tælle.
