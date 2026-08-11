@@ -89,20 +89,23 @@ export function TeamsTab() {
   
   const updateTeamAssistantsMutation = useUpdateTeamAssistants();
 
-  // Fetch staff employees for team leader selection
+  // Fetch staff employees + employees with a leader job title for leader selection
   const { data: teamLeaders = [] } = useQuery({
-    queryKey: ["staff-employees-for-teams"],
+    queryKey: ["leader-candidates-for-teams-v2"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employee_master_data")
         .select("id, first_name, last_name, job_title")
         .eq("is_active", true)
-        .eq("is_staff_employee", true)
+        .or(
+          `is_staff_employee.eq.true,job_title.in.(${LEADER_JOB_TITLES.map((t) => `"${t}"`).join(",")})`
+        )
         .order("first_name");
       if (error) throw error;
       return data as Employee[];
     },
   });
+
 
   // Fetch all active employees
   const { data: employees = [] } = useQuery({
