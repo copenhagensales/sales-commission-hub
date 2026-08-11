@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { nextRoundStart, resolveRoundEndTime, roundEndForStart } from "../_shared/league-round-time.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,8 +9,10 @@ const corsHeaders = {
 interface SeasonConfig {
   players_per_division?: number;
   round_end_hour?: number;
+  round_end_minute?: number;
   round_multipliers?: number[];
 }
+
 
 const DEFAULT_ROUND_MULTIPLIERS = [1, 1.2, 1.4, 1.6, 1.8, 2.0];
 
