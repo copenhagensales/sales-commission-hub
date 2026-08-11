@@ -74,6 +74,8 @@ export const PERMISSION_KEYS = {
 
   // ==================== MIT HJEM (under menu_section_personal) ====================
   menu_home: { label: 'Hjem', section: 'mit_hjem', parent: 'menu_section_personal' },
+  action_manage_company_events: { label: 'Opret/redigér begivenheder', section: 'mit_hjem', parent: 'menu_home' },
+
   menu_home_goals: { label: 'Hjem mål', section: 'mit_hjem', parent: 'menu_section_personal' },
   menu_h2h: { label: 'Head-to-Head', section: 'mit_hjem', parent: 'menu_section_personal' },
   menu_commission_league: { label: 'Superligaen', section: 'mit_hjem', parent: 'menu_section_personal' },
@@ -200,6 +202,8 @@ export const PERMISSION_KEYS = {
   tab_messages_email: { label: 'Fane: Email', section: 'rekruttering', parent: 'menu_messages' },
   tab_messages_call: { label: 'Fane: Opkald', section: 'rekruttering', parent: 'menu_messages' },
   tab_messages_sent: { label: 'Fane: Sendt', section: 'rekruttering', parent: 'menu_messages' },
+  action_manage_candidate_messages: { label: 'Besvar kandidat-beskeder', section: 'rekruttering', parent: 'menu_messages' },
+
 
   // ==================== LØN (under menu_section_salary) ====================
   menu_salary_types: { label: 'Løntyper', section: 'salary', parent: 'menu_section_salary' },
