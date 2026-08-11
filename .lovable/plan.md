@@ -13,6 +13,18 @@ I stedet for at auto-tilmelde ud fra jobtitel (som i dag i `league-calculate-sta
 
 Alle med salg **i går (10/8) og i dag (11/8)** tilmeldes med det samme. Det er 55 unikke sælger-mails i den periode, hvoraf 51 kan kobles direkte til en medarbejder. De sidste 4 mails mangler kobling til en medarbejder — de rapporteres i loggen, så koblingen kan rettes, og de tilmeldes automatisk ved næste salg.
 
+## Oprydning af gamle auto-tilmeldinger
+
+Sæson 4 har lige nu 114 tilmeldinger, som alle er oprettet automatisk af cron-kørslen i dag (11/8 kl. 10:58–11:09) ud fra jobtitel-reglen — ingen af dem er manuelle.
+
+Ved implementeringen slettes de tilmeldinger i Sæson 4, der:
+- er oprettet af den gamle automatik (før implementeringstidspunktet), og
+- ikke har salg i sæsonens periode (fra 10/8).
+
+Alt der oprettes af den nye salgs-trigger eller manuelt bagefter, står urørt. Tilmeldinger fra tidligere, afsluttede sæsoner røres ikke — historikken bevares.
+
+
+
 ## Teknisk
 
 1. **Kobling mail → medarbejder** (ny hjælpefunktion, samme rækkefølge som resten af systemet):
