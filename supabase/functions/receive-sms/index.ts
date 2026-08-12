@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { maskPhone } from "../_shared/sanitize.ts";
+import { verifyTwilioRequest } from "../_shared/webhook-auth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -19,7 +20,10 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Parse form data from Twilio
-    const formData = await req.formData();
+    // SECURITY: kun kald signeret af Twilio accepteres
+    const verified = await verifyTwilioRequest(req, corsHeaders);
+    if (!verified.ok) return verified.response;
+    const formData = verified.params;
     
     // Extract SMS metadata from Twilio webhook
     const messageSid = formData.get('MessageSid') as string;

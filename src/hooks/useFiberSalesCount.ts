@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { tvEdgeFetch } from "@/utils/tvEdgeFetch";
 
 /**
  * Tæller antal fiber-salg (sum af quantity) for en periode.
@@ -22,9 +23,8 @@ export function useFiberSalesCount(
     staleTime: 60_000,
     refetchInterval: 120_000,
     queryFn: async () => {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const res = await fetch(
-        `${supabaseUrl}/functions/v1/tv-dashboard-data?action=fiber-sales-count&start=${encodeURIComponent(
+      const res = await tvEdgeFetch(
+        `tv-dashboard-data?action=fiber-sales-count&start=${encodeURIComponent(
           startIso,
         )}&end=${encodeURIComponent(endIso)}`,
       );

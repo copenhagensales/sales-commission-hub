@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { REFRESH_PROFILES } from "@/utils/tvMode";
+import { tvEdgeFetch } from "@/utils/tvEdgeFetch";
 
 export interface CelebrationTriggerData {
   employeeName: string | null;
@@ -36,9 +37,8 @@ export function useTvCelebrationData({
     queryFn: async (): Promise<CelebrationTriggerData> => {
       console.log("[TvCelebrationData] Fetching via edge function:", { dashboardSlug, metric });
       
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const response = await fetch(
-        `${supabaseUrl}/functions/v1/tv-dashboard-data?action=celebration-data&dashboard=${dashboardSlug}&metric=${metric}`
+      const response = await tvEdgeFetch(
+        `tv-dashboard-data?action=celebration-data&dashboard=${dashboardSlug}&metric=${metric}`
       );
 
       if (!response.ok) {

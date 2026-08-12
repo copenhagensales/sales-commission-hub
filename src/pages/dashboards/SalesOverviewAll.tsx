@@ -12,6 +12,7 @@ import { useRequireDashboardAccess } from "@/hooks/useRequireDashboardAccess";
 import { TvBoardQuickGenerator } from "@/components/dashboard/TvBoardQuickGenerator";
 import { DataFreshnessBadge } from "@/components/ui/DataFreshnessBadge";
 import { REFRESH_PROFILES } from "@/utils/tvMode";
+import { tvEdgeFetch } from "@/utils/tvEdgeFetch";
 
 // Check if we're in TV mode
 const isTvMode = () => {
@@ -56,12 +57,9 @@ export default function SalesOverviewAll() {
   const { data: tvData } = useQuery<TvDashboardData>({
     queryKey: ["tv-dashboard-data", todayStr],
     queryFn: async () => {
-      const response = await supabase.functions.invoke('tv-dashboard-data', {
-        body: null,
-        method: 'GET',
-      });
-      if (response.error) throw response.error;
-      return response.data;
+      const response = await tvEdgeFetch('tv-dashboard-data');
+      if (!response.ok) throw new Error(`tv-dashboard-data failed: ${response.status}`);
+      return await response.json();
     },
     enabled: tvMode,
     ...REFRESH_PROFILES.dashboard,

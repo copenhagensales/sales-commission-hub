@@ -20,6 +20,7 @@ import { DateRange } from "react-day-picker";
 import { countWorkDaysInPeriod } from "@/lib/calculations";
 import { useRequireDashboardAccess } from "@/hooks/useRequireDashboardAccess";
 import { getPayrollPeriod } from "@/lib/calculations";
+import { tvEdgeFetch } from "@/utils/tvEdgeFetch";
 
 interface TopSeller {
   name: string;
@@ -119,13 +120,9 @@ export default function CphSalesDashboard() {
   const { data: tvData } = useQuery<TvDashboardData>({
     queryKey: ["tv-dashboard-data", todayStr],
     queryFn: async () => {
-      const response = await supabase.functions.invoke('tv-dashboard-data', {
-        body: null,
-        method: 'GET',
-      });
-      
-      if (response.error) throw response.error;
-      return response.data;
+      const response = await tvEdgeFetch('tv-dashboard-data');
+      if (!response.ok) throw new Error(`tv-dashboard-data failed: ${response.status}`);
+      return await response.json();
     },
     enabled: tvMode,
     refetchInterval: 60000, // 1 minute - synced with normal dashboard

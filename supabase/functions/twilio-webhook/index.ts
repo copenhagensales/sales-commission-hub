@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sanitizePayload } from "../_shared/sanitize.ts";
+import { verifyTwilioRequest } from "../_shared/webhook-auth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,17 +13,14 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const contentType = req.headers.get('content-type') || '';
-    let data: Record<string, string> = {};
+    // SECURITY: kun kald signeret af Twilio accepteres
+    const verified = await verifyTwilioRequest(req, corsHeaders);
+    if (!verified.ok) return verified.response;
 
-    if (contentType.includes('application/x-www-form-urlencoded')) {
-      const formData = await req.formData();
-      formData.forEach((value, key) => {
-        data[key] = value.toString();
-      });
-    } else {
-      data = await req.json();
-    }
+    const data: Record<string, string> = {};
+    verified.params.forEach((value, key) => {
+      data[key] = value.toString();
+    });
 
     console.log('Twilio webhook received:', JSON.stringify(sanitizePayload(data)));
 

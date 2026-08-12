@@ -25,7 +25,7 @@ serve(async (req) => {
 
     const { email, failure_reason } = await req.json() as LogFailedLoginRequest;
 
-    if (!email) {
+    if (!email || typeof email !== "string" || email.length > 255 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
       return new Response(
         JSON.stringify({ error: "Email is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -52,30 +52,10 @@ serve(async (req) => {
       console.error("Error logging failed attempt:", logError);
     }
 
-    // Increment failed login count for the employee
-    const { data: employee } = await supabaseAdmin
-      .from("employee_master_data")
-      .select("id, failed_login_count, account_locked")
-      .eq("private_email", email.toLowerCase())
-      .maybeSingle();
-
-    if (employee && !employee.account_locked) {
-      const newCount = (employee.failed_login_count || 0) + 1;
-      const shouldLock = newCount >= 5;
-
-      await supabaseAdmin
-        .from("employee_master_data")
-        .update({
-          failed_login_count: newCount,
-          account_locked: shouldLock,
-          locked_at: shouldLock ? new Date().toISOString() : null,
-        })
-        .eq("id", employee.id);
-
-      if (shouldLock) {
-        console.log(`Account locked for ${email} after ${newCount} failed attempts`);
-      }
-    }
+    // SECURITY: Dette endpoint er offentligt (kaldes før login lykkes), og må derfor
+    // IKKE kunne låse konti. Tidligere blev failed_login_count/account_locked opdateret
+    // her, hvilket gav enhver mulighed for at låse en kollegas konto (denial of service).
+    // Nu logges forsøget udelukkende til revisionsspor.
 
     return new Response(
       JSON.stringify({ success: true }),
