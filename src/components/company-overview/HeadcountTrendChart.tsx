@@ -1,8 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useMemo } from "react";
-import { endOfMonth, format, parseISO, startOfMonth, subMonths } from "date-fns";
+import { format, parseISO, startOfMonth, subMonths } from "date-fns";
 import { da } from "date-fns/locale";
 import {
   ResponsiveContainer,
@@ -13,107 +11,33 @@ import {
   Tooltip,
   CartesianGrid,
 } from "recharts";
+import { useHeadcountMonthly } from "@/hooks/useHeadcount";
 
 /**
- * Viser antal ansatte pr. måned de sidste 12 måneder.
- * En medarbejder tælles med i en måned hvis:
- *   start_date <= månedens sidste dag OG (end_date er null ELLER end_date >= månedens sidste dag)
- * Kombinerer aktive medarbejdere (employee_master_data) og historiske (historical_employment).
- * Stab er ekskluderet for at matche resten af Virksomhedsoverblik.
+ * Antal ansatte pr. måned (ekskl. Stab).
+ * Tallene kommer fra get_headcount_monthly() — samme kilde som KPI-kortene på
+ * Medarbejdere-siden. Deduplikering mellem employee_master_data og
+ * historical_employment sker i databasen, så ingen person tælles to gange.
+ * Data vises fra dec 2025, hvor løbende registrering begyndte.
  */
+const TRUSTWORTHY_START = "2025-12-01";
+
 export function HeadcountTrendChart() {
-  const { data: currentEmployees, isLoading: loadingCurrent } = useQuery({
-    queryKey: ["headcount-trend-current"],
-    queryFn: async () => {
-      const { data: employees, error } = await supabase
-        .from("employee_master_data")
-        .select("id, employment_start_date, employment_end_date, is_staff_employee")
-        .eq("is_staff_employee", false)
-        .not("employment_start_date", "is", null);
-      if (error) throw error;
+  const fromDate = useMemo(() => {
+    const twelveMonthsAgo = format(startOfMonth(subMonths(new Date(), 11)), "yyyy-MM-dd");
+    return twelveMonthsAgo > TRUSTWORTHY_START ? twelveMonthsAgo : TRUSTWORTHY_START;
+  }, []);
 
-      return (employees || []).map((e: any) => ({
-        id: e.id,
-        start_date: e.employment_start_date as string,
-        end_date: (e.employment_end_date as string | null) ?? null,
-      }));
-    },
-  });
+  const { data: monthly, isLoading } = useHeadcountMonthly(fromDate);
 
-  const { data: historicalEmployees, isLoading: loadingHistorical } = useQuery({
-    queryKey: ["headcount-trend-historical"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("historical_employment")
-        .select("id, start_date, end_date, team_name");
-      if (error) throw error;
-      // Ekskluder Stab — matcher KPI-kortet (is_staff_employee = false).
-      return (data || [])
-        .filter((e: any) => !(e.team_name ?? "").toLowerCase().includes("stab"))
-        .map((e: any) => ({
-          id: e.id,
-          start_date: e.start_date as string,
-          end_date: (e.end_date as string | null) ?? null,
-        }));
-    },
-  });
-
-  const isLoading = loadingCurrent || loadingHistorical;
-
-  const chartData = useMemo(() => {
-    if (!currentEmployees || !historicalEmployees) return [];
-
-    // Current = stadig ansatte (is_active), Historical = tidligere ansatte.
-    // Ingen overlap forventet — dedupliker ikke.
-    const combined = [
-      ...currentEmployees.map((e) => ({
-        start_date: e.start_date,
-        end_date: e.end_date,
+  const chartData = useMemo(
+    () =>
+      (monthly ?? []).map((m) => ({
+        month: format(parseISO(m.monthEnd), "MMM yy", { locale: da }),
+        count: m.headcountExclStaff,
       })),
-      ...historicalEmployees.map((e) => ({
-        start_date: e.start_date,
-        end_date: e.end_date,
-      })),
-    ];
-
-    const today = new Date();
-    // Trustworthy start: employee_master_data blev først oprettet december 2025.
-    // Måneder før det er rekonstrueret ud fra bagudfyldte datoer og vises ikke.
-    const TRUSTWORTHY_START = new Date(2025, 11, 1); // 1. dec 2025
-    const twelveMonthsAgo = startOfMonth(subMonths(today, 11));
-    const startMonth = twelveMonthsAgo > TRUSTWORTHY_START ? twelveMonthsAgo : TRUSTWORTHY_START;
-    const monthsBack = Math.max(
-      0,
-      (today.getFullYear() - startMonth.getFullYear()) * 12 +
-        (today.getMonth() - startMonth.getMonth())
-    );
-    const months = Array.from({ length: monthsBack + 1 }, (_, i) => {
-      const monthDate = subMonths(today, monthsBack - i);
-      return {
-        label: format(monthDate, "MMM yy", { locale: da }),
-        monthEnd: endOfMonth(monthDate),
-      };
-    });
-
-
-    return months.map(({ label, monthEnd }) => {
-      // For nuværende måned: sammenlign med dags dato (ikke månedsslut i fremtiden).
-      const cutoff = monthEnd > today ? today : monthEnd;
-      const count = combined.filter((e) => {
-        if (!e.start_date) return false;
-        const start = parseISO(e.start_date);
-        if (start > cutoff) return false;
-        if (e.end_date) {
-          const end = parseISO(e.end_date);
-          if (end < cutoff) return false;
-        }
-        return true;
-      }).length;
-      return { month: label, count };
-    });
-  }, [currentEmployees, historicalEmployees]);
-
-
+    [monthly]
+  );
 
   const latest = chartData[chartData.length - 1]?.count ?? 0;
   const first = chartData[0]?.count ?? 0;
@@ -124,7 +48,7 @@ export function HeadcountTrendChart() {
       <CardHeader>
         <CardTitle className="text-xl">Antal ansatte – siden dec 2025</CardTitle>
         <p className="text-sm text-muted-foreground">
-          Reelt antal ansatte pr. månedsslut (ekskl. Stab). Vises fra dec 2025, hvor data begyndte at blive registreret løbende.
+          Reelt antal ansatte pr. månedsslut (ekskl. Stab og kommende opstarter). Samme kilde som KPI-kortene under Medarbejdere.
           {!isLoading && chartData.length > 0 && (
             <>
               {" "}Nu: <span className="font-medium text-foreground">{latest}</span>
