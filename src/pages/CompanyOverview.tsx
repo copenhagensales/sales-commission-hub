@@ -11,7 +11,6 @@ import { ChurnTrendChart } from "@/components/company-overview/ChurnTrendChart";
 import { ChurnTrendChartCombined } from "@/components/company-overview/ChurnTrendChartCombined";
 import { HeadcountTrendChart } from "@/components/company-overview/HeadcountTrendChart";
 import { RevenuePerEmployeeChart } from "@/components/company-overview/RevenuePerEmployeeChart";
-import { ChurnCalculator } from "@/components/company-overview/ChurnCalculator";
 
 // Normalize team names to handle variations
 const normalizeTeamName = (name: string | null): string => {
@@ -392,9 +391,6 @@ export default function CompanyOverview() {
             </Card>
           ))}
         </div>
-
-        {/* Churn Calculator */}
-        <ChurnCalculator />
 
         {/* Charts and detailed KPIs */}
         <div className="space-y-6">
