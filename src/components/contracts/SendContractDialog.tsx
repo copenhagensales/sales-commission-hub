@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import DOMPurify from "dompurify";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -185,7 +185,6 @@ export function SendContractDialog({
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [customTitle, setCustomTitle] = useState("");
   const [notes, setNotes] = useState("");
-  const [previewContent, setPreviewContent] = useState("");
   const [showPreview, setShowPreview] = useState(false);
   const [isConfidential, setIsConfidential] = useState(false);
   const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
@@ -404,10 +403,24 @@ export function SendContractDialog({
     const template = templates.find((t) => t.id === templateId);
     if (template) {
       setCustomTitle(template.name);
-      const merged = mergeContent(template.content);
-      setPreviewContent(merged);
     }
   };
+
+  // Live preview: always merged from current field values
+  const previewContent = useMemo(
+    () => (selectedTemplate ? mergeContent(selectedTemplate.content) : ""),
+    [
+      selectedTemplate,
+      employee,
+      teamlederOpgave,
+      teamlederDbProcent,
+      teamlederMinimumslon,
+      assistTimelon,
+      assistMaanedslon,
+      assistBonus,
+      assistTeam,
+    ]
+  );
 
   // Send contract mutation
   const sendContractMutation = useMutation({
@@ -512,7 +525,6 @@ export function SendContractDialog({
     setSelectedTemplateId("");
     setCustomTitle("");
     setNotes("");
-    setPreviewContent("");
     setShowPreview(false);
     setIsConfidential(false);
     setTeamlederOpgave("");
