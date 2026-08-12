@@ -182,8 +182,20 @@ export default function SecurityDashboard() {
     },
   });
 
+  // RLS self-reference detector: catches policies that can cause infinite recursion (42P17)
+  const { data: rlsSelfRefs = [], isLoading: loadingRlsSelfRefs } = useQuery({
+    queryKey: ["rls-self-reference-check"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("check_rls_self_reference");
+      if (error) throw error;
+      return data ?? [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
   // Count employees with MFA enabled
   const mfaEnabledCount = mfaEmployees.filter(emp => emp.mfa_enabled).length;
+
 
   // Reset MFA mutation
   const resetMfaMutation = useMutation({
@@ -325,6 +337,57 @@ export default function SecurityDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* RLS Recursion Check */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            Adgangsregler: rekursions-tjek
+          </CardTitle>
+          <CardDescription>
+            Finder adgangsregler der slår op i deres egen tabel. Sådanne regler får alle opslag mod tabellen
+            til at fejle for alle brugere.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loadingRlsSelfRefs ? (
+            <p className="text-sm text-muted-foreground">Tjekker...</p>
+          ) : rlsSelfRefs.length === 0 ? (
+            <div className="flex items-center gap-2 text-sm">
+              <Badge variant="outline" className="border-emerald-500 text-emerald-600">OK</Badge>
+              <span className="text-muted-foreground">Ingen selv-refererende adgangsregler fundet.</span>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-destructive" />
+                <span className="font-medium">{rlsSelfRefs.length} regel(er) kræver gennemgang</span>
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Tabel</TableHead>
+                    <TableHead>Regel</TableHead>
+                    <TableHead>Handling</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rlsSelfRefs.map((r) => (
+                    <TableRow key={`${r.table_name}-${r.policy_name}`}>
+                      <TableCell className="font-mono text-xs">{r.table_name}</TableCell>
+                      <TableCell className="text-xs">{r.policy_name}</TableCell>
+                      <TableCell className="text-xs">{r.command}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+
 
       {/* Password Security Card */}
       <Card>

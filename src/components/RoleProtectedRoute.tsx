@@ -21,14 +21,15 @@ export function RoleProtectedRoute({
   positionPermission,
 }: RoleProtectedRouteProps) {
   const { user, loading: authLoading } = useAuth();
-  const { isLoading: permLoading, isReady, canView, permissions, position } = usePermissions();
+  const { isLoading: permLoading, isReady, isError, isRetrying, canView, permissions, position } = usePermissions();
   const isFmSalesRegistrationRoute = positionPermission === "menu_fm_sales_registration";
   const { data: canWorkFieldmarketing = false, isLoading: fmEmployeeLoading } = useCanWorkFieldmarketing(isFmSalesRegistrationRoute);
-  
+
   // CRITICAL: Wait until BOTH auth is done AND permissions are READY (fully fetched)
-  // Using isReady prevents premature redirects during browser refresh
-  const isLoading = authLoading || !isReady || (isFmSalesRegistrationRoute && fmEmployeeLoading);
-  
+  // Using isReady prevents premature redirects during browser refresh.
+  // isError is excluded so a failing backend shows an actionable error instead of an endless loader.
+  const isLoading = !isError && (authLoading || !isReady || (isFmSalesRegistrationRoute && fmEmployeeLoading));
+
   // Debug logging - only in development
   if (import.meta.env.DEV) {
     console.log("RoleProtectedRoute DEBUG:", {
@@ -39,6 +40,7 @@ export function RoleProtectedRoute({
       canWorkFieldmarketing,
       isLoading,
       isReady,
+      isError,
     });
   }
 
@@ -46,11 +48,17 @@ export function RoleProtectedRoute({
     await supabase.auth.signOut();
     window.location.href = "/auth";
   };
+
+  const handleRetry = () => {
+    window.location.reload();
+  };
   
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
-        <div className="animate-pulse text-muted-foreground">Indlæser...</div>
+        <div className="animate-pulse text-muted-foreground">
+          {isRetrying ? "Forbinder til database..." : "Indlæser..."}
+        </div>
         <Button variant="outline" size="sm" onClick={handleLogout} className="mt-4">
           <LogOut className="h-4 w-4 mr-2" />
           Log ud
@@ -58,6 +66,27 @@ export function RoleProtectedRoute({
       </div>
     );
   }
+
+  // Backend fejlede efter gentagne forsøg - vis handlingsbar fejl frem for uendelig loader
+  if (isError) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
+        <div className="text-destructive font-medium text-lg">Kunne ikke hente din profil</div>
+        <p className="text-muted-foreground text-sm max-w-md text-center">
+          Systemet kunne ikke hente dine rettigheder.<br />
+          <strong>Din konto er IKKE deaktiveret</strong> - dette er en teknisk fejl.
+        </p>
+        <div className="flex gap-2 mt-4">
+          <Button onClick={handleRetry}>Prøv igen</Button>
+          <Button variant="outline" onClick={handleLogout}>
+            <LogOut className="h-4 w-4 mr-2" />
+            Log ud
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   
   if (!user) {
     return <Navigate to="/auth" replace />;
