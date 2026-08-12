@@ -227,8 +227,10 @@ export default function EmployeeMasterData() {
     "today",
     "global"
   );
-  
-  const cachedActiveCount = getKpiValue(kpiData.active_employees);
+
+  // Én sandhed for headcount (aktive, kommende opstarter, stab).
+  const { data: headcount } = useHeadcountCurrent();
+
   const cachedStaffCount = getKpiValue(kpiData.staff_employees);
   const cachedTeamCount = getKpiValue(kpiData.team_count);
   const cachedPositionCount = getKpiValue(kpiData.position_count);
