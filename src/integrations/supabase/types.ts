@@ -14111,6 +14111,16 @@ export type Database = {
         Args: { _sale_id: string; _user_id: string }
         Returns: boolean
       }
+      check_rls_self_reference: {
+        Args: never
+        Returns: {
+          command: string
+          expression: string
+          policy_name: string
+          schema_name: string
+          table_name: string
+        }[]
+      }
       cleanup_invalid_email_sales: { Args: never; Returns: Json }
       cleanup_kpi_cache: { Args: never; Returns: number }
       cleanup_stale_leaderboard_cache: { Args: never; Returns: number }
@@ -14569,6 +14579,7 @@ export type Database = {
         | { Args: { _user_id?: string }; Returns: boolean }
         | { Args: { _user_id?: string; _variant?: string }; Returns: boolean }
       heal_fm_missing_sale_items: { Args: never; Returns: number }
+      is_active_employee: { Args: { _uid: string }; Returns: boolean }
       is_chat_conversation_member: {
         Args: { _conversation_id: string }
         Returns: boolean
