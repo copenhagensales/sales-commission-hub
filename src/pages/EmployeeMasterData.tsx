@@ -760,9 +760,10 @@ export default function EmployeeMasterData() {
 
   // Headcount kommer fra én kilde: get_headcount_current() (se useHeadcount.ts).
   // Lokale tællinger bruges kun som fallback indtil RPC'en har svaret.
-  const localNotStarted = employees.filter(
-    (e) => !!e.is_active && !!e.employment_start_date && e.employment_start_date > new Date().toISOString().split("T")[0]
-  ).length;
+  const isNotStartedYet = (e: EmployeeMasterDataRecord) =>
+    !!e.is_active && !!e.employment_start_date && e.employment_start_date > new Date().toISOString().split("T")[0];
+  const localNotStarted = employees.filter(isNotStartedYet).length;
+
   const localActiveStarted = employees.filter((e) => e.is_active).length - localNotStarted;
   const notStartedYetCount = headcount?.pendingStarts ?? localNotStarted;
   const activeCount = headcount?.activeStartedExclStaff ?? Math.max(0, localActiveStarted);
