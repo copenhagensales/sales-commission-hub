@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useMemo } from "react";
-import { endOfMonth, format, parseISO, startOfMonth, subMonths } from "date-fns";
+import { endOfMonth, format, startOfMonth, subMonths } from "date-fns";
 import { da } from "date-fns/locale";
 import {
   ResponsiveContainer,
@@ -15,14 +15,15 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
+import { useHeadcountMonthly } from "@/hooks/useHeadcount";
 
 /**
  * Viser udviklingen i omsætning pr. medarbejder pr. måned.
  *
  * Kilder:
  *  - Omsætning: get_sales_aggregates RPC (bibelens autoritative kilde).
- *  - Antal medarbejdere: employee_master_data + historical_employment (ekskl. Stab),
- *    samme logik som HeadcountTrendChart.
+ *  - Antal medarbejdere: get_headcount_monthly() (ekskl. Stab) — samme kilde som
+ *    HeadcountTrendChart og KPI-kortene under Medarbejdere.
  *
  * Vises fra dec 2025 (samme trustworthy start som headcount-grafen).
  */
@@ -55,38 +56,17 @@ export function RevenuePerEmployeeChart() {
   const today = useMemo(() => new Date(), []);
   const months = useMemo(() => buildMonths(today), [today]);
 
-  // Headcount-data (samme kilde som HeadcountTrendChart)
-  const { data: currentEmployees } = useQuery({
-    queryKey: ["headcount-trend-current"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("employee_master_data")
-        .select("id, employment_start_date, employment_end_date, is_staff_employee")
-        .eq("is_staff_employee", false)
-        .not("employment_start_date", "is", null);
-      if (error) throw error;
-      return (data || []).map((e: any) => ({
-        start_date: e.employment_start_date as string,
-        end_date: (e.employment_end_date as string | null) ?? null,
-      }));
-    },
-  });
-
-  const { data: historicalEmployees } = useQuery({
-    queryKey: ["headcount-trend-historical"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("historical_employment")
-        .select("id, start_date, end_date, team_name");
-      if (error) throw error;
-      return (data || [])
-        .filter((e: any) => !(e.team_name ?? "").toLowerCase().includes("stab"))
-        .map((e: any) => ({
-          start_date: e.start_date as string,
-          end_date: (e.end_date as string | null) ?? null,
-        }));
-    },
-  });
+  // Headcount pr. måned fra databasens ene sandhed.
+  const { data: monthlyHeadcount } = useHeadcountMonthly(
+    format(months[0]?.monthStart ?? today, "yyyy-MM-dd")
+  );
+  const headcountByMonth = useMemo(() => {
+    const map = new Map<string, number>();
+    (monthlyHeadcount ?? []).forEach((m) => {
+      map.set(m.monthEnd.slice(0, 7), m.headcountExclStaff);
+    });
+    return map;
+  }, [monthlyHeadcount]);
 
   // Månedlig omsætning — ét RPC-kald returnerer alle måneder samlet.
   const rangeStart = months[0]?.monthStart;
@@ -121,26 +101,13 @@ export function RevenuePerEmployeeChart() {
   });
 
 
-  const isLoading = loadingRevenue || !currentEmployees || !historicalEmployees;
+  const isLoading = loadingRevenue || !monthlyHeadcount;
 
   const chartData = useMemo(() => {
-    if (!revenueByMonth || !currentEmployees || !historicalEmployees) return [];
-
-    const combined = [...currentEmployees, ...historicalEmployees];
+    if (!revenueByMonth || !monthlyHeadcount) return [];
 
     return months.map((m, idx) => {
-      const cutoff = m.monthEnd > today ? today : m.monthEnd;
-      const headcount = combined.filter((e) => {
-        if (!e.start_date) return false;
-        const start = parseISO(e.start_date);
-        if (start > cutoff) return false;
-        if (e.end_date) {
-          const end = parseISO(e.end_date);
-          if (end < cutoff) return false;
-        }
-        return true;
-      }).length;
-
+      const headcount = headcountByMonth.get(format(m.monthStart, "yyyy-MM")) ?? 0;
       const revenue = revenueByMonth[idx]?.revenue ?? 0;
       const perEmployee = headcount > 0 ? Math.round(revenue / headcount) : 0;
 
@@ -151,7 +118,7 @@ export function RevenuePerEmployeeChart() {
         perEmployee,
       };
     });
-  }, [months, revenueByMonth, currentEmployees, historicalEmployees, today]);
+  }, [months, revenueByMonth, monthlyHeadcount, headcountByMonth]);
 
   const latest = chartData[chartData.length - 1]?.perEmployee ?? 0;
   const first = chartData[0]?.perEmployee ?? 0;

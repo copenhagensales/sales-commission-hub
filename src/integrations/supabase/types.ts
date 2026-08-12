@@ -14304,6 +14304,25 @@ export type Database = {
           name: string
         }[]
       }
+      get_headcount_current: {
+        Args: never
+        Returns: {
+          active_started_excl_staff: number
+          active_total: number
+          inactive_missing_end_date: number
+          missing_start_date: number
+          pending_starts: number
+          staff_active: number
+        }[]
+      }
+      get_headcount_monthly: {
+        Args: { p_from: string }
+        Returns: {
+          headcount_excl_staff: number
+          headcount_incl_staff: number
+          month_end: string
+        }[]
+      }
       get_invitation_by_token: {
         Args: { _token: string }
         Returns: {

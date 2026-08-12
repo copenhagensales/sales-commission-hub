@@ -33,6 +33,8 @@ import { EmployeeKpiCards } from "@/components/employees/EmployeeKpiCards";
 import { useTwilioDevice } from "@/hooks/useTwilioDevice";
 import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
 import { usePrecomputedKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
+import { useHeadcountCurrent } from "@/hooks/useHeadcount";
+
 
 
 interface EmployeeMasterDataRecord {
@@ -225,8 +227,10 @@ export default function EmployeeMasterData() {
     "today",
     "global"
   );
-  
-  const cachedActiveCount = getKpiValue(kpiData.active_employees);
+
+  // Én sandhed for headcount (aktive, kommende opstarter, stab).
+  const { data: headcount } = useHeadcountCurrent();
+
   const cachedStaffCount = getKpiValue(kpiData.staff_employees);
   const cachedTeamCount = getKpiValue(kpiData.team_count);
   const cachedPositionCount = getKpiValue(kpiData.position_count);
@@ -754,17 +758,19 @@ export default function EmployeeMasterData() {
       return sortDirection === "asc" ? comparison : -comparison;
     });
 
-  // Use cached KPI values (fallback to local count if cache not yet populated)
-  const today = new Date().toISOString().split("T")[0];
+  // Headcount kommer fra én kilde: get_headcount_current() (se useHeadcount.ts).
+  // Lokale tællinger bruges kun som fallback indtil RPC'en har svaret.
   const isNotStartedYet = (e: EmployeeMasterDataRecord) =>
-    !!e.is_active && !!e.employment_start_date && e.employment_start_date > today;
-  const notStartedYetCount = employees.filter(isNotStartedYet).length;
-  const localActiveCount = employees.filter((e) => e.is_active).length;
-  const rawActiveCount = cachedActiveCount > 0 ? cachedActiveCount : localActiveCount;
-  const activeCount = Math.max(0, rawActiveCount - notStartedYetCount);
-  const staffCount = cachedStaffCount;
+    !!e.is_active && !!e.employment_start_date && e.employment_start_date > new Date().toISOString().split("T")[0];
+  const localNotStarted = employees.filter(isNotStartedYet).length;
+
+  const localActiveStarted = employees.filter((e) => e.is_active).length - localNotStarted;
+  const notStartedYetCount = headcount?.pendingStarts ?? localNotStarted;
+  const activeCount = headcount?.activeStartedExclStaff ?? Math.max(0, localActiveStarted);
+  const staffCount = headcount?.staffActive ?? cachedStaffCount;
   const teamCount = cachedTeamCount;
   const positionCount = cachedPositionCount > 0 ? cachedPositionCount : jobPositions.length;
+
 
   // Section configuration - must be after activeCount/staffCount are defined
   const visibleSections = useMemo(() => {
