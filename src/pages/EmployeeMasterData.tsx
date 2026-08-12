@@ -754,17 +754,18 @@ export default function EmployeeMasterData() {
       return sortDirection === "asc" ? comparison : -comparison;
     });
 
-  // Use cached KPI values (fallback to local count if cache not yet populated)
-  const today = new Date().toISOString().split("T")[0];
-  const isNotStartedYet = (e: EmployeeMasterDataRecord) =>
-    !!e.is_active && !!e.employment_start_date && e.employment_start_date > today;
-  const notStartedYetCount = employees.filter(isNotStartedYet).length;
-  const localActiveCount = employees.filter((e) => e.is_active).length;
-  const rawActiveCount = cachedActiveCount > 0 ? cachedActiveCount : localActiveCount;
-  const activeCount = Math.max(0, rawActiveCount - notStartedYetCount);
-  const staffCount = cachedStaffCount;
+  // Headcount kommer fra én kilde: get_headcount_current() (se useHeadcount.ts).
+  // Lokale tællinger bruges kun som fallback indtil RPC'en har svaret.
+  const localNotStarted = employees.filter(
+    (e) => !!e.is_active && !!e.employment_start_date && e.employment_start_date > new Date().toISOString().split("T")[0]
+  ).length;
+  const localActiveStarted = employees.filter((e) => e.is_active).length - localNotStarted;
+  const notStartedYetCount = headcount?.pendingStarts ?? localNotStarted;
+  const activeCount = headcount?.activeStartedExclStaff ?? Math.max(0, localActiveStarted);
+  const staffCount = headcount?.staffActive ?? cachedStaffCount;
   const teamCount = cachedTeamCount;
   const positionCount = cachedPositionCount > 0 ? cachedPositionCount : jobPositions.length;
+
 
   // Section configuration - must be after activeCount/staffCount are defined
   const visibleSections = useMemo(() => {
