@@ -33,6 +33,8 @@ import { EmployeeKpiCards } from "@/components/employees/EmployeeKpiCards";
 import { useTwilioDevice } from "@/hooks/useTwilioDevice";
 import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
 import { usePrecomputedKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
+import { useHeadcountCurrent } from "@/hooks/useHeadcount";
+
 
 
 interface EmployeeMasterDataRecord {
