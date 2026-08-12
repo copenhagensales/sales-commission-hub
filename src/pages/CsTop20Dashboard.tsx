@@ -12,6 +12,7 @@ import { DashboardPeriodSelector, getDefaultPeriod, type PeriodSelection, type P
 import { supabase } from "@/integrations/supabase/client";
 import { useRequireDashboardAccess } from "@/hooks/useRequireDashboardAccess";
 import { isTvMode, useAutoReload, REFRESH_PROFILES } from "@/utils/tvMode";
+import { tvEdgeFetch } from "@/utils/tvEdgeFetch";
 
 // formatNumber imported from @/lib/calculations - alias as formatCurrency for dashboard display
 const formatCurrency = formatNumber;
@@ -171,17 +172,7 @@ export default function CsTop20Dashboard() {
   }>({
     queryKey: ["tv-cs-top-20-data"],
     queryFn: async () => {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-      const response = await fetch(
-        `${supabaseUrl}/functions/v1/tv-dashboard-data?action=cs-top-20-data`,
-        {
-          headers: {
-            "apikey": anonKey,
-            "Authorization": `Bearer ${anonKey}`,
-          },
-        }
-      );
+      const response = await tvEdgeFetch("tv-dashboard-data?action=cs-top-20-data");
       if (!response.ok) {
         throw new Error("Failed to fetch TV data");
       }

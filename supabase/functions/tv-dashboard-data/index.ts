@@ -152,6 +152,44 @@ Deno.serve(async (req) => {
     const action = url.searchParams.get("action");
     const metric = url.searchParams.get("metric") || "sales_today";
 
+    // SECURITY: Alle kald skal autentificeres — enten med en gyldig TV-adgangskode
+    // eller med en gyldig bruger-session (JWT). Ellers 401.
+    if (accessCode) {
+      const { data: accessData, error: accessError } = await supabase
+        .from("tv_board_access")
+        .select("id, dashboard_slug, is_active, access_count")
+        .eq("access_code", accessCode.toUpperCase())
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (accessError || !accessData) {
+        return new Response(
+          JSON.stringify({ error: "Invalid access code" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      await supabase
+        .from("tv_board_access")
+        .update({
+          last_accessed_at: new Date().toISOString(),
+          access_count: ((accessData as any).access_count || 0) + 1,
+        })
+        .eq("id", accessData.id);
+    } else {
+      const authHeader = req.headers.get("Authorization") || "";
+      const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+      const { data: userData } = token
+        ? await supabase.auth.getUser(token)
+        : { data: { user: null } as any };
+      if (!userData?.user) {
+        return new Response(
+          JSON.stringify({ error: "Unauthorized" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     // Handle cached KPI data request - reads from pre-computed kpi_cached_values table
     if (action === "cached-kpis") {
       const period = url.searchParams.get("period") || "today";
@@ -256,32 +294,6 @@ Deno.serve(async (req) => {
         });
       }
       return await handleFiberBoardStats(supabase, start, end, corsHeaders, cacheKey);
-    }
-
-    // Verify access code if provided
-    if (accessCode) {
-      const { data: accessData, error: accessError } = await supabase
-        .from("tv_board_access")
-        .select("id, dashboard_slug, is_active")
-        .eq("access_code", accessCode.toUpperCase())
-        .eq("is_active", true)
-        .maybeSingle();
-
-      if (accessError || !accessData) {
-        return new Response(
-          JSON.stringify({ error: "Invalid access code" }),
-          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      // Update access stats
-      await supabase
-        .from("tv_board_access")
-        .update({
-          last_accessed_at: new Date().toISOString(),
-          access_count: (accessData as any).access_count + 1 || 1,
-        })
-        .eq("id", accessData.id);
     }
 
     // Get today's date range

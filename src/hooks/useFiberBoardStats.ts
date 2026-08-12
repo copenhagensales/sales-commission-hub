@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { tvEdgeFetch } from "@/utils/tvEdgeFetch";
 
 export interface FiberEmployeeStats {
   points: number;
@@ -33,9 +34,8 @@ export function useFiberBoardStats(
     staleTime: 60_000,
     refetchInterval: 120_000,
     queryFn: async () => {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const res = await fetch(
-        `${supabaseUrl}/functions/v1/tv-dashboard-data?action=fiber-board-stats&start=${encodeURIComponent(
+      const res = await tvEdgeFetch(
+        `tv-dashboard-data?action=fiber-board-stats&start=${encodeURIComponent(
           startIso,
         )}&end=${encodeURIComponent(endIso)}`,
       );

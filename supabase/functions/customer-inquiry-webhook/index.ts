@@ -1,3 +1,4 @@
+import { escapeHtml } from '../_shared/sanitize.ts';
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -49,11 +50,11 @@ async function sendNotificationEmail(inquiry: { name: string; company?: string; 
   const accessToken = await getM365AccessToken();
 
   const rows = [
-    `<tr><td style="padding:6px 12px;font-weight:bold;color:#374151;">Navn</td><td style="padding:6px 12px;">${inquiry.name}</td></tr>`,
-    inquiry.company ? `<tr><td style="padding:6px 12px;font-weight:bold;color:#374151;">Firma</td><td style="padding:6px 12px;">${inquiry.company}</td></tr>` : "",
-    inquiry.email ? `<tr><td style="padding:6px 12px;font-weight:bold;color:#374151;">Email</td><td style="padding:6px 12px;"><a href="mailto:${inquiry.email}">${inquiry.email}</a></td></tr>` : "",
-    inquiry.phone ? `<tr><td style="padding:6px 12px;font-weight:bold;color:#374151;">Telefon</td><td style="padding:6px 12px;">${inquiry.phone}</td></tr>` : "",
-    inquiry.message ? `<tr><td style="padding:6px 12px;font-weight:bold;color:#374151;vertical-align:top;">Besked</td><td style="padding:6px 12px;">${inquiry.message.replace(/\n/g, "<br>")}</td></tr>` : "",
+    `<tr><td style="padding:6px 12px;font-weight:bold;color:#374151;">Navn</td><td style="padding:6px 12px;">${escapeHtml(inquiry.name)}</td></tr>`,
+    inquiry.company ? `<tr><td style="padding:6px 12px;font-weight:bold;color:#374151;">Firma</td><td style="padding:6px 12px;">${escapeHtml(inquiry.company)}</td></tr>` : "",
+    inquiry.email ? `<tr><td style="padding:6px 12px;font-weight:bold;color:#374151;">Email</td><td style="padding:6px 12px;"><a href="mailto:${encodeURIComponent(inquiry.email)}">${escapeHtml(inquiry.email)}</a></td></tr>` : "",
+    inquiry.phone ? `<tr><td style="padding:6px 12px;font-weight:bold;color:#374151;">Telefon</td><td style="padding:6px 12px;">${escapeHtml(inquiry.phone)}</td></tr>` : "",
+    inquiry.message ? `<tr><td style="padding:6px 12px;font-weight:bold;color:#374151;vertical-align:top;">Besked</td><td style="padding:6px 12px;">${escapeHtml(inquiry.message).replace(/\n/g, "<br>")}</td></tr>` : "",
   ].filter(Boolean).join("");
 
   const htmlBody = `

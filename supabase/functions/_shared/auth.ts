@@ -94,3 +94,10 @@ export async function requireCronOrOwner(
 }
 
 
+
+/** Require any authenticated user (valid JWT). Returns 401 otherwise. */
+export async function requireAuthenticated(req: Request): Promise<AuthOk | Response> {
+  const ctx = await getUserFromAuthHeader(req);
+  if (!ctx) return jsonError(401, "Unauthorized");
+  return { ok: true, userId: ctx.user.id, svc: ctx.svc };
+}

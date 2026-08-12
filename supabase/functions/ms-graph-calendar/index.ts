@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireManager } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,6 +22,10 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+
+  // SECURITY: kalenderproxy må kun bruges af ledere og opefter
+  const auth = await requireManager(req);
+  if (auth instanceof Response) return auth;
 
   try {
     const { action, ...params } = await req.json();

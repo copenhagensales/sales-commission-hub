@@ -1,3 +1,4 @@
+import { escapeHtml } from '../_shared/sanitize.ts';
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -184,7 +185,7 @@ Deno.serve(async (req) => {
       .eq('page_key', 'unsubscribe_success')
       .maybeSingle();
 
-    const firstName = candidate.first_name || '';
+    const firstName = escapeHtml(candidate.first_name || '');
     return new Response(
       renderSuccessHtml(firstName, pageContent),
       { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
@@ -207,7 +208,7 @@ Deno.serve(async (req) => {
 function renderSuccessHtml(firstName: string, pageContent?: { title: string; body_lines: string[]; tip_text: string | null } | null): string {
   const defaultTitle = firstName ? `Tak for din interesse, ${firstName}!` : 'Tak for din interesse!';
   const title = pageContent?.title
-    ? pageContent.title.replace('{{firstName}}', firstName || '')
+    ? escapeHtml(pageContent.title).replace('{{firstName}}', firstName || '')
     : defaultTitle;
 
   const defaultLines = [

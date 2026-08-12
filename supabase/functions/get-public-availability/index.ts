@@ -201,7 +201,7 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const { data: candidate } = await supabase
-      .from("candidates").select("id, first_name, last_name, email, phone").eq("id", candidateId).maybeSingle();
+      .from("candidates").select("id, first_name, last_name").eq("id", candidateId).maybeSingle();
 
     if (!candidate) {
       return new Response(JSON.stringify({ error: "Candidate not found" }), {
