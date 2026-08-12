@@ -182,8 +182,20 @@ export default function SecurityDashboard() {
     },
   });
 
+  // RLS self-reference detector: catches policies that can cause infinite recursion (42P17)
+  const { data: rlsSelfRefs = [], isLoading: loadingRlsSelfRefs } = useQuery({
+    queryKey: ["rls-self-reference-check"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("check_rls_self_reference");
+      if (error) throw error;
+      return data ?? [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
   // Count employees with MFA enabled
   const mfaEnabledCount = mfaEmployees.filter(emp => emp.mfa_enabled).length;
+
 
   // Reset MFA mutation
   const resetMfaMutation = useMutation({
