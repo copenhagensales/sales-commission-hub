@@ -2,12 +2,19 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { REFRESH_PROFILES } from "@/utils/tvMode";
+import { useContractPolicy } from "@/hooks/useContractPolicy";
+import { usePermissions } from "@/hooks/usePositionPermissions";
 
 export function usePendingContractLock() {
   const { user, loading: authLoading } = useAuth();
+  const { pendingLockDays, pendingLockEnabled, isLoading: policyLoading } = useContractPolicy();
+  const { isOwner } = usePermissions();
+
+  // Owners are never locked out — there must always be a way into the system.
+  const ruleActive = pendingLockEnabled && !isOwner;
 
   const { data: lockData, isLoading: queryLoading } = useQuery({
-    queryKey: ["pending-contract-lock", user?.id],
+    queryKey: ["pending-contract-lock", user?.id, pendingLockDays],
     queryFn: async () => {
       if (!user) return { isLocked: false, contract: null };
 
@@ -21,16 +28,16 @@ export function usePendingContractLock() {
           return { isLocked: false, contract: null };
         }
 
-        // Check for pending contracts older than 5 days
-        const fiveDaysAgo = new Date();
-        fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
+        // Check for pending contracts older than the configured number of days
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - pendingLockDays);
 
         const { data: pendingContracts, error: contractError } = await supabase
           .from("contracts")
           .select("id, title, sent_at")
           .eq("employee_id", employeeData)
           .eq("status", "pending_employee")
-          .lt("sent_at", fiveDaysAgo.toISOString())
+          .lt("sent_at", cutoff.toISOString())
           .order("sent_at", { ascending: true })
           .limit(1);
 
@@ -52,14 +59,15 @@ export function usePendingContractLock() {
         return { isLocked: false, contract: null };
       }
     },
-    enabled: !!user && !authLoading,
+    enabled: !!user && !authLoading && !policyLoading && ruleActive,
     ...REFRESH_PROFILES.dashboard,
     retry: 1,
   });
 
   return {
-    isLocked: lockData?.isLocked ?? false,
+    isLocked: ruleActive ? (lockData?.isLocked ?? false) : false,
     contract: lockData?.contract ?? null,
-    isLoading: authLoading || (!!user && queryLoading),
+    lockDays: pendingLockDays,
+    isLoading: authLoading || (!!user && ruleActive && (policyLoading || queryLoading)),
   };
 }
