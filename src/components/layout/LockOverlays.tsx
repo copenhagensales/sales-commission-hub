@@ -22,7 +22,7 @@ interface LockOverlaysProps {
 
 export function LockOverlays({ children }: LockOverlaysProps) {
   const { isLocked: isRejectedContractLocked, isLoading: rejectedContractLoading } = useRejectedContractLock();
-  const { isLocked: isContractLocked, contract, isLoading: contractLoading } = usePendingContractLock();
+  const { isLocked: isContractLocked, contract, lockDays: contractLockDays, isLoading: contractLoading } = usePendingContractLock();
   const { isLocked: isQuizLocked, isLoading: quizLoading } = useCarQuizLock();
   const { isRequired: isMfaRequired, isVerified: isMfaVerified, isLoading: mfaLoading } = useMfa();
   const { isLocked: isGoalLocked, employeeId, payrollPeriod, isLoading: goalLoading, refetch: refetchGoalLock } = useGoalLock();
@@ -74,6 +74,7 @@ export function LockOverlays({ children }: LockOverlaysProps) {
       <ContractLockOverlay 
         contractId={contract.id} 
         contractTitle={contract.title} 
+        lockDays={contractLockDays}
       />
     );
   }

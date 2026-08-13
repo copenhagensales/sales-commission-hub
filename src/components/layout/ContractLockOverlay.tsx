@@ -8,9 +8,10 @@ import { useQueryClient } from "@tanstack/react-query";
 interface ContractLockOverlayProps {
   contractId: string;
   contractTitle: string;
+  lockDays?: number;
 }
 
-export function ContractLockOverlay({ contractId, contractTitle }: ContractLockOverlayProps) {
+export function ContractLockOverlay({ contractId, contractTitle, lockDays = 5 }: ContractLockOverlayProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -39,7 +40,7 @@ export function ContractLockOverlay({ contractId, contractTitle }: ContractLockO
           </div>
           <CardTitle className="text-xl">Kontrakt afventer underskrift</CardTitle>
           <CardDescription className="text-base">
-            Du har en kontrakt der har afventet underskrift i mere end 5 dage. 
+            Du har en kontrakt der har afventet underskrift i mere end {lockDays} dage. 
             Du skal underskrive kontrakten før du kan fortsætte med at bruge systemet.
           </CardDescription>
         </CardHeader>

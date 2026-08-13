@@ -85,11 +85,55 @@ const handler = async (req: Request): Promise<Response> => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Find contracts pending employee signature for more than 3 days
-    // Only include contracts with less than 3 reminders sent
-    // And where last reminder was at least 3 days ago (or never sent)
-    const threeDaysAgo = new Date();
-    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+    // Dry run: report which contracts would be hit without sending anything
+    let dryRun = false;
+    try {
+      if (req.method === "POST") {
+        const body = await req.json().catch(() => ({}));
+        dryRun = body?.dry_run === true;
+      }
+    } catch (_) {
+      dryRun = false;
+    }
+
+    // Rule configuration lives in contract_policy_settings (managed under
+    // Kontrakter → Regler). Defaults below are identical to the previously
+    // hardcoded behaviour and apply if the settings cannot be read.
+    const DEFAULTS = { first_after_days: 3, interval_days: 3, max_reminders: 3 };
+    const { data: policyRow, error: policyError } = await supabase
+      .from("contract_policy_settings")
+      .select("enabled, config")
+      .eq("key", "employee_reminder")
+      .maybeSingle();
+
+    if (policyError) {
+      console.error("Could not read contract policy, using defaults:", policyError);
+    }
+
+    if (policyRow && policyRow.enabled === false) {
+      console.log("Contract reminder rule is disabled — skipping");
+      return new Response(
+        JSON.stringify({ message: "Reminder rule disabled", count: 0 }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const cfg = { ...DEFAULTS, ...((policyRow?.config as Record<string, number>) ?? {}) };
+    const clamp = (v: unknown, min: number, max: number, fallback: number) => {
+      const n = Number(v);
+      if (!Number.isFinite(n)) return fallback;
+      return Math.min(max, Math.max(min, Math.round(n)));
+    };
+    const firstAfterDays = clamp(cfg.first_after_days, 1, 60, DEFAULTS.first_after_days);
+    const intervalDays = clamp(cfg.interval_days, 1, 60, DEFAULTS.interval_days);
+    const maxReminders = clamp(cfg.max_reminders, 1, 20, DEFAULTS.max_reminders);
+
+    console.log(`Reminder rule: first after ${firstAfterDays}d, interval ${intervalDays}d, max ${maxReminders}`);
+
+    const firstCutoff = new Date();
+    firstCutoff.setDate(firstCutoff.getDate() - firstAfterDays);
+    const intervalCutoff = new Date();
+    intervalCutoff.setDate(intervalCutoff.getDate() - intervalDays);
 
     const { data: pendingContracts, error: fetchError } = await supabase
       .from("contracts")
@@ -102,21 +146,41 @@ const handler = async (req: Request): Promise<Response> => {
         employee:employee_master_data(id, first_name, last_name, private_email)
       `)
       .eq("status", "pending_employee")
-      .lt("sent_at", threeDaysAgo.toISOString())
+      .lt("sent_at", firstCutoff.toISOString())
       .not("sent_at", "is", null)
-      .lt("reminder_count", 3); // Max 3 reminders
+      .lt("reminder_count", maxReminders);
 
     if (fetchError) {
       console.error("Error fetching contracts:", fetchError);
       throw fetchError;
     }
 
-    // Filter contracts where last_reminder_at is null or at least 3 days ago
+    // Only remind when the last reminder is old enough (or none has been sent)
     const eligibleContracts = (pendingContracts || []).filter(contract => {
       if (!contract.last_reminder_at) return true;
       const lastReminder = new Date(contract.last_reminder_at);
-      return lastReminder <= threeDaysAgo;
+      return lastReminder <= intervalCutoff;
     });
+
+    if (dryRun) {
+      console.log(`DRY RUN: ${eligibleContracts.length} contracts would receive a reminder`);
+      return new Response(
+        JSON.stringify({
+          dry_run: true,
+          rule: { firstAfterDays, intervalDays, maxReminders },
+          count: eligibleContracts.length,
+          contracts: eligibleContracts.map((c) => ({
+            id: c.id,
+            title: c.title,
+            sent_at: c.sent_at,
+            reminder_count: c.reminder_count,
+            employee: `${(c.employee as any)?.first_name ?? ""} ${(c.employee as any)?.last_name ?? ""}`.trim(),
+          })),
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
 
     if (eligibleContracts.length === 0) {
       console.log("No pending contracts requiring reminders");
