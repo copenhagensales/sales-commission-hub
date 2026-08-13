@@ -297,15 +297,16 @@ export default function CareerWishesOverview() {
                               <p><span className="text-muted-foreground">Rolle:</span> {leadershipRoleLabels[wish.leadership_role_type as LeadershipRoleType]}</p>
                             )}
                             {wish.team_change_motivation && (
-                              <p className="text-muted-foreground truncate" title={wish.team_change_motivation}>
+                              <p className="text-muted-foreground line-clamp-2">
                                 {wish.team_change_motivation}
                               </p>
                             )}
                             {wish.leadership_motivation && (
-                              <p className="text-muted-foreground truncate" title={wish.leadership_motivation}>
+                              <p className="text-muted-foreground line-clamp-2">
                                 {wish.leadership_motivation}
                               </p>
                             )}
+                            <p className="text-xs text-primary">Klik for at læse alt</p>
                           </div>
                         </TableCell>
                         <TableCell className="text-muted-foreground">
