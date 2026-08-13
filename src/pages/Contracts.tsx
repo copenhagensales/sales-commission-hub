@@ -17,6 +17,8 @@ import { da } from "date-fns/locale";
 import { FileText, Plus, Send, Eye, Check, X, Clock, Edit, Trash2, Search, Upload, Loader2, Lock, LockOpen } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { RichTextEditor } from "@/components/contracts/RichTextEditor";
+import { ContractComplianceTab } from "@/components/contracts/ContractComplianceTab";
+import { ContractPolicyTab } from "@/components/contracts/ContractPolicyTab";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { CONTRACT_PROSE_SIGN_CLASSES } from "@/utils/contractProseStyles";
 import { logContractAccess } from "@/hooks/useLogContractAccess";
@@ -90,7 +92,9 @@ const statusColors: Record<ContractStatus, string> = {
 
 export default function Contracts() {
   const queryClient = useQueryClient();
-  const { canEditContracts } = usePermissions();
+  const { canEditContracts, hasPermission, isOwner } = usePermissions();
+  const canViewCompliance = isOwner || hasPermission("tab_contracts_compliance");
+  const canViewPolicy = isOwner || hasPermission("tab_contracts_policy");
   const [searchTerm, setSearchTerm] = useState("");
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<ContractTemplate | null>(null);
@@ -368,11 +372,25 @@ export default function Contracts() {
           </Card>
         </div>
 
-        <Tabs defaultValue="contracts">
+        <Tabs defaultValue={canViewCompliance ? "compliance" : "contracts"}>
           <TabsList>
+            {canViewCompliance && <TabsTrigger value="compliance">Overvågning</TabsTrigger>}
             <TabsTrigger value="contracts">Kontrakter</TabsTrigger>
             <TabsTrigger value="templates">Skabeloner</TabsTrigger>
+            {canViewPolicy && <TabsTrigger value="policy">Regler</TabsTrigger>}
           </TabsList>
+
+          {canViewCompliance && (
+            <TabsContent value="compliance" className="space-y-4">
+              <ContractComplianceTab />
+            </TabsContent>
+          )}
+
+          {canViewPolicy && (
+            <TabsContent value="policy" className="space-y-4">
+              <ContractPolicyTab canEdit={isOwner} />
+            </TabsContent>
+          )}
 
           <TabsContent value="contracts" className="space-y-4">
             <div className="flex items-center justify-between gap-4">

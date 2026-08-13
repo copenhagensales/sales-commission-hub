@@ -130,6 +130,8 @@ export const PERMISSION_KEYS = {
   // Contracts Tabs
   tab_contracts_all: { label: 'Fane: Alle kontrakter', section: 'ledelse', parent: 'menu_contracts' },
   tab_contracts_templates: { label: 'Fane: Skabeloner', section: 'ledelse', parent: 'menu_contracts' },
+  tab_contracts_compliance: { label: 'Fane: Overvågning', section: 'ledelse', parent: 'menu_contracts' },
+  tab_contracts_policy: { label: 'Fane: Regler', section: 'ledelse', parent: 'menu_contracts' },
 
   // ==================== VAGTPLAN (under menu_section_vagtplan) ====================
   menu_shift_overview: { label: 'Vagtplan (leder)', section: 'vagtplan', parent: 'menu_section_vagtplan' },

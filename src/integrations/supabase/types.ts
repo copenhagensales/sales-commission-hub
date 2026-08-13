@@ -4276,6 +4276,69 @@ export type Database = {
           },
         ]
       }
+      contract_policy_audit: {
+        Row: {
+          changed_by: string | null
+          changed_by_email: string | null
+          created_at: string
+          id: string
+          key: string
+          new_config: Json | null
+          new_enabled: boolean | null
+          old_config: Json | null
+          old_enabled: boolean | null
+        }
+        Insert: {
+          changed_by?: string | null
+          changed_by_email?: string | null
+          created_at?: string
+          id?: string
+          key: string
+          new_config?: Json | null
+          new_enabled?: boolean | null
+          old_config?: Json | null
+          old_enabled?: boolean | null
+        }
+        Update: {
+          changed_by?: string | null
+          changed_by_email?: string | null
+          created_at?: string
+          id?: string
+          key?: string
+          new_config?: Json | null
+          new_enabled?: boolean | null
+          old_config?: Json | null
+          old_enabled?: boolean | null
+        }
+        Relationships: []
+      }
+      contract_policy_settings: {
+        Row: {
+          config: Json
+          created_at: string
+          enabled: boolean
+          key: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          enabled?: boolean
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          enabled?: boolean
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       contract_signatures: {
         Row: {
           acceptance_text: string | null
@@ -14230,6 +14293,24 @@ export type Database = {
           open_tasks: number
           overdue_tasks: number
           total_tasks: number
+        }[]
+      }
+      get_contract_compliance: {
+        Args: never
+        Returns: {
+          compliance_state: string
+          contract_id: string
+          contract_status: string
+          contract_title: string
+          employee_id: string
+          employment_start_date: string
+          first_name: string
+          job_title: string
+          last_name: string
+          last_reminder_at: string
+          reminder_count: number
+          sent_at: string
+          team_name: string
         }[]
       }
       get_cs_top20_custom_period_leaderboard: {
