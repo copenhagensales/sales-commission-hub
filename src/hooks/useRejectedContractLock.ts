@@ -77,13 +77,13 @@ export function useRejectedContractLock() {
         contract: mostRecentRejected,
       };
     },
-    enabled: !!user?.email,
+    enabled: !!user?.email && !policyLoading && ruleActive,
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
   return {
-    isLocked: data?.isLocked ?? false,
+    isLocked: ruleActive ? (data?.isLocked ?? false) : false,
     contract: data?.contract ?? null,
-    isLoading,
+    isLoading: ruleActive && (policyLoading || isLoading),
   };
 }
