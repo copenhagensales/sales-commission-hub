@@ -249,7 +249,10 @@ export default function CareerWishesOverview() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => markAsReviewedMutation.mutate({ id: wish.id, reviewed: !isReviewed })}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              markAsReviewedMutation.mutate({ id: wish.id, reviewed: !isReviewed });
+                            }}
                             disabled={markAsReviewedMutation.isPending}
                             className="gap-2"
                           >
