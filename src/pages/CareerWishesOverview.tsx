@@ -103,6 +103,9 @@ export default function CareerWishesOverview() {
     leadership: careerWishes?.filter(w => w.leadership_interest === "yes" || w.leadership_interest === "maybe").length || 0,
   };
 
+  const selectedWish = careerWishes?.find((w) => w.id === selectedWishId) || null;
+
+
   return (
     <MainLayout>
       <div className="space-y-6">
