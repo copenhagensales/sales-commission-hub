@@ -128,15 +128,8 @@ const handler = async (req: Request): Promise<Response> => {
     const data: CareerWishNotificationRequest = await req.json();
     console.log("Received career wish notification request:", data);
 
-    const recipients = await getRecipients();
-    
-    if (recipients.length === 0) {
-      console.log("No recipients found, skipping email");
-      return new Response(
-        JSON.stringify({ success: true, message: "No recipients found" }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    const recipients = RECIPIENTS;
+
 
     const htmlBody = `
       <!DOCTYPE html>
