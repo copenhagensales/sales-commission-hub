@@ -341,6 +341,30 @@ export default function CareerWishesOverview() {
                         <TableCell className="text-muted-foreground">
                           {format(new Date(wish.created_at), "d. MMM yyyy", { locale: da })}
                         </TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          {wish.acknowledged_at ? (
+                            <span className="flex items-center gap-1.5 text-xs text-green-600">
+                              <MailCheck className="h-4 w-4" />
+                              Sendt {format(new Date(wish.acknowledged_at), "d. MMM", { locale: da })}
+                            </span>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-2"
+                              onClick={() => acknowledgeMutation.mutate(wish.id)}
+                              disabled={acknowledgeMutation.isPending}
+                            >
+                              {acknowledgeMutation.isPending && acknowledgeMutation.variables === wish.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Mail className="h-4 w-4" />
+                              )}
+                              <span className="text-xs">Bekræft modtagelse</span>
+                            </Button>
+                          )}
+                        </TableCell>
+
                       </TableRow>
                     );
                   })}
