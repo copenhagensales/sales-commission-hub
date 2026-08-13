@@ -8,9 +8,10 @@ import { useQueryClient } from "@tanstack/react-query";
 interface ContractLockOverlayProps {
   contractId: string;
   contractTitle: string;
+  lockDays?: number;
 }
 
-export function ContractLockOverlay({ contractId, contractTitle }: ContractLockOverlayProps) {
+export function ContractLockOverlay({ contractId, contractTitle, lockDays = 5 }: ContractLockOverlayProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
