@@ -448,6 +448,24 @@ export default function CareerWishesOverview() {
                 <DialogFooter>
                   <Button
                     variant="outline"
+                    onClick={() => acknowledgeMutation.mutate(selectedWish.id)}
+                    disabled={acknowledgeMutation.isPending || !!selectedWish.acknowledged_at}
+                    className="gap-2"
+                  >
+                    {acknowledgeMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : selectedWish.acknowledged_at ? (
+                      <MailCheck className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <Mail className="h-4 w-4" />
+                    )}
+                    {selectedWish.acknowledged_at
+                      ? `Bekræftelse sendt ${format(new Date(selectedWish.acknowledged_at), "d. MMM yyyy", { locale: da })}`
+                      : "Bekræft modtagelse (send tak-mail)"}
+                  </Button>
+
+                  <Button
+                    variant="outline"
                     onClick={() =>
                       markAsReviewedMutation.mutate({
                         id: selectedWish.id,
