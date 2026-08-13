@@ -111,25 +111,46 @@ async function getRecipients(): Promise<string[]> {
     return [];
   }
 
-  // Get emails from employee_master_data
-  const userIds = roles.map(r => r.user_id);
-  
-  // Get auth users to get their emails
-  const { data: { users }, error: usersError } = await supabase.auth.admin.listUsers();
-  
-  if (usersError) {
-    console.error("Error fetching users:", usersError);
-    return [];
+  const userIds = roles.map((r) => r.user_id).filter(Boolean);
+  const emails = new Set<string>();
+
+  // Primary source: active employees' work email (fallback private email)
+  const { data: employees, error: employeesError } = await supabase
+    .from("employee_master_data")
+    .select("auth_user_id, work_email, private_email, is_active")
+    .in("auth_user_id", userIds);
+
+  if (employeesError) {
+    console.error("Error fetching employee emails:", employeesError);
+  } else {
+    for (const emp of employees ?? []) {
+      if (emp.is_active === false) continue;
+      const email = (emp.work_email || emp.private_email || "").trim();
+      if (email.includes("@")) emails.add(email.toLowerCase());
+    }
   }
 
-  const recipientEmails = users
-    .filter(u => userIds.includes(u.id))
-    .map(u => u.email)
-    .filter((email): email is string => !!email);
+  // Fallback: auth emails (paginated — listUsers defaults to only 50 users)
+  if (emails.size === 0) {
+    for (let page = 1; page <= 20; page++) {
+      const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 200 });
+      if (error) {
+        console.error("Error fetching users:", error);
+        break;
+      }
+      const users = data?.users ?? [];
+      for (const u of users) {
+        if (userIds.includes(u.id) && u.email) emails.add(u.email.toLowerCase());
+      }
+      if (users.length < 200) break;
+    }
+  }
 
+  const recipientEmails = [...emails];
   console.log("Found recipients:", recipientEmails);
   return recipientEmails;
 }
+
 
 function formatLeadershipInterest(interest: string): string {
   switch (interest) {
