@@ -320,6 +320,106 @@ export default function CareerWishesOverview() {
             )}
           </CardContent>
         </Card>
+
+        <Dialog open={!!selectedWish} onOpenChange={(open) => !open && setSelectedWishId(null)}>
+          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+            {selectedWish && (
+              <>
+                <DialogHeader>
+                  <DialogTitle>
+                    {selectedWish.employee?.first_name} {selectedWish.employee?.last_name}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {selectedWish.employee?.department || selectedWish.employee?.job_title || "Ingen afdeling"}
+                    {" · "}
+                    Indsendt {format(new Date(selectedWish.created_at), "d. MMMM yyyy", { locale: da })}
+                    {" · "}
+                    {selectedWish.reviewed_at ? "Behandlet" : "Ubehandlet"}
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-5 text-sm">
+                  {selectedWish.wants_team_change === "yes" && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 font-medium">
+                        <Users className="h-4 w-4 text-blue-500" />
+                        Teamskifte
+                      </div>
+                      {selectedWish.desired_team && (
+                        <p>
+                          <span className="text-muted-foreground">Ønsket team:</span> {selectedWish.desired_team}
+                        </p>
+                      )}
+                      {selectedWish.team_change_motivation && (
+                        <p className="whitespace-pre-wrap text-muted-foreground">
+                          {selectedWish.team_change_motivation}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {(selectedWish.leadership_interest === "yes" || selectedWish.leadership_interest === "maybe") && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 font-medium">
+                        <Crown className="h-4 w-4 text-amber-500" />
+                        Ledelsesinteresse
+                      </div>
+                      <p>
+                        <span className="text-muted-foreground">Interesse:</span>{" "}
+                        {selectedWish.leadership_interest === "yes" ? "Ja" : "Måske"}
+                      </p>
+                      {selectedWish.leadership_role_type && (
+                        <p>
+                          <span className="text-muted-foreground">Rolle:</span>{" "}
+                          {leadershipRoleLabels[selectedWish.leadership_role_type as LeadershipRoleType]}
+                        </p>
+                      )}
+                      {selectedWish.leadership_motivation && (
+                        <p className="whitespace-pre-wrap text-muted-foreground">
+                          {selectedWish.leadership_motivation}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {selectedWish.other_comments && (
+                    <div className="space-y-2">
+                      <div className="font-medium">Øvrige kommentarer</div>
+                      <p className="whitespace-pre-wrap text-muted-foreground">{selectedWish.other_comments}</p>
+                    </div>
+                  )}
+                </div>
+
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      markAsReviewedMutation.mutate({
+                        id: selectedWish.id,
+                        reviewed: !selectedWish.reviewed_at,
+                      })
+                    }
+                    disabled={markAsReviewedMutation.isPending}
+                    className="gap-2"
+                  >
+                    {selectedWish.reviewed_at ? (
+                      <>
+                        <Circle className="h-4 w-4" />
+                        Markér som ubehandlet
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="h-4 w-4" />
+                        Markér som behandlet
+                      </>
+                    )}
+                  </Button>
+                  <Button onClick={() => setSelectedWishId(null)}>Luk</Button>
+                </DialogFooter>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </MainLayout>
   );
