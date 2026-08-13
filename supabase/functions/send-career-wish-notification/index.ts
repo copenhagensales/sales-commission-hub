@@ -89,67 +89,13 @@ async function sendEmail(
   }
 }
 
-// Get recipients (owners and rekruttering)
-async function getRecipients(): Promise<string[]> {
-  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+// Fixed recipient list for career wish notifications
+const RECIPIENTS = [
+  "mg@copenhagensales.dk",
+  "km@copenhagensales.dk",
+  "oscar@copenhagensales.dk",
+];
 
-  // Get user IDs with ejer or rekruttering roles
-  const { data: roles, error: rolesError } = await supabase
-    .from("system_roles")
-    .select("user_id, role")
-    .in("role", ["ejer", "rekruttering"]);
-
-  if (rolesError) {
-    console.error("Error fetching roles:", rolesError);
-    return [];
-  }
-
-  if (!roles || roles.length === 0) {
-    console.log("No owners or rekruttering found");
-    return [];
-  }
-
-  const userIds = roles.map((r) => r.user_id).filter(Boolean);
-  const emails = new Set<string>();
-
-  // Primary source: active employees' work email (fallback private email)
-  const { data: employees, error: employeesError } = await supabase
-    .from("employee_master_data")
-    .select("auth_user_id, work_email, private_email, is_active")
-    .in("auth_user_id", userIds);
-
-  if (employeesError) {
-    console.error("Error fetching employee emails:", employeesError);
-  } else {
-    for (const emp of employees ?? []) {
-      if (emp.is_active === false) continue;
-      const email = (emp.work_email || emp.private_email || "").trim();
-      if (email.includes("@")) emails.add(email.toLowerCase());
-    }
-  }
-
-  // Fallback: auth emails (paginated — listUsers defaults to only 50 users)
-  if (emails.size === 0) {
-    for (let page = 1; page <= 20; page++) {
-      const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 200 });
-      if (error) {
-        console.error("Error fetching users:", error);
-        break;
-      }
-      const users = data?.users ?? [];
-      for (const u of users) {
-        if (userIds.includes(u.id) && u.email) emails.add(u.email.toLowerCase());
-      }
-      if (users.length < 200) break;
-    }
-  }
-
-  const recipientEmails = [...emails];
-  console.log("Found recipients:", recipientEmails);
-  return recipientEmails;
-}
 
 
 function formatLeadershipInterest(interest: string): string {
