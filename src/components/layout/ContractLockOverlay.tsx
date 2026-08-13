@@ -40,7 +40,7 @@ export function ContractLockOverlay({ contractId, contractTitle, lockDays = 5 }:
           </div>
           <CardTitle className="text-xl">Kontrakt afventer underskrift</CardTitle>
           <CardDescription className="text-base">
-            Du har en kontrakt der har afventet underskrift i mere end 5 dage. 
+            Du har en kontrakt der har afventet underskrift i mere end {lockDays} dage. 
             Du skal underskrive kontrakten før du kan fortsætte med at bruge systemet.
           </CardDescription>
         </CardHeader>
