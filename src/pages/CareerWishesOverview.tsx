@@ -240,7 +240,11 @@ export default function CareerWishesOverview() {
                   {filteredWishes?.map((wish) => {
                     const isReviewed = !!wish.reviewed_at;
                     return (
-                      <TableRow key={wish.id} className={isReviewed ? "opacity-60" : ""}>
+                      <TableRow
+                        key={wish.id}
+                        onClick={() => setSelectedWishId(wish.id)}
+                        className={`cursor-pointer hover:bg-muted/50 ${isReviewed ? "opacity-60" : ""}`}
+                      >
                         <TableCell>
                           <Button
                             variant="ghost"
