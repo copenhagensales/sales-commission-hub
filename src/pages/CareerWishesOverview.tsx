@@ -71,6 +71,32 @@ export default function CareerWishesOverview() {
     },
   });
 
+  const acknowledgeMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { data, error } = await supabase.functions.invoke(
+        "send-career-wish-acknowledgement",
+        { body: { wishId: id } }
+      );
+      if (error) throw error;
+      if (data && (data as { error?: string }).error) {
+        throw new Error((data as { error?: string }).error);
+      }
+      return data as { recipient?: string };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["career-wishes-overview"] });
+      toast.success(
+        data?.recipient
+          ? `Bekræftelse sendt til ${data.recipient}`
+          : "Bekræftelse sendt"
+      );
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Kunne ikke sende bekræftelse");
+    },
+  });
+
+
   const filteredWishes = careerWishes?.filter((wish) => {
     const employeeName = `${wish.employee?.first_name} ${wish.employee?.last_name}`.toLowerCase();
     const matchesSearch = employeeName.includes(searchQuery.toLowerCase()) ||
