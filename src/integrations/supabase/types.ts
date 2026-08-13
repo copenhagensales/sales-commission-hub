@@ -2819,6 +2819,8 @@ export type Database = {
       }
       career_wishes: {
         Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
           created_at: string
           desired_team: string | null
           employee_id: string
@@ -2836,6 +2838,8 @@ export type Database = {
           wants_team_change: Database["public"]["Enums"]["team_change_wish"]
         }
         Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
           created_at?: string
           desired_team?: string | null
           employee_id: string
@@ -2853,6 +2857,8 @@ export type Database = {
           wants_team_change: Database["public"]["Enums"]["team_change_wish"]
         }
         Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
           created_at?: string
           desired_team?: string | null
           employee_id?: string
