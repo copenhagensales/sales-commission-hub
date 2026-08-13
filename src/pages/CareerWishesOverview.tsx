@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, Search, Users, Crown, Sparkles, CheckCircle, Circle } from "lucide-react";
+import { Loader2, Search, Users, Crown, Sparkles, CheckCircle, Circle, Mail, MailCheck } from "lucide-react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
@@ -70,6 +70,32 @@ export default function CareerWishesOverview() {
       toast.error("Kunne ikke opdatere status");
     },
   });
+
+  const acknowledgeMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { data, error } = await supabase.functions.invoke(
+        "send-career-wish-acknowledgement",
+        { body: { wishId: id } }
+      );
+      if (error) throw error;
+      if (data && (data as { error?: string }).error) {
+        throw new Error((data as { error?: string }).error);
+      }
+      return data as { recipient?: string };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["career-wishes-overview"] });
+      toast.success(
+        data?.recipient
+          ? `Bekræftelse sendt til ${data.recipient}`
+          : "Bekræftelse sendt"
+      );
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Kunne ikke sende bekræftelse");
+    },
+  });
+
 
   const filteredWishes = careerWishes?.filter((wish) => {
     const employeeName = `${wish.employee?.first_name} ${wish.employee?.last_name}`.toLowerCase();
@@ -237,6 +263,8 @@ export default function CareerWishesOverview() {
                     <TableHead>Type</TableHead>
                     <TableHead>Detaljer</TableHead>
                     <TableHead>Indsendt</TableHead>
+                    <TableHead>Bekræftelse</TableHead>
+
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -315,6 +343,30 @@ export default function CareerWishesOverview() {
                         <TableCell className="text-muted-foreground">
                           {format(new Date(wish.created_at), "d. MMM yyyy", { locale: da })}
                         </TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          {wish.acknowledged_at ? (
+                            <span className="flex items-center gap-1.5 text-xs text-green-600">
+                              <MailCheck className="h-4 w-4" />
+                              Sendt {format(new Date(wish.acknowledged_at), "d. MMM", { locale: da })}
+                            </span>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-2"
+                              onClick={() => acknowledgeMutation.mutate(wish.id)}
+                              disabled={acknowledgeMutation.isPending}
+                            >
+                              {acknowledgeMutation.isPending && acknowledgeMutation.variables === wish.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Mail className="h-4 w-4" />
+                              )}
+                              <span className="text-xs">Bekræft modtagelse</span>
+                            </Button>
+                          )}
+                        </TableCell>
+
                       </TableRow>
                     );
                   })}
@@ -394,6 +446,24 @@ export default function CareerWishesOverview() {
                 </div>
 
                 <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => acknowledgeMutation.mutate(selectedWish.id)}
+                    disabled={acknowledgeMutation.isPending || !!selectedWish.acknowledged_at}
+                    className="gap-2"
+                  >
+                    {acknowledgeMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : selectedWish.acknowledged_at ? (
+                      <MailCheck className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <Mail className="h-4 w-4" />
+                    )}
+                    {selectedWish.acknowledged_at
+                      ? `Bekræftelse sendt ${format(new Date(selectedWish.acknowledged_at), "d. MMM yyyy", { locale: da })}`
+                      : "Bekræft modtagelse (send tak-mail)"}
+                  </Button>
+
                   <Button
                     variant="outline"
                     onClick={() =>
