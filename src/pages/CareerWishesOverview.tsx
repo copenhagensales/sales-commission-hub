@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Loader2, Search, Users, Crown, Sparkles, CheckCircle, Circle } from "lucide-react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
@@ -27,6 +28,7 @@ export default function CareerWishesOverview() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<"all" | "team_change" | "leadership">("all");
   const [filterStatus, setFilterStatus] = useState<"all" | "pending" | "reviewed">("all");
+  const [selectedWishId, setSelectedWishId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -100,6 +102,9 @@ export default function CareerWishesOverview() {
     teamChange: careerWishes?.filter(w => w.wants_team_change === "yes").length || 0,
     leadership: careerWishes?.filter(w => w.leadership_interest === "yes" || w.leadership_interest === "maybe").length || 0,
   };
+
+  const selectedWish = careerWishes?.find((w) => w.id === selectedWishId) || null;
+
 
   return (
     <MainLayout>
@@ -238,12 +243,19 @@ export default function CareerWishesOverview() {
                   {filteredWishes?.map((wish) => {
                     const isReviewed = !!wish.reviewed_at;
                     return (
-                      <TableRow key={wish.id} className={isReviewed ? "opacity-60" : ""}>
+                      <TableRow
+                        key={wish.id}
+                        onClick={() => setSelectedWishId(wish.id)}
+                        className={`cursor-pointer hover:bg-muted/50 ${isReviewed ? "opacity-60" : ""}`}
+                      >
                         <TableCell>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => markAsReviewedMutation.mutate({ id: wish.id, reviewed: !isReviewed })}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              markAsReviewedMutation.mutate({ id: wish.id, reviewed: !isReviewed });
+                            }}
                             disabled={markAsReviewedMutation.isPending}
                             className="gap-2"
                           >
@@ -288,15 +300,16 @@ export default function CareerWishesOverview() {
                               <p><span className="text-muted-foreground">Rolle:</span> {leadershipRoleLabels[wish.leadership_role_type as LeadershipRoleType]}</p>
                             )}
                             {wish.team_change_motivation && (
-                              <p className="text-muted-foreground truncate" title={wish.team_change_motivation}>
+                              <p className="text-muted-foreground line-clamp-2">
                                 {wish.team_change_motivation}
                               </p>
                             )}
                             {wish.leadership_motivation && (
-                              <p className="text-muted-foreground truncate" title={wish.leadership_motivation}>
+                              <p className="text-muted-foreground line-clamp-2">
                                 {wish.leadership_motivation}
                               </p>
                             )}
+                            <p className="text-xs text-primary">Klik for at læse alt</p>
                           </div>
                         </TableCell>
                         <TableCell className="text-muted-foreground">
@@ -310,6 +323,106 @@ export default function CareerWishesOverview() {
             )}
           </CardContent>
         </Card>
+
+        <Dialog open={!!selectedWish} onOpenChange={(open) => !open && setSelectedWishId(null)}>
+          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+            {selectedWish && (
+              <>
+                <DialogHeader>
+                  <DialogTitle>
+                    {selectedWish.employee?.first_name} {selectedWish.employee?.last_name}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {selectedWish.employee?.department || selectedWish.employee?.job_title || "Ingen afdeling"}
+                    {" · "}
+                    Indsendt {format(new Date(selectedWish.created_at), "d. MMMM yyyy", { locale: da })}
+                    {" · "}
+                    {selectedWish.reviewed_at ? "Behandlet" : "Ubehandlet"}
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-5 text-sm">
+                  {selectedWish.wants_team_change === "yes" && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 font-medium">
+                        <Users className="h-4 w-4 text-blue-500" />
+                        Teamskifte
+                      </div>
+                      {selectedWish.desired_team && (
+                        <p>
+                          <span className="text-muted-foreground">Ønsket team:</span> {selectedWish.desired_team}
+                        </p>
+                      )}
+                      {selectedWish.team_change_motivation && (
+                        <p className="whitespace-pre-wrap text-muted-foreground">
+                          {selectedWish.team_change_motivation}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {(selectedWish.leadership_interest === "yes" || selectedWish.leadership_interest === "maybe") && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 font-medium">
+                        <Crown className="h-4 w-4 text-amber-500" />
+                        Ledelsesinteresse
+                      </div>
+                      <p>
+                        <span className="text-muted-foreground">Interesse:</span>{" "}
+                        {selectedWish.leadership_interest === "yes" ? "Ja" : "Måske"}
+                      </p>
+                      {selectedWish.leadership_role_type && (
+                        <p>
+                          <span className="text-muted-foreground">Rolle:</span>{" "}
+                          {leadershipRoleLabels[selectedWish.leadership_role_type as LeadershipRoleType]}
+                        </p>
+                      )}
+                      {selectedWish.leadership_motivation && (
+                        <p className="whitespace-pre-wrap text-muted-foreground">
+                          {selectedWish.leadership_motivation}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {selectedWish.other_comments && (
+                    <div className="space-y-2">
+                      <div className="font-medium">Øvrige kommentarer</div>
+                      <p className="whitespace-pre-wrap text-muted-foreground">{selectedWish.other_comments}</p>
+                    </div>
+                  )}
+                </div>
+
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      markAsReviewedMutation.mutate({
+                        id: selectedWish.id,
+                        reviewed: !selectedWish.reviewed_at,
+                      })
+                    }
+                    disabled={markAsReviewedMutation.isPending}
+                    className="gap-2"
+                  >
+                    {selectedWish.reviewed_at ? (
+                      <>
+                        <Circle className="h-4 w-4" />
+                        Markér som ubehandlet
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="h-4 w-4" />
+                        Markér som behandlet
+                      </>
+                    )}
+                  </Button>
+                  <Button onClick={() => setSelectedWishId(null)}>Luk</Button>
+                </DialogFooter>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </MainLayout>
   );
