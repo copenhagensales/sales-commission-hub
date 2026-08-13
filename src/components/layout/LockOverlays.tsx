@@ -74,6 +74,7 @@ export function LockOverlays({ children }: LockOverlaysProps) {
       <ContractLockOverlay 
         contractId={contract.id} 
         contractTitle={contract.title} 
+        lockDays={contractLockDays}
       />
     );
   }
