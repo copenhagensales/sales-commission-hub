@@ -28,6 +28,7 @@ export default function CareerWishesOverview() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<"all" | "team_change" | "leadership">("all");
   const [filterStatus, setFilterStatus] = useState<"all" | "pending" | "reviewed">("all");
+  const [selectedWishId, setSelectedWishId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
