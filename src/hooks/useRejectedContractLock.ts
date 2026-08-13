@@ -1,14 +1,22 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
+import { useContractPolicy } from "./useContractPolicy";
+import { usePermissions } from "./usePositionPermissions";
 
 export function useRejectedContractLock() {
   const { user } = useAuth();
+  const { rejectedLockEnabled, isLoading: policyLoading } = useContractPolicy();
+  const { isOwner } = usePermissions();
+
+  // Owners are never locked out — there must always be a way into the system.
+  const ruleActive = rejectedLockEnabled && !isOwner;
 
   const { data, isLoading } = useQuery({
     queryKey: ["rejected-contract-lock", user?.email],
     queryFn: async () => {
       if (!user?.email) return { isLocked: false, contract: null };
+
 
       const lowerEmail = user.email.toLowerCase();
 
