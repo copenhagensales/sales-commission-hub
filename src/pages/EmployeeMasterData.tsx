@@ -140,7 +140,7 @@ export default function EmployeeMasterData() {
   const [editingEmployee, setEditingEmployee] = useState<EmployeeMasterDataRecord | null>(null);
   const [formData, setFormData] = useState<NewEmployee>(defaultEmployee);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [createData, setCreateData] = useState({ first_name: "", last_name: "", email: "", password: "", job_title: "" });
+  const [createData, setCreateData] = useState({ first_name: "", last_name: "", email: "", password: "", job_title: "", employment_start_date: new Date().toISOString().split("T")[0] });
   const [creatingEmployee, setCreatingEmployee] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
@@ -568,7 +568,7 @@ export default function EmployeeMasterData() {
         .from("employee_master_data")
         .update({
           job_title: createData.job_title,
-          employment_start_date: new Date().toISOString().split("T")[0],
+          employment_start_date: createData.employment_start_date || new Date().toISOString().split("T")[0],
         })
         .eq("private_email", createData.email);
 
@@ -582,7 +582,7 @@ export default function EmployeeMasterData() {
         description: t("employees.toast.userCreated", { email: createData.email }) 
       });
       setCreateDialogOpen(false);
-      setCreateData({ first_name: "", last_name: "", email: "", password: "", job_title: "" });
+      setCreateData({ first_name: "", last_name: "", email: "", password: "", job_title: "", employment_start_date: new Date().toISOString().split("T")[0] });
     } catch (error) {
       console.error("Create error:", error);
       toast({
@@ -807,7 +807,7 @@ export default function EmployeeMasterData() {
                       <EmployeeExcelImport />
                       <Dialog open={createDialogOpen} onOpenChange={(open) => {
                         setCreateDialogOpen(open);
-                        if (!open) setCreateData({ first_name: "", last_name: "", email: "", password: "", job_title: "" });
+                        if (!open) setCreateData({ first_name: "", last_name: "", email: "", password: "", job_title: "", employment_start_date: new Date().toISOString().split("T")[0] });
                       }}>
                         <DialogTrigger asChild>
                           <Button size="sm"><Plus className="mr-2 h-4 w-4" /> {t("employees.create.button")}</Button>
@@ -839,6 +839,11 @@ export default function EmployeeMasterData() {
                                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                 </Button>
                               </div>
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Startdato</Label>
+                              <Input type="date" value={createData.employment_start_date} onChange={(e) => setCreateData({ ...createData, employment_start_date: e.target.value })} />
+                              <p className="text-xs text-muted-foreground">Sættes til i dag som standard — ret den hvis medarbejderen starter senere.</p>
                             </div>
                             <div className="space-y-2">
                               <Label>Stilling *</Label>
