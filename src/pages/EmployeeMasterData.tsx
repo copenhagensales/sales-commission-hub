@@ -899,7 +899,8 @@ export default function EmployeeMasterData() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredEmployees.map((employee) => (
+                        {(() => {
+                          const renderRow = (employee: EmployeeMasterDataRecord) => (
                           <TableRow key={employee.id} className="cursor-pointer hover:bg-muted/30 border-b border-border/30" onClick={() => navigate(`/employees/${employee.id}`)}>
                             <TableCell className="font-medium py-3">
                               <div className="flex items-center gap-2">
