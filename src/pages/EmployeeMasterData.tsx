@@ -152,6 +152,8 @@ export default function EmployeeMasterData() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [smsDialogOpen, setSmsDialogOpen] = useState(false);
   const [smsEmployee, setSmsEmployee] = useState<EmployeeMasterDataRecord | null>(null);
+  const [showFutureStarters, setShowFutureStarters] = useState(false);
+
   const { canEditEmployees, hasPermission, canSendEmployeeSms, position } = usePermissions();
   const currentUserPosition = position?.name;
   const { makeCall, isDeviceReady } = useTwilioDevice();
