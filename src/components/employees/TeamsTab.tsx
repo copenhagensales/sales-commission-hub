@@ -734,7 +734,8 @@ export function TeamsTab() {
                     <TableHead className="text-xs font-medium text-muted-foreground">Teamleder</TableHead>
                     <TableHead className="text-xs font-medium text-muted-foreground">Ass. Teamleder</TableHead>
                     <TableHead className="text-xs font-medium text-muted-foreground">Kunder</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Medarbejdere</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">Aktive nu</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">Starter senere</TableHead>
                     <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
