@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { notifyEmployeeDeactivated, snapshotEmployeeTeamId } from "@/lib/employees/deactivationNotify";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -122,6 +123,8 @@ export function EmployeeFormDialog({
   const queryClient = useQueryClient();
   const [formData, setFormData] = useState<NewEmployee>(defaultEmployee);
   const [autoSaving, setAutoSaving] = useState(false);
+  // Guards against sending more than one deactivation mail per dialog session
+  const deactivationNotifiedRef = useRef(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -174,6 +177,7 @@ export function EmployeeFormDialog({
       setOpenSections(["identity"]);
     }
     setLastSaved(null);
+    deactivationNotifiedRef.current = false;
   }, [editingEmployee, open]);
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -217,17 +221,30 @@ export function EmployeeFormDialog({
   // Auto-save function for editing existing employee
   const autoSaveEmployee = useCallback(async () => {
     if (!editingEmployee) return;
-    
+
     setAutoSaving(true);
     try {
+      const isDeactivating = editingEmployee.is_active && formData.is_active === false;
+      const teamId = isDeactivating ? await snapshotEmployeeTeamId(editingEmployee.id) : null;
+
       const { error } = await supabase
         .from("employee_master_data")
         .update(formData)
         .eq("id", editingEmployee.id);
-      
+
       if (!error) {
         setLastSaved(new Date());
         queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
+
+        // Same notification path as the employee lists (server resolves recipients)
+        if (isDeactivating && !deactivationNotifiedRef.current) {
+          deactivationNotifiedRef.current = true;
+          await notifyEmployeeDeactivated({
+            employeeId: editingEmployee.id,
+            source: "employee-form",
+            teamId,
+          });
+        }
       }
     } catch (err) {
       console.error("Auto-save error:", err);
@@ -235,6 +252,7 @@ export function EmployeeFormDialog({
       setAutoSaving(false);
     }
   }, [editingEmployee, formData, queryClient]);
+
 
   // Debounced auto-save when form changes
   useEffect(() => {
@@ -256,15 +274,28 @@ export function EmployeeFormDialog({
     setSaving(true);
     try {
       if (editingEmployee) {
+        const isDeactivating = editingEmployee.is_active && formData.is_active === false;
+        const teamId = isDeactivating ? await snapshotEmployeeTeamId(editingEmployee.id) : null;
+
         const { error } = await supabase
           .from("employee_master_data")
           .update(formData)
           .eq("id", editingEmployee.id);
         if (error) throw error;
+
+        if (isDeactivating && !deactivationNotifiedRef.current) {
+          deactivationNotifiedRef.current = true;
+          await notifyEmployeeDeactivated({
+            employeeId: editingEmployee.id,
+            source: "employee-form",
+            teamId,
+          });
+        }
       } else {
         const { error } = await supabase.from("employee_master_data").insert(formData);
         if (error) throw error;
       }
+
       
       queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
       toast({ title: editingEmployee ? t("employees.toast.updated") : t("employees.toast.created") });

@@ -4834,6 +4834,69 @@ export type Database = {
         }
         Relationships: []
       }
+      deactivation_notification_settings: {
+        Row: {
+          created_at: string
+          email_body: string
+          email_subject: string
+          excluded_emails: string[]
+          extra_recipients: string[]
+          followup_delay_hours: number
+          followup_enabled: boolean
+          followup_exclude_owners: boolean
+          id: string
+          include_assistant_leaders: boolean
+          include_owners: boolean
+          include_recruitment: boolean
+          include_team_leaders: boolean
+          is_enabled: boolean
+          is_singleton: boolean
+          recipient_job_titles: string[]
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          email_body?: string
+          email_subject?: string
+          excluded_emails?: string[]
+          extra_recipients?: string[]
+          followup_delay_hours?: number
+          followup_enabled?: boolean
+          followup_exclude_owners?: boolean
+          id?: string
+          include_assistant_leaders?: boolean
+          include_owners?: boolean
+          include_recruitment?: boolean
+          include_team_leaders?: boolean
+          is_enabled?: boolean
+          is_singleton?: boolean
+          recipient_job_titles?: string[]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          email_body?: string
+          email_subject?: string
+          excluded_emails?: string[]
+          extra_recipients?: string[]
+          followup_delay_hours?: number
+          followup_enabled?: boolean
+          followup_exclude_owners?: boolean
+          id?: string
+          include_assistant_leaders?: boolean
+          include_owners?: boolean
+          include_recruitment?: boolean
+          include_team_leaders?: boolean
+          is_enabled?: boolean
+          is_singleton?: boolean
+          recipient_job_titles?: string[]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       deactivation_reminder_config: {
         Row: {
           created_at: string
@@ -4879,29 +4942,47 @@ export type Database = {
         Row: {
           created_at: string
           employee_id: string
+          error_message: string | null
           followup_sent_at: string | null
           id: string
           initial_sent_at: string
+          is_test: boolean
           recipients: string[]
+          source: string | null
+          status: string
+          subject: string | null
           team_id: string | null
+          triggered_by: string | null
         }
         Insert: {
           created_at?: string
           employee_id: string
+          error_message?: string | null
           followup_sent_at?: string | null
           id?: string
           initial_sent_at?: string
+          is_test?: boolean
           recipients: string[]
+          source?: string | null
+          status?: string
+          subject?: string | null
           team_id?: string | null
+          triggered_by?: string | null
         }
         Update: {
           created_at?: string
           employee_id?: string
+          error_message?: string | null
           followup_sent_at?: string | null
           id?: string
           initial_sent_at?: string
+          is_test?: boolean
           recipients?: string[]
+          source?: string | null
+          status?: string
+          subject?: string | null
           team_id?: string | null
+          triggered_by?: string | null
         }
         Relationships: [
           {

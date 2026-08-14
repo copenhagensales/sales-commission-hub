@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Search, Users, Phone, MessageSquare, Loader2, ArrowRight, Check, FileText, Trash2, Eye, EyeOff, Mail, UserCheck, UserPlus, Send, ArrowRightLeft, Clock, X, UserX, Camera, User, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Briefcase, Shield, Network, Link2 } from "lucide-react";
+import { Plus, Pencil, Search, Users, Phone, MessageSquare, Loader2, ArrowRight, Check, FileText, Trash2, Eye, EyeOff, Mail, UserCheck, UserPlus, Send, ArrowRightLeft, Clock, X, UserX, Camera, User, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Briefcase, Shield, Network, Link2, BellRing } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -23,6 +23,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { EmployeeExcelImport } from "@/components/employees/EmployeeExcelImport";
 import { DialerMappingTab } from "@/components/employees/DialerMappingTab";
+import { DeactivationSettingsTab } from "@/components/employees/DeactivationSettingsTab";
 import { TeamsTab } from "@/components/employees/TeamsTab";
 import { PositionsTab } from "@/components/employees/PositionsTab";
 import { StaffEmployeesTab } from "@/components/employees/StaffEmployeesTab";
@@ -34,6 +35,7 @@ import { useTwilioDevice } from "@/hooks/useTwilioDevice";
 import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
 import { usePrecomputedKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
 import { useHeadcountCurrent } from "@/hooks/useHeadcount";
+import { notifyEmployeeDeactivated, snapshotEmployeeTeamId } from "@/lib/employees/deactivationNotify";
 
 
 
@@ -458,25 +460,8 @@ export default function EmployeeMasterData() {
 
       // IMPORTANT: if deactivating, snapshot team membership BEFORE the update.
       // A DB trigger removes team_members as soon as is_active flips to false.
-      let teamId: string | null | undefined;
-      let team:
-        | { id: string; name: string; team_leader_id: string | null; assistant_team_leader_id: string | null }
-        | null
-        | undefined;
-      if (!is_active) {
-        const { data: teamMembership } = await supabase
-          .from("team_members")
-          .select("team_id, teams(id, name, team_leader_id, assistant_team_leader_id)")
-          .eq("employee_id", id)
-          .maybeSingle();
+      const teamId = is_active ? null : await snapshotEmployeeTeamId(id);
 
-        teamId = teamMembership?.team_id;
-        team = teamMembership?.teams as
-          | { id: string; name: string; team_leader_id: string | null; assistant_team_leader_id: string | null }
-          | null
-          | undefined;
-      }
-      
       const { error, data } = await supabase
         .from("employee_master_data")
         .update(updateData)
@@ -487,80 +472,12 @@ export default function EmployeeMasterData() {
         throw new Error("Du har ikke rettighed til at ændre denne medarbejder");
       }
 
-      // If deactivating, send deactivation reminder
+      // Notification recipients + template are resolved server-side from settings
       if (!is_active) {
-        let manualRecipients: string[] = [];
-        const autoRecipientEmails: string[] = [];
-
-        // Only fetch team-specific config and leaders if employee has a team
-        if (teamId) {
-          // Get config for this team (manually configured recipients)
-          const { data: config } = await supabase
-            .from("deactivation_reminder_config")
-            .select("recipients")
-            .eq("team_id", teamId)
-            .single();
-
-          manualRecipients = config?.recipients 
-            ? config.recipients.split(",").map((r: string) => r.trim()).filter((r: string) => r)
-            : [];
-
-          // Get team leader and assistant team leader work emails
-          const leaderIds = [team?.team_leader_id, team?.assistant_team_leader_id].filter(Boolean) as string[];
-          if (leaderIds.length > 0) {
-            const { data: leaders } = await supabase
-              .from("employee_master_data")
-              .select("work_email")
-              .in("id", leaderIds);
-            
-            (leaders || []).forEach(l => {
-              if (l.work_email) autoRecipientEmails.push(l.work_email);
-            });
-          }
-        }
-
-        // Always get recruitment responsible employees (only work_email)
-        const { data: recruiters } = await supabase
-          .from("employee_master_data")
-          .select("work_email")
-          .eq("job_title", "Rekruttering")
-          .eq("is_active", true);
-        
-        (recruiters || []).forEach(r => {
-          if (r.work_email) autoRecipientEmails.push(r.work_email);
-        });
-
-        // Always get owners (only work_email) - exclude Angel
-        const { data: owners } = await supabase
-          .from("employee_master_data")
-          .select("work_email")
-          .eq("job_title", "Ejer")
-          .eq("is_active", true)
-          .neq("first_name", "Angel");
-        
-        const ownerEmails: string[] = [];
-        (owners || []).forEach(o => {
-          if (o.work_email) ownerEmails.push(o.work_email);
-        });
-
-        // Combine all recipients and remove duplicates
-        const allRecipients = [...new Set([...manualRecipients, ...autoRecipientEmails, ...ownerEmails])];
-
-        if (allRecipients.length > 0) {
-          await supabase.functions.invoke("send-deactivation-reminder", {
-            body: {
-              employee_id: id,
-              employee_name: `${employee?.first_name} ${employee?.last_name}`,
-              employee_email: employee?.work_email || "",
-              team_id: teamId || null,
-              team_name: team?.name || "Ingen team",
-              recipients: allRecipients,
-              is_followup: false,
-            },
-          });
-        }
+        await notifyEmployeeDeactivated({ employeeId: id, source: "employee-list", teamId });
       }
     },
+
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
       setDeactivatingEmployee(null);
@@ -781,6 +698,7 @@ export default function EmployeeMasterData() {
       { value: "positions", label: t("employees.tabs.positions"), permissionKey: "tab_employees_positions", icon: Briefcase },
       { value: "permissions", label: t("employees.tabs.permissions"), permissionKey: "tab_employees_permissions", icon: Shield },
       { value: "dialer-mapping", label: t("employees.tabs.dialerMapping"), permissionKey: "tab_employees_dialer_mapping", icon: Link2 },
+      { value: "deactivation", label: "Deaktivering", permissionKey: "tab_employees_deactivation", icon: BellRing },
     ];
     return allSections.filter(section => canView(section.permissionKey));
   }, [t, activeCount, staffCount, canView]);
@@ -1075,6 +993,11 @@ export default function EmployeeMasterData() {
                 <DialerMappingTab />
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Deactivation notification settings */}
+          <TabsContent value="deactivation" className="mt-4">
+            <DeactivationSettingsTab canEdit={canEditPermission('tab_employees_deactivation')} />
           </TabsContent>
         </Tabs>
 

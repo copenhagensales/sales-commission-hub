@@ -37,6 +37,7 @@ import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { useTwilioDevice } from "@/hooks/useTwilioDevice";
 import { isSensitiveField, logSensitiveAccess } from "@/hooks/useLogSensitiveAccess";
+import { notifyEmployeeDeactivated, snapshotEmployeeTeamId } from "@/lib/employees/deactivationNotify";
 interface EmployeeMasterDataRecord {
   id: string;
   first_name: string;
@@ -459,23 +460,41 @@ export default function EmployeeDetail() {
             }
           });
       } else {
-        // Deactivating: set end date
-        supabase
-          .from("employee_master_data")
-          .update({ is_active: false, employment_end_date: today })
-          .eq("id", id)
-          .then(({ error }) => {
-            if (error) {
-              toast({ title: "Fejl", description: error.message, variant: "destructive" });
-            } else {
-              queryClient.invalidateQueries({ queryKey: ["employee-detail", id] });
-              queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
-              toast({ title: "Medarbejder deaktiveret" });
-            }
+        // Deactivating: snapshot team BEFORE update (trigger clears team_members),
+        // then notify via the shared service (recipients resolved server-side)
+        void (async () => {
+          const teamId = await snapshotEmployeeTeamId(id!);
+          const { error } = await supabase
+            .from("employee_master_data")
+            .update({ is_active: false, employment_end_date: today })
+            .eq("id", id);
+
+          if (error) {
+            toast({ title: "Fejl", description: error.message, variant: "destructive" });
+            return;
+          }
+
+          queryClient.invalidateQueries({ queryKey: ["employee-detail", id] });
+          queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
+          toast({ title: "Medarbejder deaktiveret" });
+
+          const result = await notifyEmployeeDeactivated({
+            employeeId: id!,
+            source: "employee-profile",
+            teamId,
           });
+          if (!result.success && result.reason) {
+            toast({
+              title: "Deaktiveringsmail blev ikke sendt",
+              description: result.reason,
+              variant: "destructive",
+            });
+          }
+        })();
       }
       return;
     }
+
     
     // Log access to sensitive fields
     if (isSensitiveField(field) && id) {
