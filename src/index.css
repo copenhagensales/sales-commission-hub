@@ -686,14 +686,21 @@
   width: 100%;
   margin: 2rem 0 1.25rem;
   border-collapse: collapse;
-  table-layout: fixed;
+  table-layout: auto;
   border: 0;
   page-break-inside: avoid;
+}
+
+.contract-paper .contract-body colgroup col {
+  width: auto !important;
+  min-width: 0 !important;
 }
 
 .contract-paper .contract-body td,
 .contract-paper .contract-body th {
   border: 0;
+  min-width: 0;
+  height: 2.6rem;
   border-bottom: 1px solid rgb(229 229 229);
   padding: 0.85rem 1rem 0.6rem;
   vertical-align: bottom;
