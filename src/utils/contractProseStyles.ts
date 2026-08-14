@@ -6,22 +6,22 @@
 
 const BASE_PROSE = `
   prose-base
-  text-[15px] leading-[1.6]
+  text-[15.5px] leading-[1.75]
 
   /* Document Title */
-  prose-h1:text-xl prose-h1:font-bold prose-h1:text-center
-  prose-h1:tracking-[0.15em] prose-h1:uppercase prose-h1:mb-10 prose-h1:mt-4
+  prose-h1:text-lg md:prose-h1:text-xl prose-h1:font-semibold prose-h1:text-center
+  prose-h1:tracking-[0.22em] prose-h1:uppercase prose-h1:mb-12 prose-h1:mt-6
   prose-h1:pb-6 prose-h1:border-b
 
   /* Section Titles */
-  prose-h2:text-base prose-h2:font-bold
-  prose-h2:tracking-wide prose-h2:uppercase
-  prose-h2:mt-10 prose-h2:mb-4 prose-h2:pt-5
+  prose-h2:text-[15.5px] prose-h2:font-semibold
+  prose-h2:tracking-[0.04em]
+  prose-h2:mt-12 prose-h2:mb-5 prose-h2:pt-6
   prose-h2:border-t
   prose-h2:scroll-mt-24
 
   /* Subsection Titles */
-  prose-h3:text-[15px] prose-h3:font-semibold
+  prose-h3:text-[15.5px] prose-h3:font-semibold
   prose-h3:mt-6 prose-h3:mb-3
 
   prose-h4:text-sm prose-h4:font-semibold
@@ -29,15 +29,15 @@ const BASE_PROSE = `
   prose-h4:mt-5 prose-h4:mb-2
 
   /* Paragraphs */
-  prose-p:leading-[1.6] prose-p:my-0.5
-  prose-p:text-[15px]
+  prose-p:leading-[1.75] prose-p:my-2
+  prose-p:text-[15.5px]
 
   prose-strong:font-semibold
 
   /* Lists */
   prose-ul:my-5 prose-ul:pl-5 prose-ul:space-y-2
   prose-ol:my-5 prose-ol:pl-0 prose-ol:space-y-3 prose-ol:list-none
-  prose-li:text-[15px] prose-li:leading-[1.7]
+  prose-li:text-[15.5px] prose-li:leading-[1.75]
   prose-li:my-0
 
   /* Nested list indentation */
@@ -46,9 +46,9 @@ const BASE_PROSE = `
 
   /* Line breaks & empty paragraphs */
   [&_br]:block
-  [&_p:empty]:min-h-[1em]
+  [&_p:empty]:min-h-[0.75em]
   [&_p:has(br:only-child)]:min-h-[1em]
-  [&_p+p]:mt-1
+  [&_p+p]:mt-2
 
   /* Horizontal rules */
   [&_hr]:my-10
