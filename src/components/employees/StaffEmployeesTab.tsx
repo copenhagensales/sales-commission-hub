@@ -20,6 +20,7 @@ import { usePermissions } from "@/hooks/usePositionPermissions";
 import { useTwilioDeviceContext } from "@/contexts/TwilioDeviceContext";
 import { SendEmployeeSmsDialog } from "@/components/employees/SendEmployeeSmsDialog";
 import { notifyEmployeeDeactivated, snapshotEmployeeTeamId } from "@/lib/employees/deactivationNotify";
+import { ActivateEmployeeDialog } from "@/components/employees/ActivateEmployeeDialog";
 
 export function StaffEmployeesTab() {
   const { t } = useTranslation();
@@ -39,6 +40,7 @@ export function StaffEmployeesTab() {
   const [moveToRegularId, setMoveToRegularId] = useState<string | null>(null);
   const [sendingResetTo, setSendingResetTo] = useState<string | null>(null);
   const [deactivatingEmployee, setDeactivatingEmployee] = useState<StaffEmployee | null>(null);
+  const [activatingEmployee, setActivatingEmployee] = useState<StaffEmployee | null>(null);
   const [smsDialogOpen, setSmsDialogOpen] = useState(false);
   const [smsEmployee, setSmsEmployee] = useState<StaffEmployee | null>(null);
   const { canEditEmployees, canSendEmployeeSms, hasPermission, position } = usePermissions();
@@ -164,10 +166,9 @@ export function StaffEmployeesTab() {
 
   const toggleActiveMutation = useMutation({
     mutationFn: async ({ id, is_active }: { id: string; is_active: boolean; employee?: StaffEmployee }) => {
+      // Activation goes through ActivateEmployeeDialog (explicit start date).
       const today = new Date().toISOString().split("T")[0];
-      const updateData = is_active
-        ? { is_active, employment_start_date: today, employment_end_date: null }
-        : { is_active, employment_end_date: today };
+      const updateData = { is_active, employment_end_date: today };
 
       // IMPORTANT: if deactivating, snapshot team membership BEFORE the update.
       // A DB trigger removes team_members as soon as is_active flips to false.
@@ -666,7 +667,7 @@ export function StaffEmployeesTab() {
                           if (!checked) {
                             setDeactivatingEmployee(employee);
                           } else {
-                            toggleActiveMutation.mutate({ id: employee.id, is_active: true, employee });
+                            setActivatingEmployee(employee);
                           }
                         }}
                       />
@@ -781,6 +782,16 @@ export function StaffEmployeesTab() {
       </div>
 
       {/* Deactivation confirmation dialog */}
+      <ActivateEmployeeDialog
+        employee={activatingEmployee}
+        open={!!activatingEmployee}
+        onOpenChange={(open) => !open && setActivatingEmployee(null)}
+        onActivated={() => {
+          queryClient.invalidateQueries({ queryKey: ["staff-employees"] });
+          queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
+        }}
+      />
+
       <AlertDialog open={!!deactivatingEmployee} onOpenChange={(open) => !open && setDeactivatingEmployee(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

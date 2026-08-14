@@ -36,6 +36,7 @@ import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
 import { usePrecomputedKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
 import { useHeadcountCurrent } from "@/hooks/useHeadcount";
 import { notifyEmployeeDeactivated, snapshotEmployeeTeamId } from "@/lib/employees/deactivationNotify";
+import { ActivateEmployeeDialog } from "@/components/employees/ActivateEmployeeDialog";
 
 
 
@@ -133,12 +134,13 @@ export default function EmployeeMasterData() {
   const [sortColumn, setSortColumn] = useState<"name" | "position" | "team">("name");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [deactivatingEmployee, setDeactivatingEmployee] = useState<EmployeeMasterDataRecord | null>(null);
+  const [activatingEmployee, setActivatingEmployee] = useState<EmployeeMasterDataRecord | null>(null);
   const searchInputRef = React.useRef<HTMLInputElement>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<EmployeeMasterDataRecord | null>(null);
   const [formData, setFormData] = useState<NewEmployee>(defaultEmployee);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [createData, setCreateData] = useState({ first_name: "", last_name: "", email: "", password: "", job_title: "" });
+  const [createData, setCreateData] = useState({ first_name: "", last_name: "", email: "", password: "", job_title: "", employment_start_date: new Date().toISOString().split("T")[0] });
   const [creatingEmployee, setCreatingEmployee] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
@@ -453,10 +455,9 @@ export default function EmployeeMasterData() {
 
   const toggleActiveMutation = useMutation({
     mutationFn: async ({ id, is_active, employee }: { id: string; is_active: boolean; employee?: EmployeeMasterDataRecord }) => {
+      // Activation goes through ActivateEmployeeDialog (explicit start date).
       const today = new Date().toISOString().split("T")[0];
-      const updateData = is_active
-        ? { is_active, employment_start_date: today, employment_end_date: null }
-        : { is_active, employment_end_date: today };
+      const updateData = { is_active, employment_end_date: today };
 
       // IMPORTANT: if deactivating, snapshot team membership BEFORE the update.
       // A DB trigger removes team_members as soon as is_active flips to false.
@@ -567,7 +568,7 @@ export default function EmployeeMasterData() {
         .from("employee_master_data")
         .update({
           job_title: createData.job_title,
-          employment_start_date: new Date().toISOString().split("T")[0],
+          employment_start_date: createData.employment_start_date || new Date().toISOString().split("T")[0],
         })
         .eq("private_email", createData.email);
 
@@ -581,7 +582,7 @@ export default function EmployeeMasterData() {
         description: t("employees.toast.userCreated", { email: createData.email }) 
       });
       setCreateDialogOpen(false);
-      setCreateData({ first_name: "", last_name: "", email: "", password: "", job_title: "" });
+      setCreateData({ first_name: "", last_name: "", email: "", password: "", job_title: "", employment_start_date: new Date().toISOString().split("T")[0] });
     } catch (error) {
       console.error("Create error:", error);
       toast({
@@ -806,7 +807,7 @@ export default function EmployeeMasterData() {
                       <EmployeeExcelImport />
                       <Dialog open={createDialogOpen} onOpenChange={(open) => {
                         setCreateDialogOpen(open);
-                        if (!open) setCreateData({ first_name: "", last_name: "", email: "", password: "", job_title: "" });
+                        if (!open) setCreateData({ first_name: "", last_name: "", email: "", password: "", job_title: "", employment_start_date: new Date().toISOString().split("T")[0] });
                       }}>
                         <DialogTrigger asChild>
                           <Button size="sm"><Plus className="mr-2 h-4 w-4" /> {t("employees.create.button")}</Button>
@@ -838,6 +839,11 @@ export default function EmployeeMasterData() {
                                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                 </Button>
                               </div>
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Startdato</Label>
+                              <Input type="date" value={createData.employment_start_date} onChange={(e) => setCreateData({ ...createData, employment_start_date: e.target.value })} />
+                              <p className="text-xs text-muted-foreground">Sættes til i dag som standard — ret den hvis medarbejderen starter senere.</p>
                             </div>
                             <div className="space-y-2">
                               <Label>Stilling *</Label>
@@ -917,7 +923,7 @@ export default function EmployeeMasterData() {
                             <TableCell className="py-3 text-sm">{employee.job_title || <span className="text-muted-foreground/50">-</span>}</TableCell>
                             <TableCell className="py-3">{getEmployeeTeams(employee.id) ? <Badge variant="secondary" className="text-xs font-normal">{getEmployeeTeams(employee.id)}</Badge> : <span className="text-muted-foreground/50">-</span>}</TableCell>
                             <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
-                              <Switch checked={employee.is_active} disabled={toggleActiveMutation.isPending || !canEditPermission('action_employee_deactivate')} onCheckedChange={(checked) => { if (!checked) { setDeactivatingEmployee(employee); } else { toggleActiveMutation.mutate({ id: employee.id, is_active: true, employee }); }}} />
+                              <Switch checked={employee.is_active} disabled={toggleActiveMutation.isPending || !canEditPermission('action_employee_deactivate')} onCheckedChange={(checked) => { if (!checked) { setDeactivatingEmployee(employee); } else { setActivatingEmployee(employee); }}} />
                             </TableCell>
                             <TableCell className="py-3">
                               <div className="flex items-center gap-0.5">
@@ -1048,6 +1054,13 @@ export default function EmployeeMasterData() {
         </AlertDialog>
 
         {/* Deactivation confirmation dialog */}
+        <ActivateEmployeeDialog
+          employee={activatingEmployee}
+          open={!!activatingEmployee}
+          onOpenChange={(open) => !open && setActivatingEmployee(null)}
+          onActivated={() => queryClient.invalidateQueries({ queryKey: ["employee-master-data"] })}
+        />
+
         <AlertDialog open={!!deactivatingEmployee} onOpenChange={(open) => !open && setDeactivatingEmployee(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
