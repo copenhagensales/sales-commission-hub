@@ -682,6 +682,11 @@ export default function EmployeeMasterData() {
     !!e.is_active && !!e.employment_start_date && e.employment_start_date > new Date().toISOString().split("T")[0];
   const localNotStarted = employees.filter(isNotStartedYet).length;
 
+  // Split listen: dem der er i gang i dag vs. dem der først starter senere
+  const currentEmployees = filteredEmployees.filter((e) => !isNotStartedYet(e));
+  const futureEmployees = filteredEmployees.filter((e) => isNotStartedYet(e));
+
+
   const localActiveStarted = employees.filter((e) => e.is_active).length - localNotStarted;
   const notStartedYetCount = headcount?.pendingStarts ?? localNotStarted;
   const activeCount = headcount?.activeStartedExclStaff ?? Math.max(0, localActiveStarted);
