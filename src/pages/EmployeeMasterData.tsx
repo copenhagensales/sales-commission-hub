@@ -36,6 +36,7 @@ import { useUnifiedPermissions } from "@/hooks/useUnifiedPermissions";
 import { usePrecomputedKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
 import { useHeadcountCurrent } from "@/hooks/useHeadcount";
 import { notifyEmployeeDeactivated, snapshotEmployeeTeamId } from "@/lib/employees/deactivationNotify";
+import { ActivateEmployeeDialog } from "@/components/employees/ActivateEmployeeDialog";
 
 
 
@@ -133,6 +134,7 @@ export default function EmployeeMasterData() {
   const [sortColumn, setSortColumn] = useState<"name" | "position" | "team">("name");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [deactivatingEmployee, setDeactivatingEmployee] = useState<EmployeeMasterDataRecord | null>(null);
+  const [activatingEmployee, setActivatingEmployee] = useState<EmployeeMasterDataRecord | null>(null);
   const searchInputRef = React.useRef<HTMLInputElement>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<EmployeeMasterDataRecord | null>(null);
@@ -1047,6 +1049,13 @@ export default function EmployeeMasterData() {
         </AlertDialog>
 
         {/* Deactivation confirmation dialog */}
+        <ActivateEmployeeDialog
+          employee={activatingEmployee}
+          open={!!activatingEmployee}
+          onOpenChange={(open) => !open && setActivatingEmployee(null)}
+          onActivated={() => queryClient.invalidateQueries({ queryKey: ["employee-master-data"] })}
+        />
+
         <AlertDialog open={!!deactivatingEmployee} onOpenChange={(open) => !open && setDeactivatingEmployee(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
