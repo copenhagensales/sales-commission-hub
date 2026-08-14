@@ -953,7 +953,31 @@ export default function EmployeeMasterData() {
                               </div>
                             </TableCell>
                           </TableRow>
-                        ))}
+                          );
+                          return (
+                            <>
+                              {currentEmployees.map(renderRow)}
+                              {futureEmployees.length > 0 && (
+                                <TableRow
+                                  className="cursor-pointer hover:bg-muted/40 bg-muted/20 border-b border-border/30"
+                                  onClick={() => setShowFutureStarters((v) => !v)}
+                                >
+                                  <TableCell colSpan={5} className="py-3">
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                      {showFutureStarters ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                      <span>Starter senere</span>
+                                      <Badge variant="outline" className="text-xs font-normal border-amber-500/40 text-amber-600 dark:text-amber-400">
+                                        {futureEmployees.length}
+                                      </Badge>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                              {showFutureStarters && futureEmployees.map(renderRow)}
+                            </>
+                          );
+                        })()}
+
                         {filteredEmployees.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">{t("employees.table.noEmployeesFound")}</TableCell></TableRow>}
                       </TableBody>
                     </Table>
