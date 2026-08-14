@@ -312,6 +312,19 @@ serve(async (req) => {
         if (full) byName.set(full, { name: full, email: activeEmail });
       }
 
+      // Eksplicitte alias for kendte stavefejl i Adversus-filen. Nøgle = navnet som
+      // det står i filen, værdi = navnet som det står i Stork. Aliaset bruges kun når
+      // det normale navneopslag ikke finder et match, og kun hvis mål-navnet tilhører
+      // en aktiv medarbejder.
+      const NAME_ALIASES: Record<string, string> = {
+        "chanell gorel": "chanell gorell",
+      };
+      for (const [fileName, storkName] of Object.entries(NAME_ALIASES)) {
+        const aliasKey = norm(fileName);
+        const target = byName.get(norm(storkName));
+        if (target && !byName.has(aliasKey)) byName.set(aliasKey, target);
+      }
+
       const errors: Array<{ reason: string; seller: string; subject_id: string }> = [];
       const seenPhones = new Set<string>();
       const validIndices: number[] = [];
