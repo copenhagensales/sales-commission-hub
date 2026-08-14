@@ -450,21 +450,8 @@ export default function EmployeeDetail() {
         return;
       }
 
-      if (false) {
-        supabase
-          .from("employee_master_data")
-          .update({ is_active: true, employment_end_date: null })
-          .eq("id", id)
-          .then(({ error }) => {
-            if (error) {
-              toast({ title: "Fejl", description: error.message, variant: "destructive" });
-            } else {
-              queryClient.invalidateQueries({ queryKey: ["employee-detail", id] });
-              queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
-              toast({ title: "Medarbejder genaktiveret" });
-            }
-          });
-      } else {
+      {
+
         // Deactivating: snapshot team BEFORE update (trigger clears team_members),
         // then notify via the shared service (recipients resolved server-side)
         void (async () => {
