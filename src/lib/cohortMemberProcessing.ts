@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { ensureTeamMembership } from "@/lib/employees/ensureTeamMembership";
 
 export interface ProcessableCohortMember {
   id: string;
@@ -68,6 +69,12 @@ export async function processCohortMember(
       .single();
 
     if (empError) throw empError;
+
+    // 1b. Team membership (team_members is the authoritative source of truth —
+    // employee_master_data.team_id above is only the planned team)
+    if (cohort.team_id) {
+      await ensureTeamMembership({ employeeId: employee.id, teamId: cohort.team_id });
+    }
 
     // 2. Link cohort_members row back to the new employee
     const { error: memberError } = await supabase
