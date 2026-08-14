@@ -445,10 +445,15 @@ export default function EmployeeDetail() {
       const isActive = value as boolean;
       
       if (isActive) {
-        // Reactivating: set new start date, clear end date
+        // Activation asks for the start date (prefilled from the onboarding cohort)
+        setActivateDialogOpen(true);
+        return;
+      }
+
+      if (false) {
         supabase
           .from("employee_master_data")
-          .update({ is_active: true, employment_start_date: today, employment_end_date: null })
+          .update({ is_active: true, employment_end_date: null })
           .eq("id", id)
           .then(({ error }) => {
             if (error) {
