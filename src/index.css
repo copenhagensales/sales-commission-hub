@@ -655,3 +655,78 @@
   margin: 2.5rem 0;
   border-color: rgb(229 229 229);
 }
+
+/* Lists inside the document */
+.contract-paper .contract-body ul,
+.contract-paper .contract-body ol {
+  margin: 0.9rem 0;
+  padding-left: 1.6rem;
+}
+
+.contract-paper .contract-body li {
+  margin: 0.35rem 0;
+  line-height: 1.75;
+  color: rgb(38 38 38);
+}
+
+.contract-paper .contract-body li > p {
+  padding-left: 0;
+  text-indent: 0;
+  margin: 0;
+}
+
+.contract-paper .contract-body em {
+  color: rgb(64 64 64);
+}
+
+/* ── Tables (signature blocks, rate overviews) ─────────────────
+   Rendered as a formal signature/data block: no heavy grid, generous
+   room to sign, and no inherited clause hanging indent inside cells. */
+.contract-paper .contract-body table {
+  width: 100%;
+  margin: 2rem 0 1.25rem;
+  border-collapse: collapse;
+  table-layout: fixed;
+  border: 0;
+  page-break-inside: avoid;
+}
+
+.contract-paper .contract-body td,
+.contract-paper .contract-body th {
+  border: 0;
+  border-bottom: 1px solid rgb(229 229 229);
+  padding: 0.85rem 1rem 0.6rem;
+  vertical-align: bottom;
+  text-align: left;
+  font-size: 15px;
+  line-height: 1.6;
+  color: rgb(38 38 38);
+}
+
+.contract-paper .contract-body th {
+  font-weight: 600;
+  color: rgb(23 23 23);
+  border-bottom: 1px solid rgb(163 163 163);
+}
+
+.contract-paper .contract-body tr:last-child td {
+  border-bottom: 0;
+}
+
+/* Cell paragraphs must not inherit the clause hanging indent, which
+   otherwise pushes wrapped lines into a ragged, centred-looking block. */
+.contract-paper .contract-body td p,
+.contract-paper .contract-body th p {
+  padding-left: 0 !important;
+  text-indent: 0 !important;
+  margin: 0.15rem 0;
+  text-align: left !important;
+  line-height: 1.6;
+}
+
+/* Empty spacer cells act as signature space */
+.contract-paper .contract-body td:empty,
+.contract-paper .contract-body td p:empty {
+  min-height: 1.25rem;
+}
+
