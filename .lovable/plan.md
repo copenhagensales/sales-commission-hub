@@ -27,23 +27,29 @@ Startdatoen bliver ikke overskrevet af registreringslinket, men af **aktiverings
 ## Konsekvensen i praksis
 Oscar udfylder Startdato = næste mandag i dialogen → gemmes korrekt. Bagefter slår han medarbejderen aktiv via switchen i listen eller på medarbejderkortet → koden overskriver datoen med i dag. Derfor forsvinder den fremtidige startdato, og medarbejderen tælles som "på teamet nu" i stedet for "starter senere".
 
-## Beslutning der skal tages
+## Valgt løsning (B med hold-dato som udgangspunkt)
 
-Vælg hvordan aktivering skal opføre sig:
+Når en medarbejder aktiveres, åbnes en lille dialog "Startdato for ansættelsen?" med datoen forudfyldt:
 
-**A. Bevar altid eksisterende startdato**
-Aktivering sætter kun `is_active = true` og rydder slutdato. Startdato sættes kun hvis feltet er tomt (da falder den tilbage til i dag).
-Fordel: fremtidige opstarter bevares automatisk. Risiko: en genansat beholder sin gamle startdato, medmindre man selv retter den.
+1. Startdatoen fra det opstartshold medarbejderen er tilknyttet under Kommende opstarter (`onboarding_cohorts.start_date` via `cohort_members.employee_id`).
+2. Ellers den startdato der allerede står på medarbejderen.
+3. Ellers dagens dato.
 
-**B. Spørg ved aktivering**
-Aktivering åbner en lille dialog: "Startdato for ansættelsen?" med i dag som forudfyldt værdi.
-Fordel: eksplicit og korrekt både ved nyansættelse og genansættelse. Ulempe: et ekstra klik hver gang.
+Under datofeltet vises en note, når datoen kommer fra et hold, fx:
+"Datoen kommer fra opstartsholdet «Hold 18. august» under Kommende opstarter."
 
-**C. Bevar fremtidig dato, overskriv fortidig**
-Er den gemte startdato i fremtiden, bevares den. Er den i fortiden eller tom, sættes i dag (genansættelse).
-Fordel: ingen ekstra klik, løser den konkrete fejl. Ulempe: implicit regel man skal kende.
+Datoen kan rettes manuelt i dialogen. Bekræft → `is_active = true`, `employment_start_date` = valgt dato, `employment_end_date` ryddes. Annullér → ingen ændring.
 
-Uanset valg bør de fire hardkodede steder samles i én delt hjælpefunktion, så listen, stab-listen og medarbejderkortet ikke kan drifte fra hinanden (Bibel §8 — én sandhed).
+## Teknisk
+- Ny fælles komponent + hjælpefunktion (fx `src/components/employees/ActivateEmployeeDialog.tsx` og `src/lib/employees/activateEmployee.ts`), så al aktiveringslogik ligger ét sted.
+- De fire hardkodede steder erstattes af den fælles løsning:
+  - `src/pages/EmployeeMasterData.tsx:457-459` (medarbejderlisten)
+  - `src/components/employees/StaffEmployeesTab.tsx:167-170` (stab-listen)
+  - `src/pages/EmployeeDetail.tsx:444-451` (medarbejderkortet)
+  - `src/pages/EmployeeMasterData.tsx:565-571` (opret bruger med adgangskode — forudfyldes på samme måde)
+- Hold-datoen hentes via `cohort_members` → `onboarding_cohorts.start_date` (nyeste hold hvis flere).
+- Deaktivering ændres ikke: slutdato = i dag, notifikationer som i dag.
+
 
 ## Zone
 `employment_start_date` bruges af løn-, timer- og forecast-beregninger. Ændringen er derfor gul/rød zone og kræver din godkendelse af den valgte model, før noget implementeres. Denne plan er kun information — ingen kodeændringer er lavet.
