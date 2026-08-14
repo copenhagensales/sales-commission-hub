@@ -1,60 +1,55 @@
 import { Link } from "react-router-dom";
 import { Trophy, ArrowRight, Users } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { HomeCard, HomeCardEmpty } from "@/components/home/HomeCard";
-import {
-  useActiveSeason,
-  useMyEnrollment,
+import { Badge } from "@/components/ui/badge";
+import { 
+  useActiveSeason, 
+  useMyEnrollment, 
   useQualificationStandings,
   useEnrollmentCount,
-  type QualificationStanding,
+  type QualificationStanding 
 } from "@/hooks/useLeagueData";
 import { useCurrentEmployeeId } from "@/hooks/useOnboarding";
 import { formatPlayerName } from "@/lib/formatPlayerName";
-import { cn } from "@/lib/utils";
 
-function formatProvision(amount: number) {
-  return (
-    new Intl.NumberFormat("da-DK", {
-      style: "decimal",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(Math.round(amount)) + " kr"
-  );
-}
+function getNeighborStandings(
+  allStandings: QualificationStanding[],
+  myEmployeeId: string | null
+): { visibleStandings: QualificationStanding[]; myIndex: number } {
+  if (!myEmployeeId || allStandings.length === 0) {
+    return { visibleStandings: allStandings.slice(0, 3), myIndex: -1 };
+  }
 
-interface StandingRowProps {
-  rank: number;
-  name: string;
-  provision: number;
-  isMe?: boolean;
-}
+  const myIndex = allStandings.findIndex(s => s.employee_id === myEmployeeId);
+  
+  if (myIndex === -1) {
+    return { visibleStandings: allStandings.slice(0, 3), myIndex: -1 };
+  }
 
-function StandingRow({ rank, name, provision, isMe }: StandingRowProps) {
-  return (
-    <div
-      className={cn(
-        "flex h-9 items-center justify-between gap-2 rounded-md px-2 text-sm",
-        isMe ? "bg-primary/10 font-medium text-foreground" : "text-muted-foreground"
-      )}
-    >
-      <div className="flex min-w-0 items-center gap-2">
-        <span
-          className={cn(
-            "w-6 shrink-0 text-center text-xs tabular-nums",
-            rank <= 3 ? "font-semibold text-primary" : "text-muted-foreground"
-          )}
-        >
-          {rank}
-        </span>
-        <span className="truncate">
-          {name}
-          {isMe && <span className="ml-1 text-primary">(dig)</span>}
-        </span>
-      </div>
-      <span className="shrink-0 tabular-nums">{formatProvision(provision)}</span>
-    </div>
-  );
+  const total = allStandings.length;
+  
+  if (total <= 5) {
+    return { visibleStandings: allStandings, myIndex };
+  }
+
+  let start = myIndex - 2;
+  let end = myIndex + 3;
+
+  if (start < 0) {
+    start = 0;
+    end = Math.min(5, total);
+  }
+  
+  if (end > total) {
+    end = total;
+    start = Math.max(0, total - 5);
+  }
+
+  return { 
+    visibleStandings: allStandings.slice(start, end), 
+    myIndex: myIndex - start
+  };
 }
 
 export function CompactLeagueView() {
@@ -65,70 +60,90 @@ export function CompactLeagueView() {
   const { data: allStandings = [] } = useQualificationStandings(season?.id);
   const { data: enrollmentCount = 0 } = useEnrollmentCount(season?.id);
 
+  const formatProvision = (amount: number) => {
+    return new Intl.NumberFormat("da-DK", {
+      style: "decimal",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount) + " kr";
+  };
+
+  const getMedalEmoji = (rank: number) => {
+    switch (rank) {
+      case 1: return "🥇";
+      case 2: return "🥈";
+      case 3: return "🥉";
+      default: return null;
+    }
+  };
+
   if (!season) return null;
 
-  const topThree = allStandings.slice(0, 3);
-  const myIndex = currentEmployeeId
-    ? allStandings.findIndex((s: QualificationStanding) => s.employee_id === currentEmployeeId)
-    : -1;
-  const myStanding = myIndex >= 0 ? allStandings[myIndex] : null;
-  const showMyRow = isEnrolled && myStanding && myIndex > 2;
+  const { visibleStandings, myIndex } = isEnrolled
+    ? getNeighborStandings(allStandings, currentEmployeeId || null)
+    : { visibleStandings: allStandings.slice(0, 3), myIndex: -1 };
 
   return (
-    <HomeCard
-      icon={Trophy}
-      title="Din liga-position"
-      action={
-        <span className="flex items-center gap-1 text-xs text-muted-foreground">
-          <Users className="h-3 w-3" />
-          <span className="tabular-nums">{enrollmentCount}</span> tilmeldt
-        </span>
-      }
-      contentClassName="flex flex-col gap-3 p-3 md:p-4"
-    >
-      {allStandings.length === 0 ? (
-        <HomeCardEmpty
-          icon={Trophy}
-          title="Ingen stilling endnu"
-          hint="Stillingen opdateres når der er registreret salg i sæsonen"
-        />
-      ) : (
-        <div className="flex-1 space-y-0.5">
-          {topThree.map((standing: QualificationStanding, index: number) => (
-            <StandingRow
-              key={standing.id}
-              rank={standing.overall_rank || index + 1}
-              name={formatPlayerName(standing.employee)}
-              provision={standing.current_provision || 0}
-              isMe={standing.employee_id === currentEmployeeId}
-            />
-          ))}
-
-          {showMyRow && myStanding && (
-            <div className="mt-1 border-t border-border/40 pt-1">
-              <StandingRow
-                rank={myStanding.overall_rank || myIndex + 1}
-                name={formatPlayerName(myStanding.employee)}
-                provision={myStanding.current_provision || 0}
-                isMe
-              />
-            </div>
-          )}
-
-          {isEnrolled && !myStanding && (
-            <p className="pt-1 text-xs text-muted-foreground">
-              Du er tilmeldt — din placering vises efter dit første salg i sæsonen.
-            </p>
-          )}
+    <Card className="border-0 shadow-lg bg-card/80 backdrop-blur-sm">
+      <CardHeader className="pb-2 px-3 md:px-6 pt-3 md:pt-6">
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-1.5 md:gap-2 text-sm md:text-base font-semibold">
+            <Trophy className="w-3.5 h-3.5 md:w-4 md:h-4 text-yellow-500" />
+            Din liga-position
+          </CardTitle>
+          <div className="flex items-center gap-1 text-[10px] md:text-xs text-muted-foreground">
+            <Users className="w-3 h-3" />
+            <span>{enrollmentCount} tilmeldt</span>
+          </div>
         </div>
-      )}
+      </CardHeader>
+      
+      <CardContent className="space-y-2 md:space-y-3 px-3 md:px-6 pb-3 md:pb-6">
+        {visibleStandings.length > 0 && (
+          <div className="space-y-1">
+            {visibleStandings.map((standing, index) => {
+              const isMe = standing.employee_id === currentEmployeeId;
+              const rank = standing.overall_rank || (index + 1);
+              const medal = getMedalEmoji(rank);
+              
+              return (
+                <div 
+                  key={standing.id} 
+                  className={`flex items-center justify-between py-2 md:py-1.5 px-2 md:px-2 rounded-lg text-xs md:text-sm ${
+                    isMe 
+                      ? "bg-primary/10 border border-primary/20 font-medium" 
+                      : "text-muted-foreground"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    {medal ? (
+                      <span className="text-sm md:text-base w-5 text-center flex-shrink-0">{medal}</span>
+                    ) : (
+                      <span className="text-[10px] md:text-xs font-medium w-5 text-center flex-shrink-0">
+                        #{rank}
+                      </span>
+                    )}
+                    <span className={`truncate ${isMe ? "text-foreground" : ""}`}>
+                      {formatPlayerName(standing.employee)}
+                      {isMe && <span className="text-primary ml-1">(dig)</span>}
+                    </span>
+                  </div>
+                  <span className={`tabular-nums flex-shrink-0 ml-2 ${isMe ? "text-foreground" : ""}`}>
+                    {formatProvision(standing.current_provision || 0)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
-      <Button asChild variant="outline" size="sm" className="h-9 w-full gap-2">
         <Link to="/commission-league">
-          Se fuld liga
-          <ArrowRight className="h-3 w-3" />
+          <Button variant="outline" size="sm" className="w-full gap-2 mt-1 md:mt-2 h-10 md:h-9 text-xs md:text-sm">
+            Se fuld liga
+            <ArrowRight className="w-3 h-3" />
+          </Button>
         </Link>
-      </Button>
-    </HomeCard>
+      </CardContent>
+    </Card>
   );
 }
