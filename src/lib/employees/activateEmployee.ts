@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { ensureTeamMembership } from "@/lib/employees/ensureTeamMembership";
 
 export type ActivationDateSource = "cohort" | "employee" | "today";
 
@@ -78,4 +79,8 @@ export async function activateEmployee(params: {
   if (!data || data.length === 0) {
     throw new Error("Du har ikke rettighed til at ændre denne medarbejder");
   }
+
+  // Put them on the team chosen on their onboarding cohort (never moves an
+  // employee who already has a team).
+  await ensureTeamMembership({ employeeId });
 }
