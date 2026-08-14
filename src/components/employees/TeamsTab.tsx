@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -206,6 +206,46 @@ export function TeamsTab() {
   const getTeamMembers = (teamId: string) => {
     return teamMembers.filter((tm) => tm.team_id === teamId).map((tm) => tm.employee_id);
   };
+
+  // Per-team KPI: only active employees are counted.
+  // "started" = employment start date is today or earlier (or missing), "future" = starts later.
+  const teamStats = useMemo(() => {
+    const todayKey = format(startOfDay(new Date()), "yyyy-MM-dd");
+    const activeById = new Map(employees.map((e) => [e.id, e]));
+    const stats: Record<string, { total: number; started: number; future: number }> = {};
+
+    teams.forEach((team) => {
+      const memberIds = new Set(
+        teamMembers.filter((tm) => tm.team_id === team.id).map((tm) => tm.employee_id),
+      );
+      let started = 0;
+      let future = 0;
+      memberIds.forEach((id) => {
+        const emp = activeById.get(id);
+        if (!emp) return; // not active -> not counted
+        if (emp.employment_start_date && emp.employment_start_date > todayKey) future++;
+        else started++;
+      });
+      stats[team.id] = { total: started + future, started, future };
+    });
+
+    const allMemberIds = new Set(
+      teamMembers.map((tm) => tm.employee_id).filter((id) => activeById.has(id)),
+    );
+    let totalStarted = 0;
+    let totalFuture = 0;
+    allMemberIds.forEach((id) => {
+      const emp = activeById.get(id)!;
+      if (emp.employment_start_date && emp.employment_start_date > todayKey) totalFuture++;
+      else totalStarted++;
+    });
+
+    return {
+      byTeam: stats,
+      total: { total: totalStarted + totalFuture, started: totalStarted, future: totalFuture },
+    };
+  }, [teams, teamMembers, employees]);
+
 
   // Create team mutation
   const createMutation = useMutation({
@@ -622,9 +662,64 @@ export function TeamsTab() {
         </div>
       </div>
 
+      {/* Per-team KPI overview (only active employees) */}
+      {viewMode === "teams" && teams.length > 0 && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {teams.map((team) => {
+            const stats = teamStats.byTeam[team.id] ?? { total: 0, started: 0, future: 0 };
+            return (
+              <button
+                key={team.id}
+                type="button"
+                onClick={() => openEdit(team)}
+                className="text-left rounded-xl border border-border bg-card/50 p-4 transition-colors hover:border-primary/40 hover:bg-card"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{team.name}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {team.team_leader_id && employeeMap[team.team_leader_id]
+                        ? employeeMap[team.team_leader_id]
+                        : "Ingen teamleder"}
+                    </p>
+                  </div>
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                    <Users className="h-4 w-4 text-primary" />
+                  </div>
+                </div>
+                <div className="mt-4 flex items-end gap-4">
+                  <div>
+                    <p className="text-2xl font-semibold leading-none">{stats.started}</p>
+                    <p className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+                      På teamet nu
+                    </p>
+                  </div>
+                  <div className="border-l border-border/60 pl-4">
+                    <p
+                      className={`text-2xl font-semibold leading-none ${
+                        stats.future > 0 ? "text-amber-500" : "text-muted-foreground"
+                      }`}
+                    >
+                      {stats.future}
+                    </p>
+                    <p className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+                      Starter senere
+                    </p>
+                  </div>
+                </div>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  I alt {stats.total} aktive medarbejdere
+                </p>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Teams table */}
       {viewMode === "teams" && (
         <>
+
           <div className="rounded-xl bg-card/50 overflow-hidden border border-border">
             {isLoading ? (
               <p className="text-muted-foreground p-6">Indlæser...</p>
@@ -639,7 +734,8 @@ export function TeamsTab() {
                     <TableHead className="text-xs font-medium text-muted-foreground">Teamleder</TableHead>
                     <TableHead className="text-xs font-medium text-muted-foreground">Ass. Teamleder</TableHead>
                     <TableHead className="text-xs font-medium text-muted-foreground">Kunder</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Medarbejdere</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">Aktive nu</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">Starter senere</TableHead>
                     <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -701,9 +797,19 @@ export function TeamsTab() {
                         <TableCell className="py-3">
                           <div className="flex items-center gap-1">
                             <Users className="h-4 w-4 text-muted-foreground" />
-                            <span>{teamMemberIds.length}</span>
+                            <span>{teamStats.byTeam[team.id]?.started ?? 0}</span>
                           </div>
                         </TableCell>
+                        <TableCell className="py-3">
+                          {(teamStats.byTeam[team.id]?.future ?? 0) > 0 ? (
+                            <Badge variant="outline" className="border-amber-400/50 text-amber-500">
+                              +{teamStats.byTeam[team.id]?.future}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+
                         <TableCell className="py-3">
                           <div className="flex items-center gap-0.5">
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(team)}>
@@ -727,19 +833,25 @@ export function TeamsTab() {
                 <tfoot>
                   <tr className="border-t border-border/50 bg-muted/30">
                     <td colSpan={5} className="py-3 px-4 text-sm font-medium text-muted-foreground text-right">
-                      Samlet antal unikke medarbejdere:
+                      Samlet antal unikke aktive medarbejdere:
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-1.5">
                         <Users className="h-4 w-4 text-primary" />
                         <span className="text-sm font-semibold text-foreground">
-                          {new Set(teamMembers.map(tm => tm.employee_id)).size}
+                          {teamStats.total.started}
                         </span>
                       </div>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="text-sm font-semibold text-amber-500">
+                        {teamStats.total.future > 0 ? `+${teamStats.total.future}` : "-"}
+                      </span>
                     </td>
                     <td></td>
                   </tr>
                 </tfoot>
+
               </Table>
             )}
           </div>
