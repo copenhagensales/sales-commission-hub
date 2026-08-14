@@ -597,21 +597,61 @@
 }
 
 /* Clause paragraphs use a hanging indent so wrapped lines align under the
-   clause text instead of running back under the clause number.
+   clause text instead of running back under the clause number. The 78px
+   gutter matches the fixed spacing used in the contract templates.
    Paragraphs containing a manual line break (address blocks) are excluded. */
-.contract-paper .contract-body p:not(:has(br)) {
-  padding-left: 5.25rem;
-  text-indent: -5.25rem;
-}
-
-/* Numbered section headings get the same optical alignment. */
+.contract-paper .contract-body p:not(:has(br)),
 .contract-paper .contract-body h2,
 .contract-paper .contract-body h3 {
-  padding-left: 5.25rem;
-  text-indent: -5.25rem;
+  padding-left: 78px;
+  text-indent: -78px;
 }
 
+/* Body text rhythm */
+.contract-paper .contract-body p {
+  margin: 0.55rem 0;
+  line-height: 1.75;
+  color: rgb(38 38 38);
+}
+
+.contract-paper .contract-body strong {
+  font-weight: 600;
+  color: rgb(23 23 23);
+}
+
+/* Document title inside the contract body (e.g. "ANSÆTTELSESKONTRAKT") */
 .contract-paper .contract-body h1 {
   padding-left: 0;
   text-indent: 0;
+  margin: 2.5rem 0 2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  text-align: center;
+  color: rgb(23 23 23);
+}
+
+.contract-paper .contract-body h1 strong {
+  font-weight: 600;
+}
+
+/* Section headings — kept visually consistent with numbered clause lines */
+.contract-paper .contract-body h2,
+.contract-paper .contract-body h3 {
+  margin: 2rem 0 0.5rem;
+  font-size: 15.5px;
+  font-weight: 600;
+  line-height: 1.75;
+  letter-spacing: 0;
+  text-transform: none;
+  border: 0;
+  padding-top: 0;
+  color: rgb(23 23 23);
+  scroll-margin-top: 6rem;
+}
+
+.contract-paper .contract-body hr {
+  margin: 2.5rem 0;
+  border-color: rgb(229 229 229);
 }
