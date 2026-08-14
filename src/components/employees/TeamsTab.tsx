@@ -797,9 +797,19 @@ export function TeamsTab() {
                         <TableCell className="py-3">
                           <div className="flex items-center gap-1">
                             <Users className="h-4 w-4 text-muted-foreground" />
-                            <span>{teamMemberIds.length}</span>
+                            <span>{teamStats.byTeam[team.id]?.started ?? 0}</span>
                           </div>
                         </TableCell>
+                        <TableCell className="py-3">
+                          {(teamStats.byTeam[team.id]?.future ?? 0) > 0 ? (
+                            <Badge variant="outline" className="border-amber-400/50 text-amber-500">
+                              +{teamStats.byTeam[team.id]?.future}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+
                         <TableCell className="py-3">
                           <div className="flex items-center gap-0.5">
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(team)}>
