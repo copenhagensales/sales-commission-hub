@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Search, Users, Phone, MessageSquare, Loader2, ArrowRight, Check, FileText, Trash2, Eye, EyeOff, Mail, UserCheck, UserPlus, Send, ArrowRightLeft, Clock, X, UserX, Camera, User, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Briefcase, Shield, Network, Link2, BellRing } from "lucide-react";
+import { Plus, Pencil, Search, Users, Phone, MessageSquare, Loader2, ArrowRight, Check, FileText, Trash2, Eye, EyeOff, Mail, UserCheck, UserPlus, Send, ArrowRightLeft, Clock, X, UserX, Camera, User, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Briefcase, Shield, Network, Link2, BellRing, ChevronDown, ChevronRight } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -152,6 +152,8 @@ export default function EmployeeMasterData() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [smsDialogOpen, setSmsDialogOpen] = useState(false);
   const [smsEmployee, setSmsEmployee] = useState<EmployeeMasterDataRecord | null>(null);
+  const [showFutureStarters, setShowFutureStarters] = useState(false);
+
   const { canEditEmployees, hasPermission, canSendEmployeeSms, position } = usePermissions();
   const currentUserPosition = position?.name;
   const { makeCall, isDeviceReady } = useTwilioDevice();
@@ -682,6 +684,11 @@ export default function EmployeeMasterData() {
     !!e.is_active && !!e.employment_start_date && e.employment_start_date > new Date().toISOString().split("T")[0];
   const localNotStarted = employees.filter(isNotStartedYet).length;
 
+  // Split listen: dem der er i gang i dag vs. dem der først starter senere
+  const currentEmployees = filteredEmployees.filter((e) => !isNotStartedYet(e));
+  const futureEmployees = filteredEmployees.filter((e) => isNotStartedYet(e));
+
+
   const localActiveStarted = employees.filter((e) => e.is_active).length - localNotStarted;
   const notStartedYetCount = headcount?.pendingStarts ?? localNotStarted;
   const activeCount = headcount?.activeStartedExclStaff ?? Math.max(0, localActiveStarted);
@@ -892,7 +899,8 @@ export default function EmployeeMasterData() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredEmployees.map((employee) => (
+                        {(() => {
+                          const renderRow = (employee: EmployeeMasterDataRecord) => (
                           <TableRow key={employee.id} className="cursor-pointer hover:bg-muted/30 border-b border-border/30" onClick={() => navigate(`/employees/${employee.id}`)}>
                             <TableCell className="font-medium py-3">
                               <div className="flex items-center gap-2">
@@ -946,7 +954,31 @@ export default function EmployeeMasterData() {
                               </div>
                             </TableCell>
                           </TableRow>
-                        ))}
+                          );
+                          return (
+                            <>
+                              {currentEmployees.map(renderRow)}
+                              {futureEmployees.length > 0 && (
+                                <TableRow
+                                  className="cursor-pointer hover:bg-muted/40 bg-muted/20 border-b border-border/30"
+                                  onClick={() => setShowFutureStarters((v) => !v)}
+                                >
+                                  <TableCell colSpan={5} className="py-3">
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                      {showFutureStarters ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                      <span>Starter senere</span>
+                                      <Badge variant="outline" className="text-xs font-normal border-amber-500/40 text-amber-600 dark:text-amber-400">
+                                        {futureEmployees.length}
+                                      </Badge>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                              {showFutureStarters && futureEmployees.map(renderRow)}
+                            </>
+                          );
+                        })()}
+
                         {filteredEmployees.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">{t("employees.table.noEmployeesFound")}</TableCell></TableRow>}
                       </TableBody>
                     </Table>
