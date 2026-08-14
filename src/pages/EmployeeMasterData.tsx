@@ -697,6 +697,7 @@ export default function EmployeeMasterData() {
       { value: "positions", label: t("employees.tabs.positions"), permissionKey: "tab_employees_positions", icon: Briefcase },
       { value: "permissions", label: t("employees.tabs.permissions"), permissionKey: "tab_employees_permissions", icon: Shield },
       { value: "dialer-mapping", label: t("employees.tabs.dialerMapping"), permissionKey: "tab_employees_dialer_mapping", icon: Link2 },
+      { value: "deactivation", label: "Deaktivering", permissionKey: "tab_employees_deactivation", icon: BellRing },
     ];
     return allSections.filter(section => canView(section.permissionKey));
   }, [t, activeCount, staffCount, canView]);
@@ -991,6 +992,11 @@ export default function EmployeeMasterData() {
                 <DialerMappingTab />
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Deactivation notification settings */}
+          <TabsContent value="deactivation" className="mt-4">
+            <DeactivationSettingsTab canEdit={canEditPermission('tab_employees_deactivation')} />
           </TabsContent>
         </Tabs>
 
