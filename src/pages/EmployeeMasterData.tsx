@@ -453,10 +453,9 @@ export default function EmployeeMasterData() {
 
   const toggleActiveMutation = useMutation({
     mutationFn: async ({ id, is_active, employee }: { id: string; is_active: boolean; employee?: EmployeeMasterDataRecord }) => {
+      // Activation goes through ActivateEmployeeDialog (explicit start date).
       const today = new Date().toISOString().split("T")[0];
-      const updateData = is_active
-        ? { is_active, employment_start_date: today, employment_end_date: null }
-        : { is_active, employment_end_date: today };
+      const updateData = { is_active, employment_end_date: today };
 
       // IMPORTANT: if deactivating, snapshot team membership BEFORE the update.
       // A DB trigger removes team_members as soon as is_active flips to false.
@@ -917,7 +916,7 @@ export default function EmployeeMasterData() {
                             <TableCell className="py-3 text-sm">{employee.job_title || <span className="text-muted-foreground/50">-</span>}</TableCell>
                             <TableCell className="py-3">{getEmployeeTeams(employee.id) ? <Badge variant="secondary" className="text-xs font-normal">{getEmployeeTeams(employee.id)}</Badge> : <span className="text-muted-foreground/50">-</span>}</TableCell>
                             <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
-                              <Switch checked={employee.is_active} disabled={toggleActiveMutation.isPending || !canEditPermission('action_employee_deactivate')} onCheckedChange={(checked) => { if (!checked) { setDeactivatingEmployee(employee); } else { toggleActiveMutation.mutate({ id: employee.id, is_active: true, employee }); }}} />
+                              <Switch checked={employee.is_active} disabled={toggleActiveMutation.isPending || !canEditPermission('action_employee_deactivate')} onCheckedChange={(checked) => { if (!checked) { setDeactivatingEmployee(employee); } else { setActivatingEmployee(employee); }}} />
                             </TableCell>
                             <TableCell className="py-3">
                               <div className="flex items-center gap-0.5">
