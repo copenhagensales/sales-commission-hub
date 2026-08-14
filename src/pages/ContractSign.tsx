@@ -460,31 +460,41 @@ export default function ContractSign() {
         </div>
 
         {/* ═══ Contract Document – formal white paper ═══ */}
-        <div className="bg-white rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.12)] border border-neutral-200 overflow-hidden">
-          {/* Document header inside paper */}
-          <div className="px-8 md:px-12 lg:px-16 pt-10 pb-0">
-            <div className="flex items-center gap-2 text-neutral-400 text-xs mb-3 tracking-wide uppercase">
-              <Building2 className="h-3.5 w-3.5" />
-              <span>Copenhagen Sales</span>
+        <div className="contract-paper bg-white rounded-sm shadow-[0_1px_2px_rgba(15,23,42,0.06),0_18px_50px_-18px_rgba(15,23,42,0.35)] ring-1 ring-neutral-200/80 overflow-hidden">
+          {/* Thin letterhead rule at the top edge of the page */}
+          <div className="h-[3px] bg-neutral-900" />
+
+          {/* Letterhead */}
+          <div className="px-8 md:px-14 lg:px-20 pt-12 md:pt-16">
+            <div className="flex items-center justify-between gap-4 pb-5 border-b border-neutral-200">
+              <div className="flex items-center gap-2 text-neutral-500 text-[10.5px] font-sans font-medium tracking-[0.18em] uppercase">
+                <Building2 className="h-3.5 w-3.5" />
+                <span>Copenhagen Sales</span>
+              </div>
               {isSigned && (
-                <>
-                  <span className="text-neutral-300">·</span>
-                  <span className="text-emerald-600 font-semibold inline-flex items-center gap-1">
-                    <Check className="h-3 w-3" />
-                    Godkendt
-                  </span>
-                </>
+                <span className="text-emerald-700 text-[10.5px] font-sans font-semibold tracking-[0.14em] uppercase inline-flex items-center gap-1.5">
+                  <Check className="h-3 w-3" />
+                  Godkendt
+                </span>
               )}
             </div>
-            <h1 className="text-xl md:text-2xl font-bold tracking-tight text-neutral-900 mb-0">{contract.title}</h1>
+
+            <div className="pt-10 text-center">
+              <h1 className="text-[22px] md:text-[26px] font-semibold tracking-[0.01em] text-neutral-900 mb-0 leading-snug">
+                {contract.title}
+              </h1>
+              <div className="mx-auto mt-5 h-px w-16 bg-neutral-300" />
+            </div>
           </div>
 
           {/* Contract prose content */}
-          <div className="px-8 md:px-12 lg:px-16 py-8">
-            <div
-              className={CONTRACT_PROSE_SIGN_CLASSES}
-              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(contract.content || "") }}
-            />
+          <div className="px-8 md:px-14 lg:px-20 pt-8 pb-16 md:pb-20">
+            <div className="mx-auto max-w-[70ch]">
+              <div
+                className={`contract-body ${CONTRACT_PROSE_SIGN_CLASSES}`}
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(contract.content || "") }}
+              />
+            </div>
             {/* Invisible sentinel for scroll tracking */}
             <div ref={contentEndRef} className="h-px" />
           </div>
