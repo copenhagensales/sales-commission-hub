@@ -855,6 +855,20 @@ export default function EmployeeDetail() {
                   <DateRow label="Startdato" value={employee.employment_start_date} field="employment_start_date" onSave={handleSave} />
                   <DateRow label="Slutdato" value={employee.employment_end_date} field="employment_end_date" onSave={handleSave} />
                   <EditableRow label="Timer/uge" value={employee.weekly_hours} field="weekly_hours" type="number" onSave={handleSave} displayValue={employee.weekly_hours ? `${employee.weekly_hours} timer` : null} />
+                  <tr className="border-b border-border/50 last:border-0">
+                    <td className="py-2.5 pr-4 text-sm text-muted-foreground w-1/3">Deltid</td>
+                    <td className="py-2.5">
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={employee.working_hours_model === "deltid"}
+                          onCheckedChange={(checked) => handleSave("working_hours_model", checked ? "deltid" : "fuldtid")}
+                        />
+                        <span className="text-sm text-muted-foreground">
+                          {employee.working_hours_model === "deltid" ? "Deltid" : "Fuldtid"}
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
                   <SelectRow 
                     label="Mødetid" 
                     value={employee.standard_start_time} 
