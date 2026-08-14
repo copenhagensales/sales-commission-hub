@@ -19,6 +19,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { useTwilioDeviceContext } from "@/contexts/TwilioDeviceContext";
 import { SendEmployeeSmsDialog } from "@/components/employees/SendEmployeeSmsDialog";
+import { notifyEmployeeDeactivated, snapshotEmployeeTeamId } from "@/lib/employees/deactivationNotify";
 
 export function StaffEmployeesTab() {
   const { t } = useTranslation();
@@ -162,7 +163,7 @@ export function StaffEmployeesTab() {
   };
 
   const toggleActiveMutation = useMutation({
-    mutationFn: async ({ id, is_active, employee }: { id: string; is_active: boolean; employee?: StaffEmployee }) => {
+    mutationFn: async ({ id, is_active }: { id: string; is_active: boolean; employee?: StaffEmployee }) => {
       const today = new Date().toISOString().split("T")[0];
       const updateData = is_active
         ? { is_active, employment_start_date: today, employment_end_date: null }
@@ -170,105 +171,20 @@ export function StaffEmployeesTab() {
 
       // IMPORTANT: if deactivating, snapshot team membership BEFORE the update.
       // A DB trigger removes team_members as soon as is_active flips to false.
-      let teamId: string | null | undefined;
-      let team:
-        | { id: string; name: string; team_leader_id: string | null; assistant_team_leader_id: string | null }
-        | null
-        | undefined;
-      if (!is_active) {
-        const { data: teamMembership } = await supabase
-          .from("team_members")
-          .select("team_id, teams(id, name, team_leader_id, assistant_team_leader_id)")
-          .eq("employee_id", id)
-          .maybeSingle();
+      const teamId = is_active ? null : await snapshotEmployeeTeamId(id);
 
-        teamId = teamMembership?.team_id;
-        team = teamMembership?.teams as
-          | { id: string; name: string; team_leader_id: string | null; assistant_team_leader_id: string | null }
-          | null
-          | undefined;
-      }
-      
       const { error } = await supabase
         .from("employee_master_data")
         .update(updateData)
         .eq("id", id);
       if (error) throw error;
 
-      // If deactivating, send deactivation reminder
+      // Notification recipients + template are resolved server-side from settings
       if (!is_active) {
-        let manualRecipients: string[] = [];
-        const autoRecipientEmails: string[] = [];
-
-        // Only fetch team-specific config and leaders if employee has a team
-        if (teamId) {
-          // Get config for this team (manually configured recipients)
-          const { data: config } = await supabase
-            .from("deactivation_reminder_config")
-            .select("recipients")
-            .eq("team_id", teamId)
-            .single();
-
-          manualRecipients = config?.recipients 
-            ? config.recipients.split(",").map((r: string) => r.trim()).filter((r: string) => r)
-            : [];
-
-          // Get team leader and assistant team leader work emails
-          const leaderIds = [team?.team_leader_id, team?.assistant_team_leader_id].filter(Boolean) as string[];
-          if (leaderIds.length > 0) {
-            const { data: leaders } = await supabase
-              .from("employee_master_data")
-              .select("work_email")
-              .in("id", leaderIds);
-            
-            (leaders || []).forEach(l => {
-              if (l.work_email) autoRecipientEmails.push(l.work_email);
-            });
-          }
-        }
-
-        // Always get recruitment responsible employees (only work_email)
-        const { data: recruiters } = await supabase
-          .from("employee_master_data")
-          .select("work_email")
-          .eq("job_title", "Rekruttering")
-          .eq("is_active", true);
-        
-        (recruiters || []).forEach(r => {
-          if (r.work_email) autoRecipientEmails.push(r.work_email);
-        });
-
-        // Always get owners (only work_email) - exclude Angel
-        const { data: owners } = await supabase
-          .from("employee_master_data")
-          .select("work_email")
-          .eq("job_title", "Ejer")
-          .eq("is_active", true)
-          .neq("first_name", "Angel");
-        
-        const ownerEmails: string[] = [];
-        (owners || []).forEach(o => {
-          if (o.work_email) ownerEmails.push(o.work_email);
-        });
-
-        // Combine all recipients and remove duplicates
-        const allRecipients = [...new Set([...manualRecipients, ...autoRecipientEmails, ...ownerEmails])];
-
-        if (allRecipients.length > 0) {
-          await supabase.functions.invoke("send-deactivation-reminder", {
-            body: {
-              employee_id: id,
-              employee_name: `${employee?.first_name} ${employee?.last_name}`,
-              employee_email: employee?.work_email || "",
-              team_id: teamId || null,
-              team_name: team?.name || "Ingen team",
-              recipients: allRecipients,
-              is_followup: false,
-            },
-          });
-        }
+        await notifyEmployeeDeactivated({ employeeId: id, source: "staff-list", teamId });
       }
     },
+
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["staff-employees"] });
       setDeactivatingEmployee(null);

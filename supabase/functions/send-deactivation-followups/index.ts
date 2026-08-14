@@ -78,8 +78,16 @@ async function sendEmail(
   }
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 serve(async (req: Request) => {
-  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -91,11 +99,30 @@ serve(async (req: Request) => {
 
     console.log("Starting deactivation followup check...");
 
-    // Find reminders sent yesterday that haven't had followup
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStart = new Date(yesterday.setHours(0, 0, 0, 0)).toISOString();
-    const yesterdayEnd = new Date(yesterday.setHours(23, 59, 59, 999)).toISOString();
+    // All behaviour is driven by the central settings row — nothing hardcoded
+    const { data: settings } = await supabase
+      .from("deactivation_notification_settings")
+      .select("*")
+      .limit(1)
+      .maybeSingle();
+
+    const followupEnabled = settings?.followup_enabled ?? true;
+    const delayHours = settings?.followup_delay_hours ?? 24;
+    const excludeOwners = settings?.followup_exclude_owners ?? true;
+    const emailSubject = settings?.email_subject ?? "Medarbejder deaktiveret - Handling påkrævet";
+    const emailTemplate = settings?.email_body ?? "";
+    const excludedEmails: string[] = settings?.excluded_emails ?? [];
+
+    if (!followupEnabled) {
+      console.log("Followups disabled in settings — nothing to do");
+      return new Response(JSON.stringify({ success: true, sentCount: 0, skipped: "disabled" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const dueBefore = new Date(Date.now() - delayHours * 60 * 60 * 1000).toISOString();
+    const notOlderThan = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
     const { data: pendingFollowups, error: fetchError } = await supabase
       .from("deactivation_reminders_sent")
@@ -107,8 +134,10 @@ serve(async (req: Request) => {
         employee_master_data!inner(first_name, last_name, work_email, private_email),
         teams(name)
       `)
-      .gte("initial_sent_at", yesterdayStart)
-      .lte("initial_sent_at", yesterdayEnd)
+      .eq("status", "sent")
+      .eq("is_test", false)
+      .lte("initial_sent_at", dueBefore)
+      .gte("initial_sent_at", notOlderThan)
       .is("followup_sent_at", null);
 
     if (fetchError) {
@@ -118,36 +147,30 @@ serve(async (req: Request) => {
 
     console.log(`Found ${pendingFollowups?.length || 0} pending followups`);
 
-    // Get owner emails to exclude from followups (owners only receive initial email)
-    const { data: ownerData } = await supabase
-      .from("employee_master_data")
-      .select("work_email")
-      .eq("job_title", "Ejer")
-      .eq("is_active", true)
-      .neq("first_name", "Angel");
-    
-    const ownerEmails = new Set((ownerData || []).map(o => o.work_email).filter(Boolean));
-    console.log(`Excluding ${ownerEmails.size} owner emails from followups`);
+    const skipEmails = new Set(excludedEmails.map((e) => (e || "").trim().toLowerCase()).filter(Boolean));
+    if (excludeOwners) {
+      const { data: ownerData } = await supabase
+        .from("employee_master_data")
+        .select("work_email, private_email")
+        .eq("job_title", "Ejer")
+        .eq("is_active", true);
+      (ownerData || []).forEach((o) => {
+        const email = (o.work_email || o.private_email || "").trim().toLowerCase();
+        if (email) skipEmails.add(email);
+      });
+    }
 
-    // Get M365 access token once for all emails
     const accessToken = await getM365AccessToken();
-
     let sentCount = 0;
 
     for (const reminder of pendingFollowups || []) {
-      const employeeData = reminder.employee_master_data as unknown as { first_name: string; last_name: string; work_email: string | null; private_email: string | null };
+      const employeeData = reminder.employee_master_data as unknown as {
+        first_name: string;
+        last_name: string;
+        work_email: string | null;
+        private_email: string | null;
+      };
       const teamData = reminder.teams as unknown as { name: string } | null;
-      // Get the email template for this team
-      const { data: config, error: configError } = await supabase
-        .from("deactivation_reminder_config")
-        .select("email_subject, email_body")
-        .eq("team_id", reminder.team_id)
-        .single();
-
-      if (configError || !config) {
-        console.error(`No config found for team ${reminder.team_id}, skipping`);
-        continue;
-      }
 
       const deactivationDate = new Date().toLocaleDateString("da-DK", {
         day: "numeric",
@@ -155,88 +178,73 @@ serve(async (req: Request) => {
         year: "numeric",
       });
 
-      // Replace placeholders in email body
-      let emailBody = config.email_body
+      let emailBody = emailTemplate
         .replace(/\{\{employee_name\}\}/g, `${employeeData.first_name} ${employeeData.last_name}`)
-        .replace(/\{\{team_name\}\}/g, teamData?.name || "Ukendt team")
+        .replace(/\{\{team_name\}\}/g, teamData?.name || "Ingen team")
         .replace(/\{\{employee_email\}\}/g, employeeData.work_email || employeeData.private_email || "Ikke angivet")
-        .replace(/\{\{deactivation_date\}\}/g, deactivationDate);
+        .replace(/\{\{deactivation_date\}\}/g, deactivationDate)
+        .replace(/\{\{actor_name\}\}/g, "System");
 
-      // Add followup prefix
-      const emailSubject = `OPFØLGNING: ${config.email_subject}`;
       emailBody = `⚠️ PÅMINDELSE - Denne handling er stadig ikke udført!\n\n${emailBody}`;
+      const subject = `OPFØLGNING: ${emailSubject}`;
 
-      // Convert plain text to HTML
-      const htmlBody = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: #dc2626; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
-            .content { background: #f9fafb; padding: 20px; border-radius: 0 0 8px 8px; border: 1px solid #e5e7eb; }
-            .checklist { background: white; padding: 15px; border-radius: 6px; margin: 15px 0; }
-            .footer { margin-top: 20px; font-size: 12px; color: #6b7280; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h2 style="margin: 0;">⚠️ OPFØLGNING: Medarbejder Deaktiveret</h2>
-            </div>
-            <div class="content">
-              <pre style="white-space: pre-wrap; font-family: inherit; margin: 0;">${emailBody}</pre>
-            </div>
-          </div>
-        </body>
-        </html>
-      `;
+      const htmlBody = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;">
+  <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.6;color:#1f2937;max-width:640px;margin:0 auto;padding:24px;">
+    <div style="background:#dc2626;color:#ffffff;padding:20px 24px;border-radius:10px 10px 0 0;">
+      <h2 style="margin:0;font-size:18px;letter-spacing:0.02em;">OPFØLGNING: Medarbejder deaktiveret</h2>
+    </div>
+    <div style="background:#ffffff;padding:24px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 10px 10px;">
+      <pre style="white-space:pre-wrap;font-family:inherit;margin:0;font-size:14px;">${escapeHtml(emailBody)}</pre>
+    </div>
+    <p style="margin:16px 0 0;font-size:12px;color:#6b7280;">Automatisk besked fra Stork · Copenhagen Sales</p>
+  </div>
+</body>
+</html>`;
 
-      // Send email to all recipients, excluding owners (they only get initial email)
-      const allRecipients = reminder.recipients as string[];
-      const recipients = allRecipients.filter(email => !ownerEmails.has(email));
-      
+      const allRecipients = (reminder.recipients as string[]) || [];
+      const recipients = allRecipients.filter((email) => !skipEmails.has((email || "").trim().toLowerCase()));
+
       if (recipients.length === 0) {
-        console.log(`No non-owner recipients for ${reminder.id}, skipping followup`);
-        // Still mark as sent so we don't keep trying
+        console.log(`No eligible recipients for ${reminder.id}, marking as handled`);
         await supabase
           .from("deactivation_reminders_sent")
           .update({ followup_sent_at: new Date().toISOString() })
           .eq("id", reminder.id);
         continue;
       }
-      
+
       try {
-        await sendEmail(accessToken, recipients, emailSubject, htmlBody);
+        await sendEmail(accessToken, recipients, subject, htmlBody);
       } catch (emailError) {
         console.error(`Failed to send followup for ${reminder.id}:`, emailError);
         continue;
       }
 
-      // Update followup timestamp
       await supabase
         .from("deactivation_reminders_sent")
         .update({ followup_sent_at: new Date().toISOString() })
         .eq("id", reminder.id);
 
       sentCount++;
-      console.log(`Sent followup for employee ${employeeData.first_name} ${employeeData.last_name}`);
+      console.log(`Sent followup for ${employeeData.first_name} ${employeeData.last_name}`);
     }
 
     console.log(`Completed: sent ${sentCount} followup emails`);
 
-    return new Response(
-      JSON.stringify({ success: true, sentCount }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ success: true, sentCount }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     console.error("Error in send-deactivation-followups:", error);
-    return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: errorMessage }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
+
