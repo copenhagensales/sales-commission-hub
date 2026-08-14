@@ -662,9 +662,64 @@ export function TeamsTab() {
         </div>
       </div>
 
+      {/* Per-team KPI overview (only active employees) */}
+      {viewMode === "teams" && teams.length > 0 && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {teams.map((team) => {
+            const stats = teamStats.byTeam[team.id] ?? { total: 0, started: 0, future: 0 };
+            return (
+              <button
+                key={team.id}
+                type="button"
+                onClick={() => openEdit(team)}
+                className="text-left rounded-xl border border-border bg-card/50 p-4 transition-colors hover:border-primary/40 hover:bg-card"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{team.name}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {team.team_leader_id && employeeMap[team.team_leader_id]
+                        ? employeeMap[team.team_leader_id]
+                        : "Ingen teamleder"}
+                    </p>
+                  </div>
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                    <Users className="h-4 w-4 text-primary" />
+                  </div>
+                </div>
+                <div className="mt-4 flex items-end gap-4">
+                  <div>
+                    <p className="text-2xl font-semibold leading-none">{stats.started}</p>
+                    <p className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+                      På teamet nu
+                    </p>
+                  </div>
+                  <div className="border-l border-border/60 pl-4">
+                    <p
+                      className={`text-2xl font-semibold leading-none ${
+                        stats.future > 0 ? "text-amber-500" : "text-muted-foreground"
+                      }`}
+                    >
+                      {stats.future}
+                    </p>
+                    <p className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+                      Starter senere
+                    </p>
+                  </div>
+                </div>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  I alt {stats.total} aktive medarbejdere
+                </p>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Teams table */}
       {viewMode === "teams" && (
         <>
+
           <div className="rounded-xl bg-card/50 overflow-hidden border border-border">
             {isLoading ? (
               <p className="text-muted-foreground p-6">Indlæser...</p>
