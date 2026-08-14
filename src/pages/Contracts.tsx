@@ -685,7 +685,7 @@ export default function Contracts() {
                 </span>
               </div>
               <div
-                className={`${CONTRACT_PROSE_SIGN_CLASSES} max-w-none rounded-lg shadow-lg p-8 bg-white`}
+                className={`contract-paper contract-body ${CONTRACT_PROSE_SIGN_CLASSES} max-w-none rounded-sm ring-1 ring-neutral-200 shadow-[0_1px_2px_rgba(15,23,42,0.06),0_18px_50px_-18px_rgba(15,23,42,0.25)] px-8 md:px-12 py-12 bg-white`}
                 dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(previewContract?.content || "") }}
               />
               {previewContract?.signatures && previewContract.signatures.length > 0 && (
