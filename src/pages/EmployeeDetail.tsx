@@ -30,6 +30,7 @@ import { HistorikTabContent } from "@/components/employee/HistorikTabContent";
 import { TeamLeaderTeams } from "@/components/employees/TeamLeaderTeams";
 import { EditableRow, ContactRow, SelectRow, TableSection, DateRow } from "@/components/employee/EmployeeDetailFields";
 import { SendEmployeeSmsDialog } from "@/components/employees/SendEmployeeSmsDialog";
+import { ActivateEmployeeDialog } from "@/components/employees/ActivateEmployeeDialog";
 import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
@@ -99,6 +100,7 @@ export default function EmployeeDetail() {
   const [newPassword, setNewPassword] = useState("");
   const [isSettingPassword, setIsSettingPassword] = useState(false);
   const [smsDialogOpen, setSmsDialogOpen] = useState(false);
+  const [activateDialogOpen, setActivateDialogOpen] = useState(false);
   const [deleteContractId, setDeleteContractId] = useState<string | null>(null);
 
   const { data: employee, isLoading, error } = useQuery({
@@ -1446,6 +1448,17 @@ export default function EmployeeDetail() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Activation dialog — start date prefilled from the onboarding cohort */}
+        <ActivateEmployeeDialog
+          employee={employee ? { id: employee.id, first_name: employee.first_name, last_name: employee.last_name, employment_start_date: employee.employment_start_date } : null}
+          open={activateDialogOpen}
+          onOpenChange={setActivateDialogOpen}
+          onActivated={() => {
+            queryClient.invalidateQueries({ queryKey: ["employee-detail", id] });
+            queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
+          }}
+        />
 
         {/* SMS Dialog for employee communication */}
         <SendEmployeeSmsDialog
