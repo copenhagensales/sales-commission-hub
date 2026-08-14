@@ -870,7 +870,7 @@ export function SendContractDialog({
         ) : (
           <div className="space-y-4">
             <div
-              className="prose prose-sm max-w-none border rounded-lg p-6 bg-white text-black max-h-[60vh] overflow-y-auto"
+              className="contract-paper contract-body max-w-none border rounded-sm ring-1 ring-neutral-200 px-6 md:px-10 py-10 bg-white text-neutral-800 max-h-[60vh] overflow-y-auto"
               dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(previewContent) }}
             />
           </div>

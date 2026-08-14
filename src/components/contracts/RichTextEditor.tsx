@@ -340,7 +340,7 @@ export function RichTextEditor({ value, onChange, placeholder = "Skriv indhold h
       </div>
 
       {/* Editor */}
-      <div className={`${CONTRACT_PROSE_SIGN_CLASSES} max-w-none bg-white p-4`}>
+      <div className={`contract-paper contract-body ${CONTRACT_PROSE_SIGN_CLASSES} max-w-none bg-white px-6 py-8`}>
         <EditorContent editor={editor} />
       </div>
 
