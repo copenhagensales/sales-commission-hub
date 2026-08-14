@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -206,6 +206,46 @@ export function TeamsTab() {
   const getTeamMembers = (teamId: string) => {
     return teamMembers.filter((tm) => tm.team_id === teamId).map((tm) => tm.employee_id);
   };
+
+  // Per-team KPI: only active employees are counted.
+  // "started" = employment start date is today or earlier (or missing), "future" = starts later.
+  const teamStats = useMemo(() => {
+    const todayKey = format(startOfDay(new Date()), "yyyy-MM-dd");
+    const activeById = new Map(employees.map((e) => [e.id, e]));
+    const stats: Record<string, { total: number; started: number; future: number }> = {};
+
+    teams.forEach((team) => {
+      const memberIds = new Set(
+        teamMembers.filter((tm) => tm.team_id === team.id).map((tm) => tm.employee_id),
+      );
+      let started = 0;
+      let future = 0;
+      memberIds.forEach((id) => {
+        const emp = activeById.get(id);
+        if (!emp) return; // not active -> not counted
+        if (emp.employment_start_date && emp.employment_start_date > todayKey) future++;
+        else started++;
+      });
+      stats[team.id] = { total: started + future, started, future };
+    });
+
+    const allMemberIds = new Set(
+      teamMembers.map((tm) => tm.employee_id).filter((id) => activeById.has(id)),
+    );
+    let totalStarted = 0;
+    let totalFuture = 0;
+    allMemberIds.forEach((id) => {
+      const emp = activeById.get(id)!;
+      if (emp.employment_start_date && emp.employment_start_date > todayKey) totalFuture++;
+      else totalStarted++;
+    });
+
+    return {
+      byTeam: stats,
+      total: { total: totalStarted + totalFuture, started: totalStarted, future: totalFuture },
+    };
+  }, [teams, teamMembers, employees]);
+
 
   // Create team mutation
   const createMutation = useMutation({
