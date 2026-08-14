@@ -14845,6 +14845,7 @@ export type Database = {
         Args: { _target_employee_id: string; _user_id: string }
         Returns: boolean
       }
+      sync_cohort_team_memberships: { Args: never; Returns: Json }
       trigger_kpi_calculation: { Args: never; Returns: undefined }
       trigger_kpi_incremental: { Args: never; Returns: undefined }
       trigger_leaderboard_calculation: { Args: never; Returns: undefined }
