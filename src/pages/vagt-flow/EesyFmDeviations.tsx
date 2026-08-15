@@ -598,6 +598,33 @@ function DeviationsPanel({
     });
   }, [rawDeviationRows, search, employee, sortKey, sortDir]);
 
+  const okRowsFiltered = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    const filtered = rawOkRows.filter((row) => {
+      if (employee !== "all" && row.sellerId !== employee) return false;
+      if (!term) return true;
+      return [
+        row.sellerName,
+        row.phone,
+        row.storkProduct,
+        row.powerBiCampaign,
+        row.powerBiOperator,
+        row.sheetLabel,
+      ]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(term));
+    });
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      if (sortKey === "seller") {
+        return dir * (a.sellerName || "").localeCompare(b.sellerName || "", "da");
+      }
+      return dir * (new Date(a.saleDatetime).getTime() - new Date(b.saleDatetime).getTime());
+    });
+  }, [rawOkRows, search, employee, sortKey, sortDir]);
+
+
+
 
   const claimRows = useMemo(() => {
     const term = search.trim().toLowerCase();
