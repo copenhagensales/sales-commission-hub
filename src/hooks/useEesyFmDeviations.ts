@@ -216,9 +216,9 @@ export function useEesyFmDeviations(
     enabled && mode === "missing",
   );
 
-  const rows = useMemo<DeviationRow[]>(() => {
-    if (!storkSales) return [];
-    if (mode === "missing" && loadingClaimPhones) return [];
+  const { rows, okRows } = useMemo<{ rows: DeviationRow[]; okRows: DeviationRow[] }>(() => {
+    if (!storkSales) return { rows: [], okRows: [] };
+    if (mode === "missing" && loadingClaimPhones) return { rows: [], okRows: [] };
 
     const byPhone = new Map<string, PowerBiRow[]>();
     for (const row of powerBiRows || []) {
@@ -229,6 +229,26 @@ export function useEesyFmDeviations(
     }
 
     const result: DeviationRow[] = [];
+    const ok: DeviationRow[] = [];
+
+    const toRow = (
+      sale: EesyFmStorkSale,
+      match: PowerBiRow,
+      deviation: string,
+    ): DeviationRow => ({
+      id: `${sale.id}-${match.id}`,
+      saleDatetime: sale.saleDatetime,
+      sellerId: sale.sellerId,
+      sellerName: sale.sellerName,
+      phone: sale.phone,
+      storkProduct: sale.productName,
+      powerBiProduct: match.subscriptionName,
+      powerBiCampaign: match.campaignName,
+      powerBiOperator: match.operator,
+      sheetLabel: SHEET_LABELS[match.sheetType],
+      deviation,
+      note: sale.note,
+    });
 
     for (const sale of storkSales) {
       const matches = sale.phoneNormalized ? byPhone.get(sale.phoneNormalized) : undefined;
@@ -255,34 +275,29 @@ export function useEesyFmDeviations(
       }
 
       if (!matches || matches.length === 0) continue;
-      if (isFiveG(sale.productName)) continue;
-      const anyOk = matches.some((m) => campaignMatchesProduct(sale.productName, m.campaignName));
-      if (anyOk) continue;
 
-      const match = matches[0];
-      result.push({
-        id: `${sale.id}-${match.id}`,
-        saleDatetime: sale.saleDatetime,
-        sellerId: sale.sellerId,
-        sellerName: sale.sellerName,
-        phone: sale.phone,
-        storkProduct: sale.productName,
-        powerBiProduct: match.subscriptionName,
-        powerBiCampaign: match.campaignName,
-        powerBiOperator: match.operator,
-        sheetLabel: SHEET_LABELS[match.sheetType],
-        deviation: "Kampagne",
+      if (isFiveG(sale.productName)) {
+        ok.push(toRow(sale, matches[0], ""));
+        continue;
+      }
 
-        note: sale.note,
-      });
+      const okMatch = matches.find((m) => campaignMatchesProduct(sale.productName, m.campaignName));
+      if (okMatch) {
+        ok.push(toRow(sale, okMatch, ""));
+        continue;
+      }
+
+      result.push(toRow(sale, matches[0], "Kampagne"));
     }
 
-    return result;
+    return { rows: result, okRows: ok };
   }, [storkSales, powerBiRows, mode, claimPhones, loadingClaimPhones]);
 
   return {
     rows,
+    okRows,
     isLoading: loadingImports || loadingRows || loadingSales || loadingClaimPhones,
     hasImports: (imports || []).length > 0,
+
   };
 }
