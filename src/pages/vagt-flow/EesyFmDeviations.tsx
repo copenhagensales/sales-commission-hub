@@ -168,7 +168,9 @@ const CLAIMS_COLUMNS = [
   "Mobil",
   "Tastselv",
   "Notat",
+  "Status",
 ] as const;
+
 
 const OVERVIEW_VIEWS = [
   {
