@@ -247,6 +247,11 @@ export default function TdcErhvervEditSales() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        <TdcErhvervEditDialog
+          group={editTarget}
+          onOpenChange={(open) => !open && setEditTarget(null)}
+        />
       </div>
     </MainLayout>
   );
