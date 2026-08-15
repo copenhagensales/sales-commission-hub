@@ -7,7 +7,12 @@ import {
   useUpdateEesyFmClaimSale,
   type EesyFmClaimSale,
 } from "@/hooks/useEesyFmClaimSales";
-import { useEesyFmDeviations, type DeviationRow } from "@/hooks/useEesyFmDeviations";
+import {
+  useEesyFmDeviations,
+  OPERATORS_NUUDAY,
+  OPERATORS_NON_NUUDAY,
+  type DeviationRow,
+} from "@/hooks/useEesyFmDeviations";
 import {
   useEesyFmPowerBiImports,
   useUploadPowerBiSheet,
@@ -98,35 +103,6 @@ const CAMPAIGNS_WITHOUT_EFFECT = [
   "Unknown Campaign Name",
 ] as const;
 
-const OPERATORS_NUUDAY = ["eesy", "Telmore", "Yousee"] as const;
-
-const OPERATORS_NON_NUUDAY = [
-  "3",
-  "CBB",
-  "Call Me",
-  "Companymobile",
-  "DUKA (Telenor)",
-  "Dstny (TDC)",
-  "Evercall",
-  "FLEXII",
-  "Flexfone",
-  "HALLO",
-  "Leasy",
-  "Lebara",
-  "Lycamobile",
-  "Mit Tele Mobil",
-  "Mtel",
-  "Nettalk",
-  "Newly Created",
-  "Norlys",
-  "Oister",
-  "Relatel (TDC)",
-  "Telenabler",
-  "Telenor",
-  "UnoTel",
-  "Velkommen",
-  "greentel",
-] as const;
 
 const TABS = [
   { value: "upload", label: "Upload" },

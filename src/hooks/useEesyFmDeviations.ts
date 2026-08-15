@@ -162,6 +162,64 @@ function isFreeMonthCampaign(campaign: string | null): boolean {
   return norm(campaign) === FREE_MONTH_CAMPAIGN;
 }
 
+/** Operator-mapping — eksporteres så Mapping-fanen viser samme sandhed. */
+export const OPERATORS_NUUDAY = ["eesy", "Telmore", "Yousee"] as const;
+
+export const OPERATORS_NON_NUUDAY = [
+  "3",
+  "CBB",
+  "Call Me",
+  "Companymobile",
+  "DUKA (Telenor)",
+  "Dstny (TDC)",
+  "Evercall",
+  "FLEXII",
+  "Flexfone",
+  "HALLO",
+  "Leasy",
+  "Lebara",
+  "Lycamobile",
+  "Mit Tele Mobil",
+  "Mtel",
+  "Nettalk",
+  "Newly Created",
+  "Norlys",
+  "Oister",
+  "Relatel (TDC)",
+  "Telenabler",
+  "Telenor",
+  "UnoTel",
+  "Velkommen",
+  "greentel",
+] as const;
+
+const NUUDAY_OPERATOR_SET = new Set(OPERATORS_NUUDAY.map((o) => norm(o)));
+
+/** Ukendte/tomme operatorer behandles som "ikke Nuuday". */
+function isNuudayOperator(operator: string | null): boolean {
+  return NUUDAY_OPERATOR_SET.has(norm(operator));
+}
+
+/** Om produktnavnet er "(Nuuday)", "(IKKE Nuuday)" eller ukendt. */
+function nuudayMode(product: string | null): "nuuday" | "non_nuuday" | null {
+  const n = norm(product);
+  if (n.includes("ikke nuuday")) return "non_nuuday";
+  if (n.includes("nuuday")) return "nuuday";
+  return null;
+}
+
+/**
+ * Operator-regel:
+ * - produkt med "(IKKE Nuuday)" må ikke være solgt på en Nuuday-operator
+ * - produkt med "(Nuuday)" må ikke være solgt på en ikke-Nuuday-operator
+ */
+function operatorMatchesProduct(product: string | null, operator: string | null): boolean {
+  const mode = nuudayMode(product);
+  if (mode === null) return true;
+  const nuuday = isNuudayOperator(operator);
+  return mode === "nuuday" ? nuuday : !nuuday;
+}
+
 /**
  * Kampagne-regel:
  * - "uden første måned" må ikke være solgt med kampagnen "1 måneds gratis abonnement"
@@ -174,6 +232,7 @@ function campaignMatchesProduct(product: string | null, campaign: string | null)
   const free = isFreeMonthCampaign(campaign);
   return mode === "without" ? !free : free;
 }
+
 
 
 /**
@@ -281,13 +340,21 @@ export function useEesyFmDeviations(
         continue;
       }
 
-      const okMatch = matches.find((m) => campaignMatchesProduct(sale.productName, m.campaignName));
+      const okMatch = matches.find(
+        (m) =>
+          campaignMatchesProduct(sale.productName, m.campaignName) &&
+          operatorMatchesProduct(sale.productName, m.operator),
+      );
       if (okMatch) {
         ok.push(toRow(sale, okMatch, ""));
         continue;
       }
 
-      result.push(toRow(sale, matches[0], "Kampagne"));
+      const first = matches[0];
+      const labels: string[] = [];
+      if (!campaignMatchesProduct(sale.productName, first.campaignName)) labels.push("Kampagne");
+      if (!operatorMatchesProduct(sale.productName, first.operator)) labels.push("Operator");
+      result.push(toRow(sale, first, labels.join(" + ") || "Kampagne"));
     }
 
     return { rows: result, okRows: ok };
