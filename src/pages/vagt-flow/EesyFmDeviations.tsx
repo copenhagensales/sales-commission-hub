@@ -640,8 +640,9 @@ function DeviationsPanel({
   };
 
 
-  return (
+  const mainCard = (
     <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+
       <CardHeader>
         <CardTitle className="text-xl">{title}</CardTitle>
         <CardDescription>{description}</CardDescription>
