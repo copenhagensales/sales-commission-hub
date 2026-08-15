@@ -348,6 +348,33 @@ export default function EditSalesRegistrations() {
     }) => {
       const firstSale = originalGroup.sales[0];
       const baseDate = firstSale?.registered_at ? parseISO(firstSale.registered_at) : new Date();
+
+      // Auto-note when a leader marks a sale as Claim/Reimport without writing a comment
+      const needsAutoNote = items.some(
+        (item) => !item.toDelete && item.claim_reimport === true && !item.comment?.trim()
+      );
+      let autoClaimNote: string | null = null;
+      if (needsAutoNote) {
+        let editorName = "leder";
+        const { data: currentEmployeeId } = await supabase.rpc("get_current_employee_id");
+        if (currentEmployeeId) {
+          const { data: editor } = await supabase
+            .from("employee_master_data")
+            .select("first_name, last_name")
+            .eq("id", currentEmployeeId as string)
+            .maybeSingle();
+          const name = [editor?.first_name, editor?.last_name].filter(Boolean).join(" ").trim();
+          if (name) editorName = name;
+        }
+        autoClaimNote = `Rettet til Claim/Reimport af ${editorName} den ${format(new Date(), "dd/MM/yyyy", { locale: da })}`;
+      }
+
+      const resolveComment = (item: GroupSaleItem) =>
+        item.comment?.trim()
+          ? item.comment
+          : item.claim_reimport === true
+            ? autoClaimNote
+            : null;
       
       // Items to delete
       const toDelete = items.filter(item => item.toDelete && item.id);
@@ -394,7 +421,8 @@ export default function EditSalesRegistrations() {
             raw_payload: {
               ...existingPayload,
               fm_product_name: item.product_name,
-              fm_comment: item.comment || null,
+              fm_comment: resolveComment(item),
+              fm_claim_reimport: item.claim_reimport === true,
               fm_seller_id: updates.seller_id || existingPayload.fm_seller_id,
               fm_location_id: updates.location_id || existingPayload.fm_location_id,
               fm_client_id: updates.client_id || existingPayload.fm_client_id,
@@ -445,7 +473,8 @@ export default function EditSalesRegistrations() {
             fm_location_id: updates.location_id || firstSale?.location_id,
             fm_client_id: updates.client_id || firstSale?.client_id,
             fm_product_name: item.product_name,
-            fm_comment: item.comment || null,
+            fm_comment: resolveComment(item),
+            fm_claim_reimport: item.claim_reimport === true,
           },
         }));
         const { data: insertedNewSales, error } = await supabase
@@ -462,6 +491,7 @@ export default function EditSalesRegistrations() {
       toast.success("Salgsgruppe opdateret");
       queryClient.invalidateQueries({ queryKey: ["fm-sales-edit"] });
       queryClient.invalidateQueries({ queryKey: ["fieldmarketing-sales"] });
+      queryClient.invalidateQueries({ queryKey: ["eesy-fm-claim-sales"] });
       setGroupEditDialog({ open: false, group: null });
     },
     onError: (error: Error) => {
