@@ -1196,13 +1196,60 @@ export default function EesyFmDeviations() {
           </TabsContent>
 
           <TabsContent value="mapping">
-            <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
-              <CardHeader>
-                <CardTitle className="text-xl">Mapping</CardTitle>
-                <CardDescription>Indhold tilføjes senere.</CardDescription>
-              </CardHeader>
-            </Card>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+                <CardHeader>
+                  <CardTitle className="text-xl">Kampagne-mapping</CardTitle>
+                  <CardDescription>
+                    Styrer hvilke PowerBI-kampagner der indgår i afvigelsestjek mod interne Stork-salg.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-semibold">Kampagner med effekt</h4>
+                    <p className="text-xs text-muted-foreground">
+                      Disse kampagner udløser sammenligning mod interne Stork-salg.
+                    </p>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {CAMPAIGNS_WITH_EFFECT.map((name) => (
+                        <span
+                          key={name}
+                          className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-600 dark:text-emerald-400"
+                        >
+                          {name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 border-t border-border/50 pt-4">
+                    <h4 className="text-sm font-semibold">Kampagner uden effekt</h4>
+                    <p className="text-xs text-muted-foreground">
+                      Disse kampagner ignoreres ved afvigelsestjek.
+                    </p>
+                    <p className="pt-1 text-sm text-muted-foreground">Udfyldes senere.</p>
+                  </div>
+
+                  <p className="text-xs text-muted-foreground">
+                    Selve sammenligningsreglen mod interne salg tilføjes i næste trin.
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+                <CardHeader>
+                  <CardTitle className="text-xl">Operator-mapping</CardTitle>
+                  <CardDescription>
+                    Mapning mellem PowerBI-operatorer og interne værdier.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">Udfyldes senere.</p>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
+
 
 
         </Tabs>
