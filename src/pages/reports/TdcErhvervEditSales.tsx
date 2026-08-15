@@ -133,21 +133,27 @@ export default function TdcErhvervEditSales() {
                       </TableRow>
                     ) : (groups || []).length > 0 ? (
                       (groups || []).map((group) => (
-                        <TableRow key={group.saleIds.join("-")}>
-                          <TableCell className="font-mono text-xs whitespace-nowrap">
+                        <TableRow key={group.saleIds.join("-")} className="align-top">
+                          <TableCell className="font-mono text-xs whitespace-nowrap align-top">
                             {group.opp || "Uden OPP"}
                           </TableCell>
-                          <TableCell className="whitespace-nowrap">
+                          <TableCell className="whitespace-nowrap align-top">
                             {group.sellerName}
                           </TableCell>
-                          <TableCell className="min-w-[280px]">
-                            {group.products.length > 0
-                              ? group.products
-                                  .map((p) => `${p.name} x${p.quantity}`)
-                                  .join(", ")
-                              : "-"}
+                          <TableCell className="min-w-[280px] align-top">
+                            {group.products.length > 0 ? (
+                              <div className="flex flex-col gap-1">
+                                {group.products.map((p, i) => (
+                                  <span key={`${p.name}-${i}`}>
+                                    {p.name} x{p.quantity}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              "-"
+                            )}
                           </TableCell>
-                          <TableCell className="w-44 whitespace-nowrap">
+                          <TableCell className="w-44 whitespace-nowrap align-top">
                             <div className="flex items-center justify-end gap-1">
                               <Button
                                 variant="ghost"
