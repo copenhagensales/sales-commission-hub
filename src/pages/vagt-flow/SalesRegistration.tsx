@@ -409,6 +409,8 @@ const SalesRegistration = () => {
       // Reset form
       
       setComment("");
+      setIsClaimReimport(false);
+      setCommentError(false);
       setProductSelections([]);
     } catch (error: any) {
       console.error("Error saving sales:", error);
