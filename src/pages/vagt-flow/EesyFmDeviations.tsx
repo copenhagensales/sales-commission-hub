@@ -8,6 +8,7 @@ import {
   Search,
   CalendarIcon,
   Pencil,
+  Trash2,
   ChevronUp,
   ChevronDown,
 } from "lucide-react";
@@ -379,7 +380,9 @@ function DeviationsPanel({
                   );
                 })}
                 {showRowActions && (
-                  <TableHead className="w-20 whitespace-nowrap text-right">Ret salg</TableHead>
+                  <TableHead className="w-40 whitespace-nowrap text-right">
+                    {claimsMode ? "Handlinger" : "Ret salg"}
+                  </TableHead>
                 )}
               </TableRow>
             </TableHeader>
@@ -408,10 +411,25 @@ function DeviationsPanel({
                       {sale.note || "-"}
                     </TableCell>
                     {showRowActions && (
-                      <TableCell className="w-12">
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
+                      <TableCell className="w-40">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 gap-1.5 text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Rediger
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Slet
+                          </Button>
+                        </div>
                       </TableCell>
                     )}
                   </TableRow>
