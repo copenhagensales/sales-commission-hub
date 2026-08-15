@@ -938,7 +938,9 @@ function OverviewTab() {
         description={active.description}
         columns={active.columns}
         showRowActions={active.showRowActions}
+        deviationMode={active.value}
       />
+
 
     </div>
   );
