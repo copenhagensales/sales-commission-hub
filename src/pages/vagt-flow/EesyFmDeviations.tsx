@@ -75,7 +75,7 @@ const TABS = [
   { value: "upload", label: "Upload" },
   { value: "overview", label: "Oversigt" },
   { value: "raw", label: "Claims/Reimport" },
-  { value: "deleted", label: "Slettede salg" },
+  
 ] as const;
 
 const OVERVIEW_COLUMNS = [
@@ -977,15 +977,6 @@ export default function EesyFmDeviations() {
               showRowActions
               claimsMode
             />
-          </TabsContent>
-
-          <TabsContent value="deleted">
-            <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
-              <CardHeader>
-                <CardTitle className="text-xl">Slettede salg</CardTitle>
-                <CardDescription>Indhold tilføjes senere.</CardDescription>
-              </CardHeader>
-            </Card>
           </TabsContent>
 
 
