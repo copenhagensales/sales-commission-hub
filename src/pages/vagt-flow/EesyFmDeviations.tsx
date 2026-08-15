@@ -502,15 +502,43 @@ function DeviationsPanel({
     claimsMode,
   );
 
+  const {
+    rows: rawDeviationRows,
+    isLoading: loadingDeviations,
+    hasImports,
+  } = useEesyFmDeviations(deviationMode || "missing", fromDate, toDate, !!deviationMode);
+
   const employeeOptions = useMemo(() => {
     const map = new Map<string, string>();
     for (const sale of claimSales || []) {
       if (sale.sellerId) map.set(sale.sellerId, sale.sellerName);
     }
+    for (const row of rawDeviationRows) {
+      if (row.sellerId) map.set(row.sellerId, row.sellerName);
+    }
     return Array.from(map, ([id, name]) => ({ id, name })).sort((a, b) =>
       a.name.localeCompare(b.name, "da"),
     );
-  }, [claimSales]);
+  }, [claimSales, rawDeviationRows]);
+
+  const deviationRows = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    const filtered = rawDeviationRows.filter((row) => {
+      if (employee !== "all" && row.sellerId !== employee) return false;
+      if (!term) return true;
+      return [row.sellerName, row.phone, row.storkProduct, row.powerBiProduct, row.sheetLabel]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(term));
+    });
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      if (sortKey === "seller") {
+        return dir * (a.sellerName || "").localeCompare(b.sellerName || "", "da");
+      }
+      return dir * (new Date(a.saleDatetime).getTime() - new Date(b.saleDatetime).getTime());
+    });
+  }, [rawDeviationRows, search, employee, sortKey, sortDir]);
+
 
   const claimRows = useMemo(() => {
     const term = search.trim().toLowerCase();
