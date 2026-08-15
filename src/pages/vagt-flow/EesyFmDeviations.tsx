@@ -228,14 +228,32 @@ function DeviationsPanel({
 
   const claimRows = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return (claimSales || []).filter((sale) => {
+    const filtered = (claimSales || []).filter((sale) => {
       if (employee !== "all" && sale.sellerId !== employee) return false;
       if (!term) return true;
       return [sale.sellerName, sale.phone, sale.productName, sale.note]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(term));
     });
-  }, [claimSales, search, employee]);
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      if (sortKey === "seller") {
+        return dir * (a.sellerName || "").localeCompare(b.sellerName || "", "da");
+      }
+      return (
+        dir * (new Date(a.saleDatetime).getTime() - new Date(b.saleDatetime).getTime())
+      );
+    });
+  }, [claimSales, search, employee, sortKey, sortDir]);
+
+  const toggleSort = (key: "date" | "seller") => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir(key === "date" ? "desc" : "asc");
+    }
+  };
 
   const handleQuickRange = (value: string) => {
     setQuickRange(value);
