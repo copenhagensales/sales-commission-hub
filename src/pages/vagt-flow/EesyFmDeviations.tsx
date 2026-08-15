@@ -398,6 +398,7 @@ function DeviationsPanel({
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "approved">("all");
   const [pendingId, setPendingId] = useState<string | null>(null);
   const setApproval = useSetEesyFmClaimApproval();
+  const [editSale, setEditSale] = useState<EesyFmClaimSale | null>(null);
 
   const handleApproval = (saleId: string, approved: boolean) => {
     setPendingId(saleId);
