@@ -362,6 +362,16 @@ const SalesRegistration = () => {
       return;
     }
 
+    if (isClaimReimport && !comment.trim()) {
+      setCommentError(true);
+      toast.error("Kommentar er påkrævet ved Claim/Reimport");
+      commentRef.current?.focus();
+      commentRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+
+
+
     setIsSubmitting(true);
     
     // Use client from booking if available, otherwise use locationId to look it up
