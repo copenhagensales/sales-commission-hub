@@ -147,9 +147,7 @@ const MISSING_COLUMNS = [
   "Salgsdato",
   "Sælger",
   "Mobil",
-  "Produkt",
   "Tastselv",
-  "Type",
 ] as const;
 
 const OVERVIEW_VIEWS = [
@@ -158,12 +156,14 @@ const OVERVIEW_VIEWS = [
     title: "Afvigelser — oversigt",
     description: "Sammenholdte salg mellem Tastselv og PowerBI med afvigelser markeret.",
     columns: OVERVIEW_COLUMNS as readonly string[],
+    showRowActions: false,
   },
   {
     value: "missing" as const,
     title: "Mangler i PowerBI",
     description: "Salg registreret i Tastselv, som ikke er fundet i PowerBI.",
     columns: MISSING_COLUMNS as readonly string[],
+    showRowActions: true,
   },
 ];
 
@@ -173,10 +173,12 @@ function DeviationsPanel({
   title,
   description,
   columns,
+  showRowActions = false,
 }: {
   title: string;
   description: string;
   columns: readonly string[];
+  showRowActions?: boolean;
 }) {
   const [fromDate, setFromDate] = useState<Date | undefined>();
   const [toDate, setToDate] = useState<Date | undefined>();
