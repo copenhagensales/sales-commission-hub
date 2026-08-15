@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Pencil, Trash2, Search, ChevronDown, ChevronRight, Plus, X } from "lucide-react";
+import { Loader2, Pencil, Trash2, Search, ChevronDown, ChevronRight, Plus, X, Flag } from "lucide-react";
 import { toast } from "sonner";
 import { format, parseISO, startOfMonth, endOfMonth } from "date-fns";
 import { fetchAllRows } from "@/utils/supabasePagination";
@@ -1101,6 +1101,19 @@ export default function EditSalesRegistrations() {
                         <span className="text-xs text-muted-foreground">
                           {item.id ? `Salg #${index + 1}` : 'Nyt salg'}
                         </span>
+                        <div className="flex items-center gap-1">
+                        {!item.toDelete && (
+                          <Button
+                            type="button"
+                            variant={item.claim_reimport ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => updateGroupSaleItem(index, "claim_reimport", !item.claim_reimport)}
+                            className="h-7 text-xs"
+                          >
+                            <Flag className="h-3 w-3 mr-1" />
+                            {item.claim_reimport ? "Claim/Reimport" : "Marker som Claim/Reimport"}
+                          </Button>
+                        )}
                         {item.id ? (
                           <Button
                             variant="ghost"
@@ -1120,6 +1133,7 @@ export default function EditSalesRegistrations() {
                             <X className="h-3 w-3" />
                           </Button>
                         )}
+                        </div>
                       </div>
                       
                       {!item.toDelete && (
