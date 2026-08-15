@@ -1,7 +1,11 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   useEesyFmClaimSales,
   useSetEesyFmClaimApproval,
+  useEesyFmProducts,
+  useEesyFmSellers,
+  useUpdateEesyFmClaimSale,
+  type EesyFmClaimSale,
 } from "@/hooks/useEesyFmClaimSales";
 import { toast } from "sonner";
 import { useDropzone } from "react-dropzone";
@@ -53,6 +57,17 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { VagtFlowLayout } from "@/components/vagt-flow/VagtFlowLayout";
 import { cn } from "@/lib/utils";
 
@@ -195,6 +210,167 @@ const OVERVIEW_VIEWS = [
 
 type OverviewView = (typeof OVERVIEW_VIEWS)[number]["value"];
 
+function ClaimEditDialog({
+  sale,
+  onOpenChange,
+}: {
+  sale: EesyFmClaimSale | null;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { data: products } = useEesyFmProducts();
+  const { data: sellers } = useEesyFmSellers();
+  const updateSale = useUpdateEesyFmClaimSale();
+
+  const [productName, setProductName] = useState("");
+  const [sellerId, setSellerId] = useState("");
+  const [saleDatetime, setSaleDatetime] = useState("");
+  const [phone, setPhone] = useState("");
+  const [note, setNote] = useState("");
+  const [removeClaim, setRemoveClaim] = useState(false);
+
+  useEffect(() => {
+    if (!sale) return;
+    setProductName(sale.productName || "");
+    setSellerId(sale.sellerId || "");
+    setSaleDatetime(format(new Date(sale.saleDatetime), "yyyy-MM-dd'T'HH:mm"));
+    setPhone(sale.phone || "");
+    setNote(sale.note || "");
+    setRemoveClaim(false);
+  }, [sale]);
+
+  const handleSave = () => {
+    if (!sale) return;
+    if (!productName) {
+      toast.error("Vælg et produkt");
+      return;
+    }
+    if (!saleDatetime) {
+      toast.error("Angiv en dato");
+      return;
+    }
+    updateSale.mutate(
+      {
+        saleId: sale.id,
+        productName,
+        sellerId,
+        saleDatetime: new Date(saleDatetime).toISOString(),
+        phone: phone.trim() || null,
+        note: note.trim() || null,
+        keepClaim: !removeClaim,
+      },
+      {
+        onSuccess: () => {
+          toast.success("Salget er opdateret");
+          onOpenChange(false);
+        },
+        onError: (err: any) =>
+          toast.error(err?.message || "Kunne ikke opdatere salget"),
+      },
+    );
+  };
+
+  return (
+    <Dialog open={!!sale} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Ret salgsregistrering</DialogTitle>
+          <DialogDescription>
+            Ændringer gemmes på salget og slår igennem i hele Stork.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <Label>Produkt</Label>
+            <Select value={productName} onValueChange={setProductName}>
+              <SelectTrigger>
+                <SelectValue placeholder="Vælg produkt" />
+              </SelectTrigger>
+              <SelectContent>
+                {(products || []).map((p) => (
+                  <SelectItem key={p.id} value={p.name}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Sælger</Label>
+            <Select value={sellerId} onValueChange={setSellerId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Vælg sælger" />
+              </SelectTrigger>
+              <SelectContent>
+                {(sellers || []).map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label>Dato og tid</Label>
+              <Input
+                type="datetime-local"
+                value={saleDatetime}
+                onChange={(e) => setSaleDatetime(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Mobil/telefonnummer</Label>
+              <Input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="12345678"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Notat/kommentar</Label>
+            <Textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={3}
+              placeholder="Kommentar til salget"
+            />
+          </div>
+
+          <div className="flex items-start gap-2 rounded-lg border border-border/50 p-3">
+            <Checkbox
+              id="remove-claim"
+              checked={removeClaim}
+              onCheckedChange={(v) => setRemoveClaim(v === true)}
+            />
+            <div className="space-y-0.5">
+              <Label htmlFor="remove-claim" className="cursor-pointer">
+                Fjern Claim/Reimport-registrering
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Salget bevares, men fjernes fra denne liste.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Annuller
+          </Button>
+          <Button onClick={handleSave} disabled={updateSale.isPending}>
+            {updateSale.isPending ? "Gemmer..." : "Gem ændringer"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function DeviationsPanel({
   title,
   description,
@@ -222,6 +398,7 @@ function DeviationsPanel({
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "approved">("all");
   const [pendingId, setPendingId] = useState<string | null>(null);
   const setApproval = useSetEesyFmClaimApproval();
+  const [editSale, setEditSale] = useState<EesyFmClaimSale | null>(null);
 
   const handleApproval = (saleId: string, approved: boolean) => {
     setPendingId(saleId);
@@ -509,6 +686,7 @@ function DeviationsPanel({
                           <Button
                             variant="ghost"
                             size="sm"
+                            onClick={() => setEditSale(sale)}
                             className="h-8 gap-1.5 text-muted-foreground hover:text-foreground"
                           >
                             <Pencil className="h-3.5 w-3.5" />
@@ -542,6 +720,13 @@ function DeviationsPanel({
             </TableBody>
           </Table>
         </div>
+
+        <ClaimEditDialog
+          sale={editSale}
+          onOpenChange={(open) => {
+            if (!open) setEditSale(null);
+          }}
+        />
       </CardContent>
     </Card>
   );
