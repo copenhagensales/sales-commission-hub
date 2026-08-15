@@ -859,6 +859,13 @@ export default function EditSalesRegistrations() {
                                   <TableCell className="max-w-[150px] truncate text-muted-foreground">
                                     {sale.comment || "-"}
                                   </TableCell>
+                                  <TableCell>
+                                    {sale.claim_reimport ? (
+                                      <Badge variant="default">Ja</Badge>
+                                    ) : (
+                                      <span className="text-muted-foreground text-xs">Nej</span>
+                                    )}
+                                  </TableCell>
                                 </TableRow>
                               ))}
                             </TableBody>
