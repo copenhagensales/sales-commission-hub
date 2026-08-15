@@ -7,6 +7,15 @@ import {
   useUpdateEesyFmClaimSale,
   type EesyFmClaimSale,
 } from "@/hooks/useEesyFmClaimSales";
+import { useEesyFmDeviations } from "@/hooks/useEesyFmDeviations";
+import {
+  useEesyFmPowerBiImports,
+  useUploadPowerBiSheet,
+  useRemovePowerBiImport,
+  SHEET_LABELS,
+  type PowerBiSheetType,
+  type PowerBiImport,
+} from "@/hooks/useEesyFmPowerBiImports";
 import { toast } from "sonner";
 import { useDropzone } from "react-dropzone";
 import {
@@ -205,7 +214,7 @@ const OVERVIEW_VIEWS = [
     title: "Mangler i PowerBI",
     description: "Salg registreret i Tastselv, som ikke er fundet i PowerBI.",
     columns: MISSING_COLUMNS as readonly string[],
-    showRowActions: true,
+    showRowActions: false,
   },
 ];
 
@@ -456,12 +465,14 @@ function DeviationsPanel({
   columns,
   showRowActions = false,
   claimsMode = false,
+  deviationMode,
 }: {
   title: string;
   description: string;
   columns: readonly string[];
   showRowActions?: boolean;
   claimsMode?: boolean;
+  deviationMode?: "deviations" | "missing";
 }) {
   const [fromDate, setFromDate] = useState<Date | undefined>(
     claimsMode ? startOfMonth(new Date()) : undefined,
@@ -500,15 +511,43 @@ function DeviationsPanel({
     claimsMode,
   );
 
+  const {
+    rows: rawDeviationRows,
+    isLoading: loadingDeviations,
+    hasImports,
+  } = useEesyFmDeviations(deviationMode || "missing", fromDate, toDate, !!deviationMode);
+
   const employeeOptions = useMemo(() => {
     const map = new Map<string, string>();
     for (const sale of claimSales || []) {
       if (sale.sellerId) map.set(sale.sellerId, sale.sellerName);
     }
+    for (const row of rawDeviationRows) {
+      if (row.sellerId) map.set(row.sellerId, row.sellerName);
+    }
     return Array.from(map, ([id, name]) => ({ id, name })).sort((a, b) =>
       a.name.localeCompare(b.name, "da"),
     );
-  }, [claimSales]);
+  }, [claimSales, rawDeviationRows]);
+
+  const deviationRows = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    const filtered = rawDeviationRows.filter((row) => {
+      if (employee !== "all" && row.sellerId !== employee) return false;
+      if (!term) return true;
+      return [row.sellerName, row.phone, row.storkProduct, row.powerBiProduct, row.sheetLabel]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(term));
+    });
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      if (sortKey === "seller") {
+        return dir * (a.sellerName || "").localeCompare(b.sellerName || "", "da");
+      }
+      return dir * (new Date(a.saleDatetime).getTime() - new Date(b.saleDatetime).getTime());
+    });
+  }, [rawDeviationRows, search, employee, sortKey, sortDir]);
+
 
   const claimRows = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -651,10 +690,11 @@ function DeviationsPanel({
             <TableHeader>
               <TableRow>
                 {columns.map((col) => {
+                  const sortable = claimsMode || !!deviationMode;
                   const sortableKey =
-                    claimsMode && col === "Salgsdato"
+                    sortable && col === "Salgsdato"
                       ? ("date" as const)
-                      : claimsMode && col === "Sælger"
+                      : sortable && col === "Sælger"
                         ? ("seller" as const)
                         : null;
                   return (
@@ -699,7 +739,59 @@ function DeviationsPanel({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {claimsMode && loadingClaims ? (
+              {deviationMode ? (
+                loadingDeviations ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={columns.length + (showRowActions ? 1 : 0)}
+                      className="py-16 text-center text-sm text-muted-foreground"
+                    >
+                      Sammenholder salg...
+                    </TableCell>
+                  </TableRow>
+                ) : deviationRows.length > 0 ? (
+                  deviationRows.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell className="whitespace-nowrap">
+                        {format(new Date(row.saleDatetime), "dd/MM/yyyy HH:mm", { locale: da })}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">{row.sellerName}</TableCell>
+                      <TableCell className="font-mono text-xs whitespace-nowrap">
+                        {row.phone || "-"}
+                      </TableCell>
+                      {deviationMode === "deviations" && (
+                        <TableCell className="whitespace-nowrap">
+                          <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-500">
+                            {row.deviation}
+                          </span>
+                        </TableCell>
+                      )}
+                      <TableCell className="min-w-[200px]">{row.storkProduct || "-"}</TableCell>
+                      {deviationMode === "deviations" && (
+                        <>
+                          <TableCell className="min-w-[200px]">
+                            {row.powerBiProduct || "-"}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap text-muted-foreground">
+                            {row.sheetLabel || "-"}
+                          </TableCell>
+                        </>
+                      )}
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell
+                      colSpan={columns.length + (showRowActions ? 1 : 0)}
+                      className="py-16 text-center text-sm text-muted-foreground"
+                    >
+                      {hasImports
+                        ? "Ingen afvigelser i den valgte periode."
+                        : "Upload et PowerBI-ark under fanen Upload for at sammenligne."}
+                    </TableCell>
+                  </TableRow>
+                )
+              ) : claimsMode && loadingClaims ? (
                 <TableRow>
                   <TableCell
                     colSpan={columns.length + (showRowActions ? 1 : 0)}
@@ -846,7 +938,9 @@ function OverviewTab() {
         description={active.description}
         columns={active.columns}
         showRowActions={active.showRowActions}
+        deviationMode={active.value}
       />
+
 
     </div>
   );
@@ -854,36 +948,108 @@ function OverviewTab() {
 
 
 
-function FileDropzone({
-  label,
-  dropText,
-  file,
-  onFile,
-  onClear,
+function PowerBiDropzone({
+  sheetType,
+  existing,
 }: {
-  label: string;
-  dropText: string;
-  file: File | null;
-  onFile: (file: File) => void;
-  onClear: () => void;
+  sheetType: PowerBiSheetType;
+  existing?: PowerBiImport;
 }) {
+  const label = SHEET_LABELS[sheetType];
+  const upload = useUploadPowerBiSheet();
+  const remove = useRemovePowerBiImport();
+
+  const handleFile = (file: File) => {
+    upload.mutate(
+      { file, sheetType },
+      {
+        onSuccess: (res) =>
+          toast.success(`${label}: ${res.rowCount} rækker indlæst`),
+        onError: (err: any) =>
+          toast.error(err?.message || "Kunne ikke indlæse arket"),
+      },
+    );
+  };
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop: (accepted) => {
-      if (accepted[0]) onFile(accepted[0]);
+      if (accepted[0]) handleFile(accepted[0]);
     },
     accept: XLSX_ACCEPT,
     maxFiles: 1,
+    disabled: upload.isPending,
   });
 
-  if (file) {
+  const replaceInput = (
+    <input
+      type="file"
+      accept=".xlsx"
+      className="hidden"
+      id={`replace-${sheetType}`}
+      onChange={(e) => {
+        const file = e.target.files?.[0];
+        if (file) handleFile(file);
+        e.target.value = "";
+      }}
+    />
+  );
+
+  if (upload.isPending) {
+    return (
+      <div className="border-2 border-dashed rounded-lg p-8 text-center border-primary/40 bg-primary/5">
+        <FileSpreadsheet className="h-10 w-10 mx-auto mb-3 text-primary animate-pulse" />
+        <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">{label}</p>
+        <p className="text-sm font-medium">Indlæser ark...</p>
+      </div>
+    );
+  }
+
+  if (existing) {
+    const period =
+      existing.periodFrom && existing.periodTo
+        ? `${format(new Date(existing.periodFrom), "dd/MM/yyyy", { locale: da })} – ${format(
+            new Date(existing.periodTo),
+            "dd/MM/yyyy",
+            { locale: da },
+          )}`
+        : "Ukendt periode";
     return (
       <div className="border-2 border-dashed rounded-lg p-8 text-center border-success/40 bg-success/5">
         <FileSpreadsheet className="h-10 w-10 mx-auto mb-3 text-success" />
         <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">{label}</p>
-        <p className="text-sm font-medium truncate">{file.name}</p>
-        <Button variant="ghost" size="sm" className="mt-2 h-7" onClick={onClear}>
-          <X className="h-3.5 w-3.5 mr-1" /> Skift fil
-        </Button>
+        <p className="text-sm font-medium truncate">{existing.fileName}</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          {existing.rowCount} rækker · {period}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Uploadet {format(new Date(existing.createdAt), "dd/MM/yyyy HH:mm", { locale: da })}
+        </p>
+        <div className="mt-2 flex items-center justify-center gap-1">
+          {replaceInput}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7"
+            onClick={() => document.getElementById(`replace-${sheetType}`)?.click()}
+          >
+            <Upload className="h-3.5 w-3.5 mr-1" /> Skift fil
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+            disabled={remove.isPending}
+            onClick={() =>
+              remove.mutate(existing, {
+                onSuccess: () => toast.success(`${label}-arket er fjernet`),
+                onError: (err: any) =>
+                  toast.error(err?.message || "Kunne ikke fjerne arket"),
+              })
+            }
+          >
+            <X className="h-3.5 w-3.5 mr-1" /> Fjern
+          </Button>
+        </div>
       </div>
     );
   }
@@ -902,7 +1068,7 @@ function FileDropzone({
         <p className="text-base">Slip filen her...</p>
       ) : (
         <>
-          <p className="text-base mb-1">{dropText}</p>
+          <p className="text-base mb-1">Træk og slip {label}-fil</p>
           <p className="text-xs text-muted-foreground">eller klik for at vælge</p>
         </>
       )}
@@ -911,8 +1077,9 @@ function FileDropzone({
 }
 
 export default function EesyFmDeviations() {
-  const [gadenCoopFile, setGadenCoopFile] = useState<File | null>(null);
-  const [markedFile, setMarkedFile] = useState<File | null>(null);
+  const { data: imports } = useEesyFmPowerBiImports();
+  const findImport = (type: PowerBiSheetType) =>
+    (imports || []).find((i) => i.sheetType === type);
 
   return (
     <VagtFlowLayout>
@@ -941,25 +1108,14 @@ export default function EesyFmDeviations() {
                   Upload kurv-fil
                 </CardTitle>
                 <CardDescription>
-                  Upload Excel-filer (.xlsx). Én fil for Gaden/Coop og én for Marked.
+                  Upload Excel-filer (.xlsx). Én fil for Gaden/Coop og én for Marked. Arkene
+                  forbliver indlæst indtil de fjernes.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid md:grid-cols-2 gap-4">
-                  <FileDropzone
-                    label="Gaden/Coop"
-                    dropText="Træk og slip Gaden/Coop-fil"
-                    file={gadenCoopFile}
-                    onFile={setGadenCoopFile}
-                    onClear={() => setGadenCoopFile(null)}
-                  />
-                  <FileDropzone
-                    label="Marked"
-                    dropText="Træk og slip Marked-fil"
-                    file={markedFile}
-                    onFile={setMarkedFile}
-                    onClear={() => setMarkedFile(null)}
-                  />
+                  <PowerBiDropzone sheetType="gaden_coop" existing={findImport("gaden_coop")} />
+                  <PowerBiDropzone sheetType="marked" existing={findImport("marked")} />
                 </div>
               </CardContent>
             </Card>
