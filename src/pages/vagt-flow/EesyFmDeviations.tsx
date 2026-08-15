@@ -258,6 +258,8 @@ function DeviationsPanel({
     const term = search.trim().toLowerCase();
     const filtered = (claimSales || []).filter((sale) => {
       if (employee !== "all" && sale.sellerId !== employee) return false;
+      if (statusFilter === "approved" && !sale.approved) return false;
+      if (statusFilter === "pending" && sale.approved) return false;
       if (!term) return true;
       return [sale.sellerName, sale.phone, sale.productName, sale.note]
         .filter(Boolean)
@@ -272,7 +274,8 @@ function DeviationsPanel({
         dir * (new Date(a.saleDatetime).getTime() - new Date(b.saleDatetime).getTime())
       );
     });
-  }, [claimSales, search, employee, sortKey, sortDir]);
+  }, [claimSales, search, employee, statusFilter, sortKey, sortDir]);
+
 
   const toggleSort = (key: "date" | "seller") => {
     if (sortKey === key) {
