@@ -1442,10 +1442,6 @@ export default function EesyFmDeviations() {
                       ))}
                     </div>
                   </div>
-
-                  <p className="text-xs text-muted-foreground">
-                    Selve sammenligningsreglen mod interne salg tilføjes i næste trin.
-                  </p>
                 </CardContent>
               </Card>
 
@@ -1490,10 +1486,6 @@ export default function EesyFmDeviations() {
                       ))}
                     </div>
                   </div>
-
-                  <p className="text-xs text-muted-foreground">
-                    Selve sammenligningsreglen mod interne salg tilføjes i næste trin.
-                  </p>
                 </CardContent>
               </Card>
             </div>
