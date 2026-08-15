@@ -93,7 +93,9 @@ const OVERVIEW_COLUMNS = [
   "Mobil",
   "Afvigelse",
   "Tastselv",
-  "PowerBI",
+  "PB Produkt",
+  "PB Kampagne",
+  "PB Operator",
   "Type",
 ] as const;
 
