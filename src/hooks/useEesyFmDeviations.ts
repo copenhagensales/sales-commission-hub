@@ -103,6 +103,39 @@ export function useEesyFmStorkSales(from?: Date, to?: Date, enabled = true) {
   });
 }
 
+/** Normaliserede numre på Eesy FM-salg markeret som Claim/Reimport. */
+export function useEesyFmClaimPhones(from?: Date, to?: Date, enabled = true) {
+  const fromIso = from ? from.toISOString() : undefined;
+  const toIso = to ? to.toISOString() : undefined;
+
+  return useQuery({
+    queryKey: ["eesy-fm-claim-phones", fromIso, toIso],
+    enabled,
+    queryFn: async (): Promise<Set<string>> => {
+      const rows = await fetchAllRows<{ customer_phone: string | null }>(
+        "sales",
+        "customer_phone",
+        (query) => {
+          let q = query
+            .eq("source", "fieldmarketing")
+            .eq("raw_payload->>fm_client_id", EESY_FM_CLIENT_ID)
+            .eq("raw_payload->>fm_claim_reimport", "true");
+          if (fromIso) q = q.gte("sale_datetime", fromIso);
+          if (toIso) q = q.lte("sale_datetime", toIso);
+          return q;
+        },
+      );
+
+      const set = new Set<string>();
+      for (const row of rows) {
+        const normalized = normalizePhone(row.customer_phone);
+        if (normalized) set.add(normalized);
+      }
+      return set;
+    },
+  });
+}
+
 function sameProduct(a: string | null, b: string | null): boolean {
   const norm = (v: string | null) =>
     (v || "")
@@ -151,8 +184,15 @@ export function useEesyFmDeviations(
     enabled && (!!effFrom || (imports || []).length === 0),
   );
 
+  const { data: claimPhones, isLoading: loadingClaimPhones } = useEesyFmClaimPhones(
+    effFrom,
+    effTo,
+    enabled && mode === "missing",
+  );
+
   const rows = useMemo<DeviationRow[]>(() => {
     if (!storkSales) return [];
+    if (mode === "missing" && loadingClaimPhones) return [];
 
     const byPhone = new Map<string, PowerBiRow[]>();
     for (const row of powerBiRows || []) {
@@ -168,6 +208,7 @@ export function useEesyFmDeviations(
       const matches = sale.phoneNormalized ? byPhone.get(sale.phoneNormalized) : undefined;
 
       if (mode === "missing") {
+        if (sale.phoneNormalized && claimPhones?.has(sale.phoneNormalized)) continue;
         if (!matches || matches.length === 0) {
           result.push({
             id: sale.id,
@@ -209,11 +250,11 @@ export function useEesyFmDeviations(
     }
 
     return result;
-  }, [storkSales, powerBiRows, mode]);
+  }, [storkSales, powerBiRows, mode, claimPhones, loadingClaimPhones]);
 
   return {
     rows,
-    isLoading: loadingImports || loadingRows || loadingSales,
+    isLoading: loadingImports || loadingRows || loadingSales || loadingClaimPhones,
     hasImports: (imports || []).length > 0,
   };
 }
