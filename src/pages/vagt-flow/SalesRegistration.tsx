@@ -229,6 +229,8 @@ const SalesRegistration = () => {
     setCallbackDate(undefined);
     setProductSelections([]);
     setComment("");
+    setIsClaimReimport(false);
+    setCommentError(false);
   };
 
   // Auto-set location when today's booking is loaded
