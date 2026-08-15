@@ -214,7 +214,7 @@ const OVERVIEW_VIEWS = [
     title: "Mangler i PowerBI",
     description: "Salg registreret i Tastselv, som ikke er fundet i PowerBI.",
     columns: MISSING_COLUMNS as readonly string[],
-    showRowActions: true,
+    showRowActions: false,
   },
 ];
 
