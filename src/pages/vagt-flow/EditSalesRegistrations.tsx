@@ -208,6 +208,7 @@ export default function EditSalesRegistrations() {
           product_name: payload.fm_product_name || null,
           phone_number: sale.customer_phone || null,
           comment: payload.fm_comment || null,
+          claim_reimport: payload.fm_claim_reimport === true,
           registered_at: sale.sale_datetime,
           created_at: sale.created_at,
           seller: sellerId ? sellersMap.get(sellerId) || null : null,
