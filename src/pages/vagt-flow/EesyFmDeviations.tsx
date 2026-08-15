@@ -8,6 +8,7 @@ import {
   Search,
   CalendarIcon,
   Pencil,
+  Check,
   Trash2,
   ChevronUp,
   ChevronDown,
