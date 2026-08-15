@@ -223,6 +223,8 @@ function ClaimEditDialog({
 
   const [productName, setProductName] = useState("");
   const [sellerId, setSellerId] = useState("");
+  const [sellerQuery, setSellerQuery] = useState("");
+  const [sellerOpen, setSellerOpen] = useState(false);
   const [saleDatetime, setSaleDatetime] = useState("");
   const [phone, setPhone] = useState("");
   const [note, setNote] = useState("");
@@ -232,11 +234,34 @@ function ClaimEditDialog({
     if (!sale) return;
     setProductName(sale.productName || "");
     setSellerId(sale.sellerId || "");
+    setSellerQuery(sale.sellerName || "");
+    setSellerOpen(false);
     setSaleDatetime(format(new Date(sale.saleDatetime), "yyyy-MM-dd'T'HH:mm"));
     setPhone(sale.phone || "");
     setNote(sale.note || "");
     setRemoveClaim(false);
   }, [sale]);
+
+  const normalize = (v: string) =>
+    v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+
+  const sellerSuggestions = useMemo(() => {
+    const q = normalize(sellerQuery);
+    if (q.length < 3) return [];
+    const list = sellers || [];
+    const firstNameMatches = list.filter((s) => normalize(s.name).startsWith(q));
+    const otherNameMatches = list.filter(
+      (s) =>
+        !firstNameMatches.includes(s) &&
+        normalize(s.name)
+          .split(/\s+/)
+          .some((part) => part.startsWith(q)),
+    );
+    return [...firstNameMatches, ...otherNameMatches].slice(0, 20);
+  }, [sellerQuery, sellers]);
+
+  const selectedSeller = (sellers || []).find((s) => s.id === sellerId);
+
 
   const handleSave = () => {
     if (!sale) return;
