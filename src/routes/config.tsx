@@ -99,6 +99,7 @@ import {
   PublicReferralForm,
   Referrals,
   ReportsAdmin,
+  TdcErhvervEditSales,
   ReportsManagement,
   ReportsEmployee,
   DailyReports,
@@ -419,6 +420,7 @@ export const routes: RouteConfig[] = [
   { path: "/reports/employee", component: ReportsEmployee, access: "role", positionPermission: "menu_reports_employee" },
   { path: "/reports/daily", component: DailyReports, access: "role", positionPermission: "menu_reports_daily" },
   { path: "/reports/revenue-by-client", component: RevenueByClient, access: "role", positionPermission: "menu_reports_revenue_by_client" },
+  { path: "/reports/tdc-erhverv-edit-sales", component: TdcErhvervEditSales, access: "role", positionPermission: "menu_reports_tdc_edit_sales" },
 
   // Security Dashboard
   { path: "/admin/security", component: SecurityDashboard, access: "role", positionPermission: "menu_security_dashboard" },

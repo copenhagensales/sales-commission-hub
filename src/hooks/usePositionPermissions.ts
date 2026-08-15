@@ -655,6 +655,8 @@ export function usePermissions() {
     canViewReportsDailyReports: canView("menu_reports_daily"),
     canViewReportsManagement: canView("menu_reports_management"),
     canViewReportsEmployee: canView("menu_reports_employee"),
+    canViewReportsTdcEditSales: canView("menu_reports_tdc_edit_sales"),
+    canEditReportsTdcEditSales: canEdit("menu_reports_tdc_edit_sales"),
     // Employee SMS permission
     canSendEmployeeSms: canView("employee_sms"),
     // League admin
