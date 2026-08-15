@@ -20,6 +20,7 @@ export interface EesyFmStorkSale {
   phone: string | null;
   phoneNormalized: string | null;
   productName: string | null;
+  note: string | null;
 }
 
 export interface DeviationRow {
@@ -34,6 +35,7 @@ export interface DeviationRow {
   powerBiOperator: string | null;
   sheetLabel: string | null;
   deviation: string;
+  note: string | null;
 }
 
 /** Alle Eesy FM-salg i Stork i perioden (read-only). */
@@ -94,6 +96,7 @@ export function useEesyFmStorkSales(from?: Date, to?: Date, enabled = true) {
           phone: row.customer_phone,
           phoneNormalized: normalizePhone(row.customer_phone),
           productName: payload.fm_product_name || null,
+          note: payload.fm_comment || null,
         };
       });
     },
@@ -178,6 +181,7 @@ export function useEesyFmDeviations(
             powerBiOperator: null,
             sheetLabel: null,
             deviation: "Mangler i PowerBI",
+            note: sale.note,
           });
         }
         continue;
@@ -200,6 +204,7 @@ export function useEesyFmDeviations(
         powerBiOperator: match.operator,
         sheetLabel: SHEET_LABELS[match.sheetType],
         deviation: "Produkt",
+        note: sale.note,
       });
     }
 

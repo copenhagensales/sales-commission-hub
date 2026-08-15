@@ -249,6 +249,7 @@ export function useUpdateEesyFmClaimSale() {
     onSuccess: () => {
       for (const key of [
         ["eesy-fm-claim-sales"],
+        ["eesy-fm-stork-sales"],
         ["fm-sales-edit"],
         ["fieldmarketing-sales"],
         ["sales-aggregates"],
