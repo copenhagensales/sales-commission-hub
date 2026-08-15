@@ -5,6 +5,7 @@ import {
   useEesyFmProducts,
   useEesyFmSellers,
   useUpdateEesyFmClaimSale,
+  useDeleteEesyFmSale,
   type EesyFmClaimSale,
 } from "@/hooks/useEesyFmClaimSales";
 import {
