@@ -269,6 +269,10 @@ function ClaimEditDialog({
       toast.error("Vælg et produkt");
       return;
     }
+    if (!sellerId) {
+      toast.error("Vælg en sælger fra søgeforslagene");
+      return;
+    }
     if (!saleDatetime) {
       toast.error("Angiv en dato");
       return;
