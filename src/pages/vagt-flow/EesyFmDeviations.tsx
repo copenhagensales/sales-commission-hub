@@ -8,6 +8,7 @@ import {
   Search,
   CalendarIcon,
   Pencil,
+  Check,
   Trash2,
   ChevronUp,
   ChevronDown,
@@ -380,7 +381,7 @@ function DeviationsPanel({
                   );
                 })}
                 {showRowActions && (
-                  <TableHead className="w-40 whitespace-nowrap text-right">
+                  <TableHead className={`${claimsMode ? "w-56" : "w-40"} whitespace-nowrap text-right`}>
                     {claimsMode ? "Handlinger" : "Ret salg"}
                   </TableHead>
                 )}
@@ -411,12 +412,19 @@ function DeviationsPanel({
                       {sale.note || "-"}
                     </TableCell>
                     {showRowActions && (
-                      <TableCell className="w-40">
+                      <TableCell className="w-56 whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1">
+                          <Button
+                            size="sm"
+                            className="h-8 gap-1.5 bg-emerald-500 text-emerald-950 hover:bg-emerald-400"
+                          >
+                            <Check className="h-3.5 w-3.5" />
+                            Godkend
+                          </Button>
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-8 gap-1.5 text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10"
+                            className="h-8 gap-1.5 text-muted-foreground hover:text-foreground"
                           >
                             <Pencil className="h-3.5 w-3.5" />
                             Rediger
@@ -432,6 +440,7 @@ function DeviationsPanel({
                         </div>
                       </TableCell>
                     )}
+
                   </TableRow>
                 ))
               ) : (
