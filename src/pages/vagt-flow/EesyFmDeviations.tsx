@@ -1,7 +1,16 @@
 import { useState, useMemo } from "react";
 import { useEesyFmClaimSales } from "@/hooks/useEesyFmClaimSales";
 import { useDropzone } from "react-dropzone";
-import { FileSpreadsheet, Upload, X, Search, CalendarIcon, Pencil } from "lucide-react";
+import {
+  FileSpreadsheet,
+  Upload,
+  X,
+  Search,
+  CalendarIcon,
+  Pencil,
+  ChevronUp,
+  ChevronDown,
+} from "lucide-react";
 import {
   format,
   startOfDay,
@@ -200,6 +209,8 @@ function DeviationsPanel({
   const [search, setSearch] = useState("");
   const [employee, setEmployee] = useState<string>("all");
   const [quickRange, setQuickRange] = useState<string>(claimsMode ? "this-month" : "custom");
+  const [sortKey, setSortKey] = useState<"date" | "seller">("date");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const { data: claimSales, isLoading: loadingClaims } = useEesyFmClaimSales(
     fromDate,
@@ -219,14 +230,32 @@ function DeviationsPanel({
 
   const claimRows = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return (claimSales || []).filter((sale) => {
+    const filtered = (claimSales || []).filter((sale) => {
       if (employee !== "all" && sale.sellerId !== employee) return false;
       if (!term) return true;
       return [sale.sellerName, sale.phone, sale.productName, sale.note]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(term));
     });
-  }, [claimSales, search, employee]);
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      if (sortKey === "seller") {
+        return dir * (a.sellerName || "").localeCompare(b.sellerName || "", "da");
+      }
+      return (
+        dir * (new Date(a.saleDatetime).getTime() - new Date(b.saleDatetime).getTime())
+      );
+    });
+  }, [claimSales, search, employee, sortKey, sortDir]);
+
+  const toggleSort = (key: "date" | "seller") => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir(key === "date" ? "desc" : "asc");
+    }
+  };
 
   const handleQuickRange = (value: string) => {
     setQuickRange(value);
@@ -314,14 +343,41 @@ function DeviationsPanel({
           <Table>
             <TableHeader>
               <TableRow>
-                {columns.map((col) => (
-                  <TableHead
-                    key={col}
-                    className={col === "Notat" ? "w-full min-w-[240px]" : "whitespace-nowrap"}
-                  >
-                    {col}
-                  </TableHead>
-                ))}
+                {columns.map((col) => {
+                  const sortableKey =
+                    claimsMode && col === "Salgsdato"
+                      ? ("date" as const)
+                      : claimsMode && col === "Sælger"
+                        ? ("seller" as const)
+                        : null;
+                  return (
+                    <TableHead
+                      key={col}
+                      className={col === "Notat" ? "w-full min-w-[240px]" : "whitespace-nowrap"}
+                    >
+                      {sortableKey ? (
+                        <button
+                          type="button"
+                          onClick={() => toggleSort(sortableKey)}
+                          className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
+                        >
+                          {col}
+                          {sortKey === sortableKey ? (
+                            sortDir === "asc" ? (
+                              <ChevronUp className="h-3.5 w-3.5" />
+                            ) : (
+                              <ChevronDown className="h-3.5 w-3.5" />
+                            )
+                          ) : (
+                            <ChevronDown className="h-3.5 w-3.5 opacity-30" />
+                          )}
+                        </button>
+                      ) : (
+                        col
+                      )}
+                    </TableHead>
+                  );
+                })}
                 {showRowActions && (
                   <TableHead className="w-20 whitespace-nowrap text-right">Ret salg</TableHead>
                 )}
