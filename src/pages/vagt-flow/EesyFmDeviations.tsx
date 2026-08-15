@@ -7,7 +7,12 @@ import {
   useUpdateEesyFmClaimSale,
   type EesyFmClaimSale,
 } from "@/hooks/useEesyFmClaimSales";
-import { useEesyFmDeviations, type DeviationRow } from "@/hooks/useEesyFmDeviations";
+import {
+  useEesyFmDeviations,
+  OPERATORS_NUUDAY,
+  OPERATORS_NON_NUUDAY,
+  type DeviationRow,
+} from "@/hooks/useEesyFmDeviations";
 import {
   useEesyFmPowerBiImports,
   useUploadPowerBiSheet,
