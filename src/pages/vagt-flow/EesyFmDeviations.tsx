@@ -80,6 +80,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { VagtFlowLayout } from "@/components/vagt-flow/VagtFlowLayout";
 import { cn } from "@/lib/utils";
 
+const CAMPAIGNS_WITH_EFFECT = ["1 måneds gratis abonnement"] as const;
+
 const TABS = [
   { value: "upload", label: "Upload" },
   { value: "overview", label: "Oversigt" },
