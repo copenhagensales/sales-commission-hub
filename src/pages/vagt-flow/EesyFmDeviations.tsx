@@ -1,5 +1,9 @@
 import { useState, useMemo } from "react";
-import { useEesyFmClaimSales } from "@/hooks/useEesyFmClaimSales";
+import {
+  useEesyFmClaimSales,
+  useSetEesyFmClaimApproval,
+} from "@/hooks/useEesyFmClaimSales";
+import { toast } from "sonner";
 import { useDropzone } from "react-dropzone";
 import {
   FileSpreadsheet,
@@ -168,7 +172,9 @@ const CLAIMS_COLUMNS = [
   "Mobil",
   "Tastselv",
   "Notat",
+  "Status",
 ] as const;
+
 
 const OVERVIEW_VIEWS = [
   {
@@ -213,6 +219,24 @@ function DeviationsPanel({
   const [quickRange, setQuickRange] = useState<string>(claimsMode ? "this-month" : "custom");
   const [sortKey, setSortKey] = useState<"date" | "seller">("date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "approved">("all");
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const setApproval = useSetEesyFmClaimApproval();
+
+  const handleApproval = (saleId: string, approved: boolean) => {
+    setPendingId(saleId);
+    setApproval.mutate(
+      { saleId, approved },
+      {
+        onSuccess: () =>
+          toast.success(approved ? "Salget er godkendt" : "Godkendelse fortrudt"),
+        onError: (err: any) =>
+          toast.error(err?.message || "Kunne ikke opdatere godkendelse"),
+        onSettled: () => setPendingId(null),
+      },
+    );
+  };
+
 
   const { data: claimSales, isLoading: loadingClaims } = useEesyFmClaimSales(
     fromDate,
@@ -234,6 +258,8 @@ function DeviationsPanel({
     const term = search.trim().toLowerCase();
     const filtered = (claimSales || []).filter((sale) => {
       if (employee !== "all" && sale.sellerId !== employee) return false;
+      if (statusFilter === "approved" && !sale.approved) return false;
+      if (statusFilter === "pending" && sale.approved) return false;
       if (!term) return true;
       return [sale.sellerName, sale.phone, sale.productName, sale.note]
         .filter(Boolean)
@@ -248,7 +274,8 @@ function DeviationsPanel({
         dir * (new Date(a.saleDatetime).getTime() - new Date(b.saleDatetime).getTime())
       );
     });
-  }, [claimSales, search, employee, sortKey, sortDir]);
+  }, [claimSales, search, employee, statusFilter, sortKey, sortDir]);
+
 
   const toggleSort = (key: "date" | "seller") => {
     if (sortKey === key) {
@@ -341,6 +368,28 @@ function DeviationsPanel({
           </div>
         </div>
 
+        {claimsMode && (
+          <div className="flex flex-wrap items-center gap-2">
+            {[
+              { value: "all" as const, label: "Alle" },
+              { value: "pending" as const, label: "Afventer" },
+              { value: "approved" as const, label: "Godkendt" },
+            ].map((opt) => (
+              <Button
+                key={opt.value}
+                size="sm"
+                variant={statusFilter === opt.value ? "default" : "outline"}
+                className="h-8 rounded-full"
+                onClick={() => setStatusFilter(opt.value)}
+              >
+                {opt.label}
+              </Button>
+            ))}
+          </div>
+        )}
+
+
+
         <div className="rounded-lg border border-border/50 overflow-x-auto">
           <Table>
             <TableHeader>
@@ -411,16 +460,46 @@ function DeviationsPanel({
                     <TableCell className="min-w-[240px] text-muted-foreground">
                       {sale.note || "-"}
                     </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {sale.approved ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-500">
+                          <Check className="h-3 w-3" />
+                          Godkendt
+                          {sale.approvedAt
+                            ? ` · ${format(new Date(sale.approvedAt), "dd/MM", { locale: da })}`
+                            : ""}
+                          {sale.approvedByName ? ` · ${sale.approvedByName}` : ""}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                          Afventer
+                        </span>
+                      )}
+                    </TableCell>
                     {showRowActions && (
                       <TableCell className="w-56 whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1">
-                          <Button
-                            size="sm"
-                            className="h-8 gap-1.5 bg-emerald-500 text-emerald-950 hover:bg-emerald-400"
-                          >
-                            <Check className="h-3.5 w-3.5" />
-                            Godkend
-                          </Button>
+                          {sale.approved ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={pendingId === sale.id}
+                              onClick={() => handleApproval(sale.id, false)}
+                              className="h-8 gap-1.5"
+                            >
+                              Fortryd
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              disabled={pendingId === sale.id}
+                              onClick={() => handleApproval(sale.id, true)}
+                              className="h-8 gap-1.5 bg-emerald-500 text-emerald-950 hover:bg-emerald-400"
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                              Godkend
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="sm"
@@ -440,6 +519,7 @@ function DeviationsPanel({
                         </div>
                       </TableCell>
                     )}
+
 
                   </TableRow>
                 ))
