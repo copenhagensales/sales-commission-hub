@@ -216,7 +216,7 @@ const OVERVIEW_VIEWS = [
     title: "Mangler i PowerBI",
     description: "Salg registreret i Tastselv, som ikke er fundet i PowerBI.",
     columns: MISSING_COLUMNS as readonly string[],
-    showRowActions: false,
+    showRowActions: true,
   },
 ];
 
@@ -225,9 +225,11 @@ type OverviewView = (typeof OVERVIEW_VIEWS)[number]["value"];
 function ClaimEditDialog({
   sale,
   onOpenChange,
+  claimMode = "remove",
 }: {
   sale: EesyFmClaimSale | null;
   onOpenChange: (open: boolean) => void;
+  claimMode?: "remove" | "add";
 }) {
   const { data: products } = useEesyFmProducts();
   const { data: sellers } = useEesyFmSellers();
@@ -297,7 +299,7 @@ function ClaimEditDialog({
         saleDatetime: new Date(saleDatetime).toISOString(),
         phone: phone.trim() || null,
         note: note.trim() || null,
-        keepClaim: !removeClaim,
+        keepClaim: claimMode === "add" ? removeClaim : !removeClaim,
       },
       {
         onSuccess: () => {
@@ -439,10 +441,14 @@ function ClaimEditDialog({
             />
             <div className="space-y-0.5">
               <Label htmlFor="remove-claim" className="cursor-pointer">
-                Fjern Claim/Reimport-registrering
+                {claimMode === "add"
+                  ? "Marker som Claim/Reimport"
+                  : "Fjern Claim/Reimport-registrering"}
               </Label>
               <p className="text-xs text-muted-foreground">
-                Salget bevares, men fjernes fra denne liste.
+                {claimMode === "add"
+                  ? "Salget markeres og vises på fanen Claims/Reimport."
+                  : "Salget bevares, men fjernes fra denne liste."}
               </p>
             </div>
           </div>
@@ -459,6 +465,21 @@ function ClaimEditDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+function deviationRowToClaimSale(row: DeviationRow): EesyFmClaimSale {
+  return {
+    id: row.id,
+    saleDatetime: row.saleDatetime,
+    sellerId: row.sellerId,
+    sellerName: row.sellerName,
+    phone: row.phone,
+    productName: row.storkProduct,
+    note: row.note,
+    approved: false,
+    approvedAt: null,
+    approvedByName: null,
+  };
 }
 
 function DeviationsPanel({
@@ -699,6 +720,9 @@ function DeviationsPanel({
           <Table>
             <TableHeader>
               <TableRow>
+                {showRowActions && deviationMode === "missing" && (
+                  <TableHead className="w-44 whitespace-nowrap">Handlinger</TableHead>
+                )}
                 {columns.map((col) => {
                   const sortable = claimsMode || !!deviationMode;
                   const sortableKey =
@@ -741,7 +765,7 @@ function DeviationsPanel({
                     </TableHead>
                   );
                 })}
-                {showRowActions && (
+                {showRowActions && deviationMode !== "missing" && (
                   <TableHead className={`${claimsMode ? "w-56" : "w-40"} whitespace-nowrap text-right`}>
                     {claimsMode ? "Handlinger" : "Ret salg"}
                   </TableHead>
@@ -762,6 +786,29 @@ function DeviationsPanel({
                 ) : deviationRows.length > 0 ? (
                   deviationRows.map((row) => (
                     <TableRow key={row.id}>
+                      {showRowActions && deviationMode === "missing" && (
+                        <TableCell className="w-44 whitespace-nowrap">
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setEditSale(deviationRowToClaimSale(row))}
+                              className="h-8 gap-1.5 text-muted-foreground hover:text-foreground"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                              Rediger
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Slet
+                            </Button>
+                          </div>
+                        </TableCell>
+                      )}
                       <TableCell className="whitespace-nowrap">
                         {format(new Date(row.saleDatetime), "dd/MM/yyyy HH:mm", { locale: da })}
                       </TableCell>
@@ -909,6 +956,7 @@ function DeviationsPanel({
         </div>
 
         <ClaimEditDialog
+          claimMode={deviationMode === "missing" ? "add" : "remove"}
           sale={editSale}
           onOpenChange={(open) => {
             if (!open) setEditSale(null);
