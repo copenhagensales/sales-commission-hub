@@ -325,7 +325,9 @@ function OverviewTab() {
         title={active.title}
         description={active.description}
         columns={active.columns}
+        showRowActions={active.showRowActions}
       />
+
     </div>
   );
 }
