@@ -389,6 +389,16 @@ function DeviationsPanel({
                 {opt.label}
               </Button>
             ))}
+            <div className="ml-2 flex items-center gap-2">
+              <Switch
+                id="hide-approved"
+                checked={hideApproved}
+                onCheckedChange={setHideApproved}
+              />
+              <Label htmlFor="hide-approved" className="cursor-pointer text-sm font-medium">
+                Skjul godkendte
+              </Label>
+            </div>
           </div>
         )}
 
