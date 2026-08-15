@@ -17,7 +17,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, Minus, Phone, Save, ArrowLeft, MapPin, Building2, Tag, AlertCircle, Calendar, X } from "lucide-react";
 import { toast } from "sonner";
-import { useCreateFieldmarketingSale } from "@/hooks/useFieldmarketingSales";
+import { useCreateFieldmarketingSale, FIELDMARKETING_CLIENTS } from "@/hooks/useFieldmarketingSales";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { useFmRegistrationProducts } from "@/hooks/useFmRegistrationProducts";
