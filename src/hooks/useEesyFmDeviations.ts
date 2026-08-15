@@ -340,13 +340,21 @@ export function useEesyFmDeviations(
         continue;
       }
 
-      const okMatch = matches.find((m) => campaignMatchesProduct(sale.productName, m.campaignName));
+      const okMatch = matches.find(
+        (m) =>
+          campaignMatchesProduct(sale.productName, m.campaignName) &&
+          operatorMatchesProduct(sale.productName, m.operator),
+      );
       if (okMatch) {
         ok.push(toRow(sale, okMatch, ""));
         continue;
       }
 
-      result.push(toRow(sale, matches[0], "Kampagne"));
+      const first = matches[0];
+      const labels: string[] = [];
+      if (!campaignMatchesProduct(sale.productName, first.campaignName)) labels.push("Kampagne");
+      if (!operatorMatchesProduct(sale.productName, first.operator)) labels.push("Operator");
+      result.push(toRow(sale, first, labels.join(" + ") || "Kampagne"));
     }
 
     return { rows: result, okRows: ok };
