@@ -1245,7 +1245,16 @@ export default function EesyFmDeviations() {
                     <p className="text-xs text-muted-foreground">
                       Disse kampagner ignoreres ved afvigelsestjek.
                     </p>
-                    <p className="pt-1 text-sm text-muted-foreground">Udfyldes senere.</p>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {CAMPAIGNS_WITHOUT_EFFECT.map((name) => (
+                        <span
+                          key={name}
+                          className="rounded-full border border-border/60 bg-muted/40 px-3 py-1 text-xs font-medium text-muted-foreground"
+                        >
+                          {name}
+                        </span>
+                      ))}
+                    </div>
                   </div>
 
                   <p className="text-xs text-muted-foreground">
