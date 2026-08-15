@@ -16,8 +16,11 @@
    - Markerede salg dukker op på fanen Claims/Reimport, som i dag læser præcis den markering. Gælder salg på kunden Eesy FM.
    - Ingen godkendelse sættes automatisk — salget starter som "Afventer", indtil en leder godkender det på fanen.
 
-4. **Kommentarkrav**
-   - Ligesom ved sælgernes egen registrering kræves en kommentar på salget, når markeringen er slået til. Mangler kommentaren, gemmes der ikke, og der vises en fejlbesked med hvilket salg der mangler tekst.
+4. **Kommentar er ikke et krav for lederen**
+   - Lederen skal ikke tvinges til at skrive en kommentar (i modsætning til sælgerne, hvor kravet fortsat gælder ved egen registrering).
+   - Er kommentarfeltet tomt, når salget markeres og gemmes, udfyldes notatet automatisk med: "Rettet til Claim/Reimport af [navn på den der retter] den [dato for rettelsen]".
+   - Har lederen selv skrevet en kommentar, bevares den uændret.
+
 
 5. **Uændret**
    - Ingen ændring af pris, provision, rapporter eller de øvrige felter. Markeringen vises fortsat kun i tabellen i "Ret salgsregistrering (Leder)" og på Claims/Reimport-fanen.
@@ -28,7 +31,7 @@
   - `GroupSaleItem` udvides med `claim_reimport: boolean`.
   - `openGroupEditDialog` initialiserer feltet fra `sale.claim_reimport` (findes allerede på `SaleRecord`, læst fra `raw_payload.fm_claim_reimport`).
   - Ny toggle-knap i hvert salgs-kort (ved siden af Slet) som kalder `updateGroupSaleItem(index, 'claim_reimport', !item.claim_reimport)`.
-  - `handleGroupSave` validerer: for hvert ikke-slettet item med `claim_reimport === true` skal `comment` være udfyldt, ellers `toast.error` og afbryd.
+  - `handleGroupSave`/mutationen: for hvert ikke-slettet item med `claim_reimport === true` og tom `comment` sættes `fm_comment` til `Rettet til Claim/Reimport af <navn> den <dd/MM/yyyy>`. Navnet hentes via `get_current_employee_id` + `employee_master_data` (samme mønster som `useSetEesyFmClaimApproval`), datoen formateres med `date-fns`/`da`. Ingen blokerende validering.
   - `updateGroup`-mutationen skriver `fm_claim_reimport: item.claim_reimport === true` i `raw_payload` både i update-grenen og i `newSales`-insert-grenen. Ingen ændring af `coreDataChanged`-logikken, så pricing/rematch kun trigges som i dag.
   - `onSuccess` invaliderer desuden `["eesy-fm-claim-sales"]`, så Claims/Reimport-fanen opdateres uden reload.
 - Ingen DB-migration; feltet ligger i `sales.raw_payload` som i dag. Ingen ændringer i `useEesyFmClaimSales.ts`, pricing-service eller rapport-RPC'er.
