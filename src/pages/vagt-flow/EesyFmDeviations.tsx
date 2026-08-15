@@ -720,9 +720,6 @@ function DeviationsPanel({
           <Table>
             <TableHeader>
               <TableRow>
-                {showRowActions && deviationMode === "missing" && (
-                  <TableHead className="w-44 whitespace-nowrap">Handlinger</TableHead>
-                )}
                 {columns.map((col) => {
                   const sortable = claimsMode || !!deviationMode;
                   const sortableKey =
@@ -765,9 +762,11 @@ function DeviationsPanel({
                     </TableHead>
                   );
                 })}
-                {showRowActions && deviationMode !== "missing" && (
-                  <TableHead className={`${claimsMode ? "w-56" : "w-40"} whitespace-nowrap text-right`}>
-                    {claimsMode ? "Handlinger" : "Ret salg"}
+                {showRowActions && (
+                  <TableHead
+                    className={`${claimsMode ? "w-56" : deviationMode === "missing" ? "w-44" : "w-40"} whitespace-nowrap text-right`}
+                  >
+                    {claimsMode || deviationMode === "missing" ? "Handlinger" : "Ret salg"}
                   </TableHead>
                 )}
               </TableRow>
@@ -786,29 +785,6 @@ function DeviationsPanel({
                 ) : deviationRows.length > 0 ? (
                   deviationRows.map((row) => (
                     <TableRow key={row.id}>
-                      {showRowActions && deviationMode === "missing" && (
-                        <TableCell className="w-44 whitespace-nowrap">
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setEditSale(deviationRowToClaimSale(row))}
-                              className="h-8 gap-1.5 text-muted-foreground hover:text-foreground"
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                              Rediger
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                              Slet
-                            </Button>
-                          </div>
-                        </TableCell>
-                      )}
                       <TableCell className="whitespace-nowrap">
                         {format(new Date(row.saleDatetime), "dd/MM/yyyy HH:mm", { locale: da })}
                       </TableCell>
