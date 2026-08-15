@@ -82,6 +82,22 @@ import { cn } from "@/lib/utils";
 
 const CAMPAIGNS_WITH_EFFECT = ["1 måneds gratis abonnement"] as const;
 
+const CAMPAIGNS_WITHOUT_EFFECT = [
+  "10% rabat",
+  "10% rabat kampagne med vouchers",
+  "20% rabat",
+  "20% rabat kampagne med vouchers",
+  "25% rabat",
+  "35% i 2026",
+  "35% rabat",
+  "6 måneder gratis",
+  "9% rabat på marked",
+  "Giver 1 md. til 0 kr. (opgørelse)",
+  "Giver 15% rabat på abonnementet",
+  "Halv pris i 3 måneder",
+  "Unknown Campaign Name",
+] as const;
+
 const TABS = [
   { value: "upload", label: "Upload" },
   { value: "overview", label: "Oversigt" },
