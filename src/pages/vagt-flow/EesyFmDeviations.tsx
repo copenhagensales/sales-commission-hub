@@ -261,6 +261,7 @@ function DeviationsPanel({
     const term = search.trim().toLowerCase();
     const filtered = (claimSales || []).filter((sale) => {
       if (employee !== "all" && sale.sellerId !== employee) return false;
+      if (hideApproved && sale.approved) return false;
       if (statusFilter === "approved" && !sale.approved) return false;
       if (statusFilter === "pending" && sale.approved) return false;
       if (!term) return true;
