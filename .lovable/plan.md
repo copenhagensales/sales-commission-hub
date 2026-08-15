@@ -14,6 +14,11 @@
    - Ny kolonne "Claim/Reimport" i salgstabellen med "Ja" (fremhævet badge) eller "Nej" (dæmpet).
    - Ved redigering af et salg bevares værdien uændret (den nulstilles ikke).
 
+4. **Historiske salg påvirkes ikke**
+   - Ingen data-opdatering af eksisterende salg. Salg uden feltet læses som Nej (false) i UI'et.
+
+
+
 ## Teknisk
 
 - Feltet gemmes i `sales.raw_payload` som `fm_claim_reimport: boolean` — samme mønster som `fm_comment`, `fm_product_name` osv. Ingen DB-migration nødvendig.
