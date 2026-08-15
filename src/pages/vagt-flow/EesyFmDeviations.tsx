@@ -460,16 +460,46 @@ function DeviationsPanel({
                     <TableCell className="min-w-[240px] text-muted-foreground">
                       {sale.note || "-"}
                     </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {sale.approved ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-500">
+                          <Check className="h-3 w-3" />
+                          Godkendt
+                          {sale.approvedAt
+                            ? ` · ${format(new Date(sale.approvedAt), "dd/MM", { locale: da })}`
+                            : ""}
+                          {sale.approvedByName ? ` · ${sale.approvedByName}` : ""}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                          Afventer
+                        </span>
+                      )}
+                    </TableCell>
                     {showRowActions && (
                       <TableCell className="w-56 whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1">
-                          <Button
-                            size="sm"
-                            className="h-8 gap-1.5 bg-emerald-500 text-emerald-950 hover:bg-emerald-400"
-                          >
-                            <Check className="h-3.5 w-3.5" />
-                            Godkend
-                          </Button>
+                          {sale.approved ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={pendingId === sale.id}
+                              onClick={() => handleApproval(sale.id, false)}
+                              className="h-8 gap-1.5"
+                            >
+                              Fortryd
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              disabled={pendingId === sale.id}
+                              onClick={() => handleApproval(sale.id, true)}
+                              className="h-8 gap-1.5 bg-emerald-500 text-emerald-950 hover:bg-emerald-400"
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                              Godkend
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="sm"
@@ -489,6 +519,7 @@ function DeviationsPanel({
                         </div>
                       </TableCell>
                     )}
+
 
                   </TableRow>
                 ))
