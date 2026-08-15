@@ -32,6 +32,7 @@ interface ProductSelection {
   productName: string;
   quantity: number;
   phoneNumbers: string[];
+  claimFlags: boolean[];
 }
 
 interface TodayBooking {
