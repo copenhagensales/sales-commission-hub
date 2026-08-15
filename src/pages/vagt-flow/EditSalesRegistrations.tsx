@@ -42,6 +42,7 @@ interface SaleRecord {
   } | null;
   commission_dkk?: number;
   revenue_dkk?: number;
+  claim_reimport: boolean;
 }
 
 interface GroupedSales {
