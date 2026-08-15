@@ -343,14 +343,41 @@ function DeviationsPanel({
           <Table>
             <TableHeader>
               <TableRow>
-                {columns.map((col) => (
-                  <TableHead
-                    key={col}
-                    className={col === "Notat" ? "w-full min-w-[240px]" : "whitespace-nowrap"}
-                  >
-                    {col}
-                  </TableHead>
-                ))}
+                {columns.map((col) => {
+                  const sortableKey =
+                    claimsMode && col === "Salgsdato"
+                      ? ("date" as const)
+                      : claimsMode && col === "Sælger"
+                        ? ("seller" as const)
+                        : null;
+                  return (
+                    <TableHead
+                      key={col}
+                      className={col === "Notat" ? "w-full min-w-[240px]" : "whitespace-nowrap"}
+                    >
+                      {sortableKey ? (
+                        <button
+                          type="button"
+                          onClick={() => toggleSort(sortableKey)}
+                          className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
+                        >
+                          {col}
+                          {sortKey === sortableKey ? (
+                            sortDir === "asc" ? (
+                              <ChevronUp className="h-3.5 w-3.5" />
+                            ) : (
+                              <ChevronDown className="h-3.5 w-3.5" />
+                            )
+                          ) : (
+                            <ChevronDown className="h-3.5 w-3.5 opacity-30" />
+                          )}
+                        </button>
+                      ) : (
+                        col
+                      )}
+                    </TableHead>
+                  );
+                })}
                 {showRowActions && (
                   <TableHead className="w-20 whitespace-nowrap text-right">Ret salg</TableHead>
                 )}
