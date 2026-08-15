@@ -196,6 +196,8 @@ export function useEesyFmDeviations(
         phone: sale.phone,
         storkProduct: sale.productName,
         powerBiProduct: match.subscriptionName,
+        powerBiCampaign: match.campaignName,
+        powerBiOperator: match.operator,
         sheetLabel: SHEET_LABELS[match.sheetType],
         deviation: "Produkt",
       });
