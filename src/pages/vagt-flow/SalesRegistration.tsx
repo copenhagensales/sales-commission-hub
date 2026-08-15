@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -17,7 +17,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, Minus, Phone, Save, ArrowLeft, MapPin, Building2, Tag, AlertCircle, Calendar, X } from "lucide-react";
 import { toast } from "sonner";
-import { useCreateFieldmarketingSale } from "@/hooks/useFieldmarketingSales";
+import { useCreateFieldmarketingSale, FIELDMARKETING_CLIENTS } from "@/hooks/useFieldmarketingSales";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { useFmRegistrationProducts } from "@/hooks/useFmRegistrationProducts";
@@ -51,6 +52,9 @@ const SalesRegistration = () => {
   const isOwner = position?.name?.toLowerCase() === "ejer";
   const [locationId, setLocationId] = useState<string>("");
   const [comment, setComment] = useState("");
+  const [isClaimReimport, setIsClaimReimport] = useState(false);
+  const [commentError, setCommentError] = useState(false);
+  const commentRef = useRef<HTMLTextAreaElement>(null);
   const [productSelections, setProductSelections] = useState<ProductSelection[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedBookingId, setSelectedBookingId] = useState<string>("");
@@ -225,6 +229,8 @@ const SalesRegistration = () => {
     setCallbackDate(undefined);
     setProductSelections([]);
     setComment("");
+    setIsClaimReimport(false);
+    setCommentError(false);
   };
 
   // Auto-set location when today's booking is loaded
@@ -255,6 +261,7 @@ const SalesRegistration = () => {
 
 
   const bookingMissingCampaign = !!activeBooking && !activeBooking?.campaign?.id;
+  const isEesyFm = activeBooking?.client?.id === FIELDMARKETING_CLIENTS.EESY_FM;
 
   const addProduct = (productId: string) => {
     const product = products?.find((p) => p.id === productId);
@@ -355,6 +362,16 @@ const SalesRegistration = () => {
       return;
     }
 
+    if (isClaimReimport && !comment.trim()) {
+      setCommentError(true);
+      toast.error("Kommentar er påkrævet ved Claim/Reimport");
+      commentRef.current?.focus();
+      commentRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+
+
+
     setIsSubmitting(true);
     
     // Use client from booking if available, otherwise use locationId to look it up
@@ -392,6 +409,8 @@ const SalesRegistration = () => {
       // Reset form
       
       setComment("");
+      setIsClaimReimport(false);
+      setCommentError(false);
       setProductSelections([]);
     } catch (error: any) {
       console.error("Error saving sales:", error);
@@ -420,14 +439,26 @@ const SalesRegistration = () => {
 
             {/* Kommentar */}
             <div className="space-y-2">
-              <Label htmlFor="comment">Kommentar</Label>
+              <Label htmlFor="comment">
+                Kommentar{isClaimReimport && " *"}
+              </Label>
               <Textarea
                 id="comment"
+                ref={commentRef}
                 placeholder="Eventuelle bemærkninger..."
                 value={comment}
-                onChange={(e) => setComment(e.target.value)}
+                onChange={(e) => {
+                  setComment(e.target.value);
+                  if (commentError) setCommentError(false);
+                }}
                 rows={3}
+                className={commentError ? "border-destructive focus-visible:ring-destructive" : undefined}
               />
+              {isClaimReimport && (
+                <p className={`text-xs ${commentError ? "text-destructive" : "text-muted-foreground"}`}>
+                  Kommentar er påkrævet ved Claim/Reimport
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -439,10 +470,26 @@ const SalesRegistration = () => {
               <CardTitle className="text-lg flex items-center gap-2">
                 <Phone className="h-5 w-5" />
                 Telefonnumre *
-                Telefonnumre
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {isEesyFm && (
+                <div className="flex items-center gap-2 rounded-lg border p-3">
+                  <Checkbox
+                    id="claim-reimport"
+                    checked={isClaimReimport}
+                    onCheckedChange={(v) => {
+                      const next = v === true;
+                      setIsClaimReimport(next);
+                      if (!next) setCommentError(false);
+                    }}
+                  />
+                  <Label htmlFor="claim-reimport" className="cursor-pointer">
+                    Claim/Reimport
+                  </Label>
+                </div>
+              )}
+
               {productSelections.map((selection) => (
                 <div key={selection.productId} className="space-y-2">
                   <Label className="font-medium text-primary">
