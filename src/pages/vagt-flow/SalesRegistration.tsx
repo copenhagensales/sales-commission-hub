@@ -53,7 +53,6 @@ const SalesRegistration = () => {
   const isOwner = position?.name?.toLowerCase() === "ejer";
   const [locationId, setLocationId] = useState<string>("");
   const [comment, setComment] = useState("");
-  const [isClaimReimport, setIsClaimReimport] = useState(false);
   const [commentError, setCommentError] = useState(false);
   const commentRef = useRef<HTMLTextAreaElement>(null);
   const [productSelections, setProductSelections] = useState<ProductSelection[]>([]);
@@ -230,7 +229,6 @@ const SalesRegistration = () => {
     setCallbackDate(undefined);
     setProductSelections([]);
     setComment("");
-    setIsClaimReimport(false);
     setCommentError(false);
   };
 
@@ -395,7 +393,7 @@ const SalesRegistration = () => {
       return;
     }
 
-    if (isClaimReimport && !comment.trim()) {
+    if (hasAnyClaim && !comment.trim()) {
       setCommentError(true);
       toast.error("Kommentar er påkrævet ved Claim/Reimport");
       commentRef.current?.focus();
@@ -442,8 +440,7 @@ const SalesRegistration = () => {
       // Reset form
       
       setComment("");
-      setIsClaimReimport(false);
-      setCommentError(false);
+        setCommentError(false);
       setProductSelections([]);
     } catch (error: any) {
       console.error("Error saving sales:", error);
@@ -473,7 +470,7 @@ const SalesRegistration = () => {
             {/* Kommentar */}
             <div className="space-y-2">
               <Label htmlFor="comment">
-                Kommentar{isClaimReimport && " *"}
+                Kommentar{hasAnyClaim && " *"}
               </Label>
               <Textarea
                 id="comment"
@@ -487,7 +484,7 @@ const SalesRegistration = () => {
                 rows={3}
                 className={commentError ? "border-destructive focus-visible:ring-destructive" : undefined}
               />
-              {isClaimReimport && (
+              {hasAnyClaim && (
                 <p className={`text-xs ${commentError ? "text-destructive" : "text-muted-foreground"}`}>
                   Kommentar er påkrævet ved Claim/Reimport
                 </p>
