@@ -14,9 +14,10 @@ Adgangen udvides med en eksplicit, dokumenteret allowlist — samme mønster som
 ## Ændringer
 
 1. **Ny fil `src/config/tdcErhvervEditAccess.ts`**
-   - Eksporterer en liste af arbejds-e-mails med adgang: `joh@copenhagensales.dk`, `rh@copenhagensales.dk`.
+   - Eksporterer en liste af e-mails med adgang — både arbejds- og privat-mail, så adgangen virker uanset hvilken de er logget ind med: `joh@copenhagensales.dk`, `johannestornberg@gmail.com`, `rh@copenhagensales.dk`, `rasmus@bjerrum.nu`.
    - Hjælpefunktion `hasTdcErhvervEditAccess(email)` med lowercase-normalisering.
    - Kommentar der forklarer at listen er den manuelle undtagelse ved siden af team-medlemskab.
+
 
 2. **`src/hooks/useTdcErhvervSales.ts`**
    - I `useIsTdcErhvervLeader`: efter ejer-tjekket returneres `true`, hvis brugerens e-mail står på allowlisten — ellers uændret team-tjek.
