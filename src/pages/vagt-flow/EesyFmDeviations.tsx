@@ -8,6 +8,7 @@ import {
   Search,
   CalendarIcon,
   Pencil,
+  Trash2,
   ChevronUp,
   ChevronDown,
 } from "lucide-react";
