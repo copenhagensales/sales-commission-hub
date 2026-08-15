@@ -98,6 +98,36 @@ const CAMPAIGNS_WITHOUT_EFFECT = [
   "Unknown Campaign Name",
 ] as const;
 
+const OPERATORS_NUUDAY = ["eesy", "Telmore", "Yousee"] as const;
+
+const OPERATORS_NON_NUUDAY = [
+  "3",
+  "CBB",
+  "Call Me",
+  "Companymobile",
+  "DUKA (Telenor)",
+  "Dstny (TDC)",
+  "Evercall",
+  "FLEXII",
+  "Flexfone",
+  "HALLO",
+  "Leasy",
+  "Lebara",
+  "Lycamobile",
+  "Mit Tele Mobil",
+  "Mtel",
+  "Nettalk",
+  "Newly Created",
+  "Norlys",
+  "Oister",
+  "Relatel (TDC)",
+  "Telenabler",
+  "Telenor",
+  "UnoTel",
+  "Velkommen",
+  "greentel",
+] as const;
+
 const TABS = [
   { value: "upload", label: "Upload" },
   { value: "overview", label: "Oversigt" },
@@ -1385,8 +1415,44 @@ export default function EesyFmDeviations() {
                     Mapning mellem PowerBI-operatorer og interne værdier.
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">Udfyldes senere.</p>
+                <CardContent className="space-y-6">
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-semibold">Nuuday</h4>
+                    <p className="text-xs text-muted-foreground">
+                      Operatorer der hører under Nuuday-koncernen.
+                    </p>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {OPERATORS_NUUDAY.map((name) => (
+                        <span
+                          key={name}
+                          className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-600 dark:text-emerald-400"
+                        >
+                          {name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 border-t border-border/50 pt-4">
+                    <h4 className="text-sm font-semibold">Ikke Nuuday</h4>
+                    <p className="text-xs text-muted-foreground">
+                      Alle øvrige operatorer.
+                    </p>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {OPERATORS_NON_NUUDAY.map((name) => (
+                        <span
+                          key={name}
+                          className="rounded-full border border-border/60 bg-muted/40 px-3 py-1 text-xs font-medium text-muted-foreground"
+                        >
+                          {name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-muted-foreground">
+                    Selve sammenligningsreglen mod interne salg tilføjes i næste trin.
+                  </p>
                 </CardContent>
               </Card>
             </div>
