@@ -329,6 +329,11 @@ export function useIsTdcErhvervLeader() {
       if (!user?.email) return false;
       const lowerEmail = user.email.toLowerCase();
 
+      // Manuel undtagelse for ledere uden for TDC Erhverv-teamet
+      if (hasTdcErhvervEditAccess(lowerEmail)) return true;
+
+
+
       const { data: employee } = await supabase
         .from("employee_master_data")
         .select("id, auth_user_id")
