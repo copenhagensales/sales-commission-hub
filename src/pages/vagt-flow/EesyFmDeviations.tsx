@@ -537,7 +537,15 @@ function DeviationsPanel({
     const filtered = rawDeviationRows.filter((row) => {
       if (employee !== "all" && row.sellerId !== employee) return false;
       if (!term) return true;
-      return [row.sellerName, row.phone, row.storkProduct, row.powerBiProduct, row.sheetLabel]
+      return [
+        row.sellerName,
+        row.phone,
+        row.storkProduct,
+        row.powerBiProduct,
+        row.powerBiCampaign,
+        row.powerBiOperator,
+        row.sheetLabel,
+      ]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(term));
     });
