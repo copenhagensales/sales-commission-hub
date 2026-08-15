@@ -772,6 +772,12 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
         description: "Adgang til omsætningsrapport per kunde/opgave",
         hasEditOption: false,
       },
+      {
+        key: "menu_reports_tdc_edit_sales",
+        label: "TDC Erhverv - ret salg",
+        description: "Adgang til at rette TDC Erhverv salg",
+        hasEditOption: true,
+      },
     ],
   },
 
