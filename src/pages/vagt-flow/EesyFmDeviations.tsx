@@ -143,7 +143,41 @@ const QUICK_RANGES: { value: string; label: string; range: () => { from: Date; t
   },
 ];
 
-function OverviewTab() {
+const MISSING_COLUMNS = [
+  "Salgsdato",
+  "Sælger",
+  "Mobil",
+  "Produkt",
+  "Tastselv",
+  "Type",
+] as const;
+
+const OVERVIEW_VIEWS = [
+  {
+    value: "deviations" as const,
+    title: "Afvigelser — oversigt",
+    description: "Sammenholdte salg mellem Tastselv og PowerBI med afvigelser markeret.",
+    columns: OVERVIEW_COLUMNS as readonly string[],
+  },
+  {
+    value: "missing" as const,
+    title: "Mangler i PowerBI",
+    description: "Salg registreret i Tastselv, som ikke er fundet i PowerBI.",
+    columns: MISSING_COLUMNS as readonly string[],
+  },
+];
+
+type OverviewView = (typeof OVERVIEW_VIEWS)[number]["value"];
+
+function DeviationsPanel({
+  title,
+  description,
+  columns,
+}: {
+  title: string;
+  description: string;
+  columns: readonly string[];
+}) {
   const [fromDate, setFromDate] = useState<Date | undefined>();
   const [toDate, setToDate] = useState<Date | undefined>();
   const [search, setSearch] = useState("");
@@ -163,10 +197,8 @@ function OverviewTab() {
   return (
     <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
       <CardHeader>
-        <CardTitle className="text-xl">Afvigelser — oversigt</CardTitle>
-        <CardDescription>
-          Sammenholdte salg mellem Tastselv og PowerBI med afvigelser markeret.
-        </CardDescription>
+        <CardTitle className="text-xl">{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
@@ -232,7 +264,7 @@ function OverviewTab() {
           <Table>
             <TableHeader>
               <TableRow>
-                {OVERVIEW_COLUMNS.map((col) => (
+                {columns.map((col) => (
                   <TableHead key={col} className="whitespace-nowrap">
                     {col}
                   </TableHead>
@@ -242,7 +274,7 @@ function OverviewTab() {
             <TableBody>
               <TableRow>
                 <TableCell
-                  colSpan={OVERVIEW_COLUMNS.length}
+                  colSpan={columns.length}
                   className="py-16 text-center text-sm text-muted-foreground"
                 >
                   Ingen data endnu.
@@ -255,6 +287,46 @@ function OverviewTab() {
     </Card>
   );
 }
+
+function OverviewTab() {
+  const [view, setView] = useState<OverviewView>("deviations");
+  const active = OVERVIEW_VIEWS.find((v) => v.value === view)!;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-4 md:grid-cols-2">
+        {OVERVIEW_VIEWS.map((v) => {
+          const isActive = v.value === view;
+          return (
+            <button key={v.value} type="button" onClick={() => setView(v.value)} className="text-left">
+              <Card
+                className={cn(
+                  "h-full transition-colors backdrop-blur-sm",
+                  isActive
+                    ? "border-primary bg-primary/10"
+                    : "border-border/50 bg-card/50 hover:border-primary/50",
+                )}
+              >
+                <CardHeader>
+                  <CardTitle className="text-base">{v.title}</CardTitle>
+                  <CardDescription>{v.description}</CardDescription>
+                </CardHeader>
+              </Card>
+            </button>
+          );
+        })}
+      </div>
+
+      <DeviationsPanel
+        key={active.value}
+        title={active.title}
+        description={active.description}
+        columns={active.columns}
+      />
+    </div>
+  );
+}
+
 
 
 function FileDropzone({
