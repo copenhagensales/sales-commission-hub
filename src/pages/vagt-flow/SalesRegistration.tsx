@@ -52,6 +52,9 @@ const SalesRegistration = () => {
   const isOwner = position?.name?.toLowerCase() === "ejer";
   const [locationId, setLocationId] = useState<string>("");
   const [comment, setComment] = useState("");
+  const [isClaimReimport, setIsClaimReimport] = useState(false);
+  const [commentError, setCommentError] = useState(false);
+  const commentRef = useRef<HTMLTextAreaElement>(null);
   const [productSelections, setProductSelections] = useState<ProductSelection[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedBookingId, setSelectedBookingId] = useState<string>("");
