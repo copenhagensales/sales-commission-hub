@@ -198,6 +198,7 @@ interface CreateSaleParams {
   phone_number: string;
   comment?: string;
   registered_at?: string;
+  claim_reimport?: boolean;
 }
 
 export function useCreateFieldmarketingSale() {
