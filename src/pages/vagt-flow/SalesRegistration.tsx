@@ -497,24 +497,30 @@ const SalesRegistration = () => {
         {productSelections.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Phone className="h-5 w-5" />
-                Telefonnumre *
-              </CardTitle>
+              <div className="flex items-center justify-between gap-4">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Phone className="h-5 w-5" />
+                  Telefonnumre *
+                </CardTitle>
+                {isEesyFm && (
+                  <div className="flex items-center gap-2 rounded-full border px-4 py-2 shrink-0">
+                    <Label
+                      htmlFor="claim-all"
+                      className="cursor-pointer text-sm whitespace-nowrap"
+                    >
+                      Marker alle Claim/Reimport
+                    </Label>
+                    <Checkbox
+                      id="claim-all"
+                      checked={allClaims}
+                      onCheckedChange={(v) => setAllClaims(v === true)}
+                    />
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              {isEesyFm && (
-                <div className="flex items-center justify-end gap-2 rounded-lg border p-3">
-                  <Label htmlFor="claim-all" className="cursor-pointer">
-                    Marker alle
-                  </Label>
-                  <Checkbox
-                    id="claim-all"
-                    checked={allClaims}
-                    onCheckedChange={(v) => setAllClaims(v === true)}
-                  />
-                </div>
-              )}
+
 
               {productSelections.map((selection) => (
                 <div key={selection.productId} className="space-y-2">
