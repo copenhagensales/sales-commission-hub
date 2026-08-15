@@ -540,6 +540,7 @@ export default function EesyFmDeviations() {
               description="Salg klar til claim eller reimport — med notat pr. salg."
               columns={CLAIMS_COLUMNS as readonly string[]}
               showRowActions
+              claimsMode
             />
           </TabsContent>
 
