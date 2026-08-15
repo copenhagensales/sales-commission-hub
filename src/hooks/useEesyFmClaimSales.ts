@@ -21,7 +21,7 @@ interface SaleRow {
   raw_payload: any;
 }
 
-export function useEesyFmClaimSales(from?: Date, to?: Date) {
+export function useEesyFmClaimSales(from?: Date, to?: Date, enabled = true) {
   const fromIso = from ? from.toISOString() : undefined;
   const toIso = to ? to.toISOString() : undefined;
 
@@ -76,5 +76,6 @@ export function useEesyFmClaimSales(from?: Date, to?: Date) {
         };
       });
     },
+    enabled,
   });
 }
