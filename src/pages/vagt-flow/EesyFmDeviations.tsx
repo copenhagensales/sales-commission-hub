@@ -215,6 +215,24 @@ function DeviationsPanel({
   const [quickRange, setQuickRange] = useState<string>(claimsMode ? "this-month" : "custom");
   const [sortKey, setSortKey] = useState<"date" | "seller">("date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "approved">("all");
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const setApproval = useSetEesyFmClaimApproval();
+
+  const handleApproval = (saleId: string, approved: boolean) => {
+    setPendingId(saleId);
+    setApproval.mutate(
+      { saleId, approved },
+      {
+        onSuccess: () =>
+          toast.success(approved ? "Salget er godkendt" : "Godkendelse fortrudt"),
+        onError: (err: any) =>
+          toast.error(err?.message || "Kunne ikke opdatere godkendelse"),
+        onSettled: () => setPendingId(null),
+      },
+    );
+  };
+
 
   const { data: claimSales, isLoading: loadingClaims } = useEesyFmClaimSales(
     fromDate,
