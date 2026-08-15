@@ -93,3 +93,54 @@ export function useEesyFmClaimSales(from?: Date, to?: Date, enabled = true) {
     enabled,
   });
 }
+
+export function useSetEesyFmClaimApproval() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ saleId, approved }: { saleId: string; approved: boolean }) => {
+      const { data: existing, error: fetchError } = await supabase
+        .from("sales")
+        .select("raw_payload")
+        .eq("id", saleId)
+        .maybeSingle();
+      if (fetchError) throw fetchError;
+
+      const payload = ((existing?.raw_payload as any) || {}) as Record<string, any>;
+
+      let approverId: string | null = null;
+      let approverName: string | null = null;
+      if (approved) {
+        const { data: employeeId } = await supabase.rpc("get_current_employee_id");
+        approverId = (employeeId as string) || null;
+        if (approverId) {
+          const { data: emp } = await supabase
+            .from("employee_master_data")
+            .select("first_name, last_name")
+            .eq("id", approverId)
+            .maybeSingle();
+          approverName =
+            [emp?.first_name, emp?.last_name].filter(Boolean).join(" ").trim() || null;
+        }
+      }
+
+      const nextPayload = {
+        ...payload,
+        fm_claim_approved: approved,
+        fm_claim_approved_at: approved ? new Date().toISOString() : null,
+        fm_claim_approved_by: approverId,
+        fm_claim_approved_by_name: approverName,
+      };
+
+      const { error } = await supabase
+        .from("sales")
+        .update({ raw_payload: nextPayload })
+        .eq("id", saleId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["eesy-fm-claim-sales"] });
+    },
+  });
+}
+
