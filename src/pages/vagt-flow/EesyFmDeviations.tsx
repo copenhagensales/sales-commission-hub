@@ -82,6 +82,22 @@ import { cn } from "@/lib/utils";
 
 const CAMPAIGNS_WITH_EFFECT = ["1 måneds gratis abonnement"] as const;
 
+const CAMPAIGNS_WITHOUT_EFFECT = [
+  "10% rabat",
+  "10% rabat kampagne med vouchers",
+  "20% rabat",
+  "20% rabat kampagne med vouchers",
+  "25% rabat",
+  "35% i 2026",
+  "35% rabat",
+  "6 måneder gratis",
+  "9% rabat på marked",
+  "Giver 1 md. til 0 kr. (opgørelse)",
+  "Giver 15% rabat på abonnementet",
+  "Halv pris i 3 måneder",
+  "Unknown Campaign Name",
+] as const;
+
 const TABS = [
   { value: "upload", label: "Upload" },
   { value: "overview", label: "Oversigt" },
@@ -1229,7 +1245,16 @@ export default function EesyFmDeviations() {
                     <p className="text-xs text-muted-foreground">
                       Disse kampagner ignoreres ved afvigelsestjek.
                     </p>
-                    <p className="pt-1 text-sm text-muted-foreground">Udfyldes senere.</p>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {CAMPAIGNS_WITHOUT_EFFECT.map((name) => (
+                        <span
+                          key={name}
+                          className="rounded-full border border-border/60 bg-muted/40 px-3 py-1 text-xs font-medium text-muted-foreground"
+                        >
+                          {name}
+                        </span>
+                      ))}
+                    </div>
                   </div>
 
                   <p className="text-xs text-muted-foreground">
