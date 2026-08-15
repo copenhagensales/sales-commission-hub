@@ -136,19 +136,45 @@ export function useEesyFmClaimPhones(from?: Date, to?: Date, enabled = true) {
   });
 }
 
-function sameProduct(a: string | null, b: string | null): boolean {
-  const norm = (v: string | null) =>
-    (v || "")
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, " ")
-      .trim();
-  const na = norm(a);
-  const nb = norm(b);
-  if (!na || !nb) return false;
-  return na === nb;
+const norm = (v: string | null) =>
+  (v || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+const FREE_MONTH_CAMPAIGN = norm("1 måneds gratis abonnement");
+
+function isFiveG(product: string | null): boolean {
+  return norm(product) === "5g internet";
 }
+
+/** Om produktnavnet er "uden første måned", "med første måned" eller ukendt. */
+function firstMonthMode(product: string | null): "without" | "with" | null {
+  const n = norm(product);
+  if (n.includes(norm("uden første måned"))) return "without";
+  if (n.includes(norm("med første måned"))) return "with";
+  return null;
+}
+
+function isFreeMonthCampaign(campaign: string | null): boolean {
+  return norm(campaign) === FREE_MONTH_CAMPAIGN;
+}
+
+/**
+ * Kampagne-regel:
+ * - "uden første måned" må ikke være solgt med kampagnen "1 måneds gratis abonnement"
+ * - enhver anden kampagne kræver at produktet er "uden første måned"
+ * Returnerer true når kombinationen er i orden.
+ */
+function campaignMatchesProduct(product: string | null, campaign: string | null): boolean {
+  const mode = firstMonthMode(product);
+  if (mode === null) return true; // ingen regel at måle på
+  const free = isFreeMonthCampaign(campaign);
+  return mode === "without" ? !free : free;
+}
+
 
 /**
  * Sammenholder Stork-salg med de uploadede PowerBI-ark på normaliseret mobilnummer.
@@ -229,8 +255,9 @@ export function useEesyFmDeviations(
       }
 
       if (!matches || matches.length === 0) continue;
-      const anyEqual = matches.some((m) => sameProduct(m.subscriptionName, sale.productName));
-      if (anyEqual) continue;
+      if (isFiveG(sale.productName)) continue;
+      const anyOk = matches.some((m) => campaignMatchesProduct(sale.productName, m.campaignName));
+      if (anyOk) continue;
 
       const match = matches[0];
       result.push({
@@ -244,7 +271,8 @@ export function useEesyFmDeviations(
         powerBiCampaign: match.campaignName,
         powerBiOperator: match.operator,
         sheetLabel: SHEET_LABELS[match.sheetType],
-        deviation: "Produkt",
+        deviation: "Kampagne",
+
         note: sale.note,
       });
     }
