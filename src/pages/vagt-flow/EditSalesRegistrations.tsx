@@ -77,6 +77,7 @@ interface GroupSaleItem {
   product_name: string;
   phone_number: string;
   comment: string;
+  claim_reimport: boolean;
   toDelete?: boolean;
 }
 
