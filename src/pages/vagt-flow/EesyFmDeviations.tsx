@@ -222,6 +222,7 @@ function DeviationsPanel({
   const [sortKey, setSortKey] = useState<"date" | "seller">("date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "approved">("all");
+  const [hideApproved, setHideApproved] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const setApproval = useSetEesyFmClaimApproval();
 
