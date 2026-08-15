@@ -456,12 +456,14 @@ function DeviationsPanel({
   columns,
   showRowActions = false,
   claimsMode = false,
+  deviationMode,
 }: {
   title: string;
   description: string;
   columns: readonly string[];
   showRowActions?: boolean;
   claimsMode?: boolean;
+  deviationMode?: "deviations" | "missing";
 }) {
   const [fromDate, setFromDate] = useState<Date | undefined>(
     claimsMode ? startOfMonth(new Date()) : undefined,
