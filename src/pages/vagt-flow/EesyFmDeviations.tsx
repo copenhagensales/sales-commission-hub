@@ -774,6 +774,12 @@ function DeviationsPanel({
                           <TableCell className="min-w-[200px]">
                             {row.powerBiProduct || "-"}
                           </TableCell>
+                          <TableCell className="min-w-[180px]">
+                            {row.powerBiCampaign || "-"}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            {row.powerBiOperator || "-"}
+                          </TableCell>
                           <TableCell className="whitespace-nowrap text-muted-foreground">
                             {row.sheetLabel || "-"}
                           </TableCell>
