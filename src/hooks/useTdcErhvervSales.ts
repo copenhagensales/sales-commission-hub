@@ -11,6 +11,15 @@ export interface TdcOppProduct {
   quantity: number;
 }
 
+/** Rå salgslinje (én pr. sale_items-række) til redigering. */
+export interface TdcOppItem {
+  saleItemId: string;
+  saleId: string;
+  productId: string | null;
+  productName: string;
+  quantity: number;
+}
+
 export interface TdcOppGroup {
   /** OPP-nummer, eller "" hvis salget mangler OPP. */
   opp: string;
@@ -18,6 +27,7 @@ export interface TdcOppGroup {
   sellerName: string;
   saleDatetime: string;
   products: TdcOppProduct[];
+  items: TdcOppItem[];
 }
 
 interface SaleRow {
@@ -26,8 +36,16 @@ interface SaleRow {
   agent_email: string | null;
   agent_name: string | null;
   raw_payload: any;
-  sale_items: { quantity: number | null; products: { name: string | null } | null }[] | null;
+  sale_items:
+    | {
+        id: string;
+        quantity: number | null;
+        product_id: string | null;
+        products: { name: string | null } | null;
+      }[]
+    | null;
 }
+
 
 function dayBounds(day: Date) {
   const start = new Date(day);
