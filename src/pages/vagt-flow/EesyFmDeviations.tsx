@@ -979,7 +979,81 @@ function DeviationsPanel({
       </CardContent>
     </Card>
   );
+
+  if (deviationMode !== "deviations") return mainCard;
+
+  return (
+    <div className="space-y-6">
+      {mainCard}
+      <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+        <CardHeader>
+          <CardTitle className="text-xl">Salg uden afvigelser</CardTitle>
+          <CardDescription>
+            Salg fundet i både Tastselv og PowerBI, hvor kampagnen passer til produktet
+            {okRowsFiltered.length > 0 ? ` (${okRowsFiltered.length})` : ""}.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-lg border border-border/50 overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {OK_COLUMNS.map((col) => (
+                    <TableHead key={col} className="whitespace-nowrap">
+                      {col}
+                    </TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loadingDeviations ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={OK_COLUMNS.length}
+                      className="py-12 text-center text-sm text-muted-foreground"
+                    >
+                      Sammenholder salg...
+                    </TableCell>
+                  </TableRow>
+                ) : okRowsFiltered.length > 0 ? (
+                  okRowsFiltered.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell className="whitespace-nowrap">
+                        {format(new Date(row.saleDatetime), "dd/MM/yyyy HH:mm", { locale: da })}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">{row.sellerName}</TableCell>
+                      <TableCell className="font-mono text-xs whitespace-nowrap">
+                        {row.phone || "-"}
+                      </TableCell>
+                      <TableCell className="min-w-[200px]">{row.storkProduct || "-"}</TableCell>
+                      <TableCell className="min-w-[180px]">{row.powerBiCampaign || "-"}</TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {row.powerBiOperator || "-"}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-muted-foreground">
+                        {row.sheetLabel || "-"}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell
+                      colSpan={OK_COLUMNS.length}
+                      className="py-12 text-center text-sm text-muted-foreground"
+                    >
+                      Ingen salg uden afvigelser i perioden.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
 }
+
 
 function OverviewTab() {
   const [view, setView] = useState<OverviewView>("deviations");
