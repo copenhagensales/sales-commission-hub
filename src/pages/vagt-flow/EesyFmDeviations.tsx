@@ -323,19 +323,68 @@ function ClaimEditDialog({
 
           <div className="space-y-1.5">
             <Label>Sælger</Label>
-            <Select value={sellerId} onValueChange={setSellerId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Vælg sælger" />
-              </SelectTrigger>
-              <SelectContent>
-                {(sellers || []).map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="relative">
+              <Input
+                value={sellerQuery}
+                placeholder="Søg sælger (min. 3 tegn)"
+                autoComplete="off"
+                onChange={(e) => {
+                  setSellerQuery(e.target.value);
+                  setSellerOpen(true);
+                  if (selectedSeller && e.target.value !== selectedSeller.name) {
+                    setSellerId("");
+                  }
+                }}
+                onFocus={() => setSellerOpen(true)}
+                onBlur={() => setTimeout(() => setSellerOpen(false), 120)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && sellerSuggestions.length > 0) {
+                    e.preventDefault();
+                    const first = sellerSuggestions[0];
+                    setSellerId(first.id);
+                    setSellerQuery(first.name);
+                    setSellerOpen(false);
+                  }
+                  if (e.key === "Escape") setSellerOpen(false);
+                }}
+              />
+              {sellerOpen && sellerQuery.trim().length >= 3 && (
+                <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md max-h-56 overflow-y-auto">
+                  {sellerSuggestions.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-muted-foreground">
+                      Ingen sælgere fundet
+                    </div>
+                  ) : (
+                    sellerSuggestions.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          setSellerId(s.id);
+                          setSellerQuery(s.name);
+                          setSellerOpen(false);
+                        }}
+                      >
+                        {s.name}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+            {selectedSeller ? (
+              <p className="text-xs text-muted-foreground">
+                Valgt: {selectedSeller.name}
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Ingen sælger valgt — vælg et forslag fra listen.
+              </p>
+            )}
           </div>
+
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
