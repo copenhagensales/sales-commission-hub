@@ -948,36 +948,108 @@ function OverviewTab() {
 
 
 
-function FileDropzone({
-  label,
-  dropText,
-  file,
-  onFile,
-  onClear,
+function PowerBiDropzone({
+  sheetType,
+  existing,
 }: {
-  label: string;
-  dropText: string;
-  file: File | null;
-  onFile: (file: File) => void;
-  onClear: () => void;
+  sheetType: PowerBiSheetType;
+  existing?: PowerBiImport;
 }) {
+  const label = SHEET_LABELS[sheetType];
+  const upload = useUploadPowerBiSheet();
+  const remove = useRemovePowerBiImport();
+
+  const handleFile = (file: File) => {
+    upload.mutate(
+      { file, sheetType },
+      {
+        onSuccess: (res) =>
+          toast.success(`${label}: ${res.rowCount} rækker indlæst`),
+        onError: (err: any) =>
+          toast.error(err?.message || "Kunne ikke indlæse arket"),
+      },
+    );
+  };
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop: (accepted) => {
-      if (accepted[0]) onFile(accepted[0]);
+      if (accepted[0]) handleFile(accepted[0]);
     },
     accept: XLSX_ACCEPT,
     maxFiles: 1,
+    disabled: upload.isPending,
   });
 
-  if (file) {
+  const replaceInput = (
+    <input
+      type="file"
+      accept=".xlsx"
+      className="hidden"
+      id={`replace-${sheetType}`}
+      onChange={(e) => {
+        const file = e.target.files?.[0];
+        if (file) handleFile(file);
+        e.target.value = "";
+      }}
+    />
+  );
+
+  if (upload.isPending) {
+    return (
+      <div className="border-2 border-dashed rounded-lg p-8 text-center border-primary/40 bg-primary/5">
+        <FileSpreadsheet className="h-10 w-10 mx-auto mb-3 text-primary animate-pulse" />
+        <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">{label}</p>
+        <p className="text-sm font-medium">Indlæser ark...</p>
+      </div>
+    );
+  }
+
+  if (existing) {
+    const period =
+      existing.periodFrom && existing.periodTo
+        ? `${format(new Date(existing.periodFrom), "dd/MM/yyyy", { locale: da })} – ${format(
+            new Date(existing.periodTo),
+            "dd/MM/yyyy",
+            { locale: da },
+          )}`
+        : "Ukendt periode";
     return (
       <div className="border-2 border-dashed rounded-lg p-8 text-center border-success/40 bg-success/5">
         <FileSpreadsheet className="h-10 w-10 mx-auto mb-3 text-success" />
         <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">{label}</p>
-        <p className="text-sm font-medium truncate">{file.name}</p>
-        <Button variant="ghost" size="sm" className="mt-2 h-7" onClick={onClear}>
-          <X className="h-3.5 w-3.5 mr-1" /> Skift fil
-        </Button>
+        <p className="text-sm font-medium truncate">{existing.fileName}</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          {existing.rowCount} rækker · {period}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Uploadet {format(new Date(existing.createdAt), "dd/MM/yyyy HH:mm", { locale: da })}
+        </p>
+        <div className="mt-2 flex items-center justify-center gap-1">
+          {replaceInput}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7"
+            onClick={() => document.getElementById(`replace-${sheetType}`)?.click()}
+          >
+            <Upload className="h-3.5 w-3.5 mr-1" /> Skift fil
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+            disabled={remove.isPending}
+            onClick={() =>
+              remove.mutate(existing, {
+                onSuccess: () => toast.success(`${label}-arket er fjernet`),
+                onError: (err: any) =>
+                  toast.error(err?.message || "Kunne ikke fjerne arket"),
+              })
+            }
+          >
+            <X className="h-3.5 w-3.5 mr-1" /> Fjern
+          </Button>
+        </div>
       </div>
     );
   }
@@ -996,7 +1068,7 @@ function FileDropzone({
         <p className="text-base">Slip filen her...</p>
       ) : (
         <>
-          <p className="text-base mb-1">{dropText}</p>
+          <p className="text-base mb-1">Træk og slip {label}-fil</p>
           <p className="text-xs text-muted-foreground">eller klik for at vælge</p>
         </>
       )}
@@ -1005,8 +1077,9 @@ function FileDropzone({
 }
 
 export default function EesyFmDeviations() {
-  const [gadenCoopFile, setGadenCoopFile] = useState<File | null>(null);
-  const [markedFile, setMarkedFile] = useState<File | null>(null);
+  const { data: imports } = useEesyFmPowerBiImports();
+  const findImport = (type: PowerBiSheetType) =>
+    (imports || []).find((i) => i.sheetType === type);
 
   return (
     <VagtFlowLayout>
@@ -1035,25 +1108,14 @@ export default function EesyFmDeviations() {
                   Upload kurv-fil
                 </CardTitle>
                 <CardDescription>
-                  Upload Excel-filer (.xlsx). Én fil for Gaden/Coop og én for Marked.
+                  Upload Excel-filer (.xlsx). Én fil for Gaden/Coop og én for Marked. Arkene
+                  forbliver indlæst indtil de fjernes.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid md:grid-cols-2 gap-4">
-                  <FileDropzone
-                    label="Gaden/Coop"
-                    dropText="Træk og slip Gaden/Coop-fil"
-                    file={gadenCoopFile}
-                    onFile={setGadenCoopFile}
-                    onClear={() => setGadenCoopFile(null)}
-                  />
-                  <FileDropzone
-                    label="Marked"
-                    dropText="Træk og slip Marked-fil"
-                    file={markedFile}
-                    onFile={setMarkedFile}
-                    onClear={() => setMarkedFile(null)}
-                  />
+                  <PowerBiDropzone sheetType="gaden_coop" existing={findImport("gaden_coop")} />
+                  <PowerBiDropzone sheetType="marked" existing={findImport("marked")} />
                 </div>
               </CardContent>
             </Card>
