@@ -952,7 +952,7 @@ function DeviationsPanel({
         </div>
 
         <ClaimEditDialog
-          claimMode={deviationMode === "missing" ? "add" : "remove"}
+          claimMode={deviationMode ? "add" : "remove"}
           sale={editSale}
           onOpenChange={(open) => {
             if (!open) setEditSale(null);
