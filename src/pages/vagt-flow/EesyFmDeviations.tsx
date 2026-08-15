@@ -720,6 +720,13 @@ function DeviationsPanel({
             </TableBody>
           </Table>
         </div>
+
+        <ClaimEditDialog
+          sale={editSale}
+          onOpenChange={(open) => {
+            if (!open) setEditSale(null);
+          }}
+        />
       </CardContent>
     </Card>
   );
