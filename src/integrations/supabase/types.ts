@@ -5757,6 +5757,95 @@ export type Database = {
           },
         ]
       }
+      eesy_fm_powerbi_imports: {
+        Row: {
+          created_at: string
+          file_name: string
+          id: string
+          is_active: boolean
+          period_from: string | null
+          period_to: string | null
+          row_count: number
+          sheet_type: string
+          storage_path: string | null
+          updated_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          id?: string
+          is_active?: boolean
+          period_from?: string | null
+          period_to?: string | null
+          row_count?: number
+          sheet_type: string
+          storage_path?: string | null
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          id?: string
+          is_active?: boolean
+          period_from?: string | null
+          period_to?: string | null
+          row_count?: number
+          sheet_type?: string
+          storage_path?: string | null
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: []
+      }
+      eesy_fm_powerbi_rows: {
+        Row: {
+          campaign_name: string | null
+          created_at: string
+          id: string
+          import_id: string
+          operator: string | null
+          phone_normalized: string | null
+          phone_raw: string | null
+          sale_date: string | null
+          seller_name: string | null
+          subscription_name: string | null
+        }
+        Insert: {
+          campaign_name?: string | null
+          created_at?: string
+          id?: string
+          import_id: string
+          operator?: string | null
+          phone_normalized?: string | null
+          phone_raw?: string | null
+          sale_date?: string | null
+          seller_name?: string | null
+          subscription_name?: string | null
+        }
+        Update: {
+          campaign_name?: string | null
+          created_at?: string
+          id?: string
+          import_id?: string
+          operator?: string | null
+          phone_normalized?: string | null
+          phone_raw?: string | null
+          sale_date?: string | null
+          seller_name?: string | null
+          subscription_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eesy_fm_powerbi_rows_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "eesy_fm_powerbi_imports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_templates: {
         Row: {
           content: string
