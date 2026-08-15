@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/utils/supabasePagination";
 
@@ -12,6 +12,9 @@ export interface EesyFmClaimSale {
   phone: string | null;
   productName: string | null;
   note: string | null;
+  approved: boolean;
+  approvedAt: string | null;
+  approvedByName: string | null;
 }
 
 interface SaleRow {
@@ -20,6 +23,7 @@ interface SaleRow {
   customer_phone: string | null;
   raw_payload: any;
 }
+
 
 export function useEesyFmClaimSales(from?: Date, to?: Date, enabled = true) {
   const fromIso = from ? from.toISOString() : undefined;
