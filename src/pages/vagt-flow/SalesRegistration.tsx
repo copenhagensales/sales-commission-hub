@@ -507,19 +507,15 @@ const SalesRegistration = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               {isEesyFm && (
-                <div className="flex items-center gap-2 rounded-lg border p-3">
-                  <Checkbox
-                    id="claim-reimport"
-                    checked={isClaimReimport}
-                    onCheckedChange={(v) => {
-                      const next = v === true;
-                      setIsClaimReimport(next);
-                      if (!next) setCommentError(false);
-                    }}
-                  />
-                  <Label htmlFor="claim-reimport" className="cursor-pointer">
-                    Claim/Reimport
+                <div className="flex items-center justify-end gap-2 rounded-lg border p-3">
+                  <Label htmlFor="claim-all" className="cursor-pointer">
+                    Marker alle
                   </Label>
+                  <Checkbox
+                    id="claim-all"
+                    checked={allClaims}
+                    onCheckedChange={(v) => setAllClaims(v === true)}
+                  />
                 </div>
               )}
 
@@ -544,13 +540,31 @@ const SalesRegistration = () => {
                             e.target.value
                           )
                         }
-                        className="flex-1"
+                        className="flex-1 min-w-0"
                         required
                       />
+                      {isEesyFm && (
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Label
+                            htmlFor={`claim-${selection.productId}-${index}`}
+                            className="cursor-pointer text-xs text-muted-foreground whitespace-nowrap"
+                          >
+                            Claim/Reimport
+                          </Label>
+                          <Checkbox
+                            id={`claim-${selection.productId}-${index}`}
+                            checked={selection.claimFlags[index] ?? false}
+                            onCheckedChange={(v) =>
+                              toggleClaim(selection.productId, index, v === true)
+                            }
+                          />
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
               ))}
+
             </CardContent>
           </Card>
         )}
