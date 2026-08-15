@@ -979,6 +979,15 @@ export default function EesyFmDeviations() {
             />
           </TabsContent>
 
+          <TabsContent value="mapping">
+            <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="text-xl">Mapping</CardTitle>
+                <CardDescription>Indhold tilføjes senere.</CardDescription>
+              </CardHeader>
+            </Card>
+          </TabsContent>
+
 
         </Tabs>
       </div>
