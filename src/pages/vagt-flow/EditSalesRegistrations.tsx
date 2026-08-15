@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Pencil, Trash2, Search, ChevronDown, ChevronRight, Plus, X } from "lucide-react";
+import { Loader2, Pencil, Trash2, Search, ChevronDown, ChevronRight, Plus, X, Flag } from "lucide-react";
 import { toast } from "sonner";
 import { format, parseISO, startOfMonth, endOfMonth } from "date-fns";
 import { fetchAllRows } from "@/utils/supabasePagination";
@@ -77,6 +77,7 @@ interface GroupSaleItem {
   product_name: string;
   phone_number: string;
   comment: string;
+  claim_reimport: boolean;
   toDelete?: boolean;
 }
 
@@ -347,6 +348,33 @@ export default function EditSalesRegistrations() {
     }) => {
       const firstSale = originalGroup.sales[0];
       const baseDate = firstSale?.registered_at ? parseISO(firstSale.registered_at) : new Date();
+
+      // Auto-note when a leader marks a sale as Claim/Reimport without writing a comment
+      const needsAutoNote = items.some(
+        (item) => !item.toDelete && item.claim_reimport === true && !item.comment?.trim()
+      );
+      let autoClaimNote: string | null = null;
+      if (needsAutoNote) {
+        let editorName = "leder";
+        const { data: currentEmployeeId } = await supabase.rpc("get_current_employee_id");
+        if (currentEmployeeId) {
+          const { data: editor } = await supabase
+            .from("employee_master_data")
+            .select("first_name, last_name")
+            .eq("id", currentEmployeeId as string)
+            .maybeSingle();
+          const name = [editor?.first_name, editor?.last_name].filter(Boolean).join(" ").trim();
+          if (name) editorName = name;
+        }
+        autoClaimNote = `Rettet til Claim/Reimport af ${editorName} den ${format(new Date(), "dd/MM/yyyy", { locale: da })}`;
+      }
+
+      const resolveComment = (item: GroupSaleItem) =>
+        item.comment?.trim()
+          ? item.comment
+          : item.claim_reimport === true
+            ? autoClaimNote
+            : null;
       
       // Items to delete
       const toDelete = items.filter(item => item.toDelete && item.id);
@@ -393,7 +421,8 @@ export default function EditSalesRegistrations() {
             raw_payload: {
               ...existingPayload,
               fm_product_name: item.product_name,
-              fm_comment: item.comment || null,
+              fm_comment: resolveComment(item),
+              fm_claim_reimport: item.claim_reimport === true,
               fm_seller_id: updates.seller_id || existingPayload.fm_seller_id,
               fm_location_id: updates.location_id || existingPayload.fm_location_id,
               fm_client_id: updates.client_id || existingPayload.fm_client_id,
@@ -444,7 +473,8 @@ export default function EditSalesRegistrations() {
             fm_location_id: updates.location_id || firstSale?.location_id,
             fm_client_id: updates.client_id || firstSale?.client_id,
             fm_product_name: item.product_name,
-            fm_comment: item.comment || null,
+            fm_comment: resolveComment(item),
+            fm_claim_reimport: item.claim_reimport === true,
           },
         }));
         const { data: insertedNewSales, error } = await supabase
@@ -461,6 +491,7 @@ export default function EditSalesRegistrations() {
       toast.success("Salgsgruppe opdateret");
       queryClient.invalidateQueries({ queryKey: ["fm-sales-edit"] });
       queryClient.invalidateQueries({ queryKey: ["fieldmarketing-sales"] });
+      queryClient.invalidateQueries({ queryKey: ["eesy-fm-claim-sales"] });
       setGroupEditDialog({ open: false, group: null });
     },
     onError: (error: Error) => {
@@ -515,6 +546,7 @@ export default function EditSalesRegistrations() {
         product_name: sale.product_name || "",
         phone_number: sale.phone_number || "",
         comment: sale.comment || "",
+        claim_reimport: sale.claim_reimport === true,
       }))
     );
     setGroupEditDialog({ open: true, group });
@@ -540,7 +572,7 @@ export default function EditSalesRegistrations() {
   const addGroupSaleItem = () => {
     setGroupSaleItems(prev => [
       ...prev,
-      { id: null, product_name: "", phone_number: "", comment: "" }
+      { id: null, product_name: "", phone_number: "", comment: "", claim_reimport: false }
     ]);
   };
 
@@ -1069,6 +1101,19 @@ export default function EditSalesRegistrations() {
                         <span className="text-xs text-muted-foreground">
                           {item.id ? `Salg #${index + 1}` : 'Nyt salg'}
                         </span>
+                        <div className="flex items-center gap-1">
+                        {!item.toDelete && (
+                          <Button
+                            type="button"
+                            variant={item.claim_reimport ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => updateGroupSaleItem(index, "claim_reimport", !item.claim_reimport)}
+                            className="h-7 text-xs"
+                          >
+                            <Flag className="h-3 w-3 mr-1" />
+                            {item.claim_reimport ? "Claim/Reimport" : "Marker som Claim/Reimport"}
+                          </Button>
+                        )}
                         {item.id ? (
                           <Button
                             variant="ghost"
@@ -1088,6 +1133,7 @@ export default function EditSalesRegistrations() {
                             <X className="h-3 w-3" />
                           </Button>
                         )}
+                        </div>
                       </div>
                       
                       {!item.toDelete && (
