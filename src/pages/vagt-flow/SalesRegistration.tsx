@@ -32,6 +32,7 @@ interface ProductSelection {
   productName: string;
   quantity: number;
   phoneNumbers: string[];
+  claimFlags: boolean[];
 }
 
 interface TodayBooking {
@@ -52,7 +53,6 @@ const SalesRegistration = () => {
   const isOwner = position?.name?.toLowerCase() === "ejer";
   const [locationId, setLocationId] = useState<string>("");
   const [comment, setComment] = useState("");
-  const [isClaimReimport, setIsClaimReimport] = useState(false);
   const [commentError, setCommentError] = useState(false);
   const commentRef = useRef<HTMLTextAreaElement>(null);
   const [productSelections, setProductSelections] = useState<ProductSelection[]>([]);
@@ -229,7 +229,6 @@ const SalesRegistration = () => {
     setCallbackDate(undefined);
     setProductSelections([]);
     setComment("");
-    setIsClaimReimport(false);
     setCommentError(false);
   };
 
@@ -277,6 +276,7 @@ const SalesRegistration = () => {
                 ...p,
                 quantity: p.quantity + 1,
                 phoneNumbers: [...p.phoneNumbers, ""],
+                claimFlags: [...p.claimFlags, false],
               }
             : p
         )
@@ -290,6 +290,7 @@ const SalesRegistration = () => {
           productName: product.name,
           quantity: 1,
           phoneNumbers: [""],
+          claimFlags: [false],
         },
       ]);
     }
@@ -310,6 +311,7 @@ const SalesRegistration = () => {
               ...p,
               quantity: p.quantity - 1,
               phoneNumbers: p.phoneNumbers.slice(0, -1),
+              claimFlags: p.claimFlags.slice(0, -1),
             }
           : p
       );
@@ -334,6 +336,35 @@ const SalesRegistration = () => {
       )
     );
   };
+
+  // Claim/Reimport pr. linje
+  const toggleClaim = (productId: string, index: number, value: boolean) => {
+    setProductSelections((prev) =>
+      prev.map((p) =>
+        p.productId === productId
+          ? {
+              ...p,
+              claimFlags: p.claimFlags.map((flag, i) =>
+                i === index ? value : flag
+              ),
+            }
+          : p
+      )
+    );
+    if (!value) setCommentError(false);
+  };
+
+  const setAllClaims = (value: boolean) => {
+    setProductSelections((prev) =>
+      prev.map((p) => ({ ...p, claimFlags: p.claimFlags.map(() => value) }))
+    );
+    if (!value) setCommentError(false);
+  };
+
+  const claimFlagsFlat = productSelections.flatMap((p) => p.claimFlags);
+  const hasAnyClaim = claimFlagsFlat.some(Boolean);
+  const allClaims = claimFlagsFlat.length > 0 && claimFlagsFlat.every(Boolean);
+
 
   const getProductQuantity = (productId: string) => {
     return productSelections.find((p) => p.productId === productId)?.quantity || 0;
@@ -362,7 +393,7 @@ const SalesRegistration = () => {
       return;
     }
 
-    if (isClaimReimport && !comment.trim()) {
+    if (hasAnyClaim && !comment.trim()) {
       setCommentError(true);
       toast.error("Kommentar er påkrævet ved Claim/Reimport");
       commentRef.current?.focus();
@@ -409,8 +440,7 @@ const SalesRegistration = () => {
       // Reset form
       
       setComment("");
-      setIsClaimReimport(false);
-      setCommentError(false);
+        setCommentError(false);
       setProductSelections([]);
     } catch (error: any) {
       console.error("Error saving sales:", error);
@@ -440,7 +470,7 @@ const SalesRegistration = () => {
             {/* Kommentar */}
             <div className="space-y-2">
               <Label htmlFor="comment">
-                Kommentar{isClaimReimport && " *"}
+                Kommentar{hasAnyClaim && " *"}
               </Label>
               <Textarea
                 id="comment"
@@ -454,7 +484,7 @@ const SalesRegistration = () => {
                 rows={3}
                 className={commentError ? "border-destructive focus-visible:ring-destructive" : undefined}
               />
-              {isClaimReimport && (
+              {hasAnyClaim && (
                 <p className={`text-xs ${commentError ? "text-destructive" : "text-muted-foreground"}`}>
                   Kommentar er påkrævet ved Claim/Reimport
                 </p>
@@ -474,19 +504,15 @@ const SalesRegistration = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               {isEesyFm && (
-                <div className="flex items-center gap-2 rounded-lg border p-3">
-                  <Checkbox
-                    id="claim-reimport"
-                    checked={isClaimReimport}
-                    onCheckedChange={(v) => {
-                      const next = v === true;
-                      setIsClaimReimport(next);
-                      if (!next) setCommentError(false);
-                    }}
-                  />
-                  <Label htmlFor="claim-reimport" className="cursor-pointer">
-                    Claim/Reimport
+                <div className="flex items-center justify-end gap-2 rounded-lg border p-3">
+                  <Label htmlFor="claim-all" className="cursor-pointer">
+                    Marker alle
                   </Label>
+                  <Checkbox
+                    id="claim-all"
+                    checked={allClaims}
+                    onCheckedChange={(v) => setAllClaims(v === true)}
+                  />
                 </div>
               )}
 
@@ -511,13 +537,31 @@ const SalesRegistration = () => {
                             e.target.value
                           )
                         }
-                        className="flex-1"
+                        className="flex-1 min-w-0"
                         required
                       />
+                      {isEesyFm && (
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Label
+                            htmlFor={`claim-${selection.productId}-${index}`}
+                            className="cursor-pointer text-xs text-muted-foreground whitespace-nowrap"
+                          >
+                            Claim/Reimport
+                          </Label>
+                          <Checkbox
+                            id={`claim-${selection.productId}-${index}`}
+                            checked={selection.claimFlags[index] ?? false}
+                            onCheckedChange={(v) =>
+                              toggleClaim(selection.productId, index, v === true)
+                            }
+                          />
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
               ))}
+
             </CardContent>
           </Card>
         )}
