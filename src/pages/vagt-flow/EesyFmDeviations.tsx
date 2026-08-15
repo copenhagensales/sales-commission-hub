@@ -223,6 +223,8 @@ function ClaimEditDialog({
 
   const [productName, setProductName] = useState("");
   const [sellerId, setSellerId] = useState("");
+  const [sellerQuery, setSellerQuery] = useState("");
+  const [sellerOpen, setSellerOpen] = useState(false);
   const [saleDatetime, setSaleDatetime] = useState("");
   const [phone, setPhone] = useState("");
   const [note, setNote] = useState("");
@@ -232,16 +234,43 @@ function ClaimEditDialog({
     if (!sale) return;
     setProductName(sale.productName || "");
     setSellerId(sale.sellerId || "");
+    setSellerQuery(sale.sellerName || "");
+    setSellerOpen(false);
     setSaleDatetime(format(new Date(sale.saleDatetime), "yyyy-MM-dd'T'HH:mm"));
     setPhone(sale.phone || "");
     setNote(sale.note || "");
     setRemoveClaim(false);
   }, [sale]);
 
+  const normalize = (v: string) =>
+    v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+
+  const sellerSuggestions = useMemo(() => {
+    const q = normalize(sellerQuery);
+    if (q.length < 3) return [];
+    const list = sellers || [];
+    const firstNameMatches = list.filter((s) => normalize(s.name).startsWith(q));
+    const otherNameMatches = list.filter(
+      (s) =>
+        !firstNameMatches.includes(s) &&
+        normalize(s.name)
+          .split(/\s+/)
+          .some((part) => part.startsWith(q)),
+    );
+    return [...firstNameMatches, ...otherNameMatches].slice(0, 20);
+  }, [sellerQuery, sellers]);
+
+  const selectedSeller = (sellers || []).find((s) => s.id === sellerId);
+
+
   const handleSave = () => {
     if (!sale) return;
     if (!productName) {
       toast.error("Vælg et produkt");
+      return;
+    }
+    if (!sellerId) {
+      toast.error("Vælg en sælger fra søgeforslagene");
       return;
     }
     if (!saleDatetime) {
@@ -298,19 +327,68 @@ function ClaimEditDialog({
 
           <div className="space-y-1.5">
             <Label>Sælger</Label>
-            <Select value={sellerId} onValueChange={setSellerId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Vælg sælger" />
-              </SelectTrigger>
-              <SelectContent>
-                {(sellers || []).map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="relative">
+              <Input
+                value={sellerQuery}
+                placeholder="Søg sælger (min. 3 tegn)"
+                autoComplete="off"
+                onChange={(e) => {
+                  setSellerQuery(e.target.value);
+                  setSellerOpen(true);
+                  if (selectedSeller && e.target.value !== selectedSeller.name) {
+                    setSellerId("");
+                  }
+                }}
+                onFocus={() => setSellerOpen(true)}
+                onBlur={() => setTimeout(() => setSellerOpen(false), 120)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && sellerSuggestions.length > 0) {
+                    e.preventDefault();
+                    const first = sellerSuggestions[0];
+                    setSellerId(first.id);
+                    setSellerQuery(first.name);
+                    setSellerOpen(false);
+                  }
+                  if (e.key === "Escape") setSellerOpen(false);
+                }}
+              />
+              {sellerOpen && sellerQuery.trim().length >= 3 && (
+                <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md max-h-56 overflow-y-auto">
+                  {sellerSuggestions.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-muted-foreground">
+                      Ingen sælgere fundet
+                    </div>
+                  ) : (
+                    sellerSuggestions.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          setSellerId(s.id);
+                          setSellerQuery(s.name);
+                          setSellerOpen(false);
+                        }}
+                      >
+                        {s.name}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+            {selectedSeller ? (
+              <p className="text-xs text-muted-foreground">
+                Valgt: {selectedSeller.name}
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Ingen sælger valgt — vælg et forslag fra listen.
+              </p>
+            )}
           </div>
+
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
