@@ -66,7 +66,7 @@ export function useTdcErhvervSales(day: Date, enabled = true) {
       const { data, error } = await supabase
         .from("sales")
         .select(
-          "id, sale_datetime, agent_email, agent_name, raw_payload, client_campaigns!inner(client_id), sale_items(quantity, products(name))"
+          "id, sale_datetime, agent_email, agent_name, raw_payload, client_campaigns!inner(client_id), sale_items(id, quantity, product_id, products(name))"
         )
         .eq("client_campaigns.client_id", TDC_ERHVERV_CLIENT_ID)
         .gte("sale_datetime", start)
@@ -110,6 +110,7 @@ export function useTdcErhvervSales(day: Date, enabled = true) {
             sellerName,
             saleDatetime: row.sale_datetime,
             products: [],
+            items: [],
           };
           groups.set(key, group);
         }
@@ -119,12 +120,21 @@ export function useTdcErhvervSales(day: Date, enabled = true) {
 
         for (const item of row.sale_items || []) {
           const name = item.products?.name || "Ukendt produkt";
-          const quantity = item.quantity ?? 0;
+          const quantity = Number(item.quantity ?? 0);
           const existing = group.products.find((p) => p.name === name);
           if (existing) existing.quantity += quantity;
           else group.products.push({ name, quantity });
+
+          group.items.push({
+            saleItemId: item.id,
+            saleId: row.id,
+            productId: item.product_id,
+            productName: name,
+            quantity,
+          });
         }
       }
+
 
       return Array.from(groups.values())
         .map((g) => ({
