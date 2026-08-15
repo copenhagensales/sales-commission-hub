@@ -31,7 +31,7 @@
   - `GroupSaleItem` udvides med `claim_reimport: boolean`.
   - `openGroupEditDialog` initialiserer feltet fra `sale.claim_reimport` (findes allerede på `SaleRecord`, læst fra `raw_payload.fm_claim_reimport`).
   - Ny toggle-knap i hvert salgs-kort (ved siden af Slet) som kalder `updateGroupSaleItem(index, 'claim_reimport', !item.claim_reimport)`.
-  - `handleGroupSave` validerer: for hvert ikke-slettet item med `claim_reimport === true` skal `comment` være udfyldt, ellers `toast.error` og afbryd.
+  - `handleGroupSave`/mutationen: for hvert ikke-slettet item med `claim_reimport === true` og tom `comment` sættes `fm_comment` til `Rettet til Claim/Reimport af <navn> den <dd/MM/yyyy>`. Navnet hentes via `get_current_employee_id` + `employee_master_data` (samme mønster som `useSetEesyFmClaimApproval`), datoen formateres med `date-fns`/`da`. Ingen blokerende validering.
   - `updateGroup`-mutationen skriver `fm_claim_reimport: item.claim_reimport === true` i `raw_payload` både i update-grenen og i `newSales`-insert-grenen. Ingen ændring af `coreDataChanged`-logikken, så pricing/rematch kun trigges som i dag.
   - `onSuccess` invaliderer desuden `["eesy-fm-claim-sales"]`, så Claims/Reimport-fanen opdateres uden reload.
 - Ingen DB-migration; feltet ligger i `sales.raw_payload` som i dag. Ingen ændringer i `useEesyFmClaimSales.ts`, pricing-service eller rapport-RPC'er.
