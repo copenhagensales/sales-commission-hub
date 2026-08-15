@@ -47,19 +47,23 @@ export function useEesyFmClaimSales(from?: Date, to?: Date, enabled = true) {
         { orderBy: "sale_datetime", ascending: false }
       );
 
-      const sellerIds = Array.from(
-        new Set(rows.map((r) => r.raw_payload?.fm_seller_id).filter(Boolean) as string[])
+      const employeeIds = Array.from(
+        new Set(
+          rows
+            .flatMap((r) => [r.raw_payload?.fm_seller_id, r.raw_payload?.fm_claim_approved_by])
+            .filter(Boolean) as string[]
+        )
       );
 
-      const sellersMap = new Map<string, string>();
-      if (sellerIds.length > 0) {
-        const { data: sellers, error } = await supabase
+      const namesMap = new Map<string, string>();
+      if (employeeIds.length > 0) {
+        const { data: employees, error } = await supabase
           .from("employee_master_data")
           .select("id, first_name, last_name")
-          .in("id", sellerIds);
+          .in("id", employeeIds);
         if (error) throw error;
-        for (const s of sellers || []) {
-          sellersMap.set(
+        for (const s of employees || []) {
+          namesMap.set(
             s.id,
             [s.first_name, s.last_name].filter(Boolean).join(" ").trim() || "Ukendt"
           );
@@ -69,16 +73,22 @@ export function useEesyFmClaimSales(from?: Date, to?: Date, enabled = true) {
       return rows.map((row) => {
         const payload = row.raw_payload || {};
         const sellerId: string = payload.fm_seller_id || "";
+        const approvedBy: string = payload.fm_claim_approved_by || "";
         return {
           id: row.id,
           saleDatetime: row.sale_datetime,
           sellerId,
-          sellerName: sellersMap.get(sellerId) || "Ukendt",
+          sellerName: namesMap.get(sellerId) || "Ukendt",
           phone: row.customer_phone,
           productName: payload.fm_product_name || null,
           note: payload.fm_comment || null,
+          approved: payload.fm_claim_approved === true,
+          approvedAt: payload.fm_claim_approved_at || null,
+          approvedByName:
+            namesMap.get(approvedBy) || payload.fm_claim_approved_by_name || null,
         };
       });
+
     },
     enabled,
   });
