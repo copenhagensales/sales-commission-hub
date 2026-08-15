@@ -557,6 +557,21 @@ function DeviationsPanel({
   const [pendingId, setPendingId] = useState<string | null>(null);
   const setApproval = useSetEesyFmClaimApproval();
   const [editSale, setEditSale] = useState<EesyFmClaimSale | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<EesyFmClaimSale | null>(null);
+  const deleteSale = useDeleteEesyFmSale();
+
+  const handleDelete = () => {
+    if (!deleteTarget) return;
+    deleteSale.mutate(deleteTarget.id, {
+      onSuccess: () => {
+        toast.success("Salget er slettet");
+        setDeleteTarget(null);
+      },
+      onError: (err: any) => toast.error(err?.message || "Kunne ikke slette salget"),
+    });
+  };
+
+
 
   const handleApproval = (saleId: string, approved: boolean) => {
     setPendingId(saleId);
