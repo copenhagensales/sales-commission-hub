@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { useEesyFmClaimSales } from "@/hooks/useEesyFmClaimSales";
 import { useDropzone } from "react-dropzone";
-import { FileSpreadsheet, Upload, X, Search, CalendarIcon } from "lucide-react";
+import { FileSpreadsheet, Upload, X, Search, CalendarIcon, Pencil } from "lucide-react";
 import {
   format,
   startOfDay,
@@ -182,17 +183,50 @@ function DeviationsPanel({
   description,
   columns,
   showRowActions = false,
+  claimsMode = false,
 }: {
   title: string;
   description: string;
   columns: readonly string[];
   showRowActions?: boolean;
+  claimsMode?: boolean;
 }) {
-  const [fromDate, setFromDate] = useState<Date | undefined>();
-  const [toDate, setToDate] = useState<Date | undefined>();
+  const [fromDate, setFromDate] = useState<Date | undefined>(
+    claimsMode ? startOfMonth(new Date()) : undefined,
+  );
+  const [toDate, setToDate] = useState<Date | undefined>(
+    claimsMode ? endOfMonth(new Date()) : undefined,
+  );
   const [search, setSearch] = useState("");
   const [employee, setEmployee] = useState<string>("all");
-  const [quickRange, setQuickRange] = useState<string>("custom");
+  const [quickRange, setQuickRange] = useState<string>(claimsMode ? "this-month" : "custom");
+
+  const { data: claimSales, isLoading: loadingClaims } = useEesyFmClaimSales(
+    fromDate,
+    toDate,
+    claimsMode,
+  );
+
+  const employeeOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const sale of claimSales || []) {
+      if (sale.sellerId) map.set(sale.sellerId, sale.sellerName);
+    }
+    return Array.from(map, ([id, name]) => ({ id, name })).sort((a, b) =>
+      a.name.localeCompare(b.name, "da"),
+    );
+  }, [claimSales]);
+
+  const claimRows = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return (claimSales || []).filter((sale) => {
+      if (employee !== "all" && sale.sellerId !== employee) return false;
+      if (!term) return true;
+      return [sale.sellerName, sale.phone, sale.productName, sale.note]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(term));
+    });
+  }, [claimSales, search, employee]);
 
   const handleQuickRange = (value: string) => {
     setQuickRange(value);
@@ -203,6 +237,7 @@ function DeviationsPanel({
       setToDate(to);
     }
   };
+
 
   return (
     <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
@@ -265,6 +300,11 @@ function DeviationsPanel({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Alle medarbejdere</SelectItem>
+                {employeeOptions.map((opt) => (
+                  <SelectItem key={opt.id} value={opt.id}>
+                    {opt.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -286,14 +326,48 @@ function DeviationsPanel({
               </TableRow>
             </TableHeader>
             <TableBody>
-              <TableRow>
-                <TableCell
-                  colSpan={columns.length + (showRowActions ? 1 : 0)}
-                  className="py-16 text-center text-sm text-muted-foreground"
-                >
-                  Ingen data endnu.
-                </TableCell>
-              </TableRow>
+              {claimsMode && loadingClaims ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={columns.length + (showRowActions ? 1 : 0)}
+                    className="py-16 text-center text-sm text-muted-foreground"
+                  >
+                    Henter salg...
+                  </TableCell>
+                </TableRow>
+              ) : claimsMode && claimRows.length > 0 ? (
+                claimRows.map((sale) => (
+                  <TableRow key={sale.id}>
+                    <TableCell className="whitespace-nowrap">
+                      {format(new Date(sale.saleDatetime), "dd/MM/yyyy HH:mm", { locale: da })}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">{sale.sellerName}</TableCell>
+                    <TableCell className="font-mono text-xs whitespace-nowrap">
+                      {sale.phone || "-"}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">{sale.productName || "-"}</TableCell>
+                    <TableCell className="min-w-[240px] text-muted-foreground">
+                      {sale.note || "-"}
+                    </TableCell>
+                    {showRowActions && (
+                      <TableCell className="w-12">
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell
+                    colSpan={columns.length + (showRowActions ? 1 : 0)}
+                    className="py-16 text-center text-sm text-muted-foreground"
+                  >
+                    Ingen data endnu.
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </div>
@@ -466,6 +540,7 @@ export default function EesyFmDeviations() {
               description="Salg klar til claim eller reimport — med notat pr. salg."
               columns={CLAIMS_COLUMNS as readonly string[]}
               showRowActions
+              claimsMode
             />
           </TabsContent>
 
