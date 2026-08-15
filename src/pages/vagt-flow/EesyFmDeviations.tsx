@@ -75,6 +75,7 @@ const TABS = [
   { value: "upload", label: "Upload" },
   { value: "overview", label: "Oversigt" },
   { value: "raw", label: "Claims/Reimport" },
+  { value: "deleted", label: "Slettede salg" },
 ] as const;
 
 const OVERVIEW_COLUMNS = [
