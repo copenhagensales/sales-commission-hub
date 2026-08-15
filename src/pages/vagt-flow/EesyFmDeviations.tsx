@@ -553,9 +553,11 @@ function DeviationsPanel({
 
   const {
     rows: rawDeviationRows,
+    okRows: rawOkRows,
     isLoading: loadingDeviations,
     hasImports,
   } = useEesyFmDeviations(deviationMode || "missing", fromDate, toDate, !!deviationMode);
+
 
   const employeeOptions = useMemo(() => {
     const map = new Map<string, string>();
