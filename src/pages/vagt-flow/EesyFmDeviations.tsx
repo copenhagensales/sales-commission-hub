@@ -209,6 +209,8 @@ function DeviationsPanel({
   const [search, setSearch] = useState("");
   const [employee, setEmployee] = useState<string>("all");
   const [quickRange, setQuickRange] = useState<string>(claimsMode ? "this-month" : "custom");
+  const [sortKey, setSortKey] = useState<"date" | "seller">("date");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const { data: claimSales, isLoading: loadingClaims } = useEesyFmClaimSales(
     fromDate,
