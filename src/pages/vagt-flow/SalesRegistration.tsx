@@ -417,13 +417,14 @@ const SalesRegistration = () => {
     try {
       // Create sales records - one per product/phone combination
       const salesRecords = productSelections.flatMap((selection) =>
-        selection.phoneNumbers.map((phone) => ({
+        selection.phoneNumbers.map((phone, index) => ({
           seller_id: currentEmployee.id,
           location_id: activeBooking.location!.id,
           client_id: clientId,
           product_name: selection.productName,
           phone_number: phone.trim(),
           comment: comment || undefined,
+          claim_reimport: selection.claimFlags[index] === true,
               registered_at: isCallbackMode && callbackDate 
                 ? format(callbackDate, "yyyy-MM-dd'T'12:00:00")
                 : new Date().toISOString(),
