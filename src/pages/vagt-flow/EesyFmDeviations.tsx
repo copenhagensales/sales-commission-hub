@@ -182,17 +182,50 @@ function DeviationsPanel({
   description,
   columns,
   showRowActions = false,
+  claimsMode = false,
 }: {
   title: string;
   description: string;
   columns: readonly string[];
   showRowActions?: boolean;
+  claimsMode?: boolean;
 }) {
-  const [fromDate, setFromDate] = useState<Date | undefined>();
-  const [toDate, setToDate] = useState<Date | undefined>();
+  const [fromDate, setFromDate] = useState<Date | undefined>(
+    claimsMode ? startOfMonth(new Date()) : undefined,
+  );
+  const [toDate, setToDate] = useState<Date | undefined>(
+    claimsMode ? endOfMonth(new Date()) : undefined,
+  );
   const [search, setSearch] = useState("");
   const [employee, setEmployee] = useState<string>("all");
-  const [quickRange, setQuickRange] = useState<string>("custom");
+  const [quickRange, setQuickRange] = useState<string>(claimsMode ? "this-month" : "custom");
+
+  const { data: claimSales, isLoading: loadingClaims } = useEesyFmClaimSales(
+    fromDate,
+    toDate,
+    claimsMode,
+  );
+
+  const employeeOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const sale of claimSales || []) {
+      if (sale.sellerId) map.set(sale.sellerId, sale.sellerName);
+    }
+    return Array.from(map, ([id, name]) => ({ id, name })).sort((a, b) =>
+      a.name.localeCompare(b.name, "da"),
+    );
+  }, [claimSales]);
+
+  const claimRows = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return (claimSales || []).filter((sale) => {
+      if (employee !== "all" && sale.sellerId !== employee) return false;
+      if (!term) return true;
+      return [sale.sellerName, sale.phone, sale.productName, sale.note]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(term));
+    });
+  }, [claimSales, search, employee]);
 
   const handleQuickRange = (value: string) => {
     setQuickRange(value);
@@ -203,6 +236,7 @@ function DeviationsPanel({
       setToDate(to);
     }
   };
+
 
   return (
     <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
