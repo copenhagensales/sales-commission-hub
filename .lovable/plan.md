@@ -16,8 +16,11 @@
    - Markerede salg dukker op på fanen Claims/Reimport, som i dag læser præcis den markering. Gælder salg på kunden Eesy FM.
    - Ingen godkendelse sættes automatisk — salget starter som "Afventer", indtil en leder godkender det på fanen.
 
-4. **Kommentarkrav**
-   - Ligesom ved sælgernes egen registrering kræves en kommentar på salget, når markeringen er slået til. Mangler kommentaren, gemmes der ikke, og der vises en fejlbesked med hvilket salg der mangler tekst.
+4. **Kommentar er ikke et krav for lederen**
+   - Lederen skal ikke tvinges til at skrive en kommentar (i modsætning til sælgerne, hvor kravet fortsat gælder ved egen registrering).
+   - Er kommentarfeltet tomt, når salget markeres og gemmes, udfyldes notatet automatisk med: "Rettet til Claim/Reimport af [navn på den der retter] den [dato for rettelsen]".
+   - Har lederen selv skrevet en kommentar, bevares den uændret.
+
 
 5. **Uændret**
    - Ingen ændring af pris, provision, rapporter eller de øvrige felter. Markeringen vises fortsat kun i tabellen i "Ret salgsregistrering (Leder)" og på Claims/Reimport-fanen.
