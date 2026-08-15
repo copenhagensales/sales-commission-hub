@@ -461,11 +461,12 @@ export default function EesyFmDeviations() {
           </TabsContent>
 
           <TabsContent value="raw">
-            <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
-              <CardContent className="py-16 text-center text-sm text-muted-foreground">
-                Indhold tilføjes her.
-              </CardContent>
-            </Card>
+            <DeviationsPanel
+              title="Claims/Reimport"
+              description="Salg klar til claim eller reimport — med notat pr. salg."
+              columns={CLAIMS_COLUMNS as readonly string[]}
+              showRowActions
+            />
           </TabsContent>
 
         </Tabs>
