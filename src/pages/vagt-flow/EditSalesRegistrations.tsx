@@ -833,6 +833,7 @@ export default function EditSalesRegistrations() {
                                 <TableHead className="text-right">Provi</TableHead>
                                 <TableHead className="text-right">Oms</TableHead>
                                 <TableHead>Kommentar</TableHead>
+                                <TableHead className="whitespace-nowrap">Claim/Reimport</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
