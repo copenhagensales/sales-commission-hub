@@ -420,14 +420,26 @@ const SalesRegistration = () => {
 
             {/* Kommentar */}
             <div className="space-y-2">
-              <Label htmlFor="comment">Kommentar</Label>
+              <Label htmlFor="comment">
+                Kommentar{isClaimReimport && " *"}
+              </Label>
               <Textarea
                 id="comment"
+                ref={commentRef}
                 placeholder="Eventuelle bemærkninger..."
                 value={comment}
-                onChange={(e) => setComment(e.target.value)}
+                onChange={(e) => {
+                  setComment(e.target.value);
+                  if (commentError) setCommentError(false);
+                }}
                 rows={3}
+                className={commentError ? "border-destructive focus-visible:ring-destructive" : undefined}
               />
+              {isClaimReimport && (
+                <p className={`text-xs ${commentError ? "text-destructive" : "text-muted-foreground"}`}>
+                  Kommentar er påkrævet ved Claim/Reimport
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -439,10 +451,26 @@ const SalesRegistration = () => {
               <CardTitle className="text-lg flex items-center gap-2">
                 <Phone className="h-5 w-5" />
                 Telefonnumre *
-                Telefonnumre
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {isEesyFm && (
+                <div className="flex items-center gap-2 rounded-lg border p-3">
+                  <Checkbox
+                    id="claim-reimport"
+                    checked={isClaimReimport}
+                    onCheckedChange={(v) => {
+                      const next = v === true;
+                      setIsClaimReimport(next);
+                      if (!next) setCommentError(false);
+                    }}
+                  />
+                  <Label htmlFor="claim-reimport" className="cursor-pointer">
+                    Claim/Reimport
+                  </Label>
+                </div>
+              )}
+
               {productSelections.map((selection) => (
                 <div key={selection.productId} className="space-y-2">
                   <Label className="font-medium text-primary">
