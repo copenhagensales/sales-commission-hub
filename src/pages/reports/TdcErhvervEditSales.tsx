@@ -113,8 +113,11 @@ export default function TdcErhvervEditSales() {
                     <TableRow>
                       <TableHead className="whitespace-nowrap">OPP nr.</TableHead>
                       <TableHead className="whitespace-nowrap">Sælgernavn</TableHead>
-                      <TableHead className="w-full min-w-[280px]">
-                        Produktnavn (inkl. antal)
+                      <TableHead className="w-16 whitespace-nowrap text-right">
+                        Antal
+                      </TableHead>
+                      <TableHead className="w-full min-w-[240px]">
+                        Produktnavn
                       </TableHead>
                       <TableHead className="w-44 whitespace-nowrap text-right">
                         Handlinger
@@ -125,7 +128,7 @@ export default function TdcErhvervEditSales() {
                     {isLoading || loadingAccess ? (
                       <TableRow>
                         <TableCell
-                          colSpan={4}
+                          colSpan={5}
                           className="py-16 text-center text-sm text-muted-foreground"
                         >
                           Henter salg...
@@ -137,15 +140,18 @@ export default function TdcErhvervEditSales() {
                           <TableCell className="font-mono text-xs whitespace-nowrap align-top">
                             {group.opp || "Uden OPP"}
                           </TableCell>
-                          <TableCell className="whitespace-nowrap align-top">
+                          <TableCell className="whitespace-nowrap align-top font-medium">
                             {group.sellerName}
                           </TableCell>
-                          <TableCell className="min-w-[280px] align-top">
+                          <TableCell className="w-16 text-right align-top">
                             {group.products.length > 0 ? (
                               <div className="flex flex-col gap-1">
                                 {group.products.map((p, i) => (
-                                  <span key={`${p.name}-${i}`}>
-                                    {p.name} x{p.quantity}
+                                  <span
+                                    key={`qty-${p.name}-${i}`}
+                                    className="font-semibold text-primary tabular-nums"
+                                  >
+                                    {p.quantity}
                                   </span>
                                 ))}
                               </div>
@@ -153,6 +159,18 @@ export default function TdcErhvervEditSales() {
                               "-"
                             )}
                           </TableCell>
+                          <TableCell className="min-w-[240px] align-top">
+                            {group.products.length > 0 ? (
+                              <div className="flex flex-col gap-1">
+                                {group.products.map((p, i) => (
+                                  <span key={`${p.name}-${i}`}>{p.name}</span>
+                                ))}
+                              </div>
+                            ) : (
+                              "-"
+                            )}
+                          </TableCell>
+
                           <TableCell className="w-44 whitespace-nowrap align-top">
                             <div className="flex items-center justify-end gap-1">
                               <Button
