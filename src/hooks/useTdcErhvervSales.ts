@@ -146,6 +146,152 @@ export function useTdcErhvervSales(day: Date, enabled = true) {
   });
 }
 
+export interface TdcProductOption {
+  id: string;
+  name: string;
+}
+
+/** Aktive TDC Erhverv-produkter til valg i redigeringsdialogen. */
+export function useTdcErhvervProducts(enabled = true) {
+  return useQuery({
+    queryKey: ["tdc-erhverv-products"],
+    enabled,
+    staleTime: 10 * 60 * 1000,
+    queryFn: async (): Promise<TdcProductOption[]> => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, name, client_campaigns!inner(client_id)")
+        .eq("client_campaigns.client_id", TDC_ERHVERV_CLIENT_ID)
+        .eq("is_active", true)
+        .eq("is_hidden", false)
+        .is("merged_into_product_id", null)
+        .order("name");
+      if (error) throw error;
+      return (data || []).map((p: any) => ({ id: p.id, name: p.name as string }));
+    },
+  });
+}
+
+export interface TdcOppEditLine {
+  /** Findes kun for eksisterende salgslinjer. */
+  saleItemId?: string;
+  saleId?: string;
+  productId: string;
+  quantity: number;
+}
+
+export interface UpdateTdcErhvervOppInput {
+  saleIds: string[];
+  /** Primær salgsrække, som nye produktlinjer oprettes på. */
+  primarySaleId: string;
+  originalOpp: string;
+  opp: string;
+  lines: TdcOppEditLine[];
+  removedSaleItemIds: string[];
+}
+
+/** Retter OPP-nummer, produkter og antal – og genberegner provision/omsætning. */
+export function useUpdateTdcErhvervOpp() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: UpdateTdcErhvervOppInput) => {
+      // 1. OPP-nummer på alle salgsrækker i gruppen
+      const newOpp = input.opp.trim();
+      if (newOpp && newOpp !== input.originalOpp) {
+        const { data: salesRows, error: salesError } = await supabase
+          .from("sales")
+          .select("id, raw_payload")
+          .in("id", input.saleIds);
+        if (salesError) throw salesError;
+
+        for (const row of salesRows || []) {
+          const payload = ((row.raw_payload as any) || {}) as Record<string, any>;
+          const fields = { ...((payload.leadResultFields as Record<string, any>) || {}) };
+          fields["OPP nr"] = newOpp;
+          const { error } = await supabase
+            .from("sales")
+            .update({ raw_payload: { ...payload, leadResultFields: fields } })
+            .eq("id", row.id);
+          if (error) throw error;
+        }
+      }
+
+      // 2. Slettede produktlinjer
+      if (input.removedSaleItemIds.length > 0) {
+        const { error } = await supabase
+          .from("sale_items")
+          .delete()
+          .in("id", input.removedSaleItemIds);
+        if (error) throw error;
+      }
+
+      // Produktnavne til adversus_product_title
+      const productIds = Array.from(new Set(input.lines.map((l) => l.productId)));
+      const nameById = new Map<string, string>();
+      if (productIds.length > 0) {
+        const { data: products } = await supabase
+          .from("products")
+          .select("id, name")
+          .in("id", productIds);
+        for (const p of products || []) nameById.set(p.id, p.name as string);
+      }
+
+      // 3. Opdater eksisterende og opret nye linjer
+      for (const line of input.lines) {
+        const title = nameById.get(line.productId) || null;
+        if (line.saleItemId) {
+          const { error } = await supabase
+            .from("sale_items")
+            .update({
+              product_id: line.productId,
+              quantity: line.quantity,
+              adversus_product_title: title,
+              needs_mapping: false,
+            })
+            .eq("id", line.saleItemId);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.from("sale_items").insert({
+            sale_id: line.saleId || input.primarySaleId,
+            product_id: line.productId,
+            quantity: line.quantity,
+            adversus_product_title: title,
+            needs_mapping: false,
+          });
+          if (error) throw error;
+        }
+      }
+
+      // 4. Genberegn provision/omsætning
+      await supabase.functions.invoke("rematch-pricing-rules", {
+        body: { sale_ids: input.saleIds },
+      });
+
+      // 5. Advarsel hvis nogen linjer ender uden provision
+      const { data: after } = await supabase
+        .from("sale_items")
+        .select("mapped_commission")
+        .in("sale_id", input.saleIds);
+      const zeroCommission = (after || []).filter(
+        (i) => !i.mapped_commission || Number(i.mapped_commission) === 0
+      ).length;
+
+      return { zeroCommission };
+    },
+    onSuccess: () => {
+      for (const key of [
+        ["tdc-erhverv-sales"],
+        ["sales-aggregates"],
+        ["fm-sales-edit"],
+      ]) {
+        queryClient.invalidateQueries({ queryKey: key });
+      }
+    },
+  });
+}
+
+
 /** Sletter alle salgsrækker under et OPP-nummer (hard delete). */
 export function useDeleteTdcErhvervOpp() {
   const queryClient = useQueryClient();
