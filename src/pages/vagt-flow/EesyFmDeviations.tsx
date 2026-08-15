@@ -275,7 +275,10 @@ function DeviationsPanel({
             <TableHeader>
               <TableRow>
                 {columns.map((col) => (
-                  <TableHead key={col} className="whitespace-nowrap">
+                  <TableHead
+                    key={col}
+                    className={col === "Notat" ? "w-full min-w-[240px]" : "whitespace-nowrap"}
+                  >
                     {col}
                   </TableHead>
                 ))}
