@@ -174,6 +174,8 @@ export function useEesyFmDeviations(
             phone: sale.phone,
             storkProduct: sale.productName,
             powerBiProduct: null,
+            powerBiCampaign: null,
+            powerBiOperator: null,
             sheetLabel: null,
             deviation: "Mangler i PowerBI",
           });
