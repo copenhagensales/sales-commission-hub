@@ -75,7 +75,7 @@ const TABS = [
   { value: "upload", label: "Upload" },
   { value: "overview", label: "Oversigt" },
   { value: "raw", label: "Claims/Reimport" },
-  
+  { value: "mapping", label: "Mapping" },
 ] as const;
 
 const OVERVIEW_COLUMNS = [
@@ -977,6 +977,15 @@ export default function EesyFmDeviations() {
               showRowActions
               claimsMode
             />
+          </TabsContent>
+
+          <TabsContent value="mapping">
+            <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="text-xl">Mapping</CardTitle>
+                <CardDescription>Indhold tilføjes senere.</CardDescription>
+              </CardHeader>
+            </Card>
           </TabsContent>
 
 
