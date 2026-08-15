@@ -763,9 +763,9 @@ function DeviationsPanel({
                 })}
                 {showRowActions && (
                   <TableHead
-                    className={`${claimsMode ? "w-56" : deviationMode === "missing" ? "w-44" : "w-40"} whitespace-nowrap text-right`}
+                    className={`${claimsMode ? "w-56" : deviationMode ? "w-44" : "w-40"} whitespace-nowrap text-right`}
                   >
-                    {claimsMode || deviationMode === "missing" ? "Handlinger" : "Ret salg"}
+                    {claimsMode || deviationMode ? "Handlinger" : "Ret salg"}
                   </TableHead>
                 )}
               </TableRow>
