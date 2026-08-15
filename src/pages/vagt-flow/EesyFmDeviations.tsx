@@ -96,7 +96,7 @@ const OVERVIEW_COLUMNS = [
   "PB Produkt",
   "PB Kampagne",
   "PB Operator",
-  "Type",
+  "Kilde",
 ] as const;
 
 const XLSX_ACCEPT = {
