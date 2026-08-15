@@ -278,6 +278,7 @@ const SalesRegistration = () => {
                 ...p,
                 quantity: p.quantity + 1,
                 phoneNumbers: [...p.phoneNumbers, ""],
+                claimFlags: [...p.claimFlags, false],
               }
             : p
         )
@@ -291,6 +292,7 @@ const SalesRegistration = () => {
           productName: product.name,
           quantity: 1,
           phoneNumbers: [""],
+          claimFlags: [false],
         },
       ]);
     }
@@ -311,6 +313,7 @@ const SalesRegistration = () => {
               ...p,
               quantity: p.quantity - 1,
               phoneNumbers: p.phoneNumbers.slice(0, -1),
+              claimFlags: p.claimFlags.slice(0, -1),
             }
           : p
       );
@@ -335,6 +338,35 @@ const SalesRegistration = () => {
       )
     );
   };
+
+  // Claim/Reimport pr. linje
+  const toggleClaim = (productId: string, index: number, value: boolean) => {
+    setProductSelections((prev) =>
+      prev.map((p) =>
+        p.productId === productId
+          ? {
+              ...p,
+              claimFlags: p.claimFlags.map((flag, i) =>
+                i === index ? value : flag
+              ),
+            }
+          : p
+      )
+    );
+    if (!value) setCommentError(false);
+  };
+
+  const setAllClaims = (value: boolean) => {
+    setProductSelections((prev) =>
+      prev.map((p) => ({ ...p, claimFlags: p.claimFlags.map(() => value) }))
+    );
+    if (!value) setCommentError(false);
+  };
+
+  const claimFlagsFlat = productSelections.flatMap((p) => p.claimFlags);
+  const hasAnyClaim = claimFlagsFlat.some(Boolean);
+  const allClaims = claimFlagsFlat.length > 0 && claimFlagsFlat.every(Boolean);
+
 
   const getProductQuantity = (productId: string) => {
     return productSelections.find((p) => p.productId === productId)?.quantity || 0;
