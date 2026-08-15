@@ -739,7 +739,59 @@ function DeviationsPanel({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {claimsMode && loadingClaims ? (
+              {deviationMode ? (
+                loadingDeviations ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={columns.length + (showRowActions ? 1 : 0)}
+                      className="py-16 text-center text-sm text-muted-foreground"
+                    >
+                      Sammenholder salg...
+                    </TableCell>
+                  </TableRow>
+                ) : deviationRows.length > 0 ? (
+                  deviationRows.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell className="whitespace-nowrap">
+                        {format(new Date(row.saleDatetime), "dd/MM/yyyy HH:mm", { locale: da })}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">{row.sellerName}</TableCell>
+                      <TableCell className="font-mono text-xs whitespace-nowrap">
+                        {row.phone || "-"}
+                      </TableCell>
+                      {deviationMode === "deviations" && (
+                        <TableCell className="whitespace-nowrap">
+                          <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-500">
+                            {row.deviation}
+                          </span>
+                        </TableCell>
+                      )}
+                      <TableCell className="min-w-[200px]">{row.storkProduct || "-"}</TableCell>
+                      {deviationMode === "deviations" && (
+                        <>
+                          <TableCell className="min-w-[200px]">
+                            {row.powerBiProduct || "-"}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap text-muted-foreground">
+                            {row.sheetLabel || "-"}
+                          </TableCell>
+                        </>
+                      )}
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell
+                      colSpan={columns.length + (showRowActions ? 1 : 0)}
+                      className="py-16 text-center text-sm text-muted-foreground"
+                    >
+                      {hasImports
+                        ? "Ingen afvigelser i den valgte periode."
+                        : "Upload et PowerBI-ark under fanen Upload for at sammenligne."}
+                    </TableCell>
+                  </TableRow>
+                )
+              ) : claimsMode && loadingClaims ? (
                 <TableRow>
                   <TableCell
                     colSpan={columns.length + (showRowActions ? 1 : 0)}
