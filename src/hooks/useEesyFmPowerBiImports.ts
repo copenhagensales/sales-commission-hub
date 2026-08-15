@@ -78,6 +78,16 @@ function toDateString(value: unknown): string | null {
     const d = String(value.getDate()).padStart(2, "0");
     return `${y}-${m}-${d}`;
   }
+  // Excel serial date (days since 1899-12-30)
+  const num = typeof value === "number" ? value : Number(String(value).trim());
+  if (Number.isFinite(num) && num > 20000 && num < 80000) {
+    const ms = Math.round(num) * 86400000;
+    const base = Date.UTC(1899, 11, 30);
+    const d = new Date(base + ms);
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(
+      d.getUTCDate(),
+    ).padStart(2, "0")}`;
+  }
   const str = String(value).trim();
   const iso = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
