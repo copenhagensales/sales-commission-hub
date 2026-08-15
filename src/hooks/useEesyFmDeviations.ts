@@ -255,8 +255,9 @@ export function useEesyFmDeviations(
       }
 
       if (!matches || matches.length === 0) continue;
-      const anyEqual = matches.some((m) => sameProduct(m.subscriptionName, sale.productName));
-      if (anyEqual) continue;
+      if (isFiveG(sale.productName)) continue;
+      const anyOk = matches.some((m) => campaignMatchesProduct(sale.productName, m.campaignName));
+      if (anyOk) continue;
 
       const match = matches[0];
       result.push({
@@ -270,7 +271,8 @@ export function useEesyFmDeviations(
         powerBiCampaign: match.campaignName,
         powerBiOperator: match.operator,
         sheetLabel: SHEET_LABELS[match.sheetType],
-        deviation: "Produkt",
+        deviation: "Kampagne",
+
         note: sale.note,
       });
     }
