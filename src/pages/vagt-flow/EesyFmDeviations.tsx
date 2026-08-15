@@ -1051,6 +1051,43 @@ function DeviationsPanel({
             if (!open) setEditSale(null);
           }}
         />
+
+        <AlertDialog
+          open={!!deleteTarget}
+          onOpenChange={(open) => {
+            if (!open && !deleteSale.isPending) setDeleteTarget(null);
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Er du sikker?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Du er ved at slette salget for{" "}
+                <strong>{deleteTarget?.sellerName || "ukendt sælger"}</strong>
+                {deleteTarget?.saleDatetime
+                  ? ` den ${format(new Date(deleteTarget.saleDatetime), "d. MMMM yyyy", { locale: da })}`
+                  : ""}
+                {deleteTarget?.productName ? ` — ${deleteTarget.productName}` : ""}
+                {deleteTarget?.phone ? ` (${deleteTarget.phone})` : ""}. Salget slettes permanent, og
+                provision samt omsætning fjernes fra sælgeren. Handlingen kan ikke fortrydes.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleteSale.isPending}>Annuller</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleDelete();
+                }}
+                disabled={deleteSale.isPending}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deleteSale.isPending ? "Sletter..." : "Bekræft sletning"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
       </CardContent>
     </Card>
   );
