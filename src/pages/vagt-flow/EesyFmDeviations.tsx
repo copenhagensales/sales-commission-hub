@@ -150,6 +150,14 @@ const MISSING_COLUMNS = [
   "Tastselv",
 ] as const;
 
+const CLAIMS_COLUMNS = [
+  "Salgsdato",
+  "Sælger",
+  "Mobil",
+  "Tastselv",
+  "Notat",
+] as const;
+
 const OVERVIEW_VIEWS = [
   {
     value: "deviations" as const,
