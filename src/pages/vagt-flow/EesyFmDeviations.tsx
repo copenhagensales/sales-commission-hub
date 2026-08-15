@@ -208,7 +208,7 @@ const OVERVIEW_VIEWS = [
     title: "Afvigelser — oversigt",
     description: "Sammenholdte salg mellem Tastselv og PowerBI med afvigelser markeret.",
     columns: OVERVIEW_COLUMNS as readonly string[],
-    showRowActions: false,
+    showRowActions: true,
   },
   {
     value: "missing" as const,
