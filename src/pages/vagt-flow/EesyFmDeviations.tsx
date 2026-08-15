@@ -93,7 +93,6 @@ const OVERVIEW_COLUMNS = [
   "Mobil",
   "Afvigelse",
   "Tastselv",
-  "PB Produkt",
   "PB Kampagne",
   "PB Operator",
   "Kilde",
@@ -802,9 +801,6 @@ function DeviationsPanel({
                       <TableCell className="min-w-[200px]">{row.storkProduct || "-"}</TableCell>
                       {deviationMode === "deviations" && (
                         <>
-                          <TableCell className="min-w-[200px]">
-                            {row.powerBiProduct || "-"}
-                          </TableCell>
                           <TableCell className="min-w-[180px]">
                             {row.powerBiCampaign || "-"}
                           </TableCell>
