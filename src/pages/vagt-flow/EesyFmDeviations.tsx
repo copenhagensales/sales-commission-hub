@@ -43,7 +43,7 @@ import { cn } from "@/lib/utils";
 const TABS = [
   { value: "upload", label: "Upload" },
   { value: "overview", label: "Oversigt" },
-  { value: "raw", label: "Rådata" },
+  { value: "raw", label: "Claims/Reimport" },
 ] as const;
 
 const OVERVIEW_COLUMNS = [
