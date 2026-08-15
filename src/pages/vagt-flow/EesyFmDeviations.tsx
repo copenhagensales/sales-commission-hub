@@ -690,10 +690,11 @@ function DeviationsPanel({
             <TableHeader>
               <TableRow>
                 {columns.map((col) => {
+                  const sortable = claimsMode || !!deviationMode;
                   const sortableKey =
-                    claimsMode && col === "Salgsdato"
+                    sortable && col === "Salgsdato"
                       ? ("date" as const)
-                      : claimsMode && col === "Sælger"
+                      : sortable && col === "Sælger"
                         ? ("seller" as const)
                         : null;
                   return (
