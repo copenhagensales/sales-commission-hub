@@ -30,6 +30,8 @@ export interface DeviationRow {
   phone: string | null;
   storkProduct: string | null;
   powerBiProduct: string | null;
+  powerBiCampaign: string | null;
+  powerBiOperator: string | null;
   sheetLabel: string | null;
   deviation: string;
 }
@@ -172,6 +174,8 @@ export function useEesyFmDeviations(
             phone: sale.phone,
             storkProduct: sale.productName,
             powerBiProduct: null,
+            powerBiCampaign: null,
+            powerBiOperator: null,
             sheetLabel: null,
             deviation: "Mangler i PowerBI",
           });
@@ -192,6 +196,8 @@ export function useEesyFmDeviations(
         phone: sale.phone,
         storkProduct: sale.productName,
         powerBiProduct: match.subscriptionName,
+        powerBiCampaign: match.campaignName,
+        powerBiOperator: match.operator,
         sheetLabel: SHEET_LABELS[match.sheetType],
         deviation: "Produkt",
       });

@@ -93,7 +93,9 @@ const OVERVIEW_COLUMNS = [
   "Mobil",
   "Afvigelse",
   "Tastselv",
-  "PowerBI",
+  "PB Produkt",
+  "PB Kampagne",
+  "PB Operator",
   "Type",
 ] as const;
 
@@ -535,7 +537,15 @@ function DeviationsPanel({
     const filtered = rawDeviationRows.filter((row) => {
       if (employee !== "all" && row.sellerId !== employee) return false;
       if (!term) return true;
-      return [row.sellerName, row.phone, row.storkProduct, row.powerBiProduct, row.sheetLabel]
+      return [
+        row.sellerName,
+        row.phone,
+        row.storkProduct,
+        row.powerBiProduct,
+        row.powerBiCampaign,
+        row.powerBiOperator,
+        row.sheetLabel,
+      ]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(term));
     });
@@ -771,6 +781,12 @@ function DeviationsPanel({
                         <>
                           <TableCell className="min-w-[200px]">
                             {row.powerBiProduct || "-"}
+                          </TableCell>
+                          <TableCell className="min-w-[180px]">
+                            {row.powerBiCampaign || "-"}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            {row.powerBiOperator || "-"}
                           </TableCell>
                           <TableCell className="whitespace-nowrap text-muted-foreground">
                             {row.sheetLabel || "-"}
