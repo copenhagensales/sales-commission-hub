@@ -261,3 +261,27 @@ export function useUpdateEesyFmClaimSale() {
   });
 }
 
+export function useDeleteEesyFmSale() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (saleId: string) => {
+      const { error } = await supabase.from("sales").delete().eq("id", saleId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      for (const key of [
+        ["eesy-fm-claim-sales"],
+        ["eesy-fm-stork-sales"],
+        ["eesy-fm-claim-phones"],
+        ["fm-sales-edit"],
+        ["fieldmarketing-sales"],
+        ["sales-aggregates"],
+      ]) {
+        queryClient.invalidateQueries({ queryKey: key });
+      }
+    },
+  });
+}
+
+
