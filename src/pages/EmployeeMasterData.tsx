@@ -926,7 +926,18 @@ export default function EmployeeMasterData() {
                                     <TooltipContent>Ikke startet endnu — tælles ikke som aktiv medarbejder</TooltipContent>
                                   </Tooltip>
                                 )}
+                                {employee.working_hours_model === 'deltid' && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Badge variant="outline" className="text-xs font-normal border-primary/40 text-primary">
+                                        Deltid
+                                      </Badge>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Markeret som deltid på stamkortet</TooltipContent>
+                                  </Tooltip>
+                                )}
                               </div>
+
                             </TableCell>
                             <TableCell className="py-3 text-sm">{employee.job_title || <span className="text-muted-foreground/50">-</span>}</TableCell>
                             <TableCell className="py-3">{getEmployeeTeams(employee.id) ? <Badge variant="secondary" className="text-xs font-normal">{getEmployeeTeams(employee.id)}</Badge> : <span className="text-muted-foreground/50">-</span>}</TableCell>
