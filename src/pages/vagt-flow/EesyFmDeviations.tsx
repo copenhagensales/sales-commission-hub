@@ -98,6 +98,36 @@ const CAMPAIGNS_WITHOUT_EFFECT = [
   "Unknown Campaign Name",
 ] as const;
 
+const OPERATORS_NUUDAY = ["eesy", "Telmore", "Yousee"] as const;
+
+const OPERATORS_NON_NUUDAY = [
+  "3",
+  "CBB",
+  "Call Me",
+  "Companymobile",
+  "DUKA (Telenor)",
+  "Dstny (TDC)",
+  "Evercall",
+  "FLEXII",
+  "Flexfone",
+  "HALLO",
+  "Leasy",
+  "Lebara",
+  "Lycamobile",
+  "Mit Tele Mobil",
+  "Mtel",
+  "Nettalk",
+  "Newly Created",
+  "Norlys",
+  "Oister",
+  "Relatel (TDC)",
+  "Telenabler",
+  "Telenor",
+  "UnoTel",
+  "Velkommen",
+  "greentel",
+] as const;
+
 const TABS = [
   { value: "upload", label: "Upload" },
   { value: "overview", label: "Oversigt" },
