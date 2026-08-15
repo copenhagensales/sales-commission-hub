@@ -368,6 +368,28 @@ function DeviationsPanel({
           </div>
         </div>
 
+        {claimsMode && (
+          <div className="flex flex-wrap items-center gap-2">
+            {[
+              { value: "all" as const, label: "Alle" },
+              { value: "pending" as const, label: "Afventer" },
+              { value: "approved" as const, label: "Godkendt" },
+            ].map((opt) => (
+              <Button
+                key={opt.value}
+                size="sm"
+                variant={statusFilter === opt.value ? "default" : "outline"}
+                className="h-8 rounded-full"
+                onClick={() => setStatusFilter(opt.value)}
+              >
+                {opt.label}
+              </Button>
+            ))}
+          </div>
+        )}
+
+
+
         <div className="rounded-lg border border-border/50 overflow-x-auto">
           <Table>
             <TableHeader>
