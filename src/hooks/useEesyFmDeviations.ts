@@ -30,6 +30,8 @@ export interface DeviationRow {
   phone: string | null;
   storkProduct: string | null;
   powerBiProduct: string | null;
+  powerBiCampaign: string | null;
+  powerBiOperator: string | null;
   sheetLabel: string | null;
   deviation: string;
 }
