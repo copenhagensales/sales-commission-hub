@@ -404,7 +404,13 @@ function DeviationsPanel({
                   return (
                     <TableHead
                       key={col}
-                      className={col === "Notat" ? "w-full min-w-[240px]" : "whitespace-nowrap"}
+                      className={
+                        col === "Notat"
+                          ? "w-full min-w-[240px]"
+                          : col === "Status"
+                            ? "w-[260px] min-w-[260px] whitespace-nowrap"
+                            : "whitespace-nowrap"
+                      }
                     >
                       {sortableKey ? (
                         <button
@@ -460,7 +466,7 @@ function DeviationsPanel({
                     <TableCell className="min-w-[240px] text-muted-foreground">
                       {sale.note || "-"}
                     </TableCell>
-                    <TableCell className="whitespace-nowrap">
+                    <TableCell className="w-[260px] min-w-[260px] whitespace-nowrap">
                       {sale.approved ? (
                         <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-500">
                           <Check className="h-3 w-3" />
