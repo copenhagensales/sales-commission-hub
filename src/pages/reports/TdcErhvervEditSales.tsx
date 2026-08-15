@@ -38,14 +38,17 @@ import {
   useIsTdcErhvervLeader,
   type TdcOppGroup,
 } from "@/hooks/useTdcErhvervSales";
+import { TdcErhvervEditDialog } from "@/components/reports/TdcErhvervEditDialog";
 
 export default function TdcErhvervEditSales() {
   const [day, setDay] = useState<Date>(new Date());
   const [deleteTarget, setDeleteTarget] = useState<TdcOppGroup | null>(null);
+  const [editTarget, setEditTarget] = useState<TdcOppGroup | null>(null);
 
   const { data: hasAccess, isLoading: loadingAccess } = useIsTdcErhvervLeader();
   const { data: groups, isLoading } = useTdcErhvervSales(day, hasAccess === true);
   const deleteOpp = useDeleteTdcErhvervOpp();
+
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
