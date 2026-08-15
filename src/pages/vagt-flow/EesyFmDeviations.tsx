@@ -5,6 +5,7 @@ import {
   useEesyFmProducts,
   useEesyFmSellers,
   useUpdateEesyFmClaimSale,
+  useDeleteEesyFmSale,
   type EesyFmClaimSale,
 } from "@/hooks/useEesyFmClaimSales";
 import {
@@ -82,6 +83,16 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { VagtFlowLayout } from "@/components/vagt-flow/VagtFlowLayout";
 import { cn } from "@/lib/utils";
 
@@ -546,6 +557,21 @@ function DeviationsPanel({
   const [pendingId, setPendingId] = useState<string | null>(null);
   const setApproval = useSetEesyFmClaimApproval();
   const [editSale, setEditSale] = useState<EesyFmClaimSale | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<EesyFmClaimSale | null>(null);
+  const deleteSale = useDeleteEesyFmSale();
+
+  const handleDelete = () => {
+    if (!deleteTarget) return;
+    deleteSale.mutate(deleteTarget.id, {
+      onSuccess: () => {
+        toast.success("Salget er slettet");
+        setDeleteTarget(null);
+      },
+      onError: (err: any) => toast.error(err?.message || "Kunne ikke slette salget"),
+    });
+  };
+
+
 
   const handleApproval = (saleId: string, approved: boolean) => {
     setPendingId(saleId);
@@ -892,6 +918,7 @@ function DeviationsPanel({
                             <Button
                               variant="ghost"
                               size="sm"
+                              onClick={() => setDeleteTarget(deviationRowToClaimSale(row))}
                               className="h-8 gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
@@ -990,6 +1017,7 @@ function DeviationsPanel({
                           <Button
                             variant="ghost"
                             size="sm"
+                            onClick={() => setDeleteTarget(sale)}
                             className="h-8 gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
@@ -1023,6 +1051,43 @@ function DeviationsPanel({
             if (!open) setEditSale(null);
           }}
         />
+
+        <AlertDialog
+          open={!!deleteTarget}
+          onOpenChange={(open) => {
+            if (!open && !deleteSale.isPending) setDeleteTarget(null);
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Er du sikker?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Du er ved at slette salget for{" "}
+                <strong>{deleteTarget?.sellerName || "ukendt sælger"}</strong>
+                {deleteTarget?.saleDatetime
+                  ? ` den ${format(new Date(deleteTarget.saleDatetime), "d. MMMM yyyy", { locale: da })}`
+                  : ""}
+                {deleteTarget?.productName ? ` — ${deleteTarget.productName}` : ""}
+                {deleteTarget?.phone ? ` (${deleteTarget.phone})` : ""}. Salget slettes permanent, og
+                provision samt omsætning fjernes fra sælgeren. Handlingen kan ikke fortrydes.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleteSale.isPending}>Annuller</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleDelete();
+                }}
+                disabled={deleteSale.isPending}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deleteSale.isPending ? "Sletter..." : "Bekræft sletning"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
       </CardContent>
     </Card>
   );
