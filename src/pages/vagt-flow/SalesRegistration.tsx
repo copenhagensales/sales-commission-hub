@@ -259,6 +259,7 @@ const SalesRegistration = () => {
 
 
   const bookingMissingCampaign = !!activeBooking && !activeBooking?.campaign?.id;
+  const isEesyFm = activeBooking?.client?.id === FIELDMARKETING_CLIENTS.EESY_FM;
 
   const addProduct = (productId: string) => {
     const product = products?.find((p) => p.id === productId);
