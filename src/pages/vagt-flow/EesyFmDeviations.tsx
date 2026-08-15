@@ -271,12 +271,13 @@ function DeviationsPanel({
                     {col}
                   </TableHead>
                 ))}
+                {showRowActions && <TableHead className="w-12" />}
               </TableRow>
             </TableHeader>
             <TableBody>
               <TableRow>
                 <TableCell
-                  colSpan={columns.length}
+                  colSpan={columns.length + (showRowActions ? 1 : 0)}
                   className="py-16 text-center text-sm text-muted-foreground"
                 >
                   Ingen data endnu.
