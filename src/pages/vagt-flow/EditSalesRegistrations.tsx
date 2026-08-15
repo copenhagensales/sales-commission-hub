@@ -516,6 +516,7 @@ export default function EditSalesRegistrations() {
         product_name: sale.product_name || "",
         phone_number: sale.phone_number || "",
         comment: sale.comment || "",
+        claim_reimport: sale.claim_reimport === true,
       }))
     );
     setGroupEditDialog({ open: true, group });
@@ -541,7 +542,7 @@ export default function EditSalesRegistrations() {
   const addGroupSaleItem = () => {
     setGroupSaleItems(prev => [
       ...prev,
-      { id: null, product_name: "", phone_number: "", comment: "" }
+      { id: null, product_name: "", phone_number: "", comment: "", claim_reimport: false }
     ]);
   };
 
