@@ -208,7 +208,7 @@ const OVERVIEW_VIEWS = [
     title: "Afvigelser — oversigt",
     description: "Sammenholdte salg mellem Tastselv og PowerBI med afvigelser markeret.",
     columns: OVERVIEW_COLUMNS as readonly string[],
-    showRowActions: false,
+    showRowActions: true,
   },
   {
     value: "missing" as const,
@@ -763,9 +763,9 @@ function DeviationsPanel({
                 })}
                 {showRowActions && (
                   <TableHead
-                    className={`${claimsMode ? "w-56" : deviationMode === "missing" ? "w-44" : "w-40"} whitespace-nowrap text-right`}
+                    className={`${claimsMode ? "w-56" : deviationMode ? "w-44" : "w-40"} whitespace-nowrap text-right`}
                   >
-                    {claimsMode || deviationMode === "missing" ? "Handlinger" : "Ret salg"}
+                    {claimsMode || deviationMode ? "Handlinger" : "Ret salg"}
                   </TableHead>
                 )}
               </TableRow>
@@ -952,7 +952,7 @@ function DeviationsPanel({
         </div>
 
         <ClaimEditDialog
-          claimMode={deviationMode === "missing" ? "add" : "remove"}
+          claimMode={deviationMode ? "add" : "remove"}
           sale={editSale}
           onOpenChange={(open) => {
             if (!open) setEditSale(null);
