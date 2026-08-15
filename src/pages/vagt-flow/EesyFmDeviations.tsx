@@ -381,7 +381,7 @@ function DeviationsPanel({
                   );
                 })}
                 {showRowActions && (
-                  <TableHead className="w-40 whitespace-nowrap text-right">
+                  <TableHead className={`${claimsMode ? "w-56" : "w-40"} whitespace-nowrap text-right`}>
                     {claimsMode ? "Handlinger" : "Ret salg"}
                   </TableHead>
                 )}
