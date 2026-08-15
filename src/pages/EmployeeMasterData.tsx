@@ -692,9 +692,13 @@ export default function EmployeeMasterData() {
   const localActiveStarted = employees.filter((e) => e.is_active).length - localNotStarted;
   const notStartedYetCount = headcount?.pendingStarts ?? localNotStarted;
   const activeCount = headcount?.activeStartedExclStaff ?? Math.max(0, localActiveStarted);
+  const partTimeCount = employees.filter(
+    (e) => e.is_active && !isNotStartedYet(e) && e.working_hours_model === "deltid"
+  ).length;
   const staffCount = headcount?.staffActive ?? cachedStaffCount;
   const teamCount = cachedTeamCount;
   const positionCount = cachedPositionCount > 0 ? cachedPositionCount : jobPositions.length;
+
 
 
   // Section configuration - must be after activeCount/staffCount are defined
@@ -728,7 +732,9 @@ export default function EmployeeMasterData() {
           teamCount={teamCount}
           positionCount={positionCount}
           pendingStartCount={notStartedYetCount}
+          partTimeCount={partTimeCount}
         />
+
 
         {/* Employee Form Dialog */}
         <EmployeeFormDialog

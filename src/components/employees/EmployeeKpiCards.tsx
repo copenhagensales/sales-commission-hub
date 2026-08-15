@@ -8,6 +8,7 @@ interface EmployeeKpiCardsProps {
   teamCount: number;
   positionCount: number;
   pendingStartCount?: number;
+  partTimeCount?: number;
 }
 
 export function EmployeeKpiCards({ 
@@ -16,7 +17,13 @@ export function EmployeeKpiCards({
   teamCount, 
   positionCount,
   pendingStartCount = 0,
+  partTimeCount = 0,
 }: EmployeeKpiCardsProps) {
+  const activeSublineParts = [
+    pendingStartCount > 0 ? `+${pendingStartCount} starter senere` : null,
+    partTimeCount > 0 ? `${partTimeCount} deltid` : null,
+  ].filter(Boolean) as string[];
+
   const kpis = [
     {
       label: "Aktive medarbejdere",
@@ -26,8 +33,9 @@ export function EmployeeKpiCards({
       border: "border-blue-500/20",
       iconColor: "text-blue-500",
       valueColor: "text-blue-600 dark:text-blue-400",
-      subline: pendingStartCount > 0 ? `+${pendingStartCount} starter senere` : null,
+      subline: activeSublineParts.length > 0 ? activeSublineParts.join(" · ") : null,
     },
+
     {
       label: "Stab / Backoffice",
       value: staffCount,
