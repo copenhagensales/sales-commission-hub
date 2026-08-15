@@ -278,7 +278,7 @@ function DeviationsPanel({
         dir * (new Date(a.saleDatetime).getTime() - new Date(b.saleDatetime).getTime())
       );
     });
-  }, [claimSales, search, employee, statusFilter, sortKey, sortDir]);
+  }, [claimSales, search, employee, statusFilter, hideApproved, sortKey, sortDir]);
 
 
   const toggleSort = (key: "date" | "seller") => {
