@@ -210,7 +210,18 @@ const MISSING_COLUMNS = [
   "Tastselv",
 ] as const;
 
+const OK_COLUMNS = [
+  "Salgsdato",
+  "Sælger",
+  "Mobil",
+  "Tastselv",
+  "PB Kampagne",
+  "PB Operator",
+  "Kilde",
+] as const;
+
 const CLAIMS_COLUMNS = [
+
   "Salgsdato",
   "Sælger",
   "Mobil",
