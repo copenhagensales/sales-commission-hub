@@ -7,7 +7,7 @@ import {
   useUpdateEesyFmClaimSale,
   type EesyFmClaimSale,
 } from "@/hooks/useEesyFmClaimSales";
-import { useEesyFmDeviations } from "@/hooks/useEesyFmDeviations";
+import { useEesyFmDeviations, type DeviationRow } from "@/hooks/useEesyFmDeviations";
 import {
   useEesyFmPowerBiImports,
   useUploadPowerBiSheet,
