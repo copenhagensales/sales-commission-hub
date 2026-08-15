@@ -322,7 +322,9 @@ function DeviationsPanel({
                     {col}
                   </TableHead>
                 ))}
-                {showRowActions && <TableHead className="w-12" />}
+                {showRowActions && (
+                  <TableHead className="w-20 whitespace-nowrap text-right">Ret salg</TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
