@@ -35,8 +35,6 @@ import { da } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
@@ -222,7 +220,6 @@ function DeviationsPanel({
   const [sortKey, setSortKey] = useState<"date" | "seller">("date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "approved">("all");
-  const [hideApproved, setHideApproved] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const setApproval = useSetEesyFmClaimApproval();
 
@@ -261,7 +258,6 @@ function DeviationsPanel({
     const term = search.trim().toLowerCase();
     const filtered = (claimSales || []).filter((sale) => {
       if (employee !== "all" && sale.sellerId !== employee) return false;
-      if (hideApproved && sale.approved) return false;
       if (statusFilter === "approved" && !sale.approved) return false;
       if (statusFilter === "pending" && sale.approved) return false;
       if (!term) return true;
@@ -278,7 +274,7 @@ function DeviationsPanel({
         dir * (new Date(a.saleDatetime).getTime() - new Date(b.saleDatetime).getTime())
       );
     });
-  }, [claimSales, search, employee, statusFilter, hideApproved, sortKey, sortDir]);
+  }, [claimSales, search, employee, statusFilter, sortKey, sortDir]);
 
 
   const toggleSort = (key: "date" | "seller") => {
@@ -389,16 +385,6 @@ function DeviationsPanel({
                 {opt.label}
               </Button>
             ))}
-            <div className="ml-2 flex items-center gap-2">
-              <Switch
-                id="hide-approved"
-                checked={hideApproved}
-                onCheckedChange={setHideApproved}
-              />
-              <Label htmlFor="hide-approved" className="cursor-pointer text-sm font-medium">
-                Skjul godkendte
-              </Label>
-            </div>
           </div>
         )}
 
