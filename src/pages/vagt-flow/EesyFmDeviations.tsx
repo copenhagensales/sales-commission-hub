@@ -300,6 +300,11 @@ function DeviationsPanel({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Alle medarbejdere</SelectItem>
+                {employeeOptions.map((opt) => (
+                  <SelectItem key={opt.id} value={opt.id}>
+                    {opt.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -321,14 +326,48 @@ function DeviationsPanel({
               </TableRow>
             </TableHeader>
             <TableBody>
-              <TableRow>
-                <TableCell
-                  colSpan={columns.length + (showRowActions ? 1 : 0)}
-                  className="py-16 text-center text-sm text-muted-foreground"
-                >
-                  Ingen data endnu.
-                </TableCell>
-              </TableRow>
+              {claimsMode && loadingClaims ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={columns.length + (showRowActions ? 1 : 0)}
+                    className="py-16 text-center text-sm text-muted-foreground"
+                  >
+                    Henter salg...
+                  </TableCell>
+                </TableRow>
+              ) : claimsMode && claimRows.length > 0 ? (
+                claimRows.map((sale) => (
+                  <TableRow key={sale.id}>
+                    <TableCell className="whitespace-nowrap">
+                      {format(new Date(sale.saleDatetime), "dd/MM/yyyy HH:mm", { locale: da })}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">{sale.sellerName}</TableCell>
+                    <TableCell className="font-mono text-xs whitespace-nowrap">
+                      {sale.phone || "-"}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">{sale.productName || "-"}</TableCell>
+                    <TableCell className="min-w-[240px] text-muted-foreground">
+                      {sale.note || "-"}
+                    </TableCell>
+                    {showRowActions && (
+                      <TableCell className="w-12">
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell
+                    colSpan={columns.length + (showRowActions ? 1 : 0)}
+                    className="py-16 text-center text-sm text-muted-foreground"
+                  >
+                    Ingen data endnu.
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </div>
