@@ -150,6 +150,14 @@ const MISSING_COLUMNS = [
   "Tastselv",
 ] as const;
 
+const CLAIMS_COLUMNS = [
+  "Salgsdato",
+  "Sælger",
+  "Mobil",
+  "Tastselv",
+  "Notat",
+] as const;
+
 const OVERVIEW_VIEWS = [
   {
     value: "deviations" as const,
@@ -267,7 +275,10 @@ function DeviationsPanel({
             <TableHeader>
               <TableRow>
                 {columns.map((col) => (
-                  <TableHead key={col} className="whitespace-nowrap">
+                  <TableHead
+                    key={col}
+                    className={col === "Notat" ? "w-full min-w-[240px]" : "whitespace-nowrap"}
+                  >
                     {col}
                   </TableHead>
                 ))}
@@ -450,11 +461,12 @@ export default function EesyFmDeviations() {
           </TabsContent>
 
           <TabsContent value="raw">
-            <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
-              <CardContent className="py-16 text-center text-sm text-muted-foreground">
-                Indhold tilføjes her.
-              </CardContent>
-            </Card>
+            <DeviationsPanel
+              title="Claims/Reimport"
+              description="Salg klar til claim eller reimport — med notat pr. salg."
+              columns={CLAIMS_COLUMNS as readonly string[]}
+              showRowActions
+            />
           </TabsContent>
 
         </Tabs>
