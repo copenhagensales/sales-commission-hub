@@ -250,6 +250,7 @@ export function useUpdateEesyFmClaimSale() {
       for (const key of [
         ["eesy-fm-claim-sales"],
         ["eesy-fm-stork-sales"],
+        ["eesy-fm-claim-phones"],
         ["fm-sales-edit"],
         ["fieldmarketing-sales"],
         ["sales-aggregates"],
