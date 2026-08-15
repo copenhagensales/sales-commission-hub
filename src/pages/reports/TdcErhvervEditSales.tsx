@@ -198,7 +198,7 @@ export default function TdcErhvervEditSales() {
                     ) : (
                       <TableRow>
                         <TableCell
-                          colSpan={4}
+                          colSpan={5}
                           className="py-16 text-center text-sm text-muted-foreground"
                         >
                           Ingen TDC Erhverv salg på den valgte dag.
