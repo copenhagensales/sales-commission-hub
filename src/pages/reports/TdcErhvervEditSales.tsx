@@ -179,7 +179,7 @@ export default function TdcErhvervEditSales() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                disabled
+                                onClick={() => setEditTarget(group)}
                                 className="h-8 gap-1.5 text-muted-foreground hover:text-foreground"
                               >
                                 <Pencil className="h-3.5 w-3.5" />
