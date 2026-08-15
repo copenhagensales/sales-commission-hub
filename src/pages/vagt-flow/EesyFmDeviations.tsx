@@ -816,7 +816,31 @@ function DeviationsPanel({
                           </TableCell>
                         </>
                       )}
+                      {showRowActions && (
+                        <TableCell className="w-44 whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setEditSale(deviationRowToClaimSale(row))}
+                              className="h-8 gap-1.5 text-muted-foreground hover:text-foreground"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                              Rediger
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Slet
+                            </Button>
+                          </div>
+                        </TableCell>
+                      )}
                     </TableRow>
+
                   ))
                 ) : (
                   <TableRow>
