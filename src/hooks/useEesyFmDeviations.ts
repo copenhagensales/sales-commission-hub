@@ -125,7 +125,26 @@ export function useEesyFmDeviations(
 ) {
   const { data: imports, isLoading: loadingImports } = useEesyFmPowerBiImports();
   const { data: powerBiRows, isLoading: loadingRows } = useEesyFmPowerBiRows(imports);
-  const { data: storkSales, isLoading: loadingSales } = useEesyFmStorkSales(from, to, enabled);
+
+  // Uden valgt periode begrænses Stork-opslaget til de uploadede arks periode,
+  // så vi ikke henter hele FM-historikken.
+  const importPeriod = useMemo(() => {
+    const froms = (imports || []).map((i) => i.periodFrom).filter(Boolean) as string[];
+    const tos = (imports || []).map((i) => i.periodTo).filter(Boolean) as string[];
+    if (froms.length === 0 || tos.length === 0) return null;
+    const start = new Date(`${froms.sort()[0]}T00:00:00`);
+    const end = new Date(`${tos.sort().slice(-1)[0]}T23:59:59`);
+    return { start, end };
+  }, [imports]);
+
+  const effFrom = from ?? importPeriod?.start;
+  const effTo = to ?? importPeriod?.end;
+
+  const { data: storkSales, isLoading: loadingSales } = useEesyFmStorkSales(
+    effFrom,
+    effTo,
+    enabled && (!!effFrom || (imports || []).length === 0),
+  );
 
   const rows = useMemo<DeviationRow[]>(() => {
     if (!storkSales) return [];
