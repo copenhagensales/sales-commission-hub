@@ -72,6 +72,9 @@ import { da } from "date-fns/locale";
 import { getRandomQuote, getPerformanceStatus } from "@/lib/gamification-quotes";
 import { LeagueMotivationBar } from "@/components/league/LeagueMotivationBar";
 import { usePersonalWeeklyStats } from "@/hooks/usePersonalWeeklyStats";
+import { TeamCompetitionView } from "@/components/league/TeamCompetitionView";
+import { useLeagueTeamCompetition } from "@/hooks/useLeagueTeamCompetition";
+
 
 export default function CommissionLeague() {
   const queryClient = useQueryClient();
