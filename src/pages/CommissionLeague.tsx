@@ -165,6 +165,10 @@ export default function CommissionLeague() {
     season?.status === "active" ? (currentRound?.round_number ?? undefined) : undefined
   );
   const { data: weeklyStats } = usePersonalWeeklyStats(currentEmployeeId);
+  const { data: teamCompetition } = useLeagueTeamCompetition(
+    leagueView === "team" ? season : null
+  );
+
 
   // Today's provision for all enrolled players
   const allEmployeeIds = useMemo(() => {
@@ -450,8 +454,11 @@ export default function CommissionLeague() {
                       </div>
                     )}
                     <span className="text-xs text-muted-foreground">
-                      {enrollmentCount ?? 0} spillere tilmeldt
+                      {leagueView === "team"
+                        ? `${teamCompetition?.totalTeams ?? 0} hold · ${teamCompetition?.countingPlayers ?? 0} tællende sælgere`
+                        : `${enrollmentCount ?? 0} spillere tilmeldt`}
                     </span>
+
                     {isFan && (
                       <Badge variant="outline" className="text-xs border-yellow-500/50 text-yellow-400 w-fit self-center md:self-start">
                         <Eye className="h-3 w-3 mr-1" />
