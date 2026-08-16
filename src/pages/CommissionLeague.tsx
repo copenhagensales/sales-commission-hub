@@ -454,9 +454,10 @@ export default function CommissionLeague() {
                       </div>
                     )}
                     <span className="text-xs text-muted-foreground">
-                      {leagueView === "team"
-                        ? `${teamCompetition?.totalTeams ?? 0} hold · ${teamCompetition?.countingPlayers ?? 0} tællende sælgere`
+                      {leagueView === "team" && teamCompetition?.hasStarted
+                        ? `${teamCompetition.totalTeams} hold · ${teamCompetition.countingPlayers} tællende sælgere`
                         : `${enrollmentCount ?? 0} spillere tilmeldt`}
+
                     </span>
 
                     {isFan && (
