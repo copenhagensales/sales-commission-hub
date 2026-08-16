@@ -518,13 +518,8 @@ export default function CommissionLeague() {
               </div>
           </div>
 
-          {leagueView === "team" && (
-            <Card className="bg-slate-800/30 border-slate-700">
-              <CardContent className="py-16 text-center">
-                <p className="text-sm text-muted-foreground">Holdkonkurrence kommer snart.</p>
-              </CardContent>
-            </Card>
-          )}
+          {leagueView === "team" && <TeamCompetitionView season={season} />}
+
 
           {leagueView === "individual" && (
           <>
