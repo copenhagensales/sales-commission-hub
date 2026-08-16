@@ -81,6 +81,7 @@ export default function CommissionLeague() {
   const [currentEmployeeId, setCurrentEmployeeId] = useState<string | undefined>();
   const [isCalculating, setIsCalculating] = useState(false);
   const [stickyVisible, setStickyVisible] = useState(false);
+  const [leagueView, setLeagueView] = useState<"individual" | "team">("individual");
   const headerRef = useRef<HTMLDivElement>(null);
 
   // Show sticky bar when header scrolls out of view
@@ -366,7 +367,7 @@ export default function CommissionLeague() {
   return (
     <MainLayout>
       {/* Sticky status bar */}
-      {stickyData && isEnrolled && (
+      {stickyData && isEnrolled && leagueView === "individual" && (
         <LeagueStickyBar
           rank={stickyData.rank}
           division={stickyData.division}
@@ -388,6 +389,32 @@ export default function CommissionLeague() {
 
                   {/* === LEFT COLUMN === */}
                   <div className="order-2 md:order-1 flex flex-col gap-1.5">
+                    {/* Visnings-toggle: Individuel / Hold */}
+                    <div className="flex items-center gap-1 self-center md:self-start rounded-lg bg-slate-900/60 p-1 ring-1 ring-indigo-500/25 mb-1">
+                      <button
+                        type="button"
+                        onClick={() => setLeagueView("individual")}
+                        className={`rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide transition-colors ${
+                          leagueView === "individual"
+                            ? "bg-indigo-500/25 text-indigo-100 ring-1 ring-indigo-400/50"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        Individuel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setLeagueView("team")}
+                        className={`rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide transition-colors ${
+                          leagueView === "team"
+                            ? "bg-indigo-500/25 text-indigo-100 ring-1 ring-indigo-400/50"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        Hold
+                      </button>
+                    </div>
+
                     {isCompletedPhase ? (
                       <div className="inline-flex items-center gap-2 self-center md:self-start rounded-full bg-yellow-500/15 px-3 py-1 ring-1 ring-yellow-500/40">
                         <Trophy className="h-3.5 w-3.5 text-yellow-400" />
@@ -491,6 +518,16 @@ export default function CommissionLeague() {
               </div>
           </div>
 
+          {leagueView === "team" && (
+            <Card className="bg-slate-800/30 border-slate-700">
+              <CardContent className="py-16 text-center">
+                <p className="text-sm text-muted-foreground">Holdkonkurrence kommer snart.</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {leagueView === "individual" && (
+          <>
           {/* Final Round Banner */}
           {isFinalRound && currentRound && (
             <FinalRoundBanner
@@ -860,6 +897,9 @@ export default function CommissionLeague() {
               </Card>
             </>
           )}
+          </>
+          )}
+
 
         </div>
       </div>
