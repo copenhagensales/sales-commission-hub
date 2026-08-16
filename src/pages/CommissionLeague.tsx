@@ -81,6 +81,7 @@ export default function CommissionLeague() {
   const [currentEmployeeId, setCurrentEmployeeId] = useState<string | undefined>();
   const [isCalculating, setIsCalculating] = useState(false);
   const [stickyVisible, setStickyVisible] = useState(false);
+  const [leagueView, setLeagueView] = useState<"individual" | "team">("individual");
   const headerRef = useRef<HTMLDivElement>(null);
 
   // Show sticky bar when header scrolls out of view
