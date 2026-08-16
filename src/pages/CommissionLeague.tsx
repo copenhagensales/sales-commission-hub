@@ -367,7 +367,7 @@ export default function CommissionLeague() {
   return (
     <MainLayout>
       {/* Sticky status bar */}
-      {stickyData && isEnrolled && (
+      {stickyData && isEnrolled && leagueView === "individual" && (
         <LeagueStickyBar
           rank={stickyData.rank}
           division={stickyData.division}
