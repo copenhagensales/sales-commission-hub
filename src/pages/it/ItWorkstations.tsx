@@ -23,6 +23,7 @@ import {
   type OverallStatus,
 } from "@/hooks/useItWorkstations";
 import { usePermissions } from "@/hooks/usePositionPermissions";
+import { MainLayout } from "@/components/layout/MainLayout";
 
 type StatusFilter =
   | "all"
@@ -151,14 +152,17 @@ export default function ItWorkstations() {
 
   if (accessLoading) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
+      <MainLayout>
+        <div className="flex min-h-[60vh] items-center justify-center">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      </MainLayout>
     );
   }
 
   if (!hasAccess) {
     return (
+      <MainLayout>
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 px-6 text-center">
         <ShieldAlert className="h-8 w-8 text-muted-foreground" />
         <h1 className="text-lg font-semibold text-foreground">Ingen adgang til IT-modulet</h1>
@@ -167,11 +171,13 @@ export default function ItWorkstations() {
           have adgang.
         </p>
       </div>
+      </MainLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <MainLayout>
+    <div className="min-h-dvh bg-background">
       {/* Header */}
       <header className="border-b border-border px-4 py-4 sm:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -488,5 +494,6 @@ export default function ItWorkstations() {
         campaignId={activeCampaign?.id}
       />
     </div>
+    </MainLayout>
   );
 }
