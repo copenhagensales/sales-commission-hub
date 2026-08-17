@@ -146,9 +146,10 @@ export function deriveWorkstation(
     overall = "down";
     headline = "PC nede";
   } else if (
-    row.update_status === "unknown" ||
     row.computer_status === "needs_investigation" ||
-    (equipment.length > 0 && unknownGear.length === equipment.length)
+    (!row.last_checked_at &&
+      equipment.length > 0 &&
+      unknownGear.length === equipment.length)
   ) {
     overall = "unknown";
     headline = "Ikke verificeret";
