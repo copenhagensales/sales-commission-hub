@@ -50,11 +50,19 @@ export function AreaEditorDialog({ open, onOpenChange, area, existingCodes = [] 
   const rename = useRenameArea();
   const addSeats = useAddSeats();
   const deleteSeat = useDeleteWorkstation();
+  const { data: edgeMap } = useItAreaEdges(open);
+  const saveEdges = useSaveAreaEdges();
 
   const [label, setLabel] = useState("");
   const [code, setCode] = useState("");
   const [seatCount, setSeatCount] = useState("4");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [edges, setEdges] = useState<Record<EdgeSide, string>>({
+    edge_top: "",
+    edge_right: "",
+    edge_bottom: "",
+    edge_left: "",
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -64,7 +72,31 @@ export function AreaEditorDialog({ open, onOpenChange, area, existingCodes = [] 
     setConfirmDeleteId(null);
   }, [open, area, isNew]);
 
-  const busy = rename.isPending || addSeats.isPending || deleteSeat.isPending;
+  useEffect(() => {
+    if (!open) return;
+    const row = area ? edgeMap?.[area.code] : undefined;
+    setEdges({
+      edge_top: row?.edge_top ?? "",
+      edge_right: row?.edge_right ?? "",
+      edge_bottom: row?.edge_bottom ?? "",
+      edge_left: row?.edge_left ?? "",
+    });
+  }, [open, area, edgeMap]);
+
+  const busy =
+    rename.isPending || addSeats.isPending || deleteSeat.isPending || saveEdges.isPending;
+
+  const handleSaveEdges = async () => {
+    const targetCode = area?.code ?? code.trim().toUpperCase();
+    if (!targetCode) return toast.error("Angiv først en områdekode");
+    try {
+      await saveEdges.mutateAsync({ areaCode: targetCode, edges });
+      toast.success("Kanttekster gemt");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Kunne ikke gemme kantteksterne");
+    }
+  };
+
 
   const handleCreate = async () => {
     const normalized = code.trim().toUpperCase();
