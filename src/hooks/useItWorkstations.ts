@@ -611,7 +611,9 @@ export function useItAreaEdges(enabled = true) {
     queryFn: async (): Promise<Record<string, ItAreaEdges>> => {
       const { data, error } = await supabase
         .from("it_area_edges")
-        .select("area_code, edge_top, edge_right, edge_bottom, edge_left, seats_per_row, row_gap_after");
+        .select(
+          "area_code, edge_top, edge_right, edge_bottom, edge_left, seats_per_row, row_gap_after, row_sizes",
+        );
       if (error) throw error;
       const map: Record<string, ItAreaEdges> = {};
       for (const row of data ?? []) {
@@ -619,6 +621,7 @@ export function useItAreaEdges(enabled = true) {
           ...(row as ItAreaEdges),
           seats_per_row: row.seats_per_row ?? DEFAULT_SEATS_PER_ROW,
           row_gap_after: row.row_gap_after ?? [],
+          row_sizes: row.row_sizes ?? [],
         };
       }
       return map;
