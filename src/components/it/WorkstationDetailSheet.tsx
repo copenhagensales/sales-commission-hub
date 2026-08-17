@@ -313,16 +313,20 @@ export function WorkstationDetailSheet({
 
           {/* Notes */}
           <section className="space-y-2">
-            <Label htmlFor="it-notes">Noter</Label>
+            <Label htmlFor="it-notes">Anden fejl / note</Label>
             <Textarea
               id="it-notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
               disabled={!canEdit}
-              placeholder="Fx: skærm 2 sendt til reparation"
+              placeholder="Fx: bordet kan ikke køre op og ned, stol defekt, kabel mangler …"
             />
+            <p className="text-xs text-muted-foreground">
+              Beskriv fejl der ikke dækkes af udstyrslisten ovenfor.
+            </p>
           </section>
+
 
           {canEdit && (
             <div className="flex gap-2 pb-4">
