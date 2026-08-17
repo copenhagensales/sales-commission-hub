@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Search, ArrowRight, MonitorSmartphone, Loader2, ShieldAlert } from "lucide-react";
+import { Search, ArrowRight, MonitorSmartphone, Loader2, ShieldAlert, Plus, Pencil } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +15,7 @@ import { OVERALL_DOT_CLASS } from "@/components/it/statusStyles";
 import {
   useItAccess,
   useItActivityLog,
+  useItAreas,
   useItCampaigns,
   useItRealtime,
   useItStats,
@@ -22,6 +23,8 @@ import {
   type ItWorkstation,
   type OverallStatus,
 } from "@/hooks/useItWorkstations";
+import { AreaEditorDialog } from "@/components/it/AreaEditorDialog";
+
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { MainLayout } from "@/components/layout/MainLayout";
 
@@ -93,12 +96,21 @@ export default function ItWorkstations() {
   const [problemsOnly, setProblemsOnly] = useState(false);
   const [selected, setSelected] = useState<ItWorkstation | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [areaDialogOpen, setAreaDialogOpen] = useState(false);
+  const [areaBeingEdited, setAreaBeingEdited] = useState<string | null>(null);
 
-  const areas = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const w of workstations ?? []) map.set(w.area_code, w.area_label);
-    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  }, [workstations]);
+  const areaList = useItAreas(workstations);
+  const areas = useMemo(
+    () => areaList.map((a) => [a.code, a.label] as [string, string]),
+    [areaList],
+  );
+  const editingArea = areaList.find((a) => a.code === areaBeingEdited) ?? null;
+
+  const openAreaEditor = (code: string | null) => {
+    setAreaBeingEdited(code);
+    setAreaDialogOpen(true);
+  };
+
 
   const matchesStatus = (w: ItWorkstation) => {
     switch (statusFilter) {
@@ -314,7 +326,7 @@ export default function ItWorkstations() {
             >
               Alle områder
             </Button>
-            {areas.map(([code]) => (
+            {areas.map(([code, label]) => (
               <Button
                 key={code}
                 size="sm"
@@ -323,10 +335,23 @@ export default function ItWorkstations() {
                 aria-pressed={areaFilter === code}
                 className="h-9 rounded-full"
               >
-                Område {code}
+                <span className="font-mono opacity-70">{code}</span>
+                <span className="ml-1.5">{label}</span>
               </Button>
             ))}
+            {canEdit && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => openAreaEditor(null)}
+                className="h-9 gap-1.5 rounded-full"
+              >
+                <Plus className="h-4 w-4" />
+                Nyt område
+              </Button>
+            )}
           </div>
+
 
           <div className="flex items-center gap-2">
             <Switch
@@ -412,11 +437,23 @@ export default function ItWorkstations() {
                             {code}
                           </Badge>
                           <h3 className="text-sm font-semibold text-foreground">{label}</h3>
+                          {canEdit && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                              aria-label={`Redigér område ${code}`}
+                              onClick={() => openAreaEditor(code)}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                         </div>
                         <span className="text-xs text-muted-foreground">
                           {seats.length} pladser · {attention} kræver opmærksomhed
                         </span>
                       </div>
+
                       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
                         {seats.map((ws) => (
                           <WorkstationCard
@@ -493,6 +530,14 @@ export default function ItWorkstations() {
         canEdit={canEdit}
         campaignId={activeCampaign?.id}
       />
+
+      <AreaEditorDialog
+        open={areaDialogOpen}
+        onOpenChange={setAreaDialogOpen}
+        area={editingArea}
+        existingCodes={areaList.map((a) => a.code)}
+      />
+
     </div>
     </MainLayout>
   );

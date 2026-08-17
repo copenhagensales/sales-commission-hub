@@ -545,3 +545,220 @@ export function useItStats(workstations: ItWorkstation[] | undefined): ItStats {
     };
   }, [workstations]);
 }
+
+// ============================================================================
+// AREA & SEAT MANAGEMENT
+// ============================================================================
+
+export interface ItArea {
+  code: string;
+  label: string;
+  seats: ItWorkstation[];
+}
+
+export function useItAreas(workstations: ItWorkstation[] | undefined): ItArea[] {
+  return useMemo(() => {
+    const map = new Map<string, ItArea>();
+    for (const w of workstations ?? []) {
+      const existing = map.get(w.area_code);
+      if (existing) existing.seats.push(w);
+      else map.set(w.area_code, { code: w.area_code, label: w.area_label, seats: [w] });
+    }
+    return [...map.values()].sort((a, b) => a.code.localeCompare(b.code));
+  }, [workstations]);
+}
+
+function buildSeatCode(areaCode: string, seatOrder: number) {
+  return `${areaCode}${String(seatOrder).padStart(2, "0")}`;
+}
+
+function useItLogger() {
+  const { user } = useAuth();
+  const { data: userName } = useItCurrentUserName();
+
+  return async (entries: {
+    workstation_id?: string | null;
+    workstation_code?: string | null;
+    action: string;
+    field?: string | null;
+    previous_value?: string | null;
+    new_value?: string | null;
+  }[]) => {
+    if (entries.length === 0) return;
+    const { error } = await supabase.from("it_activity_logs").insert(
+      entries.map((e) => ({
+        workstation_id: e.workstation_id ?? null,
+        workstation_code: e.workstation_code ?? null,
+        user_id: user?.id ?? null,
+        user_name: userName ?? null,
+        action: e.action,
+        field: e.field ?? null,
+        previous_value: e.previous_value ?? null,
+        new_value: e.new_value ?? null,
+      })),
+    );
+    if (error) throw error;
+  };
+}
+
+function useItInvalidate() {
+  const queryClient = useQueryClient();
+  return () => {
+    queryClient.invalidateQueries({ queryKey: ["it-workstations"] });
+    queryClient.invalidateQueries({ queryKey: ["it-activity-log"] });
+    queryClient.invalidateQueries({ queryKey: ["it-campaigns"] });
+    queryClient.invalidateQueries({ queryKey: ["it-campaign-pending"] });
+  };
+}
+
+/** Rename an area (all seats in it share the label). */
+export function useRenameArea() {
+  const log = useItLogger();
+  const invalidate = useItInvalidate();
+
+  return useMutation({
+    mutationFn: async ({
+      areaCode,
+      label,
+      previousLabel,
+    }: {
+      areaCode: string;
+      label: string;
+      previousLabel?: string;
+    }) => {
+      const trimmed = label.trim();
+      if (!trimmed) throw new Error("Områdenavnet må ikke være tomt");
+
+      const { error } = await supabase
+        .from("it_workstations")
+        .update({ area_label: trimmed })
+        .eq("area_code", areaCode);
+      if (error) throw error;
+
+      await log([
+        {
+          action: `Område ${areaCode} omdøbt til "${trimmed}"`,
+          field: "area_label",
+          previous_value: previousLabel ?? null,
+          new_value: trimmed,
+        },
+      ]);
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/** Add one or more seats (desks) to an area. Codes are generated automatically. */
+export function useAddSeats() {
+  const log = useItLogger();
+  const invalidate = useItInvalidate();
+
+  return useMutation({
+    mutationFn: async ({
+      areaCode,
+      areaLabel,
+      count,
+      withEquipment = true,
+    }: {
+      areaCode: string;
+      areaLabel: string;
+      count: number;
+      withEquipment?: boolean;
+    }) => {
+      const code = areaCode.trim().toUpperCase();
+      const label = areaLabel.trim();
+      if (!code) throw new Error("Områdekode mangler");
+      if (!label) throw new Error("Områdenavn mangler");
+      if (count < 1 || count > 50) throw new Error("Antal borde skal være mellem 1 og 50");
+
+      const { data: existing, error: existingError } = await supabase
+        .from("it_workstations")
+        .select("code, seat_order")
+        .eq("area_code", code);
+      if (existingError) throw existingError;
+
+      const taken = new Set((existing ?? []).map((r) => r.code));
+      let nextOrder = Math.max(0, ...(existing ?? []).map((r) => r.seat_order)) + 1;
+
+      const rows: { code: string; area_code: string; area_label: string; seat_order: number }[] = [];
+      for (let i = 0; i < count; i++) {
+        let seatCode = buildSeatCode(code, nextOrder);
+        while (taken.has(seatCode)) {
+          nextOrder += 1;
+          seatCode = buildSeatCode(code, nextOrder);
+        }
+        taken.add(seatCode);
+        rows.push({ code: seatCode, area_code: code, area_label: label, seat_order: nextOrder });
+        nextOrder += 1;
+      }
+
+      const { data: inserted, error } = await supabase
+        .from("it_workstations")
+        .insert(rows)
+        .select("id, code");
+      if (error) throw error;
+
+      if (withEquipment && inserted) {
+        const equipmentRows = inserted.flatMap((ws) =>
+          EQUIPMENT_KINDS.map((kind) => ({
+            workstation_id: ws.id,
+            kind,
+            status: "unknown" as EquipmentStatus,
+          })),
+        );
+        const { error: eqError } = await supabase
+          .from("it_equipment")
+          .upsert(equipmentRows, { onConflict: "workstation_id,kind" });
+        if (eqError) throw eqError;
+      }
+
+      await log(
+        (inserted ?? []).map((ws) => ({
+          workstation_id: ws.id,
+          workstation_code: ws.code,
+          action: `${ws.code}: Bord oprettet i område ${code}`,
+          field: "workstation",
+          new_value: ws.code,
+        })),
+      );
+
+      return inserted?.map((r) => r.code) ?? [];
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/** Delete a single seat and its equipment. */
+export function useDeleteWorkstation() {
+  const log = useItLogger();
+  const invalidate = useItInvalidate();
+
+  return useMutation({
+    mutationFn: async (ws: Pick<ItWorkstation, "id" | "code" | "area_code">) => {
+      const { error: eqError } = await supabase
+        .from("it_equipment")
+        .delete()
+        .eq("workstation_id", ws.id);
+      if (eqError) throw eqError;
+
+      const { error: linkError } = await supabase
+        .from("it_campaign_workstations")
+        .delete()
+        .eq("workstation_id", ws.id);
+      if (linkError) throw linkError;
+
+      const { error } = await supabase.from("it_workstations").delete().eq("id", ws.id);
+      if (error) throw error;
+
+      await log([
+        {
+          workstation_code: ws.code,
+          action: `${ws.code}: Bord fjernet fra område ${ws.area_code}`,
+          field: "workstation",
+          previous_value: ws.code,
+        },
+      ]);
+    },
+    onSuccess: invalidate,
+  });
+}
