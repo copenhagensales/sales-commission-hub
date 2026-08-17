@@ -364,7 +364,9 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
     5: { tv: "grid grid-cols-5 gap-4", normal: "grid grid-cols-2 gap-4 md:grid-cols-5" },
     6: { tv: "grid grid-cols-6 gap-4", normal: "grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6" },
     7: { tv: "grid grid-cols-7 gap-4", normal: "grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-7" },
+    8: { tv: "grid grid-cols-8 gap-4", normal: "grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-8" },
   };
+
   const kpiGridClass = colsMap[kpiCards.length] || colsMap[5];
 
   const liveSalesCount = liveData?.totals.sales ?? 0;
