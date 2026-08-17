@@ -394,16 +394,26 @@ export default function Auth() {
         console.log('[Auth Diagnostic] Hostname:', window.location.hostname);
         console.log('[Auth Diagnostic] Auth endpoint:', authEndpoint);
         
-        // Check if we're online first
-        if (!navigator.onLine) {
-          toast({
-            title: "Ingen internetforbindelse",
-            description: "Tjek din forbindelse og prøv igen.",
-            variant: "destructive",
-          });
-          setLoading(false);
-          return;
+        // Check if we're online first.
+        // navigator.onLine alene er upålideligt (VPN, virtuelle netkort, visse
+        // browsere melder falsk offline) - derfor verificeres det med et rigtigt
+        // kald mod backend, før vi blokerer login.
+        if (browserReportsOffline()) {
+          setRetryStatus("Tjekker forbindelse...");
+          const reallyOffline = !(await canReachBackend());
+          setRetryStatus(null);
+          if (reallyOffline) {
+            toast({
+              title: "Ingen internetforbindelse",
+              description: "Tjek din forbindelse og prøv igen.",
+              variant: "destructive",
+            });
+            setLoading(false);
+            return;
+          }
+          console.log('[Auth Diagnostic] navigator.onLine=false, men backend kunne nås - fortsætter login');
         }
+
         
         // ===== HEALTH CHECK WITH TIMING =====
         setRetryStatus("Tjekker server health...");
