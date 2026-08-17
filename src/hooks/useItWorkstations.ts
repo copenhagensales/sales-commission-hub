@@ -587,6 +587,8 @@ export interface ItAreaEdges {
   seats_per_row: number;
   /** Rækkenumre (1-baseret) der efterfølges af et mellemrum/gang. */
   row_gap_after: number[];
+  /** Eksplicit antal borde pr. række (fx [4,3,4]). Tom = brug seats_per_row. */
+  row_sizes: number[];
 }
 
 export const DEFAULT_SEATS_PER_ROW = 4;
