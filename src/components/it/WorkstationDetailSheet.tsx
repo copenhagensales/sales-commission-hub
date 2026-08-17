@@ -329,7 +329,11 @@ export function WorkstationDetailSheet({
               <Button
                 className="flex-1 min-h-11"
                 disabled={save.isPending}
-                onClick={() => void persist({}, "Ændringer gemt")}
+                onClick={() => {
+                  void persist({}, "Ændringer gemt").then((ok) => {
+                    if (ok) onOpenChange(false);
+                  });
+                }}
               >
                 {save.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Gem ændringer
