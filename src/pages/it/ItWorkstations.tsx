@@ -331,6 +331,27 @@ export default function ItWorkstations() {
 
   const isProblem = (w: ItWorkstation) => w.overall !== "ok";
 
+  /** Optæller manglende/defekt udstyr pr. type på tværs af alle borde. */
+  const missingByKind = useMemo(() => {
+    const counts = new Map<EquipmentKind, number>();
+    let missing = 0;
+    let broken = 0;
+    let stations = 0;
+    for (const w of workstations ?? []) {
+      let hit = false;
+      for (const e of w.equipment) {
+        if (e.status !== "missing" && e.status !== "broken") continue;
+        counts.set(e.kind, (counts.get(e.kind) ?? 0) + 1);
+        if (e.status === "missing") missing += 1;
+        else broken += 1;
+        hit = true;
+      }
+      if (hit) stations += 1;
+    }
+    const rows = EQUIPMENT_ORDER.map((kind) => ({ kind, count: counts.get(kind) ?? 0 }));
+    return { rows, total: missing + broken, missing, broken, stations };
+  }, [workstations]);
+
   const visible = useMemo(
     () =>
       (workstations ?? []).filter(
