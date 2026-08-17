@@ -8709,6 +8709,235 @@ export type Database = {
           },
         ]
       }
+      it_activity_logs: {
+        Row: {
+          action: string
+          created_at: string
+          field: string | null
+          id: string
+          new_value: string | null
+          previous_value: string | null
+          user_id: string | null
+          user_name: string | null
+          workstation_code: string | null
+          workstation_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          field?: string | null
+          id?: string
+          new_value?: string | null
+          previous_value?: string | null
+          user_id?: string | null
+          user_name?: string | null
+          workstation_code?: string | null
+          workstation_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          field?: string | null
+          id?: string
+          new_value?: string | null
+          previous_value?: string | null
+          user_id?: string | null
+          user_name?: string | null
+          workstation_code?: string | null
+          workstation_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_activity_logs_workstation_id_fkey"
+            columns: ["workstation_id"]
+            isOneToOne: false
+            referencedRelation: "it_workstations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      it_campaign_workstations: {
+        Row: {
+          campaign_id: string
+          completed_at: string | null
+          completed_by: string | null
+          completed_by_name: string | null
+          created_at: string
+          id: string
+          status: Database["public"]["Enums"]["it_campaign_ws_status"]
+          updated_at: string
+          workstation_id: string
+        }
+        Insert: {
+          campaign_id: string
+          completed_at?: string | null
+          completed_by?: string | null
+          completed_by_name?: string | null
+          created_at?: string
+          id?: string
+          status?: Database["public"]["Enums"]["it_campaign_ws_status"]
+          updated_at?: string
+          workstation_id: string
+        }
+        Update: {
+          campaign_id?: string
+          completed_at?: string | null
+          completed_by?: string | null
+          completed_by_name?: string | null
+          created_at?: string
+          id?: string
+          status?: Database["public"]["Enums"]["it_campaign_ws_status"]
+          updated_at?: string
+          workstation_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_campaign_workstations_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "it_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "it_campaign_workstations_workstation_id_fkey"
+            columns: ["workstation_id"]
+            isOneToOne: false
+            referencedRelation: "it_workstations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      it_campaigns: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          created_by_name: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          created_by_name?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          created_by_name?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      it_equipment: {
+        Row: {
+          created_at: string
+          id: string
+          kind: Database["public"]["Enums"]["it_equipment_kind"]
+          notes: string | null
+          status: Database["public"]["Enums"]["it_equipment_status"]
+          updated_at: string
+          workstation_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind: Database["public"]["Enums"]["it_equipment_kind"]
+          notes?: string | null
+          status?: Database["public"]["Enums"]["it_equipment_status"]
+          updated_at?: string
+          workstation_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["it_equipment_kind"]
+          notes?: string | null
+          status?: Database["public"]["Enums"]["it_equipment_status"]
+          updated_at?: string
+          workstation_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_equipment_workstation_id_fkey"
+            columns: ["workstation_id"]
+            isOneToOne: false
+            referencedRelation: "it_workstations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      it_workstations: {
+        Row: {
+          area_code: string
+          area_label: string
+          asset_id: string | null
+          code: string
+          computer_name: string | null
+          computer_status: Database["public"]["Enums"]["it_computer_status"]
+          created_at: string
+          id: string
+          last_checked_at: string | null
+          last_updated_at: string | null
+          notes: string | null
+          seat_order: number
+          serial_number: string | null
+          update_status: Database["public"]["Enums"]["it_update_status"]
+          updated_at: string
+          updated_by: string | null
+          updated_by_name: string | null
+        }
+        Insert: {
+          area_code: string
+          area_label: string
+          asset_id?: string | null
+          code: string
+          computer_name?: string | null
+          computer_status?: Database["public"]["Enums"]["it_computer_status"]
+          created_at?: string
+          id?: string
+          last_checked_at?: string | null
+          last_updated_at?: string | null
+          notes?: string | null
+          seat_order?: number
+          serial_number?: string | null
+          update_status?: Database["public"]["Enums"]["it_update_status"]
+          updated_at?: string
+          updated_by?: string | null
+          updated_by_name?: string | null
+        }
+        Update: {
+          area_code?: string
+          area_label?: string
+          asset_id?: string | null
+          code?: string
+          computer_name?: string | null
+          computer_status?: Database["public"]["Enums"]["it_computer_status"]
+          created_at?: string
+          id?: string
+          last_checked_at?: string | null
+          last_updated_at?: string | null
+          notes?: string | null
+          seat_order?: number
+          serial_number?: string | null
+          update_status?: Database["public"]["Enums"]["it_update_status"]
+          updated_at?: string
+          updated_by?: string | null
+          updated_by_name?: string | null
+        }
+        Relationships: []
+      }
       job_positions: {
         Row: {
           created_at: string | null
@@ -14817,6 +15046,10 @@ export type Database = {
         Args: { _permission_key: string; _user_id: string }
         Returns: boolean
       }
+      has_it_access: {
+        Args: { _require_edit?: boolean; _user_id: string }
+        Returns: boolean
+      }
       has_page_permission: {
         Args: {
           _check_edit?: boolean
@@ -15065,6 +15298,22 @@ export type Database = {
         | "assistant_team_leader"
       crm_type: "hubspot" | "salesforce" | "pipedrive" | "generic_api" | "excel"
       employment_type: "hourly" | "monthly"
+      it_campaign_ws_status: "pending" | "completed" | "failed"
+      it_computer_status: "working" | "not_working" | "needs_investigation"
+      it_equipment_kind:
+        | "computer"
+        | "monitor_1"
+        | "monitor_2"
+        | "headset"
+        | "mouse"
+        | "keyboard"
+      it_equipment_status: "ok" | "missing" | "broken" | "unknown"
+      it_update_status:
+        | "updated"
+        | "update_required"
+        | "update_in_progress"
+        | "update_failed"
+        | "unknown"
       leadership_interest: "yes" | "maybe" | "no"
       leadership_role_type: "junior_teamleder" | "teamleder" | "coach" | "other"
       location_status: "Ny" | "Aktiv" | "Pause" | "Sortlistet"
@@ -15278,6 +15527,24 @@ export const Constants = {
       ],
       crm_type: ["hubspot", "salesforce", "pipedrive", "generic_api", "excel"],
       employment_type: ["hourly", "monthly"],
+      it_campaign_ws_status: ["pending", "completed", "failed"],
+      it_computer_status: ["working", "not_working", "needs_investigation"],
+      it_equipment_kind: [
+        "computer",
+        "monitor_1",
+        "monitor_2",
+        "headset",
+        "mouse",
+        "keyboard",
+      ],
+      it_equipment_status: ["ok", "missing", "broken", "unknown"],
+      it_update_status: [
+        "updated",
+        "update_required",
+        "update_in_progress",
+        "update_failed",
+        "unknown",
+      ],
       leadership_interest: ["yes", "maybe", "no"],
       leadership_role_type: ["junior_teamleder", "teamleder", "coach", "other"],
       location_status: ["Ny", "Aktiv", "Pause", "Sortlistet"],

@@ -164,6 +164,7 @@ import {
   PublicUnsubscribe,
   MenuEditor,
   TastSelvSalg,
+  ItWorkstations,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -489,6 +490,9 @@ export const routes: RouteConfig[] = [
 
   // Manual sales entry (team United — enforced in the edge function)
   { path: "/tast-selv-salg", component: TastSelvSalg, access: "protected" },
+
+  // IT (stab only — enforced by permission + staff flag in DB)
+  { path: "/it/arbejdsstationer", component: ItWorkstations, access: "role", positionPermission: "menu_it_workstations" },
 
 
   { path: "*", component: NotFound, access: "public" },

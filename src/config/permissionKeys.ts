@@ -15,7 +15,7 @@
 
 import { 
   Home, Users, Crown, Calendar, Briefcase, BarChart3, 
-  GraduationCap, FileBarChart, Wrench, Video, ShoppingCart, Phone, FileText, Wallet
+  GraduationCap, FileBarChart, Wrench, Video, ShoppingCart, Phone, FileText, Wallet, MonitorSmartphone
 } from "lucide-react";
 
 // ============================================================================
@@ -44,6 +44,11 @@ export const PERMISSION_KEYS = {
   menu_section_economic: { label: 'Økonomi', section: 'sections', parent: null },
   menu_section_amo: { label: 'Arbejdsmiljø (AMO)', section: 'sections', parent: null },
   menu_section_compliance: { label: 'Compliance', section: 'sections', parent: null },
+  menu_section_it: { label: 'IT', section: 'sections', parent: null },
+
+  // ==================== IT (under menu_section_it) ====================
+  menu_it_workstations: { label: 'Arbejdsstationer', section: 'it', parent: 'menu_section_it' },
+
 
   // ==================== COMPLIANCE (under menu_section_compliance) ====================
   menu_compliance_overview: { label: 'Compliance Oversigt', section: 'compliance', parent: 'menu_section_compliance' },
@@ -421,7 +426,9 @@ export const SECTION_ICONS: Record<string, typeof Home> = {
   menu_section_admin: Wrench,
   menu_section_test: Wrench,
   menu_section_economic: Wallet,
+  menu_section_it: MonitorSmartphone,
   softphone_section: Phone,
+
   messages_section: FileText,
 };
 

@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, ShieldCheck, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, ClipboardCheck, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity, Swords, Mail, Gift, FileBarChart, CreditCard, Pencil, Trophy, Wrench, BookOpen, TrendingUp, TrendingDown, PanelLeft, XCircle, PencilLine, List, Inbox, Bug, AlertTriangle, Menu as MenuIcon } from "lucide-react";
+import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, ShieldCheck, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, ClipboardCheck, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity, Swords, Mail, Gift, FileBarChart, CreditCard, Pencil, Trophy, Wrench, BookOpen, TrendingUp, TrendingDown, PanelLeft, XCircle, PencilLine, List, Inbox, Bug, AlertTriangle, Menu as MenuIcon, MonitorSmartphone } from "lucide-react";
 import { EnvironmentSwitcher } from "./EnvironmentSwitcher";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,6 +17,7 @@ import { useState, useMemo, useEffect } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
+import { useItAccess } from "@/hooks/useItWorkstations";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
@@ -483,6 +484,10 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   );
   
   // Check if Spil (Games) menu should be visible
+  // IT-modul: kun stab med IT-rettigheden (verificeret i databasen)
+  const { data: hasItAccess = false } = useItAccess();
+  const showItMenu = !isMenuHidden('section_it') && hasItAccess && p.canView("menu_it_workstations");
+
   const showSpilMenu = !isMenuHidden('section_spil') && (p.canViewH2h || p.canViewCommissionLeague);
   return (
     <aside className={sidebarClasses}>
@@ -1792,6 +1797,22 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
           )}
 
           {/* AMO Compliance Hub */}
+          {showItMenu && (
+            <NavLink
+              to="/it/arbejdsstationer"
+              onClick={handleNavClick}
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                location.pathname.startsWith("/it")
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+              )}
+            >
+              <MonitorSmartphone className="h-5 w-5" />
+              IT
+            </NavLink>
+          )}
+
           {showAmoMenu && (
             <Collapsible open={amoOpen} onOpenChange={setAmoOpen}>
               <CollapsibleTrigger className={cn(
