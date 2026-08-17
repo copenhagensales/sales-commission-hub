@@ -454,17 +454,20 @@ export default function ItWorkstations() {
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
-                        {seats.map((ws) => (
-                          <WorkstationCard
-                            key={ws.id}
-                            workstation={ws}
-                            onOpen={openWorkstation}
-                            faded={problemsOnly && !isProblem(ws)}
-                            highlighted={!!searchTerm && matchesSearch(ws)}
-                          />
-                        ))}
-                      </div>
+                      <AreaFloorFrame edges={areaEdges?.[code]}>
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+                          {seats.map((ws) => (
+                            <WorkstationCard
+                              key={ws.id}
+                              workstation={ws}
+                              onOpen={openWorkstation}
+                              faded={problemsOnly && !isProblem(ws)}
+                              highlighted={!!searchTerm && matchesSearch(ws)}
+                            />
+                          ))}
+                        </div>
+                      </AreaFloorFrame>
+
                     </Card>
                   );
                 })}
