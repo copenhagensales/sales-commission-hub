@@ -1,8 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
-import { extractOpp } from "@/components/cancellations/utils/extractOpp";
-import { hasTdcErhvervEditAccess } from "@/config/tdcErhvervEditAccess";
+import { usePermissions } from "@/hooks/usePositionPermissions";
+
 
 export const TDC_ERHVERV_CLIENT_ID = "20744525-7466-4b2c-afa7-6ee09a9112b0";
 export const TDC_ERHVERV_TEAM_ID = "ee967dfd-04c8-465e-bda7-f1c47094bae0";
