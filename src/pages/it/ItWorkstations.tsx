@@ -736,33 +736,31 @@ export default function ItWorkstations() {
                                     disabled={saveEdges.isPending}
                                     aria-pressed={gapRows.includes(rowIndex + 1)}
                                     className={cn(
-                                      "my-2 flex w-full items-center gap-2 rounded-md py-1 transition-colors hover:bg-muted/60",
-                                      gapRows.includes(rowIndex + 1) && "my-3",
+                                      "my-2 flex w-full items-center justify-center rounded-lg transition-colors",
+                                      gapRows.includes(rowIndex + 1)
+                                        ? "my-3 border border-border bg-[repeating-linear-gradient(135deg,hsl(var(--muted))_0px,hsl(var(--muted))_8px,hsl(var(--background))_8px,hsl(var(--background))_16px)] py-2.5 hover:border-destructive/50"
+                                        : "gap-2 border border-dashed border-border/60 py-1.5 hover:bg-muted/60",
                                     )}
                                   >
-                                    <span className="h-px flex-1 border-t border-dashed border-border" />
-                                    <span
-                                      className={cn(
-                                        "text-[10px] uppercase tracking-wider",
-                                        gapRows.includes(rowIndex + 1)
-                                          ? "text-foreground"
-                                          : "text-muted-foreground/60",
-                                      )}
-                                    >
-                                      {gapRows.includes(rowIndex + 1)
-                                        ? "Gang — klik for at fjerne"
-                                        : "Tilføj mellemrum"}
-                                    </span>
-                                    <span className="h-px flex-1 border-t border-dashed border-border" />
+                                    {gapRows.includes(rowIndex + 1) ? (
+                                      <span className="rounded-full bg-background/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-foreground shadow-sm">
+                                        Gang — klik for at fjerne
+                                      </span>
+                                    ) : (
+                                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground/70">
+                                        Tilføj mellemrum
+                                      </span>
+                                    )}
                                   </button>
                                 ) : (
                                   gapRows.includes(rowIndex + 1) && (
-                                    <div className="my-3 flex items-center gap-2" aria-hidden="true">
-                                      <span className="h-px flex-1 border-t border-dashed border-border" />
-                                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                                    <div
+                                      className="my-3 flex items-center justify-center rounded-lg border border-border bg-[repeating-linear-gradient(135deg,hsl(var(--muted))_0px,hsl(var(--muted))_8px,hsl(var(--background))_8px,hsl(var(--background))_16px)] py-2.5"
+                                      aria-label="Gangareal"
+                                    >
+                                      <span className="rounded-full bg-background/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground shadow-sm">
                                         Gang
                                       </span>
-                                      <span className="h-px flex-1 border-t border-dashed border-border" />
                                     </div>
                                   )
                                 ))}
