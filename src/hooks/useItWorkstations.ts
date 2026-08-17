@@ -21,7 +21,8 @@ export type EquipmentKind =
   | "monitor_2"
   | "headset"
   | "mouse"
-  | "keyboard";
+  | "keyboard"
+  | "desk";
 export type EquipmentStatus = "ok" | "missing" | "broken" | "unknown";
 export type OverallStatus = "ok" | "attention" | "down" | "unknown";
 
@@ -79,6 +80,7 @@ export const EQUIPMENT_KINDS: EquipmentKind[] = [
   "headset",
   "mouse",
   "keyboard",
+  "desk",
 ];
 
 export const EQUIPMENT_LABELS: Record<EquipmentKind, string> = {
@@ -88,7 +90,9 @@ export const EQUIPMENT_LABELS: Record<EquipmentKind, string> = {
   headset: "Headset",
   mouse: "Mus",
   keyboard: "Tastatur",
+  desk: "Hæve-sænke bord",
 };
+
 
 export const EQUIPMENT_STATUS_LABELS: Record<EquipmentStatus, string> = {
   ok: "OK",

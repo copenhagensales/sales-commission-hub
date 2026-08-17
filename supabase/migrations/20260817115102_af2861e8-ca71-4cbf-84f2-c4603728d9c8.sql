@@ -1,0 +1,1 @@
+ALTER TYPE public.it_equipment_kind ADD VALUE IF NOT EXISTS 'desk';

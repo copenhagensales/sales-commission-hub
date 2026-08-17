@@ -1,4 +1,4 @@
-import { Laptop, Monitor, Headphones, Mouse, Keyboard } from "lucide-react";
+import { Laptop, Monitor, Headphones, Mouse, Keyboard, ArrowUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   EQUIPMENT_LABELS,
@@ -26,6 +26,7 @@ const KIND_ICON: Record<EquipmentKind, typeof Laptop> = {
   headset: Headphones,
   mouse: Mouse,
   keyboard: Keyboard,
+  desk: ArrowUpDown,
 };
 
 interface Props {
@@ -140,6 +141,17 @@ export function WorkstationCard({
           Opdateret {formatSince(ws.last_updated_at)}
         </span>
       )}
+
+      {ws.notes?.trim() && (
+        <span
+          className="truncate text-[11px] text-amber-500"
+          title={ws.notes}
+        >
+          Note: {ws.notes}
+        </span>
+      )}
+
+
 
     </div>
   );
