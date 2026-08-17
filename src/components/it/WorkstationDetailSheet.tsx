@@ -33,6 +33,7 @@ import {
   type EquipmentStatus,
   type ItWorkstation,
   type UpdateStatus,
+  seatLabel,
 } from "@/hooks/useItWorkstations";
 import { OVERALL_DOT_CLASS } from "./statusStyles";
 import { formatSince, stalenessLevel, STALENESS_TEXT_CLASS } from "@/lib/itTime";

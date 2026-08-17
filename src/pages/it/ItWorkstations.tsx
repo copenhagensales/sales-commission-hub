@@ -24,6 +24,7 @@ import {
   useItWorkstations,
   type ItWorkstation,
   type OverallStatus,
+  seatLabel,
 } from "@/hooks/useItWorkstations";
 import { AreaEditorDialog } from "@/components/it/AreaEditorDialog";
 import { AreaFloorFrame } from "@/components/it/AreaFloorFrame";

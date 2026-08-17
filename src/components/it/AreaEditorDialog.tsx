@@ -24,6 +24,7 @@ import {
   EDGE_SIDE_LABEL,
   type EdgeSide,
   type ItArea,
+  seatLabel,
 } from "@/hooks/useItWorkstations";
 import { formatSince, stalenessLevel, STALENESS_TEXT_CLASS } from "@/lib/itTime";
 
