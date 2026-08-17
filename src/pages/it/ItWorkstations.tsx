@@ -41,6 +41,7 @@ import {
   type OverallStatus,
   seatLabel,
   DEFAULT_SEATS_PER_ROW,
+  isUpdateOverdue,
 } from "@/hooks/useItWorkstations";
 import { AreaEditorDialog } from "@/components/it/AreaEditorDialog";
 import { AreaFloorFrame } from "@/components/it/AreaFloorFrame";
