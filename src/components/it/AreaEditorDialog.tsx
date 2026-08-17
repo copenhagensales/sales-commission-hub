@@ -136,21 +136,31 @@ export function AreaEditorDialog({ open, onOpenChange, area, existingCodes = [] 
     void persistLayout(clamped, gapRows);
   };
 
-  const handleSaveEdges = async () => {
-    const targetCode = area?.code ?? code.trim().toUpperCase();
-    if (!targetCode) return toast.error("Angiv først en områdekode");
+  /** Gemmer navn, layout og kanttekster i én handling og lukker dialogen. */
+  const handleSaveAll = async () => {
+    if (!area) return;
+    if (!label.trim()) return toast.error("Angiv et navn til området");
     try {
+      if (label.trim() !== area.label) {
+        await rename.mutateAsync({
+          areaCode: area.code,
+          label,
+          previousLabel: area.label,
+        });
+      }
       await saveEdges.mutateAsync({
-        areaCode: targetCode,
+        areaCode: area.code,
         edges,
         seatsPerRow: perRow,
         rowGapAfter: gapRows,
       });
-      toast.success("Layout og kanttekster gemt");
+      toast.success("Området er gemt");
+      onOpenChange(false);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Kunne ikke gemme kantteksterne");
+      toast.error(error instanceof Error ? error.message : "Kunne ikke gemme området");
     }
   };
+
 
 
 
