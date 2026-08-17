@@ -26,6 +26,8 @@ import {
   type OverallStatus,
 } from "@/hooks/useItWorkstations";
 import { AreaEditorDialog } from "@/components/it/AreaEditorDialog";
+import { AreaFloorFrame } from "@/components/it/AreaFloorFrame";
+
 
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { MainLayout } from "@/components/layout/MainLayout";
