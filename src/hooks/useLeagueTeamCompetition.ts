@@ -83,18 +83,26 @@ function rankTeams(totals: Array<{ team_id: string; provision: number }>): Recor
  * Kun de 5 sælgere med højest provision pr. hold tæller i holdets total.
  */
 export function useLeagueTeamCompetition(season: LeagueSeason | null | undefined) {
+  // Holdkonkurrencen starter på kvalifikationsrundens første dag (dansk tid)
+  const teamStartDate = season
+    ? toCopenhagenDateOnly(
+        season.qualification_source_start || season.qualification_start_at
+      ) || season.start_date
+    : undefined;
+
   return useQuery({
-    queryKey: ["league-team-competition", season?.id],
+    queryKey: ["league-team-competition", season?.id, teamStartDate],
     staleTime: 60_000,
     refetchInterval: 120_000,
     enabled: !!season?.id,
     queryFn: async (): Promise<TeamCompetitionData> => {
       const today = toCopenhagenToday();
       const todayStr = toDateOnly(today);
-      const startDate = season!.start_date;
+      const startDate = teamStartDate || season!.start_date;
       const seasonEnd = season!.end_date;
 
       const hasStarted = todayStr >= startDate;
+
 
       // Slut på perioden: i dag eller sæsonens slutdato (den tidligste)
       const endDate = seasonEnd && seasonEnd < todayStr ? seasonEnd : todayStr;
