@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { extractOpp } from "@/components/cancellations/utils/extractOpp";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 
 
