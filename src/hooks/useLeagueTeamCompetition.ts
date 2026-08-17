@@ -139,56 +139,17 @@ export function useLeagueTeamCompetition(season: LeagueSeason | null | undefined
           ? {}
           : provisionTotal;
 
-      // Klient-id'er til de afledte FM-hold
-      const { data: clientRows, error: clientError } = await supabase
-        .from("clients")
-        .select("id, name")
-        .in(
-          "name",
-          TEAM_COMPETITION_SPLIT_TARGETS.map((t) => t.client)
-        );
-      if (clientError) throw clientError;
-      const clientIdByName = new Map<string, string>(
-        (clientRows || []).map((c: any) => [c.name, c.id as string])
-      );
-
-      // Provision pr. brand (kun til de afledte FM-hold)
-      const splitData = await Promise.all(
-        TEAM_COMPETITION_SPLIT_TARGETS.map(async (target) => {
-          const clientId = clientIdByName.get(target.client) ?? null;
-          if (!clientId) return { target, total: {}, before: {} };
-          const total = await fetchProvisionByEmployee(periodStart, periodEnd, clientId);
-          const before = hasBefore
-            ? await fetchProvisionByEmployee(periodStart, beforeEnd, clientId)
-            : includesToday
-              ? {}
-              : total;
-          return { target, total, before };
-        })
-      );
-
       // Grupper pr. hold
       interface RawPlayer extends TeamCompetitionPlayer {
         excl_today: number;
       }
       const teamMap = new Map<string, { name: string; players: RawPlayer[] }>();
-      const splitMembers: Array<{ id: string; first_name: string | null; last_name: string | null }> =
-        [];
 
       (members || []).forEach((row: any) => {
         const team = row.team;
         const employee = row.employee;
         if (!team?.id || !employee?.id) return;
         if (TEAM_COMPETITION_EXCLUDED_TEAMS.includes(team.name)) return;
-
-        if (team.name === TEAM_COMPETITION_SPLIT_TEAM) {
-          splitMembers.push({
-            id: employee.id,
-            first_name: employee.first_name,
-            last_name: employee.last_name,
-          });
-          return;
-        }
 
         const provision = provisionTotal[employee.id] ?? 0;
         const exclToday = provisionExclToday[employee.id] ?? 0;
@@ -205,25 +166,6 @@ export function useLeagueTeamCompetition(season: LeagueSeason | null | undefined
         });
       });
 
-      // Afledte FM-hold: kun provision fra det pågældende brand
-      splitData.forEach(({ target, total, before }) => {
-        const players: RawPlayer[] = splitMembers
-          .map((m) => {
-            const provision = total[m.id] ?? 0;
-            const exclToday = before[m.id] ?? 0;
-            return {
-              employee_id: m.id,
-              first_name: m.first_name,
-              last_name: m.last_name,
-              provision,
-              today_provision: Math.max(0, provision - exclToday),
-              excl_today: exclToday,
-              counts: false,
-            };
-          })
-          .filter((p) => p.provision > 0 || p.excl_today > 0);
-        teamMap.set(target.key, { name: target.name, players });
-      });
 
       // Totaler nu og uden i dag
       const totalsNow: Array<{ team_id: string; provision: number }> = [];
