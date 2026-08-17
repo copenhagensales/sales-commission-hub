@@ -437,11 +437,23 @@ export default function ItWorkstations() {
                             {code}
                           </Badge>
                           <h3 className="text-sm font-semibold text-foreground">{label}</h3>
+                          {canEdit && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                              aria-label={`Redigér område ${code}`}
+                              onClick={() => openAreaEditor(code)}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                         </div>
                         <span className="text-xs text-muted-foreground">
                           {seats.length} pladser · {attention} kræver opmærksomhed
                         </span>
                       </div>
+
                       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
                         {seats.map((ws) => (
                           <WorkstationCard
