@@ -530,6 +530,14 @@ export default function ItWorkstations() {
         canEdit={canEdit}
         campaignId={activeCampaign?.id}
       />
+
+      <AreaEditorDialog
+        open={areaDialogOpen}
+        onOpenChange={setAreaDialogOpen}
+        area={editingArea}
+        existingCodes={areaList.map((a) => a.code)}
+      />
+
     </div>
     </MainLayout>
   );
