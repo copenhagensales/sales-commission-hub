@@ -202,7 +202,6 @@ export default function ItWorkstations() {
               onChange={(e) => setSearch(e.target.value)}
               aria-label="Søg arbejdsstation"
               placeholder="Søg plads, computer, aktiv-ID, serienr."
-              aria-label="Søg arbejdsstation"
               className="pl-9"
             />
           </div>
