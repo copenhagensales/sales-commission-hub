@@ -52,6 +52,15 @@ function toDateOnly(d: Date): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+/** Konvertér et timestamptz til dato (YYYY-MM-DD) i dansk tid */
+function toCopenhagenDateOnly(ts: string | null | undefined): string | null {
+  if (!ts) return null;
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return null;
+  return toDateOnly(new Date(d.toLocaleString("en-US", { timeZone: "Europe/Copenhagen" })));
+}
+
+
 async function fetchProvisionByEmployee(
   start: string,
   end: string
