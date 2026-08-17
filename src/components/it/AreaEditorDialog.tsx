@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import {
@@ -312,7 +312,7 @@ export function AreaEditorDialog({ open, onOpenChange, area, existingCodes = [] 
                 min={1}
                 max={12}
                 value={seatsPerRow}
-                onChange={(e) => setSeatsPerRow(e.target.value)}
+                onChange={(e) => handlePerRowChange(e.target.value)}
                 className="w-28 tabular-nums"
               />
             </div>
