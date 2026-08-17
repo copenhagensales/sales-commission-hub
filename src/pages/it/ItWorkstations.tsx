@@ -11,6 +11,11 @@ import {
   Trash2,
   Check,
   SlidersHorizontal,
+  Laptop,
+  Monitor,
+  Headphones,
+  Mouse,
+  Keyboard,
 } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
