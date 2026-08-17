@@ -426,7 +426,9 @@ export const SECTION_ICONS: Record<string, typeof Home> = {
   menu_section_admin: Wrench,
   menu_section_test: Wrench,
   menu_section_economic: Wallet,
+  menu_section_it: MonitorSmartphone,
   softphone_section: Phone,
+
   messages_section: FileText,
 };
 
