@@ -698,6 +698,33 @@ export default function ItWorkstations() {
         existingCodes={areaList.map((a) => a.code)}
       />
 
+      <AlertDialog open={!!seatToDelete} onOpenChange={(o) => !o && setSeatToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Slet {seatToDelete ? seatLabel(seatToDelete) : "bordet"}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Bordet og dets udstyr fjernes permanent fra gulvplanen. Handlingen kan ikke fortrydes.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteSeat.isPending}>Annullér</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                if (seatToDelete) void handleDeleteSeat(seatToDelete);
+              }}
+              disabled={deleteSeat.isPending}
+            >
+              {deleteSeat.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Slet bord
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+
     </div>
     </MainLayout>
   );
