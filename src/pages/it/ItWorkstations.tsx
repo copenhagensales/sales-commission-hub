@@ -59,10 +59,22 @@ import {
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { MainLayout } from "@/components/layout/MainLayout";
 
-function chunkSeats(seats: ItWorkstation[], perRow?: number | null): ItWorkstation[][] {
+function chunkSeats(
+  seats: ItWorkstation[],
+  perRow?: number | null,
+  rowSizes?: number[] | null,
+): ItWorkstation[][] {
   const size = Math.min(12, Math.max(1, perRow ?? DEFAULT_SEATS_PER_ROW));
   const rows: ItWorkstation[][] = [];
-  for (let i = 0; i < seats.length; i += size) rows.push(seats.slice(i, i + size));
+  let i = 0;
+  let r = 0;
+  while (i < seats.length) {
+    const explicit = rowSizes?.[r];
+    const take = Math.min(12, Math.max(1, explicit ?? size));
+    rows.push(seats.slice(i, i + take));
+    i += take;
+    r += 1;
+  }
   return rows;
 }
 
