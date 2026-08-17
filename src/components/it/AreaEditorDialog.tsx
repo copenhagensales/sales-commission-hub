@@ -76,9 +76,18 @@ export function AreaEditorDialog({ open, onOpenChange, area, existingCodes = [] 
     setConfirmDeleteId(null);
   }, [open, area, isNew]);
 
+  // Hydrate kun én gang pr. åbning/område — ellers nulstiller en refetch brugerens valg.
+  const hydratedKey = useRef<string | null>(null);
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      hydratedKey.current = null;
+      return;
+    }
+    const key = area?.code ?? "__new__";
+    if (hydratedKey.current === key) return;
     const row = area ? edgeMap?.[area.code] : undefined;
+    if (area && !edgeMap) return; // vent på data
+    hydratedKey.current = key;
     setEdges({
       edge_top: row?.edge_top ?? "",
       edge_right: row?.edge_right ?? "",
@@ -96,8 +105,36 @@ export function AreaEditorDialog({ open, onOpenChange, area, existingCodes = [] 
   const totalSeats = isNew ? Number(seatCount) || 0 : area?.seats.length ?? 0;
   const rowCount = Math.max(0, Math.ceil(totalSeats / perRow));
 
-  const toggleGapRow = (row: number) =>
-    setGapRows((prev) => (prev.includes(row) ? prev.filter((r) => r !== row) : [...prev, row].sort((a, b) => a - b)));
+  /** Gemmer layout med det samme, så gulvplanen opdateres uden ekstra klik. */
+  const persistLayout = async (nextPerRow: number, nextGapRows: number[]) => {
+    if (!area) return; // nye områder gemmes ved oprettelse
+    try {
+      await saveEdges.mutateAsync({
+        areaCode: area.code,
+        edges,
+        seatsPerRow: nextPerRow,
+        rowGapAfter: nextGapRows,
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Kunne ikke gemme layoutet");
+    }
+  };
+
+  const toggleGapRow = (row: number) => {
+    const next = gapRows.includes(row)
+      ? gapRows.filter((r) => r !== row)
+      : [...gapRows, row].sort((a, b) => a - b);
+    setGapRows(next);
+    void persistLayout(perRow, next);
+  };
+
+  const handlePerRowChange = (value: string) => {
+    setSeatsPerRow(value);
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed < 1) return;
+    const clamped = Math.min(12, Math.max(1, Math.round(parsed)));
+    void persistLayout(clamped, gapRows);
+  };
 
   const handleSaveEdges = async () => {
     const targetCode = area?.code ?? code.trim().toUpperCase();
@@ -114,6 +151,7 @@ export function AreaEditorDialog({ open, onOpenChange, area, existingCodes = [] 
       toast.error(error instanceof Error ? error.message : "Kunne ikke gemme kantteksterne");
     }
   };
+
 
 
   const handleCreate = async () => {
