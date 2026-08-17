@@ -8765,6 +8765,7 @@ export type Database = {
           edge_right: string | null
           edge_top: string | null
           row_gap_after: number[]
+          row_sizes: number[]
           seats_per_row: number
           updated_at: string
         }
@@ -8776,6 +8777,7 @@ export type Database = {
           edge_right?: string | null
           edge_top?: string | null
           row_gap_after?: number[]
+          row_sizes?: number[]
           seats_per_row?: number
           updated_at?: string
         }
@@ -8787,6 +8789,7 @@ export type Database = {
           edge_right?: string | null
           edge_top?: string | null
           row_gap_after?: number[]
+          row_sizes?: number[]
           seats_per_row?: number
           updated_at?: string
         }

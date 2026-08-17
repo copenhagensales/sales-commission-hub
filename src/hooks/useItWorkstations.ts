@@ -587,6 +587,8 @@ export interface ItAreaEdges {
   seats_per_row: number;
   /** Rækkenumre (1-baseret) der efterfølges af et mellemrum/gang. */
   row_gap_after: number[];
+  /** Eksplicit antal borde pr. række (fx [4,3,4]). Tom = brug seats_per_row. */
+  row_sizes: number[];
 }
 
 export const DEFAULT_SEATS_PER_ROW = 4;
@@ -609,7 +611,9 @@ export function useItAreaEdges(enabled = true) {
     queryFn: async (): Promise<Record<string, ItAreaEdges>> => {
       const { data, error } = await supabase
         .from("it_area_edges")
-        .select("area_code, edge_top, edge_right, edge_bottom, edge_left, seats_per_row, row_gap_after");
+        .select(
+          "area_code, edge_top, edge_right, edge_bottom, edge_left, seats_per_row, row_gap_after, row_sizes",
+        );
       if (error) throw error;
       const map: Record<string, ItAreaEdges> = {};
       for (const row of data ?? []) {
@@ -617,6 +621,7 @@ export function useItAreaEdges(enabled = true) {
           ...(row as ItAreaEdges),
           seats_per_row: row.seats_per_row ?? DEFAULT_SEATS_PER_ROW,
           row_gap_after: row.row_gap_after ?? [],
+          row_sizes: row.row_sizes ?? [],
         };
       }
       return map;
@@ -635,11 +640,13 @@ export function useSaveAreaEdges() {
       edges,
       seatsPerRow,
       rowGapAfter,
+      rowSizes,
     }: {
       areaCode: string;
       edges: Record<EdgeSide, string>;
       seatsPerRow?: number;
       rowGapAfter?: number[];
+      rowSizes?: number[];
     }) => {
       const clean = (v: string) => {
         const t = v.trim();
@@ -654,6 +661,9 @@ export function useSaveAreaEdges() {
           edge_left: clean(edges.edge_left),
           seats_per_row: Math.min(12, Math.max(1, seatsPerRow ?? DEFAULT_SEATS_PER_ROW)),
           row_gap_after: [...new Set(rowGapAfter ?? [])].sort((a, b) => a - b),
+          row_sizes: (rowSizes ?? [])
+            .map((n) => Math.min(12, Math.max(1, Math.round(n))))
+            .filter((n) => Number.isFinite(n)),
         },
         { onConflict: "area_code" },
       );

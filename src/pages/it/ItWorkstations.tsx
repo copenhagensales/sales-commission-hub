@@ -6,6 +6,7 @@ import {
   Loader2,
   ShieldAlert,
   Plus,
+  Minus,
   Pencil,
   Trash2,
   Check,
@@ -59,10 +60,22 @@ import {
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { MainLayout } from "@/components/layout/MainLayout";
 
-function chunkSeats(seats: ItWorkstation[], perRow?: number | null): ItWorkstation[][] {
+function chunkSeats(
+  seats: ItWorkstation[],
+  perRow?: number | null,
+  rowSizes?: number[] | null,
+): ItWorkstation[][] {
   const size = Math.min(12, Math.max(1, perRow ?? DEFAULT_SEATS_PER_ROW));
   const rows: ItWorkstation[][] = [];
-  for (let i = 0; i < seats.length; i += size) rows.push(seats.slice(i, i + size));
+  let i = 0;
+  let r = 0;
+  while (i < seats.length) {
+    const explicit = rowSizes?.[r];
+    const take = Math.min(12, Math.max(1, explicit ?? size));
+    rows.push(seats.slice(i, i + take));
+    i += take;
+    r += 1;
+  }
   return rows;
 }
 
@@ -206,6 +219,28 @@ export default function ItWorkstations() {
       });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Kunne ikke gemme mellemrummet");
+    }
+  };
+
+  /** Ændrer antal borde i én specifik række (fx 3 i én række, 4 i næste). */
+  const adjustRowSize = async (
+    code: string,
+    rowIndex: number,
+    delta: number,
+    currentRowLengths: number[],
+  ) => {
+    const next = currentRowLengths.slice(0, rowIndex + 1);
+    next[rowIndex] = Math.min(12, Math.max(1, (next[rowIndex] ?? 0) + delta));
+    try {
+      await saveEdges.mutateAsync({
+        areaCode: code,
+        edges: edgeValues(code),
+        seatsPerRow: areaEdges?.[code]?.seats_per_row ?? DEFAULT_SEATS_PER_ROW,
+        rowGapAfter: areaEdges?.[code]?.row_gap_after ?? [],
+        rowSizes: next,
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Kunne ikke gemme rækken");
     }
   };
 
@@ -527,6 +562,12 @@ export default function ItWorkstations() {
                   const attention = seats.filter(isProblem).length;
                   const editing = canEdit && isLayoutEdit(code);
                   const gapRows = areaEdges?.[code]?.row_gap_after ?? [];
+                  const seatRows = chunkSeats(
+                    seats,
+                    areaEdges?.[code]?.seats_per_row,
+                    areaEdges?.[code]?.row_sizes,
+                  );
+                  const rowLengths = seatRows.map((r) => r.length);
                   return (
                     <Card key={code} className={cn("p-4", editing && "ring-1 ring-primary/40")}>
                       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -575,17 +616,19 @@ export default function ItWorkstations() {
 
                       {editing && (
                         <p className="mb-3 rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
-                          Klik på papirkurven for at slette et bord, brug "Tilføj bord" nederst, og
-                          klik på en stiplet linje for at slå mellemrum til og fra.
+                          Klik på papirkurven for at slette et bord, brug "Tilføj bord" nederst,
+                          klik på en stiplet linje for mellemrum, og brug −/+ ude til højre for en
+                          række for at ændre antal borde i netop den række.
                         </p>
                       )}
 
                       <AreaFloorFrame edges={areaEdges?.[code]}>
                         <div className="space-y-2">
-                          {chunkSeats(seats, areaEdges?.[code]?.seats_per_row).map((row, rowIndex, rows) => (
+                          {seatRows.map((row, rowIndex, rows) => (
                             <div key={`row-${rowIndex}`}>
+                              <div className="flex items-stretch gap-2">
                               <div
-                                className="grid gap-2"
+                                className="grid flex-1 gap-2"
                                 style={{
                                   gridTemplateColumns: `repeat(${row.length}, minmax(0, 1fr))`,
                                 }}
@@ -612,6 +655,38 @@ export default function ItWorkstations() {
                                     )}
                                   </div>
                                 ))}
+                              </div>
+                              {editing && (
+                                <div className="flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border px-1 py-1">
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-6 w-6"
+                                    aria-label={`Færre borde i række ${rowIndex + 1}`}
+                                    disabled={saveEdges.isPending || row.length <= 1}
+                                    onClick={() =>
+                                      void adjustRowSize(code, rowIndex, -1, rowLengths)
+                                    }
+                                  >
+                                    <Minus className="h-3 w-3" />
+                                  </Button>
+                                  <span className="text-[10px] font-medium text-muted-foreground">
+                                    {row.length}
+                                  </span>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-6 w-6"
+                                    aria-label={`Flere borde i række ${rowIndex + 1}`}
+                                    disabled={saveEdges.isPending || row.length >= 12}
+                                    onClick={() =>
+                                      void adjustRowSize(code, rowIndex, 1, rowLengths)
+                                    }
+                                  >
+                                    <Plus className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              )}
                               </div>
                               {rowIndex < rows.length - 1 &&
                                 (editing ? (
