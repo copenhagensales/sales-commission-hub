@@ -44,6 +44,11 @@ export const PERMISSION_KEYS = {
   menu_section_economic: { label: 'Økonomi', section: 'sections', parent: null },
   menu_section_amo: { label: 'Arbejdsmiljø (AMO)', section: 'sections', parent: null },
   menu_section_compliance: { label: 'Compliance', section: 'sections', parent: null },
+  menu_section_it: { label: 'IT', section: 'sections', parent: null },
+
+  // ==================== IT (under menu_section_it) ====================
+  menu_it_workstations: { label: 'Arbejdsstationer', section: 'it', parent: 'menu_section_it' },
+
 
   // ==================== COMPLIANCE (under menu_section_compliance) ====================
   menu_compliance_overview: { label: 'Compliance Oversigt', section: 'compliance', parent: 'menu_section_compliance' },
