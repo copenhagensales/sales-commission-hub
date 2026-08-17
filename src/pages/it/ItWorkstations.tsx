@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Search, ArrowRight, MonitorSmartphone, Loader2, ShieldAlert, Plus, Pencil } from "lucide-react";
+import { Search, MonitorSmartphone, Loader2, ShieldAlert, Plus, Pencil } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +14,6 @@ import { WorkstationDetailSheet } from "@/components/it/WorkstationDetailSheet";
 import { OVERALL_DOT_CLASS } from "@/components/it/statusStyles";
 import {
   useItAccess,
-  useItActivityLog,
   useItAreas,
   useItAreaEdges,
 
@@ -96,7 +95,6 @@ export default function ItWorkstations() {
 
   const enabled = hasAccess === true;
   const { data: workstations, isLoading, isError, refetch } = useItWorkstations(enabled);
-  const { data: activity } = useItActivityLog(8, enabled);
   const { data: campaigns } = useItCampaigns(enabled);
   useItRealtime(enabled);
 
@@ -162,10 +160,6 @@ export default function ItWorkstations() {
     [workstations, statusFilter, searchTerm, areaFilter],
   );
 
-  const problemQueue = useMemo(
-    () => (workstations ?? []).filter(isProblem),
-    [workstations],
-  );
 
   const openWorkstation = (ws: ItWorkstation) => {
     setSelected(ws);
@@ -382,7 +376,7 @@ export default function ItWorkstations() {
       </section>
 
       {/* Floor map + activity */}
-      <div className="grid gap-6 px-4 py-6 sm:px-6 xl:grid-cols-[1fr_320px]">
+      <div className="grid gap-6 px-4 py-6 sm:px-6">
         <section>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-base font-semibold text-foreground">
@@ -514,55 +508,7 @@ export default function ItWorkstations() {
           )}
         </section>
 
-        {/* Right column */}
-        <aside className="space-y-6">
-          <Card className="p-4">
-            <h2 className="mb-3 text-base font-semibold text-foreground">Seneste aktivitet</h2>
-            {!activity || activity.length === 0 ? (
-              <p className="text-xs text-muted-foreground">Ingen aktivitet registreret endnu.</p>
-            ) : (
-              <ol className="space-y-3">
-                {activity.map((a) => (
-                  <li key={a.id} className="flex gap-3 text-sm">
-                    <time
-                      className="w-12 shrink-0 font-mono text-xs text-muted-foreground"
-                      dateTime={a.created_at}
-                    >
-                      {new Date(a.created_at).toLocaleTimeString("da-DK", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </time>
-                    <div className="min-w-0">
-                      <p className="text-sm text-foreground">{a.action}</p>
-                      <p className="text-xs text-muted-foreground">{a.user_name ?? "System"}</p>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </Card>
 
-          <Card className="p-4">
-            <h2 className="mb-2 text-base font-semibold text-foreground">Gennemgangskø</h2>
-            <p className="mb-3 text-xs text-muted-foreground">
-              {problemQueue.length === 0
-                ? "Alle pladser er i orden."
-                : `${problemQueue.length} pladser kræver et besøg: ${problemQueue
-                    .slice(0, 4)
-                    .map((w) => seatLabel(w))
-                    .join(", ")}${problemQueue.length > 4 ? "…" : ""}`}
-            </p>
-            <Button
-              className="w-full min-h-11 gap-2"
-              disabled={problemQueue.length === 0}
-              onClick={() => openWorkstation(problemQueue[0])}
-            >
-              Åbn næste problem
-              <ArrowRight className="h-4 w-4" />
-            </Button>
-          </Card>
-        </aside>
       </div>
 
       <WorkstationDetailSheet
