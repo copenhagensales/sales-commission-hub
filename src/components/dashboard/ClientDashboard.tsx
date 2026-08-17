@@ -343,11 +343,18 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
       icon: CalendarDays,
     });
     kpiCards.push({
+      label: `${secondaryLabel} denne uge`,
+      value: secondaryKpis?.this_week.sales_count ?? 0,
+      sub: `Uge ${format(today, "w", { locale: da })}`,
+      icon: CalendarRange,
+    });
+    kpiCards.push({
       label: `${secondaryLabel} lønperiode`,
       value: secondaryKpis?.payroll_period.sales_count ?? 0,
       sub: periodLabel,
       icon: Calendar,
     });
+
   }
 
   // Tailwind needs static classes – map col counts to full class strings
