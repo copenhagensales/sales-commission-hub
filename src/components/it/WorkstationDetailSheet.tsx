@@ -165,6 +165,9 @@ export function WorkstationDetailSheet({
               <dd className="font-medium text-foreground">
                 {formatDateTime(workstation.last_checked_at)}
               </dd>
+              <dd className={cn("text-xs", STALENESS_TEXT_CLASS[stalenessLevel(workstation.last_checked_at)])}>
+                {formatSince(workstation.last_checked_at)}
+              </dd>
             </div>
             <div>
               <dt className="text-muted-foreground">Sidst opdateret</dt>
@@ -172,8 +175,12 @@ export function WorkstationDetailSheet({
                 {formatDateTime(workstation.last_updated_at)}
                 {workstation.updated_by_name ? ` · ${workstation.updated_by_name}` : ""}
               </dd>
+              <dd className={cn("text-xs", STALENESS_TEXT_CLASS[stalenessLevel(workstation.last_updated_at)])}>
+                {formatSince(workstation.last_updated_at)}
+              </dd>
             </div>
           </dl>
+
 
           {canEdit && (
             <section className="space-y-2">
