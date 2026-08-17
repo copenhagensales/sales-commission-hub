@@ -240,3 +240,5 @@ export const ComplianceContractAccessLog = lazyPage(() => import("@/pages/compli
 export const ShortLinkRedirect = lazyPage(() => import("@/pages/ShortLinkRedirect"));
 export const MenuEditor = lazyPage(() => import("@/pages/MenuEditor"));
 export const TastSelvSalg = lazyPage(() => import("@/pages/TastSelvSalg"));
+
+export const ItWorkstations = lazyPage(() => import("@/pages/it/ItWorkstations"));
