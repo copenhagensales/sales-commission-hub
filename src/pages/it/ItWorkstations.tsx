@@ -15,6 +15,7 @@ import { OVERALL_DOT_CLASS } from "@/components/it/statusStyles";
 import {
   useItAccess,
   useItActivityLog,
+  useItAreas,
   useItCampaigns,
   useItRealtime,
   useItStats,
@@ -22,6 +23,8 @@ import {
   type ItWorkstation,
   type OverallStatus,
 } from "@/hooks/useItWorkstations";
+import { AreaEditorDialog } from "@/components/it/AreaEditorDialog";
+
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { MainLayout } from "@/components/layout/MainLayout";
 
