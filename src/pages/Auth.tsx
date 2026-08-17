@@ -9,6 +9,8 @@ import cphSalesLogo from "@/assets/cph-sales-logo.png";
 import { useAuth } from "@/hooks/useAuth";
 import { PasswordStrengthIndicator } from "@/components/password/PasswordStrengthIndicator";
 import { validatePassword } from "@/lib/password-validation";
+import { browserReportsOffline, canReachBackend } from "@/lib/connectivity";
+
 
 // Timeout helper - returns fallback value on timeout, but propagates actual errors
 const withTimeout = <T,>(promise: Promise<T>, ms: number, fallback: T): Promise<T> => {
