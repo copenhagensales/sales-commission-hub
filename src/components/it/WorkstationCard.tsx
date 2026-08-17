@@ -1,4 +1,4 @@
-import { Laptop, Monitor, Headphones, Mouse, Keyboard } from "lucide-react";
+import { Laptop, Monitor, Headphones, Mouse, Keyboard, ArrowUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   EQUIPMENT_LABELS,
