@@ -49,6 +49,11 @@ export interface ItWorkstationRow {
   notes: string | null;
 }
 
+/** Visningsnavn: bordene navngives "Bord 1", "Bord 2" ... inden for hvert område. */
+export function seatLabel(seat: { seat_order: number }): string {
+  return `Bord ${seat.seat_order}`;
+}
+
 export interface ItWorkstation extends ItWorkstationRow {
   equipment: ItEquipment[];
   overall: OverallStatus;
