@@ -142,6 +142,17 @@ export function WorkstationCard({
         </span>
       )}
 
+      {ws.notes?.trim() && (
+        <span
+          className="truncate text-[11px] text-amber-500"
+          title={ws.notes}
+        >
+          Note: {ws.notes}
+        </span>
+      )}
+
+
+
     </div>
   );
 }
