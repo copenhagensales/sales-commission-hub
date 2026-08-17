@@ -5,6 +5,7 @@ import {
   EQUIPMENT_STATUS_LABELS,
   OVERALL_LABELS,
   type EquipmentKind,
+  seatLabel,
   type ItWorkstation,
 } from "@/hooks/useItWorkstations";
 import {
@@ -38,7 +39,7 @@ export function WorkstationCard({ workstation: ws, onOpen, faded, highlighted }:
     <button
       type="button"
       onClick={() => onOpen(ws)}
-      aria-label={`${ws.code} — ${OVERALL_LABELS[ws.overall]} — ${ws.headline}`}
+      aria-label={`${seatLabel(ws)} — ${OVERALL_LABELS[ws.overall]} — ${ws.headline}`}
       className={cn(
         "group flex w-full flex-col gap-2 rounded-xl border p-3 text-left transition-all duration-150",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
@@ -48,7 +49,7 @@ export function WorkstationCard({ workstation: ws, onOpen, faded, highlighted }:
       )}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-semibold tracking-tight text-foreground">{ws.code}</span>
+        <span className="text-sm font-semibold tracking-tight text-foreground">{seatLabel(ws)}</span>
         <span className="flex items-center gap-1">
           <span className="text-[10px] font-bold text-muted-foreground" aria-hidden="true">
             {OVERALL_SYMBOL[ws.overall]}

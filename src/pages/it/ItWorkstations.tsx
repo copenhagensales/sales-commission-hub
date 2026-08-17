@@ -136,7 +136,7 @@ export default function ItWorkstations() {
   const searchTerm = search.trim().toLowerCase();
   const matchesSearch = (w: ItWorkstation) =>
     !searchTerm ||
-    [w.code, w.computer_name, w.asset_id, w.serial_number]
+    [w.code, seatLabel(w), w.computer_name, w.asset_id, w.serial_number]
       .filter(Boolean)
       .some((v) => String(v).toLowerCase().includes(searchTerm));
 
@@ -517,7 +517,7 @@ export default function ItWorkstations() {
                 ? "Alle pladser er i orden."
                 : `${problemQueue.length} pladser kræver et besøg: ${problemQueue
                     .slice(0, 4)
-                    .map((w) => w.code)
+                    .map((w) => seatLabel(w))
                     .join(", ")}${problemQueue.length > 4 ? "…" : ""}`}
             </p>
             <Button

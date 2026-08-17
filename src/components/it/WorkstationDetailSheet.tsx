@@ -109,7 +109,7 @@ export function WorkstationDetailSheet({
         markUpdatedNow: overrides.markUpdatedNow,
         campaignId,
       });
-      toast.success(`${workstation.code}: ${successMessage}`);
+      toast.success(`${seatLabel(workstation)}: ${successMessage}`);
       onSaved?.();
       return true;
     } catch (error) {
@@ -137,7 +137,7 @@ export function WorkstationDetailSheet({
       <SheetContent className="w-full overflow-y-auto sm:max-w-md">
         <SheetHeader className="space-y-2">
           <div className="flex items-center gap-2">
-            <SheetTitle className="text-2xl">{workstation.code}</SheetTitle>
+            <SheetTitle className="text-2xl">{seatLabel(workstation)}</SheetTitle>
             <Badge variant="outline" className="gap-1.5">
               <span
                 className={cn("h-2 w-2 rounded-full", OVERALL_DOT_CLASS[workstation.overall])}

@@ -158,7 +158,7 @@ export function AreaEditorDialog({ open, onOpenChange, area, existingCodes = [] 
     if (!seat) return;
     try {
       await deleteSeat.mutateAsync(seat);
-      toast.success(`Bord ${seat.code} fjernet`);
+      toast.success(`${seatLabel(seat)} fjernet`);
       setConfirmDeleteId(null);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Kunne ikke fjerne bordet");
@@ -294,8 +294,8 @@ export function AreaEditorDialog({ open, onOpenChange, area, existingCodes = [] 
                       >
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <Badge variant="secondary" className="font-mono">
-                              {seat.code}
+                            <Badge variant="secondary">
+                              {seatLabel(seat)}
                             </Badge>
                             <span className="truncate text-xs text-muted-foreground">
                               {seat.computer_name ?? "Ingen computer"}
@@ -332,7 +332,7 @@ export function AreaEditorDialog({ open, onOpenChange, area, existingCodes = [] 
                           <Button
                             size="icon"
                             variant="ghost"
-                            aria-label={`Fjern bord ${seat.code}`}
+                            aria-label={`Fjern ${seatLabel(seat)}`}
                             className="shrink-0 text-muted-foreground hover:text-destructive"
                             onClick={() => setConfirmDeleteId(seat.id)}
                             disabled={busy}
