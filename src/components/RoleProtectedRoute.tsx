@@ -6,6 +6,8 @@ import { useCanWorkFieldmarketing } from "@/hooks/useFieldmarketingEmployee";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { browserReportsOffline, isReallyOffline } from "@/lib/connectivity";
+
 interface RoleProtectedRouteProps {
   children: React.ReactNode;
   positionPermission?: string; // Position-based permission key to check
