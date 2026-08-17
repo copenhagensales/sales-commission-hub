@@ -162,10 +162,6 @@ export default function ItWorkstations() {
     [workstations, statusFilter, searchTerm, areaFilter],
   );
 
-  const problemQueue = useMemo(
-    () => (workstations ?? []).filter(isProblem),
-    [workstations],
-  );
 
   const openWorkstation = (ws: ItWorkstation) => {
     setSelected(ws);
