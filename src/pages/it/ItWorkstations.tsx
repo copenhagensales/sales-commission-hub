@@ -104,6 +104,8 @@ export default function ItWorkstations() {
   const [areaBeingEdited, setAreaBeingEdited] = useState<string | null>(null);
 
   const areaList = useItAreas(workstations);
+  const { data: areaEdges } = useItAreaEdges(enabled);
+
   const areas = useMemo(
     () => areaList.map((a) => [a.code, a.label] as [string, string]),
     [areaList],
