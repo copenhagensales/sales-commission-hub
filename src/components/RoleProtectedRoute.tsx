@@ -6,6 +6,8 @@ import { useCanWorkFieldmarketing } from "@/hooks/useFieldmarketingEmployee";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { browserReportsOffline, isReallyOffline } from "@/lib/connectivity";
+
 interface RoleProtectedRouteProps {
   children: React.ReactNode;
   positionPermission?: string; // Position-based permission key to check
@@ -143,8 +145,34 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     window.location.reload();
   };
   
-  // Check if we're offline
-  const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+  // Offline-tjek: navigator.onLine alene er upålideligt og må ikke blokere siden.
+  // Vi starter på "online" og markerer først offline, hvis både browserflaget OG
+  // et rigtigt kald mod backend fejler.
+  const [isOffline, setIsOffline] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const evaluate = () => {
+      if (!browserReportsOffline()) {
+        if (!cancelled) setIsOffline(false);
+        return;
+      }
+      isReallyOffline().then((offline) => {
+        if (!cancelled) setIsOffline(offline);
+      });
+    };
+
+    evaluate();
+    window.addEventListener("online", evaluate);
+    window.addEventListener("offline", evaluate);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("online", evaluate);
+      window.removeEventListener("offline", evaluate);
+    };
+  }, []);
+
   
   // Basic pages that can work in limited mode
   const basicPages = ['/home', '/my-schedule', '/my-profile'];
