@@ -26,6 +26,7 @@ const KIND_ICON: Record<EquipmentKind, typeof Laptop> = {
   headset: Headphones,
   mouse: Mouse,
   keyboard: Keyboard,
+  desk: ArrowUpDown,
 };
 
 interface Props {
