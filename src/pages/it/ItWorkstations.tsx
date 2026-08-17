@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Search, ArrowRight, MonitorSmartphone, Loader2, ShieldAlert, Plus, Pencil } from "lucide-react";
+import { Search, MonitorSmartphone, Loader2, ShieldAlert, Plus, Pencil } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +14,6 @@ import { WorkstationDetailSheet } from "@/components/it/WorkstationDetailSheet";
 import { OVERALL_DOT_CLASS } from "@/components/it/statusStyles";
 import {
   useItAccess,
-  useItActivityLog,
   useItAreas,
   useItAreaEdges,
 
@@ -96,7 +95,6 @@ export default function ItWorkstations() {
 
   const enabled = hasAccess === true;
   const { data: workstations, isLoading, isError, refetch } = useItWorkstations(enabled);
-  const { data: activity } = useItActivityLog(8, enabled);
   const { data: campaigns } = useItCampaigns(enabled);
   useItRealtime(enabled);
 
