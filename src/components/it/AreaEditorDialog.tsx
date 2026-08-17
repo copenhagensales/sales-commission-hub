@@ -390,9 +390,11 @@ export function AreaEditorDialog({ open, onOpenChange, area, existingCodes = [] 
                               {seat.computer_name ?? "Ingen computer"}
                             </span>
                           </div>
-                          <p className={cn("mt-0.5 text-xs", STALENESS_TEXT_CLASS[level])}>
-                            Opdateret {formatSince(seat.last_updated_at)}
-                          </p>
+                          {seat.last_updated_at && (
+                            <p className={cn("mt-0.5 text-xs", STALENESS_TEXT_CLASS[level])}>
+                              Opdateret {formatSince(seat.last_updated_at)}
+                            </p>
+                          )}
                         </div>
                         {confirmDeleteId === seat.id ? (
                           <div className="flex shrink-0 gap-1">
