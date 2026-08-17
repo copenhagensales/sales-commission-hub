@@ -102,9 +102,12 @@ export const COMPUTER_STATUS_LABELS: Record<ComputerStatus, string> = {
   needs_investigation: "Skal undersøges",
 };
 
+/** Antal dage før en opdateret maskine regnes som forfalden. */
+export const UPDATE_OVERDUE_DAYS = 30;
+
 export const UPDATE_STATUS_LABELS: Record<UpdateStatus, string> = {
   updated: "Opdateret",
-  update_required: "Opdatering påkrævet",
+  update_required: "Ikke opdateret endnu",
   update_in_progress: "Opdatering i gang",
   update_failed: "Opdatering fejlede",
   unknown: "Ukendt",
