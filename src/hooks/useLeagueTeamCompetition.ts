@@ -8,6 +8,15 @@ export const TEAM_COMPETITION_EXCLUDED_TEAMS = ["Stab"];
 /** Antal sælgere pr. hold der tæller i holdets total */
 export const TEAM_COMPETITION_COUNTING_PLAYERS = 5;
 
+/** Hold der i holdkonkurrencen deles op i flere hold pr. brand/klient */
+export const TEAM_COMPETITION_SPLIT_TEAM = "Fieldmarketing";
+
+/** De afledte hold: navn i konkurrencen + klientnavn i `clients` */
+export const TEAM_COMPETITION_SPLIT_TARGETS = [
+  { key: "fm-eesy", name: "Eesy FM", client: "Eesy FM" },
+  { key: "fm-yousee", name: "YouSee FM", client: "Yousee" },
+] as const;
+
 export interface TeamCompetitionPlayer {
   employee_id: string;
   first_name: string | null;
@@ -53,12 +62,14 @@ function toDateOnly(d: Date): string {
 
 async function fetchProvisionByEmployee(
   start: string,
-  end: string
+  end: string,
+  clientId?: string | null
 ): Promise<Record<string, number>> {
   const { data, error } = await supabase.rpc("get_sales_aggregates_v2", {
     p_start: start,
     p_end: end,
     p_group_by: "employee",
+    ...(clientId ? { p_client_id: clientId } : {}),
   });
   if (error) throw error;
   const map: Record<string, number> = {};
@@ -128,15 +139,49 @@ export function useLeagueTeamCompetition(season: LeagueSeason | null | undefined
       yesterday.setDate(yesterday.getDate() - 1);
       const yesterdayStr = toDateOnly(yesterday);
       const includesToday = endDate === todayStr;
-      const provisionExclToday = includesToday && yesterdayStr >= startDate
-        ? await fetchProvisionByEmployee(periodStart, `${yesterdayStr}T23:59:59+00:00`)
+      const beforeEnd = `${yesterdayStr}T23:59:59+00:00`;
+      const hasBefore = includesToday && yesterdayStr >= startDate;
+      const provisionExclToday = hasBefore
+        ? await fetchProvisionByEmployee(periodStart, beforeEnd)
         : includesToday
           ? {}
           : provisionTotal;
 
+      // Klient-id'er til de afledte FM-hold
+      const { data: clientRows, error: clientError } = await supabase
+        .from("clients")
+        .select("id, name")
+        .in(
+          "name",
+          TEAM_COMPETITION_SPLIT_TARGETS.map((t) => t.client)
+        );
+      if (clientError) throw clientError;
+      const clientIdByName = new Map<string, string>(
+        (clientRows || []).map((c: any) => [c.name, c.id as string])
+      );
+
+      // Provision pr. brand (kun til de afledte FM-hold)
+      const splitData = await Promise.all(
+        TEAM_COMPETITION_SPLIT_TARGETS.map(async (target) => {
+          const clientId = clientIdByName.get(target.client) ?? null;
+          if (!clientId) return { target, total: {}, before: {} };
+          const total = await fetchProvisionByEmployee(periodStart, periodEnd, clientId);
+          const before = hasBefore
+            ? await fetchProvisionByEmployee(periodStart, beforeEnd, clientId)
+            : includesToday
+              ? {}
+              : total;
+          return { target, total, before };
+        })
+      );
+
       // Grupper pr. hold
-      const teamMap = new Map<string, { name: string; players: TeamCompetitionPlayer[] }>();
-      const exclTodayByEmployee: Record<string, number> = {};
+      interface RawPlayer extends TeamCompetitionPlayer {
+        excl_today: number;
+      }
+      const teamMap = new Map<string, { name: string; players: RawPlayer[] }>();
+      const splitMembers: Array<{ id: string; first_name: string | null; last_name: string | null }> =
+        [];
 
       (members || []).forEach((row: any) => {
         const team = row.team;
@@ -144,9 +189,17 @@ export function useLeagueTeamCompetition(season: LeagueSeason | null | undefined
         if (!team?.id || !employee?.id) return;
         if (TEAM_COMPETITION_EXCLUDED_TEAMS.includes(team.name)) return;
 
+        if (team.name === TEAM_COMPETITION_SPLIT_TEAM) {
+          splitMembers.push({
+            id: employee.id,
+            first_name: employee.first_name,
+            last_name: employee.last_name,
+          });
+          return;
+        }
+
         const provision = provisionTotal[employee.id] ?? 0;
         const exclToday = provisionExclToday[employee.id] ?? 0;
-        exclTodayByEmployee[employee.id] = exclToday;
 
         if (!teamMap.has(team.id)) teamMap.set(team.id, { name: team.name, players: [] });
         teamMap.get(team.id)!.players.push({
@@ -155,8 +208,29 @@ export function useLeagueTeamCompetition(season: LeagueSeason | null | undefined
           last_name: employee.last_name,
           provision,
           today_provision: Math.max(0, provision - exclToday),
+          excl_today: exclToday,
           counts: false,
         });
+      });
+
+      // Afledte FM-hold: kun provision fra det pågældende brand
+      splitData.forEach(({ target, total, before }) => {
+        const players: RawPlayer[] = splitMembers
+          .map((m) => {
+            const provision = total[m.id] ?? 0;
+            const exclToday = before[m.id] ?? 0;
+            return {
+              employee_id: m.id,
+              first_name: m.first_name,
+              last_name: m.last_name,
+              provision,
+              today_provision: Math.max(0, provision - exclToday),
+              excl_today: exclToday,
+              counts: false,
+            };
+          })
+          .filter((p) => p.provision > 0 || p.excl_today > 0);
+        teamMap.set(target.key, { name: target.name, players });
       });
 
       // Totaler nu og uden i dag
@@ -176,7 +250,7 @@ export function useLeagueTeamCompetition(season: LeagueSeason | null | undefined
 
         // Top 5 målt uden i dag (til pladsændring)
         const beforeTop = [...value.players]
-          .map((p) => exclTodayByEmployee[p.employee_id] ?? 0)
+          .map((p) => p.excl_today)
           .sort((a, b) => b - a)
           .slice(0, TEAM_COMPETITION_COUNTING_PLAYERS)
           .reduce((sum, v) => sum + v, 0);
