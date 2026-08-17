@@ -15,7 +15,7 @@
 
 import { 
   Home, Users, Crown, Calendar, Briefcase, BarChart3, 
-  GraduationCap, FileBarChart, Wrench, Video, ShoppingCart, Phone, FileText, Wallet
+  GraduationCap, FileBarChart, Wrench, Video, ShoppingCart, Phone, FileText, Wallet, MonitorSmartphone
 } from "lucide-react";
 
 // ============================================================================
