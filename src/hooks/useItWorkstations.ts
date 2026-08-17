@@ -21,7 +21,8 @@ export type EquipmentKind =
   | "monitor_2"
   | "headset"
   | "mouse"
-  | "keyboard";
+  | "keyboard"
+  | "desk";
 export type EquipmentStatus = "ok" | "missing" | "broken" | "unknown";
 export type OverallStatus = "ok" | "attention" | "down" | "unknown";
 
