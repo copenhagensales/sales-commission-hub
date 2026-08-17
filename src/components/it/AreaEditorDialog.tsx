@@ -25,6 +25,7 @@ import {
   type EdgeSide,
   type ItArea,
   seatLabel,
+  DEFAULT_SEATS_PER_ROW,
 } from "@/hooks/useItWorkstations";
 import { formatSince, stalenessLevel, STALENESS_TEXT_CLASS } from "@/lib/itTime";
 
@@ -58,6 +59,8 @@ export function AreaEditorDialog({ open, onOpenChange, area, existingCodes = [] 
   const [code, setCode] = useState("");
   const [seatCount, setSeatCount] = useState("4");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [seatsPerRow, setSeatsPerRow] = useState(String(DEFAULT_SEATS_PER_ROW));
+  const [gapRows, setGapRows] = useState<number[]>([]);
   const [edges, setEdges] = useState<Record<EdgeSide, string>>({
     edge_top: "",
     edge_right: "",
@@ -82,17 +85,31 @@ export function AreaEditorDialog({ open, onOpenChange, area, existingCodes = [] 
       edge_bottom: row?.edge_bottom ?? "",
       edge_left: row?.edge_left ?? "",
     });
+    setSeatsPerRow(String(row?.seats_per_row ?? DEFAULT_SEATS_PER_ROW));
+    setGapRows(row?.row_gap_after ?? []);
   }, [open, area, edgeMap]);
 
   const busy =
     rename.isPending || addSeats.isPending || deleteSeat.isPending || saveEdges.isPending;
 
+  const perRow = Math.min(12, Math.max(1, Number(seatsPerRow) || DEFAULT_SEATS_PER_ROW));
+  const totalSeats = isNew ? Number(seatCount) || 0 : area?.seats.length ?? 0;
+  const rowCount = Math.max(0, Math.ceil(totalSeats / perRow));
+
+  const toggleGapRow = (row: number) =>
+    setGapRows((prev) => (prev.includes(row) ? prev.filter((r) => r !== row) : [...prev, row].sort((a, b) => a - b)));
+
   const handleSaveEdges = async () => {
     const targetCode = area?.code ?? code.trim().toUpperCase();
     if (!targetCode) return toast.error("Angiv først en områdekode");
     try {
-      await saveEdges.mutateAsync({ areaCode: targetCode, edges });
-      toast.success("Kanttekster gemt");
+      await saveEdges.mutateAsync({
+        areaCode: targetCode,
+        edges,
+        seatsPerRow: perRow,
+        rowGapAfter: gapRows,
+      });
+      toast.success("Layout og kanttekster gemt");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Kunne ikke gemme kantteksterne");
     }
@@ -110,9 +127,12 @@ export function AreaEditorDialog({ open, onOpenChange, area, existingCodes = [] 
         areaLabel: label,
         count: Number(seatCount) || 1,
       });
-      if (EDGE_SIDES.some((s) => edges[s].trim())) {
-        await saveEdges.mutateAsync({ areaCode: normalized, edges });
-      }
+      await saveEdges.mutateAsync({
+        areaCode: normalized,
+        edges,
+        seatsPerRow: perRow,
+        rowGapAfter: gapRows,
+      });
       toast.success(`Område ${normalized} oprettet med ${created.length} borde`);
       onOpenChange(false);
 
@@ -237,6 +257,55 @@ export function AreaEditorDialog({ open, onOpenChange, area, existingCodes = [] 
           <Separator />
 
           <div className="space-y-3">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Rækkeopsætning</h3>
+              <p className="text-xs text-muted-foreground">
+                Vælg hvor mange borde der står ved siden af hinanden, og hvor der er gang/mellemrum
+                mellem rækkerne (fx 4 overfor 4).
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="area-per-row" className="text-xs">
+                Borde pr. række
+              </Label>
+              <Input
+                id="area-per-row"
+                type="number"
+                min={1}
+                max={12}
+                value={seatsPerRow}
+                onChange={(e) => setSeatsPerRow(e.target.value)}
+                className="w-28 tabular-nums"
+              />
+            </div>
+            {rowCount > 1 && (
+              <div className="space-y-2">
+                <span className="text-xs font-medium text-foreground">Mellemrum efter række</span>
+                <div className="flex flex-wrap gap-2">
+                  {Array.from({ length: rowCount - 1 }, (_, i) => i + 1).map((row) => (
+                    <Button
+                      key={row}
+                      type="button"
+                      size="sm"
+                      variant={gapRows.includes(row) ? "default" : "outline"}
+                      className="min-w-16"
+                      aria-pressed={gapRows.includes(row)}
+                      onClick={() => toggleGapRow(row)}
+                    >
+                      Række {row}
+                    </Button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Markerede rækker får en gang tegnet under sig i gulvplanen.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <Separator />
+
+          <div className="space-y-3">
             <div className="flex items-center justify-between gap-2">
               <div>
                 <h3 className="text-sm font-semibold text-foreground">Kanttekster</h3>
@@ -251,7 +320,7 @@ export function AreaEditorDialog({ open, onOpenChange, area, existingCodes = [] 
                   onClick={() => void handleSaveEdges()}
                   disabled={busy}
                 >
-                  Gem kanter
+                  Gem layout
                 </Button>
               )}
             </div>
