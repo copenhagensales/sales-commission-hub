@@ -93,6 +93,24 @@ type StatusFilter =
   | "update_failed"
   | "missing_equipment";
 
+const EQUIPMENT_ICONS: Record<EquipmentKind, typeof Laptop> = {
+  computer: Laptop,
+  monitor_1: Monitor,
+  monitor_2: Monitor,
+  headset: Headphones,
+  mouse: Mouse,
+  keyboard: Keyboard,
+};
+
+const EQUIPMENT_ORDER: EquipmentKind[] = [
+  "computer",
+  "monitor_1",
+  "monitor_2",
+  "headset",
+  "mouse",
+  "keyboard",
+];
+
 const STATUS_FILTERS: { key: StatusFilter; label: string; dot?: OverallStatus }[] = [
   { key: "all", label: "Alle" },
   { key: "ok", label: "Alt OK", dot: "ok" },
