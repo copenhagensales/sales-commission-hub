@@ -16,6 +16,8 @@ import {
   useItAccess,
   useItActivityLog,
   useItAreas,
+  useItAreaEdges,
+
   useItCampaigns,
   useItRealtime,
   useItStats,
