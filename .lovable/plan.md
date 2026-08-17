@@ -1,29 +1,26 @@
-# Forhåndsvisning af hold-konkurrencen før sæsonstart
+# Rasmus Emil Hansen ser ikke "TDC Erhverv - ret salg" i Rapporter
 
-Mål: du skal kunne se hele hold-UI'et (podium, afstands-graf, tabel med top 5) med rigtige tal, allerede nu — uden at ændre hvornår konkurrencen reelt tæller for andre brugere.
+## Hvad der er verificeret i databasen
 
-## Sådan får du adgang
+- Rasmus Emil Hansen (`rh@copenhagensales.dk`, privat `rasmus@bjerrum.nu`) er aktiv, `position_id` peger på Teamleder, og `job_positions.system_role_key = 'teamleder'`.
+- `role_page_permissions` har `menu_reports_tdc_edit_sales` med `can_view = true, can_edit = true` for `ejer`, `teamleder` og `assisterendetm` (rækkerne blev oprettet 15/8 22:53).
+- RLS på `role_page_permissions` tillader alle authenticated at læse rækkerne.
+- Menupunktet i `AppSidebar.tsx:1361` er kun gated af `p.canViewReportsTdcEditSales` inde i Rapporter-blokken, og `sidebar_menu_config` indeholder ingen række der skjuler det.
 
-En skjult preview-tilstand, som kun aktiveres bevidst:
+Konklusion: rettighedsdataene er korrekte for hans rolle. Årsagen til at han ikke ser punktet er derfor **ikke bekræftet endnu** — den mest sandsynlige forklaring er klient-side cache af rettigheder (`localStorage`-nøglen `cached-permissions-v5` + React Query `staleTime` 15 min), men det skal verificeres før vi ændrer noget.
 
-- Åbn `/commission-league?teamPreview=1` og vælg "Hold".
-- Uden parameteren ser alle andre stadig "starter 17. august"-beskeden.
-- Der vises et tydeligt badge "Forhåndsvisning – data fra kvalifikationsrunden", så tallene ikke misforstås som den rigtige holdkonkurrence.
+## Plan
 
-Ingen rollekrav ud over den eksisterende adgang til Superligaen, og intet gemmes i databasen.
+1. **Verificér først (ingen kodeændring).** Log preview ind som Rasmus og læs den faktisk resolvede rolle og rettighed:
+   - Bekræft `usePositionPermissions`-loggen viser `roleKey: teamleder`.
+   - Bekræft om `menu_reports_tdc_edit_sales` findes i det hentede permission-objekt.
+   - Bekræft om Rapporter-menuen i det hele taget vises for ham.
+2. **Fix afhængigt af resultat:**
+   - Hvis rettigheden er der, men punktet mangler i UI: fejlen ligger i sidebar-gaten — rettes der.
+   - Hvis rettigheden mangler i det hentede objekt, mens DB har den: det er stale cache. Fix = bump cache-nøglen til `cached-permissions-v6` i `src/hooks/usePositionPermissions.ts` (og ryd v5), så alle brugere får friske rettigheder ved næste load.
+   - Hvis rollen resolver til noget andet end `teamleder`: rettes i hans position/rolle-opsætning, ikke i koden.
+3. **Efterprøv** at han både ser menupunktet og kan åbne siden med indhold (han står allerede på allowlisten i `src/config/tdcErhvervEditAccess.ts`, så indholdsgaten burde være åben).
 
-## Hvilke data vises i preview
+## Uden for scope
 
-Perioden for holdkonkurrencen er ikke startet, så preview bruger den periode der findes data for:
-sæsonens hidtidige periode (kvalifikationsrunden) fra sæsonstart til i dag. Samme regler i øvrigt:
-alle hold undtagen Stab, kun de 5 bedst tjenende sælgere pr. hold tæller, dagsdelta og pladsændring beregnes som normalt.
-
-Når den rigtige periode (17/8–28/9) starter, skifter visningen automatisk til den — preview-parameteren har derefter ingen effekt.
-
-## Teknisk
-
-- `src/hooks/useLeagueTeamCompetition.ts`: tilføj `options?: { preview?: boolean }`. Når `preview` er sat og `hasStarted` er falsk, skal hooket ikke returnere tom tilstand, men beregne på perioden `season.start_date` → i dag (eller kvalifikationsperiodens datoer hvis de findes på sæsonen), og sætte nyt felt `isPreview: true` i returværdien. Query-key udvides med preview-flaget.
-- `src/pages/CommissionLeague.tsx`: læs `teamPreview` fra `useSearchParams()` og send flaget videre til hold-visningen.
-- `src/components/league/TeamCompetitionView.tsx`: når `isPreview` er sat, vis badge/banner øverst og render podium + graf + tabel i stedet for "starter"-beskeden.
-
-Ingen ændringer i pricing, provision eller løn — kun læsning via den eksisterende `get_sales_aggregates_v2` RPC (grøn/gul zone: præsentation).
+Ingen ændring af pricing, løn, salgsdata eller andre rollers rettigheder.
