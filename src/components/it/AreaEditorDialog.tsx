@@ -18,10 +18,23 @@ import { cn } from "@/lib/utils";
 import {
   useAddSeats,
   useDeleteWorkstation,
+  useItAreaEdges,
   useRenameArea,
+  useSaveAreaEdges,
+  EDGE_SIDE_LABEL,
+  type EdgeSide,
   type ItArea,
 } from "@/hooks/useItWorkstations";
 import { formatSince, stalenessLevel, STALENESS_TEXT_CLASS } from "@/lib/itTime";
+
+const EDGE_SIDES: EdgeSide[] = ["edge_top", "edge_right", "edge_bottom", "edge_left"];
+const EDGE_PLACEHOLDER: Record<EdgeSide, string> = {
+  edge_top: "Fx Vinduer mod Nørre Voldgade",
+  edge_right: "Fx Glasvæg til område B",
+  edge_bottom: "Fx Hovedgang",
+  edge_left: "Fx Indgang / elevatorer",
+};
+
 
 interface Props {
   open: boolean;
