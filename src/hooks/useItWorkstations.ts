@@ -640,11 +640,13 @@ export function useSaveAreaEdges() {
       edges,
       seatsPerRow,
       rowGapAfter,
+      rowSizes,
     }: {
       areaCode: string;
       edges: Record<EdgeSide, string>;
       seatsPerRow?: number;
       rowGapAfter?: number[];
+      rowSizes?: number[];
     }) => {
       const clean = (v: string) => {
         const t = v.trim();
@@ -659,6 +661,9 @@ export function useSaveAreaEdges() {
           edge_left: clean(edges.edge_left),
           seats_per_row: Math.min(12, Math.max(1, seatsPerRow ?? DEFAULT_SEATS_PER_ROW)),
           row_gap_after: [...new Set(rowGapAfter ?? [])].sort((a, b) => a - b),
+          row_sizes: (rowSizes ?? [])
+            .map((n) => Math.min(12, Math.max(1, Math.round(n))))
+            .filter((n) => Number.isFinite(n)),
         },
         { onConflict: "area_code" },
       );
