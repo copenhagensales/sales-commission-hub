@@ -336,24 +336,13 @@ export function AreaEditorDialog({ open, onOpenChange, area, existingCodes = [] 
           <Separator />
 
           <div className="space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <h3 className="text-sm font-semibold text-foreground">Kanttekster</h3>
-                <p className="text-xs text-muted-foreground">
-                  Beskriv hvad der ligger rundt om området, så computerne er nemme at finde.
-                </p>
-              </div>
-              {!isNew && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => void handleSaveEdges()}
-                  disabled={busy}
-                >
-                  Gem layout
-                </Button>
-              )}
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Kanttekster</h3>
+              <p className="text-xs text-muted-foreground">
+                Beskriv hvad der ligger rundt om området, så computerne er nemme at finde.
+              </p>
             </div>
+
             <div className="grid gap-3 sm:grid-cols-2">
               {EDGE_SIDES.map((side) => (
                 <div key={side} className="space-y-1.5">
