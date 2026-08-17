@@ -389,6 +389,10 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
       );
 
   // Wait for permissions to load
+  // IT-modul: kun stab med IT-rettigheden (verificeret i databasen)
+  const { data: hasItAccess = false } = useItAccess();
+  const showItMenu = !isMenuHidden('section_it') && hasItAccess && p.canView("menu_it_workstations");
+
   if (p.isLoading) {
     return (
       <aside className={sidebarClasses}>
@@ -484,10 +488,6 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   );
   
   // Check if Spil (Games) menu should be visible
-  // IT-modul: kun stab med IT-rettigheden (verificeret i databasen)
-  const { data: hasItAccess = false } = useItAccess();
-  const showItMenu = !isMenuHidden('section_it') && hasItAccess && p.canView("menu_it_workstations");
-
   const showSpilMenu = !isMenuHidden('section_spil') && (p.canViewH2h || p.canViewCommissionLeague);
   return (
     <aside className={sidebarClasses}>
