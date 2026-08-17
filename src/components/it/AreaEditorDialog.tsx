@@ -254,20 +254,14 @@ export function AreaEditorDialog({ open, onOpenChange, area, existingCodes = [] 
 
           <div className="space-y-2">
             <Label htmlFor="area-label">Områdenavn</Label>
-            <div className="flex gap-2">
-              <Input
-                id="area-label"
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-                placeholder="Fx Salg – nord"
-              />
-              {!isNew && (
-                <Button variant="secondary" onClick={() => void handleRename()} disabled={busy}>
-                  Gem navn
-                </Button>
-              )}
-            </div>
+            <Input
+              id="area-label"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="Fx Salg – nord"
+            />
           </div>
+
 
           <div className="space-y-2">
             <Label htmlFor="area-seats">{isNew ? "Antal borde" : "Tilføj borde"}</Label>
