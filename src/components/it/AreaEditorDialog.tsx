@@ -189,20 +189,8 @@ export function AreaEditorDialog({ open, onOpenChange, area, existingCodes = [] 
     }
   };
 
-  const handleRename = async () => {
-    if (!area) return;
-    if (label.trim() === area.label) return toast.info("Navnet er uændret");
-    try {
-      await rename.mutateAsync({
-        areaCode: area.code,
-        label,
-        previousLabel: area.label,
-      });
-      toast.success("Områdenavn opdateret");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Kunne ikke omdøbe området");
-    }
-  };
+
+
 
   const handleAddSeats = async () => {
     if (!area) return;
