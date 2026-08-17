@@ -15346,6 +15346,7 @@ export type Database = {
         | "headset"
         | "mouse"
         | "keyboard"
+        | "desk"
       it_equipment_status: "ok" | "missing" | "broken" | "unknown"
       it_update_status:
         | "updated"
@@ -15575,6 +15576,7 @@ export const Constants = {
         "headset",
         "mouse",
         "keyboard",
+        "desk",
       ],
       it_equipment_status: ["ok", "missing", "broken", "unknown"],
       it_update_status: [
