@@ -11,6 +11,11 @@ import {
   Trash2,
   Check,
   SlidersHorizontal,
+  Laptop,
+  Monitor,
+  Headphones,
+  Mouse,
+  Keyboard,
 } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
@@ -92,6 +97,24 @@ type StatusFilter =
   | "campaign_pending"
   | "update_failed"
   | "missing_equipment";
+
+const EQUIPMENT_ICONS: Record<EquipmentKind, typeof Laptop> = {
+  computer: Laptop,
+  monitor_1: Monitor,
+  monitor_2: Monitor,
+  headset: Headphones,
+  mouse: Mouse,
+  keyboard: Keyboard,
+};
+
+const EQUIPMENT_ORDER: EquipmentKind[] = [
+  "computer",
+  "monitor_1",
+  "monitor_2",
+  "headset",
+  "mouse",
+  "keyboard",
+];
 
 const STATUS_FILTERS: { key: StatusFilter; label: string; dot?: OverallStatus }[] = [
   { key: "all", label: "Alle" },
@@ -308,6 +331,27 @@ export default function ItWorkstations() {
 
   const isProblem = (w: ItWorkstation) => w.overall !== "ok";
 
+  /** Optæller manglende/defekt udstyr pr. type på tværs af alle borde. */
+  const missingByKind = useMemo(() => {
+    const counts = new Map<EquipmentKind, number>();
+    let missing = 0;
+    let broken = 0;
+    let stations = 0;
+    for (const w of workstations ?? []) {
+      let hit = false;
+      for (const e of w.equipment) {
+        if (e.status !== "missing" && e.status !== "broken") continue;
+        counts.set(e.kind, (counts.get(e.kind) ?? 0) + 1);
+        if (e.status === "missing") missing += 1;
+        else broken += 1;
+        hit = true;
+      }
+      if (hit) stations += 1;
+    }
+    const rows = EQUIPMENT_ORDER.map((kind) => ({ kind, count: counts.get(kind) ?? 0 }));
+    return { rows, total: missing + broken, missing, broken, stations };
+  }, [workstations]);
+
   const visible = useMemo(
     () =>
       (workstations ?? []).filter(
@@ -443,6 +487,67 @@ export default function ItWorkstations() {
           )}
         </Card>
       </section>
+
+      {/* Manglende udstyr pr. type */}
+      {missingByKind.total > 0 && (
+        <section className="px-4 pb-4 sm:px-6">
+          <Card className="p-4">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Manglende udstyr
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setStatusFilter("missing_equipment");
+                  setProblemsOnly(false);
+                }}
+                className="text-xs font-medium text-primary underline-offset-2 hover:underline"
+              >
+                Vis berørte borde →
+              </button>
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-3 xl:grid-cols-6">
+              {missingByKind.rows.map((row) => {
+                const Icon = EQUIPMENT_ICONS[row.kind];
+                return (
+                  <div
+                    key={row.kind}
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg border border-border px-3 py-2",
+                      row.count > 0 ? "bg-destructive/5 border-destructive/30" : "opacity-60",
+                    )}
+                  >
+                    <Icon
+                      className={cn(
+                        "h-4 w-4 shrink-0",
+                        row.count > 0 ? "text-destructive" : "text-muted-foreground",
+                      )}
+                    />
+                    <div className="min-w-0">
+                      <p className="truncate text-xs text-muted-foreground">
+                        {EQUIPMENT_LABELS[row.kind]}
+                      </p>
+                      <p
+                        className={cn(
+                          "text-lg font-semibold tabular-nums",
+                          row.count > 0 ? "text-destructive" : "text-foreground",
+                        )}
+                      >
+                        {row.count}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="mt-3 text-xs text-muted-foreground">
+              I alt {missingByKind.total} markeringer ({missingByKind.missing} mangler,{" "}
+              {missingByKind.broken} defekte) på {missingByKind.stations} borde.
+            </p>
+          </Card>
+        </section>
+      )}
 
       {/* Filters */}
       <section className="space-y-3 border-y border-border px-4 py-4 sm:px-6">
