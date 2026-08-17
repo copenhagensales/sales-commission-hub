@@ -75,6 +75,21 @@ export function WorkstationCard({ workstation: ws, onOpen, faded, highlighted }:
       <span className={cn("truncate text-xs font-medium", OVERALL_TEXT_CLASS[ws.overall])}>
         {ws.headline}
       </span>
+
+      <span
+        className={cn(
+          "truncate text-[11px]",
+          STALENESS_TEXT_CLASS[stalenessLevel(ws.last_updated_at)],
+        )}
+        title={
+          ws.last_updated_at
+            ? `Sidst opdateret ${new Date(ws.last_updated_at).toLocaleString("da-DK")}`
+            : "Aldrig opdateret"
+        }
+      >
+        Opdateret {formatSince(ws.last_updated_at)}
+      </span>
+
     </button>
   );
 }
