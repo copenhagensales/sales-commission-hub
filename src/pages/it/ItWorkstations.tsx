@@ -561,6 +561,12 @@ export default function ItWorkstations() {
                   const attention = seats.filter(isProblem).length;
                   const editing = canEdit && isLayoutEdit(code);
                   const gapRows = areaEdges?.[code]?.row_gap_after ?? [];
+                  const seatRows = chunkSeats(
+                    seats,
+                    areaEdges?.[code]?.seats_per_row,
+                    areaEdges?.[code]?.row_sizes,
+                  );
+                  const rowLengths = seatRows.map((r) => r.length);
                   return (
                     <Card key={code} className={cn("p-4", editing && "ring-1 ring-primary/40")}>
                       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
