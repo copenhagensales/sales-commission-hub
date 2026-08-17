@@ -53,6 +53,7 @@ import { CompactLeagueView } from "@/components/home/CompactLeagueView";
 import { DailyCommissionChart } from "@/components/home/DailyCommissionChart";
 import { StickyPerformanceBar } from "@/components/home/StickyPerformanceBar";
 import { PendingContractBanner } from "@/components/home/PendingContractBanner";
+import { PendingPulseSurveyBanner } from "@/components/home/PendingPulseSurveyBanner";
 import { getPayrollPeriod, getVacationPayRate } from "@/lib/calculations";
 
 
@@ -475,6 +476,9 @@ const Home = () => {
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 p-3 md:p-8 space-y-3 md:space-y-6">
         {/* Kontrakt der afventer underskrift */}
         <PendingContractBanner employeeId={employee?.id} />
+
+        {/* Pulsmåling der mangler besvarelse */}
+        <PendingPulseSurveyBanner />
 
         {/* ZONE 1: Hero Performance Card - Full Width with integrated CTA */}
         <HeroPerformanceCard
