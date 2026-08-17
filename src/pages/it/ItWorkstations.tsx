@@ -675,6 +675,9 @@ export default function ItWorkstations() {
                                     <WorkstationCard
                                       workstation={ws}
                                       onOpen={openWorkstation}
+                                      onToggleEquipment={
+                                        canEdit ? handleToggleEquipment : undefined
+                                      }
                                       faded={problemsOnly && !isProblem(ws)}
                                       highlighted={!!searchTerm && matchesSearch(ws)}
                                     />
