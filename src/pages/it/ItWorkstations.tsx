@@ -382,7 +382,7 @@ export default function ItWorkstations() {
       </section>
 
       {/* Floor map + activity */}
-      <div className="grid gap-6 px-4 py-6 sm:px-6 xl:grid-cols-[1fr_320px]">
+      <div className="grid gap-6 px-4 py-6 sm:px-6">
         <section>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-base font-semibold text-foreground">
