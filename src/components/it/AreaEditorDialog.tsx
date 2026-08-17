@@ -438,18 +438,30 @@ export function AreaEditorDialog({ open, onOpenChange, area, existingCodes = [] 
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="gap-2 sm:justify-between">
           {isNew ? (
-            <Button onClick={() => void handleCreate()} disabled={busy} className="gap-2">
+            <Button onClick={() => void handleCreate()} disabled={busy} className="w-full gap-2 sm:w-auto">
               {addSeats.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               Opret område
             </Button>
           ) : (
-            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
-              Luk
-            </Button>
+            <>
+              <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>
+                Annullér
+              </Button>
+              <Button
+                size="lg"
+                onClick={() => void handleSaveAll()}
+                disabled={busy}
+                className="w-full gap-2 sm:w-auto"
+              >
+                {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+                Luk og gem
+              </Button>
+            </>
           )}
         </DialogFooter>
+
       </DialogContent>
     </Dialog>
   );
