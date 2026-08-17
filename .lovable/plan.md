@@ -1,26 +1,26 @@
-# Rasmus Emil Hansen ser ikke "TDC Erhverv - ret salg" i Rapporter
+# Rolle-baseret adgang til "TDC Erhverv - ret salg" (allowlist fjernes)
 
-## Hvad der er verificeret i databasen
+## Hvad der er verificeret
 
-- Rasmus Emil Hansen (`rh@copenhagensales.dk`, privat `rasmus@bjerrum.nu`) er aktiv, `position_id` peger på Teamleder, og `job_positions.system_role_key = 'teamleder'`.
-- `role_page_permissions` har `menu_reports_tdc_edit_sales` med `can_view = true, can_edit = true` for `ejer`, `teamleder` og `assisterendetm` (rækkerne blev oprettet 15/8 22:53).
-- RLS på `role_page_permissions` tillader alle authenticated at læse rækkerne.
-- Menupunktet i `AppSidebar.tsx:1361` er kun gated af `p.canViewReportsTdcEditSales` inde i Rapporter-blokken, og `sidebar_menu_config` indeholder ingen række der skjuler det.
+- `role_page_permissions` har `menu_reports_tdc_edit_sales` med `can_view = true, can_edit = true` for `ejer`, `teamleder` og `assisterendetm`.
+- Rasmus Emil Hansen resolver til rollen `teamleder`, Johannes Hedebrink til `assisterendetm` (via `job_positions.system_role_key`).
+- Menupunktet i `AppSidebar.tsx:1361` er kun gated af `p.canViewReportsTdcEditSales`, så menuen burde vises for dem allerede.
+- Indholdet gates i stedet af `useIsTdcErhvervLeader` (`src/hooks/useTdcErhvervSales.ts:318-361`), som kræver ejer, medlemskab af TDC Erhverv-teamet, eller at e-mailen står i `src/config/tdcErhvervEditAccess.ts`. Det er den hardkodede undtagelse vi nu fjerner.
 
-Konklusion: rettighedsdataene er korrekte for hans rolle. Årsagen til at han ikke ser punktet er derfor **ikke bekræftet endnu** — den mest sandsynlige forklaring er klient-side cache af rettigheder (`localStorage`-nøglen `cached-permissions-v5` + React Query `staleTime` 15 min), men det skal verificeres før vi ændrer noget.
+## Ændringer
 
-## Plan
+1. **`src/hooks/useTdcErhvervSales.ts`** — `useIsTdcErhvervLeader` erstattes af et rent rettighedstjek:
+   - Adgang = rettigheden `menu_reports_tdc_edit_sales` (view/edit) fra rolle-systemet, plus ejer-bypass som i dag.
+   - Team-tjek på TDC Erhverv-teamet og allowlist-tjek fjernes.
+   - Hooket beholder sit navn og returværdi, så `TdcErhvervEditSales.tsx` ikke ændres, men bygger nu på `usePermissions()` i stedet for egne DB-opslag.
+2. **`src/config/tdcErhvervEditAccess.ts`** — slettes (ingen andre brugssteder).
 
-1. **Verificér først (ingen kodeændring).** Log preview ind som Rasmus og læs den faktisk resolvede rolle og rettighed:
-   - Bekræft `usePositionPermissions`-loggen viser `roleKey: teamleder`.
-   - Bekræft om `menu_reports_tdc_edit_sales` findes i det hentede permission-objekt.
-   - Bekræft om Rapporter-menuen i det hele taget vises for ham.
-2. **Fix afhængigt af resultat:**
-   - Hvis rettigheden er der, men punktet mangler i UI: fejlen ligger i sidebar-gaten — rettes der.
-   - Hvis rettigheden mangler i det hentede objekt, mens DB har den: det er stale cache. Fix = bump cache-nøglen til `cached-permissions-v6` i `src/hooks/usePositionPermissions.ts` (og ryd v5), så alle brugere får friske rettigheder ved næste load.
-   - Hvis rollen resolver til noget andet end `teamleder`: rettes i hans position/rolle-opsætning, ikke i koden.
-3. **Efterprøv** at han både ser menupunktet og kan åbne siden med indhold (han står allerede på allowlisten i `src/config/tdcErhvervEditAccess.ts`, så indholdsgaten burde være åben).
+Ingen migration er nødvendig: rettigheden findes allerede for begge roller. Fremover styres adgangen udelukkende under Ledelse → Rettigheder.
+
+## Konsekvens (bekræftet valg)
+
+Alle brugere med rollen `teamleder` eller `assisterendetm` — ikke kun TDC Erhverv-ledelsen — kan herefter åbne og rette TDC Erhverv-salg. Skal det strammes senere, sker det ved at slå rettigheden fra for rollen i rettighedsmodulet.
 
 ## Uden for scope
 
-Ingen ændring af pricing, løn, salgsdata eller andre rollers rettigheder.
+Ingen ændring af RLS på `sales`/`sale_items`, pricing, provision eller løn. Rettelses-logikken i dialogen berøres ikke.
