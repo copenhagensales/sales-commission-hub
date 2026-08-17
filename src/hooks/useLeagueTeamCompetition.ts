@@ -8,14 +8,6 @@ export const TEAM_COMPETITION_EXCLUDED_TEAMS = ["Stab"];
 /** Antal sælgere pr. hold der tæller i holdets total */
 export const TEAM_COMPETITION_COUNTING_PLAYERS = 5;
 
-/** Hold der i holdkonkurrencen deles op i flere hold pr. brand/klient */
-export const TEAM_COMPETITION_SPLIT_TEAM = "Fieldmarketing";
-
-/** De afledte hold: navn i konkurrencen + klientnavn i `clients` */
-export const TEAM_COMPETITION_SPLIT_TARGETS = [
-  { key: "fm-eesy", name: "Eesy FM", client: "Eesy FM" },
-  { key: "fm-yousee", name: "YouSee FM", client: "Yousee" },
-] as const;
 
 export interface TeamCompetitionPlayer {
   employee_id: string;
