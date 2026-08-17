@@ -59,7 +59,7 @@ const sectionOrder = [
   "menu_section_mg", "menu_section_salary", "menu_section_dashboards",
   "menu_section_test", "menu_section_rekruttering", "menu_section_onboarding",
   "menu_section_reports", "menu_section_admin", "menu_section_sales_system",
-  "menu_section_economic", "menu_section_amo", "menu_section_spil", "softphone_section",
+  "menu_section_economic", "menu_section_amo", "menu_section_spil", "menu_section_it", "softphone_section",
 ];
 
 export function PermissionMap() {
