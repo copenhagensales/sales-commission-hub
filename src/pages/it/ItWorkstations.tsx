@@ -142,6 +142,34 @@ export default function ItWorkstations() {
   const stats = useItStats(workstations);
   const activeCampaign = campaigns?.find((c) => c.is_active) ?? campaigns?.[0];
 
+  const toggleEquipment = useToggleEquipmentStatus();
+
+  const handleToggleEquipment = (
+    ws: ItWorkstation,
+    kind: EquipmentKind,
+    next: EquipmentStatus,
+  ) => {
+    const previous = ws.equipment.find((e) => e.kind === kind)?.status ?? "unknown";
+    toggleEquipment.mutate(
+      { workstation: ws, kind, next },
+      {
+        onSuccess: () => {
+          toast.success(
+            `${seatLabel(ws)}: ${EQUIPMENT_LABELS[kind]} → ${EQUIPMENT_STATUS_LABELS[next]}`,
+            {
+              action: {
+                label: "Fortryd",
+                onClick: () =>
+                  toggleEquipment.mutate({ workstation: ws, kind, next: previous }),
+              },
+            },
+          );
+        },
+        onError: () => toast.error("Kunne ikke gemme ændringen"),
+      },
+    );
+  };
+
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [areaFilter, setAreaFilter] = useState<string>("all");
