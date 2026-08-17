@@ -62,12 +62,14 @@ function toDateOnly(d: Date): string {
 
 async function fetchProvisionByEmployee(
   start: string,
-  end: string
+  end: string,
+  clientId?: string | null
 ): Promise<Record<string, number>> {
   const { data, error } = await supabase.rpc("get_sales_aggregates_v2", {
     p_start: start,
     p_end: end,
     p_group_by: "employee",
+    ...(clientId ? { p_client_id: clientId } : {}),
   });
   if (error) throw error;
   const map: Record<string, number> = {};
