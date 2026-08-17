@@ -150,6 +150,67 @@ export default function ItWorkstations() {
     setAreaDialogOpen(true);
   };
 
+  // ---- Inline redigering af borde og mellemrum direkte i gulvplanen ----
+  const [layoutEditAreas, setLayoutEditAreas] = useState<string[]>([]);
+  const [seatToDelete, setSeatToDelete] = useState<ItWorkstation | null>(null);
+  const addSeats = useAddSeats();
+  const deleteSeat = useDeleteWorkstation();
+  const saveEdges = useSaveAreaEdges();
+
+  const isLayoutEdit = (code: string) => layoutEditAreas.includes(code);
+  const toggleLayoutEdit = (code: string) =>
+    setLayoutEditAreas((prev) =>
+      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code],
+    );
+
+  const edgeValues = (code: string): Record<EdgeSide, string> => {
+    const row = areaEdges?.[code];
+    return {
+      edge_top: row?.edge_top ?? "",
+      edge_right: row?.edge_right ?? "",
+      edge_bottom: row?.edge_bottom ?? "",
+      edge_left: row?.edge_left ?? "",
+    };
+  };
+
+  const handleAddSeat = async (code: string, label: string) => {
+    try {
+      const created = await addSeats.mutateAsync({ areaCode: code, areaLabel: label, count: 1 });
+      toast.success(`Bord ${created[0]} tilføjet`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Kunne ikke tilføje bordet");
+    }
+  };
+
+  const handleDeleteSeat = async (ws: ItWorkstation) => {
+    try {
+      await deleteSeat.mutateAsync(ws);
+      toast.success(`${seatLabel(ws)} fjernet`);
+      setSeatToDelete(null);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Kunne ikke fjerne bordet");
+    }
+  };
+
+  const toggleRowGap = async (code: string, row: number) => {
+    const current = areaEdges?.[code]?.row_gap_after ?? [];
+    const next = current.includes(row)
+      ? current.filter((r) => r !== row)
+      : [...current, row].sort((a, b) => a - b);
+    try {
+      await saveEdges.mutateAsync({
+        areaCode: code,
+        edges: edgeValues(code),
+        seatsPerRow: areaEdges?.[code]?.seats_per_row ?? DEFAULT_SEATS_PER_ROW,
+        rowGapAfter: next,
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Kunne ikke gemme mellemrummet");
+    }
+  };
+
+
+
 
   const matchesStatus = (w: ItWorkstation) => {
     switch (statusFilter) {
