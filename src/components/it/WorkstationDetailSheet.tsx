@@ -35,6 +35,8 @@ import {
   type UpdateStatus,
 } from "@/hooks/useItWorkstations";
 import { OVERALL_DOT_CLASS } from "./statusStyles";
+import { formatSince, stalenessLevel, STALENESS_TEXT_CLASS } from "@/lib/itTime";
+
 
 interface Props {
   workstation: ItWorkstation | null;
