@@ -42,6 +42,11 @@ import {
   seatLabel,
   DEFAULT_SEATS_PER_ROW,
   isUpdateOverdue,
+  useToggleEquipmentStatus,
+  EQUIPMENT_LABELS,
+  EQUIPMENT_STATUS_LABELS,
+  type EquipmentKind,
+  type EquipmentStatus,
 } from "@/hooks/useItWorkstations";
 import { AreaEditorDialog } from "@/components/it/AreaEditorDialog";
 import { AreaFloorFrame } from "@/components/it/AreaFloorFrame";
