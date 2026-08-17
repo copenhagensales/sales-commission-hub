@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
 import { extractOpp } from "@/components/cancellations/utils/extractOpp";
-import { hasTdcErhvervEditAccess } from "@/config/tdcErhvervEditAccess";
+import { usePermissions } from "@/hooks/usePositionPermissions";
+
 
 export const TDC_ERHVERV_CLIENT_ID = "20744525-7466-4b2c-afa7-6ee09a9112b0";
 export const TDC_ERHVERV_TEAM_ID = "ee967dfd-04c8-465e-bda7-f1c47094bae0";
@@ -316,47 +316,15 @@ export function useDeleteTdcErhvervOpp() {
 }
 
 /**
- * True hvis brugeren er ejer/ledelse, eller medlem af TDC Erhverv-teamet
- * (leder og assisterende leder er medlemmer af teamet).
+ * Adgang til "TDC Erhverv - ret salg" styres udelukkende af rolle-rettigheden
+ * `menu_reports_tdc_edit_sales` (Ledelse → Rettigheder). Ejere har fuld adgang
+ * via det almindelige ejer-bypass i permission-systemet.
  */
 export function useIsTdcErhvervLeader() {
-  const { user } = useAuth();
+  const { canView, canEdit, isReady } = usePermissions();
+  const hasAccess =
+    canView("menu_reports_tdc_edit_sales") || canEdit("menu_reports_tdc_edit_sales");
 
-  return useQuery({
-    queryKey: ["is-tdc-erhverv-leader", user?.email],
-    enabled: !!user?.email,
-    staleTime: 10 * 60 * 1000,
-    queryFn: async () => {
-      if (!user?.email) return false;
-      const lowerEmail = user.email.toLowerCase();
-
-      // Manuel undtagelse for ledere uden for TDC Erhverv-teamet
-      if (hasTdcErhvervEditAccess(lowerEmail)) return true;
-
-
-
-      const { data: employee } = await supabase
-        .from("employee_master_data")
-        .select("id, auth_user_id")
-        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
-        .eq("is_active", true)
-        .maybeSingle();
-
-      if (employee?.auth_user_id) {
-        const { data: isOwner } = await supabase.rpc("is_owner", {
-          _user_id: employee.auth_user_id,
-        });
-        if (isOwner) return true;
-      }
-
-      if (!employee) return false;
-
-      const { data: memberships } = await supabase
-        .from("team_members")
-        .select("team_id")
-        .eq("employee_id", employee.id);
-
-      return (memberships ?? []).some((m) => m.team_id === TDC_ERHVERV_TEAM_ID);
-    },
-  });
+  return { data: isReady ? hasAccess : false, isLoading: !isReady };
 }
+
