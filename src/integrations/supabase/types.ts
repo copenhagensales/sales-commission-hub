@@ -8764,6 +8764,8 @@ export type Database = {
           edge_left: string | null
           edge_right: string | null
           edge_top: string | null
+          row_gap_after: number[]
+          seats_per_row: number
           updated_at: string
         }
         Insert: {
@@ -8773,6 +8775,8 @@ export type Database = {
           edge_left?: string | null
           edge_right?: string | null
           edge_top?: string | null
+          row_gap_after?: number[]
+          seats_per_row?: number
           updated_at?: string
         }
         Update: {
@@ -8782,6 +8786,8 @@ export type Database = {
           edge_left?: string | null
           edge_right?: string | null
           edge_top?: string | null
+          row_gap_after?: number[]
+          seats_per_row?: number
           updated_at?: string
         }
         Relationships: []
