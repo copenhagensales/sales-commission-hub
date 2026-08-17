@@ -93,12 +93,21 @@ export default function ItWorkstations() {
   const [problemsOnly, setProblemsOnly] = useState(false);
   const [selected, setSelected] = useState<ItWorkstation | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [areaDialogOpen, setAreaDialogOpen] = useState(false);
+  const [areaBeingEdited, setAreaBeingEdited] = useState<string | null>(null);
 
-  const areas = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const w of workstations ?? []) map.set(w.area_code, w.area_label);
-    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  }, [workstations]);
+  const areaList = useItAreas(workstations);
+  const areas = useMemo(
+    () => areaList.map((a) => [a.code, a.label] as [string, string]),
+    [areaList],
+  );
+  const editingArea = areaList.find((a) => a.code === areaBeingEdited) ?? null;
+
+  const openAreaEditor = (code: string | null) => {
+    setAreaBeingEdited(code);
+    setAreaDialogOpen(true);
+  };
+
 
   const matchesStatus = (w: ItWorkstation) => {
     switch (statusFilter) {
