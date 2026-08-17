@@ -615,17 +615,19 @@ export default function ItWorkstations() {
 
                       {editing && (
                         <p className="mb-3 rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
-                          Klik på papirkurven for at slette et bord, brug "Tilføj bord" nederst, og
-                          klik på en stiplet linje for at slå mellemrum til og fra.
+                          Klik på papirkurven for at slette et bord, brug "Tilføj bord" nederst,
+                          klik på en stiplet linje for mellemrum, og brug −/+ ude til højre for en
+                          række for at ændre antal borde i netop den række.
                         </p>
                       )}
 
                       <AreaFloorFrame edges={areaEdges?.[code]}>
                         <div className="space-y-2">
-                          {chunkSeats(seats, areaEdges?.[code]?.seats_per_row).map((row, rowIndex, rows) => (
+                          {seatRows.map((row, rowIndex, rows) => (
                             <div key={`row-${rowIndex}`}>
+                              <div className="flex items-stretch gap-2">
                               <div
-                                className="grid gap-2"
+                                className="grid flex-1 gap-2"
                                 style={{
                                   gridTemplateColumns: `repeat(${row.length}, minmax(0, 1fr))`,
                                 }}
