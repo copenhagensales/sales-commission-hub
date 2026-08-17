@@ -525,8 +525,10 @@ export default function ItWorkstations() {
                 .map(([code, label]) => {
                   const seats = visible.filter((w) => w.area_code === code);
                   const attention = seats.filter(isProblem).length;
+                  const editing = canEdit && isLayoutEdit(code);
+                  const gapRows = areaEdges?.[code]?.row_gap_after ?? [];
                   return (
-                    <Card key={code} className="p-4">
+                    <Card key={code} className={cn("p-4", editing && "ring-1 ring-primary/40")}>
                       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
                           <Badge variant="secondary" className="font-mono">
@@ -534,21 +536,49 @@ export default function ItWorkstations() {
                           </Badge>
                           <h3 className="text-sm font-semibold text-foreground">{label}</h3>
                           {canEdit && (
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                              aria-label={`Redigér område ${code}`}
-                              onClick={() => openAreaEditor(code)}
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
+                            <>
+                              <Button
+                                size="sm"
+                                variant={editing ? "default" : "ghost"}
+                                className="h-7 gap-1.5 px-2 text-xs"
+                                aria-pressed={editing}
+                                onClick={() => toggleLayoutEdit(code)}
+                              >
+                                {editing ? (
+                                  <>
+                                    <Check className="h-3.5 w-3.5" />
+                                    Færdig
+                                  </>
+                                ) : (
+                                  <>
+                                    <SlidersHorizontal className="h-3.5 w-3.5" />
+                                    Redigér borde
+                                  </>
+                                )}
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                aria-label={`Områdeindstillinger for ${code}`}
+                                onClick={() => openAreaEditor(code)}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                            </>
                           )}
                         </div>
                         <span className="text-xs text-muted-foreground">
                           {seats.length} pladser · {attention} kræver opmærksomhed
                         </span>
                       </div>
+
+                      {editing && (
+                        <p className="mb-3 rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+                          Klik på papirkurven for at slette et bord, brug "Tilføj bord" nederst, og
+                          klik på en stiplet linje for at slå mellemrum til og fra.
+                        </p>
+                      )}
 
                       <AreaFloorFrame edges={areaEdges?.[code]}>
                         <div className="space-y-2">
@@ -561,36 +591,91 @@ export default function ItWorkstations() {
                                 }}
                               >
                                 {row.map((ws) => (
-                                  <WorkstationCard
-                                    key={ws.id}
-                                    workstation={ws}
-                                    onOpen={openWorkstation}
-                                    faded={problemsOnly && !isProblem(ws)}
-                                    highlighted={!!searchTerm && matchesSearch(ws)}
-                                  />
+                                  <div key={ws.id} className="relative min-w-0">
+                                    <WorkstationCard
+                                      workstation={ws}
+                                      onOpen={openWorkstation}
+                                      faded={problemsOnly && !isProblem(ws)}
+                                      highlighted={!!searchTerm && matchesSearch(ws)}
+                                    />
+                                    {editing && (
+                                      <Button
+                                        size="icon"
+                                        variant="destructive"
+                                        aria-label={`Slet ${seatLabel(ws)}`}
+                                        className="absolute -right-1.5 -top-1.5 h-6 w-6 rounded-full shadow-md"
+                                        disabled={deleteSeat.isPending}
+                                        onClick={() => setSeatToDelete(ws)}
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </Button>
+                                    )}
+                                  </div>
                                 ))}
                               </div>
                               {rowIndex < rows.length - 1 &&
-                                (areaEdges?.[code]?.row_gap_after ?? []).includes(rowIndex + 1) && (
-                                  <div
-                                    className="my-3 flex items-center gap-2"
-                                    aria-hidden="true"
+                                (editing ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => void toggleRowGap(code, rowIndex + 1)}
+                                    disabled={saveEdges.isPending}
+                                    aria-pressed={gapRows.includes(rowIndex + 1)}
+                                    className={cn(
+                                      "my-2 flex w-full items-center gap-2 rounded-md py-1 transition-colors hover:bg-muted/60",
+                                      gapRows.includes(rowIndex + 1) && "my-3",
+                                    )}
                                   >
                                     <span className="h-px flex-1 border-t border-dashed border-border" />
-                                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                                      Gang
+                                    <span
+                                      className={cn(
+                                        "text-[10px] uppercase tracking-wider",
+                                        gapRows.includes(rowIndex + 1)
+                                          ? "text-foreground"
+                                          : "text-muted-foreground/60",
+                                      )}
+                                    >
+                                      {gapRows.includes(rowIndex + 1)
+                                        ? "Gang — klik for at fjerne"
+                                        : "Tilføj mellemrum"}
                                     </span>
                                     <span className="h-px flex-1 border-t border-dashed border-border" />
-                                  </div>
-                                )}
+                                  </button>
+                                ) : (
+                                  gapRows.includes(rowIndex + 1) && (
+                                    <div className="my-3 flex items-center gap-2" aria-hidden="true">
+                                      <span className="h-px flex-1 border-t border-dashed border-border" />
+                                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                                        Gang
+                                      </span>
+                                      <span className="h-px flex-1 border-t border-dashed border-border" />
+                                    </div>
+                                  )
+                                ))}
                             </div>
                           ))}
+
+                          {editing && (
+                            <Button
+                              variant="outline"
+                              className="mt-2 w-full gap-2 border-dashed"
+                              disabled={addSeats.isPending}
+                              onClick={() => void handleAddSeat(code, label)}
+                            >
+                              {addSeats.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Plus className="h-4 w-4" />
+                              )}
+                              Tilføj bord
+                            </Button>
+                          )}
                         </div>
                       </AreaFloorFrame>
 
                     </Card>
                   );
                 })}
+
             </div>
           )}
         </section>
