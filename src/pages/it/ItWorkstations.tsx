@@ -326,7 +326,7 @@ export default function ItWorkstations() {
             >
               Alle områder
             </Button>
-            {areas.map(([code]) => (
+            {areas.map(([code, label]) => (
               <Button
                 key={code}
                 size="sm"
@@ -335,10 +335,23 @@ export default function ItWorkstations() {
                 aria-pressed={areaFilter === code}
                 className="h-9 rounded-full"
               >
-                Område {code}
+                <span className="font-mono opacity-70">{code}</span>
+                <span className="ml-1.5">{label}</span>
               </Button>
             ))}
+            {canEdit && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => openAreaEditor(null)}
+                className="h-9 gap-1.5 rounded-full"
+              >
+                <Plus className="h-4 w-4" />
+                Nyt område
+              </Button>
+            )}
           </div>
+
 
           <div className="flex items-center gap-2">
             <Switch
