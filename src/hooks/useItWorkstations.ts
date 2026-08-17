@@ -568,6 +568,92 @@ export function useItAreas(workstations: ItWorkstation[] | undefined): ItArea[] 
   }, [workstations]);
 }
 
+// ============================================================================
+// AREA EDGE LABELS (fx "Vinduer", "Møderum", "Hovedgang")
+// ============================================================================
+
+export interface ItAreaEdges {
+  area_code: string;
+  edge_top: string | null;
+  edge_right: string | null;
+  edge_bottom: string | null;
+  edge_left: string | null;
+}
+
+export type EdgeSide = "edge_top" | "edge_right" | "edge_bottom" | "edge_left";
+
+export const EDGE_SIDE_LABEL: Record<EdgeSide, string> = {
+  edge_top: "Øverste kant",
+  edge_right: "Højre kant",
+  edge_bottom: "Nederste kant",
+  edge_left: "Venstre kant",
+};
+
+/** All area edge labels, keyed by area code. */
+export function useItAreaEdges(enabled = true) {
+  return useQuery({
+    queryKey: ["it-area-edges"],
+    enabled,
+    staleTime: 60_000,
+    queryFn: async (): Promise<Record<string, ItAreaEdges>> => {
+      const { data, error } = await supabase
+        .from("it_area_edges")
+        .select("area_code, edge_top, edge_right, edge_bottom, edge_left");
+      if (error) throw error;
+      const map: Record<string, ItAreaEdges> = {};
+      for (const row of data ?? []) map[row.area_code] = row as ItAreaEdges;
+      return map;
+    },
+  });
+}
+
+/** Save (upsert) the four edge labels for an area. */
+export function useSaveAreaEdges() {
+  const queryClient = useQueryClient();
+  const log = useItLogger();
+
+  return useMutation({
+    mutationFn: async ({
+      areaCode,
+      edges,
+    }: {
+      areaCode: string;
+      edges: Record<EdgeSide, string>;
+    }) => {
+      const clean = (v: string) => {
+        const t = v.trim();
+        return t.length > 0 ? t : null;
+      };
+      const { error } = await supabase.from("it_area_edges").upsert(
+        {
+          area_code: areaCode,
+          edge_top: clean(edges.edge_top),
+          edge_right: clean(edges.edge_right),
+          edge_bottom: clean(edges.edge_bottom),
+          edge_left: clean(edges.edge_left),
+        },
+        { onConflict: "area_code" },
+      );
+      if (error) throw error;
+
+      await log([
+        {
+          action: `Kanttekster opdateret for område ${areaCode}`,
+          field: "area_edges",
+          new_value: (["edge_top", "edge_right", "edge_bottom", "edge_left"] as EdgeSide[])
+            .map((s) => `${EDGE_SIDE_LABEL[s]}: ${clean(edges[s]) ?? "—"}`)
+            .join(" · "),
+        },
+      ]);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["it-area-edges"] });
+      queryClient.invalidateQueries({ queryKey: ["it-activity-log"] });
+    },
+  });
+}
+
+
 function buildSeatCode(areaCode: string, seatOrder: number) {
   return `${areaCode}${String(seatOrder).padStart(2, "0")}`;
 }

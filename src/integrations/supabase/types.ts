@@ -8756,6 +8756,36 @@ export type Database = {
           },
         ]
       }
+      it_area_edges: {
+        Row: {
+          area_code: string
+          created_at: string
+          edge_bottom: string | null
+          edge_left: string | null
+          edge_right: string | null
+          edge_top: string | null
+          updated_at: string
+        }
+        Insert: {
+          area_code: string
+          created_at?: string
+          edge_bottom?: string | null
+          edge_left?: string | null
+          edge_right?: string | null
+          edge_top?: string | null
+          updated_at?: string
+        }
+        Update: {
+          area_code?: string
+          created_at?: string
+          edge_bottom?: string | null
+          edge_left?: string | null
+          edge_right?: string | null
+          edge_top?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       it_campaign_workstations: {
         Row: {
           campaign_id: string

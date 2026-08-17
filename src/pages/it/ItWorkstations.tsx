@@ -16,6 +16,8 @@ import {
   useItAccess,
   useItActivityLog,
   useItAreas,
+  useItAreaEdges,
+
   useItCampaigns,
   useItRealtime,
   useItStats,
@@ -24,6 +26,8 @@ import {
   type OverallStatus,
 } from "@/hooks/useItWorkstations";
 import { AreaEditorDialog } from "@/components/it/AreaEditorDialog";
+import { AreaFloorFrame } from "@/components/it/AreaFloorFrame";
+
 
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -100,6 +104,8 @@ export default function ItWorkstations() {
   const [areaBeingEdited, setAreaBeingEdited] = useState<string | null>(null);
 
   const areaList = useItAreas(workstations);
+  const { data: areaEdges } = useItAreaEdges(enabled);
+
   const areas = useMemo(
     () => areaList.map((a) => [a.code, a.label] as [string, string]),
     [areaList],
@@ -454,17 +460,20 @@ export default function ItWorkstations() {
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
-                        {seats.map((ws) => (
-                          <WorkstationCard
-                            key={ws.id}
-                            workstation={ws}
-                            onOpen={openWorkstation}
-                            faded={problemsOnly && !isProblem(ws)}
-                            highlighted={!!searchTerm && matchesSearch(ws)}
-                          />
-                        ))}
-                      </div>
+                      <AreaFloorFrame edges={areaEdges?.[code]}>
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+                          {seats.map((ws) => (
+                            <WorkstationCard
+                              key={ws.id}
+                              workstation={ws}
+                              onOpen={openWorkstation}
+                              faded={problemsOnly && !isProblem(ws)}
+                              highlighted={!!searchTerm && matchesSearch(ws)}
+                            />
+                          ))}
+                        </div>
+                      </AreaFloorFrame>
+
                     </Card>
                   );
                 })}

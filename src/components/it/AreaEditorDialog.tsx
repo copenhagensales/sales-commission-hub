@@ -18,10 +18,23 @@ import { cn } from "@/lib/utils";
 import {
   useAddSeats,
   useDeleteWorkstation,
+  useItAreaEdges,
   useRenameArea,
+  useSaveAreaEdges,
+  EDGE_SIDE_LABEL,
+  type EdgeSide,
   type ItArea,
 } from "@/hooks/useItWorkstations";
 import { formatSince, stalenessLevel, STALENESS_TEXT_CLASS } from "@/lib/itTime";
+
+const EDGE_SIDES: EdgeSide[] = ["edge_top", "edge_right", "edge_bottom", "edge_left"];
+const EDGE_PLACEHOLDER: Record<EdgeSide, string> = {
+  edge_top: "Fx Vinduer mod Nørre Voldgade",
+  edge_right: "Fx Glasvæg til område B",
+  edge_bottom: "Fx Hovedgang",
+  edge_left: "Fx Indgang / elevatorer",
+};
+
 
 interface Props {
   open: boolean;
@@ -37,11 +50,19 @@ export function AreaEditorDialog({ open, onOpenChange, area, existingCodes = [] 
   const rename = useRenameArea();
   const addSeats = useAddSeats();
   const deleteSeat = useDeleteWorkstation();
+  const { data: edgeMap } = useItAreaEdges(open);
+  const saveEdges = useSaveAreaEdges();
 
   const [label, setLabel] = useState("");
   const [code, setCode] = useState("");
   const [seatCount, setSeatCount] = useState("4");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [edges, setEdges] = useState<Record<EdgeSide, string>>({
+    edge_top: "",
+    edge_right: "",
+    edge_bottom: "",
+    edge_left: "",
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -51,7 +72,31 @@ export function AreaEditorDialog({ open, onOpenChange, area, existingCodes = [] 
     setConfirmDeleteId(null);
   }, [open, area, isNew]);
 
-  const busy = rename.isPending || addSeats.isPending || deleteSeat.isPending;
+  useEffect(() => {
+    if (!open) return;
+    const row = area ? edgeMap?.[area.code] : undefined;
+    setEdges({
+      edge_top: row?.edge_top ?? "",
+      edge_right: row?.edge_right ?? "",
+      edge_bottom: row?.edge_bottom ?? "",
+      edge_left: row?.edge_left ?? "",
+    });
+  }, [open, area, edgeMap]);
+
+  const busy =
+    rename.isPending || addSeats.isPending || deleteSeat.isPending || saveEdges.isPending;
+
+  const handleSaveEdges = async () => {
+    const targetCode = area?.code ?? code.trim().toUpperCase();
+    if (!targetCode) return toast.error("Angiv først en områdekode");
+    try {
+      await saveEdges.mutateAsync({ areaCode: targetCode, edges });
+      toast.success("Kanttekster gemt");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Kunne ikke gemme kantteksterne");
+    }
+  };
+
 
   const handleCreate = async () => {
     const normalized = code.trim().toUpperCase();
@@ -64,8 +109,12 @@ export function AreaEditorDialog({ open, onOpenChange, area, existingCodes = [] 
         areaLabel: label,
         count: Number(seatCount) || 1,
       });
+      if (EDGE_SIDES.some((s) => edges[s].trim())) {
+        await saveEdges.mutateAsync({ areaCode: normalized, edges });
+      }
       toast.success(`Område ${normalized} oprettet med ${created.length} borde`);
       onOpenChange(false);
+
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Kunne ikke oprette området");
     }
@@ -183,6 +232,47 @@ export function AreaEditorDialog({ open, onOpenChange, area, existingCodes = [] 
               )}
             </div>
           </div>
+
+          <Separator />
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Kanttekster</h3>
+                <p className="text-xs text-muted-foreground">
+                  Beskriv hvad der ligger rundt om området, så computerne er nemme at finde.
+                </p>
+              </div>
+              {!isNew && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => void handleSaveEdges()}
+                  disabled={busy}
+                >
+                  Gem kanter
+                </Button>
+              )}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {EDGE_SIDES.map((side) => (
+                <div key={side} className="space-y-1.5">
+                  <Label htmlFor={`edge-${side}`} className="text-xs">
+                    {EDGE_SIDE_LABEL[side]}
+                  </Label>
+                  <Input
+                    id={`edge-${side}`}
+                    value={edges[side]}
+                    onChange={(e) => setEdges((prev) => ({ ...prev, [side]: e.target.value }))}
+                    placeholder={EDGE_PLACEHOLDER[side]}
+                    maxLength={60}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+
 
           {!isNew && area && (
             <>
