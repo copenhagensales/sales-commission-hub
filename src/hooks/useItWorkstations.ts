@@ -151,9 +151,16 @@ export function deriveWorkstation(
   } else if (missing.length > 0) {
     overall = "attention";
     headline = "Manglende udstyr";
-  } else if (row.update_status !== "updated") {
+  } else if (row.update_status === "update_failed") {
     overall = "attention";
-    headline = UPDATE_STATUS_LABELS[row.update_status];
+    headline = "Opdatering fejlede";
+  } else if (!row.last_updated_at) {
+    // Aldrig opdateret endnu — udløser ikke en advarsel.
+    overall = "ok";
+    headline = "Ikke opdateret endnu";
+  } else if (isUpdateOverdue(row.last_updated_at)) {
+    overall = "attention";
+    headline = `Opdatering forfalden (${daysSince(row.last_updated_at)} dage)`;
   } else {
     overall = "ok";
     headline = "Opdateret";
