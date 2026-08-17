@@ -28,18 +28,32 @@ import {
   useItAccess,
   useItAreas,
   useItAreaEdges,
-
+  useAddSeats,
+  useDeleteWorkstation,
+  useSaveAreaEdges,
   useItCampaigns,
   useItRealtime,
   useItStats,
   useItWorkstations,
   type ItWorkstation,
+  type EdgeSide,
   type OverallStatus,
   seatLabel,
   DEFAULT_SEATS_PER_ROW,
 } from "@/hooks/useItWorkstations";
 import { AreaEditorDialog } from "@/components/it/AreaEditorDialog";
 import { AreaFloorFrame } from "@/components/it/AreaFloorFrame";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
 
 
 import { usePermissions } from "@/hooks/usePositionPermissions";
