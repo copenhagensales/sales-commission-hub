@@ -136,21 +136,31 @@ export function AreaEditorDialog({ open, onOpenChange, area, existingCodes = [] 
     void persistLayout(clamped, gapRows);
   };
 
-  const handleSaveEdges = async () => {
-    const targetCode = area?.code ?? code.trim().toUpperCase();
-    if (!targetCode) return toast.error("Angiv først en områdekode");
+  /** Gemmer navn, layout og kanttekster i én handling og lukker dialogen. */
+  const handleSaveAll = async () => {
+    if (!area) return;
+    if (!label.trim()) return toast.error("Angiv et navn til området");
     try {
+      if (label.trim() !== area.label) {
+        await rename.mutateAsync({
+          areaCode: area.code,
+          label,
+          previousLabel: area.label,
+        });
+      }
       await saveEdges.mutateAsync({
-        areaCode: targetCode,
+        areaCode: area.code,
         edges,
         seatsPerRow: perRow,
         rowGapAfter: gapRows,
       });
-      toast.success("Layout og kanttekster gemt");
+      toast.success("Området er gemt");
+      onOpenChange(false);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Kunne ikke gemme kantteksterne");
+      toast.error(error instanceof Error ? error.message : "Kunne ikke gemme området");
     }
   };
+
 
 
 
@@ -179,20 +189,8 @@ export function AreaEditorDialog({ open, onOpenChange, area, existingCodes = [] 
     }
   };
 
-  const handleRename = async () => {
-    if (!area) return;
-    if (label.trim() === area.label) return toast.info("Navnet er uændret");
-    try {
-      await rename.mutateAsync({
-        areaCode: area.code,
-        label,
-        previousLabel: area.label,
-      });
-      toast.success("Områdenavn opdateret");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Kunne ikke omdøbe området");
-    }
-  };
+
+
 
   const handleAddSeats = async () => {
     if (!area) return;
@@ -256,20 +254,14 @@ export function AreaEditorDialog({ open, onOpenChange, area, existingCodes = [] 
 
           <div className="space-y-2">
             <Label htmlFor="area-label">Områdenavn</Label>
-            <div className="flex gap-2">
-              <Input
-                id="area-label"
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-                placeholder="Fx Salg – nord"
-              />
-              {!isNew && (
-                <Button variant="secondary" onClick={() => void handleRename()} disabled={busy}>
-                  Gem navn
-                </Button>
-              )}
-            </div>
+            <Input
+              id="area-label"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="Fx Salg – nord"
+            />
           </div>
+
 
           <div className="space-y-2">
             <Label htmlFor="area-seats">{isNew ? "Antal borde" : "Tilføj borde"}</Label>
@@ -344,24 +336,13 @@ export function AreaEditorDialog({ open, onOpenChange, area, existingCodes = [] 
           <Separator />
 
           <div className="space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <h3 className="text-sm font-semibold text-foreground">Kanttekster</h3>
-                <p className="text-xs text-muted-foreground">
-                  Beskriv hvad der ligger rundt om området, så computerne er nemme at finde.
-                </p>
-              </div>
-              {!isNew && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => void handleSaveEdges()}
-                  disabled={busy}
-                >
-                  Gem layout
-                </Button>
-              )}
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Kanttekster</h3>
+              <p className="text-xs text-muted-foreground">
+                Beskriv hvad der ligger rundt om området, så computerne er nemme at finde.
+              </p>
             </div>
+
             <div className="grid gap-3 sm:grid-cols-2">
               {EDGE_SIDES.map((side) => (
                 <div key={side} className="space-y-1.5">
@@ -457,18 +438,30 @@ export function AreaEditorDialog({ open, onOpenChange, area, existingCodes = [] 
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="gap-2 sm:justify-between">
           {isNew ? (
-            <Button onClick={() => void handleCreate()} disabled={busy} className="gap-2">
+            <Button onClick={() => void handleCreate()} disabled={busy} className="w-full gap-2 sm:w-auto">
               {addSeats.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               Opret område
             </Button>
           ) : (
-            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
-              Luk
-            </Button>
+            <>
+              <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>
+                Annullér
+              </Button>
+              <Button
+                size="lg"
+                onClick={() => void handleSaveAll()}
+                disabled={busy}
+                className="w-full gap-2 sm:w-auto"
+              >
+                {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+                Luk og gem
+              </Button>
+            </>
           )}
         </DialogFooter>
+
       </DialogContent>
     </Dialog>
   );
