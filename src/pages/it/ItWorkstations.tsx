@@ -82,7 +82,8 @@ function chunkSeats(
 type StatusFilter =
   | "all"
   | OverallStatus
-  | "update_required"
+  | "update_overdue"
+  | "campaign_pending"
   | "update_failed"
   | "missing_equipment";
 
@@ -91,7 +92,7 @@ const STATUS_FILTERS: { key: StatusFilter; label: string; dot?: OverallStatus }[
   { key: "ok", label: "Alt OK", dot: "ok" },
   { key: "attention", label: "Kræver opmærksomhed", dot: "attention" },
   { key: "down", label: "Virker ikke", dot: "down" },
-  { key: "update_required", label: "Opdatering påkrævet" },
+  { key: "update_overdue", label: "Opdatering forfalden (30+ dage)" },
   { key: "update_failed", label: "Opdatering fejlede" },
   { key: "missing_equipment", label: "Manglende udstyr" },
   { key: "unknown", label: "Ukendt", dot: "unknown" },
@@ -251,8 +252,10 @@ export default function ItWorkstations() {
     switch (statusFilter) {
       case "all":
         return true;
-      case "update_required":
-        return w.update_status === "update_required" || w.update_status === "update_in_progress";
+      case "update_overdue":
+        return isUpdateOverdue(w.last_updated_at);
+      case "campaign_pending":
+        return w.update_status !== "updated";
       case "update_failed":
         return w.update_status === "update_failed";
       case "missing_equipment":
@@ -388,7 +391,7 @@ export default function ItWorkstations() {
               <button
                 type="button"
                 onClick={() => {
-                  setStatusFilter("update_required");
+                  setStatusFilter("campaign_pending");
                   setProblemsOnly(false);
                 }}
                 className="mt-2 text-xs font-medium text-primary underline-offset-2 hover:underline"
@@ -414,8 +417,8 @@ export default function ItWorkstations() {
             const count =
               f.key === "all"
                 ? stats.total
-                : f.key === "update_required"
-                  ? stats.updateRequired
+                : f.key === "update_overdue"
+                  ? stats.updateOverdue
                   : f.key === "missing_equipment"
                     ? stats.missingEquipment
                     : f.key === "update_failed"

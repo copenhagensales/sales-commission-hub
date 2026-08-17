@@ -543,7 +543,7 @@ export interface ItStats {
   down: number;
   unknown: number;
   updated: number;
-  updateRequired: number;
+  updateOverdue: number;
   missingEquipment: number;
   brokenEquipment: number;
 }
@@ -557,8 +557,9 @@ export function useItStats(workstations: ItWorkstation[] | undefined): ItStats {
       attention: list.filter((w) => w.overall === "attention").length,
       down: list.filter((w) => w.overall === "down").length,
       unknown: list.filter((w) => w.overall === "unknown").length,
-      updated: list.filter((w) => w.update_status === "updated").length,
-      updateRequired: list.filter((w) => w.update_status !== "updated").length,
+      updated: list.filter((w) => !!w.last_updated_at && !isUpdateOverdue(w.last_updated_at))
+        .length,
+      updateOverdue: list.filter((w) => isUpdateOverdue(w.last_updated_at)).length,
       missingEquipment: list.filter((w) =>
         w.equipment.some((e) => e.status === "missing"),
       ).length,
