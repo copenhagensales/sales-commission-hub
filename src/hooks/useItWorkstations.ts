@@ -162,9 +162,9 @@ export function deriveWorkstation(
     overall = "attention";
     headline = "Opdatering fejlede";
   } else if (!row.last_updated_at) {
-    // Aldrig opdateret endnu — udløser ikke en advarsel.
+    // Aldrig opdateret endnu — regnes ikke som en mangel.
     overall = "ok";
-    headline = "Ikke opdateret endnu";
+    headline = "Alt OK";
   } else if (isUpdateOverdue(row.last_updated_at)) {
     overall = "attention";
     headline = `Opdatering forfalden (${daysSince(row.last_updated_at)} dage)`;
