@@ -106,6 +106,12 @@ export const COMPUTER_STATUS_LABELS: Record<ComputerStatus, string> = {
 /** Antal dage før en opdateret maskine regnes som forfalden. */
 export const UPDATE_OVERDUE_DAYS = 30;
 
+/** Forfalden = opdateret mindst én gang, men for mere end UPDATE_OVERDUE_DAYS siden. */
+export function isUpdateOverdue(lastUpdatedAt: string | null | undefined): boolean {
+  const days = daysSince(lastUpdatedAt);
+  return days !== null && days >= UPDATE_OVERDUE_DAYS;
+}
+
 export const UPDATE_STATUS_LABELS: Record<UpdateStatus, string> = {
   updated: "Opdateret",
   update_required: "Ikke opdateret endnu",
