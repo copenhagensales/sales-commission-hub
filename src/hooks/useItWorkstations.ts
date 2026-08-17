@@ -583,7 +583,13 @@ export interface ItAreaEdges {
   edge_right: string | null;
   edge_bottom: string | null;
   edge_left: string | null;
+  /** Antal borde pr. række i gulvplanen (fx 5 i bredden). */
+  seats_per_row: number;
+  /** Rækkenumre (1-baseret) der efterfølges af et mellemrum/gang. */
+  row_gap_after: number[];
 }
+
+export const DEFAULT_SEATS_PER_ROW = 4;
 
 export type EdgeSide = "edge_top" | "edge_right" | "edge_bottom" | "edge_left";
 
@@ -603,10 +609,16 @@ export function useItAreaEdges(enabled = true) {
     queryFn: async (): Promise<Record<string, ItAreaEdges>> => {
       const { data, error } = await supabase
         .from("it_area_edges")
-        .select("area_code, edge_top, edge_right, edge_bottom, edge_left");
+        .select("area_code, edge_top, edge_right, edge_bottom, edge_left, seats_per_row, row_gap_after");
       if (error) throw error;
       const map: Record<string, ItAreaEdges> = {};
-      for (const row of data ?? []) map[row.area_code] = row as ItAreaEdges;
+      for (const row of data ?? []) {
+        map[row.area_code] = {
+          ...(row as ItAreaEdges),
+          seats_per_row: row.seats_per_row ?? DEFAULT_SEATS_PER_ROW,
+          row_gap_after: row.row_gap_after ?? [],
+        };
+      }
       return map;
     },
   });
@@ -621,9 +633,13 @@ export function useSaveAreaEdges() {
     mutationFn: async ({
       areaCode,
       edges,
+      seatsPerRow,
+      rowGapAfter,
     }: {
       areaCode: string;
       edges: Record<EdgeSide, string>;
+      seatsPerRow?: number;
+      rowGapAfter?: number[];
     }) => {
       const clean = (v: string) => {
         const t = v.trim();
@@ -636,6 +652,8 @@ export function useSaveAreaEdges() {
           edge_right: clean(edges.edge_right),
           edge_bottom: clean(edges.edge_bottom),
           edge_left: clean(edges.edge_left),
+          seats_per_row: Math.min(12, Math.max(1, seatsPerRow ?? DEFAULT_SEATS_PER_ROW)),
+          row_gap_after: [...new Set(rowGapAfter ?? [])].sort((a, b) => a - b),
         },
         { onConflict: "area_code" },
       );
@@ -643,7 +661,7 @@ export function useSaveAreaEdges() {
 
       await log([
         {
-          action: `Kanttekster opdateret for område ${areaCode}`,
+          action: `Layout opdateret for område ${areaCode}`,
           field: "area_edges",
           new_value: (["edge_top", "edge_right", "edge_bottom", "edge_left"] as EdgeSide[])
             .map((s) => `${EDGE_SIDE_LABEL[s]}: ${clean(edges[s]) ?? "—"}`)

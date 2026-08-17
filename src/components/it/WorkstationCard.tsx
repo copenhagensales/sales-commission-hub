@@ -41,15 +41,15 @@ export function WorkstationCard({ workstation: ws, onOpen, faded, highlighted }:
       onClick={() => onOpen(ws)}
       aria-label={`${seatLabel(ws)} — ${OVERALL_LABELS[ws.overall]} — ${ws.headline}`}
       className={cn(
-        "group flex w-full flex-col gap-2 rounded-xl border p-3 text-left transition-all duration-150",
+        "group flex w-full min-w-0 flex-col gap-2 overflow-hidden rounded-xl border p-2.5 text-left transition-all duration-150 sm:p-3",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         OVERALL_CARD_CLASS[ws.overall],
         faded && "opacity-30",
         highlighted && "ring-2 ring-primary ring-offset-2 ring-offset-background",
       )}
     >
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-semibold tracking-tight text-foreground">{seatLabel(ws)}</span>
+      <div className="flex min-w-0 items-center justify-between gap-2">
+        <span className="truncate text-sm font-semibold tracking-tight text-foreground">{seatLabel(ws)}</span>
         <span className="flex items-center gap-1">
           <span className="text-[10px] font-bold text-muted-foreground" aria-hidden="true">
             {OVERALL_SYMBOL[ws.overall]}
@@ -61,7 +61,7 @@ export function WorkstationCard({ workstation: ws, onOpen, faded, highlighted }:
         </span>
       </div>
 
-      <div className="flex items-center gap-1">
+      <div className="flex min-w-0 flex-wrap items-center gap-1">
         {ws.equipment.map((item) => {
           const Icon = KIND_ICON[item.kind];
           return (
