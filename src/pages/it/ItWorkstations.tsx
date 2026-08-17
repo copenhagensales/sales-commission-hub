@@ -551,42 +551,8 @@ export default function ItWorkstations() {
 
       {/* Filters */}
       <section className="space-y-3 border-y border-border px-4 py-4 sm:px-6">
-        <div className="flex flex-wrap items-center gap-2">
-          {STATUS_FILTERS.map((f) => {
-            const count =
-              f.key === "all"
-                ? stats.total
-                : f.key === "update_overdue"
-                  ? stats.updateOverdue
-                  : f.key === "missing_equipment"
-                    ? stats.missingEquipment
-                    : f.key === "update_failed"
-                      ? (workstations ?? []).filter((w) => w.update_status === "update_failed")
-                          .length
-                      : (workstations ?? []).filter((w) => w.overall === f.key).length;
-            const active = statusFilter === f.key;
-            return (
-              <Button
-                key={f.key}
-                type="button"
-                size="sm"
-                variant={active ? "default" : "outline"}
-                onClick={() => setStatusFilter(f.key)}
-                aria-pressed={active}
-                className="h-9 gap-2 rounded-full"
-              >
-                {f.dot && (
-                  <span
-                    className={cn("h-2 w-2 rounded-full", OVERALL_DOT_CLASS[f.dot])}
-                    aria-hidden="true"
-                  />
-                )}
-                {f.label}
-                <span className="tabular-nums opacity-70">{count}</span>
-              </Button>
-            );
-          })}
-        </div>
+
+
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
