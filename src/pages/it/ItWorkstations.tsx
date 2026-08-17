@@ -25,6 +25,7 @@ import {
   type ItWorkstation,
   type OverallStatus,
   seatLabel,
+  DEFAULT_SEATS_PER_ROW,
 } from "@/hooks/useItWorkstations";
 import { AreaEditorDialog } from "@/components/it/AreaEditorDialog";
 import { AreaFloorFrame } from "@/components/it/AreaFloorFrame";
@@ -32,6 +33,13 @@ import { AreaFloorFrame } from "@/components/it/AreaFloorFrame";
 
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { MainLayout } from "@/components/layout/MainLayout";
+
+function chunkSeats(seats: ItWorkstation[], perRow?: number | null): ItWorkstation[][] {
+  const size = Math.min(12, Math.max(1, perRow ?? DEFAULT_SEATS_PER_ROW));
+  const rows: ItWorkstation[][] = [];
+  for (let i = 0; i < seats.length; i += size) rows.push(seats.slice(i, i + size));
+  return rows;
+}
 
 type StatusFilter =
   | "all"
@@ -462,15 +470,39 @@ export default function ItWorkstations() {
                       </div>
 
                       <AreaFloorFrame edges={areaEdges?.[code]}>
-                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
-                          {seats.map((ws) => (
-                            <WorkstationCard
-                              key={ws.id}
-                              workstation={ws}
-                              onOpen={openWorkstation}
-                              faded={problemsOnly && !isProblem(ws)}
-                              highlighted={!!searchTerm && matchesSearch(ws)}
-                            />
+                        <div className="space-y-2">
+                          {chunkSeats(seats, areaEdges?.[code]?.seats_per_row).map((row, rowIndex, rows) => (
+                            <div key={`row-${rowIndex}`}>
+                              <div
+                                className="grid gap-2"
+                                style={{
+                                  gridTemplateColumns: `repeat(${row.length}, minmax(0, 1fr))`,
+                                }}
+                              >
+                                {row.map((ws) => (
+                                  <WorkstationCard
+                                    key={ws.id}
+                                    workstation={ws}
+                                    onOpen={openWorkstation}
+                                    faded={problemsOnly && !isProblem(ws)}
+                                    highlighted={!!searchTerm && matchesSearch(ws)}
+                                  />
+                                ))}
+                              </div>
+                              {rowIndex < rows.length - 1 &&
+                                (areaEdges?.[code]?.row_gap_after ?? []).includes(rowIndex + 1) && (
+                                  <div
+                                    className="my-3 flex items-center gap-2"
+                                    aria-hidden="true"
+                                  >
+                                    <span className="h-px flex-1 border-t border-dashed border-border" />
+                                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                                      Gang
+                                    </span>
+                                    <span className="h-px flex-1 border-t border-dashed border-border" />
+                                  </div>
+                                )}
+                            </div>
                           ))}
                         </div>
                       </AreaFloorFrame>
