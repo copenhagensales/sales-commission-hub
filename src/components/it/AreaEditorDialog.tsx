@@ -109,8 +109,12 @@ export function AreaEditorDialog({ open, onOpenChange, area, existingCodes = [] 
         areaLabel: label,
         count: Number(seatCount) || 1,
       });
+      if (EDGE_SIDES.some((s) => edges[s].trim())) {
+        await saveEdges.mutateAsync({ areaCode: normalized, edges });
+      }
       toast.success(`Område ${normalized} oprettet med ${created.length} borde`);
       onOpenChange(false);
+
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Kunne ikke oprette området");
     }
