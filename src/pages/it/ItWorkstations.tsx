@@ -221,6 +221,28 @@ export default function ItWorkstations() {
     }
   };
 
+  /** Ændrer antal borde i én specifik række (fx 3 i én række, 4 i næste). */
+  const adjustRowSize = async (
+    code: string,
+    rowIndex: number,
+    delta: number,
+    currentRowLengths: number[],
+  ) => {
+    const next = currentRowLengths.slice(0, rowIndex + 1);
+    next[rowIndex] = Math.min(12, Math.max(1, (next[rowIndex] ?? 0) + delta));
+    try {
+      await saveEdges.mutateAsync({
+        areaCode: code,
+        edges: edgeValues(code),
+        seatsPerRow: areaEdges?.[code]?.seats_per_row ?? DEFAULT_SEATS_PER_ROW,
+        rowGapAfter: areaEdges?.[code]?.row_gap_after ?? [],
+        rowSizes: next,
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Kunne ikke gemme rækken");
+    }
+  };
+
 
 
 
