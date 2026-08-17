@@ -1,5 +1,17 @@
 import { useMemo, useState } from "react";
-import { Search, MonitorSmartphone, Loader2, ShieldAlert, Plus, Pencil } from "lucide-react";
+import { toast } from "sonner";
+import {
+  Search,
+  MonitorSmartphone,
+  Loader2,
+  ShieldAlert,
+  Plus,
+  Pencil,
+  Trash2,
+  Check,
+  SlidersHorizontal,
+} from "lucide-react";
+
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
