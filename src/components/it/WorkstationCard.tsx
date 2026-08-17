@@ -5,6 +5,7 @@ import {
   EQUIPMENT_STATUS_LABELS,
   OVERALL_LABELS,
   type EquipmentKind,
+  type EquipmentStatus,
   seatLabel,
   type ItWorkstation,
 } from "@/hooks/useItWorkstations";
@@ -30,18 +31,35 @@ const KIND_ICON: Record<EquipmentKind, typeof Laptop> = {
 interface Props {
   workstation: ItWorkstation;
   onOpen: (ws: ItWorkstation) => void;
+  /** Hurtig toggle af udstyr direkte på kortet (kun med redigeringsadgang). */
+  onToggleEquipment?: (ws: ItWorkstation, kind: EquipmentKind, next: EquipmentStatus) => void;
   faded?: boolean;
   highlighted?: boolean;
 }
 
-export function WorkstationCard({ workstation: ws, onOpen, faded, highlighted }: Props) {
+export function WorkstationCard({
+  workstation: ws,
+  onOpen,
+  onToggleEquipment,
+  faded,
+  highlighted,
+}: Props) {
+  const interactiveEquipment = !!onToggleEquipment;
+
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={() => onOpen(ws)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onOpen(ws);
+        }
+      }}
       aria-label={`${seatLabel(ws)} — ${OVERALL_LABELS[ws.overall]} — ${ws.headline}`}
       className={cn(
-        "group flex w-full min-w-0 flex-col gap-2 overflow-hidden rounded-xl border p-2.5 text-left transition-all duration-150 sm:p-3",
+        "group flex w-full min-w-0 cursor-pointer flex-col gap-2 overflow-hidden rounded-xl border p-2.5 text-left transition-all duration-150 sm:p-3",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         OVERALL_CARD_CLASS[ws.overall],
         faded && "opacity-30",
@@ -64,13 +82,45 @@ export function WorkstationCard({ workstation: ws, onOpen, faded, highlighted }:
       <div className="flex min-w-0 flex-wrap items-center gap-1">
         {ws.equipment.map((item) => {
           const Icon = KIND_ICON[item.kind];
-          return (
-            <span
-              key={item.id}
-              title={`${EQUIPMENT_LABELS[item.kind]}: ${EQUIPMENT_STATUS_LABELS[item.status]}`}
-            >
+          const isMissing = item.status === "missing" || item.status === "broken";
+          const next: EquipmentStatus = isMissing ? "ok" : "missing";
+          const label = `${EQUIPMENT_LABELS[item.kind]}: ${EQUIPMENT_STATUS_LABELS[item.status]}`;
+
+          const icon = (
+            <span className="relative inline-flex h-3.5 w-3.5 items-center justify-center">
               <Icon className={cn("h-3.5 w-3.5", EQUIPMENT_ICON_CLASS[item.status])} />
+              {isMissing && (
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute left-1/2 top-1/2 h-[1.5px] w-[130%] -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-full bg-destructive"
+                />
+              )}
             </span>
+          );
+
+          if (!interactiveEquipment) {
+            return (
+              <span key={item.id} title={label}>
+                {icon}
+              </span>
+            );
+          }
+
+          return (
+            <button
+              key={item.id}
+              type="button"
+              title={`${label} — klik for at markere som ${EQUIPMENT_STATUS_LABELS[next].toLowerCase()}`}
+              aria-label={`${label} — klik for at markere som ${EQUIPMENT_STATUS_LABELS[next].toLowerCase()}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggleEquipment?.(ws, item.kind, next);
+              }}
+              onKeyDown={(event) => event.stopPropagation()}
+              className="rounded p-0.5 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {icon}
+            </button>
           );
         })}
       </div>
@@ -91,6 +141,6 @@ export function WorkstationCard({ workstation: ws, onOpen, faded, highlighted }:
         </span>
       )}
 
-    </button>
+    </div>
   );
 }

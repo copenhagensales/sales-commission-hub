@@ -42,6 +42,11 @@ import {
   seatLabel,
   DEFAULT_SEATS_PER_ROW,
   isUpdateOverdue,
+  useToggleEquipmentStatus,
+  EQUIPMENT_LABELS,
+  EQUIPMENT_STATUS_LABELS,
+  type EquipmentKind,
+  type EquipmentStatus,
 } from "@/hooks/useItWorkstations";
 import { AreaEditorDialog } from "@/components/it/AreaEditorDialog";
 import { AreaFloorFrame } from "@/components/it/AreaFloorFrame";
@@ -141,6 +146,34 @@ export default function ItWorkstations() {
 
   const stats = useItStats(workstations);
   const activeCampaign = campaigns?.find((c) => c.is_active) ?? campaigns?.[0];
+
+  const toggleEquipment = useToggleEquipmentStatus();
+
+  const handleToggleEquipment = (
+    ws: ItWorkstation,
+    kind: EquipmentKind,
+    next: EquipmentStatus,
+  ) => {
+    const previous = ws.equipment.find((e) => e.kind === kind)?.status ?? "unknown";
+    toggleEquipment.mutate(
+      { workstation: ws, kind, next },
+      {
+        onSuccess: () => {
+          toast.success(
+            `${seatLabel(ws)}: ${EQUIPMENT_LABELS[kind]} → ${EQUIPMENT_STATUS_LABELS[next]}`,
+            {
+              action: {
+                label: "Fortryd",
+                onClick: () =>
+                  toggleEquipment.mutate({ workstation: ws, kind, next: previous }),
+              },
+            },
+          );
+        },
+        onError: () => toast.error("Kunne ikke gemme ændringen"),
+      },
+    );
+  };
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -642,6 +675,9 @@ export default function ItWorkstations() {
                                     <WorkstationCard
                                       workstation={ws}
                                       onOpen={openWorkstation}
+                                      onToggleEquipment={
+                                        canEdit ? handleToggleEquipment : undefined
+                                      }
                                       faded={problemsOnly && !isProblem(ws)}
                                       highlighted={!!searchTerm && matchesSearch(ws)}
                                     />
