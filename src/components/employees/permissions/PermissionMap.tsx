@@ -59,7 +59,7 @@ const sectionOrder = [
   "menu_section_mg", "menu_section_salary", "menu_section_dashboards",
   "menu_section_test", "menu_section_rekruttering", "menu_section_onboarding",
   "menu_section_reports", "menu_section_admin", "menu_section_sales_system",
-  "menu_section_economic", "menu_section_amo", "menu_section_spil", "softphone_section",
+  "menu_section_economic", "menu_section_amo", "menu_section_spil", "menu_section_it", "softphone_section",
 ];
 
 export function PermissionMap() {
@@ -215,6 +215,14 @@ export function PermissionMap() {
                     <h3 className="text-sm font-semibold text-foreground">{cat.label}</h3>
                     <Badge variant="secondary" className="text-xs">{pageKeys.length}</Badge>
                   </div>
+
+                  {sectionKey === "menu_section_it" && (
+                    <p className="text-xs text-muted-foreground mb-3">
+                      IT-modulet kræver desuden at medarbejderen er markeret som <strong>stab</strong>.
+                    </p>
+                  )}
+
+
 
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
                     {pageKeys.map((permKey) => {
