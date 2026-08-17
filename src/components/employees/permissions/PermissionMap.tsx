@@ -216,6 +216,14 @@ export function PermissionMap() {
                     <Badge variant="secondary" className="text-xs">{pageKeys.length}</Badge>
                   </div>
 
+                  {sectionKey === "menu_section_it" && (
+                    <p className="text-xs text-muted-foreground mb-3">
+                      IT-modulet kræver desuden at medarbejderen er markeret som <strong>stab</strong>.
+                    </p>
+                  )}
+
+
+
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
                     {pageKeys.map((permKey) => {
                       const label = permissionKeyLabels[permKey] || permKey.replace(/^menu_/, "").replace(/_/g, " ");
