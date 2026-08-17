@@ -233,6 +233,47 @@ export function AreaEditorDialog({ open, onOpenChange, area, existingCodes = [] 
             </div>
           </div>
 
+          <Separator />
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Kanttekster</h3>
+                <p className="text-xs text-muted-foreground">
+                  Beskriv hvad der ligger rundt om området, så computerne er nemme at finde.
+                </p>
+              </div>
+              {!isNew && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => void handleSaveEdges()}
+                  disabled={busy}
+                >
+                  Gem kanter
+                </Button>
+              )}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {EDGE_SIDES.map((side) => (
+                <div key={side} className="space-y-1.5">
+                  <Label htmlFor={`edge-${side}`} className="text-xs">
+                    {EDGE_SIDE_LABEL[side]}
+                  </Label>
+                  <Input
+                    id={`edge-${side}`}
+                    value={edges[side]}
+                    onChange={(e) => setEdges((prev) => ({ ...prev, [side]: e.target.value }))}
+                    placeholder={EDGE_PLACEHOLDER[side]}
+                    maxLength={60}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+
+
           {!isNew && area && (
             <>
               <Separator />
