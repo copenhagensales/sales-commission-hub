@@ -2,6 +2,7 @@ import { useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { daysSince } from "@/lib/itTime";
 
 // ============================================================================
 // TYPES
@@ -102,9 +103,18 @@ export const COMPUTER_STATUS_LABELS: Record<ComputerStatus, string> = {
   needs_investigation: "Skal undersøges",
 };
 
+/** Antal dage før en opdateret maskine regnes som forfalden. */
+export const UPDATE_OVERDUE_DAYS = 30;
+
+/** Forfalden = opdateret mindst én gang, men for mere end UPDATE_OVERDUE_DAYS siden. */
+export function isUpdateOverdue(lastUpdatedAt: string | null | undefined): boolean {
+  const days = daysSince(lastUpdatedAt);
+  return days !== null && days >= UPDATE_OVERDUE_DAYS;
+}
+
 export const UPDATE_STATUS_LABELS: Record<UpdateStatus, string> = {
   updated: "Opdateret",
-  update_required: "Opdatering påkrævet",
+  update_required: "Ikke opdateret endnu",
   update_in_progress: "Opdatering i gang",
   update_failed: "Opdatering fejlede",
   unknown: "Ukendt",
@@ -148,9 +158,16 @@ export function deriveWorkstation(
   } else if (missing.length > 0) {
     overall = "attention";
     headline = "Manglende udstyr";
-  } else if (row.update_status !== "updated") {
+  } else if (row.update_status === "update_failed") {
     overall = "attention";
-    headline = UPDATE_STATUS_LABELS[row.update_status];
+    headline = "Opdatering fejlede";
+  } else if (!row.last_updated_at) {
+    // Aldrig opdateret endnu — udløser ikke en advarsel.
+    overall = "ok";
+    headline = "Ikke opdateret endnu";
+  } else if (isUpdateOverdue(row.last_updated_at)) {
+    overall = "attention";
+    headline = `Opdatering forfalden (${daysSince(row.last_updated_at)} dage)`;
   } else {
     overall = "ok";
     headline = "Opdateret";
@@ -526,7 +543,7 @@ export interface ItStats {
   down: number;
   unknown: number;
   updated: number;
-  updateRequired: number;
+  updateOverdue: number;
   missingEquipment: number;
   brokenEquipment: number;
 }
@@ -540,8 +557,9 @@ export function useItStats(workstations: ItWorkstation[] | undefined): ItStats {
       attention: list.filter((w) => w.overall === "attention").length,
       down: list.filter((w) => w.overall === "down").length,
       unknown: list.filter((w) => w.overall === "unknown").length,
-      updated: list.filter((w) => w.update_status === "updated").length,
-      updateRequired: list.filter((w) => w.update_status !== "updated").length,
+      updated: list.filter((w) => !!w.last_updated_at && !isUpdateOverdue(w.last_updated_at))
+        .length,
+      updateOverdue: list.filter((w) => isUpdateOverdue(w.last_updated_at)).length,
       missingEquipment: list.filter((w) =>
         w.equipment.some((e) => e.status === "missing"),
       ).length,
