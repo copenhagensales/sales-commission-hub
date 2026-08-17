@@ -655,6 +655,38 @@ export default function ItWorkstations() {
                                   </div>
                                 ))}
                               </div>
+                              {editing && (
+                                <div className="flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border px-1 py-1">
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-6 w-6"
+                                    aria-label={`Færre borde i række ${rowIndex + 1}`}
+                                    disabled={saveEdges.isPending || row.length <= 1}
+                                    onClick={() =>
+                                      void adjustRowSize(code, rowIndex, -1, rowLengths)
+                                    }
+                                  >
+                                    <Minus className="h-3 w-3" />
+                                  </Button>
+                                  <span className="text-[10px] font-medium text-muted-foreground">
+                                    {row.length}
+                                  </span>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-6 w-6"
+                                    aria-label={`Flere borde i række ${rowIndex + 1}`}
+                                    disabled={saveEdges.isPending || row.length >= 12}
+                                    onClick={() =>
+                                      void adjustRowSize(code, rowIndex, 1, rowLengths)
+                                    }
+                                  >
+                                    <Plus className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              )}
+                              </div>
                               {rowIndex < rows.length - 1 &&
                                 (editing ? (
                                   <button
