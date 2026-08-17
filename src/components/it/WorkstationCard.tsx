@@ -14,6 +14,8 @@ import {
   OVERALL_SYMBOL,
   OVERALL_TEXT_CLASS,
 } from "./statusStyles";
+import { formatSince, stalenessLevel, STALENESS_TEXT_CLASS } from "@/lib/itTime";
+
 
 const KIND_ICON: Record<EquipmentKind, typeof Laptop> = {
   computer: Laptop,
