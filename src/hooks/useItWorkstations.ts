@@ -533,6 +533,85 @@ export function useSaveWorkstation() {
   });
 }
 
+/**
+ * Hurtig toggle af ét stykke udstyr direkte i gulvplanen (OK <-> mangler).
+ * Optimistisk: ikonet skifter med det samme og rulles tilbage ved fejl.
+ */
+export function useToggleEquipmentStatus() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const { data: userName } = useItCurrentUserName();
+
+  return useMutation({
+    mutationFn: async ({
+      workstation,
+      kind,
+      next,
+    }: {
+      workstation: ItWorkstation;
+      kind: EquipmentKind;
+      next: EquipmentStatus;
+    }) => {
+      const nowIso = new Date().toISOString();
+      const existing = workstation.equipment.find((e) => e.kind === kind);
+
+      const { error: eqError } = await supabase
+        .from("it_equipment")
+        .upsert(
+          { workstation_id: workstation.id, kind, status: next },
+          { onConflict: "workstation_id,kind" },
+        );
+      if (eqError) throw eqError;
+
+      const { error: wsError } = await supabase
+        .from("it_workstations")
+        .update({ last_checked_at: nowIso })
+        .eq("id", workstation.id);
+      if (wsError) throw wsError;
+
+      const { error: logError } = await supabase.from("it_activity_logs").insert({
+        workstation_id: workstation.id,
+        workstation_code: workstation.code,
+        user_id: user?.id ?? null,
+        user_name: userName ?? null,
+        action: `${workstation.code}: ${EQUIPMENT_LABELS[kind]} markeret som "${EQUIPMENT_STATUS_LABELS[next]}"`,
+        field: kind,
+        previous_value: existing ? EQUIPMENT_STATUS_LABELS[existing.status] : null,
+        new_value: EQUIPMENT_STATUS_LABELS[next],
+      });
+      if (logError) throw logError;
+    },
+    onMutate: async ({ workstation, kind, next }) => {
+      await queryClient.cancelQueries({ queryKey: ["it-workstations"] });
+      const previous = queryClient.getQueryData<ItWorkstation[]>(["it-workstations"]);
+
+      queryClient.setQueryData<ItWorkstation[]>(["it-workstations"], (old) =>
+        (old ?? []).map((w) => {
+          if (w.id !== workstation.id) return w;
+          const equipment = w.equipment.map((e) =>
+            e.kind === kind ? { ...e, status: next } : e,
+          );
+          return deriveWorkstation(
+            { ...w, last_checked_at: new Date().toISOString() },
+            equipment,
+          );
+        }),
+      );
+
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["it-workstations"], context.previous);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["it-workstations"] });
+      queryClient.invalidateQueries({ queryKey: ["it-activity-log"] });
+    },
+  });
+}
+
 // ============================================================================
 // AGGREGATES
 // ============================================================================
