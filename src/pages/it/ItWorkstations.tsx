@@ -105,6 +105,7 @@ const EQUIPMENT_ICONS: Record<EquipmentKind, typeof Laptop> = {
   headset: Headphones,
   mouse: Mouse,
   keyboard: Keyboard,
+  desk: ArrowUpDown,
 };
 
 const EQUIPMENT_ORDER: EquipmentKind[] = [
@@ -114,6 +115,7 @@ const EQUIPMENT_ORDER: EquipmentKind[] = [
   "headset",
   "mouse",
   "keyboard",
+  "desk",
 ];
 
 const STATUS_FILTERS: { key: StatusFilter; label: string; dot?: OverallStatus }[] = [
