@@ -25,6 +25,7 @@ export interface EesyFmStorkSale {
 
 export interface DeviationRow {
   id: string;
+  saleId: string;
   saleDatetime: string;
   sellerId: string;
   sellerName: string;
