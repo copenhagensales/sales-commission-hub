@@ -61,19 +61,25 @@ function toCopenhagenDateOnly(ts: string | null | undefined): string | null {
 }
 
 
-async function fetchProvisionByEmployee(
+/**
+ * Provision pr. hold+medarbejder, hvor kun salg på klienter tilknyttet
+ * medarbejderens eget hold (team_clients) tælles med.
+ * Nøgle i map: `${team_id}|${employee_id}`
+ */
+async function fetchTeamScopedProvision(
   start: string,
   end: string
 ): Promise<Record<string, number>> {
-  const { data, error } = await supabase.rpc("get_sales_aggregates_v2", {
+  const { data, error } = await supabase.rpc("get_league_team_provision", {
     p_start: start,
     p_end: end,
-    p_group_by: "employee",
   });
   if (error) throw error;
   const map: Record<string, number> = {};
   (data || []).forEach((row: any) => {
-    if (row.group_key) map[row.group_key] = Number(row.total_commission) || 0;
+    if (row.team_id && row.employee_id) {
+      map[`${row.team_id}|${row.employee_id}`] = Number(row.total_commission) || 0;
+    }
   });
   return map;
 }
