@@ -297,6 +297,7 @@ export function useEesyFmDeviations(
       deviation: string,
     ): DeviationRow => ({
       id: `${sale.id}-${match.id}`,
+      saleId: sale.id,
       saleDatetime: sale.saleDatetime,
       sellerId: sale.sellerId,
       sellerName: sale.sellerName,
