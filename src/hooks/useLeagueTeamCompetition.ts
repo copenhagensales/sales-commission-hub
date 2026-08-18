@@ -5,6 +5,16 @@ import type { LeagueSeason } from "./useLeagueData";
 /** Hold der ikke deltager i holdkonkurrencen (ikke sælgere) */
 export const TEAM_COMPETITION_EXCLUDED_TEAMS = ["Stab"];
 
+/**
+ * Hold der i holdkonkurrencen slås sammen til ét hold.
+ * Alt Fieldmarketing tæller under "Fieldmarketing" — kun her, ikke i data.
+ */
+export const TEAM_COMPETITION_TEAM_ALIASES: Record<string, string> = {
+  "YouSee FM": "Fieldmarketing",
+  "Yousee FM": "Fieldmarketing",
+  "Eesy FM": "Fieldmarketing",
+};
+
 /** Antal sælgere pr. hold der tæller i holdets total */
 export const TEAM_COMPETITION_COUNTING_PLAYERS = 5;
 
