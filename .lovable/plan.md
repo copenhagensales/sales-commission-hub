@@ -4,23 +4,25 @@
 
 I holdkonkurrencen hentes provision pr. medarbejder uden hensyn til hvilken klient salget ligger på (`src/hooks/useLeagueTeamCompetition.ts:64-79` kalder `get_sales_aggregates_v2` med `p_group_by: "employee"` og ingen klient-afgrænsning). Medarbejderens totale provision lægges derefter til det hold han står på i `team_members`.
 
-Konkret for Thorbjørn (10/8 → i dag), provision fordelt på det hold der ejer klienten:
+Thorbjørn Mindedal Weichert (`thor@cph-relatel.dk`, hold Relatel), 10/8 → i dag, fordelt på det hold der ejer klienten:
 
-| Ejer-hold | Provision |
-|---|---|
-| Relatel | 36.602 kr |
-| TDC Erhverv | 16.405 kr |
-| Fieldmarketing | 13.965 kr |
-| Eesy TM | 1.375 kr |
+| Ejer-hold | Klient | Antal linjer | Provision |
+|---|---|---|---|
+| Relatel | Relatel | 31 | 36.602 kr |
+| Fieldmarketing | Eesy FM (Eesy marked, 15.-16./8) | 40 | 13.965 kr |
+| Eesy TM | Eesy TM (12/8) | 4 | 1.375 kr |
 
-Tavlen viser 51.942 kr under Relatel — altså inkl. FM, TDC og Eesy TM.
+Sum = 51.942 kr = præcis det tal tavlen viser under Relatel. (Tidligere nævnte TDC Erhverv-salg tilhører en anden person, Thorbjørn Hansen-Larsen — ikke relevant her.)
+
+Sidebemærkning: de 4 Eesy TM-linjer den 12/8 kan være fejlattribuerede salg. Det er et separat datasspørgsmål — sig til hvis de skal undersøges.
 
 ## Ændring
 
 Et holds provision må kun bestå af salg på klienter der er tilknyttet holdet via `team_clients`:
 
-- Relatel-holdet: Thorbjørn tæller kun med sine Relatel-salg.
-- Salg han laver på Fieldmarketing/TDC/Eesy TM tæller ikke for noget hold i konkurrencen (han deltager kun under sit eget hold).
+- Relatel-holdet: Thorbjørn tæller kun med sine 36.602 kr fra Relatel.
+- Hans Eesy FM- og Eesy TM-salg tæller ikke for noget hold i konkurrencen.
+
 - Top-5-udvælgelsen pr. hold sker efter den nye, holdafgrænsede provision — så rangeringen internt på holdet kan ændre sig.
 - "I dag"-tilvækst og pladsændring beregnes på samme afgrænsede tal.
 - Den individuelle konkurrence, point, divisioner og løn ændres ikke.
