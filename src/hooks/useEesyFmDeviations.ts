@@ -319,6 +319,7 @@ export function useEesyFmDeviations(
         if (!matches || matches.length === 0) {
           result.push({
             id: sale.id,
+            saleId: sale.id,
             saleDatetime: sale.saleDatetime,
             sellerId: sale.sellerId,
             sellerName: sale.sellerName,
