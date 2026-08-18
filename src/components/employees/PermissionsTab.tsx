@@ -335,6 +335,11 @@ export function PermissionsTab() {
           <Settings2 className="h-4 w-4" />
           Rediger
         </TabsTrigger>
+        <TabsTrigger value="users" className="gap-2">
+          <User className="h-4 w-4" />
+          Undtagelser
+        </TabsTrigger>
+
       </TabsList>
 
       <TabsContent value="overview" className="space-y-6">
