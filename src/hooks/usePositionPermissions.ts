@@ -369,7 +369,10 @@ export function usePositionPermissions() {
           }
 
           if (position) {
-            const legacyPerms = (position.permissions as PositionPermissions) || {};
+            const legacyPerms = applyUserOverrides(
+              (position.permissions as PositionPermissions) || {},
+              userOverrides as UserPagePermissionRow[] | null
+            );
             console.log("usePositionPermissions: Using legacy job_positions.permissions", { 
               position: position.name,
               permCount: Object.keys(legacyPerms).length 
@@ -388,13 +391,18 @@ export function usePositionPermissions() {
           }
         }
 
+        const mergedPermissions = applyUserOverrides(
+          permissions,
+          userOverrides as UserPagePermissionRow[] | null
+        );
+
         const result = {
           position: { 
             id: roleKey, 
             name: employee.job_title, 
-            permissions,
+            permissions: mergedPermissions,
           },
-          permissions,
+          permissions: mergedPermissions,
           roleKey,
         };
         setCachedPermissions(result);
