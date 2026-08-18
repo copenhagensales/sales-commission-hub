@@ -14923,6 +14923,14 @@ export type Database = {
           status: string
         }[]
       }
+      get_league_team_provision: {
+        Args: { p_end: string; p_start: string }
+        Returns: {
+          employee_id: string
+          team_id: string
+          total_commission: number
+        }[]
+      }
       get_monthly_revenue: {
         Args: { p_end: string; p_start: string }
         Returns: {
