@@ -311,12 +311,23 @@ export function usePositionPermissions() {
           return result;
         }
 
+        // Per-bruger undtagelser (grant/deny) — styres under Rettigheder
+        const { data: userOverrides, error: userOverrideError } = await supabase
+          .from("user_page_permissions")
+          .select("permission_key, can_view, can_edit, mode")
+          .eq("user_id", employee.auth_user_id ?? user?.id ?? "");
+
+        if (userOverrideError) {
+          console.error("usePositionPermissions: Error fetching user overrides", userOverrideError);
+        }
+
         // CONSOLIDATED: Fetch permissions from role_page_permissions table (new system)
         // INCLUDING visibility for data scope
         const { data: rolePermissions, error: rolePermError } = await supabase
           .from("role_page_permissions")
           .select("permission_key, can_view, can_edit, visibility")
           .eq("role_key", roleKey);
+
 
         if (rolePermError) {
           console.error("usePositionPermissions: Error fetching role permissions", rolePermError);
