@@ -23,6 +23,8 @@ import {
 } from "@/hooks/useUnifiedPermissions";
 import { PermissionEditor } from "./permissions/PermissionEditor";
 import { PermissionMap } from "./permissions/PermissionMap";
+import { UserPermissionOverrides } from "./permissions/UserPermissionOverrides";
+
 import { cn } from "@/lib/utils";
 
 // Visibility icon mapping
