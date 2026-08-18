@@ -23,6 +23,8 @@ import {
 } from "@/hooks/useUnifiedPermissions";
 import { PermissionEditor } from "./permissions/PermissionEditor";
 import { PermissionMap } from "./permissions/PermissionMap";
+import { UserPermissionOverrides } from "./permissions/UserPermissionOverrides";
+
 import { cn } from "@/lib/utils";
 
 // Visibility icon mapping
@@ -335,6 +337,11 @@ export function PermissionsTab() {
           <Settings2 className="h-4 w-4" />
           Rediger
         </TabsTrigger>
+        <TabsTrigger value="users" className="gap-2">
+          <User className="h-4 w-4" />
+          Undtagelser
+        </TabsTrigger>
+
       </TabsList>
 
       <TabsContent value="overview" className="space-y-6">
@@ -592,6 +599,11 @@ export function PermissionsTab() {
       <TabsContent value="edit">
         <PermissionEditor />
       </TabsContent>
+
+      <TabsContent value="users">
+        <UserPermissionOverrides />
+      </TabsContent>
+
     </Tabs>
   );
 }

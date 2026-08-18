@@ -108,8 +108,39 @@ const PERMISSION_SCOPE_MAP: Record<string, string> = {
   'menu_reports_daily': 'scope_reports_daily',
 };
 
+/**
+ * Per-bruger undtagelser fra `user_page_permissions`.
+ * Rækkefølge (samme som DB-funktionen `has_page_permission`):
+ * personlig deny > personlig grant > rollens rettighed.
+ */
+export interface UserPagePermissionRow {
+  permission_key: string;
+  can_view: boolean | null;
+  can_edit: boolean | null;
+  mode: string;
+}
+
+function applyUserOverrides(
+  permissions: PositionPermissions,
+  overrides: UserPagePermissionRow[] | null | undefined
+): PositionPermissions {
+  if (!overrides || overrides.length === 0) return permissions;
+  const merged: PositionPermissions = { ...permissions };
+  for (const row of overrides) {
+    if (row.mode === 'deny') {
+      merged[row.permission_key] = { view: false, edit: false };
+    } else {
+      merged[row.permission_key] = {
+        view: row.can_view ?? true,
+        edit: row.can_edit ?? false,
+      };
+    }
+  }
+  return merged;
+}
+
 // localStorage cache key for permissions
-const PERMISSIONS_CACHE_KEY = 'cached-permissions-v5';
+const PERMISSIONS_CACHE_KEY = 'cached-permissions-v6';
 const CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 // Force-clear old cache versions on load
@@ -118,6 +149,7 @@ try {
   localStorage.removeItem('cached-permissions-v2');
   localStorage.removeItem('cached-permissions-v3');
   localStorage.removeItem('cached-permissions-v4');
+  localStorage.removeItem('cached-permissions-v5');
 } catch (e) {
   // Ignore errors
 }
@@ -279,12 +311,23 @@ export function usePositionPermissions() {
           return result;
         }
 
+        // Per-bruger undtagelser (grant/deny) — styres under Rettigheder
+        const { data: userOverrides, error: userOverrideError } = await supabase
+          .from("user_page_permissions")
+          .select("permission_key, can_view, can_edit, mode")
+          .eq("user_id", employee.auth_user_id ?? user?.id ?? "");
+
+        if (userOverrideError) {
+          console.error("usePositionPermissions: Error fetching user overrides", userOverrideError);
+        }
+
         // CONSOLIDATED: Fetch permissions from role_page_permissions table (new system)
         // INCLUDING visibility for data scope
         const { data: rolePermissions, error: rolePermError } = await supabase
           .from("role_page_permissions")
           .select("permission_key, can_view, can_edit, visibility")
           .eq("role_key", roleKey);
+
 
         if (rolePermError) {
           console.error("usePositionPermissions: Error fetching role permissions", rolePermError);
@@ -326,7 +369,10 @@ export function usePositionPermissions() {
           }
 
           if (position) {
-            const legacyPerms = (position.permissions as PositionPermissions) || {};
+            const legacyPerms = applyUserOverrides(
+              (position.permissions as PositionPermissions) || {},
+              userOverrides as UserPagePermissionRow[] | null
+            );
             console.log("usePositionPermissions: Using legacy job_positions.permissions", { 
               position: position.name,
               permCount: Object.keys(legacyPerms).length 
@@ -345,13 +391,18 @@ export function usePositionPermissions() {
           }
         }
 
+        const mergedPermissions = applyUserOverrides(
+          permissions,
+          userOverrides as UserPagePermissionRow[] | null
+        );
+
         const result = {
           position: { 
             id: roleKey, 
             name: employee.job_title, 
-            permissions,
+            permissions: mergedPermissions,
           },
-          permissions,
+          permissions: mergedPermissions,
           roleKey,
         };
         setCachedPermissions(result);
