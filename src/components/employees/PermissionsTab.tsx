@@ -597,6 +597,11 @@ export function PermissionsTab() {
       <TabsContent value="edit">
         <PermissionEditor />
       </TabsContent>
+
+      <TabsContent value="users">
+        <UserPermissionOverrides />
+      </TabsContent>
+
     </Tabs>
   );
 }
