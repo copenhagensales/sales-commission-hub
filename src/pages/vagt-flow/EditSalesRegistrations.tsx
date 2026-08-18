@@ -297,10 +297,12 @@ export default function EditSalesRegistrations() {
         .eq("id", id);
       if (error) throw error;
 
-      // Delete existing sale_items so the trigger can recreate with correct campaign-aware pricing
+      // Slet linjer og genskab dem — triggeren fyrer kun ved INSERT, så vi healer eksplicit
       await supabase.from("sale_items").delete().eq("sale_id", id);
-      // Re-trigger sale_items creation by touching the sale (trigger fires on insert only)
-      // So we need to invoke rematch for this specific sale
+      const { error: healError } = await supabase.rpc("heal_fm_missing_sale_items", {
+        p_sale_ids: [id],
+      });
+      if (healError) throw healError;
       await supabase.functions.invoke("rematch-pricing-rules", {
         body: { sale_ids: [id] },
       });

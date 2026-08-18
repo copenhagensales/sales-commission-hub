@@ -240,7 +240,12 @@ export function useUpdateEesyFmClaimSale() {
       if (error) throw error;
 
       if (productChanged) {
+        // Slet linjer og genskab dem — triggeren fyrer kun ved INSERT, så vi healer eksplicit
         await supabase.from("sale_items").delete().eq("sale_id", input.saleId);
+        const { error: healError } = await supabase.rpc("heal_fm_missing_sale_items", {
+          p_sale_ids: [input.saleId],
+        });
+        if (healError) throw healError;
         await supabase.functions.invoke("rematch-pricing-rules", {
           body: { sale_ids: [input.saleId] },
         });
