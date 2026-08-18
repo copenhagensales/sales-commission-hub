@@ -465,7 +465,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
 
   // Check if any Reports menu items are visible (requires section permission)
   const showReportsMenu = !isMenuHidden('section_rapporter') && p.canView("menu_section_reports") && 
-    (p.canViewReportsAdmin || p.canViewReportsDailyReports || p.canViewReportsManagement || p.canViewReportsEmployee || canViewCancellations);
+    (p.canViewReportsAdmin || p.canViewReportsDailyReports || p.canViewReportsManagement || p.canViewReportsEmployee || canViewCancellations || p.canViewReportsTdcEditSales);
   
   // HARDCODED: Only Kasper, Mathias and Lone can see salary menu
   const SALARY_ALLOWED_USER_IDS = [
