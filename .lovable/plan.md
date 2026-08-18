@@ -18,6 +18,17 @@ Oliver er korrekt opsat i databasen. Fejlen ligger i sidemenuens overordnede vis
    - Direkte adgang til siden fortsat beskyttes af `menu_reports_tdc_edit_sales`.
    - Brugere uden TDC-rettigheden ikke får menupunktet.
 
+## Han får kun det ene punkt — bekræftet
+
+Hvert punkt under Rapporter er gated individuelt på sin egen rettighed. Rollen `salgskonsulent_tdc_support` har `can_view = false` på alle øvrige:
+
+- `menu_reports_admin`, `menu_reports_daily`, `menu_reports_management`, `menu_reports_employee`, `menu_reports_revenue_by_client`: nej.
+- Annulleringer (`menu_cancellations` + alle `tab_cancellations_*`): nej.
+- Løn-sektion (`menu_section_salary`, `menu_salary_types`): nej.
+
+Ændringen åbner altså kun selve sektions-overskriften, så det ene punkt kan vises. De øvrige punkter forbliver skjulte, og deres ruter afviser ham fortsat ved direkte URL. Dette verificeres eksplicit efter ændringen.
+
+
 ## Scope og risiko
 
 - **Én fil:** `src/components/layout/AppSidebar.tsx`.
