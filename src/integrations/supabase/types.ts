@@ -14159,6 +14159,42 @@ export type Database = {
         }
         Relationships: []
       }
+      user_page_permissions: {
+        Row: {
+          can_edit: boolean
+          can_view: boolean
+          created_at: string
+          created_by: string | null
+          id: string
+          mode: string
+          permission_key: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          can_edit?: boolean
+          can_view?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          mode?: string
+          permission_key: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          can_edit?: boolean
+          can_view?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          mode?: string
+          permission_key?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
