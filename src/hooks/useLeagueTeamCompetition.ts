@@ -145,7 +145,7 @@ export function useLeagueTeamCompetition(season: LeagueSeason | null | undefined
         );
       if (memberError) throw memberError;
 
-      const provisionTotal = await fetchProvisionByEmployee(periodStart, periodEnd);
+      const provisionTotal = await fetchTeamScopedProvision(periodStart, periodEnd);
 
       // Perioden uden i dag (til dagsdelta og pladsændring)
       const yesterday = new Date(today);
@@ -155,7 +155,7 @@ export function useLeagueTeamCompetition(season: LeagueSeason | null | undefined
       const beforeEnd = `${yesterdayStr}T23:59:59+00:00`;
       const hasBefore = includesToday && yesterdayStr >= startDate;
       const provisionExclToday = hasBefore
-        ? await fetchProvisionByEmployee(periodStart, beforeEnd)
+        ? await fetchTeamScopedProvision(periodStart, beforeEnd)
         : includesToday
           ? {}
           : provisionTotal;
@@ -172,8 +172,9 @@ export function useLeagueTeamCompetition(season: LeagueSeason | null | undefined
         if (!team?.id || !employee?.id) return;
         if (TEAM_COMPETITION_EXCLUDED_TEAMS.includes(team.name)) return;
 
-        const provision = provisionTotal[employee.id] ?? 0;
-        const exclToday = provisionExclToday[employee.id] ?? 0;
+        const key = `${team.id}|${employee.id}`;
+        const provision = provisionTotal[key] ?? 0;
+        const exclToday = provisionExclToday[key] ?? 0;
 
         if (!teamMap.has(team.id)) teamMap.set(team.id, { name: team.name, players: [] });
         teamMap.get(team.id)!.players.push({
