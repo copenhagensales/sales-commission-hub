@@ -5,6 +5,16 @@ import type { LeagueSeason } from "./useLeagueData";
 /** Hold der ikke deltager i holdkonkurrencen (ikke sælgere) */
 export const TEAM_COMPETITION_EXCLUDED_TEAMS = ["Stab"];
 
+/**
+ * Hold der i holdkonkurrencen slås sammen til ét hold.
+ * Alt Fieldmarketing tæller under "Fieldmarketing" — kun her, ikke i data.
+ */
+export const TEAM_COMPETITION_TEAM_ALIASES: Record<string, string> = {
+  "YouSee FM": "Fieldmarketing",
+  "Yousee FM": "Fieldmarketing",
+  "Eesy FM": "Fieldmarketing",
+};
+
 /** Antal sælgere pr. hold der tæller i holdets total */
 export const TEAM_COMPETITION_COUNTING_PLAYERS = 5;
 
@@ -166,18 +176,42 @@ export function useLeagueTeamCompetition(season: LeagueSeason | null | undefined
       }
       const teamMap = new Map<string, { name: string; players: RawPlayer[] }>();
 
+      // Slå alias-hold sammen: find id på det hold de skal tælle under
+      const idByName = new Map<string, string>();
+      (members || []).forEach((row: any) => {
+        if (row.team?.id && row.team?.name && !idByName.has(row.team.name)) {
+          idByName.set(row.team.name, row.team.id);
+        }
+      });
+
+      const seen = new Set<string>();
+
       (members || []).forEach((row: any) => {
         const team = row.team;
         const employee = row.employee;
         if (!team?.id || !employee?.id) return;
         if (TEAM_COMPETITION_EXCLUDED_TEAMS.includes(team.name)) return;
 
-        const key = `${team.id}|${employee.id}`;
-        const provision = provisionTotal[key] ?? 0;
-        const exclToday = provisionExclToday[key] ?? 0;
+        // Alias: fx "YouSee FM" tæller under "Fieldmarketing"
+        const aliasName = TEAM_COMPETITION_TEAM_ALIASES[team.name];
+        const aliasId = aliasName ? idByName.get(aliasName) : undefined;
+        const effectiveTeamId = aliasId || team.id;
+        const effectiveTeamName = aliasId ? aliasName! : team.name;
 
-        if (!teamMap.has(team.id)) teamMap.set(team.id, { name: team.name, players: [] });
-        teamMap.get(team.id)!.players.push({
+        // Undgå dubletter (samme person kan have flere medlemsrækker)
+        const dedupeKey = `${effectiveTeamId}|${employee.id}`;
+        if (seen.has(dedupeKey)) return;
+        seen.add(dedupeKey);
+
+        // Provision slås op på både alias-holdet og medarbejderens eget hold
+        const keys = [`${effectiveTeamId}|${employee.id}`, `${team.id}|${employee.id}`];
+        const provision = Math.max(...keys.map((k) => provisionTotal[k] ?? 0));
+        const exclToday = Math.max(...keys.map((k) => provisionExclToday[k] ?? 0));
+
+        if (!teamMap.has(effectiveTeamId)) {
+          teamMap.set(effectiveTeamId, { name: effectiveTeamName, players: [] });
+        }
+        teamMap.get(effectiveTeamId)!.players.push({
           employee_id: employee.id,
           first_name: employee.first_name,
           last_name: employee.last_name,
