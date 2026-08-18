@@ -315,6 +315,7 @@ export function useEesyFmDeviations(
       const matches = sale.phoneNormalized ? byPhone.get(sale.phoneNormalized) : undefined;
 
       if (mode === "missing") {
+        if (isFiveG(sale.productName)) continue;
         if (sale.phoneNormalized && claimPhones?.has(sale.phoneNormalized)) continue;
         if (!matches || matches.length === 0) {
           result.push({
