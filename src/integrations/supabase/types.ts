@@ -14609,6 +14609,10 @@ export type Database = {
         Args: { _user_id: string }
         Returns: boolean
       }
+      can_edit_tdc_erhverv_sales: {
+        Args: { _user_id: string }
+        Returns: boolean
+      }
       can_manage_permissions: { Args: { _user_id: string }; Returns: boolean }
       can_view_employee: {
         Args: { _employee_id: string; _user_id: string }
@@ -15178,6 +15182,7 @@ export type Database = {
         Args: { p_import_id: string }
         Returns: Json
       }
+      sale_is_tdc_erhverv: { Args: { _sale_id: string }; Returns: boolean }
       save_integration_secret: {
         Args: {
           p_api_url: string
