@@ -514,7 +514,7 @@ function ClaimEditDialog({
 
 function deviationRowToClaimSale(row: DeviationRow): EesyFmClaimSale {
   return {
-    id: row.id,
+    id: row.saleId,
     saleDatetime: row.saleDatetime,
     sellerId: row.sellerId,
     sellerName: row.sellerName,

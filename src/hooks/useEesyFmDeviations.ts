@@ -25,6 +25,7 @@ export interface EesyFmStorkSale {
 
 export interface DeviationRow {
   id: string;
+  saleId: string;
   saleDatetime: string;
   sellerId: string;
   sellerName: string;
@@ -296,6 +297,7 @@ export function useEesyFmDeviations(
       deviation: string,
     ): DeviationRow => ({
       id: `${sale.id}-${match.id}`,
+      saleId: sale.id,
       saleDatetime: sale.saleDatetime,
       sellerId: sale.sellerId,
       sellerName: sale.sellerName,
@@ -317,6 +319,7 @@ export function useEesyFmDeviations(
         if (!matches || matches.length === 0) {
           result.push({
             id: sale.id,
+            saleId: sale.id,
             saleDatetime: sale.saleDatetime,
             sellerId: sale.sellerId,
             sellerName: sale.sellerName,
