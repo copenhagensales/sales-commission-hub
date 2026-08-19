@@ -713,6 +713,22 @@ function DeviationsPanel({
     }
   };
 
+  const handleExportMissing = async () => {
+    const rows = deviationRows.map((row) => ({
+      Salgsdato: format(new Date(row.saleDatetime), "dd/MM/yyyy HH:mm", { locale: da }),
+      Sælger: row.sellerName || "",
+      Mobil: row.phone || "",
+      Tastselv: row.storkProduct || "",
+    }));
+    const stamp = (d?: Date) => (d ? format(d, "yyyy-MM-dd") : "alle");
+    await downloadExcel(
+      `mangler-i-powerbi-${stamp(fromDate)}-${stamp(toDate)}.xlsx`,
+      [{ name: "Mangler i PowerBI", rows, columnWidths: [18, 28, 16, 40] }],
+    );
+  };
+
+
+
 
   const mainCard = (
     <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
