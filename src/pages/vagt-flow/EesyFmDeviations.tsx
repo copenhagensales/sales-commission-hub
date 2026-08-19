@@ -35,6 +35,7 @@ import {
   Trash2,
   ChevronUp,
   ChevronDown,
+  Download,
 } from "lucide-react";
 import {
   format,
@@ -71,6 +72,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { downloadExcel } from "@/utils/excel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -711,6 +713,22 @@ function DeviationsPanel({
     }
   };
 
+  const handleExportMissing = async () => {
+    const rows = deviationRows.map((row) => ({
+      Salgsdato: format(new Date(row.saleDatetime), "dd/MM/yyyy HH:mm", { locale: da }),
+      Sælger: row.sellerName || "",
+      Mobil: row.phone || "",
+      Tastselv: row.storkProduct || "",
+    }));
+    const stamp = (d?: Date) => (d ? format(d, "yyyy-MM-dd") : "alle");
+    await downloadExcel(
+      `mangler-i-powerbi-${stamp(fromDate)}-${stamp(toDate)}.xlsx`,
+      [{ name: "Mangler i PowerBI", rows, columnWidths: [18, 28, 16, 40] }],
+    );
+  };
+
+
+
 
   const mainCard = (
     <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
@@ -805,6 +823,21 @@ function DeviationsPanel({
         )}
 
 
+
+        {deviationMode === "missing" && (
+          <div className="flex justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5"
+              disabled={deviationRows.length === 0}
+              onClick={handleExportMissing}
+            >
+              <Download className="h-3.5 w-3.5" />
+              Eksportér
+            </Button>
+          </div>
+        )}
 
         <div className="rounded-lg border border-border/50 overflow-x-auto">
           <Table>
