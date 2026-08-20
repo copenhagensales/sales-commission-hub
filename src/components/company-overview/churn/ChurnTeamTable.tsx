@@ -204,8 +204,8 @@ export function ChurnTeamTable({
                 <th className="py-2 pr-6">Udvikling: nyeste 3 mdr. startere vs. de 3 før</th>
                 {hasTarget && <th className="py-2 pr-4">Afstand til mål</th>}
                 {hasTarget && <th className="py-2 pr-4">Exits over mål</th>}
-                <th className="py-2 pr-4">Nok data?</th>
-                <th className="py-2">Handling</th>
+              </tr>
+
               </tr>
             </thead>
 
