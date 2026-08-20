@@ -274,7 +274,14 @@ export function ChurnTeamTable({
                     </span>
                   )}
                 </th>
-                <th className="py-2 pr-6">Udvikling: nyeste 3 mdr. startere vs. de 3 før</th>
+                <th className="py-2 pr-6">
+                  Udvikling: nyeste 3 mdr. startere vs. de 3 før
+                  {ranges?.recent && (
+                    <span className="block font-normal normal-case tracking-normal text-[10px]">
+                      {ranges.previous ? `${ranges.previous} → ${ranges.recent}` : ranges.recent}
+                    </span>
+                  )}
+                </th>
                 {hasTarget && <th className="py-2 pr-4">Afstand til mål</th>}
                 {hasTarget && <th className="py-2 pr-4">Exits over mål</th>}
               </tr>
