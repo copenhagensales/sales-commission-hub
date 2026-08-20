@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { TeamAvgTenureChart } from "@/components/company-overview/TeamAvgTenureChart";
 import { HeadcountTrendChart } from "@/components/company-overview/HeadcountTrendChart";
 import { RevenuePerEmployeeChart } from "@/components/company-overview/RevenuePerEmployeeChart";
-import { ChurnConclusion } from "@/components/company-overview/churn/ChurnConclusion";
+
 import { ChurnKpiCards } from "@/components/company-overview/churn/ChurnKpiCards";
 
 
@@ -164,7 +164,7 @@ export default function CompanyOverview() {
           </TabsList>
 
           <TabsContent value="ceo" className="space-y-4">
-            <ChurnConclusion payload={payload} company={company} teams={teams} />
+            
             <ChurnKpiCards payload={payload} company={company} />
             
             <ChurnTeamTable
