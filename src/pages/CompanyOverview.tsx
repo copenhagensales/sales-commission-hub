@@ -26,6 +26,7 @@ export default function CompanyOverview() {
   const { data: payload, isLoading, error, dataUpdatedAt } = useChurnMetrics();
   const { data: canEdit = false } = useCanManageChurn();
   const { data: actions = [] } = useChurnActions();
+  const { data: trend } = useChurnTrendWindows(30);
 
   const [dimension, setDimension] = useState<"teams" | "leaders">("teams");
   const [drilldown, setDrilldown] = useState<{ teamKey: string | null; month: string | null; open: boolean }>({
