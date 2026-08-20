@@ -18,7 +18,7 @@ import { ChurnDrilldown } from "@/components/company-overview/churn/ChurnDrilldo
 import { ChurnActionsTab } from "@/components/company-overview/churn/ChurnActionsTab";
 import { ChurnActionDialog } from "@/components/company-overview/churn/ChurnActionDialog";
 import { ChurnMethodTab } from "@/components/company-overview/churn/ChurnMethodTab";
-import { useChurnMetrics, useChurnActions } from "@/hooks/useChurnDashboard";
+import { useChurnMetrics, useChurnActions, useChurnTrendWindows } from "@/hooks/useChurnDashboard";
 import { useCanManageChurn } from "@/hooks/useCanManageChurn";
 import { deriveCompany, deriveTeams, fmtMonth, fmtPct } from "@/lib/churn/metrics";
 
