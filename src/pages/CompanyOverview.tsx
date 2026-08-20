@@ -13,7 +13,7 @@ import { ChurnConclusion } from "@/components/company-overview/churn/ChurnConclu
 import { ChurnKpiCards } from "@/components/company-overview/churn/ChurnKpiCards";
 import { ChurnSinceLast } from "@/components/company-overview/churn/ChurnSinceLast";
 import { ChurnHeatmap } from "@/components/company-overview/churn/ChurnHeatmap";
-import { ChurnTeamTable } from "@/components/company-overview/churn/ChurnTeamTable";
+import { ChurnTeamTable, type TrendCounts } from "@/components/company-overview/churn/ChurnTeamTable";
 import { ChurnDrilldown } from "@/components/company-overview/churn/ChurnDrilldown";
 import { ChurnActionsTab } from "@/components/company-overview/churn/ChurnActionsTab";
 import { ChurnActionDialog } from "@/components/company-overview/churn/ChurnActionDialog";
