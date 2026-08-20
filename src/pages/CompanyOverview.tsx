@@ -38,6 +38,19 @@ export default function CompanyOverview() {
 
   const company = useMemo(() => (payload ? deriveCompany(payload) : null), [payload]);
   const teams = useMemo(() => (payload ? deriveTeams(payload) : []), [payload]);
+  /** Startere/exits pr. team for seneste fuldt modne startmåned. */
+  const latestMonthByTeam = useMemo(() => {
+    const map = new Map<string, { starters: number; exits: number }>();
+    const month = payload?.latest_mature_month;
+    if (!payload || !month) return map;
+    payload.team_months
+      .filter((c) => c.m.slice(0, 7) === month.slice(0, 7))
+      .forEach((c) => {
+        const cur = map.get(c.team_key) ?? { starters: 0, exits: 0 };
+        map.set(c.team_key, { starters: cur.starters + c.starters, exits: cur.exits + c.exits });
+      });
+    return map;
+  }, [payload]);
   const selectedTeam = teams.find((t) => t.key === drilldown.teamKey) ?? null;
 
   const openAction = (teamKey: string) => {
@@ -131,6 +144,7 @@ export default function CompanyOverview() {
               settings={s}
               immatureTeams={payload.immature_teams}
               latestMatureMonth={payload.latest_mature_month}
+              latestMonthByTeam={latestMonthByTeam}
               onSelectTeam={(teamKey) => setDrilldown({ teamKey, month: null, open: true })}
               onCreateAction={canEdit ? openAction : undefined}
             />
@@ -182,6 +196,8 @@ export default function CompanyOverview() {
                 settings={s}
                 immatureTeams={payload.immature_teams}
                 latestMatureMonth={payload.latest_mature_month}
+                latestMonthByTeam={latestMonthByTeam}
+              latestMonthByTeam={latestMonthByTeam}
                 onSelectTeam={(teamKey) => setDrilldown({ teamKey, month: null, open: true })}
                 onCreateAction={canEdit ? openAction : undefined}
               />
