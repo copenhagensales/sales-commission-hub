@@ -129,8 +129,8 @@ export default function CompanyOverview() {
             <ChurnTeamTable
               teams={teams}
               settings={s}
-              immatureTeams={metrics?.immature_teams}
-              latestMatureMonth={metrics?.latest_mature_month}
+              immatureTeams={payload.immature_teams}
+              latestMatureMonth={payload.latest_mature_month}
               onSelectTeam={(teamKey) => setDrilldown({ teamKey, month: null, open: true })}
               onCreateAction={canEdit ? openAction : undefined}
             />
@@ -180,8 +180,8 @@ export default function CompanyOverview() {
               <ChurnTeamTable
                 teams={teams}
                 settings={s}
-                immatureTeams={metrics?.immature_teams}
-                latestMatureMonth={metrics?.latest_mature_month}
+                immatureTeams={payload.immature_teams}
+                latestMatureMonth={payload.latest_mature_month}
                 onSelectTeam={(teamKey) => setDrilldown({ teamKey, month: null, open: true })}
                 onCreateAction={canEdit ? openAction : undefined}
               />
