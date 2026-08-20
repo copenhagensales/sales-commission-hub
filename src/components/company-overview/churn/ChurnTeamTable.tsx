@@ -434,8 +434,17 @@ export function ChurnTeamTable({
               temperaturmåling, ikke til konklusioner. Ikke farvet under 3 startere.
             </p>
             <p>
-              <strong className="text-foreground">Udvikling</strong> sammenligner de medarbejdere der startede i de 3
-              nyeste måneder (tallet efter pilen) med dem der startede i de 3 måneder før. Grøn betyder færre stopper nu.
+              <strong className="text-foreground">Udvikling</strong> sammenligner to rullende {trendDays}-dages
+              perioder — ikke kalendermåneder.
+              {trendWindow && (
+                <>
+                  {" "}
+                  Nyeste periode er startere fra {dk(trendWindow.recent_start)} til {dk(trendWindow.recent_end)} (tallet
+                  efter pilen), forrige periode er {dk(trendWindow.previous_start)}–{dk(trendWindow.previous_end)}.
+                </>
+              )}{" "}
+              Nyeste periode slutter 60 dage før i dag, så alle i begge perioder har haft fulde 60 dage. Grøn betyder
+              færre stopper nu.
             </p>
             <p>
               {hasTarget
