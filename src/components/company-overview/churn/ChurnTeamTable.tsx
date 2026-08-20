@@ -333,6 +333,7 @@ export function ChurnTeamTable({
                   immature={immatureByTeam.get(r.key)}
                   rolling={rollingByTeam?.get(r.key)}
                   windowStats={windowByTeam?.get(r.key)}
+                  trend={trendByTeam?.get(r.key)}
                   onSelectTeam={onSelectTeam}
                   onCreateAction={onCreateAction}
                 />
