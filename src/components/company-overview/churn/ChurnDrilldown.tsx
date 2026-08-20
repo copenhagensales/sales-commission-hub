@@ -5,8 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip as RTooltip, XAxis, YAxis } from "recharts";
 import { fmtPct, fmtPp, rate, STATUS_CLASSES, type ChurnMetricsPayload, type DerivedGroup } from "@/lib/churn/metrics";
-import { formatMonth } from "./ChurnHeatmap";
 import type { ChurnActionRow } from "@/hooks/useChurnDashboard";
+
+const MONTH_LABELS = ["jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
+
+function formatMonth(iso: string): string {
+  const [y, m] = iso.split("-").map(Number);
+  return `${MONTH_LABELS[m - 1]} ${String(y).slice(2)}`;
+}
+
 
 interface Props {
   open: boolean;
