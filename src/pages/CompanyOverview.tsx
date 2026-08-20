@@ -167,12 +167,6 @@ export default function CompanyOverview() {
             <ChurnConclusion payload={payload} company={company} teams={teams} />
             <ChurnKpiCards payload={payload} company={company} />
             <ChurnSinceLast teams={teams} settings={s} onCreateAction={canEdit ? openAction : undefined} />
-            <ChurnHeatmap
-              payload={payload}
-              teams={teams}
-              dimension="teams"
-              onSelectCell={(teamKey, month) => setDrilldown({ teamKey, month, open: true })}
-            />
             <ChurnTeamTable
               teams={teams}
               settings={s}
