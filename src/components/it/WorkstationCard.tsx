@@ -34,6 +34,8 @@ interface Props {
   onOpen: (ws: ItWorkstation) => void;
   /** Hurtig toggle af udstyr direkte på kortet (kun med redigeringsadgang). */
   onToggleEquipment?: (ws: ItWorkstation, kind: EquipmentKind, next: EquipmentStatus) => void;
+  /** Hurtig markering af bordet som i brug / ledigt (kun med redigeringsadgang). */
+  onToggleOccupancy?: (ws: ItWorkstation, next: boolean) => void;
   faded?: boolean;
   highlighted?: boolean;
 }
@@ -42,10 +44,13 @@ export function WorkstationCard({
   workstation: ws,
   onOpen,
   onToggleEquipment,
+  onToggleOccupancy,
   faded,
   highlighted,
 }: Props) {
   const interactiveEquipment = !!onToggleEquipment;
+  const isFree = ws.is_occupied === false;
+
 
   return (
     <div
