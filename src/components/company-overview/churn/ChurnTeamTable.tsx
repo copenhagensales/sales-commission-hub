@@ -11,6 +11,8 @@ interface Props {
   /** Startere efter seneste modne måned — vises som "for nye til at tælle med". */
   immatureTeams?: Array<{ team_key: string; starters: number; exits_so_far: number }>;
   latestMatureMonth?: string | null;
+  /** Seneste fuldt modne startmåned pr. team — startere og exits inden 60 dage. */
+  latestMonthByTeam?: Map<string, { starters: number; exits: number }>;
 }
 
 /** Farvezone for rate — grå når datagrundlaget er for tyndt. */
@@ -60,6 +62,7 @@ function TeamRow({
   emphasize,
   hasTarget,
   immature,
+  latestMonth,
   onSelectTeam,
   onCreateAction,
 }: {
@@ -68,10 +71,14 @@ function TeamRow({
   emphasize: boolean;
   hasTarget: boolean;
   immature?: number;
+  latestMonth?: { starters: number; exits: number };
   onSelectTeam?: (k: string) => void;
   onCreateAction?: (k: string) => void;
 }) {
   const tone = rateTone(r.rate, r.lowData);
+  const lmRate =
+    latestMonth && latestMonth.starters > 0 ? (latestMonth.exits / latestMonth.starters) * 100 : null;
+  const lmTone = rateTone(lmRate, !latestMonth || latestMonth.starters < 3);
   const width = r.rate === null ? 0 : Math.min(100, r.rate);
 
   return (
@@ -99,6 +106,18 @@ function TeamRow({
           <div className={`h-1.5 rounded-full ${tone.bar}`} style={{ width: `${width}%` }} />
         </div>
       </td>
+      <td className="py-3 pr-6 min-w-[150px]">
+        {latestMonth && latestMonth.starters > 0 ? (
+          <div className="flex items-baseline gap-2">
+            <span className={`text-sm font-bold ${lmTone.text}`}>{fmtPct(lmRate)}</span>
+            <span className="text-[11px] text-muted-foreground tabular-nums">
+              {latestMonth.exits} / {latestMonth.starters}
+            </span>
+          </div>
+        ) : (
+          <span className="text-xs text-muted-foreground">ingen startere</span>
+        )}
+      </td>
       <td className="py-3 pr-6 text-xs">
         <TrendCell r={r} />
       </td>
@@ -124,6 +143,7 @@ export function ChurnTeamTable({
   onCreateAction,
   immatureTeams,
   latestMatureMonth,
+  latestMonthByTeam,
 }: Props) {
   const UNKNOWN_TEAM_KEY = "Øvrige / ukendt team";
   const immatureByTeam = new Map(
@@ -147,7 +167,17 @@ export function ChurnTeamTable({
     { starters: 0, exits: 0, excess: 0 },
   );
   const totalRate = total.starters ? (total.exits / total.starters) * 100 : null;
-  const colSpan = hasTarget ? 9 : 7;
+  const latestMonthTotal = rows.reduce(
+    (acc, r) => {
+      const c = latestMonthByTeam?.get(r.key);
+      return { starters: acc.starters + (c?.starters ?? 0), exits: acc.exits + (c?.exits ?? 0) };
+    },
+    { starters: 0, exits: 0 },
+  );
+  const latestMonthTotalRate = latestMonthTotal.starters
+    ? (latestMonthTotal.exits / latestMonthTotal.starters) * 100
+    : null;
+  const colSpan = hasTarget ? 10 : 8;
 
   return (
     <Card>
@@ -205,6 +235,7 @@ export function ChurnTeamTable({
                 <th className="py-2 pr-4 text-right">For nye til at måle</th>
                 <th className="py-2 pr-6 text-right">Stoppet inden 60 dage</th>
                 <th className="py-2 pr-6">Andel der stoppede (12 mdr.)</th>
+                <th className="py-2 pr-6">Andel der stoppede (seneste måned: {fmtMonth(latestMatureMonth)})</th>
                 <th className="py-2 pr-6">Udvikling: nyeste 3 mdr. startere vs. de 3 før</th>
                 {hasTarget && <th className="py-2 pr-4">Afstand til mål</th>}
                 {hasTarget && <th className="py-2 pr-4">Exits over mål</th>}
@@ -221,6 +252,7 @@ export function ChurnTeamTable({
                   emphasize
                   hasTarget={hasTarget}
                   immature={immatureByTeam.get(r.key)}
+                  latestMonth={latestMonthByTeam?.get(r.key)}
                   onSelectTeam={onSelectTeam}
                   onCreateAction={onCreateAction}
                 />
@@ -247,6 +279,7 @@ export function ChurnTeamTable({
                   emphasize={false}
                   hasTarget={hasTarget}
                   immature={immatureByTeam.get(r.key)}
+                  latestMonth={latestMonthByTeam?.get(r.key)}
                   onSelectTeam={onSelectTeam}
                   onCreateAction={onCreateAction}
                 />
@@ -263,6 +296,12 @@ export function ChurnTeamTable({
                 <td className="py-3 pr-6">
                   <span className="mr-2">{fmtPct(totalRate)}</span>
                   <span className="text-[11px] font-normal text-muted-foreground">i alt</span>
+                </td>
+                <td className="py-3 pr-6">
+                  <span className="mr-2">{fmtPct(latestMonthTotalRate)}</span>
+                  <span className="text-[11px] font-normal text-muted-foreground tabular-nums">
+                    {latestMonthTotal.exits} / {latestMonthTotal.starters}
+                  </span>
                 </td>
                 <td className="py-3 pr-6" />
                 {hasTarget && (
@@ -301,6 +340,11 @@ export function ChurnTeamTable({
               <strong className="text-foreground">For nye til at måle</strong> er dem der er startet efter{" "}
               {fmtMonth(latestMatureMonth)}. De er ansat og tælles med i medarbejderoversigten, men de har ikke haft
               mulighed for at nå 60 dage endnu, så de kan ikke indgå i andelen uden at gøre den kunstigt lav.
+            </p>
+            <p>
+              <strong className="text-foreground">Andel der stoppede (seneste måned)</strong> er kun de nye der startede
+              i {fmtMonth(latestMatureMonth)} — den nyeste startmåned hvor alle har haft 60 dage. Tallet er følsomt ved
+              få personer og er derfor ikke farvet under 3 startere.
             </p>
             <p>
               <strong className="text-foreground">Udvikling</strong> sammenligner de medarbejdere der startede i de 3
