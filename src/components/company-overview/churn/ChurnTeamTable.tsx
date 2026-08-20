@@ -206,7 +206,6 @@ export function ChurnTeamTable({
                 {hasTarget && <th className="py-2 pr-4">Exits over mål</th>}
               </tr>
 
-              </tr>
             </thead>
 
             <tbody>
