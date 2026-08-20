@@ -97,6 +97,13 @@ export interface ChurnMetricsPayload {
   /** Startere der er kommet EFTER seneste modne startmåned — indgår ikke i 60-dages raten endnu. */
   immature_total?: number;
   immature_teams?: Array<{ team_key: string; starters: number; exits_so_far: number }>;
+  /** Løbende vindue: startere de seneste X dage (ikke modne endnu) + hvor mange af dem der er stoppet. */
+  rolling_window?: {
+    days: number;
+    window_start: string;
+    total: { starters: number; exits: number };
+    teams: Array<{ team_key: string; starters: number; exits: number }>;
+  };
   quality: ChurnQuality;
   headcount_bridge: ChurnHeadcountBridge;
 }
