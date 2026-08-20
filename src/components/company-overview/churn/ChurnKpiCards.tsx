@@ -80,34 +80,8 @@ export function ChurnKpiCards({ payload, company }: Props) {
         </CardContent>
       </Card>
 
-      {/* Kort 3 */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">Merfrafald mod mål</CardTitle>
-          <AlertTriangle className="h-4 w-4 text-orange-500" aria-hidden />
-        </CardHeader>
-        <CardContent className="space-y-1">
-          {hasTarget && company.excessExits !== null ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button type="button" className="text-left focus:outline-none focus:ring-2 focus:ring-ring rounded">
-                  <div className="text-3xl font-bold">{company.excessExits.toFixed(1).replace(".", ",")}</div>
-                  <div className="text-xs text-muted-foreground">
-                    Faktiske exits {company.exits} · forventet ved mål {company.expectedExitsAtTarget?.toFixed(1).replace(".", ",")}
-                  </div>
-                  <div className="text-xs text-muted-foreground">≈ {Math.round(company.excessExits)} personer</div>
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>
-                {company.starters} startere × {fmtPct(s.target_60d_rate)} = {company.expectedExitsAtTarget?.toFixed(1)} forventede exits.
-                Merfrafald = {company.exits} − {company.expectedExitsAtTarget?.toFixed(1)}.
-              </TooltipContent>
-            </Tooltip>
-          ) : (
-            <div className="text-sm text-muted-foreground">Mål ikke sat</div>
-          )}
-        </CardContent>
-      </Card>
+
+
 
       {/* Kort 4 */}
       <Card>
