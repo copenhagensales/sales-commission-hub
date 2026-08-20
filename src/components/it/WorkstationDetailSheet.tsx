@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { CheckCircle2, RefreshCw, PackageX, PowerOff, Loader2 } from "lucide-react";
+import { CheckCircle2, RefreshCw, PackageX, PowerOff, Loader2, Armchair } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   COMPUTER_STATUS_LABELS,
