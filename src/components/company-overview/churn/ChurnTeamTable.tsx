@@ -21,19 +21,30 @@ interface Props {
   windowByTeam?: Map<string, { starters: number; exits: number }>;
   /** Antal modne måneder vinduet dækker. */
   windowMonths?: number;
-  /** Alle modne startmåneder (ældst → nyest) — bruges til at vise dato-interval på udviklings-kolonnen. */
+  /** Alle modne startmåneder (ældst → nyest) — bevaret af bagudkompatibilitet. */
   matureMonths?: string[];
+  /** Udvikling målt på rullende vinduer (fx 30 dage) pr. team. */
+  trendByTeam?: Map<string, TrendCounts>;
+  /** Udvikling for hele virksomheden i samme vinduer. */
+  trendTotal?: TrendCounts;
+  /** Datointervaller for de to vinduer (ISO-datoer). */
+  trendWindow?: {
+    window_days: number;
+    recent_start: string;
+    recent_end: string;
+    previous_start: string;
+    previous_end: string;
+  };
 }
 
-/** "nyeste 3" og "de 3 før" som læsbare måneds-intervaller. */
-function trendRanges(matureMonths?: string[]) {
-  if (!matureMonths || matureMonths.length < 2) return null;
-  const recent = matureMonths.slice(-3);
-  const previous = matureMonths.slice(-6, -3);
-  const label = (arr: string[]) =>
-    arr.length === 0 ? null : arr.length === 1 ? fmtMonth(arr[0]) : `${fmtMonth(arr[0])}–${fmtMonth(arr[arr.length - 1])}`;
-  return { recent: label(recent), previous: label(previous) };
+export interface TrendCounts {
+  recent_n: number;
+  recent_x: number;
+  previous_n: number;
+  previous_x: number;
 }
+
+const dk = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString("da-DK") : "");
 
 /** Farvezone for rate — grå når datagrundlaget er for tyndt. */
 function rateTone(rate: number | null, lowData: boolean) {
