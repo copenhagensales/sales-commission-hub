@@ -111,23 +111,10 @@ function TeamRow({
           </td>
         </>
       )}
-      <td className="py-3 pr-4 text-xs text-muted-foreground whitespace-nowrap">
-        {r.lowData ? "Lavt" : "Tilstrækkeligt"}
-      </td>
-      <td className="py-3">
-        {onCreateAction && (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={(e) => {
-              e.stopPropagation();
-              onCreateAction(r.key);
-            }}
-          >
-            Opret
-          </Button>
-        )}
-      </td>
+    </tr>
+  );
+}
+
     </tr>
   );
 }
