@@ -38,6 +38,21 @@ export default function CompanyOverview() {
 
   const company = useMemo(() => (payload ? deriveCompany(payload) : null), [payload]);
   const teams = useMemo(() => (payload ? deriveTeams(payload) : []), [payload]);
+  /** Sidste 6 modne startmåneder pr. team — bruges til tabellens andel. */
+  const TABLE_WINDOW_MONTHS = 6;
+  const windowByTeam = useMemo(() => {
+    const map = new Map<string, { starters: number; exits: number }>();
+    if (!payload) return map;
+    const months = new Set(payload.mature_months.slice(-TABLE_WINDOW_MONTHS));
+    payload.team_months
+      .filter((c) => months.has(c.m))
+      .forEach((c) => {
+        const cur = map.get(c.team_key) ?? { starters: 0, exits: 0 };
+        map.set(c.team_key, { starters: cur.starters + c.starters, exits: cur.exits + c.exits });
+      });
+    return map;
+  }, [payload]);
+
   /** Løbende vindue: startere de seneste 60 dage pr. team + hvor mange af dem der er stoppet. */
   const rollingByTeam = useMemo(() => {
     const map = new Map<string, { starters: number; exits: number }>();
@@ -140,6 +155,8 @@ export default function CompanyOverview() {
               immatureTeams={payload.immature_teams}
               latestMatureMonth={payload.latest_mature_month}
               rollingByTeam={rollingByTeam}
+              windowByTeam={windowByTeam}
+              windowMonths={TABLE_WINDOW_MONTHS}
               rollingWindowStart={payload.rolling_window?.window_start ?? null}
               rollingDays={payload.rolling_window?.days ?? 60}
               onSelectTeam={(teamKey) => setDrilldown({ teamKey, month: null, open: true })}
@@ -194,6 +211,10 @@ export default function CompanyOverview() {
                 immatureTeams={payload.immature_teams}
                 latestMatureMonth={payload.latest_mature_month}
                 rollingByTeam={rollingByTeam}
+                windowByTeam={windowByTeam}
+                windowMonths={TABLE_WINDOW_MONTHS}
+              windowByTeam={windowByTeam}
+              windowMonths={TABLE_WINDOW_MONTHS}
                 rollingWindowStart={payload.rolling_window?.window_start ?? null}
                 rollingDays={payload.rolling_window?.days ?? 60}
                 onSelectTeam={(teamKey) => setDrilldown({ teamKey, month: null, open: true })}
