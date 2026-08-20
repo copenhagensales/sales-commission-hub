@@ -462,7 +462,7 @@ export default function ItWorkstations() {
       </header>
 
       {/* KPI row */}
-      <section className="grid gap-3 px-4 py-4 sm:px-6 md:grid-cols-3 xl:grid-cols-6">
+      <section className="grid gap-3 px-4 py-4 sm:px-6 md:grid-cols-3 xl:grid-cols-7">
         <StatCard label="Arbejdsstationer" value={stats.total} hint={`${areas.length} områder`} />
         <StatCard label="Alt OK" value={stats.ok} hint="opdateret & komplet" dot="ok" />
         <StatCard
