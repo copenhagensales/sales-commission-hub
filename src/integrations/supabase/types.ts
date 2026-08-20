@@ -14905,6 +14905,14 @@ export type Database = {
         }
         Returns: Json
       }
+      get_churn_trend_windows: {
+        Args: {
+          p_as_of_date?: string
+          p_horizon_days?: number
+          p_window_days?: number
+        }
+        Returns: Json
+      }
       get_client_sales_stats: {
         Args: { p_end_date?: string; p_start_date?: string }
         Returns: {
