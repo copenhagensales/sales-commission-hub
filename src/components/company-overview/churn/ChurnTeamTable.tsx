@@ -54,34 +54,47 @@ function rateTone(rate: number | null, lowData: boolean) {
   return { text: "text-emerald-500", bar: "bg-emerald-500" };
 }
 
-function TrendCell({ r }: { r: DerivedGroup }) {
-  const hasBoth = r.previous.rate !== null && r.recent.rate !== null;
-  const onePerson = r.recent.n <= 1 || r.previous.n <= 1;
+/** Rate for et rullende vindue — null når der ingen startere er. */
+function windowRate(x: number, n: number) {
+  return n > 0 ? (x / n) * 100 : null;
+}
+
+function TrendCell({ counts }: { counts?: TrendCounts }) {
+  const prevRate = counts ? windowRate(counts.previous_x, counts.previous_n) : null;
+  const recentRate = counts ? windowRate(counts.recent_x, counts.recent_n) : null;
+  const hasBoth = prevRate !== null && recentRate !== null;
+  const deltaPp = hasBoth ? recentRate! - prevRate! : null;
+  const onePerson = !!counts && (counts.recent_n <= 1 || counts.previous_n <= 1);
   return (
     <div className="flex flex-wrap items-center gap-2 whitespace-nowrap">
-      <span className={r.previous.rate === null ? "text-muted-foreground" : ""}>
-        {r.previous.rate === null ? "ingen data" : fmtPct(r.previous.rate)}
+      <span className={prevRate === null ? "text-muted-foreground" : ""}>
+        {prevRate === null ? "ingen data" : fmtPct(prevRate)}
       </span>
+      {counts && (
+        <span className="text-[10px] text-muted-foreground tabular-nums">
+          ({counts.previous_x}/{counts.previous_n})
+        </span>
+      )}
       <ArrowRight className="h-3 w-3 text-muted-foreground" aria-hidden />
-      <span className={r.recent.rate === null ? "text-muted-foreground" : "font-semibold"}>
-        {r.recent.rate === null ? "ingen data" : fmtPct(r.recent.rate)}
+      <span className={recentRate === null ? "text-muted-foreground" : "font-semibold"}>
+        {recentRate === null ? "ingen data" : fmtPct(recentRate)}
       </span>
-      {hasBoth && !r.lowData && !onePerson && r.deltaPp !== null && (
+      {counts && (
+        <span className="text-[10px] text-muted-foreground tabular-nums">
+          ({counts.recent_x}/{counts.recent_n})
+        </span>
+      )}
+      {hasBoth && !onePerson && deltaPp !== null && (
         <Badge
           variant="outline"
           className={`text-[10px] ${
-            r.deltaPp <= 0
+            deltaPp <= 0
               ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-500"
               : "border-red-500/30 bg-red-500/10 text-red-500"
           }`}
         >
-          {fmtPp(r.deltaPp)}
+          {fmtPp(deltaPp)}
         </Badge>
-      )}
-      {hasBoth && onePerson && (
-        <span className="text-[10px] text-muted-foreground">
-          {Math.max(r.recent.n, r.previous.n)} af {Math.max(r.recent.n, r.previous.n)} person
-        </span>
       )}
     </div>
   );
