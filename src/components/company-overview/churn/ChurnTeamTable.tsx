@@ -309,10 +309,10 @@ export function ChurnTeamTable({
                   )}
                 </th>
                 <th className="py-2 pr-6">
-                  Udvikling: nyeste 3 mdr. startere vs. de 3 før
-                  {ranges?.recent && (
+                  Udvikling: nyeste {trendDays} dages startere vs. de {trendDays} før
+                  {trendRangeLabel && (
                     <span className="block font-normal normal-case tracking-normal text-[10px]">
-                      {ranges.previous ? `${ranges.previous} → ${ranges.recent}` : ranges.recent}
+                      {trendRangeLabel}
                     </span>
                   )}
                 </th>
