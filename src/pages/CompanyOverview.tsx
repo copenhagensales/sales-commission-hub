@@ -225,12 +225,6 @@ export default function CompanyOverview() {
               </Button>
             </div>
 
-            <ChurnHeatmap
-              payload={payload}
-              teams={teams}
-              dimension={dimension}
-              onSelectCell={(teamKey, month) => setDrilldown({ teamKey, month, open: true })}
-            />
 
             {dimension === "teams" && (
               <ChurnTeamTable
