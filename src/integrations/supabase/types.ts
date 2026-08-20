@@ -3185,6 +3185,123 @@ export type Database = {
           },
         ]
       }
+      churn_actions: {
+        Row: {
+          action_description: string
+          actual_effect_pp: number | null
+          created_at: string
+          created_by: string | null
+          decision: string
+          due_date: string | null
+          expected_effect_pp: number | null
+          first_measurable_cohort_month: string | null
+          hypothesis: string | null
+          id: string
+          leader_id: string | null
+          owner_name: string | null
+          owner_user_id: string | null
+          problem_statement: string
+          scope_type: string
+          start_date: string
+          status: string
+          team_id: string | null
+          team_key: string | null
+          updated_at: string
+        }
+        Insert: {
+          action_description: string
+          actual_effect_pp?: number | null
+          created_at?: string
+          created_by?: string | null
+          decision?: string
+          due_date?: string | null
+          expected_effect_pp?: number | null
+          first_measurable_cohort_month?: string | null
+          hypothesis?: string | null
+          id?: string
+          leader_id?: string | null
+          owner_name?: string | null
+          owner_user_id?: string | null
+          problem_statement: string
+          scope_type?: string
+          start_date: string
+          status?: string
+          team_id?: string | null
+          team_key?: string | null
+          updated_at?: string
+        }
+        Update: {
+          action_description?: string
+          actual_effect_pp?: number | null
+          created_at?: string
+          created_by?: string | null
+          decision?: string
+          due_date?: string | null
+          expected_effect_pp?: number | null
+          first_measurable_cohort_month?: string | null
+          hypothesis?: string | null
+          id?: string
+          leader_id?: string | null
+          owner_name?: string | null
+          owner_user_id?: string | null
+          problem_statement?: string
+          scope_type?: string
+          start_date?: string
+          status?: string
+          team_id?: string | null
+          team_key?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      churn_dashboard_settings: {
+        Row: {
+          benchmark_min_months: number
+          benchmark_min_n: number
+          created_at: string
+          id: string
+          material_trend_pp: number
+          minimum_n: number
+          official_horizon_days: number
+          official_month_count: number
+          orange_threshold_pp: number
+          target_60d_rate: number | null
+          timezone: string
+          updated_at: string
+          yellow_threshold_pp: number
+        }
+        Insert: {
+          benchmark_min_months?: number
+          benchmark_min_n?: number
+          created_at?: string
+          id?: string
+          material_trend_pp?: number
+          minimum_n?: number
+          official_horizon_days?: number
+          official_month_count?: number
+          orange_threshold_pp?: number
+          target_60d_rate?: number | null
+          timezone?: string
+          updated_at?: string
+          yellow_threshold_pp?: number
+        }
+        Update: {
+          benchmark_min_months?: number
+          benchmark_min_n?: number
+          created_at?: string
+          id?: string
+          material_trend_pp?: number
+          minimum_n?: number
+          official_horizon_days?: number
+          official_month_count?: number
+          orange_threshold_pp?: number
+          target_60d_rate?: number | null
+          timezone?: string
+          updated_at?: string
+          yellow_threshold_pp?: number
+        }
+        Relationships: []
+      }
       client_adjustment_percents: {
         Row: {
           cancellation_percent: number
@@ -14631,6 +14748,33 @@ export type Database = {
           },
         ]
       }
+      v_employment_spells_clean: {
+        Row: {
+          campaign_id: string | null
+          campaign_name: string | null
+          current_leader_id: string | null
+          current_team_id: string | null
+          data_quality_status: string | null
+          employee_id: string | null
+          employee_name: string | null
+          employment_spell_id: string | null
+          employment_type: string | null
+          exit_date: string | null
+          exit_day: number | null
+          exit_reason_category: string | null
+          exit_reason_detail: string | null
+          is_active: boolean | null
+          is_future_start: boolean | null
+          leader_at_start_id: string | null
+          leader_at_start_name: string | null
+          recruitment_source: string | null
+          source: string | null
+          start_date: string | null
+          team_at_start_name: string | null
+          tenure_days_as_of: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       assign_role_by_email: {
@@ -14668,6 +14812,7 @@ export type Database = {
           table_name: string
         }[]
       }
+      churn_normalize_team: { Args: { p_name: string }; Returns: string }
       cleanup_invalid_email_sales: { Args: never; Returns: Json }
       cleanup_kpi_cache: { Args: never; Returns: number }
       cleanup_stale_leaderboard_cache: { Args: never; Returns: number }
@@ -14750,6 +14895,16 @@ export type Database = {
           avg_duration: number
           total_duration: number
         }[]
+      }
+      get_churn_dashboard_metrics: {
+        Args: {
+          p_as_of_date?: string
+          p_horizon_days?: number
+          p_leader_ids?: string[]
+          p_month_count?: number
+          p_team_keys?: string[]
+        }
+        Returns: Json
       }
       get_client_sales_stats: {
         Args: { p_end_date?: string; p_start_date?: string }
