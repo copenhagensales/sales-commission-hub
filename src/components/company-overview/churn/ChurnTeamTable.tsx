@@ -199,8 +199,14 @@ export function ChurnTeamTable({
   windowByTeam,
   windowMonths = 6,
   matureMonths,
+  trendByTeam,
+  trendTotal,
+  trendWindow,
 }: Props) {
-  const ranges = trendRanges(matureMonths);
+  const trendDays = trendWindow?.window_days ?? 30;
+  const trendRangeLabel = trendWindow
+    ? `${dk(trendWindow.previous_start)}–${dk(trendWindow.previous_end)} → ${dk(trendWindow.recent_start)}–${dk(trendWindow.recent_end)}`
+    : null;
   const UNKNOWN_TEAM_KEY = "Øvrige / ukendt team";
   const immatureByTeam = new Map(
     (immatureTeams ?? []).filter((t) => t.team_key !== UNKNOWN_TEAM_KEY).map((t) => [t.team_key, t.starters]),
