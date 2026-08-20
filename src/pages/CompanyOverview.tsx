@@ -91,7 +91,10 @@ export default function CompanyOverview() {
               Seneste opdatering: {new Date(dataUpdatedAt).toLocaleString("da-DK")}
             </Badge>
             <Badge variant="outline">Organisationsscope: alle teams ekskl. stab</Badge>
-            <Badge variant="outline">Seneste fuldt modne startmåned: {payload.latest_mature_month ?? "Data mangler"}</Badge>
+            <Badge variant="outline">
+              Seneste fuldt modne startmåned:{" "}
+              {payload.latest_mature_month ? fmtMonth(payload.latest_mature_month) : "Data mangler"}
+            </Badge>
             <Badge variant="outline">
               {s.target_60d_rate === null ? "Mål ikke sat" : `Mål: ${fmtPct(s.target_60d_rate)}`}
             </Badge>
