@@ -21,6 +21,18 @@ interface Props {
   windowByTeam?: Map<string, { starters: number; exits: number }>;
   /** Antal modne måneder vinduet dækker. */
   windowMonths?: number;
+  /** Alle modne startmåneder (ældst → nyest) — bruges til at vise dato-interval på udviklings-kolonnen. */
+  matureMonths?: string[];
+}
+
+/** "nyeste 3" og "de 3 før" som læsbare måneds-intervaller. */
+function trendRanges(matureMonths?: string[]) {
+  if (!matureMonths || matureMonths.length < 2) return null;
+  const recent = matureMonths.slice(-3);
+  const previous = matureMonths.slice(-6, -3);
+  const label = (arr: string[]) =>
+    arr.length === 0 ? null : arr.length === 1 ? fmtMonth(arr[0]) : `${fmtMonth(arr[0])}–${fmtMonth(arr[arr.length - 1])}`;
+  return { recent: label(recent), previous: label(previous) };
 }
 
 /** Farvezone for rate — grå når datagrundlaget er for tyndt. */
@@ -160,7 +172,9 @@ export function ChurnTeamTable({
   rollingDays = 60,
   windowByTeam,
   windowMonths = 6,
+  matureMonths,
 }: Props) {
+  const ranges = trendRanges(matureMonths);
   const UNKNOWN_TEAM_KEY = "Øvrige / ukendt team";
   const immatureByTeam = new Map(
     (immatureTeams ?? []).filter((t) => t.team_key !== UNKNOWN_TEAM_KEY).map((t) => [t.team_key, t.starters]),
@@ -262,7 +276,14 @@ export function ChurnTeamTable({
                     </span>
                   )}
                 </th>
-                <th className="py-2 pr-6">Udvikling: nyeste 3 mdr. startere vs. de 3 før</th>
+                <th className="py-2 pr-6">
+                  Udvikling: nyeste 3 mdr. startere vs. de 3 før
+                  {ranges?.recent && (
+                    <span className="block font-normal normal-case tracking-normal text-[10px]">
+                      {ranges.previous ? `${ranges.previous} → ${ranges.recent}` : ranges.recent}
+                    </span>
+                  )}
+                </th>
                 {hasTarget && <th className="py-2 pr-4">Afstand til mål</th>}
                 {hasTarget && <th className="py-2 pr-4">Exits over mål</th>}
               </tr>
