@@ -21,19 +21,30 @@ interface Props {
   windowByTeam?: Map<string, { starters: number; exits: number }>;
   /** Antal modne måneder vinduet dækker. */
   windowMonths?: number;
-  /** Alle modne startmåneder (ældst → nyest) — bruges til at vise dato-interval på udviklings-kolonnen. */
+  /** Alle modne startmåneder (ældst → nyest) — bevaret af bagudkompatibilitet. */
   matureMonths?: string[];
+  /** Udvikling målt på rullende vinduer (fx 30 dage) pr. team. */
+  trendByTeam?: Map<string, TrendCounts>;
+  /** Udvikling for hele virksomheden i samme vinduer. */
+  trendTotal?: TrendCounts;
+  /** Datointervaller for de to vinduer (ISO-datoer). */
+  trendWindow?: {
+    window_days: number;
+    recent_start: string;
+    recent_end: string;
+    previous_start: string;
+    previous_end: string;
+  };
 }
 
-/** "nyeste 3" og "de 3 før" som læsbare måneds-intervaller. */
-function trendRanges(matureMonths?: string[]) {
-  if (!matureMonths || matureMonths.length < 2) return null;
-  const recent = matureMonths.slice(-3);
-  const previous = matureMonths.slice(-6, -3);
-  const label = (arr: string[]) =>
-    arr.length === 0 ? null : arr.length === 1 ? fmtMonth(arr[0]) : `${fmtMonth(arr[0])}–${fmtMonth(arr[arr.length - 1])}`;
-  return { recent: label(recent), previous: label(previous) };
+export interface TrendCounts {
+  recent_n: number;
+  recent_x: number;
+  previous_n: number;
+  previous_x: number;
 }
+
+const dk = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString("da-DK") : "");
 
 /** Farvezone for rate — grå når datagrundlaget er for tyndt. */
 function rateTone(rate: number | null, lowData: boolean) {
@@ -43,34 +54,47 @@ function rateTone(rate: number | null, lowData: boolean) {
   return { text: "text-emerald-500", bar: "bg-emerald-500" };
 }
 
-function TrendCell({ r }: { r: DerivedGroup }) {
-  const hasBoth = r.previous.rate !== null && r.recent.rate !== null;
-  const onePerson = r.recent.n <= 1 || r.previous.n <= 1;
+/** Rate for et rullende vindue — null når der ingen startere er. */
+function windowRate(x: number, n: number) {
+  return n > 0 ? (x / n) * 100 : null;
+}
+
+function TrendCell({ counts }: { counts?: TrendCounts }) {
+  const prevRate = counts ? windowRate(counts.previous_x, counts.previous_n) : null;
+  const recentRate = counts ? windowRate(counts.recent_x, counts.recent_n) : null;
+  const hasBoth = prevRate !== null && recentRate !== null;
+  const deltaPp = hasBoth ? recentRate! - prevRate! : null;
+  const onePerson = !!counts && (counts.recent_n <= 1 || counts.previous_n <= 1);
   return (
     <div className="flex flex-wrap items-center gap-2 whitespace-nowrap">
-      <span className={r.previous.rate === null ? "text-muted-foreground" : ""}>
-        {r.previous.rate === null ? "ingen data" : fmtPct(r.previous.rate)}
+      <span className={prevRate === null ? "text-muted-foreground" : ""}>
+        {prevRate === null ? "ingen data" : fmtPct(prevRate)}
       </span>
+      {counts && (
+        <span className="text-[10px] text-muted-foreground tabular-nums">
+          ({counts.previous_x}/{counts.previous_n})
+        </span>
+      )}
       <ArrowRight className="h-3 w-3 text-muted-foreground" aria-hidden />
-      <span className={r.recent.rate === null ? "text-muted-foreground" : "font-semibold"}>
-        {r.recent.rate === null ? "ingen data" : fmtPct(r.recent.rate)}
+      <span className={recentRate === null ? "text-muted-foreground" : "font-semibold"}>
+        {recentRate === null ? "ingen data" : fmtPct(recentRate)}
       </span>
-      {hasBoth && !r.lowData && !onePerson && r.deltaPp !== null && (
+      {counts && (
+        <span className="text-[10px] text-muted-foreground tabular-nums">
+          ({counts.recent_x}/{counts.recent_n})
+        </span>
+      )}
+      {hasBoth && !onePerson && deltaPp !== null && (
         <Badge
           variant="outline"
           className={`text-[10px] ${
-            r.deltaPp <= 0
+            deltaPp <= 0
               ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-500"
               : "border-red-500/30 bg-red-500/10 text-red-500"
           }`}
         >
-          {fmtPp(r.deltaPp)}
+          {fmtPp(deltaPp)}
         </Badge>
-      )}
-      {hasBoth && onePerson && (
-        <span className="text-[10px] text-muted-foreground">
-          {Math.max(r.recent.n, r.previous.n)} af {Math.max(r.recent.n, r.previous.n)} person
-        </span>
       )}
     </div>
   );
@@ -84,6 +108,7 @@ function TeamRow({
   immature,
   rolling,
   windowStats,
+  trend,
   onSelectTeam,
   onCreateAction,
 }: {
@@ -94,6 +119,7 @@ function TeamRow({
   immature?: number;
   rolling?: { starters: number; exits: number };
   windowStats?: { starters: number; exits: number };
+  trend?: TrendCounts;
   onSelectTeam?: (k: string) => void;
   onCreateAction?: (k: string) => void;
 }) {
@@ -143,7 +169,7 @@ function TeamRow({
         )}
       </td>
       <td className="py-3 pr-6 text-xs">
-        <TrendCell r={r} />
+        <TrendCell counts={trend} />
       </td>
       {hasTarget && (
         <>
@@ -173,8 +199,14 @@ export function ChurnTeamTable({
   windowByTeam,
   windowMonths = 6,
   matureMonths,
+  trendByTeam,
+  trendTotal,
+  trendWindow,
 }: Props) {
-  const ranges = trendRanges(matureMonths);
+  const trendDays = trendWindow?.window_days ?? 30;
+  const trendRangeLabel = trendWindow
+    ? `${dk(trendWindow.previous_start)}–${dk(trendWindow.previous_end)} → ${dk(trendWindow.recent_start)}–${dk(trendWindow.recent_end)}`
+    : null;
   const UNKNOWN_TEAM_KEY = "Øvrige / ukendt team";
   const immatureByTeam = new Map(
     (immatureTeams ?? []).filter((t) => t.team_key !== UNKNOWN_TEAM_KEY).map((t) => [t.team_key, t.starters]),
@@ -277,10 +309,10 @@ export function ChurnTeamTable({
                   )}
                 </th>
                 <th className="py-2 pr-6">
-                  Udvikling: nyeste 3 mdr. startere vs. de 3 før
-                  {ranges?.recent && (
+                  Udvikling: nyeste {trendDays} dages startere vs. de {trendDays} før
+                  {trendRangeLabel && (
                     <span className="block font-normal normal-case tracking-normal text-[10px]">
-                      {ranges.previous ? `${ranges.previous} → ${ranges.recent}` : ranges.recent}
+                      {trendRangeLabel}
                     </span>
                   )}
                 </th>
@@ -301,6 +333,7 @@ export function ChurnTeamTable({
                   immature={immatureByTeam.get(r.key)}
                   rolling={rollingByTeam?.get(r.key)}
                   windowStats={windowByTeam?.get(r.key)}
+                  trend={trendByTeam?.get(r.key)}
                   onSelectTeam={onSelectTeam}
                   onCreateAction={onCreateAction}
                 />
@@ -329,6 +362,7 @@ export function ChurnTeamTable({
                   immature={immatureByTeam.get(r.key)}
                   rolling={rollingByTeam?.get(r.key)}
                   windowStats={windowByTeam?.get(r.key)}
+                  trend={trendByTeam?.get(r.key)}
                   onSelectTeam={onSelectTeam}
                   onCreateAction={onCreateAction}
                 />
@@ -352,7 +386,9 @@ export function ChurnTeamTable({
                     {rollingTotal.exits} / {rollingTotal.starters}
                   </span>
                 </td>
-                <td className="py-3 pr-6" />
+                <td className="py-3 pr-6 text-xs font-normal">
+                  <TrendCell counts={trendTotal} />
+                </td>
                 {hasTarget && (
                   <>
                     <td className="py-3 pr-4" />
@@ -398,8 +434,17 @@ export function ChurnTeamTable({
               temperaturmåling, ikke til konklusioner. Ikke farvet under 3 startere.
             </p>
             <p>
-              <strong className="text-foreground">Udvikling</strong> sammenligner de medarbejdere der startede i de 3
-              nyeste måneder (tallet efter pilen) med dem der startede i de 3 måneder før. Grøn betyder færre stopper nu.
+              <strong className="text-foreground">Udvikling</strong> sammenligner to rullende {trendDays}-dages
+              perioder — ikke kalendermåneder.
+              {trendWindow && (
+                <>
+                  {" "}
+                  Nyeste periode er startere fra {dk(trendWindow.recent_start)} til {dk(trendWindow.recent_end)} (tallet
+                  efter pilen), forrige periode er {dk(trendWindow.previous_start)}–{dk(trendWindow.previous_end)}.
+                </>
+              )}{" "}
+              Nyeste periode slutter 60 dage før i dag, så alle i begge perioder har haft fulde 60 dage. Grøn betyder
+              færre stopper nu.
             </p>
             <p>
               {hasTarget

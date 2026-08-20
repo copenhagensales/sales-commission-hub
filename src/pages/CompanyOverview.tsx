@@ -13,12 +13,12 @@ import { ChurnConclusion } from "@/components/company-overview/churn/ChurnConclu
 import { ChurnKpiCards } from "@/components/company-overview/churn/ChurnKpiCards";
 import { ChurnSinceLast } from "@/components/company-overview/churn/ChurnSinceLast";
 import { ChurnHeatmap } from "@/components/company-overview/churn/ChurnHeatmap";
-import { ChurnTeamTable } from "@/components/company-overview/churn/ChurnTeamTable";
+import { ChurnTeamTable, type TrendCounts } from "@/components/company-overview/churn/ChurnTeamTable";
 import { ChurnDrilldown } from "@/components/company-overview/churn/ChurnDrilldown";
 import { ChurnActionsTab } from "@/components/company-overview/churn/ChurnActionsTab";
 import { ChurnActionDialog } from "@/components/company-overview/churn/ChurnActionDialog";
 import { ChurnMethodTab } from "@/components/company-overview/churn/ChurnMethodTab";
-import { useChurnMetrics, useChurnActions } from "@/hooks/useChurnDashboard";
+import { useChurnMetrics, useChurnActions, useChurnTrendWindows } from "@/hooks/useChurnDashboard";
 import { useCanManageChurn } from "@/hooks/useCanManageChurn";
 import { deriveCompany, deriveTeams, fmtMonth, fmtPct } from "@/lib/churn/metrics";
 
@@ -26,6 +26,7 @@ export default function CompanyOverview() {
   const { data: payload, isLoading, error, dataUpdatedAt } = useChurnMetrics();
   const { data: canEdit = false } = useCanManageChurn();
   const { data: actions = [] } = useChurnActions();
+  const { data: trend } = useChurnTrendWindows(30);
 
   const [dimension, setDimension] = useState<"teams" | "leaders">("teams");
   const [drilldown, setDrilldown] = useState<{ teamKey: string | null; month: string | null; open: boolean }>({
@@ -61,6 +62,29 @@ export default function CompanyOverview() {
     });
     return map;
   }, [payload]);
+
+  /** Udvikling: to rullende 30-dages perioder, hvor alle har haft fulde 60 dage. */
+  const trendByTeam = useMemo(() => {
+    const map = new Map<string, TrendCounts>();
+    (trend?.teams ?? []).forEach((t) => {
+      map.set(t.team_key, {
+        recent_n: t.recent_n,
+        recent_x: t.recent_x,
+        previous_n: t.previous_n,
+        previous_x: t.previous_x,
+      });
+    });
+    return map;
+  }, [trend]);
+  const trendWindow = trend
+    ? {
+        window_days: trend.window_days,
+        recent_start: trend.recent_start,
+        recent_end: trend.recent_end,
+        previous_start: trend.previous_start,
+        previous_end: trend.previous_end,
+      }
+    : undefined;
   const selectedTeam = teams.find((t) => t.key === drilldown.teamKey) ?? null;
 
   const openAction = (teamKey: string) => {
@@ -160,6 +184,9 @@ export default function CompanyOverview() {
               matureMonths={payload.mature_months}
               rollingWindowStart={payload.rolling_window?.window_start ?? null}
               rollingDays={payload.rolling_window?.days ?? 60}
+              trendByTeam={trendByTeam}
+              trendTotal={trend?.total}
+              trendWindow={trendWindow}
               onSelectTeam={(teamKey) => setDrilldown({ teamKey, month: null, open: true })}
               onCreateAction={canEdit ? openAction : undefined}
             />
@@ -216,6 +243,9 @@ export default function CompanyOverview() {
                 windowMonths={TABLE_WINDOW_MONTHS}
                 rollingWindowStart={payload.rolling_window?.window_start ?? null}
                 rollingDays={payload.rolling_window?.days ?? 60}
+                trendByTeam={trendByTeam}
+                trendTotal={trend?.total}
+                trendWindow={trendWindow}
                 onSelectTeam={(teamKey) => setDrilldown({ teamKey, month: null, open: true })}
                 onCreateAction={canEdit ? openAction : undefined}
               />
