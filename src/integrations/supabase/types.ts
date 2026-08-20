@@ -9044,6 +9044,7 @@ export type Database = {
           computer_status: Database["public"]["Enums"]["it_computer_status"]
           created_at: string
           id: string
+          is_occupied: boolean
           last_checked_at: string | null
           last_updated_at: string | null
           notes: string | null
@@ -9063,6 +9064,7 @@ export type Database = {
           computer_status?: Database["public"]["Enums"]["it_computer_status"]
           created_at?: string
           id?: string
+          is_occupied?: boolean
           last_checked_at?: string | null
           last_updated_at?: string | null
           notes?: string | null
@@ -9082,6 +9084,7 @@ export type Database = {
           computer_status?: Database["public"]["Enums"]["it_computer_status"]
           created_at?: string
           id?: string
+          is_occupied?: boolean
           last_checked_at?: string | null
           last_updated_at?: string | null
           notes?: string | null
