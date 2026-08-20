@@ -11,7 +11,7 @@ import { HeadcountTrendChart } from "@/components/company-overview/HeadcountTren
 import { RevenuePerEmployeeChart } from "@/components/company-overview/RevenuePerEmployeeChart";
 import { ChurnConclusion } from "@/components/company-overview/churn/ChurnConclusion";
 import { ChurnKpiCards } from "@/components/company-overview/churn/ChurnKpiCards";
-import { ChurnSinceLast } from "@/components/company-overview/churn/ChurnSinceLast";
+
 
 import { ChurnTeamTable, type TrendCounts } from "@/components/company-overview/churn/ChurnTeamTable";
 import { ChurnDrilldown } from "@/components/company-overview/churn/ChurnDrilldown";
