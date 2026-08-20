@@ -14,7 +14,12 @@ type Channel = {
 };
 
 // Eksplicit allowlist for bulk-import. Samme liste som src/config/bulkSalesAccess.ts
-const BULK_SALES_EMAILS = ["fk@copenhagensales.dk", "filipkirketerp@gmail.com"];
+const BULK_SALES_EMAILS = [
+  "fk@copenhagensales.dk",
+  "filipkirketerp@gmail.com",
+  "anni@copenhagensales.dk",
+  "sondergaardannika@gmail.com",
+];
 function isBulkSalesEmail(email?: string | null): boolean {
   if (!email) return false;
   return BULK_SALES_EMAILS.includes(email.trim().toLowerCase());
