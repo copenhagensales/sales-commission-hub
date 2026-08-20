@@ -107,23 +107,47 @@ export async function verifyTwilioRequest(
     return { ok: false, response: unauthorized(corsHeaders) };
   }
 
-  // Twilio signs the exact URL it was configured with. Supabase terminates TLS
-  // upstream, so rebuild the public https URL from forwarded headers.
-  const url = new URL(req.url);
-  const forwardedHost = req.headers.get("x-forwarded-host");
-  if (forwardedHost) url.host = forwardedHost;
-  url.protocol = "https:";
+  // Twilio signerer den præcise URL den er konfigureret med. Inde i edge-runtime
+  // er req.url typisk http://localhost:9999/<function>, så den offentlige URL
+  // skal rekonstrueres. Vi prøver alle realistiske varianter.
+  const reqUrl = new URL(req.url);
+  const search = reqUrl.search;
+  const rawPath = reqUrl.pathname.replace(/\/+$/, "");
+  const fnName = rawPath.replace(/^\/functions\/v1/, "").replace(/^\//, "");
+
+  const origins = new Set<string>();
+  const forwardedHost = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+  if (forwardedHost && !/^localhost(:|$)/.test(forwardedHost)) origins.add(`https://${forwardedHost}`);
+  const configuredBase = Deno.env.get("TWILIO_WEBHOOK_BASE_URL");
+  if (configuredBase) origins.add(configuredBase.replace(/\/+$/, ""));
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  if (supabaseUrl) origins.add(new URL(supabaseUrl).origin);
+
+  const candidates = new Set<string>();
+  for (const origin of origins) {
+    for (const path of [`/functions/v1/${fnName}`, `/${fnName}`]) {
+      candidates.add(`${origin}${path}${search}`);
+      candidates.add(`${origin}${path}`);
+    }
+  }
+  // Fallback: den oprindelige adfærd, hvis intet af ovenstående matcher.
+  candidates.add(`${reqUrl.origin}${rawPath}${search}`);
 
   const sortedKeys = [...new Set([...params.keys()])].sort();
-  const candidates = [url.toString(), url.toString().replace(/\?$/, "")];
+  const suffix = sortedKeys.map((k) => k + params.getAll(k).join("")).join("");
 
   for (const base of candidates) {
-    const data = base + sortedKeys.map((k) => k + params.getAll(k).join("")).join("");
-    const expected = await hmacSha1Base64(authToken, data);
+    const expected = await hmacSha1Base64(authToken, base + suffix);
     if (expected === signature) {
       return { ok: true, params, raw };
     }
   }
+
+  console.error("[webhook-auth] Invalid Twilio signature — request rejected", {
+    triedCandidates: [...candidates],
+    paramKeys: sortedKeys,
+  });
+
 
   console.error("[webhook-auth] Invalid Twilio signature — request rejected");
   return { ok: false, response: unauthorized(corsHeaders) };
