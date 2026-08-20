@@ -270,7 +270,6 @@ export function ChurnTeamTable({
                 )}
               </tr>
 
-              </tr>
             </tbody>
           </table>
         </div>
