@@ -34,6 +34,8 @@ interface Props {
   onOpen: (ws: ItWorkstation) => void;
   /** Hurtig toggle af udstyr direkte på kortet (kun med redigeringsadgang). */
   onToggleEquipment?: (ws: ItWorkstation, kind: EquipmentKind, next: EquipmentStatus) => void;
+  /** Hurtig markering af bordet som i brug / ledigt (kun med redigeringsadgang). */
+  onToggleOccupancy?: (ws: ItWorkstation, next: boolean) => void;
   faded?: boolean;
   highlighted?: boolean;
 }
@@ -42,10 +44,13 @@ export function WorkstationCard({
   workstation: ws,
   onOpen,
   onToggleEquipment,
+  onToggleOccupancy,
   faded,
   highlighted,
 }: Props) {
   const interactiveEquipment = !!onToggleEquipment;
+  const isFree = ws.is_occupied === false;
+
 
   return (
     <div
@@ -58,11 +63,13 @@ export function WorkstationCard({
           onOpen(ws);
         }
       }}
-      aria-label={`${seatLabel(ws)} — ${OVERALL_LABELS[ws.overall]} — ${ws.headline}`}
+      aria-label={`${seatLabel(ws)} — ${isFree ? "Ledigt" : "I brug"} — ${OVERALL_LABELS[ws.overall]} — ${ws.headline}`}
       className={cn(
         "group flex w-full min-w-0 cursor-pointer flex-col gap-2 overflow-hidden rounded-xl border p-2.5 text-left transition-all duration-150 sm:p-3",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-        OVERALL_CARD_CLASS[ws.overall],
+        isFree
+          ? "border-dashed border-primary/50 bg-primary/5 hover:border-primary"
+          : OVERALL_CARD_CLASS[ws.overall],
         faded && "opacity-30",
         highlighted && "ring-2 ring-primary ring-offset-2 ring-offset-background",
       )}
@@ -79,6 +86,40 @@ export function WorkstationCard({
           />
         </span>
       </div>
+
+      {onToggleOccupancy ? (
+        <button
+          type="button"
+          aria-pressed={isFree}
+          title={`Klik for at markere bordet som ${isFree ? "i brug" : "ledigt"}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggleOccupancy(ws, isFree);
+          }}
+          onKeyDown={(event) => event.stopPropagation()}
+          className={cn(
+            "w-fit rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition-colors",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            isFree
+              ? "border-primary/50 bg-primary/10 text-primary hover:bg-primary/20"
+              : "border-border bg-muted/60 text-muted-foreground hover:bg-muted",
+          )}
+        >
+          {isFree ? "Ledigt" : "I brug"}
+        </button>
+      ) : (
+        <span
+          className={cn(
+            "w-fit rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+            isFree
+              ? "border-primary/50 bg-primary/10 text-primary"
+              : "border-border bg-muted/60 text-muted-foreground",
+          )}
+        >
+          {isFree ? "Ledigt" : "I brug"}
+        </span>
+      )}
+
 
       <div className="flex min-w-0 flex-wrap items-center gap-1">
         {ws.equipment.map((item) => {

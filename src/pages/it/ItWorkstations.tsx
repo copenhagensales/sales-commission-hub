@@ -49,6 +49,7 @@ import {
   DEFAULT_SEATS_PER_ROW,
   isUpdateOverdue,
   useToggleEquipmentStatus,
+  useToggleOccupancy,
   EQUIPMENT_LABELS,
   EQUIPMENT_STATUS_LABELS,
   type EquipmentKind,
@@ -97,7 +98,9 @@ type StatusFilter =
   | "update_overdue"
   | "campaign_pending"
   | "update_failed"
-  | "missing_equipment";
+  | "missing_equipment"
+  | "free"
+  | "occupied";
 
 const EQUIPMENT_ICONS: Record<EquipmentKind, typeof Laptop> = {
   computer: Laptop,
@@ -127,6 +130,8 @@ const STATUS_FILTERS: { key: StatusFilter; label: string; dot?: OverallStatus }[
   { key: "update_overdue", label: "Opdatering forfalden (30+ dage)" },
   { key: "update_failed", label: "Opdatering fejlede" },
   { key: "missing_equipment", label: "Manglende udstyr" },
+  { key: "occupied", label: "I brug" },
+  { key: "free", label: "Ledige borde" },
   { key: "unknown", label: "Ukendt", dot: "unknown" },
 ];
 
@@ -174,6 +179,7 @@ export default function ItWorkstations() {
   const activeCampaign = campaigns?.find((c) => c.is_active) ?? campaigns?.[0];
 
   const toggleEquipment = useToggleEquipmentStatus();
+  const toggleOccupancy = useToggleOccupancy();
 
   const handleToggleEquipment = (
     ws: ItWorkstation,
@@ -196,6 +202,22 @@ export default function ItWorkstations() {
             },
           );
         },
+        onError: () => toast.error("Kunne ikke gemme ændringen"),
+      },
+    );
+  };
+
+  const handleToggleOccupancy = (ws: ItWorkstation, next: boolean) => {
+    toggleOccupancy.mutate(
+      { workstation: ws, next },
+      {
+        onSuccess: () =>
+          toast.success(`${seatLabel(ws)} markeret som ${next ? "i brug" : "ledigt"}`, {
+            action: {
+              label: "Fortryd",
+              onClick: () => toggleOccupancy.mutate({ workstation: ws, next: !next }),
+            },
+          }),
         onError: () => toast.error("Kunne ikke gemme ændringen"),
       },
     );
@@ -320,6 +342,10 @@ export default function ItWorkstations() {
         return w.update_status === "update_failed";
       case "missing_equipment":
         return w.equipment.some((e) => e.status === "missing" || e.status === "broken");
+      case "free":
+        return w.is_occupied === false;
+      case "occupied":
+        return w.is_occupied !== false;
       default:
         return w.overall === statusFilter;
     }
@@ -436,7 +462,7 @@ export default function ItWorkstations() {
       </header>
 
       {/* KPI row */}
-      <section className="grid gap-3 px-4 py-4 sm:px-6 md:grid-cols-3 xl:grid-cols-6">
+      <section className="grid gap-3 px-4 py-4 sm:px-6 md:grid-cols-3 xl:grid-cols-7">
         <StatCard label="Arbejdsstationer" value={stats.total} hint={`${areas.length} områder`} />
         <StatCard label="Alt OK" value={stats.ok} hint="opdateret & komplet" dot="ok" />
         <StatCard
@@ -447,6 +473,11 @@ export default function ItWorkstations() {
         />
         <StatCard label="Virker ikke" value={stats.down} hint="hardware nede" dot="down" />
         <StatCard label="Ukendt" value={stats.unknown} hint="ikke tjekket" dot="unknown" />
+        <StatCard
+          label="I brug / ledige"
+          value={`${stats.occupied} / ${stats.free}`}
+          hint="borde optaget mod ledige"
+        />
 
         <Card className="p-4">
           {activeCampaign ? (
@@ -721,7 +752,8 @@ export default function ItWorkstations() {
                           )}
                         </div>
                         <span className="text-xs text-muted-foreground">
-                          {seats.length} pladser · {attention} kræver opmærksomhed
+                          {seats.length} pladser · {seats.filter((w) => w.is_occupied === false).length} ledige ·{" "}
+                          {attention} kræver opmærksomhed
                         </span>
                       </div>
 
@@ -751,6 +783,9 @@ export default function ItWorkstations() {
                                       onOpen={openWorkstation}
                                       onToggleEquipment={
                                         canEdit ? handleToggleEquipment : undefined
+                                      }
+                                      onToggleOccupancy={
+                                        canEdit ? handleToggleOccupancy : undefined
                                       }
                                       faded={problemsOnly && !isProblem(ws)}
                                       highlighted={!!searchTerm && matchesSearch(ws)}

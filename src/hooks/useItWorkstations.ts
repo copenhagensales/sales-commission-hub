@@ -49,6 +49,8 @@ export interface ItWorkstationRow {
   last_updated_at: string | null;
   updated_by_name: string | null;
   notes: string | null;
+  /** Bordet er i brug (true) eller ledigt (false). */
+  is_occupied: boolean;
 }
 
 /** Visningsnavn: bordene navngives "Bord 1", "Bord 2" ... inden for hvert område. */
@@ -236,7 +238,7 @@ export function useItWorkstations(enabled = true) {
         supabase
           .from("it_workstations")
           .select(
-            "id, code, area_code, area_label, seat_order, computer_name, asset_id, serial_number, computer_status, update_status, last_checked_at, last_updated_at, updated_by_name, notes",
+            "id, code, area_code, area_label, seat_order, computer_name, asset_id, serial_number, computer_status, update_status, last_checked_at, last_updated_at, updated_by_name, notes, is_occupied",
           )
           .order("area_code")
           .order("seat_order"),
@@ -616,6 +618,61 @@ export function useToggleEquipmentStatus() {
   });
 }
 
+/**
+ * Hurtig markering af et bord som i brug / ledigt direkte i gulvplanen.
+ * Optimistisk med rollback ved fejl. Rører ingen udstyrs- eller statuslogik.
+ */
+export function useToggleOccupancy() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const { data: userName } = useItCurrentUserName();
+
+  return useMutation({
+    mutationFn: async ({
+      workstation,
+      next,
+    }: {
+      workstation: ItWorkstation;
+      next: boolean;
+    }) => {
+      const { error } = await supabase
+        .from("it_workstations")
+        .update({ is_occupied: next })
+        .eq("id", workstation.id);
+      if (error) throw error;
+
+      const { error: logError } = await supabase.from("it_activity_logs").insert({
+        workstation_id: workstation.id,
+        workstation_code: workstation.code,
+        user_id: user?.id ?? null,
+        user_name: userName ?? null,
+        action: `${workstation.code}: markeret som "${next ? "I brug" : "Ledigt"}"`,
+        field: "is_occupied",
+        previous_value: workstation.is_occupied === false ? "Ledigt" : "I brug",
+        new_value: next ? "I brug" : "Ledigt",
+      });
+      if (logError) throw logError;
+    },
+    onMutate: async ({ workstation, next }) => {
+      await queryClient.cancelQueries({ queryKey: ["it-workstations"] });
+      const previous = queryClient.getQueryData<ItWorkstation[]>(["it-workstations"]);
+      queryClient.setQueryData<ItWorkstation[]>(["it-workstations"], (old) =>
+        (old ?? []).map((w) => (w.id === workstation.id ? { ...w, is_occupied: next } : w)),
+      );
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["it-workstations"], context.previous);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["it-workstations"] });
+      queryClient.invalidateQueries({ queryKey: ["it-activity-log"] });
+    },
+  });
+}
+
 // ============================================================================
 // AGGREGATES
 // ============================================================================
@@ -630,6 +687,8 @@ export interface ItStats {
   updateOverdue: number;
   missingEquipment: number;
   brokenEquipment: number;
+  occupied: number;
+  free: number;
 }
 
 export function useItStats(workstations: ItWorkstation[] | undefined): ItStats {
@@ -649,6 +708,8 @@ export function useItStats(workstations: ItWorkstation[] | undefined): ItStats {
       ).length,
       brokenEquipment: list.filter((w) => w.equipment.some((e) => e.status === "broken"))
         .length,
+      occupied: list.filter((w) => w.is_occupied !== false).length,
+      free: list.filter((w) => w.is_occupied === false).length,
     };
   }, [workstations]);
 }
