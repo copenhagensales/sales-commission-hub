@@ -52,6 +52,7 @@ export function ChurnHeatmap({ payload, teams, dimension, onSelectCell }: Props)
   }, [payload.team_months]);
 
   const rows = useMemo(() => sortTeamsForPriority(teams, settings), [teams, settings]);
+  const latestMonth = months.length ? months[months.length - 1] : null;
 
   const leaderRows = useMemo(
     () =>
@@ -133,7 +134,7 @@ export function ChurnHeatmap({ payload, teams, dimension, onSelectCell }: Props)
         <CardTitle>Team × startmåned — 60-dages tidligt frafald</CardTitle>
         <CardDescription>
           {months.length} fuldt modne startmåneder. Hver celle viser rate og exits/startere. Klik en celle for
-          drilldown.
+          drilldown.{latestMonth ? ` Nyeste modne startmåned er ${formatMonth(latestMonth)} — fremhævet til højre.` : ""}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -150,14 +151,25 @@ export function ChurnHeatmap({ payload, teams, dimension, onSelectCell }: Props)
             <thead>
               <tr>
                 <th className="sticky left-0 z-20 bg-card px-3 py-2 text-left font-medium border-b">Team</th>
-                {months.map((m) => (
-                  <th key={m} className="px-2 py-2 text-center font-medium border-b whitespace-nowrap">
-                    {formatMonth(m)}
-                    <div className="text-[10px] font-normal text-muted-foreground">
-                      n={monthTotals.get(m)?.starters ?? 0}
-                    </div>
-                  </th>
-                ))}
+                {months.map((m) => {
+                  const isLatest = m === latestMonth;
+                  return (
+                    <th
+                      key={m}
+                      className={`px-2 py-2 text-center font-medium border-b whitespace-nowrap ${
+                        isLatest ? "bg-primary/10 border-x border-t border-primary/50 rounded-t-md text-primary" : ""
+                      }`}
+                    >
+                      {formatMonth(m)}
+                      {isLatest && (
+                        <div className="text-[9px] font-semibold uppercase tracking-wide text-primary">Nyeste</div>
+                      )}
+                      <div className="text-[10px] font-normal text-muted-foreground">
+                        n={monthTotals.get(m)?.starters ?? 0}
+                      </div>
+                    </th>
+                  );
+                })}
                 <th className="px-2 py-2 border-b whitespace-nowrap">12-mdr</th>
                 <th className="px-2 py-2 border-b whitespace-nowrap">Seneste 3</th>
                 <th className="px-2 py-2 border-b whitespace-nowrap">Foregå. 3</th>
@@ -179,7 +191,10 @@ export function ChurnHeatmap({ payload, teams, dimension, onSelectCell }: Props)
                     const cell = cellIndex.get(`${row.key}|${m}`);
                     if (!cell) {
                       return (
-                        <td key={m} className="border-b px-1 py-1">
+                        <td
+                          key={m}
+                          className={`border-b px-1 py-1 ${m === latestMonth ? "bg-primary/5 border-x border-primary/50" : ""}`}
+                        >
                           <div className="rounded bg-muted/40 text-muted-foreground text-center py-1">–</div>
                         </td>
                       );
@@ -187,7 +202,10 @@ export function ChurnHeatmap({ payload, teams, dimension, onSelectCell }: Props)
                     const r = rate(cell.exits, cell.starters);
                     const st = statusFor(r, cell.starters, settings);
                     return (
-                      <td key={m} className="border-b px-1 py-1">
+                      <td
+                        key={m}
+                        className={`border-b px-1 py-1 ${m === latestMonth ? "bg-primary/5 border-x border-primary/50" : ""}`}
+                      >
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <button
@@ -267,7 +285,12 @@ export function ChurnHeatmap({ payload, teams, dimension, onSelectCell }: Props)
                   const t = monthTotals.get(m);
                   const r = rate(t?.exits ?? 0, t?.starters ?? 0);
                   return (
-                    <td key={m} className="px-1 py-1 text-center">
+                    <td
+                      key={m}
+                      className={`px-1 py-1 text-center ${
+                        m === latestMonth ? "bg-primary/10 border-x border-b border-primary/50 rounded-b-md" : ""
+                      }`}
+                    >
                       {r === null ? "–" : `${Math.round(r)} %`}
                       <div className="text-[10px] font-normal text-muted-foreground">
                         {t?.exits ?? 0}/{t?.starters ?? 0}
