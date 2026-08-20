@@ -181,6 +181,23 @@ export default function ItWorkstations() {
 
   const toggleEquipment = useToggleEquipmentStatus();
   const toggleOccupancy = useToggleOccupancy();
+  const toggleChair = useToggleChairBroken();
+
+  const handleToggleChair = (ws: ItWorkstation, next: boolean) => {
+    toggleChair.mutate(
+      { workstation: ws, next },
+      {
+        onSuccess: () =>
+          toast.success(`${seatLabel(ws)}: stol markeret som ${next ? "ødelagt" : "ok"}`, {
+            action: {
+              label: "Fortryd",
+              onClick: () => toggleChair.mutate({ workstation: ws, next: !next }),
+            },
+          }),
+        onError: () => toast.error("Kunne ikke gemme ændringen"),
+      },
+    );
+  };
 
   const handleToggleEquipment = (
     ws: ItWorkstation,
