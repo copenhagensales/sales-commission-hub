@@ -1,9 +1,10 @@
-import { Laptop, Monitor, Headphones, Mouse, Keyboard, ArrowUpDown } from "lucide-react";
+import { Laptop, Monitor, Headphones, Mouse, Keyboard, ArrowUpDown, Armchair } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   EQUIPMENT_LABELS,
   EQUIPMENT_STATUS_LABELS,
   OVERALL_LABELS,
+  isChairBroken,
   type EquipmentKind,
   type EquipmentStatus,
   seatLabel,
