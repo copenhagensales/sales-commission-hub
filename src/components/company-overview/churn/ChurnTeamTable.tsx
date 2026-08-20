@@ -150,11 +150,11 @@ export function ChurnTeamTable({ teams, settings, onSelectTeam, onCreateAction }
       <CardHeader>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <CardTitle>Prioriteret teamtabel</CardTitle>
+            <CardTitle>Hvor mange nye stopper — pr. team</CardTitle>
             <CardDescription>
               {hasTarget
-                ? "Sorteret efter positivt merfrafald mod mål, derefter antal faktiske exits."
-                : "Sorteret efter estimeret personpåvirkning — antal exits inden for de første 60 dage."}
+                ? "Teams med flest exits mere end målet står øverst."
+                : "Teams med flest nye medarbejdere der stoppede inden for de første 60 dage står øverst."}
             </CardDescription>
           </div>
           <Badge variant="outline" className="border-orange-400/40 bg-orange-400/10 text-orange-400">
@@ -165,15 +165,15 @@ export function ChurnTeamTable({ teams, settings, onSelectTeam, onCreateAction }
       <CardContent className="space-y-5">
         <div className="grid grid-cols-2 divide-border rounded-lg border md:grid-cols-4 md:divide-x">
           <div className="p-4">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Modne startere</p>
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Nye startet (sidste 12 mdr.)</p>
             <p className="text-2xl font-bold">{total.starters}</p>
           </div>
           <div className="p-4">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Exits dag 0–60</p>
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Stoppet inden 60 dage</p>
             <p className="text-2xl font-bold">{total.exits}</p>
           </div>
           <div className="p-4">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Samlet 60-dages rate</p>
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Andel der stoppede</p>
             <p className={`text-2xl font-bold ${rateTone(totalRate, false).text}`}>{fmtPct(totalRate)}</p>
           </div>
           <div className="p-4">
@@ -190,16 +190,17 @@ export function ChurnTeamTable({ teams, settings, onSelectTeam, onCreateAction }
               <tr className="border-b text-left text-[11px] uppercase tracking-wide text-muted-foreground">
                 <th className="py-2 pr-2" />
                 <th className="py-2 pr-4">Team</th>
-                <th className="py-2 pr-4 text-right">Modne startere</th>
-                <th className="py-2 pr-6 text-right">Exits 0–60</th>
-                <th className="py-2 pr-6">60-dages rate</th>
-                <th className="py-2 pr-6">Seneste 3 vs. foregående 3</th>
-                {hasTarget && <th className="py-2 pr-4">Mål-gap</th>}
-                {hasTarget && <th className="py-2 pr-4">Merfrafald</th>}
-                <th className="py-2 pr-4">Datagrundlag</th>
+                <th className="py-2 pr-4 text-right">Nye startet</th>
+                <th className="py-2 pr-6 text-right">Stoppet inden 60 dage</th>
+                <th className="py-2 pr-6">Andel der stoppede (12 mdr.)</th>
+                <th className="py-2 pr-6">Udvikling: nyeste 3 mdr. startere vs. de 3 før</th>
+                {hasTarget && <th className="py-2 pr-4">Afstand til mål</th>}
+                {hasTarget && <th className="py-2 pr-4">Exits over mål</th>}
+                <th className="py-2 pr-4">Nok data?</th>
                 <th className="py-2">Handling</th>
               </tr>
             </thead>
+
             <tbody>
               {solid.map((r, i) => (
                 <TeamRow
