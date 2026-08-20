@@ -143,7 +143,7 @@ export function ChurnTeamTable({
     { starters: 0, exits: 0, excess: 0 },
   );
   const totalRate = total.starters ? (total.exits / total.starters) * 100 : null;
-  const colSpan = hasTarget ? 11 : 9;
+  const colSpan = hasTarget ? 9 : 7;
 
   return (
     <Card>
