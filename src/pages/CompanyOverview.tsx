@@ -61,6 +61,29 @@ export default function CompanyOverview() {
     });
     return map;
   }, [payload]);
+
+  /** Udvikling: to rullende 30-dages perioder, hvor alle har haft fulde 60 dage. */
+  const trendByTeam = useMemo(() => {
+    const map = new Map<string, TrendCounts>();
+    (trend?.teams ?? []).forEach((t) => {
+      map.set(t.team_key, {
+        recent_n: t.recent_n,
+        recent_x: t.recent_x,
+        previous_n: t.previous_n,
+        previous_x: t.previous_x,
+      });
+    });
+    return map;
+  }, [trend]);
+  const trendWindow = trend
+    ? {
+        window_days: trend.window_days,
+        recent_start: trend.recent_start,
+        recent_end: trend.recent_end,
+        previous_start: trend.previous_start,
+        previous_end: trend.previous_end,
+      }
+    : undefined;
   const selectedTeam = teams.find((t) => t.key === drilldown.teamKey) ?? null;
 
   const openAction = (teamKey: string) => {
