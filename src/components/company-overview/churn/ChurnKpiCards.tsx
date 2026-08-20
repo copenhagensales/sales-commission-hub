@@ -53,7 +53,7 @@ export function ChurnKpiCards({ payload, company }: Props) {
             {company.status.label}
           </Badge>
           <div className="text-xs text-muted-foreground">
-            Seneste modne startmåned: {payload.latest_mature_month ?? "Data mangler"}
+            Seneste modne startmåned: {payload.latest_mature_month ? fmtMonth(payload.latest_mature_month) : "Data mangler"}
           </div>
         </CardContent>
       </Card>
