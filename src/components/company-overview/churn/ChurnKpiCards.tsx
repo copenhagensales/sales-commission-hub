@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { UserMinus, TrendingDown, TrendingUp, Minus, AlertTriangle, ShieldCheck, Eye } from "lucide-react";
+
+import { UserMinus, TrendingDown, TrendingUp, Minus, ShieldCheck, Eye } from "lucide-react";
 import { fmtMonth, fmtPct, fmtPp, rate, STATUS_CLASSES, type ChurnMetricsPayload, type DerivedGroup } from "@/lib/churn/metrics";
 
 interface Props {
@@ -30,7 +30,7 @@ export function ChurnKpiCards({ payload, company }: Props) {
   const r30 = rate(payload.horizon_30.x, payload.horizon_30.n);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
       {/* Kort 1 */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
