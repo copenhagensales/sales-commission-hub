@@ -805,6 +805,7 @@ export default function ItWorkstations() {
                                       onToggleOccupancy={
                                         canEdit ? handleToggleOccupancy : undefined
                                       }
+                                      onToggleChair={canEdit ? handleToggleChair : undefined}
                                       faded={problemsOnly && !isProblem(ws)}
                                       highlighted={!!searchTerm && matchesSearch(ws)}
                                     />
