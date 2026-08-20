@@ -2,13 +2,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
-import { fmtPct, fmtPp, sortTeamsForPriority, type ChurnSettings, type DerivedGroup } from "@/lib/churn/metrics";
+import { fmtMonth, fmtPct, fmtPp, sortTeamsForPriority, type ChurnSettings, type DerivedGroup } from "@/lib/churn/metrics";
 
 interface Props {
   teams: DerivedGroup[];
   settings: ChurnSettings;
   onSelectTeam?: (teamKey: string) => void;
   onCreateAction?: (teamKey: string) => void;
+  /** Startere efter seneste modne måned — vises som "for nye til at tælle med". */
+  immatureTeams?: Array<{ team_key: string; starters: number; exits_so_far: number }>;
+  latestMatureMonth?: string | null;
 }
 
 /** Farvezone for rate — grå når datagrundlaget er for tyndt. */
@@ -57,6 +60,7 @@ function TeamRow({
   index,
   emphasize,
   hasTarget,
+  immature,
   onSelectTeam,
   onCreateAction,
 }: {
@@ -64,6 +68,7 @@ function TeamRow({
   index: number;
   emphasize: boolean;
   hasTarget: boolean;
+  immature?: number;
   onSelectTeam?: (k: string) => void;
   onCreateAction?: (k: string) => void;
 }) {
@@ -82,6 +87,7 @@ function TeamRow({
         {r.key}
       </td>
       <td className="py-3 pr-4 text-right tabular-nums">{r.starters}</td>
+      <td className="py-3 pr-4 text-right tabular-nums text-muted-foreground">{immature ? `+${immature}` : "–"}</td>
       <td className="py-3 pr-6 text-right tabular-nums">{r.exits}</td>
       <td className="py-3 pr-6 min-w-[190px]">
         <div className="flex items-baseline gap-2">
@@ -127,7 +133,16 @@ function TeamRow({
 }
 
 /** UI-06: prioriteret teamtabel — omdesignet for klarhed. */
-export function ChurnTeamTable({ teams, settings, onSelectTeam, onCreateAction }: Props) {
+export function ChurnTeamTable({
+  teams,
+  settings,
+  onSelectTeam,
+  onCreateAction,
+  immatureTeams,
+  latestMatureMonth,
+}: Props) {
+  const immatureByTeam = new Map((immatureTeams ?? []).map((t) => [t.team_key, t.starters]));
+  const immatureTotal = (immatureTeams ?? []).reduce((a, t) => a + t.starters, 0);
   const hasTarget = settings.target_60d_rate !== null && settings.target_60d_rate !== undefined;
   const ordered = sortTeamsForPriority(teams, settings);
   const solid = ordered.filter((t) => !t.lowData);
@@ -143,7 +158,7 @@ export function ChurnTeamTable({ teams, settings, onSelectTeam, onCreateAction }
     { starters: 0, exits: 0, excess: 0 },
   );
   const totalRate = total.starters ? (total.exits / total.starters) * 100 : null;
-  const colSpan = hasTarget ? 10 : 8;
+  const colSpan = hasTarget ? 11 : 9;
 
   return (
     <Card>
@@ -163,10 +178,17 @@ export function ChurnTeamTable({ teams, settings, onSelectTeam, onCreateAction }
         </div>
       </CardHeader>
       <CardContent className="space-y-5">
-        <div className="grid grid-cols-2 divide-border rounded-lg border md:grid-cols-4 md:divide-x">
+        <div className="grid grid-cols-2 divide-border rounded-lg border md:grid-cols-5 md:divide-x">
           <div className="p-4">
             <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Nye startet (sidste 12 mdr.)</p>
             <p className="text-2xl font-bold">{total.starters}</p>
+          </div>
+          <div className="p-4">
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Nye — for tidligt at måle</p>
+            <p className="text-2xl font-bold">{immatureTotal}</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              startet efter {fmtMonth(latestMatureMonth)}
+            </p>
           </div>
           <div className="p-4">
             <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Stoppet inden 60 dage</p>
@@ -191,6 +213,7 @@ export function ChurnTeamTable({ teams, settings, onSelectTeam, onCreateAction }
                 <th className="py-2 pr-2" />
                 <th className="py-2 pr-4">Team</th>
                 <th className="py-2 pr-4 text-right">Nye startet</th>
+                <th className="py-2 pr-4 text-right">For nye til at måle</th>
                 <th className="py-2 pr-6 text-right">Stoppet inden 60 dage</th>
                 <th className="py-2 pr-6">Andel der stoppede (12 mdr.)</th>
                 <th className="py-2 pr-6">Udvikling: nyeste 3 mdr. startere vs. de 3 før</th>
@@ -209,6 +232,7 @@ export function ChurnTeamTable({ teams, settings, onSelectTeam, onCreateAction }
                   index={i + 1}
                   emphasize
                   hasTarget={hasTarget}
+                  immature={immatureByTeam.get(r.key)}
                   onSelectTeam={onSelectTeam}
                   onCreateAction={onCreateAction}
                 />
@@ -234,6 +258,7 @@ export function ChurnTeamTable({ teams, settings, onSelectTeam, onCreateAction }
                   index={solid.length + i + 1}
                   emphasize={false}
                   hasTarget={hasTarget}
+                  immature={immatureByTeam.get(r.key)}
                   onSelectTeam={onSelectTeam}
                   onCreateAction={onCreateAction}
                 />
@@ -243,6 +268,9 @@ export function ChurnTeamTable({ teams, settings, onSelectTeam, onCreateAction }
                 <td />
                 <td className="py-3 pr-4 whitespace-nowrap">Hele virksomheden</td>
                 <td className="py-3 pr-4 text-right tabular-nums">{total.starters}</td>
+                <td className="py-3 pr-4 text-right tabular-nums text-muted-foreground">
+                  {immatureTotal ? `+${immatureTotal}` : "–"}
+                </td>
                 <td className="py-3 pr-6 text-right tabular-nums">{total.exits}</td>
                 <td className="py-3 pr-6">
                   <span className="mr-2">{fmtPct(totalRate)}</span>
@@ -281,6 +309,11 @@ export function ChurnTeamTable({ teams, settings, onSelectTeam, onCreateAction }
             <p>
               <strong className="text-foreground">Andel der stoppede</strong> er gennemsnittet for alle der er startet
               de sidste 12 måneder — ikke kun de sidste 60 dage. Hver person følges i 60 dage fra sin startdato.
+            </p>
+            <p>
+              <strong className="text-foreground">For nye til at måle</strong> er dem der er startet efter{" "}
+              {fmtMonth(latestMatureMonth)}. De er ansat og tælles med i medarbejderoversigten, men de har ikke haft
+              mulighed for at nå 60 dage endnu, så de kan ikke indgå i andelen uden at gøre den kunstigt lav.
             </p>
             <p>
               <strong className="text-foreground">Udvikling</strong> sammenligner de medarbejdere der startede i de 3
