@@ -108,6 +108,7 @@ function TeamRow({
   immature,
   rolling,
   windowStats,
+  trend,
   onSelectTeam,
   onCreateAction,
 }: {
@@ -118,6 +119,7 @@ function TeamRow({
   immature?: number;
   rolling?: { starters: number; exits: number };
   windowStats?: { starters: number; exits: number };
+  trend?: TrendCounts;
   onSelectTeam?: (k: string) => void;
   onCreateAction?: (k: string) => void;
 }) {
