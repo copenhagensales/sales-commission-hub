@@ -115,9 +115,7 @@ function TeamRow({
   );
 }
 
-    </tr>
-  );
-}
+
 
 /** UI-06: prioriteret teamtabel — omdesignet for klarhed. */
 export function ChurnTeamTable({
