@@ -17,6 +17,10 @@ interface Props {
   rollingWindowStart?: string | null;
   /** Antal dage i det løbende vindue. */
   rollingDays?: number;
+  /** Startere/exits pr. team for det viste antal modne måneder (fx sidste 6). */
+  windowByTeam?: Map<string, { starters: number; exits: number }>;
+  /** Antal modne måneder vinduet dækker. */
+  windowMonths?: number;
 }
 
 /** Farvezone for rate — grå når datagrundlaget er for tyndt. */
@@ -67,6 +71,7 @@ function TeamRow({
   hasTarget,
   immature,
   rolling,
+  windowStats,
   onSelectTeam,
   onCreateAction,
 }: {
@@ -76,13 +81,17 @@ function TeamRow({
   hasTarget: boolean;
   immature?: number;
   rolling?: { starters: number; exits: number };
+  windowStats?: { starters: number; exits: number };
   onSelectTeam?: (k: string) => void;
   onCreateAction?: (k: string) => void;
 }) {
-  const tone = rateTone(r.rate, r.lowData);
+  const starters = windowStats ? windowStats.starters : r.starters;
+  const exits = windowStats ? windowStats.exits : r.exits;
+  const shownRate = windowStats ? (starters > 0 ? (exits / starters) * 100 : null) : r.rate;
+  const tone = rateTone(shownRate, r.lowData);
   const rollRate = rolling && rolling.starters > 0 ? (rolling.exits / rolling.starters) * 100 : null;
   const rollTone = rateTone(rollRate, !rolling || rolling.starters < 3);
-  const width = r.rate === null ? 0 : Math.min(100, r.rate);
+  const width = shownRate === null ? 0 : Math.min(100, shownRate);
 
   return (
     <tr
@@ -95,14 +104,14 @@ function TeamRow({
       <td className={`py-3 pr-4 whitespace-nowrap ${emphasize ? "font-semibold" : "font-medium text-muted-foreground"}`}>
         {r.key}
       </td>
-      <td className="py-3 pr-4 text-right tabular-nums">{r.starters}</td>
+      <td className="py-3 pr-4 text-right tabular-nums">{starters}</td>
       <td className="py-3 pr-4 text-right tabular-nums text-muted-foreground">{immature ? `+${immature}` : "–"}</td>
-      <td className="py-3 pr-6 text-right tabular-nums">{r.exits}</td>
+      <td className="py-3 pr-6 text-right tabular-nums">{exits}</td>
       <td className="py-3 pr-6 min-w-[190px]">
         <div className="flex items-baseline gap-2">
-          <span className={`text-sm font-bold ${tone.text}`}>{fmtPct(r.rate)}</span>
+          <span className={`text-sm font-bold ${tone.text}`}>{fmtPct(shownRate)}</span>
           <span className="text-[11px] text-muted-foreground tabular-nums">
-            {r.exits} / {r.starters}
+            {exits} / {starters}
           </span>
         </div>
         <div className="mt-1.5 h-1.5 w-full max-w-[220px] rounded-full bg-muted">
@@ -149,6 +158,8 @@ export function ChurnTeamTable({
   rollingByTeam,
   rollingWindowStart,
   rollingDays = 60,
+  windowByTeam,
+  windowMonths = 6,
 }: Props) {
   const UNKNOWN_TEAM_KEY = "Øvrige / ukendt team";
   const immatureByTeam = new Map(
@@ -164,11 +175,14 @@ export function ChurnTeamTable({
   const rows = [...solid, ...thin];
 
   const total = rows.reduce(
-    (acc, r) => ({
-      starters: acc.starters + r.starters,
-      exits: acc.exits + r.exits,
-      excess: acc.excess + (r.excessExits ?? 0),
-    }),
+    (acc, r) => {
+      const w = windowByTeam?.get(r.key);
+      return {
+        starters: acc.starters + (w ? w.starters : r.starters),
+        exits: acc.exits + (w ? w.exits : r.exits),
+        excess: acc.excess + (r.excessExits ?? 0),
+      };
+    },
     { starters: 0, exits: 0, excess: 0 },
   );
   const totalRate = total.starters ? (total.exits / total.starters) * 100 : null;
@@ -204,7 +218,7 @@ export function ChurnTeamTable({
       <CardContent className="space-y-5">
         <div className="grid grid-cols-2 divide-border rounded-lg border md:grid-cols-5 md:divide-x">
           <div className="p-4">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Nye startet (sidste 12 mdr.)</p>
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Nye startet (sidste {windowMonths} mdr.)</p>
             <p className="text-2xl font-bold">{total.starters}</p>
           </div>
           <div className="p-4">
@@ -239,7 +253,7 @@ export function ChurnTeamTable({
                 <th className="py-2 pr-4 text-right">Nye startet</th>
                 <th className="py-2 pr-4 text-right">For nye til at måle</th>
                 <th className="py-2 pr-6 text-right">Stoppet inden 60 dage</th>
-                <th className="py-2 pr-6">Andel der stoppede (12 mdr.)</th>
+                <th className="py-2 pr-6">Andel der stoppede ({windowMonths} mdr.)</th>
                 <th className="py-2 pr-6">
                   Stoppet — sidste {rollingDays} dage (løbende)
                   {rollingWindowStart && (
@@ -265,6 +279,7 @@ export function ChurnTeamTable({
                   hasTarget={hasTarget}
                   immature={immatureByTeam.get(r.key)}
                   rolling={rollingByTeam?.get(r.key)}
+                  windowStats={windowByTeam?.get(r.key)}
                   onSelectTeam={onSelectTeam}
                   onCreateAction={onCreateAction}
                 />
@@ -292,6 +307,7 @@ export function ChurnTeamTable({
                   hasTarget={hasTarget}
                   immature={immatureByTeam.get(r.key)}
                   rolling={rollingByTeam?.get(r.key)}
+                  windowStats={windowByTeam?.get(r.key)}
                   onSelectTeam={onSelectTeam}
                   onCreateAction={onCreateAction}
                 />
@@ -346,7 +362,7 @@ export function ChurnTeamTable({
           <div className="space-y-1 text-xs text-muted-foreground">
             <p>
               <strong className="text-foreground">Andel der stoppede</strong> er gennemsnittet for alle der er startet
-              de sidste 12 måneder — ikke kun de sidste 60 dage. Hver person følges i 60 dage fra sin startdato.
+              de sidste {windowMonths} måneder — ikke kun de sidste 60 dage. Hver person følges i 60 dage fra sin startdato.
             </p>
             <p>
               <strong className="text-foreground">For nye til at måle</strong> er dem der er startet efter{" "}
