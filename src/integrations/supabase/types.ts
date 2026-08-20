@@ -14896,16 +14896,26 @@ export type Database = {
           total_duration: number
         }[]
       }
-      get_churn_dashboard_metrics: {
-        Args: {
-          p_as_of_date?: string
-          p_horizon_days?: number
-          p_leader_ids?: string[]
-          p_month_count?: number
-          p_team_keys?: string[]
-        }
-        Returns: Json
-      }
+      get_churn_dashboard_metrics:
+        | {
+            Args: {
+              p_as_of_date?: string
+              p_horizon_days?: number
+              p_month_count?: number
+              p_team_keys?: string[]
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_as_of_date?: string
+              p_horizon_days?: number
+              p_leader_ids?: string[]
+              p_month_count?: number
+              p_team_keys?: string[]
+            }
+            Returns: Json
+          }
       get_client_sales_stats: {
         Args: { p_end_date?: string; p_start_date?: string }
         Returns: {
