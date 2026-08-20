@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { UserMinus, TrendingDown, TrendingUp, Minus, AlertTriangle, ShieldCheck, Eye } from "lucide-react";
-import { fmtPct, fmtPp, rate, STATUS_CLASSES, type ChurnMetricsPayload, type DerivedGroup } from "@/lib/churn/metrics";
+import { fmtMonth, fmtPct, fmtPp, rate, STATUS_CLASSES, type ChurnMetricsPayload, type DerivedGroup } from "@/lib/churn/metrics";
 
 interface Props {
   payload: ChurnMetricsPayload;

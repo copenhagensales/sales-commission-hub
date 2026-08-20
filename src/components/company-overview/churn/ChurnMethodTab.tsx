@@ -55,8 +55,8 @@ export function ChurnMethodTab({ payload, teams, canEdit }: Props) {
             <strong className="text-foreground">Moden kohorte:</strong> en startmåned indgår først, når månedens sidste
             dag plus {payload.settings.official_horizon_days} kalenderdage er nået. Den officielle KPI bruger de{" "}
             {payload.settings.official_month_count} seneste fuldt modne startmåneder — her{" "}
-            {payload.mature_months.length} måneder ({payload.mature_months[0] ?? "–"} til{" "}
-            {payload.latest_mature_month ?? "–"}).
+            {payload.mature_months.length} måneder ({fmtMonth(payload.mature_months[0])} til{" "}
+            {fmtMonth(payload.latest_mature_month)}).
           </p>
           <p>
             <strong className="text-foreground">Dag 60:</strong> exit på dag 0 til og med dag 60 tæller i tælleren. Dag
