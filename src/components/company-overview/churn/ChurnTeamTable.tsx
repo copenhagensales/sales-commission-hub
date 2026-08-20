@@ -354,9 +354,11 @@ export function ChurnTeamTable({
               mulighed for at nå 60 dage endnu, så de kan ikke indgå i andelen uden at gøre den kunstigt lav.
             </p>
             <p>
-              <strong className="text-foreground">Andel der stoppede (seneste måned)</strong> er kun de nye der startede
-              i {fmtMonth(latestMatureMonth)} — den nyeste startmåned hvor alle har haft 60 dage. Tallet er følsomt ved
-              få personer og er derfor ikke farvet under 3 startere.
+              <strong className="text-foreground">Stoppet — sidste {rollingDays} dage (løbende)</strong> er alle der er
+              startet inden for de seneste {rollingDays} dage, og hvor mange af dem der allerede er stoppet. Det er et
+              her-og-nu-tal: de fleste af dem har endnu ikke haft mulighed for at nå {rollingDays} dage, så tallet vil
+              typisk være lavere end den officielle andel og kan stige når de bliver ældre. Brug det til løbende
+              temperaturmåling, ikke til konklusioner. Ikke farvet under 3 startere.
             </p>
             <p>
               <strong className="text-foreground">Udvikling</strong> sammenligner de medarbejdere der startede i de 3
