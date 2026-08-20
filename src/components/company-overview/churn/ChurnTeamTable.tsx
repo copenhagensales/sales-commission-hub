@@ -1,6 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import { fmtMonth, fmtPct, fmtPp, sortTeamsForPriority, type ChurnSettings, type DerivedGroup } from "@/lib/churn/metrics";
 
@@ -111,26 +110,11 @@ function TeamRow({
           </td>
         </>
       )}
-      <td className="py-3 pr-4 text-xs text-muted-foreground whitespace-nowrap">
-        {r.lowData ? "Lavt" : "Tilstrækkeligt"}
-      </td>
-      <td className="py-3">
-        {onCreateAction && (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={(e) => {
-              e.stopPropagation();
-              onCreateAction(r.key);
-            }}
-          >
-            Opret
-          </Button>
-        )}
-      </td>
     </tr>
   );
 }
+
+
 
 /** UI-06: prioriteret teamtabel — omdesignet for klarhed. */
 export function ChurnTeamTable({
@@ -158,7 +142,7 @@ export function ChurnTeamTable({
     { starters: 0, exits: 0, excess: 0 },
   );
   const totalRate = total.starters ? (total.exits / total.starters) * 100 : null;
-  const colSpan = hasTarget ? 11 : 9;
+  const colSpan = hasTarget ? 9 : 7;
 
   return (
     <Card>
@@ -219,9 +203,8 @@ export function ChurnTeamTable({
                 <th className="py-2 pr-6">Udvikling: nyeste 3 mdr. startere vs. de 3 før</th>
                 {hasTarget && <th className="py-2 pr-4">Afstand til mål</th>}
                 {hasTarget && <th className="py-2 pr-4">Exits over mål</th>}
-                <th className="py-2 pr-4">Nok data?</th>
-                <th className="py-2">Handling</th>
               </tr>
+
             </thead>
 
             <tbody>
@@ -283,9 +266,8 @@ export function ChurnTeamTable({
                     <td className="py-3 pr-4 tabular-nums">{total.excess.toFixed(1).replace(".", ",")}</td>
                   </>
                 )}
-                <td className="py-3 pr-4" />
-                <td className="py-3" />
               </tr>
+
             </tbody>
           </table>
         </div>
