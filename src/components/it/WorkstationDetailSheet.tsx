@@ -232,6 +232,25 @@ export function WorkstationDetailSheet({
                   <PowerOff className="h-4 w-4" />
                   PC virker ikke
                 </Button>
+                <Button
+                  variant="outline"
+                  className="col-span-2 justify-start gap-2 text-destructive"
+                  disabled={save.isPending}
+                  onClick={() => {
+                    const CHAIR_NOTE = "Stol ødelagt";
+                    const current = notes.trim();
+                    if (current.toLowerCase().includes(CHAIR_NOTE.toLowerCase())) {
+                      toast.info("Stolen er allerede markeret som ødelagt");
+                      return;
+                    }
+                    const nextNotes = current ? `${current} · ${CHAIR_NOTE}` : CHAIR_NOTE;
+                    setNotes(nextNotes);
+                    void persist({ notes: nextNotes }, "Stol markeret som ødelagt");
+                  }}
+                >
+                  <Armchair className="h-4 w-4" />
+                  Stol ødelagt
+                </Button>
               </div>
             </section>
           )}
