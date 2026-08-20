@@ -119,6 +119,19 @@ export function fmtPp(value: number | null | undefined, decimals = 1): string {
   return `${sign}${value.toFixed(decimals).replace(".", ",")} pp`;
 }
 
+/** Formatér "2026-05-01" eller "2026-05" som "maj 2026". */
+export function fmtMonth(monthISO: string | null | undefined): string {
+  if (!monthISO) return "–";
+  const [y, m] = monthISO.split("-").map(Number);
+  if (!y || !m) return monthISO;
+  const label = new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString("da-DK", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+  return label;
+}
+
 /** Modenhedsregel: månedens sidste dag + horisont skal være nået. */
 export function isMonthMature(monthISO: string, asOfISO: string, horizonDays: number): boolean {
   const [y, m] = monthISO.split("-").map(Number);
