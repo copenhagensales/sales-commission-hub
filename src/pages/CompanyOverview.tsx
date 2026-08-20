@@ -12,7 +12,7 @@ import { RevenuePerEmployeeChart } from "@/components/company-overview/RevenuePe
 import { ChurnConclusion } from "@/components/company-overview/churn/ChurnConclusion";
 import { ChurnKpiCards } from "@/components/company-overview/churn/ChurnKpiCards";
 import { ChurnSinceLast } from "@/components/company-overview/churn/ChurnSinceLast";
-import { ChurnHeatmap } from "@/components/company-overview/churn/ChurnHeatmap";
+
 import { ChurnTeamTable, type TrendCounts } from "@/components/company-overview/churn/ChurnTeamTable";
 import { ChurnDrilldown } from "@/components/company-overview/churn/ChurnDrilldown";
 import { ChurnActionsTab } from "@/components/company-overview/churn/ChurnActionsTab";
