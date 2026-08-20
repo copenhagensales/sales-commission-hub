@@ -1,407 +1,219 @@
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, TrendingUp, TrendingDown, Minus, FileText, Clock, UserMinus } from "lucide-react";
-import { subDays, format, differenceInDays, parseISO } from "date-fns";
+import { useMemo, useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { TeamAvgTenureChart } from "@/components/company-overview/TeamAvgTenureChart";
-import { NewHireChurnKpi } from "@/components/company-overview/NewHireChurnKpi";
-import { HistoricalTenureStats } from "@/components/company-overview/HistoricalTenureStats";
-import { ChurnTrendChart } from "@/components/company-overview/ChurnTrendChart";
-import { ChurnTrendChartCombined } from "@/components/company-overview/ChurnTrendChartCombined";
 import { HeadcountTrendChart } from "@/components/company-overview/HeadcountTrendChart";
 import { RevenuePerEmployeeChart } from "@/components/company-overview/RevenuePerEmployeeChart";
-
-// Normalize team names to handle variations
-const normalizeTeamName = (name: string | null): string => {
-  if (!name) return "Ukendt";
-  const lower = name.toLowerCase().trim();
-  if (lower.includes("eesy fm") || lower === "eesy fm") return "Eesy FM";
-  if (lower.includes("eesy tm") || lower === "eesy tm") return "Eesy TM";
-  if (lower.includes("fieldmarketing")) return "Fieldmarketing";
-  if (lower.includes("relatel")) return "Relatel";
-  if (lower.includes("tdc erhverv")) return "TDC Erhverv";
-  if (lower.includes("united")) return "United";
-  if (lower.includes("stab")) return "Stab";
-  return name;
-};
-
-// Teams to exclude
-const EXCLUDED_TEAMS = ["Stab", "Ukendt"];
+import { ChurnConclusion } from "@/components/company-overview/churn/ChurnConclusion";
+import { ChurnKpiCards } from "@/components/company-overview/churn/ChurnKpiCards";
+import { ChurnSinceLast } from "@/components/company-overview/churn/ChurnSinceLast";
+import { ChurnHeatmap } from "@/components/company-overview/churn/ChurnHeatmap";
+import { ChurnTeamTable } from "@/components/company-overview/churn/ChurnTeamTable";
+import { ChurnDrilldown } from "@/components/company-overview/churn/ChurnDrilldown";
+import { ChurnActionsTab } from "@/components/company-overview/churn/ChurnActionsTab";
+import { ChurnActionDialog } from "@/components/company-overview/churn/ChurnActionDialog";
+import { ChurnMethodTab } from "@/components/company-overview/churn/ChurnMethodTab";
+import { useChurnMetrics, useChurnActions } from "@/hooks/useChurnDashboard";
+import { useCanManageChurn } from "@/hooks/useCanManageChurn";
+import { deriveCompany, deriveTeams, fmtPct } from "@/lib/churn/metrics";
 
 export default function CompanyOverview() {
-  const today = new Date();
-  const thirtyDaysAgo = subDays(today, 30);
-  const sixtyDaysAgo = subDays(today, 60);
-  const thirtyDaysAgoStr = format(thirtyDaysAgo, "yyyy-MM-dd");
-  const sixtyDaysAgoStr = format(sixtyDaysAgo, "yyyy-MM-dd");
+  const { data: payload, isLoading, error, dataUpdatedAt } = useChurnMetrics();
+  const { data: canEdit = false } = useCanManageChurn();
+  const { data: actions = [] } = useChurnActions();
 
-  // Fetch current employee stats with 30-day comparison for growth trend
-  const { data: employeeStats, isLoading: isLoadingEmployees } = useQuery({
-    queryKey: ["company-overview-employee-growth-stats"],
-    queryFn: async () => {
-      // Current employees from team_members
-      const { data: teamMembers, error: tmError } = await supabase
-        .from("team_members")
-        .select("employee_id, team:teams(name)");
-      if (tmError) throw tmError;
-      
-      // Count unique current employees (including Stab, only excluding Ukendt)
-      const currentEmployees = new Set<string>();
-      (teamMembers || []).forEach(tm => {
-        const teamName = normalizeTeamName((tm.team as any)?.name || null);
-        if (teamName !== "Ukendt") {
-          currentEmployees.add(tm.employee_id);
-        }
-      });
-      
-      const currentCount = currentEmployees.size;
-      
-      // Get employees who left in the last 30 days (from historical_employment)
-      const thirtyDaysAgoDate = subDays(today, 30);
-      const sixtyDaysAgoDate = subDays(today, 60);
-      
-      const { data: historicalData, error: histError } = await supabase
-        .from("historical_employment")
-        .select("id, team_name, end_date");
-      if (histError) throw histError;
-      
-      // Get employees hired in last 30 days
-      const { data: recentHires, error: hiresError } = await supabase
-        .from("employee_master_data")
-        .select("id, employment_start_date")
-        .eq("is_active", true)
-        .gte("employment_start_date", format(thirtyDaysAgoDate, "yyyy-MM-dd"));
-      if (hiresError) throw hiresError;
-      
-      // Get employees hired 30-60 days ago
-      const { data: prevHires, error: prevHiresError } = await supabase
-        .from("employee_master_data")
-        .select("id, employment_start_date")
-        .eq("is_active", true)
-        .gte("employment_start_date", format(sixtyDaysAgoDate, "yyyy-MM-dd"))
-        .lt("employment_start_date", format(thirtyDaysAgoDate, "yyyy-MM-dd"));
-      if (prevHiresError) throw prevHiresError;
-      
-      // Count leavers in last 30 days
-      const leaversLast30 = (historicalData || []).filter(emp => {
-        const teamName = normalizeTeamName(emp.team_name);
-        if (EXCLUDED_TEAMS.includes(teamName)) return false;
-        if (!emp.end_date) return false;
-        const endDate = parseISO(emp.end_date);
-        return endDate >= thirtyDaysAgoDate;
-      }).length;
-      
-      // Count leavers 30-60 days ago
-      const leavers30to60 = (historicalData || []).filter(emp => {
-        const teamName = normalizeTeamName(emp.team_name);
-        if (EXCLUDED_TEAMS.includes(teamName)) return false;
-        if (!emp.end_date) return false;
-        const endDate = parseISO(emp.end_date);
-        return endDate >= sixtyDaysAgoDate && endDate < thirtyDaysAgoDate;
-      }).length;
-      
-      // Net change in last 30 days = hires - leavers
-      const hiresLast30 = (recentHires || []).length;
-      const hiresPrev30 = (prevHires || []).length;
-      
-      const netChangeLast30 = hiresLast30 - leaversLast30;
-      const netChangePrev30 = hiresPrev30 - leavers30to60;
-      
-      return { 
-        currentCount, 
-        netChange: netChangeLast30,
-        prevNetChange: netChangePrev30,
-        hiresLast30,
-        leaversLast30
-      };
-    },
+  const [dimension, setDimension] = useState<"teams" | "leaders">("teams");
+  const [drilldown, setDrilldown] = useState<{ teamKey: string | null; month: string | null; open: boolean }>({
+    teamKey: null,
+    month: null,
+    open: false,
   });
+  const [actionTeam, setActionTeam] = useState<string | null>(null);
+  const [actionOpen, setActionOpen] = useState(false);
 
-  // Fetch candidate/application counts with 30-day comparison
-  const { data: applicationStats, isLoading: isLoadingApplications } = useQuery({
-    queryKey: ["company-overview-candidate-stats"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("candidates")
-        .select("id, created_at");
-      
-      if (error) throw error;
-      
-      const now = new Date();
-      const thirtyDaysAgoDate = subDays(now, 30);
-      const sixtyDaysAgoDate = subDays(now, 60);
-      
-      const last30d = data.filter(c => {
-        const created = new Date(c.created_at);
-        return created >= thirtyDaysAgoDate;
-      }).length;
-      
-      const prev30d = data.filter(c => {
-        const created = new Date(c.created_at);
-        return created >= sixtyDaysAgoDate && created < thirtyDaysAgoDate;
-      }).length;
-      
-      let percentageChange = 0;
-      if (prev30d !== 0) {
-        percentageChange = ((last30d - prev30d) / prev30d) * 100;
-      } else if (last30d !== 0) {
-        percentageChange = 100;
-      }
-      
-      const change = last30d - prev30d;
-      
-      return { currentCount: last30d, change, percentageChange };
-    },
-  });
+  const company = useMemo(() => (payload ? deriveCompany(payload) : null), [payload]);
+  const teams = useMemo(() => (payload ? deriveTeams(payload) : []), [payload]);
+  const selectedTeam = teams.find((t) => t.key === drilldown.teamKey) ?? null;
 
-  // Fetch average tenure for current employees only (no trend - it's not meaningful for tenure)
-  const { data: tenureStats, isLoading: isLoadingTenure } = useQuery({
-    queryKey: ["company-overview-current-tenure-stats"],
-    queryFn: async () => {
-      // Current employees only
-      const { data: employees, error: empError } = await supabase
-        .from("employee_master_data")
-        .select("id, employment_start_date")
-        .eq("is_active", true)
-        .not("employment_start_date", "is", null);
-      if (empError) throw empError;
-      
-      // Team memberships
-      const { data: teamMemberships, error: tmError } = await supabase
-        .from("team_members")
-        .select("employee_id, team:teams(name)");
-      if (tmError) throw tmError;
-      
-      // Map employee_id to team name
-      const employeeTeamMap = new Map<string, string>();
-      (teamMemberships || []).forEach((tm: { employee_id: string; team: { name: string } | null }) => {
-        if (tm.team?.name && !employeeTeamMap.has(tm.employee_id)) {
-          employeeTeamMap.set(tm.employee_id, tm.team.name);
-        }
-      });
-      
-      const now = new Date();
-      let totalDays = 0;
-      let count = 0;
-      
-      // Current employees tenure only
-      (employees || []).forEach(emp => {
-        const teamName = normalizeTeamName(employeeTeamMap.get(emp.id) || null);
-        if (EXCLUDED_TEAMS.includes(teamName)) return;
-        
-        const startDate = emp.employment_start_date ? parseISO(emp.employment_start_date) : now;
-        const tenureDays = differenceInDays(now, startDate);
-        totalDays += Math.max(0, tenureDays);
-        count++;
-      });
-      
-      const avgDays = count > 0 ? totalDays / count : 0;
-      const avgMonths = avgDays / 30;
-      
-      return { 
-        avgMonths: Math.round(avgMonths * 10) / 10, 
-        totalCount: count
-      };
-    },
-  });
-
-  // Fetch 60-day churn using ALL employees (current + historical) - matches team table calculation
-  const { data: churnStats, isLoading: isLoadingChurn } = useQuery({
-    queryKey: ["company-overview-all-employees-churn-stats"],
-    queryFn: async () => {
-      // Team memberships for filtering current employees
-      const { data: teamMemberships, error: tmError } = await supabase
-        .from("team_members")
-        .select("employee_id, team:teams(name)");
-      if (tmError) throw tmError;
-      
-      // Current active employees
-      const { data: currentEmployees, error: currError } = await supabase
-        .from("employee_master_data")
-        .select("id, employment_start_date")
-        .eq("is_active", true);
-      if (currError) throw currError;
-      
-      // Historical employees (those who left)
-      const { data: historicalData, error: histError } = await supabase
-        .from("historical_employment")
-        .select("id, team_name, tenure_days, end_date, start_date");
-      if (histError) throw histError;
-      
-      // Map employee_id to team name
-      const employeeTeamMap = new Map<string, string>();
-      (teamMemberships || []).forEach((tm: { employee_id: string; team: { name: string } | null }) => {
-        if (tm.team?.name && !employeeTeamMap.has(tm.employee_id)) {
-          employeeTeamMap.set(tm.employee_id, tm.team.name);
-        }
-      });
-      
-      // Count current employees (excluding Stab/Ledelse)
-      let currentCount = 0;
-      (currentEmployees || []).forEach(emp => {
-        const teamName = normalizeTeamName(employeeTeamMap.get(emp.id) || null);
-        if (EXCLUDED_TEAMS.includes(teamName)) return;
-        currentCount++;
-      });
-      
-      // Count historical employees and 60-day exits (excluding Stab/Ledelse)
-      let historicalCount = 0;
-      let exits60Days = 0;
-      
-      (historicalData || []).forEach(emp => {
-        const teamName = normalizeTeamName(emp.team_name);
-        if (EXCLUDED_TEAMS.includes(teamName)) return;
-        
-        historicalCount++;
-        if (emp.tenure_days <= 60) {
-          exits60Days++;
-        }
-      });
-      
-      // Total = current + historical (same as team table)
-      const totalCount = currentCount + historicalCount;
-      
-      // Churn rate = exits60Days / totalCount (all employees)
-      const churnRate = totalCount > 0 ? (exits60Days / totalCount) * 100 : 0;
-      
-      return { 
-        churnRate: Math.round(churnRate * 10) / 10, 
-        totalCount,
-        exits60Days,
-        currentCount,
-        historicalCount
-      };
-    },
-  });
-
-  const formatTenure = (months: number) => {
-    if (months < 12) return `${months.toFixed(1)} mdr`;
-    const years = Math.floor(months / 12);
-    const remainingMonths = Math.round(months % 12);
-    if (remainingMonths === 0) return `${years} år`;
-    return `${years} år ${remainingMonths} mdr`;
+  const openAction = (teamKey: string) => {
+    setActionTeam(teamKey);
+    setActionOpen(true);
   };
 
-  const getTrendIcon = (change: number) => {
-    if (change > 0) return TrendingUp;
-    if (change < 0) return TrendingDown;
-    return Minus;
-  };
+  if (isLoading) {
+    return (
+      <MainLayout>
+        <div className="space-y-4">
+          <Skeleton className="h-10 w-72" />
+          <Skeleton className="h-24 w-full" />
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-40 w-full" />
+            ))}
+          </div>
+          <Skeleton className="h-72 w-full" />
+        </div>
+      </MainLayout>
+    );
+  }
 
-  const getTrendColor = (change: number, invertColors = false) => {
-    if (invertColors) {
-      // For metrics where lower is better (like churn)
-      if (change > 0) return "text-red-600";
-      if (change < 0) return "text-green-600";
-    } else {
-      if (change > 0) return "text-green-600";
-      if (change < 0) return "text-red-600";
-    }
-    return "text-muted-foreground";
-  };
+  if (error || !payload || !company) {
+    return (
+      <MainLayout>
+        <Alert variant="destructive">
+          <AlertDescription>
+            Kunne ikke indlæse churn-datagrundlaget. {error instanceof Error ? error.message : "Ukendt fejl."}
+          </AlertDescription>
+        </Alert>
+      </MainLayout>
+    );
+  }
 
-  const kpiCards = [
-    {
-      title: "Nuværende ansatte",
-      value: isLoadingEmployees ? "..." : employeeStats?.currentCount ?? 0,
-      icon: Users,
-      description: employeeStats ? `${employeeStats.hiresLast30} ansat, ${employeeStats.leaversLast30} stoppet (30 dage)` : "Indlæser...",
-      color: "text-primary",
-      bgColor: "bg-primary/10",
-      trend: employeeStats ? {
-        change: employeeStats.netChange,
-        // Percentage change relative to total current employees
-        percentage: employeeStats.currentCount > 0 
-          ? (employeeStats.netChange / employeeStats.currentCount) * 100
-          : 0
-      } : null
-    },
-    {
-      title: "Ansøgninger",
-      value: isLoadingApplications ? "..." : applicationStats?.currentCount ?? 0,
-      icon: FileText,
-      description: "Ansøgninger de sidste 30 dage",
-      color: "text-primary",
-      bgColor: "bg-primary/10",
-      trend: applicationStats ? {
-        change: applicationStats.change,
-        percentage: applicationStats.percentageChange
-      } : null
-    },
-    {
-      title: "Gns. anciennitet",
-      value: isLoadingTenure ? "..." : tenureStats ? formatTenure(tenureStats.avgMonths) : "-",
-      icon: Clock,
-      description: `Baseret på ${tenureStats?.totalCount ?? 0} nuværende ansatte (ekskl. Stab)`,
-      color: "text-primary",
-      bgColor: "bg-primary/10",
-      trend: null // No trend for tenure - it naturally increases over time
-    },
-    {
-      title: "60-dages Churn",
-      value: isLoadingChurn ? "..." : churnStats ? `${churnStats.churnRate}%` : "-",
-      icon: UserMinus,
-      description: `${churnStats?.exits60Days ?? 0} af ${churnStats?.totalCount ?? 0} stoppede inden 60 dage`,
-      color: "text-primary",
-      bgColor: "bg-primary/10",
-      trend: null // No trend - using all employees (current + historical) calculation
-    },
-  ];
+  const s = payload.settings;
+  const monthsShown = payload.mature_months.length;
 
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div>
+        <div className="space-y-2">
           <h1 className="text-2xl font-bold text-foreground">Virksomhedsoverblik</h1>
-          <p className="text-muted-foreground">Overblik over virksomhedens nøgletal (nuværende + historiske ansatte)</p>
+          <p className="text-muted-foreground">
+            CEO-overblik over tidligt medarbejderfrafald, bemanding og handlinger
+          </p>
+          <div className="flex flex-wrap gap-2 text-xs">
+            <Badge variant="outline">Dataskæringsdato: {payload.as_of_date}</Badge>
+            <Badge variant="outline">
+              Seneste opdatering: {new Date(dataUpdatedAt).toLocaleString("da-DK")}
+            </Badge>
+            <Badge variant="outline">Organisationsscope: alle teams ekskl. stab</Badge>
+            <Badge variant="outline">Seneste fuldt modne startmåned: {payload.latest_mature_month ?? "Data mangler"}</Badge>
+            <Badge variant="outline">
+              {s.target_60d_rate === null ? "Mål ikke sat" : `Mål: ${fmtPct(s.target_60d_rate)}`}
+            </Badge>
+          </div>
+          {monthsShown < s.official_month_count && (
+            <Alert>
+              <AlertDescription>
+                Kun {monthsShown} fuldt modne startmåneder tilgængelige — perioden udfyldes ikke kunstigt.
+              </AlertDescription>
+            </Alert>
+          )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {kpiCards.map((kpi, index) => (
-            <Card key={index} className="relative overflow-hidden">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {kpi.title}
-                </CardTitle>
-                <div className={`h-8 w-8 rounded-lg ${kpi.bgColor} flex items-center justify-center`}>
-                  <kpi.icon className={`h-4 w-4 ${kpi.color}`} />
-                </div>
+        <Tabs defaultValue="ceo" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="ceo">CEO-overblik</TabsTrigger>
+            <TabsTrigger value="teams">Team &amp; ledere</TabsTrigger>
+            <TabsTrigger value="actions">Handlinger</TabsTrigger>
+            <TabsTrigger value="method">Metode &amp; datakvalitet</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="ceo" className="space-y-4">
+            <ChurnConclusion payload={payload} company={company} teams={teams} />
+            <ChurnKpiCards payload={payload} company={company} />
+            <ChurnSinceLast teams={teams} settings={s} onCreateAction={canEdit ? openAction : undefined} />
+            <ChurnHeatmap
+              payload={payload}
+              teams={teams}
+              dimension="teams"
+              onSelectCell={(teamKey, month) => setDrilldown({ teamKey, month, open: true })}
+            />
+            <ChurnTeamTable
+              teams={teams}
+              settings={s}
+              onSelectTeam={(teamKey) => setDrilldown({ teamKey, month: null, open: true })}
+              onCreateAction={canEdit ? openAction : undefined}
+            />
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Kapacitet og økonomi</CardTitle>
+                <CardDescription>
+                  Sekundær sektion. Bemanding og indtjening pr. hoved — populationen er ikke identisk med
+                  churn-nævneren, se Metode &amp; datakvalitet.
+                </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-foreground">{kpi.value}</div>
-                <p className="text-xs text-muted-foreground mt-1">{kpi.description}</p>
-                {kpi.trend && (
-                  <div className={`flex items-center gap-1 mt-2 text-sm ${getTrendColor(kpi.trend.change, 'invertColors' in kpi.trend ? Boolean(kpi.trend.invertColors) : false)}`}>
-                    {(() => {
-                      const TrendIcon = getTrendIcon(kpi.trend.change);
-                      return <TrendIcon className="h-4 w-4" />;
-                    })()}
-                    <span>
-                      {kpi.trend.change > 0 ? "+" : ""}{kpi.trend.change.toFixed(1)}{'unit' in kpi.trend && kpi.trend.unit ? ` ${String(kpi.trend.unit)}` : ""} ift. forrige 30 dage
-                    </span>
-                    {kpi.trend.percentage !== null && kpi.trend.percentage !== 0 && (
-                      <span className="text-muted-foreground ml-1">
-                        ({kpi.trend.percentage > 0 ? "+" : ""}{kpi.trend.percentage.toFixed(1)}%)
-                      </span>
-                    )}
-                  </div>
-                )}
+              <CardContent className="space-y-6">
+                <HeadcountTrendChart />
+                <RevenuePerEmployeeChart />
               </CardContent>
             </Card>
-          ))}
-        </div>
+          </TabsContent>
 
-        {/* Charts and detailed KPIs */}
-        <div className="space-y-6">
-          <TeamAvgTenureChart />
-          <NewHireChurnKpi />
-          <HistoricalTenureStats />
-          <ChurnTrendChart />
-          <ChurnTrendChartCombined />
-          <HeadcountTrendChart />
-          <RevenuePerEmployeeChart />
-        </div>
+          <TabsContent value="teams" className="space-y-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Visning:</span>
+              <Button
+                size="sm"
+                variant={dimension === "teams" ? "default" : "outline"}
+                onClick={() => setDimension("teams")}
+              >
+                Teams
+              </Button>
+              <Button
+                size="sm"
+                variant={dimension === "leaders" ? "default" : "outline"}
+                onClick={() => setDimension("leaders")}
+              >
+                Ledere
+              </Button>
+            </div>
+
+            <ChurnHeatmap
+              payload={payload}
+              teams={teams}
+              dimension={dimension}
+              onSelectCell={(teamKey, month) => setDrilldown({ teamKey, month, open: true })}
+            />
+
+            {dimension === "teams" && (
+              <ChurnTeamTable
+                teams={teams}
+                settings={s}
+                onSelectTeam={(teamKey) => setDrilldown({ teamKey, month: null, open: true })}
+                onCreateAction={canEdit ? openAction : undefined}
+              />
+            )}
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Anciennitet pr. team</CardTitle>
+                <CardDescription>
+                  Population: nuværende og stoppede medarbejdere pr. team — ikke den officielle churn-nævner.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <TeamAvgTenureChart />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="actions">
+            <ChurnActionsTab payload={payload} canEdit={canEdit} />
+          </TabsContent>
+
+          <TabsContent value="method">
+            <ChurnMethodTab payload={payload} teams={teams} canEdit={canEdit} />
+          </TabsContent>
+        </Tabs>
+
+        <ChurnDrilldown
+          open={drilldown.open}
+          onOpenChange={(open) => setDrilldown((d) => ({ ...d, open }))}
+          teamKey={drilldown.teamKey}
+          month={drilldown.month}
+          payload={payload}
+          team={selectedTeam}
+          actions={actions}
+          onCreateAction={canEdit ? openAction : undefined}
+        />
+
+        <ChurnActionDialog open={actionOpen} onOpenChange={setActionOpen} teamKey={actionTeam} canEdit={canEdit} />
       </div>
     </MainLayout>
   );
