@@ -1,9 +1,10 @@
-import { Laptop, Monitor, Headphones, Mouse, Keyboard, ArrowUpDown } from "lucide-react";
+import { Laptop, Monitor, Headphones, Mouse, Keyboard, ArrowUpDown, Armchair } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   EQUIPMENT_LABELS,
   EQUIPMENT_STATUS_LABELS,
   OVERALL_LABELS,
+  isChairBroken,
   type EquipmentKind,
   type EquipmentStatus,
   seatLabel,
@@ -36,6 +37,8 @@ interface Props {
   onToggleEquipment?: (ws: ItWorkstation, kind: EquipmentKind, next: EquipmentStatus) => void;
   /** Hurtig markering af bordet som i brug / ledigt (kun med redigeringsadgang). */
   onToggleOccupancy?: (ws: ItWorkstation, next: boolean) => void;
+  /** Hurtig markering af stolen som ødelagt / i orden (kun med redigeringsadgang). */
+  onToggleChair?: (ws: ItWorkstation, next: boolean) => void;
   faded?: boolean;
   highlighted?: boolean;
 }
@@ -45,11 +48,13 @@ export function WorkstationCard({
   onOpen,
   onToggleEquipment,
   onToggleOccupancy,
+  onToggleChair,
   faded,
   highlighted,
 }: Props) {
   const interactiveEquipment = !!onToggleEquipment;
   const isFree = ws.is_occupied === false;
+  const chairBroken = isChairBroken(ws);
 
 
   return (
@@ -165,6 +170,46 @@ export function WorkstationCard({
             </button>
           );
         })}
+
+        {(() => {
+          const chairLabel = `Stol: ${chairBroken ? "Ødelagt" : "OK"}`;
+          const chairIcon = (
+            <span className="relative inline-flex h-3.5 w-3.5 items-center justify-center">
+              <Armchair
+                className={cn(
+                  "h-3.5 w-3.5",
+                  chairBroken ? "text-destructive" : "text-muted-foreground",
+                )}
+              />
+              {chairBroken && (
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute left-1/2 top-1/2 h-[1.5px] w-[130%] -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-full bg-destructive"
+                />
+              )}
+            </span>
+          );
+
+          if (!onToggleChair) {
+            return <span title={chairLabel}>{chairIcon}</span>;
+          }
+
+          return (
+            <button
+              type="button"
+              title={`${chairLabel} — klik for at markere som ${chairBroken ? "ok" : "ødelagt"}`}
+              aria-label={`${chairLabel} — klik for at markere som ${chairBroken ? "ok" : "ødelagt"}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggleChair(ws, !chairBroken);
+              }}
+              onKeyDown={(event) => event.stopPropagation()}
+              className="rounded p-0.5 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {chairIcon}
+            </button>
+          );
+        })()}
       </div>
 
       <span className={cn("truncate text-xs font-medium", OVERALL_TEXT_CLASS[ws.overall])}>

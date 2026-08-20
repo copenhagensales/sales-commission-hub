@@ -673,6 +673,82 @@ export function useToggleOccupancy() {
   });
 }
 
+/** Notemarkør der angiver at stolen ved bordet er ødelagt. */
+export const CHAIR_BROKEN_NOTE = "Stol ødelagt";
+
+export function isChairBroken(ws: ItWorkstation): boolean {
+  return (ws.notes ?? "").toLowerCase().includes(CHAIR_BROKEN_NOTE.toLowerCase());
+}
+
+/** Tilføjer/fjerner notemarkøren "Stol ødelagt" — rører ikke øvrige noter. */
+function nextNotes(current: string | null, broken: boolean): string | null {
+  const parts = (current ?? "")
+    .split("·")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .filter((s) => s.toLowerCase() !== CHAIR_BROKEN_NOTE.toLowerCase());
+  if (broken) parts.push(CHAIR_BROKEN_NOTE);
+  return parts.length ? parts.join(" · ") : null;
+}
+
+/**
+ * Hurtig markering af stolen som ødelagt / i orden direkte i gulvplanen.
+ * Gemmes som notemarkør, da stol ikke er et udstyrs-kind i databasen.
+ */
+export function useToggleChairBroken() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const { data: userName } = useItCurrentUserName();
+
+  return useMutation({
+    mutationFn: async ({
+      workstation,
+      next,
+    }: {
+      workstation: ItWorkstation;
+      next: boolean;
+    }) => {
+      const notes = nextNotes(workstation.notes, next);
+      const { error } = await supabase
+        .from("it_workstations")
+        .update({ notes })
+        .eq("id", workstation.id);
+      if (error) throw error;
+
+      const { error: logError } = await supabase.from("it_activity_logs").insert({
+        workstation_id: workstation.id,
+        workstation_code: workstation.code,
+        user_id: user?.id ?? null,
+        user_name: userName ?? null,
+        action: `${workstation.code}: stol markeret som "${next ? "Ødelagt" : "OK"}"`,
+        field: "notes",
+        previous_value: workstation.notes ?? null,
+        new_value: notes,
+      });
+      if (logError) throw logError;
+    },
+    onMutate: async ({ workstation, next }) => {
+      await queryClient.cancelQueries({ queryKey: ["it-workstations"] });
+      const previous = queryClient.getQueryData<ItWorkstation[]>(["it-workstations"]);
+      queryClient.setQueryData<ItWorkstation[]>(["it-workstations"], (old) =>
+        (old ?? []).map((w) =>
+          w.id === workstation.id ? { ...w, notes: nextNotes(w.notes, next) } : w,
+        ),
+      );
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["it-workstations"], context.previous);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["it-workstations"] });
+      queryClient.invalidateQueries({ queryKey: ["it-activity-log"] });
+    },
+  });
+}
+
 // ============================================================================
 // AGGREGATES
 // ============================================================================

@@ -50,6 +50,7 @@ import {
   isUpdateOverdue,
   useToggleEquipmentStatus,
   useToggleOccupancy,
+  useToggleChairBroken,
   EQUIPMENT_LABELS,
   EQUIPMENT_STATUS_LABELS,
   type EquipmentKind,
@@ -180,6 +181,23 @@ export default function ItWorkstations() {
 
   const toggleEquipment = useToggleEquipmentStatus();
   const toggleOccupancy = useToggleOccupancy();
+  const toggleChair = useToggleChairBroken();
+
+  const handleToggleChair = (ws: ItWorkstation, next: boolean) => {
+    toggleChair.mutate(
+      { workstation: ws, next },
+      {
+        onSuccess: () =>
+          toast.success(`${seatLabel(ws)}: stol markeret som ${next ? "ødelagt" : "ok"}`, {
+            action: {
+              label: "Fortryd",
+              onClick: () => toggleChair.mutate({ workstation: ws, next: !next }),
+            },
+          }),
+        onError: () => toast.error("Kunne ikke gemme ændringen"),
+      },
+    );
+  };
 
   const handleToggleEquipment = (
     ws: ItWorkstation,
@@ -787,6 +805,7 @@ export default function ItWorkstations() {
                                       onToggleOccupancy={
                                         canEdit ? handleToggleOccupancy : undefined
                                       }
+                                      onToggleChair={canEdit ? handleToggleChair : undefined}
                                       faded={problemsOnly && !isProblem(ws)}
                                       highlighted={!!searchTerm && matchesSearch(ws)}
                                     />
