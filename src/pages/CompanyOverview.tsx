@@ -20,7 +20,7 @@ import { ChurnActionDialog } from "@/components/company-overview/churn/ChurnActi
 import { ChurnMethodTab } from "@/components/company-overview/churn/ChurnMethodTab";
 import { useChurnMetrics, useChurnActions } from "@/hooks/useChurnDashboard";
 import { useCanManageChurn } from "@/hooks/useCanManageChurn";
-import { deriveCompany, deriveTeams, fmtPct } from "@/lib/churn/metrics";
+import { deriveCompany, deriveTeams, fmtMonth, fmtPct } from "@/lib/churn/metrics";
 
 export default function CompanyOverview() {
   const { data: payload, isLoading, error, dataUpdatedAt } = useChurnMetrics();
