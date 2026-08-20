@@ -125,10 +125,15 @@ export function ChurnTeamTable({
   immatureTeams,
   latestMatureMonth,
 }: Props) {
-  const immatureByTeam = new Map((immatureTeams ?? []).map((t) => [t.team_key, t.starters]));
-  const immatureTotal = (immatureTeams ?? []).reduce((a, t) => a + t.starters, 0);
+  const UNKNOWN_TEAM_KEY = "Øvrige / ukendt team";
+  const immatureByTeam = new Map(
+    (immatureTeams ?? []).filter((t) => t.team_key !== UNKNOWN_TEAM_KEY).map((t) => [t.team_key, t.starters]),
+  );
+  const immatureTotal = (immatureTeams ?? [])
+    .filter((t) => t.team_key !== UNKNOWN_TEAM_KEY)
+    .reduce((a, t) => a + t.starters, 0);
   const hasTarget = settings.target_60d_rate !== null && settings.target_60d_rate !== undefined;
-  const ordered = sortTeamsForPriority(teams, settings);
+  const ordered = sortTeamsForPriority(teams, settings).filter((t) => t.key !== UNKNOWN_TEAM_KEY);
   const solid = ordered.filter((t) => !t.lowData);
   const thin = ordered.filter((t) => t.lowData);
   const rows = [...solid, ...thin];
