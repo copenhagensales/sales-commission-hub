@@ -268,8 +268,8 @@ export function ChurnTeamTable({
                     <td className="py-3 pr-4 tabular-nums">{total.excess.toFixed(1).replace(".", ",")}</td>
                   </>
                 )}
-                <td className="py-3 pr-4" />
-                <td className="py-3" />
+              </tr>
+
               </tr>
             </tbody>
           </table>
