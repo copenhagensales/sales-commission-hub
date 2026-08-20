@@ -155,8 +155,9 @@ export function ChurnKpiCards({ payload, company }: Props) {
             Disse medarbejdere er valide, men deres endelige 60-dages udfald er endnu ikke kendt.
           </p>
           <div className="text-xs text-muted-foreground border-t pt-1">
-            14-dages: {fmtPct(r14)} · {payload.horizon_14.x}/{payload.horizon_14.n} — 30-dages: {fmtPct(r30)} ·{" "}
-            {payload.horizon_30.x}/{payload.horizon_30.n}
+            {payload.horizon_14?.n && payload.horizon_30?.n
+              ? `14-dages: ${fmtPct(r14)} · ${payload.horizon_14.x}/${payload.horizon_14.n} — 30-dages: ${fmtPct(r30)} · ${payload.horizon_30.x}/${payload.horizon_30.n}`
+              : "14- og 30-dages horisonter: datagrundlag mangler"}
           </div>
         </CardContent>
       </Card>
