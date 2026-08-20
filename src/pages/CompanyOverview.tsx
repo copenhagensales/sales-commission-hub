@@ -12,7 +12,7 @@ import { RevenuePerEmployeeChart } from "@/components/company-overview/RevenuePe
 import { ChurnConclusion } from "@/components/company-overview/churn/ChurnConclusion";
 import { ChurnKpiCards } from "@/components/company-overview/churn/ChurnKpiCards";
 import { ChurnSinceLast } from "@/components/company-overview/churn/ChurnSinceLast";
-import { ChurnHeatmap } from "@/components/company-overview/churn/ChurnHeatmap";
+
 import { ChurnTeamTable, type TrendCounts } from "@/components/company-overview/churn/ChurnTeamTable";
 import { ChurnDrilldown } from "@/components/company-overview/churn/ChurnDrilldown";
 import { ChurnActionsTab } from "@/components/company-overview/churn/ChurnActionsTab";
@@ -167,12 +167,6 @@ export default function CompanyOverview() {
             <ChurnConclusion payload={payload} company={company} teams={teams} />
             <ChurnKpiCards payload={payload} company={company} />
             <ChurnSinceLast teams={teams} settings={s} onCreateAction={canEdit ? openAction : undefined} />
-            <ChurnHeatmap
-              payload={payload}
-              teams={teams}
-              dimension="teams"
-              onSelectCell={(teamKey, month) => setDrilldown({ teamKey, month, open: true })}
-            />
             <ChurnTeamTable
               teams={teams}
               settings={s}
@@ -225,12 +219,6 @@ export default function CompanyOverview() {
               </Button>
             </div>
 
-            <ChurnHeatmap
-              payload={payload}
-              teams={teams}
-              dimension={dimension}
-              onSelectCell={(teamKey, month) => setDrilldown({ teamKey, month, open: true })}
-            />
 
             {dimension === "teams" && (
               <ChurnTeamTable
