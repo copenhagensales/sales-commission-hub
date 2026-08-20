@@ -94,6 +94,9 @@ export interface ChurnMetricsPayload {
   horizon_30: { n: number; x: number };
   observation: { d0_13: number; d14_29: number; d30_59: number };
   upcoming_starters: number;
+  /** Startere der er kommet EFTER seneste modne startmåned — indgår ikke i 60-dages raten endnu. */
+  immature_total?: number;
+  immature_teams?: Array<{ team_key: string; starters: number; exits_so_far: number }>;
   quality: ChurnQuality;
   headcount_bridge: ChurnHeadcountBridge;
 }
