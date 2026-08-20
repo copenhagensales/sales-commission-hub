@@ -50,6 +50,7 @@ import {
   isUpdateOverdue,
   useToggleEquipmentStatus,
   useToggleOccupancy,
+  useToggleChairBroken,
   EQUIPMENT_LABELS,
   EQUIPMENT_STATUS_LABELS,
   type EquipmentKind,
