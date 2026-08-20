@@ -166,7 +166,7 @@ export default function CompanyOverview() {
           <TabsContent value="ceo" className="space-y-4">
             <ChurnConclusion payload={payload} company={company} teams={teams} />
             <ChurnKpiCards payload={payload} company={company} />
-            <ChurnSinceLast teams={teams} settings={s} onCreateAction={canEdit ? openAction : undefined} />
+            
             <ChurnTeamTable
               teams={teams}
               settings={s}
