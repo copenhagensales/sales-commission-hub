@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { fmtPct, rate, type ChurnMetricsPayload, type DerivedGroup } from "@/lib/churn/metrics";
+import { fmtMonth, fmtPct, rate, type ChurnMetricsPayload, type DerivedGroup } from "@/lib/churn/metrics";
 import { useChurnSettings, useUpdateChurnSettings } from "@/hooks/useChurnDashboard";
 import { HistoricalTenureStats } from "@/components/company-overview/HistoricalTenureStats";
 import { NewHireChurnKpi } from "@/components/company-overview/NewHireChurnKpi";
