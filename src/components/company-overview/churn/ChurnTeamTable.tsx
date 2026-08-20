@@ -21,6 +21,18 @@ interface Props {
   windowByTeam?: Map<string, { starters: number; exits: number }>;
   /** Antal modne måneder vinduet dækker. */
   windowMonths?: number;
+  /** Alle modne startmåneder (ældst → nyest) — bruges til at vise dato-interval på udviklings-kolonnen. */
+  matureMonths?: string[];
+}
+
+/** "nyeste 3" og "de 3 før" som læsbare måneds-intervaller. */
+function trendRanges(matureMonths?: string[]) {
+  if (!matureMonths || matureMonths.length < 2) return null;
+  const recent = matureMonths.slice(-3);
+  const previous = matureMonths.slice(-6, -3);
+  const label = (arr: string[]) =>
+    arr.length === 0 ? null : arr.length === 1 ? fmtMonth(arr[0]) : `${fmtMonth(arr[0])}–${fmtMonth(arr[arr.length - 1])}`;
+  return { recent: label(recent), previous: label(previous) };
 }
 
 /** Farvezone for rate — grå når datagrundlaget er for tyndt. */
