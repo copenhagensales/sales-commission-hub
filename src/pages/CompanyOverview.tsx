@@ -131,6 +131,7 @@ export default function CompanyOverview() {
               settings={s}
               immatureTeams={payload.immature_teams}
               latestMatureMonth={payload.latest_mature_month}
+              latestMonthByTeam={latestMonthByTeam}
               onSelectTeam={(teamKey) => setDrilldown({ teamKey, month: null, open: true })}
               onCreateAction={canEdit ? openAction : undefined}
             />
@@ -182,6 +183,8 @@ export default function CompanyOverview() {
                 settings={s}
                 immatureTeams={payload.immature_teams}
                 latestMatureMonth={payload.latest_mature_month}
+                latestMonthByTeam={latestMonthByTeam}
+              latestMonthByTeam={latestMonthByTeam}
                 onSelectTeam={(teamKey) => setDrilldown({ teamKey, month: null, open: true })}
                 onCreateAction={canEdit ? openAction : undefined}
               />
