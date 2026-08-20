@@ -213,8 +213,6 @@ export default function CompanyOverview() {
                 rollingByTeam={rollingByTeam}
                 windowByTeam={windowByTeam}
                 windowMonths={TABLE_WINDOW_MONTHS}
-              windowByTeam={windowByTeam}
-              windowMonths={TABLE_WINDOW_MONTHS}
                 rollingWindowStart={payload.rolling_window?.window_start ?? null}
                 rollingDays={payload.rolling_window?.days ?? 60}
                 onSelectTeam={(teamKey) => setDrilldown({ teamKey, month: null, open: true })}
