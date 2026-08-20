@@ -243,6 +243,9 @@ export default function CompanyOverview() {
                 windowMonths={TABLE_WINDOW_MONTHS}
                 rollingWindowStart={payload.rolling_window?.window_start ?? null}
                 rollingDays={payload.rolling_window?.days ?? 60}
+                trendByTeam={trendByTeam}
+                trendTotal={trend?.total}
+                trendWindow={trendWindow}
                 onSelectTeam={(teamKey) => setDrilldown({ teamKey, month: null, open: true })}
                 onCreateAction={canEdit ? openAction : undefined}
               />
