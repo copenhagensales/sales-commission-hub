@@ -7,7 +7,45 @@ export const CHURN_QUERY_KEYS = {
   metrics: "churn-dashboard-metrics",
   settings: "churn-dashboard-settings",
   actions: "churn-actions",
+  trendWindows: "churn-trend-windows",
 } as const;
+
+export interface ChurnTrendWindowsPayload {
+  as_of_date: string;
+  horizon_days: number;
+  window_days: number;
+  recent_start: string;
+  recent_end: string;
+  previous_start: string;
+  previous_end: string;
+  total: { recent_n: number; recent_x: number; previous_n: number; previous_x: number };
+  teams: Array<{
+    team_key: string;
+    recent_n: number;
+    recent_x: number;
+    previous_n: number;
+    previous_x: number;
+  }>;
+}
+
+/**
+ * Udvikling målt på rullende vinduer i stedet for kalendermåneder.
+ * Nyeste vindue slutter (dags dato − horizon), så alle i det har haft fulde horizon-dage.
+ */
+export function useChurnTrendWindows(windowDays = 30, asOfDate?: string) {
+  return useQuery({
+    queryKey: [CHURN_QUERY_KEYS.trendWindows, windowDays, asOfDate ?? "default"],
+    queryFn: async (): Promise<ChurnTrendWindowsPayload> => {
+      const { data, error } = await supabase.rpc("get_churn_trend_windows", {
+        p_as_of_date: asOfDate ?? undefined,
+        p_window_days: windowDays,
+      });
+      if (error) throw error;
+      return data as unknown as ChurnTrendWindowsPayload;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
 
 /** Eneste indgang til churn-tal. Al beregning ligger i den centrale RPC. */
 export function useChurnMetrics(asOfDate?: string) {
