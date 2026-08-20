@@ -169,7 +169,7 @@ function TeamRow({
         )}
       </td>
       <td className="py-3 pr-6 text-xs">
-        <TrendCell r={r} />
+        <TrendCell counts={trend} />
       </td>
       {hasTarget && (
         <>
