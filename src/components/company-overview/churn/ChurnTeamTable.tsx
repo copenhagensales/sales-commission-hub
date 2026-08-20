@@ -219,7 +219,7 @@ export function ChurnTeamTable({ teams, settings, onSelectTeam, onCreateAction }
                   <td colSpan={colSpan} className="pt-5 pb-2">
                     <div className="flex items-center gap-3">
                       <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                        For lidt data til at konkludere
+                        For få personer til at man kan konkludere noget
                       </span>
                       <span className="h-px flex-1 bg-border" />
                     </div>
@@ -241,12 +241,12 @@ export function ChurnTeamTable({ teams, settings, onSelectTeam, onCreateAction }
 
               <tr className="border-t-2 font-semibold">
                 <td />
-                <td className="py-3 pr-4 whitespace-nowrap">Total (inkl. ukendt)</td>
+                <td className="py-3 pr-4 whitespace-nowrap">Hele virksomheden</td>
                 <td className="py-3 pr-4 text-right tabular-nums">{total.starters}</td>
                 <td className="py-3 pr-6 text-right tabular-nums">{total.exits}</td>
                 <td className="py-3 pr-6">
                   <span className="mr-2">{fmtPct(totalRate)}</span>
-                  <span className="text-[11px] font-normal text-muted-foreground">samlet rate</span>
+                  <span className="text-[11px] font-normal text-muted-foreground">i alt</span>
                 </td>
                 <td className="py-3 pr-6" />
                 {hasTarget && (
@@ -265,25 +265,36 @@ export function ChurnTeamTable({ teams, settings, onSelectTeam, onCreateAction }
         <div className="space-y-2 border-t pt-4">
           <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
             <span className="flex items-center gap-2">
-              <span className="h-1.5 w-6 rounded-full bg-red-500" /> Rate over 60 %
+              <span className="h-1.5 w-6 rounded-full bg-red-500" /> Mere end 60 % stopper
             </span>
             <span className="flex items-center gap-2">
-              <span className="h-1.5 w-6 rounded-full bg-orange-400" /> 40–60 %
+              <span className="h-1.5 w-6 rounded-full bg-orange-400" /> 40–60 % stopper
             </span>
             <span className="flex items-center gap-2">
-              <span className="h-1.5 w-6 rounded-full bg-emerald-500" /> Under 40 %
+              <span className="h-1.5 w-6 rounded-full bg-emerald-500" /> Under 40 % stopper
             </span>
             <span className="flex items-center gap-2">
-              <span className="h-1.5 w-6 rounded-full bg-muted-foreground/40" /> Lavt datagrundlag — ikke farvet
+              <span className="h-1.5 w-6 rounded-full bg-muted-foreground/40" /> For få personer — ikke farvet
             </span>
           </div>
-          <p className="text-xs text-muted-foreground">
-            {hasTarget
-              ? "Mål-gap og merfrafald måles mod det konfigurerede mål."
-              : "Mål-gap og merfrafald vises, når et mål er sat under Metode & datakvalitet."}{" "}
-            Historisk lederdata mangler for alle teams.
-          </p>
+          <div className="space-y-1 text-xs text-muted-foreground">
+            <p>
+              <strong className="text-foreground">Andel der stoppede</strong> er gennemsnittet for alle der er startet
+              de sidste 12 måneder — ikke kun de sidste 60 dage. Hver person følges i 60 dage fra sin startdato.
+            </p>
+            <p>
+              <strong className="text-foreground">Udvikling</strong> sammenligner de medarbejdere der startede i de 3
+              nyeste måneder (tallet efter pilen) med dem der startede i de 3 måneder før. Grøn betyder færre stopper nu.
+            </p>
+            <p>
+              {hasTarget
+                ? "Afstand til mål og exits over mål måles mod det mål der er sat."
+                : "Afstand til mål vises, når der er sat et mål under Metode & datakvalitet."}{" "}
+              Vi har endnu ikke historik på hvilken leder der havde teamet ved hver opstart.
+            </p>
+          </div>
         </div>
+
       </CardContent>
     </Card>
   );
