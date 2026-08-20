@@ -386,7 +386,9 @@ export function ChurnTeamTable({
                     {rollingTotal.exits} / {rollingTotal.starters}
                   </span>
                 </td>
-                <td className="py-3 pr-6" />
+                <td className="py-3 pr-6 text-xs font-normal">
+                  <TrendCell counts={trendTotal} />
+                </td>
                 {hasTarget && (
                   <>
                     <td className="py-3 pr-4" />
