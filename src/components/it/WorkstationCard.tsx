@@ -37,6 +37,8 @@ interface Props {
   onToggleEquipment?: (ws: ItWorkstation, kind: EquipmentKind, next: EquipmentStatus) => void;
   /** Hurtig markering af bordet som i brug / ledigt (kun med redigeringsadgang). */
   onToggleOccupancy?: (ws: ItWorkstation, next: boolean) => void;
+  /** Hurtig markering af stolen som ødelagt / i orden (kun med redigeringsadgang). */
+  onToggleChair?: (ws: ItWorkstation, next: boolean) => void;
   faded?: boolean;
   highlighted?: boolean;
 }
@@ -46,11 +48,13 @@ export function WorkstationCard({
   onOpen,
   onToggleEquipment,
   onToggleOccupancy,
+  onToggleChair,
   faded,
   highlighted,
 }: Props) {
   const interactiveEquipment = !!onToggleEquipment;
   const isFree = ws.is_occupied === false;
+  const chairBroken = isChairBroken(ws);
 
 
   return (
