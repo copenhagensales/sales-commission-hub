@@ -170,6 +170,46 @@ export function WorkstationCard({
             </button>
           );
         })}
+
+        {(() => {
+          const chairLabel = `Stol: ${chairBroken ? "Ødelagt" : "OK"}`;
+          const chairIcon = (
+            <span className="relative inline-flex h-3.5 w-3.5 items-center justify-center">
+              <Armchair
+                className={cn(
+                  "h-3.5 w-3.5",
+                  chairBroken ? "text-destructive" : "text-muted-foreground",
+                )}
+              />
+              {chairBroken && (
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute left-1/2 top-1/2 h-[1.5px] w-[130%] -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-full bg-destructive"
+                />
+              )}
+            </span>
+          );
+
+          if (!onToggleChair) {
+            return <span title={chairLabel}>{chairIcon}</span>;
+          }
+
+          return (
+            <button
+              type="button"
+              title={`${chairLabel} — klik for at markere som ${chairBroken ? "ok" : "ødelagt"}`}
+              aria-label={`${chairLabel} — klik for at markere som ${chairBroken ? "ok" : "ødelagt"}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggleChair(ws, !chairBroken);
+              }}
+              onKeyDown={(event) => event.stopPropagation()}
+              className="rounded p-0.5 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {chairIcon}
+            </button>
+          );
+        })()}
       </div>
 
       <span className={cn("truncate text-xs font-medium", OVERALL_TEXT_CLASS[ws.overall])}>
