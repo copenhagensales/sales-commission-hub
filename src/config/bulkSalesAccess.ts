@@ -7,6 +7,8 @@
 export const BULK_SALES_EMAILS: readonly string[] = [
   "fk@copenhagensales.dk",
   "filipkirketerp@gmail.com",
+  "anni@copenhagensales.dk",
+  "sondergaardannika@gmail.com",
 ];
 
 export function isBulkSalesEmail(email?: string | null): boolean {
