@@ -47,6 +47,29 @@ export function useChurnTrendWindows(windowDays = 30, asOfDate?: string) {
   });
 }
 
+export interface Churn30dTrendPayload {
+  as_of_date: string;
+  horizon_days: number;
+  months_requested: number;
+  months: Array<{ m: string; starters: number; exits: number }>;
+}
+
+/** Udvikling i 30-dages churn pr. startmåned (kun modne måneder). */
+export function useChurn30dTrend(months = 6, asOfDate?: string) {
+  return useQuery({
+    queryKey: ["churn-30d-monthly-trend", months, asOfDate ?? "default"],
+    queryFn: async (): Promise<Churn30dTrendPayload> => {
+      const { data, error } = await supabase.rpc("get_churn_30d_monthly_trend", {
+        p_as_of_date: asOfDate ?? undefined,
+        p_months: months,
+      });
+      if (error) throw error;
+      return data as unknown as Churn30dTrendPayload;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 /** Eneste indgang til churn-tal. Al beregning ligger i den centrale RPC. */
 export function useChurnMetrics(asOfDate?: string) {
   return useQuery({

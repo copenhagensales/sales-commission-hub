@@ -14899,6 +14899,10 @@ export type Database = {
           total_duration: number
         }[]
       }
+      get_churn_30d_monthly_trend: {
+        Args: { p_as_of_date?: string; p_months?: number }
+        Returns: Json
+      }
       get_churn_dashboard_metrics: {
         Args: {
           p_as_of_date?: string
