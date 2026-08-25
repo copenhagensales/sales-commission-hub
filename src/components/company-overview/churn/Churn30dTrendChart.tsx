@@ -1,9 +1,13 @@
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 import { useChurn30dTrend } from "@/hooks/useChurnDashboard";
 import { fmtMonth, fmtPct, rate } from "@/lib/churn/metrics";
+
+const MONTH_OPTIONS = [6, 12, 16, 24] as const;
 
 /**
  * Udvikling i 30-dages churn pr. startmåned.
@@ -12,7 +16,9 @@ import { fmtMonth, fmtPct, rate } from "@/lib/churn/metrics";
  * alle startere har haft fulde 30 dage vises (ingen kunstig udfyldning).
  */
 export function Churn30dTrendChart({ months = 6 }: { months?: number }) {
-  const { data, isLoading, error } = useChurn30dTrend(months);
+  const [selectedMonths, setSelectedMonths] = useState<number>(months);
+  const { data, isLoading, error } = useChurn30dTrend(selectedMonths);
+
 
   const points = (data?.months ?? []).map((row) => ({
     label: fmtMonth(row.m).replace(/ (\d{4})$/, " $1"),
@@ -27,13 +33,28 @@ export function Churn30dTrendChart({ months = 6 }: { months?: number }) {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Udvikling i 30-dages churn</CardTitle>
-        <CardDescription>
-          Andel af nye medarbejdere der stopper inden for 30 dage fra startdato, pr. startmåned. Kun måneder hvor alle
-          startere har haft fulde 30 dage. Samme population som churn-nævneren (ekskl. stab).
-        </CardDescription>
+      <CardHeader className="flex flex-row items-start justify-between gap-4">
+        <div className="space-y-1.5">
+          <CardTitle>Udvikling i 30-dages churn</CardTitle>
+          <CardDescription>
+            Andel af nye medarbejdere der stopper inden for 30 dage fra startdato, pr. startmåned. Kun måneder hvor alle
+            startere har haft fulde 30 dage. Samme population som churn-nævneren (ekskl. stab).
+          </CardDescription>
+        </div>
+        <Select value={String(selectedMonths)} onValueChange={(v) => setSelectedMonths(Number(v))}>
+          <SelectTrigger className="w-[150px] shrink-0">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {MONTH_OPTIONS.map((m) => (
+              <SelectItem key={m} value={String(m)}>
+                Sidste {m} mdr.
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </CardHeader>
+
       <CardContent>
         {isLoading ? (
           <Skeleton className="h-[300px] w-full" />
