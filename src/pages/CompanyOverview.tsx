@@ -17,6 +17,7 @@ import { ChurnTeamTable, type TrendCounts } from "@/components/company-overview/
 import { ChurnDrilldown } from "@/components/company-overview/churn/ChurnDrilldown";
 import { ChurnActionsTab } from "@/components/company-overview/churn/ChurnActionsTab";
 import { ChurnActionDialog } from "@/components/company-overview/churn/ChurnActionDialog";
+import { Churn30dTrendChart } from "@/components/company-overview/churn/Churn30dTrendChart";
 import { ChurnMethodTab } from "@/components/company-overview/churn/ChurnMethodTab";
 import { useChurnMetrics, useChurnActions, useChurnTrendWindows } from "@/hooks/useChurnDashboard";
 import { useCanManageChurn } from "@/hooks/useCanManageChurn";
@@ -260,6 +261,8 @@ export default function CompanyOverview() {
             <ChurnMethodTab payload={payload} teams={teams} canEdit={canEdit} />
           </TabsContent>
         </Tabs>
+
+        <Churn30dTrendChart months={6} />
 
         <ChurnDrilldown
           open={drilldown.open}
