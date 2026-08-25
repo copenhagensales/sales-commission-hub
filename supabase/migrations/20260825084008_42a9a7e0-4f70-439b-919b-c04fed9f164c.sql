@@ -1,0 +1,1 @@
+GRANT EXECUTE ON FUNCTION public.get_churn_30d_monthly_trend(date, integer) TO postgres;
