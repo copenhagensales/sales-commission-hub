@@ -78,7 +78,7 @@ export function Churn30dTrendChart({ months = 6 }: { months?: number }) {
         ) : error ? (
           <Alert variant="destructive">
             <AlertDescription>
-              Kunne ikke indlæse 30-dages udviklingen. {error instanceof Error ? error.message : "Ukendt fejl."}
+              Kunne ikke indlæse {horizon}-dages udviklingen. {error instanceof Error ? error.message : "Ukendt fejl."}
             </AlertDescription>
           </Alert>
         ) : withData.length === 0 ? (
@@ -104,10 +104,10 @@ export function Churn30dTrendChart({ months = 6 }: { months?: number }) {
                         <div className="bg-popover border border-border rounded-lg p-3 shadow-lg">
                           <p className="font-medium text-foreground">{label}</p>
                           <p className="text-sm text-primary mt-1">
-                            30-dages churn: <span className="font-semibold">{fmtPct(d.churnRate)}</span>
+                            {horizon}-dages churn: <span className="font-semibold">{fmtPct(d.churnRate)}</span>
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {d.exits} af {d.starters} nye stoppede inden for 30 dage
+                            {d.exits} af {d.starters} nye stoppede inden for {horizon} dage
                           </p>
                         </div>
                       );
