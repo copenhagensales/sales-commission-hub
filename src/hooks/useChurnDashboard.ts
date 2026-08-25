@@ -54,14 +54,15 @@ export interface Churn30dTrendPayload {
   months: Array<{ m: string; starters: number; exits: number }>;
 }
 
-/** Udvikling i 30-dages churn pr. startmåned (kun modne måneder). */
-export function useChurn30dTrend(months = 6, asOfDate?: string) {
+/** Udvikling i tidlig churn pr. startmåned (kun modne måneder). Horisont: 30/60/90 dage. */
+export function useChurn30dTrend(months = 6, horizonDays: 30 | 60 | 90 = 30, asOfDate?: string) {
   return useQuery({
-    queryKey: ["churn-30d-monthly-trend", months, asOfDate ?? "default"],
+    queryKey: ["churn-30d-monthly-trend", months, horizonDays, asOfDate ?? "default"],
     queryFn: async (): Promise<Churn30dTrendPayload> => {
       const { data, error } = await supabase.rpc("get_churn_30d_monthly_trend", {
         p_as_of_date: asOfDate ?? undefined,
         p_months: months,
+        p_horizon_days: horizonDays,
       });
       if (error) throw error;
       return data as unknown as Churn30dTrendPayload;
@@ -69,6 +70,7 @@ export function useChurn30dTrend(months = 6, asOfDate?: string) {
     staleTime: 5 * 60 * 1000,
   });
 }
+
 
 /** Eneste indgang til churn-tal. Al beregning ligger i den centrale RPC. */
 export function useChurnMetrics(asOfDate?: string) {
