@@ -8,17 +8,19 @@ import { useChurn30dTrend } from "@/hooks/useChurnDashboard";
 import { fmtMonth, fmtPct, rate } from "@/lib/churn/metrics";
 
 const MONTH_OPTIONS = [6, 12, 16, 24] as const;
+const HORIZON_OPTIONS = [30, 60, 90] as const;
+type Horizon = (typeof HORIZON_OPTIONS)[number];
 
 /**
- * Udvikling i 30-dages churn pr. startmåned.
+ * Udvikling i tidlig churn pr. startmåned (30/60/90 dage).
  * Datagrundlag: RPC `get_churn_30d_monthly_trend` — samme rensede
  * ansættelsesforløb som resten af churn-dashboardet. Kun måneder hvor
- * alle startere har haft fulde 30 dage vises (ingen kunstig udfyldning).
+ * alle startere har haft den fulde horisont vises (ingen kunstig udfyldning).
  */
 export function Churn30dTrendChart({ months = 6 }: { months?: number }) {
   const [selectedMonths, setSelectedMonths] = useState<number>(months);
-  const { data, isLoading, error } = useChurn30dTrend(selectedMonths);
-
+  const [horizon, setHorizon] = useState<Horizon>(30);
+  const { data, isLoading, error } = useChurn30dTrend(selectedMonths, horizon);
 
   const points = (data?.months ?? []).map((row) => ({
     label: fmtMonth(row.m).replace(/ (\d{4})$/, " $1"),
@@ -35,25 +37,40 @@ export function Churn30dTrendChart({ months = 6 }: { months?: number }) {
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-4">
         <div className="space-y-1.5">
-          <CardTitle>Udvikling i 30-dages churn</CardTitle>
+          <CardTitle>Udvikling i {horizon}-dages churn</CardTitle>
           <CardDescription>
-            Andel af nye medarbejdere der stopper inden for 30 dage fra startdato, pr. startmåned. Kun måneder hvor alle
-            startere har haft fulde 30 dage. Samme population som churn-nævneren (ekskl. stab).
+            Andel af nye medarbejdere der stopper inden for {horizon} dage fra startdato, pr. startmåned. Kun måneder
+            hvor alle startere har haft fulde {horizon} dage. Samme population som churn-nævneren (ekskl. stab).
           </CardDescription>
         </div>
-        <Select value={String(selectedMonths)} onValueChange={(v) => setSelectedMonths(Number(v))}>
-          <SelectTrigger className="w-[150px] shrink-0">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {MONTH_OPTIONS.map((m) => (
-              <SelectItem key={m} value={String(m)}>
-                Sidste {m} mdr.
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex shrink-0 gap-2">
+          <Select value={String(horizon)} onValueChange={(v) => setHorizon(Number(v) as Horizon)}>
+            <SelectTrigger className="w-[130px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {HORIZON_OPTIONS.map((h) => (
+                <SelectItem key={h} value={String(h)}>
+                  {h} dages churn
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={String(selectedMonths)} onValueChange={(v) => setSelectedMonths(Number(v))}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {MONTH_OPTIONS.map((m) => (
+                <SelectItem key={m} value={String(m)}>
+                  Sidste {m} mdr.
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </CardHeader>
+
 
       <CardContent>
         {isLoading ? (
