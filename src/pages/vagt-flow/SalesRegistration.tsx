@@ -20,6 +20,8 @@ import { toast } from "sonner";
 import { useCreateFieldmarketingSale, FIELDMARKETING_CLIENTS } from "@/hooks/useFieldmarketingSales";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/useAuth";
+import { findEmployeeByAuth } from "@/lib/employeeLookup";
+
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { useFmRegistrationProducts } from "@/hooks/useFmRegistrationProducts";
 import { format } from "date-fns";
@@ -64,22 +66,21 @@ const SalesRegistration = () => {
   const createSalesMutation = useCreateFieldmarketingSale();
   const today = format(new Date(), "yyyy-MM-dd");
 
-  // Get current employee ID from logged-in user
+  // Get current employee ID from logged-in user (auth_user_id først, mail som fallback)
   const { data: currentEmployee } = useQuery({
-    queryKey: ["current-employee", user?.email],
+    queryKey: ["current-employee", user?.id, user?.email],
     queryFn: async () => {
-      if (!user?.email) return null;
-      const { data, error } = await supabase
-        .from("employee_master_data")
-        .select("id, first_name, last_name")
-        .or(`private_email.ilike.${user.email},work_email.ilike.${user.email}`)
-        .eq("is_active", true)
-        .maybeSingle();
+      const { data, error } = await findEmployeeByAuth<{
+        id: string;
+        first_name: string | null;
+        last_name: string | null;
+      }>(user, "id, first_name, last_name", { activeOnly: true });
       if (error) throw error;
       return data;
     },
-    enabled: !!user?.email,
+    enabled: !!user?.id,
   });
+
 
   // Fetch today's booking assignment for the current employee
   const { data: todayBooking } = useQuery({
