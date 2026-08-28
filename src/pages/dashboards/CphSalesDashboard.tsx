@@ -1274,10 +1274,6 @@ export default function CphSalesDashboard() {
         </Card>
       </div>
 
-      {/* Daily Revenue Chart */}
-      {!tvMode && (
-        <DailyRevenueChart daysBack={30} />
-      )}
 
       {/* Footer */}
       <div className="text-center text-muted-foreground text-sm">
