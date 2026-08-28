@@ -126,6 +126,40 @@ export async function importSingleSale(
 
   const { integration, auth } = await getAuth(supabase, integrationName);
 
+  // READ ONLY: list distinct sale owners in the window (no lead calls, fast)
+  if (mode === "owners") {
+    const raw = await fetchSalesWindow(auth, days, maxPages);
+    const users = await fetchUsers(auth).catch(() => new Map());
+    const nameFilter = String(body.name_contains || "").toLowerCase();
+    const agg = new Map<string, any>();
+    for (const s of raw) {
+      if (campaignIds.length && !campaignIds.includes(String(s.campaignId))) continue;
+      const id = ownerOf(s) || creatorOf(s);
+      const u = users.get(id);
+      const key = id || "unknown";
+      const row = agg.get(key) || {
+        ownerId: id,
+        name: (typeof s.ownedBy === "object" ? s.ownedBy?.name : null) || u?.name || null,
+        email: (typeof s.ownedBy === "object" ? s.ownedBy?.email : null) || u?.email || null,
+        campaigns: new Set<string>(),
+        count: 0,
+        saleIds: [] as string[],
+      };
+      row.count++;
+      row.campaigns.add(String(s.campaignId));
+      if (row.saleIds.length < 10) row.saleIds.push(String(s.id));
+      agg.set(key, row);
+    }
+    let owners = [...agg.values()].map((r) => ({ ...r, campaigns: [...r.campaigns] }));
+    if (nameFilter) {
+      owners = owners.filter((o) =>
+        `${o.name ?? ""} ${o.email ?? ""}`.toLowerCase().includes(nameFilter)
+      );
+    }
+    owners.sort((a, b) => b.count - a.count);
+    return { success: true, mode, window: { days, rawSalesFetched: raw.length }, owners };
+  }
+
   if (mode === "lookup") {
     const raw = await fetchSalesWindow(auth, days, maxPages);
 
