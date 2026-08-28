@@ -269,7 +269,10 @@ export async function importSingleSale(
     for (const s of rawTargets) {
       const ownerId = ownerOf(s) || creatorOf(s);
       const u = users.get(ownerId);
-      const agentEmail = (typeof s.ownedBy === "object" ? s.ownedBy?.email : null) || u?.email || null;
+      // Optional override: used when the Adversus user has a private email
+      // (which the normal sync filters out) but the seller is a known employee.
+      const agentEmail = (body.agent_email_override ? String(body.agent_email_override) : null)
+        || (typeof s.ownedBy === "object" ? s.ownedBy?.email : null) || u?.email || null;
       const agentName = (typeof s.ownedBy === "object" ? s.ownedBy?.name : null) || u?.name || "Ukendt";
 
       if (!agentEmail) {
