@@ -299,7 +299,8 @@ export async function importSingleSale(
         agentEmail,
         agentName,
         customerName: s.lead?.company || s.lead?.name || "",
-        customerPhone: s.lead?.phone || leadInfo?.phone || "",
+        customerPhone: s.lead?.phone || leadInfo?.phone
+          || String((leadInfo?.resultFields as any)?.["Kontakt nummer"] || "").replace(/\s/g, "") || "",
         campaignId,
         campaignName: s.campaign?.name || undefined,
         externalReference: leadInfo?.opp || null,
