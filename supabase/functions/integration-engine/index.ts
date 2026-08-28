@@ -112,6 +112,15 @@ serve(async (req) => {
       return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    if (action === "import-single-sale") {
+      const { importSingleSale } = await import("./actions/import-single-sale.ts");
+      const result = await importSingleSale(supabase, body, log);
+      return new Response(JSON.stringify(result, null, 2), {
+        status: result.success === false ? 400 : 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (action === "repair-history") {
       const { repairHistory } = await import("./actions/repair-history.ts");
       if (background) {
