@@ -10,7 +10,7 @@ import { Users, TrendingUp, Target, Trophy, Medal, Activity } from "lucide-react
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { DataFreshnessBadge } from "@/components/ui/DataFreshnessBadge";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { DailyRevenueChart } from "@/components/dashboard/DailyRevenueChart";
+
 import { TeamPerformanceTabs } from "@/components/dashboard/TeamPerformanceTabs";
 import { QuickStatsBar } from "@/components/dashboard/QuickStatsBar";
 import { usePrecomputedKpis, getKpiValue } from "@/hooks/usePrecomputedKpi";
@@ -1274,10 +1274,6 @@ export default function CphSalesDashboard() {
         </Card>
       </div>
 
-      {/* Daily Revenue Chart */}
-      {!tvMode && (
-        <DailyRevenueChart daysBack={30} />
-      )}
 
       {/* Footer */}
       <div className="text-center text-muted-foreground text-sm">
