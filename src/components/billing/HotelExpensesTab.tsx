@@ -227,17 +227,33 @@ export function HotelExpensesTab() {
                   const lineTotal = bh.total_price || 0;
                   const pricePerNight = nights > 0 ? lineTotal / nights : 0;
                   const statusInfo = STATUS_LABELS[bh.status] || { label: bh.status, variant: "outline" as const };
+                  const isDuplicate = duplicateIds.has(bh.id);
 
                   return (
-                    <TableRow key={bh.id}>
+                    <TableRow key={bh.id} className={isDuplicate ? "bg-yellow-50 dark:bg-yellow-900/20" : undefined}>
                       <TableCell>
-                        <div className="font-medium">{bh.booking?.location?.name || "—"}</div>
+                        <div className="font-medium flex items-center gap-1.5">
+                          {isDuplicate && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <TriangleAlert className="h-4 w-4 text-yellow-600 shrink-0" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  Mulig dublet: samme hotel, datoer, antal værelser og beløb som en anden række.
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                          {bh.booking?.location?.name || "—"}
+                        </div>
                         <div className="text-xs text-muted-foreground">{bh.booking?.location?.address_city || ""}</div>
                       </TableCell>
                       <TableCell>
                         <div className="font-medium">{bh.hotel?.name || "—"}</div>
                         <div className="text-xs text-muted-foreground">{bh.hotel?.city || ""}</div>
                       </TableCell>
+
                       <TableCell>{format(checkIn, "dd/MM/yyyy")}</TableCell>
                       <TableCell>{format(checkOut, "dd/MM/yyyy")}</TableCell>
                       <TableCell className="text-right">{nights}</TableCell>
