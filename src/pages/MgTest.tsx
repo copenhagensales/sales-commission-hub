@@ -3276,6 +3276,7 @@ export default function MgTest() {
                           <TableHead className="w-[60px]">Logo</TableHead>
                           <TableHead>Kundenavn</TableHead>
                           <TableHead>Teams</TableHead>
+                          <TableHead className="w-[170px]">Lokationsudgifter</TableHead>
                           <TableHead className="w-[200px] text-right">Handling</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -3368,6 +3369,24 @@ export default function MgTest() {
                                 ) : (
                                   <span className="text-xs text-muted-foreground">Ingen teams</span>
                                 )}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <Switch
+                                    checked={client.has_location_costs === true}
+                                    onCheckedChange={(checked) =>
+                                      updateClientLocationCostsMutation.mutate({
+                                        id: client.id,
+                                        hasLocationCosts: checked,
+                                      })
+                                    }
+                                    disabled={updateClientLocationCostsMutation.isPending}
+                                    aria-label={`Lokationsudgifter for ${client.name}`}
+                                  />
+                                  <span className="text-xs text-muted-foreground">
+                                    {client.has_location_costs ? "Ja" : "Nej"}
+                                  </span>
+                                </div>
                               </TableCell>
                               <TableCell className="text-right space-x-2">
                                 {isEditing ? (
