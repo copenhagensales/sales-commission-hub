@@ -266,13 +266,17 @@ export default function MyProfile() {
         .filter(Boolean)
         .join(", ");
       
-      // Egen løn hentes fra den beskyttede løntabel (egen række er altid tilladt)
+      // Egen løn hentes fra den beskyttede løntabel (egen række er altid tilladt).
+      // Procentsats og minimumsløn er superadmin-beskyttet i RLS — man kan kun
+      // se sine EGNE tal her, aldrig andres.
       const ownSalary = await fetchSalaryDetails(data.id);
 
       return {
         ...data,
         department: teamNames || data.department,
         salary_amount: ownSalary?.amount ?? null,
+        own_percentage_rate: ownSalary?.percentage_rate ?? null,
+        own_minimum_salary: ownSalary?.minimum_salary ?? null,
       };
     },
   });
