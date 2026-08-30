@@ -96,6 +96,19 @@ export function LocationReportTab() {
   const [periodStart, setPeriodStart] = useState("2026-01-01");
   const [periodEnd, setPeriodEnd] = useState("2026-03-20");
 
+  const { data: locationCostClients = [] } = useLocationCostClients();
+  const locationCostClientIds = useMemo(
+    () => locationCostClients.map((c) => c.id),
+    [locationCostClients]
+  );
+  const clientOptions = useMemo(
+    () => [
+      { id: "all", label: "Alle kunder med lokationsudgifter" },
+      ...locationCostClients.map((c) => ({ id: c.id, label: c.name })),
+    ],
+    [locationCostClients]
+  );
+
   // All locations query
   const { data: locations, isLoading: isLoadingLocations } = useQuery({
     queryKey: ["location-report-all", clientId, locationType],
