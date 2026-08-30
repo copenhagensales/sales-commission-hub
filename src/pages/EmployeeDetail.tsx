@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchSalaryDetails, saveSalaryDetails, logSalaryAccess } from "@/lib/salary/salaryDetails";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -113,7 +114,13 @@ export default function EmployeeDetail() {
         .eq("id", id)
         .maybeSingle();
       if (error) throw error;
-      return data as EmployeeMasterDataRecord | null;
+      if (!data) return null;
+      // Lønbeløbet ligger i den beskyttede løntabel; RLS afgør om det følger med.
+      const salary = await fetchSalaryDetails(id);
+      if (salary?.amount != null) {
+        await logSalaryAccess(id, "salary_amount", "view");
+      }
+      return { ...data, salary_amount: salary?.amount ?? null } as unknown as EmployeeMasterDataRecord;
     },
     enabled: !!id,
   });
@@ -489,7 +496,31 @@ export default function EmployeeDetail() {
       return;
     }
 
-    
+
+    // Lønbeløb skrives til den beskyttede løntabel, ikke til stamkortet
+    if (field === "salary_amount") {
+      if (!id) return;
+      void (async () => {
+        try {
+          const raw = value as string | number | null;
+          const amount =
+            raw === null || raw === "" ? null : typeof raw === "number" ? raw : parseFloat(String(raw));
+          await saveSalaryDetails(id, { amount: Number.isFinite(amount as number) ? amount : null });
+          await logSalaryAccess(id, "salary_amount", "edit");
+          queryClient.invalidateQueries({ queryKey: ["employee-detail", id] });
+          queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
+          toast({ title: "Gemt" });
+        } catch (err) {
+          toast({
+            title: "Fejl",
+            description: err instanceof Error ? err.message : "Kunne ikke gemme løn",
+            variant: "destructive",
+          });
+        }
+      })();
+      return;
+    }
+
     // Log access to sensitive fields
     if (isSensitiveField(field) && id) {
       logSensitiveAccess(id, field, "edit");
