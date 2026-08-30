@@ -11,7 +11,8 @@ import {
   DollarSign,
   PieChart,
   TrendingUp,
-  SlidersHorizontal
+  SlidersHorizontal,
+  ShieldCheck
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -34,6 +35,7 @@ import { DBOverviewTab } from "./DBOverviewTab";
 import { ClientDBTab } from "./ClientDBTab";
 import { CalculationSettingsTab } from "./CalculationSettingsTab";
 import { SuperadminGate } from "@/components/auth/SuperadminGate";
+import { SuperadminsTab } from "./SuperadminsTab";
 
 interface SubTab {
   id: string;
@@ -90,6 +92,16 @@ const categories: Category[] = [
         label: "Nye medarbejdere",
         icon: <UserPlus className="h-4 w-4" />,
         component: <NewEmployeesTab />,
+      },
+      {
+        id: "superadmins",
+        label: "Superadmins",
+        icon: <ShieldCheck className="h-4 w-4" />,
+        component: (
+          <SuperadminGate message="Kun superadmins kan se og ændre listen over superadmins.">
+            <SuperadminsTab />
+          </SuperadminGate>
+        ),
       },
       {
         id: "calculation-settings",
