@@ -257,7 +257,7 @@ export function LocationReportTab() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {FM_CLIENTS.map((c) => (
+                {clientOptions.map((c) => (
                   <SelectItem key={c.id} value={c.id}>
                     {c.label}
                   </SelectItem>
