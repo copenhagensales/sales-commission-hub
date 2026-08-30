@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTeamDBStats } from "@/hooks/useTeamDBStats";
+import { useSalaryAccessAudit } from "@/hooks/useSalaryAccessAudit";
 import { formatCurrency } from "@/lib/calculations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -13,6 +14,8 @@ import { da } from "date-fns/locale";
 
 interface SalaryEntry {
   id: string;
+  /** Sat for stab/teamleder/assistent, hvor beløbet er en fast løn (bruges til audit). */
+  employeeId?: string;
   name: string;
   type: "sælger" | "teamleder" | "assistent" | "stab";
   amount: number;
@@ -109,6 +112,7 @@ export function CombinedSalaryTab() {
         if (amount > 0) {
           entries.push({
             id: ps.id,
+            employeeId: ps.employee_id,
             name: `${emp.first_name} ${emp.last_name}`,
             type: typeLabel,
             amount,
@@ -120,6 +124,12 @@ export function CombinedSalaryTab() {
     },
     enabled: !aggregatesLoading, // Wait for aggregates to load first
   });
+
+  // Audit: log opslag i løndata for stab/teamledere/assistenter
+  useSalaryAccessAudit(
+    (data ?? []).filter((e) => e.employeeId).map((e) => e.employeeId),
+    "combined_salary_overview"
+  );
 
   // formatCurrency imported from @/lib/calculations
 
