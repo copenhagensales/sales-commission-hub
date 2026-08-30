@@ -17,6 +17,7 @@ hardkodede forretningsregler skal ud i systemet, datakvalitet skal advares om, o
 - [x] Feriepengesatser, arbejdsdage/md., ATP-sats og Stab-team læses ét sted (`useCalculationSettings`)
 - [x] `FIXED_MONTHLY_OVERHEAD` beregnes fra data (Stab-udgifter + stabsløn)
 - [x] `RevenueByClient`: `ALLOWED_EMAILS` → rettighedssystemet; `EESY_FM_ID`/`YOUSEE_ID` → `has_location_costs`
+- [x] `LocationReportTab`: hardkodet `FM_CLIENTS`-liste → klienter med `has_location_costs`
 - [x] Side "Beregningsindstillinger" under Løn med hjælpetekster + ændringslog
 - [x] Ensret lederløn mellem `DBOverviewTab` og `ClientDBTab` (samme grundlag, ét kodested)
 
