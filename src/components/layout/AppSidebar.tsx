@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { useItAccess } from "@/hooks/useItWorkstations";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePositionPermissions";
+import { useIsSuperadmin } from "@/hooks/useIsSuperadmin";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
 import { useCanWorkFieldmarketing, useIsFieldmarketingEmployee } from "@/hooks/useFieldmarketingEmployee";
 import { useEmployeeSmsUnreadCount } from "@/hooks/useEmployeeSmsConversations";
@@ -51,6 +52,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   const { user } = useAuth();
   const p = usePermissions(); // Position permissions - THE ONLY source of truth
   const { isPreviewMode } = useRolePreview();
+  const { isSuperadmin } = useIsSuperadmin();
   
   const { data: isFieldmarketing } = useIsFieldmarketingEmployee();
   const { data: canWorkFieldmarketing } = useCanWorkFieldmarketing();

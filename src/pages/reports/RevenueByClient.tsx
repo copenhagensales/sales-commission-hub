@@ -4,6 +4,7 @@ import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/utils/supabasePagination";
 import { useHasPermission, usePositionPermissions } from "@/hooks/usePositionPermissions";
+import { useIsSuperadmin } from "@/hooks/useIsSuperadmin";
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, parseISO, startOfDay, endOfDay, differenceInDays } from "date-fns";
 import { da } from "date-fns/locale";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -53,9 +54,14 @@ export default function RevenueByClient() {
    * brugerniveau som alle andre sider.
    */
   const { isLoading: permissionsLoading } = usePositionPermissions();
-  const hasAccess = useHasPermission("menu_reports_revenue_by_client", "view");
-  const canEditAdjustments = useHasPermission("menu_reports_revenue_by_client", "edit");
-  const authLoading = permissionsLoading;
+  const { isSuperadmin, isLoading: superadminLoading } = useIsSuperadmin();
+  // DB/overskudstal kræver superadmin OVEN I menurettigheden. Databasen
+  // håndhæver det samme med RLS, så tallene ikke kan hentes ad en bagvej.
+  const hasAccess =
+    useHasPermission("menu_reports_revenue_by_client", "view") && isSuperadmin;
+  const canEditAdjustments =
+    useHasPermission("menu_reports_revenue_by_client", "edit") && isSuperadmin;
+  const authLoading = permissionsLoading || superadminLoading;
 
   /**
    * Klienter markeret med "har lokationsudgifter" — erstatter de tidligere
