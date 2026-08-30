@@ -659,7 +659,7 @@ export default function RevenueByClient() {
                               {Math.round(totalLaborCost).toLocaleString("da-DK")} kr
                             </TableCell>
                             <TableCell className="text-right text-orange-500">
-                              {(client.clientId === EESY_FM_ID || client.clientId === YOUSEE_ID)
+                              {locationCostClientIdSet.has(client.clientId)
                                 ? `${Math.round(client.locationCosts || 0).toLocaleString("da-DK")} kr`
                                 : "-"
                               }
@@ -672,6 +672,7 @@ export default function RevenueByClient() {
                                 step="0.1"
                                 className="w-20 text-right h-8"
                                 placeholder="0"
+                                disabled={!canEditAdjustments}
                                 value={deductionPercents[client.clientId] || ""}
                                 onChange={(e) => handlePercentChange(client.clientId, "deduction", parseFloat(e.target.value) || 0)}
                               />
@@ -684,6 +685,7 @@ export default function RevenueByClient() {
                                 step="0.1"
                                 className="w-20 text-right h-8"
                                 placeholder="0"
+                                disabled={!canEditAdjustments}
                                 value={cancellationPercents[client.clientId] || ""}
                                 onChange={(e) => handlePercentChange(client.clientId, "cancellation", parseFloat(e.target.value) || 0)}
                               />
