@@ -15,12 +15,20 @@ import { DBPeriodSelector } from "./DBPeriodSelector";
 import { ClientDBDailyBreakdown } from "./ClientDBDailyBreakdown";
 import { ClientDBKPIs } from "./ClientDBKPIs";
 import { ClientDBExpandableRow } from "./ClientDBExpandableRow";
+import {
+  ClientDBTeamGroupRow,
+  type ClientDBTeamGroupSummary,
+} from "./ClientDBTeamGroupRow";
 import { ClientDBSummaryCard } from "./ClientDBSummaryCard";
 import { ClientDBDailyChart } from "./ClientDBDailyChart";
 import { DbDataQualityPanel } from "./DbDataQualityPanel";
 import { useClientPeriodComparison } from "@/hooks/useClientPeriodComparison";
 import { useSalesAggregatesExtended } from "@/hooks/useSalesAggregatesExtended";
-import { useClientDbData, type DbPeriodMode } from "@/hooks/useClientDbData";
+import {
+  useClientDbData,
+  type ClientDbRow,
+  type DbPeriodMode,
+} from "@/hooks/useClientDbData";
 import { useMonthlyOverhead } from "@/hooks/useMonthlyOverhead";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -36,6 +44,20 @@ type SortColumn =
   | "dbPercent"
   | "revenuePerFTE";
 type SortDirection = "asc" | "desc";
+
+/** Samme omkostningssum som vises i kolonnen "Omkostninger" pr. klient. */
+function rowCosts(row: ClientDbRow): number {
+  return (
+    row.adjustedSellerCost +
+    row.sickPayAmount +
+    row.locationCosts +
+    row.teamExpenseAllocation +
+    row.assistantAllocation +
+    row.leaderAllocation +
+    row.leaderVacationPay +
+    row.atpBarsselAllocation
+  );
+}
 
 /**
  * DB per klient.
@@ -60,6 +82,8 @@ export function ClientDBTab() {
   const [sortColumn, setSortColumn] = useState<SortColumn>("finalDB");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [hideZeroClients, setHideZeroClients] = useState(true);
+  const [groupByTeam, setGroupByTeam] = useState(true);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
 
@@ -68,6 +92,7 @@ export function ClientDBTab() {
   // --- Fælles DB-beregning (samme kilde som DB Oversigt) ---
   const {
     clientRows,
+    teamSummaryById,
     totals,
     isLoading: dbLoading,
     isCapped,
