@@ -2233,6 +2233,30 @@ export default function MgTest() {
     },
   });
 
+  /**
+   * "Har lokationsudgifter" styrer om klientens bookinger tælles som
+   * lokationsudgifter i DB-beregningen. Erstatter det tidligere navnematch
+   * (FM_CLIENT_NAMES), som gik i stykker hvis en klient blev omdøbt.
+   */
+  const updateClientLocationCostsMutation = useMutation({
+    mutationFn: async ({ id, hasLocationCosts }: { id: string; hasLocationCosts: boolean }) => {
+      const { error } = await supabase
+        .from("clients")
+        .update({ has_location_costs: hasLocationCosts })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Lokationsudgifter opdateret");
+      queryClient.invalidateQueries({ queryKey: ["mg-clients"] });
+      queryClient.invalidateQueries({ queryKey: ["clients-with-teams"] });
+      queryClient.invalidateQueries({ queryKey: ["revenue-by-client-clients"] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Kunne ikke opdatere lokationsudgifter");
+    },
+  });
+
   // Upload client logo
   const uploadClientLogo = async (clientId: string, file: File): Promise<string | null> => {
     const fileExt = file.name.split('.').pop();
