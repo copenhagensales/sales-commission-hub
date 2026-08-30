@@ -112,15 +112,19 @@ export interface MasterSalaryInput {
 export interface MasterSalaryPayload {
   personnel_category: string;
   salary_type: "provision" | "fixed" | "hourly";
-  salary_amount: number | null;
-  salary_percentage_rate: number | null;
-  salary_minimum: number | null;
-  salary_notes: string | null;
   salary_start_date: string | null;
   salary_hours_source: string;
 }
 
-/** Oversætter lønformularen til stamkortets kolonner. */
+/** Beløbsfelterne der hører til den beskyttede løntabel. */
+export interface SalaryDetailsPayload {
+  amount: number | null;
+  percentage_rate: number | null;
+  minimum_salary: number | null;
+  notes: string | null;
+}
+
+/** Oversætter lønformularen til stamkortets kolonner (uden beløb). */
 export function masterSalaryPayload(input: MasterSalaryInput): MasterSalaryPayload {
   const isPercentage = input.compensationModel === "percentage";
   return {
@@ -131,11 +135,18 @@ export function masterSalaryPayload(input: MasterSalaryInput): MasterSalaryPaylo
         : isPercentage
           ? "provision"
           : "fixed",
-    salary_amount: isPercentage ? null : input.amount,
-    salary_percentage_rate: isPercentage ? input.percentageRate : null,
-    salary_minimum: isPercentage ? input.minimumSalary : null,
-    salary_notes: input.notes || null,
     salary_start_date: input.startDate ?? null,
     salary_hours_source: input.hoursSource ?? "shift",
+  };
+}
+
+/** Oversætter lønformularen til beløbsfelterne i `employee_salary_details`. */
+export function salaryDetailsPayload(input: MasterSalaryInput): SalaryDetailsPayload {
+  const isPercentage = input.compensationModel === "percentage";
+  return {
+    amount: isPercentage ? null : input.amount,
+    percentage_rate: isPercentage ? input.percentageRate : null,
+    minimum_salary: isPercentage ? input.minimumSalary : null,
+    notes: input.notes || null,
   };
 }

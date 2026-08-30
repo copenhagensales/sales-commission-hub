@@ -34,8 +34,10 @@ import {
   compensationModelHelp,
   defaultCompensationModel,
   masterSalaryPayload,
+  salaryDetailsPayload,
   type PersonnelSalaryRow,
 } from "./personnelSalary";
+import { saveSalaryDetails } from "@/lib/salary/salaryDetails";
 
 const getSalaryTypeLabel = (type: string | null) => {
   switch (type) {
@@ -145,22 +147,25 @@ export function EditPersonnelDialog({
 
       // Lønnen rettes på medarbejderens stamkort — den eneste kilde.
       // Databasen spejler den selv over i personnel_salaries (beregningerne).
+      const salaryInput = {
+        salaryType: salary.salary_type as "team_leader" | "assistant" | "staff",
+        compensationModel,
+        amount: parsedAmount,
+        percentageRate: parsedPercentage,
+        minimumSalary: parsedMinimum,
+        notes,
+        startDate: startDate ? format(startDate, "yyyy-MM-dd") : null,
+      };
+
       const { error } = await supabase
         .from("employee_master_data")
-        .update(
-          masterSalaryPayload({
-            salaryType: salary.salary_type as "team_leader" | "assistant" | "staff",
-            compensationModel,
-            amount: parsedAmount,
-            percentageRate: parsedPercentage,
-            minimumSalary: parsedMinimum,
-            notes,
-            startDate: startDate ? format(startDate, "yyyy-MM-dd") : null,
-          })
-        )
+        .update(masterSalaryPayload(salaryInput))
         .eq("id", salary.employee_id);
 
       if (error) throw error;
+
+      // Beløbene ligger i den beskyttede løntabel
+      await saveSalaryDetails(salary.employee_id, salaryDetailsPayload(salaryInput));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["personnel-salaries"] });

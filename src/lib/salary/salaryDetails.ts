@@ -85,16 +85,17 @@ export async function saveSalaryDetails(
   employeeId: string,
   values: SalaryDetailsInput
 ): Promise<void> {
-  const { error } = await supabase.from("employee_salary_details").upsert(
-    {
-      employee_id: employeeId,
-      amount: values.amount ?? null,
-      percentage_rate: values.percentage_rate ?? null,
-      minimum_salary: values.minimum_salary ?? null,
-      notes: values.notes ?? null,
-    },
-    { onConflict: "employee_id" }
-  );
+  // Kun de felter der faktisk sendes med bliver rørt — så et beløb-update
+  // ikke nulstiller procentsats/minimumsløn/note.
+  const payload: Record<string, unknown> = { employee_id: employeeId };
+  if ("amount" in values) payload.amount = values.amount ?? null;
+  if ("percentage_rate" in values) payload.percentage_rate = values.percentage_rate ?? null;
+  if ("minimum_salary" in values) payload.minimum_salary = values.minimum_salary ?? null;
+  if ("notes" in values) payload.notes = values.notes ?? null;
+
+  const { error } = await supabase
+    .from("employee_salary_details")
+    .upsert(payload as never, { onConflict: "employee_id" });
 
   if (error) throw error;
 }

@@ -26,7 +26,9 @@ import {
   compensationModelHelp,
   defaultCompensationModel,
   masterSalaryPayload,
+  salaryDetailsPayload,
 } from "./personnelSalary";
+import { saveSalaryDetails } from "@/lib/salary/salaryDetails";
 
 interface AddPersonnelDialogProps {
   open: boolean;
@@ -133,21 +135,24 @@ export function AddPersonnelDialog({
 
       // Lønnen gemmes på medarbejderens stamkort — den eneste kilde.
       // Databasen spejler den selv over i personnel_salaries (beregningerne).
+      const salaryInput = {
+        salaryType,
+        compensationModel,
+        amount: parsedAmount,
+        percentageRate: parsedPercentage,
+        minimumSalary: parsedMinimum,
+        notes,
+      };
+
       const { error } = await supabase
         .from("employee_master_data")
-        .update(
-          masterSalaryPayload({
-            salaryType,
-            compensationModel,
-            amount: parsedAmount,
-            percentageRate: parsedPercentage,
-            minimumSalary: parsedMinimum,
-            notes,
-          })
-        )
+        .update(masterSalaryPayload(salaryInput))
         .eq("id", selectedEmployee.id);
 
       if (error) throw error;
+
+      // Beløbene ligger i den beskyttede løntabel
+      await saveSalaryDetails(selectedEmployee.id, salaryDetailsPayload(salaryInput));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["personnel-salaries"] });
