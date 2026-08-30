@@ -15,6 +15,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -22,24 +23,18 @@ import { format, parseISO } from "date-fns";
 import { da } from "date-fns/locale";
 import { CalendarIcon, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-interface PersonnelSalary {
-  id: string;
-  employee_id: string;
-  salary_type: string;
-  monthly_salary: number;
-  percentage_rate: number | null;
-  minimum_salary: number | null;
-  start_date: string | null;
-  is_active: boolean;
-  notes: string | null;
-  employee: {
-    first_name: string;
-    last_name: string;
-    job_title: string | null;
-    salary_type: "provision" | "fixed" | "hourly" | null;
-  } | null;
-}
+import {
+  COMPENSATION_MODELS,
+  COMPENSATION_MODEL_LABELS,
+  resolveCompensation,
+  type CompensationModel,
+} from "@/lib/calculations/dbModel";
+import {
+  amountFieldLabel,
+  compensationModelHelp,
+  defaultCompensationModel,
+  type PersonnelSalaryRow,
+} from "./personnelSalary";
 
 const getSalaryTypeLabel = (type: string | null) => {
   switch (type) {
@@ -50,19 +45,10 @@ const getSalaryTypeLabel = (type: string | null) => {
   }
 };
 
-const getMonthlySalaryLabel = (salaryType: string | null) => {
-  switch (salaryType) {
-    case "hourly": return "Timeløn (DKK/time)";
-    case "fixed": return "Månedsløn (DKK)";
-    case "provision": return "Basisløn (DKK)";
-    default: return "Månedsløn (DKK)";
-  }
-};
-
 interface EditPersonnelDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  salary: PersonnelSalary | null;
+  salary: PersonnelSalaryRow | null;
 }
 
 export function EditPersonnelDialog({
@@ -70,9 +56,11 @@ export function EditPersonnelDialog({
   onOpenChange,
   salary,
 }: EditPersonnelDialogProps) {
+  const [compensationModel, setCompensationModel] =
+    useState<CompensationModel>("monthly_fixed");
   const [percentageRate, setPercentageRate] = useState("");
   const [minimumSalary, setMinimumSalary] = useState("");
-  const [monthlySalary, setMonthlySalary] = useState("");
+  const [amount, setAmount] = useState("");
   const [notes, setNotes] = useState("");
   const [startDate, setStartDate] = useState<Date | undefined>();
   const { toast } = useToast();
@@ -114,25 +102,54 @@ export function EditPersonnelDialog({
   });
 
   useEffect(() => {
-    if (salary) {
-      setPercentageRate(salary.percentage_rate?.toString() || "0");
-      setMinimumSalary(salary.minimum_salary?.toString() || "0");
-      setMonthlySalary(salary.monthly_salary?.toString() || "0");
-      setNotes(salary.notes || "");
-      setStartDate(salary.start_date ? parseISO(salary.start_date) : undefined);
-    }
+    if (!salary) return;
+
+    const resolved = resolveCompensation(salary);
+    const model: CompensationModel =
+      salary.compensation_model === "monthly_fixed" ||
+      salary.compensation_model === "hourly" ||
+      salary.compensation_model === "percentage"
+        ? salary.compensation_model
+        : resolved.hasBasis
+          ? resolved.model
+          : defaultCompensationModel(salary.salary_type);
+
+    setCompensationModel(model);
+    setPercentageRate(salary.percentage_rate?.toString() || "0");
+    setMinimumSalary(salary.minimum_salary?.toString() || "0");
+    setAmount(
+      model === "hourly"
+        ? (salary.hourly_rate ?? 0).toString()
+        : (salary.monthly_salary ?? 0).toString()
+    );
+    setNotes(salary.notes || "");
+    setStartDate(salary.start_date ? parseISO(salary.start_date) : undefined);
   }, [salary]);
+
+  const parsedAmount = parseFloat(amount) || 0;
+  const parsedPercentage = parseFloat(percentageRate) || 0;
+  const parsedMinimum = parseFloat(minimumSalary) || 0;
+
+  const missingAmount =
+    (compensationModel === "monthly_fixed" || compensationModel === "hourly") &&
+    parsedAmount <= 0;
+  const missingPercentage =
+    compensationModel === "percentage" && parsedPercentage <= 0 && parsedMinimum <= 0;
 
   const updateMutation = useMutation({
     mutationFn: async () => {
       if (!salary) throw new Error("Ingen løndata");
+      if (missingAmount) throw new Error("Udfyld beløbet for den valgte lønmodel");
+      if (missingPercentage) throw new Error("Udfyld procentsats eller minimumsløn");
 
       const { error } = await supabase
         .from("personnel_salaries")
         .update({
-          percentage_rate: parseFloat(percentageRate) || 0,
-          minimum_salary: parseFloat(minimumSalary) || 0,
-          monthly_salary: parseFloat(monthlySalary) || 0,
+          compensation_model: compensationModel,
+          percentage_rate: compensationModel === "percentage" ? parsedPercentage : 0,
+          minimum_salary: compensationModel === "percentage" ? parsedMinimum : 0,
+          monthly_salary: compensationModel === "monthly_fixed" ? parsedAmount : 0,
+          hourly_rate: compensationModel === "hourly" ? parsedAmount : 0,
           notes: notes || null,
           start_date: startDate ? format(startDate, "yyyy-MM-dd") : null,
         })
@@ -142,6 +159,9 @@ export function EditPersonnelDialog({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["personnel-salaries"] });
+      queryClient.invalidateQueries({ queryKey: ["assistant-hours-calculation"] });
+      queryClient.invalidateQueries({ queryKey: ["staff-hours-calculation"] });
+      queryClient.invalidateQueries({ queryKey: ["db-team-structure"] });
       toast({ title: "Lønoplysninger opdateret" });
       onOpenChange(false);
     },
@@ -160,7 +180,7 @@ export function EditPersonnelDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             Rediger løn: {salary.employee?.first_name} {salary.employee?.last_name}
@@ -171,7 +191,7 @@ export function EditPersonnelDialog({
           {/* Medarbejderens løntype */}
           <div className="p-3 bg-muted/50 rounded-lg">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Løntype:</span>
+              <span className="text-sm font-medium">Løntype i stamdata:</span>
               <Badge variant="secondary">
                 {getSalaryTypeLabel(salary.employee?.salary_type ?? null)}
               </Badge>
@@ -231,42 +251,69 @@ export function EditPersonnelDialog({
             </Popover>
           </div>
 
+          {/* Eksplicit lønmodel — beregningen gætter ikke længere ud fra beløbet */}
           <div className="space-y-2">
-            <Label htmlFor="percentage-rate">Procentsats (%)</Label>
-            <Input
-              id="percentage-rate"
-              type="number"
-              step="0.1"
-              placeholder="0"
-              value={percentageRate}
-              onChange={(e) => setPercentageRate(e.target.value)}
-            />
+            <Label>Lønmodel</Label>
+            <RadioGroup
+              value={compensationModel}
+              onValueChange={(value) => setCompensationModel(value as CompensationModel)}
+              className="space-y-1"
+            >
+              {COMPENSATION_MODELS.map((model) => (
+                <div key={model} className="flex items-center gap-2">
+                  <RadioGroupItem value={model} id={`edit-model-${model}`} />
+                  <Label htmlFor={`edit-model-${model}`} className="font-normal cursor-pointer">
+                    {COMPENSATION_MODEL_LABELS[model]}
+                  </Label>
+                </div>
+              ))}
+            </RadioGroup>
+            <p className="text-xs text-muted-foreground">
+              {compensationModelHelp(compensationModel)}
+            </p>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="minimum-salary">Minimumsløn (DKK)</Label>
-            <Input
-              id="minimum-salary"
-              type="number"
-              placeholder="0"
-              value={minimumSalary}
-              onChange={(e) => setMinimumSalary(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="monthly-salary">
-              {getMonthlySalaryLabel(salary.employee?.salary_type ?? null)}
-            </Label>
-            <Input
-              id="monthly-salary"
-              type="number"
-              step={salary.employee?.salary_type === "hourly" ? "0.01" : "1"}
-              placeholder="0"
-              value={monthlySalary}
-              onChange={(e) => setMonthlySalary(e.target.value)}
-            />
-          </div>
+          {compensationModel === "percentage" ? (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="percentage-rate">Procentsats (%)</Label>
+                <Input
+                  id="percentage-rate"
+                  type="number"
+                  step="0.1"
+                  placeholder="0"
+                  value={percentageRate}
+                  onChange={(e) => setPercentageRate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="minimum-salary">Minimumsløn (kr. pr. måned)</Label>
+                <Input
+                  id="minimum-salary"
+                  type="number"
+                  placeholder="0"
+                  value={minimumSalary}
+                  onChange={(e) => setMinimumSalary(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Gulv for lønnen: det højeste af procentberegningen og den prorateret
+                  minimumsløn.
+                </p>
+              </div>
+            </>
+          ) : (
+            <div className="space-y-2">
+              <Label htmlFor="amount">{amountFieldLabel(compensationModel)}</Label>
+              <Input
+                id="amount"
+                type="number"
+                step={compensationModel === "hourly" ? "0.01" : "1"}
+                placeholder="0"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+              />
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="notes">Noter (valgfrit)</Label>
@@ -277,6 +324,12 @@ export function EditPersonnelDialog({
               onChange={(e) => setNotes(e.target.value)}
             />
           </div>
+
+          {(missingAmount || missingPercentage) && (
+            <p className="text-xs text-destructive">
+              Uden beløb kan lønnen ikke beregnes — DB vil vise "mangler grundlag".
+            </p>
+          )}
 
           <div className="flex justify-end gap-2 pt-4">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
