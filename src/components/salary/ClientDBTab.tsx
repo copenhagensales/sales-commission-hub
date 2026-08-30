@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency } from "@/lib/calculations";
@@ -280,24 +280,8 @@ export function ClientDBTab() {
           bVal = b.adjustedRevenue;
           break;
         case "costs":
-          aVal =
-            a.adjustedSellerCost +
-            a.sickPayAmount +
-            a.locationCosts +
-            a.teamExpenseAllocation +
-            a.assistantAllocation +
-            a.leaderAllocation +
-            a.leaderVacationPay +
-            a.atpBarsselAllocation;
-          bVal =
-            b.adjustedSellerCost +
-            b.sickPayAmount +
-            b.locationCosts +
-            b.teamExpenseAllocation +
-            b.assistantAllocation +
-            b.leaderAllocation +
-            b.leaderVacationPay +
-            b.atpBarsselAllocation;
+          aVal = rowCosts(a);
+          bVal = rowCosts(b);
           break;
         case "dbPercent":
           aVal = a.dbPercent;
@@ -427,6 +411,25 @@ export function ClientDBTab() {
   const isLoading = dbLoading || overhead.isLoading;
   const hiddenCount = clientRows.length - filteredAndSortedData.length;
 
+  const renderClientRow = (client: ClientDbRow) => {
+    const prevData = previousPeriodData?.[client.clientId];
+    const trend = prevData
+      ? getTrendInfo(client.adjustedRevenue, prevData.previousRevenue)
+      : null;
+
+    return (
+      <ClientDBExpandableRow
+        key={client.clientId}
+        client={client}
+        trend={trend}
+        previousPeriodLabel={previousPeriodLabel}
+        onEditCancellation={handleEditCancellationClick}
+        onEditSickPay={handleEditSickPayClick}
+        onShowDaily={setSelectedClientForDaily}
+      />
+    );
+  };
+
   const getTrendInfo = (current: number, previous: number) => {
     if (!previous || previous === 0) return null;
     const change = ((current - previous) / previous) * 100;
@@ -464,6 +467,14 @@ export function ClientDBTab() {
           </div>
 
           <div className="flex items-center gap-2">
+            <Switch
+              id="group-by-team"
+              checked={groupByTeam}
+              onCheckedChange={setGroupByTeam}
+            />
+            <Label htmlFor="group-by-team" className="text-sm text-muted-foreground mr-3">
+              Gruppér efter team
+            </Label>
             <Switch id="hide-zero" checked={hideZeroClients} onCheckedChange={setHideZeroClients} />
             <Label
               htmlFor="hide-zero"
@@ -623,24 +634,21 @@ export function ClientDBTab() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredAndSortedData.map((client) => {
-                    const prevData = previousPeriodData?.[client.clientId];
-                    const trend = prevData
-                      ? getTrendInfo(client.adjustedRevenue, prevData.previousRevenue)
-                      : null;
-
-                    return (
-                      <ClientDBExpandableRow
-                        key={client.clientId}
-                        client={client}
-                        trend={trend}
-                        previousPeriodLabel={previousPeriodLabel}
-                        onEditCancellation={handleEditCancellationClick}
-                        onEditSickPay={handleEditSickPayClick}
-                        onShowDaily={setSelectedClientForDaily}
-                      />
-                    );
-                  })}
+                  {groupByTeam
+                    ? teamGroups.map(({ group, rows }) => {
+                        const isExpanded = !collapsedGroups.has(group.key);
+                        return (
+                          <Fragment key={group.key}>
+                            <ClientDBTeamGroupRow
+                              group={group}
+                              isExpanded={isExpanded}
+                              onToggle={() => toggleGroup(group.key)}
+                            />
+                            {isExpanded && rows.map((client) => renderClientRow(client))}
+                          </Fragment>
+                        );
+                      })
+                    : filteredAndSortedData.map((client) => renderClientRow(client))}
                 </TableBody>
               </Table>
             </div>
