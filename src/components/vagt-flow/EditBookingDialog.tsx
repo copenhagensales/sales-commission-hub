@@ -220,7 +220,11 @@ function HotelTabContent({ booking }: { booking: any }) {
             className={!price ? "border-destructive" : ""}
             placeholder="Påkrævet"
           />
+          <p className="text-xs text-muted-foreground mt-1">
+            Indtast den samlede pris for hele opholdet — alle nætter og alle værelser.
+          </p>
         </div>
+
         <div>
           <Label className="text-xs">Status</Label>
           <Select value={status} onValueChange={setStatus}>

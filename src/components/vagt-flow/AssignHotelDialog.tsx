@@ -306,7 +306,11 @@ export function AssignHotelDialog({ open, onOpenChange, booking, existingBooking
             <div>
               <Label className="text-xs">Samlet pris (DKK) *</Label>
               <Input type="number" value={pricePerNight} onChange={(e) => setPricePerNight(e.target.value)} className={!pricePerNight ? "border-destructive" : ""} placeholder="Påkrævet" />
+              <p className="text-xs text-muted-foreground mt-1">
+                Indtast den samlede pris for hele opholdet — alle nætter og alle værelser.
+              </p>
             </div>
+
             <div className="col-span-2">
               <Label className="text-xs">Bekræftelsesnummer</Label>
               <Input value={confirmationNumber} onChange={(e) => setConfirmationNumber(e.target.value)} />
