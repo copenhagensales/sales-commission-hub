@@ -87,7 +87,7 @@ export function AssignHotelDialog({ open, onOpenChange, booking, existingBooking
       setSelectedHotelId(existingBookingHotel.hotel_id);
       setRooms(existingBookingHotel.rooms);
       setConfirmationNumber(existingBookingHotel.confirmation_number || "");
-      setPricePerNight(existingBookingHotel.price_per_night?.toString() || "");
+      setPricePerNight(existingBookingHotel.total_price?.toString() || "");
       setNotes(existingBookingHotel.notes || "");
       setStatus(existingBookingHotel.status);
       setHotelBookedDays(existingBookingHotel.booked_days || []);
@@ -115,7 +115,7 @@ export function AssignHotelDialog({ open, onOpenChange, booking, existingBooking
         status,
         confirmation_number: confirmationNumber || undefined,
         rooms,
-        price_per_night: Number(pricePerNight),
+        total_price: Number(pricePerNight),
         notes: notes || undefined,
         booked_days: hotelBookedDays,
       });
@@ -140,7 +140,7 @@ export function AssignHotelDialog({ open, onOpenChange, booking, existingBooking
       booking_id: booking.id, hotel_id: hotelId,
       check_in: booking.start_date, check_out: booking.end_date, rooms,
       confirmation_number: confirmationNumber || undefined,
-      price_per_night: pricePerNight ? Number(pricePerNight) : undefined,
+      total_price: pricePerNight ? Number(pricePerNight) : undefined,
       notes: notes || undefined,
       booked_days: hotelBookedDays,
     });
@@ -306,7 +306,11 @@ export function AssignHotelDialog({ open, onOpenChange, booking, existingBooking
             <div>
               <Label className="text-xs">Samlet pris (DKK) *</Label>
               <Input type="number" value={pricePerNight} onChange={(e) => setPricePerNight(e.target.value)} className={!pricePerNight ? "border-destructive" : ""} placeholder="Påkrævet" />
+              <p className="text-xs text-muted-foreground mt-1">
+                Indtast den samlede pris for hele opholdet — alle nætter og alle værelser.
+              </p>
             </div>
+
             <div className="col-span-2">
               <Label className="text-xs">Bekræftelsesnummer</Label>
               <Input value={confirmationNumber} onChange={(e) => setConfirmationNumber(e.target.value)} />

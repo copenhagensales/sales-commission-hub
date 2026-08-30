@@ -220,7 +220,7 @@ export default function LocationProfitabilityContent() {
       if (bookingIds.length === 0) return [];
       const { data, error } = await (supabase as any)
         .from("booking_hotel")
-        .select("booking_id, check_in, check_out, price_per_night, rooms, booked_days")
+        .select("booking_id, check_in, check_out, total_price, rooms, booked_days")
         .in("booking_id", bookingIds);
       if (error) throw error;
       return data || [];
@@ -266,7 +266,7 @@ export default function LocationProfitabilityContent() {
   const hotelCostByBooking = useMemo(() => {
     const map = new Map<string, number>();
     for (const h of hotelData || []) {
-      const cost = h.price_per_night || 0;
+      const cost = h.total_price || 0;
       map.set(h.booking_id, (map.get(h.booking_id) || 0) + cost);
     }
     return map;

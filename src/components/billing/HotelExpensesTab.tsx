@@ -4,8 +4,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { da } from "date-fns/locale";
-import { Hotel, Calendar, CreditCard } from "lucide-react";
+import { Hotel, Calendar, CreditCard, TriangleAlert } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
 import {
   Select,
   SelectContent,
@@ -73,7 +76,7 @@ export function HotelExpensesTab() {
   }
 
   const totalExpense = hotelBookings?.reduce((sum, bh) => {
-    return sum + (bh.price_per_night || 0);
+    return sum + (bh.total_price || 0);
   }, 0) || 0;
 
   const totalNights = hotelBookings?.reduce((sum, bh) => {
@@ -85,8 +88,40 @@ export function HotelExpensesTab() {
 
   const totalBookings = hotelBookings?.length || 0;
 
+  // Mulige dubletter: samme hotel, check-in, check-out, antal værelser og beløb
+  const duplicateIds = (() => {
+    const groups = new Map<string, string[]>();
+    (hotelBookings || []).forEach((bh) => {
+      const key = [
+        bh.hotel_id,
+        bh.check_in,
+        bh.check_out,
+        bh.rooms ?? 1,
+        bh.total_price ?? 0,
+      ].join("|");
+      const arr = groups.get(key) || [];
+      arr.push(bh.id);
+      groups.set(key, arr);
+    });
+    const ids = new Set<string>();
+    groups.forEach((arr) => {
+      if (arr.length > 1) arr.forEach((id) => ids.add(id));
+    });
+    return ids;
+  })();
+
+
   return (
     <div className="space-y-6">
+      {duplicateIds.size > 0 && (
+        <Alert variant="default" className="border-yellow-400/60 bg-yellow-50 dark:bg-yellow-900/20">
+          <TriangleAlert className="h-4 w-4" />
+          <AlertDescription>
+            {duplicateIds.size} mulige dubletter fundet i perioden — kontrollér før fakturering. Beløbene tælles fortsat med i totalen.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="flex items-center gap-3">
         <Select value={periodType} onValueChange={(v) => setPeriodType(v as "month" | "payroll")}>
           <SelectTrigger className="w-[200px]">
@@ -189,20 +224,36 @@ export function HotelExpensesTab() {
                   const checkOut = new Date(bh.check_out);
                   const nights = bh.booked_days?.length || Math.max(1, Math.round((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24)));
                   const rooms = bh.rooms || 1;
-                  const lineTotal = bh.price_per_night || 0;
+                  const lineTotal = bh.total_price || 0;
                   const pricePerNight = nights > 0 ? lineTotal / nights : 0;
                   const statusInfo = STATUS_LABELS[bh.status] || { label: bh.status, variant: "outline" as const };
+                  const isDuplicate = duplicateIds.has(bh.id);
 
                   return (
-                    <TableRow key={bh.id}>
+                    <TableRow key={bh.id} className={isDuplicate ? "bg-yellow-50 dark:bg-yellow-900/20" : undefined}>
                       <TableCell>
-                        <div className="font-medium">{bh.booking?.location?.name || "—"}</div>
+                        <div className="font-medium flex items-center gap-1.5">
+                          {isDuplicate && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <TriangleAlert className="h-4 w-4 text-yellow-600 shrink-0" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  Mulig dublet: samme hotel, datoer, antal værelser og beløb som en anden række.
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                          {bh.booking?.location?.name || "—"}
+                        </div>
                         <div className="text-xs text-muted-foreground">{bh.booking?.location?.address_city || ""}</div>
                       </TableCell>
                       <TableCell>
                         <div className="font-medium">{bh.hotel?.name || "—"}</div>
                         <div className="text-xs text-muted-foreground">{bh.hotel?.city || ""}</div>
                       </TableCell>
+
                       <TableCell>{format(checkIn, "dd/MM/yyyy")}</TableCell>
                       <TableCell>{format(checkOut, "dd/MM/yyyy")}</TableCell>
                       <TableCell className="text-right">{nights}</TableCell>

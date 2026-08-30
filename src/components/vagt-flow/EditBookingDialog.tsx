@@ -107,7 +107,7 @@ function HotelTabContent({ booking }: { booking: any }) {
 
   useEffect(() => {
     if (hotelEntry) {
-      setPrice(hotelEntry.price_per_night?.toString() || "");
+      setPrice(hotelEntry.total_price?.toString() || "");
       setConfNum(hotelEntry.confirmation_number || "");
       setStatus(hotelEntry.status);
       setNotes(hotelEntry.notes || "");
@@ -124,7 +124,7 @@ function HotelTabContent({ booking }: { booking: any }) {
     if (!hotelEntry) return;
     await updateBookingHotel.mutateAsync({
       id: hotelEntry.id,
-      price_per_night: price ? Number(price) : undefined,
+      total_price: price ? Number(price) : undefined,
       confirmation_number: confNum || undefined,
       status,
       notes: notes || undefined,
@@ -220,7 +220,11 @@ function HotelTabContent({ booking }: { booking: any }) {
             className={!price ? "border-destructive" : ""}
             placeholder="Påkrævet"
           />
+          <p className="text-xs text-muted-foreground mt-1">
+            Indtast den samlede pris for hele opholdet — alle nætter og alle værelser.
+          </p>
         </div>
+
         <div>
           <Label className="text-xs">Status</Label>
           <Select value={status} onValueChange={setStatus}>
