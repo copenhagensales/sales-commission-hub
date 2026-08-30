@@ -1,0 +1,1 @@
+ALTER TABLE public.booking_hotel RENAME COLUMN price_per_night TO total_price;
