@@ -243,15 +243,17 @@ Deno.serve(async (req) => {
       }
     });
 
-    // Fetch team memberships
+    // Fetch team memberships (inkl. fratraadtes sidste kendte team, saa historiske
+    // leaderboards bevarer teamattributionen)
     const { data: teamMembers } = await supabase
-      .from("team_members")
-      .select("employee_id, teams(id, name)");
+      .from("employee_team_attribution")
+      .select("employee_id, team_name, is_current")
+      .order("is_current", { ascending: false });
     
     const employeeTeamMap = new Map<string, string>();
     (teamMembers || []).forEach(tm => {
-      const teamName = (tm.teams as any)?.name;
-      if (teamName && tm.employee_id) {
+      const teamName = (tm as any)?.team_name;
+      if (teamName && tm.employee_id && !employeeTeamMap.has(tm.employee_id)) {
         employeeTeamMap.set(tm.employee_id, teamName);
       }
     });

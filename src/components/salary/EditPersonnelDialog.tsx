@@ -33,6 +33,7 @@ import {
   amountFieldLabel,
   compensationModelHelp,
   defaultCompensationModel,
+  masterSalaryPayload,
   type PersonnelSalaryRow,
 } from "./personnelSalary";
 
@@ -142,18 +143,22 @@ export function EditPersonnelDialog({
       if (missingAmount) throw new Error("Udfyld beløbet for den valgte lønmodel");
       if (missingPercentage) throw new Error("Udfyld procentsats eller minimumsløn");
 
+      // Lønnen rettes på medarbejderens stamkort — den eneste kilde.
+      // Databasen spejler den selv over i personnel_salaries (beregningerne).
       const { error } = await supabase
-        .from("personnel_salaries")
-        .update({
-          compensation_model: compensationModel,
-          percentage_rate: compensationModel === "percentage" ? parsedPercentage : 0,
-          minimum_salary: compensationModel === "percentage" ? parsedMinimum : 0,
-          monthly_salary: compensationModel === "monthly_fixed" ? parsedAmount : 0,
-          hourly_rate: compensationModel === "hourly" ? parsedAmount : 0,
-          notes: notes || null,
-          start_date: startDate ? format(startDate, "yyyy-MM-dd") : null,
-        })
-        .eq("id", salary.id);
+        .from("employee_master_data")
+        .update(
+          masterSalaryPayload({
+            salaryType: salary.salary_type as "team_leader" | "assistant" | "staff",
+            compensationModel,
+            amount: parsedAmount,
+            percentageRate: parsedPercentage,
+            minimumSalary: parsedMinimum,
+            notes,
+            startDate: startDate ? format(startDate, "yyyy-MM-dd") : null,
+          })
+        )
+        .eq("id", salary.employee_id);
 
       if (error) throw error;
     },
@@ -162,6 +167,7 @@ export function EditPersonnelDialog({
       queryClient.invalidateQueries({ queryKey: ["assistant-hours-calculation"] });
       queryClient.invalidateQueries({ queryKey: ["staff-hours-calculation"] });
       queryClient.invalidateQueries({ queryKey: ["db-team-structure"] });
+      queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
       toast({ title: "Lønoplysninger opdateret" });
       onOpenChange(false);
     },
@@ -186,6 +192,11 @@ export function EditPersonnelDialog({
             Rediger løn: {salary.employee?.first_name} {salary.employee?.last_name}
           </DialogTitle>
         </DialogHeader>
+
+        <p className="text-xs text-muted-foreground">
+          Lønnen gemmes på medarbejderens stamkort og bruges direkte i
+          DB-beregningen — der er kun ét sted at taste den ind.
+        </p>
 
         <div className="space-y-4">
           {/* Medarbejderens løntype */}

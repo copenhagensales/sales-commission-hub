@@ -63,8 +63,10 @@ export function useCpoRevenue(opts: {
       // If teamId filter, narrow employees to team members
       let teamEmployeeIds: Set<string> | null = null;
       if (teamId) {
+        // employee_team_attribution bevarer fratraadtes sidste kendte team,
+        // saa deres timer/omsaetning stadig taeller i historiske perioder.
         const { data: members } = await supabase
-          .from("team_members")
+          .from("employee_team_attribution")
           .select("employee_id")
           .eq("team_id", teamId);
         teamEmployeeIds = new Set((members || []).map((m) => m.employee_id));

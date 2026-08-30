@@ -101,13 +101,15 @@ export function useSeasonStandings(seasonId: string | undefined) {
       const employeeIds = (data || []).map(s => s.employee?.id).filter(Boolean) as string[];
       let teamMap: Record<string, string> = {};
       if (employeeIds.length > 0) {
+        // employee_team_attribution bevarer fratraadtes sidste kendte team
         const { data: teamData } = await supabase
-          .from("team_members")
-          .select("employee_id, team:teams(name)")
-          .in("employee_id", employeeIds);
+          .from("employee_team_attribution")
+          .select("employee_id, team_name, is_current")
+          .in("employee_id", employeeIds)
+          .order("is_current", { ascending: false });
         if (teamData) {
           teamData.forEach((tm: any) => {
-            if (tm.team?.name) teamMap[tm.employee_id] = tm.team.name;
+            if (tm.team_name && !teamMap[tm.employee_id]) teamMap[tm.employee_id] = tm.team_name;
           });
         }
       }
@@ -146,13 +148,15 @@ export function useRoundStandings(roundId: string | undefined) {
       const employeeIds = (data || []).map(s => s.employee?.id).filter(Boolean) as string[];
       let teamMap: Record<string, string> = {};
       if (employeeIds.length > 0) {
+        // employee_team_attribution bevarer fratraadtes sidste kendte team
         const { data: teamData } = await supabase
-          .from("team_members")
-          .select("employee_id, team:teams(name)")
-          .in("employee_id", employeeIds);
+          .from("employee_team_attribution")
+          .select("employee_id, team_name, is_current")
+          .in("employee_id", employeeIds)
+          .order("is_current", { ascending: false });
         if (teamData) {
           teamData.forEach((tm: any) => {
-            if (tm.team?.name) teamMap[tm.employee_id] = tm.team.name;
+            if (tm.team_name && !teamMap[tm.employee_id]) teamMap[tm.employee_id] = tm.team_name;
           });
         }
       }

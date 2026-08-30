@@ -25,6 +25,7 @@ import {
   amountFieldLabel,
   compensationModelHelp,
   defaultCompensationModel,
+  masterSalaryPayload,
 } from "./personnelSalary";
 
 interface AddPersonnelDialogProps {
@@ -130,17 +131,21 @@ export function AddPersonnelDialog({
       if (missingAmount) throw new Error("Udfyld beløbet for den valgte lønmodel");
       if (missingPercentage) throw new Error("Udfyld procentsats eller minimumsløn");
 
-      const { error } = await supabase.from("personnel_salaries").insert({
-        employee_id: selectedEmployee.id,
-        salary_type: salaryType,
-        compensation_model: compensationModel,
-        monthly_salary: compensationModel === "monthly_fixed" ? parsedAmount : 0,
-        hourly_rate: compensationModel === "hourly" ? parsedAmount : 0,
-        percentage_rate: compensationModel === "percentage" ? parsedPercentage : 0,
-        minimum_salary: compensationModel === "percentage" ? parsedMinimum : 0,
-        notes: notes || null,
-        is_active: true,
-      });
+      // Lønnen gemmes på medarbejderens stamkort — den eneste kilde.
+      // Databasen spejler den selv over i personnel_salaries (beregningerne).
+      const { error } = await supabase
+        .from("employee_master_data")
+        .update(
+          masterSalaryPayload({
+            salaryType,
+            compensationModel,
+            amount: parsedAmount,
+            percentageRate: parsedPercentage,
+            minimumSalary: parsedMinimum,
+            notes,
+          })
+        )
+        .eq("id", selectedEmployee.id);
 
       if (error) throw error;
     },
@@ -149,6 +154,8 @@ export function AddPersonnelDialog({
       queryClient.invalidateQueries({ queryKey: ["existing-personnel-salaries-all"] });
       queryClient.invalidateQueries({ queryKey: ["assistant-hours-calculation"] });
       queryClient.invalidateQueries({ queryKey: ["staff-hours-calculation"] });
+      queryClient.invalidateQueries({ queryKey: ["db-team-structure"] });
+      queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
       toast({ title: "Medarbejder tilføjet" });
       resetForm();
       onOpenChange(false);
@@ -185,6 +192,11 @@ export function AddPersonnelDialog({
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
+
+        <p className="text-xs text-muted-foreground">
+          Lønnen gemmes på medarbejderens stamkort og bruges direkte i
+          DB-beregningen — der er kun ét sted at taste den ind.
+        </p>
 
         <div className="space-y-4">
           {/* Employee search */}

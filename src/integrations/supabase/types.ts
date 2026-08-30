@@ -6547,14 +6547,16 @@ export type Database = {
           onboarding_data_complete: boolean | null
           parking_monthly_cost: number | null
           parking_spot_id: string | null
+          personnel_category: string | null
           position_id: string | null
           private_email: string | null
           private_phone: string | null
           referral_bonus: number | null
           referral_code: string | null
-          salary_amount: number | null
           salary_deduction: number | null
           salary_deduction_note: string | null
+          salary_hours_source: string | null
+          salary_start_date: string | null
           salary_type: Database["public"]["Enums"]["salary_type"] | null
           standard_start_time: string | null
           system_role_id: string | null
@@ -6609,14 +6611,16 @@ export type Database = {
           onboarding_data_complete?: boolean | null
           parking_monthly_cost?: number | null
           parking_spot_id?: string | null
+          personnel_category?: string | null
           position_id?: string | null
           private_email?: string | null
           private_phone?: string | null
           referral_bonus?: number | null
           referral_code?: string | null
-          salary_amount?: number | null
           salary_deduction?: number | null
           salary_deduction_note?: string | null
+          salary_hours_source?: string | null
+          salary_start_date?: string | null
           salary_type?: Database["public"]["Enums"]["salary_type"] | null
           standard_start_time?: string | null
           system_role_id?: string | null
@@ -6671,14 +6675,16 @@ export type Database = {
           onboarding_data_complete?: boolean | null
           parking_monthly_cost?: number | null
           parking_spot_id?: string | null
+          personnel_category?: string | null
           position_id?: string | null
           private_email?: string | null
           private_phone?: string | null
           referral_bonus?: number | null
           referral_code?: string | null
-          salary_amount?: number | null
           salary_deduction?: number | null
           salary_deduction_note?: string | null
+          salary_hours_source?: string | null
+          salary_start_date?: string | null
           salary_type?: Database["public"]["Enums"]["salary_type"] | null
           standard_start_time?: string | null
           system_role_id?: string | null
@@ -6934,6 +6940,61 @@ export type Database = {
             foreignKeyName: "employee_referrals_referrer_employee_id_fkey"
             columns: ["referrer_employee_id"]
             isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_salary_details: {
+        Row: {
+          amount: number | null
+          created_at: string
+          employee_id: string
+          minimum_salary: number | null
+          notes: string | null
+          percentage_rate: number | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          amount?: number | null
+          created_at?: string
+          employee_id: string
+          minimum_salary?: number | null
+          notes?: string | null
+          percentage_rate?: number | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          amount?: number | null
+          created_at?: string
+          employee_id?: string
+          minimum_salary?: number | null
+          notes?: string | null
+          percentage_rate?: number | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_salary_details_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_salary_details_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_salary_details_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
             referencedRelation: "employee_referral_lookup"
             referencedColumns: ["id"]
           },
@@ -12822,6 +12883,39 @@ export type Database = {
         }
         Relationships: []
       }
+      superadmins: {
+        Row: {
+          created_at: string
+          email: string
+          granted_at: string
+          granted_by: string | null
+          id: string
+          is_active: boolean
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          granted_at?: string
+          granted_by?: string | null
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          granted_at?: string
+          granted_by?: string | null
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       supplier_contacts: {
         Row: {
           created_at: string
@@ -13662,6 +13756,71 @@ export type Database = {
           },
           {
             foreignKeyName: "team_members_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_membership_removal_log: {
+        Row: {
+          created_at: string
+          employee_id: string | null
+          employee_name: string | null
+          id: string
+          reason: string
+          removal_type: string
+          removed_by: string | null
+          team_id: string | null
+          team_name: string | null
+        }
+        Insert: {
+          created_at?: string
+          employee_id?: string | null
+          employee_name?: string | null
+          id?: string
+          reason: string
+          removal_type: string
+          removed_by?: string | null
+          team_id?: string | null
+          team_name?: string | null
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string | null
+          employee_name?: string | null
+          id?: string
+          reason?: string
+          removal_type?: string
+          removed_by?: string | null
+          team_id?: string | null
+          team_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_membership_removal_log_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_membership_removal_log_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_membership_removal_log_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_membership_removal_log_team_id_fkey"
             columns: ["team_id"]
             isOneToOne: false
             referencedRelation: "teams"
@@ -14751,6 +14910,15 @@ export type Database = {
         }
         Relationships: []
       }
+      employee_team_attribution: {
+        Row: {
+          employee_id: string | null
+          is_current: boolean | null
+          team_id: string | null
+          team_name: string | null
+        }
+        Relationships: []
+      }
       mv_daily_sales_stats: {
         Row: {
           agent_email: string | null
@@ -14846,6 +15014,7 @@ export type Database = {
       }
     }
     Functions: {
+      am_i_superadmin: { Args: never; Returns: boolean }
       assign_role_by_email: {
         Args: {
           _email: string
@@ -15422,8 +15591,13 @@ export type Database = {
       is_manager_position: { Args: { _user_id: string }; Returns: boolean }
       is_owner: { Args: { _user_id: string }; Returns: boolean }
       is_owner_only: { Args: { _user_id: string }; Returns: boolean }
+      is_protected_salary_employee: {
+        Args: { p_employee_id: string }
+        Returns: boolean
+      }
       is_rekruttering: { Args: { _user_id: string }; Returns: boolean }
       is_some: { Args: { _user_id: string }; Returns: boolean }
+      is_superadmin: { Args: { _user_id?: string }; Returns: boolean }
       is_teamleder_or_above: { Args: { _user_id: string }; Returns: boolean }
       is_vagt_admin_or_planner: { Args: { _user_id: string }; Returns: boolean }
       jsonb_object_keys_array: { Args: { p_json: Json }; Returns: Json }
@@ -15458,6 +15632,14 @@ export type Database = {
       }
       league_resolve_employee_from_agent_email: {
         Args: { p_agent_email: string }
+        Returns: string
+      }
+      log_salary_access: {
+        Args: { p_access_type?: string; p_employee_id: string; p_field: string }
+        Returns: undefined
+      }
+      map_salary_type_to_compensation_model: {
+        Args: { _salary_type: string }
         Returns: string
       }
       recalculate_coaching_due_dates_for_employee: {
@@ -15500,6 +15682,10 @@ export type Database = {
         Returns: boolean
       }
       sync_cohort_team_memberships: { Args: never; Returns: Json }
+      sync_personnel_salary: {
+        Args: { p_employee_id: string }
+        Returns: undefined
+      }
       trigger_kpi_calculation: { Args: never; Returns: undefined }
       trigger_kpi_incremental: { Args: never; Returns: undefined }
       trigger_leaderboard_calculation: { Args: never; Returns: undefined }

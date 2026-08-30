@@ -45,14 +45,18 @@ export function EmployeeCommissionHistory({
     enabled: !!employeeId,
   });
 
-  // Fetch employee's team membership
+  // Fetch employee's team membership.
+  // Bruger employee_team_attribution, saa fratraadte medarbejdere fortsat kobles
+  // til deres sidste kendte team (team_members-raekken fjernes ved deaktivering).
   const { data: teamMembership } = useQuery({
-    queryKey: ["employee-team-membership", employeeId],
+    queryKey: ["employee-team-attribution", employeeId],
     queryFn: async () => {
       const { data } = await supabase
-        .from("team_members")
-        .select("team_id")
+        .from("employee_team_attribution")
+        .select("team_id, is_current")
         .eq("employee_id", employeeId)
+        .order("is_current", { ascending: false })
+        .limit(1)
         .maybeSingle();
       return data;
     },

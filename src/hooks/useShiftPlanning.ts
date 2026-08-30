@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { attachSalaryAmount } from "@/lib/salary/salaryDetails";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { parseISO, startOfDay } from "date-fns";
@@ -675,15 +676,16 @@ export function useEmployeesForShifts(teamId?: string) {
         if (employeeIds.length === 0) return [];
         const { data, error } = await supabase
           .from("employee_master_data")
-          .select("id, first_name, last_name, standard_start_time, weekly_hours, manager_id, salary_type, salary_amount, team_id, is_active, employment_start_date, employment_end_date")
+          .select("id, first_name, last_name, standard_start_time, weekly_hours, manager_id, salary_type, team_id, is_active, employment_start_date, employment_end_date")
           .in("id", employeeIds)
           .order("first_name");
         if (error) throw error;
-        // Filter by visibility rules, then enrich with team names
-        return filterVisibleEmployees(data || []).map(emp => ({
+        // Filter by visibility rules, then enrich with team names + lønbeløb
+        const visible = filterVisibleEmployees(data || []).map(emp => ({
           ...emp,
           department: employeeTeamMap.get(emp.id) || null,
         }));
+        return attachSalaryAmount(visible);
       };
       
       // If a specific team is selected, get employees from team_members
@@ -748,32 +750,36 @@ export function useEmployeesForShifts(teamId?: string) {
         console.log("[useEmployeesForShifts] No led teams, trying manager_id fallback");
         const { data, error } = await supabase
           .from("employee_master_data")
-          .select("id, first_name, last_name, standard_start_time, weekly_hours, manager_id, salary_type, salary_amount, team_id, is_active, employment_start_date, employment_end_date")
+          .select("id, first_name, last_name, standard_start_time, weekly_hours, manager_id, salary_type, team_id, is_active, employment_start_date, employment_end_date")
           .eq("manager_id", currentEmployeeId)
           .neq("id", currentEmployeeId)
           .order("first_name");
         
         if (error) throw error;
-        // Filter by visibility rules, then enrich with team names
-        return filterVisibleEmployees(data || []).map(emp => ({
-          ...emp,
-          department: employeeTeamMap.get(emp.id) || null,
-        }));
+        // Filter by visibility rules, then enrich with team names + lønbeløb
+        return attachSalaryAmount(
+          filterVisibleEmployees(data || []).map(emp => ({
+            ...emp,
+            department: employeeTeamMap.get(emp.id) || null,
+          }))
+        );
       }
       
       // Owner - get all active employees
       console.log("[useEmployeesForShifts] Owner mode - fetching all employees");
       const { data, error } = await supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name, standard_start_time, weekly_hours, manager_id, salary_type, salary_amount, team_id, is_active, employment_start_date, employment_end_date")
+        .select("id, first_name, last_name, standard_start_time, weekly_hours, manager_id, salary_type, team_id, is_active, employment_start_date, employment_end_date")
         .order("first_name");
 
       if (error) throw error;
-      // Filter by visibility rules, then enrich with team names
-      return filterVisibleEmployees(data || []).map(emp => ({
-        ...emp,
-        department: employeeTeamMap.get(emp.id) || null,
-      }));
+      // Filter by visibility rules, then enrich with team names + lønbeløb
+      return attachSalaryAmount(
+        filterVisibleEmployees(data || []).map(emp => ({
+          ...emp,
+          department: employeeTeamMap.get(emp.id) || null,
+        }))
+      );
     },
     enabled: !!user?.id,
   });

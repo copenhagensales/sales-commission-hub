@@ -92,3 +92,50 @@ export function compensationModelHelp(model: CompensationModel): string {
       return "Fast månedsløn, prorateret efter arbejdsdage når perioden ikke er en hel måned.";
   }
 }
+
+/**
+ * Løn står KUN på medarbejderens stamkort (`employee_master_data`).
+ * `personnel_salaries` er et afledt spejl, som databasen selv vedligeholder via
+ * trigger — derfor skriver løndialogerne til stamkortet, ikke til lønrækken.
+ */
+export interface MasterSalaryInput {
+  salaryType: "team_leader" | "assistant" | "staff";
+  compensationModel: CompensationModel;
+  amount: number;
+  percentageRate: number;
+  minimumSalary: number;
+  notes: string;
+  startDate?: string | null;
+  hoursSource?: "shift" | "timestamp" | null;
+}
+
+export interface MasterSalaryPayload {
+  personnel_category: string;
+  salary_type: "provision" | "fixed" | "hourly";
+  salary_amount: number | null;
+  salary_percentage_rate: number | null;
+  salary_minimum: number | null;
+  salary_notes: string | null;
+  salary_start_date: string | null;
+  salary_hours_source: string;
+}
+
+/** Oversætter lønformularen til stamkortets kolonner. */
+export function masterSalaryPayload(input: MasterSalaryInput): MasterSalaryPayload {
+  const isPercentage = input.compensationModel === "percentage";
+  return {
+    personnel_category: input.salaryType,
+    salary_type:
+      input.compensationModel === "hourly"
+        ? "hourly"
+        : isPercentage
+          ? "provision"
+          : "fixed",
+    salary_amount: isPercentage ? null : input.amount,
+    salary_percentage_rate: isPercentage ? input.percentageRate : null,
+    salary_minimum: isPercentage ? input.minimumSalary : null,
+    salary_notes: input.notes || null,
+    salary_start_date: input.startDate ?? null,
+    salary_hours_source: input.hoursSource ?? "shift",
+  };
+}
