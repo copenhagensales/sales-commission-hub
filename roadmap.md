@@ -33,3 +33,9 @@ hardkodede forretningsregler skal ud i systemet, datakvalitet skal advares om, o
 ## Åbne punkter (kræver beslutning fra Mathias/Kasper)
 - `CombinedSalaryTab` viser fortsat `monthly_salary` som teamleder-placeholder i stedet for den DB-beregnede lederløn (uændret i denne opgave).
 - Data: 4 assistenter i `team_assistant_leaders` har ingen aktiv `personnel_salaries`-række (Sebastian V. Bangsbo, Felix J. A. Kjeldsen, Mathias Grubak, Annika Søndergaard) og 2 inaktive ligger stadig på team (Rasmus A. Eltong, Eline-Kirstine Jørgensen). Panelet viser dem nu; rettelse af data kræver beslutning.
+
+## Del 5 — oprydning af teamtilknytninger for inaktive medarbejdere
+- [x] Niveau 2 (beregninger): verificeret allerede opfyldt — `useClientDbData` bygger `activeMemberCounts` via `activeIds.has()` + `getActiveTeamAssistantIds`, og `ClientDBTab`/`DBOverviewTab` læser begge fra samme hook. ATP rammer derfor kun aktive.
+- [x] Datakvalitetspanelets tjek "Inaktive medarbejdere stadig tilknyttet et team" viser alle 79 rækker.
+- [ ] Niveau 1 (trigger ved deaktivering) — AFVENTER BESLUTNING: konflikterer med tidligere bevidst ændring af `remove_deactivated_employee_from_teams`.
+- [ ] Niveau 3 (oprydning af 77+2 rækker) — AFVENTER BESLUTNING: 5 kodesteder mister teamattribution uden `last_team_id`-fallback.
