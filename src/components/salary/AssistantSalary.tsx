@@ -20,6 +20,7 @@ import {
 } from "./personnelSalary";
 import { format, parseISO } from "date-fns";
 import { da } from "date-fns/locale";
+import { useSalaryAccessAudit } from "@/hooks/useSalaryAccessAudit";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -50,6 +51,9 @@ export function AssistantSalary() {
       return data as PersonnelSalary[];
     },
   });
+
+  // Audit: log at løntal for disse medarbejdere er blevet vist
+  useSalaryAccessAudit(salaries.map((s) => s.employee_id), "personnel_salary_assistant");
 
   const toggleMutation = useMutation({
     mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
