@@ -1315,6 +1315,25 @@ export default function MyProfile() {
                           />
                         </div>
                       )}
+                      {/* Egen DB-sats (kun ens egen — andres er superadmin-beskyttet) */}
+                      {!!employee.own_percentage_rate && (
+                        <div>
+                          <label className="text-xs text-muted-foreground">Din sats af DB</label>
+                          <DisplayField
+                            value={employee.own_percentage_rate}
+                            displayValue={`${employee.own_percentage_rate} %`}
+                          />
+                        </div>
+                      )}
+                      {!!employee.own_minimum_salary && (
+                        <div>
+                          <label className="text-xs text-muted-foreground">Din minimumsløn</label>
+                          <DisplayField
+                            value={employee.own_minimum_salary}
+                            displayValue={`${employee.own_minimum_salary.toLocaleString('da-DK')} kr/måned`}
+                          />
+                        </div>
+                      )}
                       <div>
                         <label className="text-xs text-muted-foreground">Reg.nr. (kan redigeres)</label>
                         <EditableSensitiveField 
