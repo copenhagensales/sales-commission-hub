@@ -23,11 +23,25 @@ import {
 } from "@/components/ui/table";
 import { Download, MapPin, Loader2 } from "lucide-react";
 
-const FM_CLIENTS = [
-  { id: "all", label: "Alle FM-kunder" },
-  { id: "9a92ea4c-6404-4b58-be08-065e7552d552", label: "Eesy FM" },
-  { id: "5011a7cd-bf07-4838-a63f-55a12c604b40", label: "Yousee" },
-] as const;
+/**
+ * Kunder med lokationsudgifter hentes fra `clients.has_location_costs`
+ * i stedet for hardkodede UUID'er, så listen kan styres i klientadministrationen.
+ */
+function useLocationCostClients() {
+  return useQuery({
+    queryKey: ["clients-with-location-costs"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("clients")
+        .select("id, name")
+        .eq("has_location_costs", true)
+        .order("name");
+      if (error) throw error;
+      return (data ?? []) as { id: string; name: string }[];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
 
 const LOCATION_TYPES = [
   "Alle typer",
