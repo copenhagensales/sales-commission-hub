@@ -1,11 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { eachDayOfInterval, format, getDay, startOfMonth, endOfMonth } from "date-fns";
-import { VACATION_PAY_RATES, calculateHoursFromShift } from "@/lib/calculations";
+import { calculateHoursFromShift } from "@/lib/calculations";
 import { useFeatureFlag } from "@/hooks/useFeatureFlag";
 import { resolveHoursSourceBatch } from "@/lib/resolveHoursSource";
- 
-interface StaffHoursData {
+import { useCalculationSettings } from "@/hooks/useCalculationSettings";
+import {
+  resolveCompensation,
+  type CompensationModel,
+  type MissingBasisReason,
+} from "@/lib/calculations/dbModel";
+
+export interface StaffHoursData {
   employeeId: string;
   hourlyRate: number;
   workedHours: number;
@@ -14,9 +20,12 @@ interface StaffHoursData {
   totalSalary: number;
   isHourlyBased: boolean;
   hoursSource: 'shift' | 'timestamp';
+  /** Eksplicit lønmodel fra personnel_salaries.compensation_model */
+  compensationModel: CompensationModel;
+  /** false = beløbet kunne ikke beregnes; vis "mangler grundlag" i stedet for 0 kr. */
+  hasBasis: boolean;
+  missingReason: MissingBasisReason | null;
 }
-
-const HOURLY_RATE_THRESHOLD = 1000;
 
  export function useStaffHoursCalculation(
    periodStart: Date,
@@ -25,8 +34,11 @@ const HOURLY_RATE_THRESHOLD = 1000;
    useNewAssignments?: boolean,
    clientId?: string
  ) {
+   const { settings, fingerprint, isLoading: settingsLoading } = useCalculationSettings();
+   const rates = settings.vacationPayRates;
+
    return useQuery<Record<string, StaffHoursData>>({
-     queryKey: ["staff-hours-calculation", periodStart.toISOString(), periodEnd.toISOString(), staffIds.sort().join(","), useNewAssignments, clientId],
+     queryKey: ["staff-hours-calculation", periodStart.toISOString(), periodEnd.toISOString(), staffIds.slice().sort().join(","), useNewAssignments, clientId, fingerprint],
      queryFn: async () => {
        if (staffIds.length === 0) return {};
 
@@ -38,7 +50,7 @@ const HOURLY_RATE_THRESHOLD = 1000;
        // 1. Get salary info
        const { data: salaries } = await supabase
          .from("personnel_salaries")
-         .select("employee_id, monthly_salary, hourly_rate, hours_source")
+         .select("employee_id, compensation_model, monthly_salary, hourly_rate, percentage_rate, minimum_salary, hours_source")
          .eq("salary_type", "staff")
          .eq("is_active", true)
          .in("employee_id", staffIds);
@@ -141,16 +153,38 @@ const HOURLY_RATE_THRESHOLD = 1000;
        // Build result
        const result: Record<string, StaffHoursData> = {};
 
-       for (const staffId of staffIds) {
-         const salary = salaries?.find(s => s.employee_id === staffId);
-         const monthlySalary = Number(salary?.monthly_salary) || 0;
-         const hourlyRate = Number(salary?.hourly_rate) || 0;
-         const hoursSource: 'shift' | 'timestamp' = hoursSourceMap
-           ? (hoursSourceMap[staffId]?.source === 'timestamp' ? 'timestamp' : 'shift')
-           : ((salary?.hours_source as 'shift' | 'timestamp') || 'shift');
-          
-         const effectiveHourlyRate = hourlyRate > 0 ? hourlyRate : (monthlySalary < HOURLY_RATE_THRESHOLD ? monthlySalary : 0);
-         const isHourlyBased = effectiveHourlyRate > 0;
+        for (const staffId of staffIds) {
+          const salaryRow = salaries?.find(s => s.employee_id === staffId) ?? null;
+          const compensation = resolveCompensation(salaryRow);
+          const hoursSource: 'shift' | 'timestamp' = hoursSourceMap
+            ? (hoursSourceMap[staffId]?.source === 'timestamp' ? 'timestamp' : 'shift')
+            : ((salaryRow?.hours_source as 'shift' | 'timestamp') || 'shift');
+
+          // Lønmodellen læses eksplicit — der gættes ikke ud fra beløbets størrelse.
+          // Manglende lønrække eller sats giver 0 kr. MED markering "mangler grundlag".
+          if (!compensation.hasBasis || compensation.model === "percentage") {
+            result[staffId] = {
+              employeeId: staffId,
+              hourlyRate: 0,
+              workedHours: 0,
+              baseSalary: 0,
+              vacationPay: 0,
+              totalSalary: 0,
+              isHourlyBased: compensation.model === "hourly",
+              hoursSource,
+              compensationModel: compensation.model,
+              hasBasis: false,
+              missingReason:
+                compensation.model === "percentage" && compensation.hasBasis
+                  ? "unsupported_model"
+                  : compensation.missingReason,
+            };
+            continue;
+          }
+
+          const monthlySalary = compensation.monthlySalary;
+          const effectiveHourlyRate = compensation.hourlyRate;
+          const isHourlyBased = compensation.model === "hourly";
          
          if (!isHourlyBased) {
           const monthStart = startOfMonth(periodStart);
@@ -178,7 +212,7 @@ const HOURLY_RATE_THRESHOLD = 1000;
           
           const prorationFactor = workdaysInMonth > 0 ? workdaysInPeriod / workdaysInMonth : 1;
           const baseSalary = Math.round(monthlySalary * prorationFactor * 100) / 100;
-           const vacationPay = baseSalary * VACATION_PAY_RATES.STAFF;
+           const vacationPay = baseSalary * rates.staff;
           
            result[staffId] = {
              employeeId: staffId,
@@ -189,6 +223,9 @@ const HOURLY_RATE_THRESHOLD = 1000;
              totalSalary: baseSalary + vacationPay,
              isHourlyBased: false,
              hoursSource,
+             compensationModel: "monthly_fixed",
+             hasBasis: true,
+             missingReason: null,
            };
            continue;
          }
@@ -295,25 +332,28 @@ const HOURLY_RATE_THRESHOLD = 1000;
            }
          }
 
-         const baseSalary = totalHours * effectiveHourlyRate;
-          const vacationPay = baseSalary * VACATION_PAY_RATES.STAFF;
-          const totalSalary = baseSalary + vacationPay;
+          const baseSalary = totalHours * effectiveHourlyRate;
+           const vacationPay = baseSalary * rates.staff;
+           const totalSalary = baseSalary + vacationPay;
 
-         result[staffId] = {
-           employeeId: staffId,
-           hourlyRate: effectiveHourlyRate,
-           workedHours: totalHours,
-           baseSalary,
-           vacationPay,
-           totalSalary,
-           isHourlyBased: true,
-           hoursSource,
-         };
+          result[staffId] = {
+            employeeId: staffId,
+            hourlyRate: effectiveHourlyRate,
+            workedHours: totalHours,
+            baseSalary,
+            vacationPay,
+            totalSalary,
+            isHourlyBased: true,
+            hoursSource,
+            compensationModel: "hourly",
+            hasBasis: true,
+            missingReason: null,
+          };
        }
 
        return result;
      },
-     enabled: staffIds.length > 0,
+     enabled: staffIds.length > 0 && !settingsLoading,
      staleTime: 60000,
    });
  }

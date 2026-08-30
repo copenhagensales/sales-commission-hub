@@ -24,6 +24,8 @@ interface ClientDBSummaryCardProps {
   staffSalaryList?: StaffSalaryItem[];
   fullStabExpenses?: number;
   fullStaffSalaries?: number;
+  /** Antal stabsmedarbejdere hvor lønnen ikke kunne beregnes (mangler grundlag) */
+  staffMissingBasisCount?: number;
 }
 
 export function ClientDBSummaryCard({
@@ -34,6 +36,7 @@ export function ClientDBSummaryCard({
   staffSalaryList = [],
   fullStabExpenses,
   fullStaffSalaries,
+  staffMissingBasisCount = 0,
 }: ClientDBSummaryCardProps) {
   const [isStaffExpanded, setIsStaffExpanded] = useState(false);
   const netPercent = teamDB > 0 ? ((netEarnings / teamDB) * 100).toFixed(1) : "0";
@@ -98,6 +101,12 @@ export function ClientDBSummaryCard({
 
             <CollapsibleContent className="mt-2">
               <div className="bg-muted/50 rounded-md p-2 space-y-1.5">
+                {staffMissingBasisCount > 0 && (
+                  <p className="text-xs text-destructive">
+                    {staffMissingBasisCount} stabsmedarbejder(e) mangler lønmodel eller sats —
+                    beløbet mangler grundlag og indgår ikke.
+                  </p>
+                )}
                 {staffSalaryList.length === 0 ? (
                   <p className="text-xs text-muted-foreground">Ingen stabslønninger</p>
                 ) : (

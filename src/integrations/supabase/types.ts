@@ -2048,6 +2048,66 @@ export type Database = {
         }
         Relationships: []
       }
+      calculation_settings: {
+        Row: {
+          created_at: string
+          description: string | null
+          key: string
+          label: string
+          updated_at: string
+          updated_by: string | null
+          value: Json
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          key: string
+          label: string
+          updated_at?: string
+          updated_by?: string | null
+          value: Json
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          key?: string
+          label?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Relationships: []
+      }
+      calculation_settings_audit: {
+        Row: {
+          changed_by: string | null
+          changed_by_email: string | null
+          created_at: string
+          id: string
+          key: string
+          new_value: Json | null
+          old_value: Json | null
+        }
+        Insert: {
+          changed_by?: string | null
+          changed_by_email?: string | null
+          created_at?: string
+          id?: string
+          key: string
+          new_value?: Json | null
+          old_value?: Json | null
+        }
+        Update: {
+          changed_by?: string | null
+          changed_by_email?: string | null
+          created_at?: string
+          id?: string
+          key?: string
+          new_value?: Json | null
+          old_value?: Json | null
+        }
+        Relationships: []
+      }
       call_records: {
         Row: {
           candidate_id: string | null
@@ -3416,6 +3476,7 @@ export type Database = {
       clients: {
         Row: {
           created_at: string | null
+          has_location_costs: boolean
           id: string
           logo_url: string | null
           name: string
@@ -3423,6 +3484,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          has_location_costs?: boolean
           id?: string
           logo_url?: string | null
           name: string
@@ -3430,6 +3492,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          has_location_costs?: boolean
           id?: string
           logo_url?: string | null
           name?: string
@@ -10737,6 +10800,7 @@ export type Database = {
       }
       personnel_salaries: {
         Row: {
+          compensation_model: string
           created_at: string
           employee_id: string
           hourly_rate: number | null
@@ -10752,6 +10816,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          compensation_model?: string
           created_at?: string
           employee_id: string
           hourly_rate?: number | null
@@ -10767,6 +10832,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          compensation_model?: string
           created_at?: string
           employee_id?: string
           hourly_rate?: number | null
