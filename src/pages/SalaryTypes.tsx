@@ -2,6 +2,7 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { SalaryDashboardKPIs } from "@/components/salary/SalaryDashboardKPIs";
 import { CategoryTabs } from "@/components/salary/CategoryTabs";
 import { Receipt } from "lucide-react";
+import { SuperadminGate } from "@/components/auth/SuperadminGate";
 
 export default function SalaryTypes() {
   return (
@@ -15,8 +16,10 @@ export default function SalaryTypes() {
           </div>
         </div>
 
-        {/* KPI Dashboard */}
-        <SalaryDashboardKPIs />
+        {/* KPI Dashboard — lønsummer er kun for superadmins */}
+        <SuperadminGate message="Løn-KPI'er er forbeholdt superadmins.">
+          <SalaryDashboardKPIs />
+        </SuperadminGate>
 
         {/* Categorized Tabs */}
         <CategoryTabs />
