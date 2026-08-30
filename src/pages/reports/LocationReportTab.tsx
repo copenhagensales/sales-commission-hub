@@ -141,7 +141,7 @@ export function LocationReportTab() {
 
   // Booked locations query
   const { data: bookings, isLoading: isLoadingBookings } = useQuery({
-    queryKey: ["location-report-booked", clientId, locationType, periodStart, periodEnd],
+    queryKey: ["location-report-booked", clientId, locationType, periodStart, periodEnd, locationCostClientIds],
     queryFn: async () => {
       let query = supabase
         .from("booking")
@@ -153,11 +153,8 @@ export function LocationReportTab() {
       if (clientId !== "all") {
         query = query.eq("client_id", clientId);
       } else {
-        // Only FM clients
-        query = query.in("client_id", [
-          "9a92ea4c-6404-4b58-be08-065e7552d552",
-          "5011a7cd-bf07-4838-a63f-55a12c604b40",
-        ]);
+        // Kun kunder markeret med lokationsudgifter
+        query = query.in("client_id", locationCostClientIds);
       }
 
       const { data, error } = await query;
@@ -169,11 +166,11 @@ export function LocationReportTab() {
       }
       return results;
     },
-    enabled: mode === "booked",
+    enabled: mode === "booked" && (clientId !== "all" || locationCostClientIds.length > 0),
   });
 
   const clientLabel = (id: string) =>
-    FM_CLIENTS.find((c) => c.id === id)?.label ?? "Ukendt";
+    clientOptions.find((c) => c.id === id)?.label ?? "Ukendt";
 
   const isLoading = mode === "all" ? isLoadingLocations : isLoadingBookings;
   const rowCount = mode === "all" ? (locations?.length ?? 0) : (bookings?.length ?? 0);
