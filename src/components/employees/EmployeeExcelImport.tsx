@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Upload, FileSpreadsheet, Check, AlertCircle, Loader2, ArrowRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { saveSalaryDetails } from "@/lib/salary/salaryDetails";
 import { useQueryClient } from "@tanstack/react-query";
 import { parseExcelFile } from "@/utils/excel";
 
@@ -251,7 +252,6 @@ export function EmployeeExcelImport() {
           department: e.department?.trim() || null,
           employment_start_date: startDate || new Date().toISOString().split("T")[0],
           salary_type: e.salary_type || null,
-          salary_amount: e.salary_amount || null,
           weekly_hours: e.weekly_hours || 37.5,
           standard_start_time: e.standard_start_time?.trim() || null,
           work_location: e.work_location?.trim() || "København V",
@@ -260,9 +260,26 @@ export function EmployeeExcelImport() {
         };
       });
 
-      const { error } = await supabase.from("employee_master_data").insert(employeesToInsert);
+      const { data: insertedEmployees, error } = await supabase
+        .from("employee_master_data")
+        .insert(employeesToInsert)
+        .select("id, first_name, last_name");
 
       if (error) throw error;
+
+      // Lønbeløb gemmes i den beskyttede løntabel — ét sted, aldrig på stamkortet
+      for (const row of validEmployees) {
+        const amount = row.salary_amount || null;
+        if (amount === null) continue;
+        const match = (insertedEmployees ?? []).find(
+          (e) =>
+            e.first_name === row.first_name.trim() &&
+            e.last_name === row.last_name.trim()
+        );
+        if (match) {
+          await saveSalaryDetails(match.id, { amount });
+        }
+      }
 
       toast({
         title: "Import gennemført",
