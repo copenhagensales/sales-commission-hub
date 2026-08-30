@@ -266,13 +266,17 @@ export default function MyProfile() {
         .filter(Boolean)
         .join(", ");
       
-      // Egen løn hentes fra den beskyttede løntabel (egen række er altid tilladt)
+      // Egen løn hentes fra den beskyttede løntabel (egen række er altid tilladt).
+      // Procentsats og minimumsløn er superadmin-beskyttet i RLS — man kan kun
+      // se sine EGNE tal her, aldrig andres.
       const ownSalary = await fetchSalaryDetails(data.id);
 
       return {
         ...data,
         department: teamNames || data.department,
         salary_amount: ownSalary?.amount ?? null,
+        own_percentage_rate: ownSalary?.percentage_rate ?? null,
+        own_minimum_salary: ownSalary?.minimum_salary ?? null,
       };
     },
   });
@@ -1308,6 +1312,25 @@ export default function MyProfile() {
                           <DisplayField 
                             value={employee.salary_amount} 
                             displayValue={`${employee.salary_amount.toLocaleString('da-DK')} kr${employee.salary_type === 'fixed' ? '/måned' : '/time'}`} 
+                          />
+                        </div>
+                      )}
+                      {/* Egen DB-sats (kun ens egen — andres er superadmin-beskyttet) */}
+                      {!!employee.own_percentage_rate && (
+                        <div>
+                          <label className="text-xs text-muted-foreground">Din sats af DB</label>
+                          <DisplayField
+                            value={employee.own_percentage_rate}
+                            displayValue={`${employee.own_percentage_rate} %`}
+                          />
+                        </div>
+                      )}
+                      {!!employee.own_minimum_salary && (
+                        <div>
+                          <label className="text-xs text-muted-foreground">Din minimumsløn</label>
+                          <DisplayField
+                            value={employee.own_minimum_salary}
+                            displayValue={`${employee.own_minimum_salary.toLocaleString('da-DK')} kr/måned`}
                           />
                         </div>
                       )}
