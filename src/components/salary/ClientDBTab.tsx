@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency } from "@/lib/calculations";
@@ -15,12 +15,20 @@ import { DBPeriodSelector } from "./DBPeriodSelector";
 import { ClientDBDailyBreakdown } from "./ClientDBDailyBreakdown";
 import { ClientDBKPIs } from "./ClientDBKPIs";
 import { ClientDBExpandableRow } from "./ClientDBExpandableRow";
+import {
+  ClientDBTeamGroupRow,
+  type ClientDBTeamGroupSummary,
+} from "./ClientDBTeamGroupRow";
 import { ClientDBSummaryCard } from "./ClientDBSummaryCard";
 import { ClientDBDailyChart } from "./ClientDBDailyChart";
 import { DbDataQualityPanel } from "./DbDataQualityPanel";
 import { useClientPeriodComparison } from "@/hooks/useClientPeriodComparison";
 import { useSalesAggregatesExtended } from "@/hooks/useSalesAggregatesExtended";
-import { useClientDbData, type DbPeriodMode } from "@/hooks/useClientDbData";
+import {
+  useClientDbData,
+  type ClientDbRow,
+  type DbPeriodMode,
+} from "@/hooks/useClientDbData";
 import { useMonthlyOverhead } from "@/hooks/useMonthlyOverhead";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -36,6 +44,20 @@ type SortColumn =
   | "dbPercent"
   | "revenuePerFTE";
 type SortDirection = "asc" | "desc";
+
+/** Samme omkostningssum som vises i kolonnen "Omkostninger" pr. klient. */
+function rowCosts(row: ClientDbRow): number {
+  return (
+    row.adjustedSellerCost +
+    row.sickPayAmount +
+    row.locationCosts +
+    row.teamExpenseAllocation +
+    row.assistantAllocation +
+    row.leaderAllocation +
+    row.leaderVacationPay +
+    row.atpBarsselAllocation
+  );
+}
 
 /**
  * DB per klient.
@@ -60,6 +82,8 @@ export function ClientDBTab() {
   const [sortColumn, setSortColumn] = useState<SortColumn>("finalDB");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [hideZeroClients, setHideZeroClients] = useState(true);
+  const [groupByTeam, setGroupByTeam] = useState(true);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
 
@@ -68,6 +92,7 @@ export function ClientDBTab() {
   // --- Fælles DB-beregning (samme kilde som DB Oversigt) ---
   const {
     clientRows,
+    teamSummaryById,
     totals,
     isLoading: dbLoading,
     isCapped,
@@ -255,24 +280,8 @@ export function ClientDBTab() {
           bVal = b.adjustedRevenue;
           break;
         case "costs":
-          aVal =
-            a.adjustedSellerCost +
-            a.sickPayAmount +
-            a.locationCosts +
-            a.teamExpenseAllocation +
-            a.assistantAllocation +
-            a.leaderAllocation +
-            a.leaderVacationPay +
-            a.atpBarsselAllocation;
-          bVal =
-            b.adjustedSellerCost +
-            b.sickPayAmount +
-            b.locationCosts +
-            b.teamExpenseAllocation +
-            b.assistantAllocation +
-            b.leaderAllocation +
-            b.leaderVacationPay +
-            b.atpBarsselAllocation;
+          aVal = rowCosts(a);
+          bVal = rowCosts(b);
           break;
         case "dbPercent":
           aVal = a.dbPercent;
@@ -312,8 +321,114 @@ export function ClientDBTab() {
     [clientRows]
   );
 
+  /**
+   * Gruppering pr. team. Rent visning — rækkerne er de samme som i den flade
+   * liste, og sammentællingen er en simpel sum af de viste klientrækker.
+   * Lederlønnen tages fra team-sammendraget, fordi den beregnes på teamniveau.
+   */
+  const teamGroups = useMemo(() => {
+    const map = new Map<
+      string,
+      { group: ClientDBTeamGroupSummary; rows: typeof filteredAndSortedData }
+    >();
+
+    for (const row of filteredAndSortedData) {
+      const key = row.teamId ?? "__no_team__";
+      let entry = map.get(key);
+      if (!entry) {
+        entry = {
+          group: {
+            key,
+            teamId: row.teamId,
+            teamName: row.teamName || "Uden team",
+            clientCount: 0,
+            sales: 0,
+            revenue: 0,
+            costs: 0,
+            finalDB: 0,
+            dbPercent: 0,
+            leaderCost: 0,
+            leaderHasBasis: true,
+          },
+          rows: [],
+        };
+        map.set(key, entry);
+      }
+      entry.rows.push(row);
+      entry.group.clientCount += 1;
+      entry.group.sales += row.sales;
+      entry.group.revenue += row.adjustedRevenue;
+      entry.group.costs += rowCosts(row);
+      entry.group.finalDB += row.finalDB;
+    }
+
+    for (const entry of map.values()) {
+      const { group } = entry;
+      group.dbPercent = group.revenue > 0 ? (group.finalDB / group.revenue) * 100 : 0;
+      const summary = group.teamId ? teamSummaryById[group.teamId] : undefined;
+      if (summary) {
+        group.leaderCost = summary.leader.totalCost;
+        group.leaderHasBasis = summary.leader.hasBasis;
+      } else {
+        group.leaderCost = 0;
+        group.leaderHasBasis = group.teamId === null;
+      }
+    }
+
+    return Array.from(map.values()).sort((a, b) => {
+      // Grupper uden team altid sidst, så de ikke forsvinder øverst/nederst
+      if (a.group.teamId === null) return 1;
+      if (b.group.teamId === null) return -1;
+      if (sortColumn === "clientName" || sortColumn === "teamName") {
+        return sortDirection === "asc"
+          ? a.group.teamName.localeCompare(b.group.teamName)
+          : b.group.teamName.localeCompare(a.group.teamName);
+      }
+      const pick = (g: ClientDBTeamGroupSummary) =>
+        sortColumn === "sales"
+          ? g.sales
+          : sortColumn === "revenue"
+            ? g.revenue
+            : sortColumn === "costs"
+              ? g.costs
+              : sortColumn === "dbPercent"
+                ? g.dbPercent
+                : g.finalDB;
+      return sortDirection === "asc"
+        ? pick(a.group) - pick(b.group)
+        : pick(b.group) - pick(a.group);
+    });
+  }, [filteredAndSortedData, teamSummaryById, sortColumn, sortDirection]);
+
+  const toggleGroup = (key: string) =>
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
   const isLoading = dbLoading || overhead.isLoading;
   const hiddenCount = clientRows.length - filteredAndSortedData.length;
+
+  const renderClientRow = (client: ClientDbRow) => {
+    const prevData = previousPeriodData?.[client.clientId];
+    const trend = prevData
+      ? getTrendInfo(client.adjustedRevenue, prevData.previousRevenue)
+      : null;
+
+    return (
+      <ClientDBExpandableRow
+        key={client.clientId}
+        client={client}
+        trend={trend}
+        previousPeriodLabel={previousPeriodLabel}
+        onEditCancellation={handleEditCancellationClick}
+        onEditSickPay={handleEditSickPayClick}
+        onShowDaily={setSelectedClientForDaily}
+      />
+    );
+  };
 
   const getTrendInfo = (current: number, previous: number) => {
     if (!previous || previous === 0) return null;
@@ -352,6 +467,14 @@ export function ClientDBTab() {
           </div>
 
           <div className="flex items-center gap-2">
+            <Switch
+              id="group-by-team"
+              checked={groupByTeam}
+              onCheckedChange={setGroupByTeam}
+            />
+            <Label htmlFor="group-by-team" className="text-sm text-muted-foreground mr-3">
+              Gruppér efter team
+            </Label>
             <Switch id="hide-zero" checked={hideZeroClients} onCheckedChange={setHideZeroClients} />
             <Label
               htmlFor="hide-zero"
@@ -511,24 +634,21 @@ export function ClientDBTab() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredAndSortedData.map((client) => {
-                    const prevData = previousPeriodData?.[client.clientId];
-                    const trend = prevData
-                      ? getTrendInfo(client.adjustedRevenue, prevData.previousRevenue)
-                      : null;
-
-                    return (
-                      <ClientDBExpandableRow
-                        key={client.clientId}
-                        client={client}
-                        trend={trend}
-                        previousPeriodLabel={previousPeriodLabel}
-                        onEditCancellation={handleEditCancellationClick}
-                        onEditSickPay={handleEditSickPayClick}
-                        onShowDaily={setSelectedClientForDaily}
-                      />
-                    );
-                  })}
+                  {groupByTeam
+                    ? teamGroups.map(({ group, rows }) => {
+                        const isExpanded = !collapsedGroups.has(group.key);
+                        return (
+                          <Fragment key={group.key}>
+                            <ClientDBTeamGroupRow
+                              group={group}
+                              isExpanded={isExpanded}
+                              onToggle={() => toggleGroup(group.key)}
+                            />
+                            {isExpanded && rows.map((client) => renderClientRow(client))}
+                          </Fragment>
+                        );
+                      })
+                    : filteredAndSortedData.map((client) => renderClientRow(client))}
                 </TableBody>
               </Table>
             </div>
