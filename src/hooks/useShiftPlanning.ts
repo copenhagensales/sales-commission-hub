@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { attachSalaryAmount } from "@/lib/salary/salaryDetails";
+import { attachSalaryAmount, fetchSalaryDetails } from "@/lib/salary/salaryDetails";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { parseISO, startOfDay } from "date-fns";
@@ -619,7 +619,10 @@ export function useCurrentEmployee() {
         .maybeSingle();
 
       if (error) throw error;
-      return data;
+      if (!data) return null;
+      // Egen løn må man altid se (RLS tillader egen række).
+      const salary = await fetchSalaryDetails(data.id);
+      return { ...data, salary_amount: salary?.amount ?? null };
     },
     enabled: !!user?.email,
   });

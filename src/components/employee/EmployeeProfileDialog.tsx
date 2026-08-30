@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchSalaryDetails, logSalaryAccess } from "@/lib/salary/salaryDetails";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -22,7 +23,13 @@ export function EmployeeProfileDialog({ open, onOpenChange, employeeId }: Employ
         .eq("id", employeeId)
         .maybeSingle();
       if (error) throw error;
-      return data;
+      if (!data) return null;
+      // Lønbeløbet ligger i den beskyttede løntabel — RLS afgør om det vises.
+      const salary = await fetchSalaryDetails(employeeId);
+      if (salary?.amount != null) {
+        await logSalaryAccess(employeeId, "salary_amount", "view");
+      }
+      return { ...data, salary_amount: salary?.amount ?? null };
     },
     enabled: !!employeeId && open,
   });
