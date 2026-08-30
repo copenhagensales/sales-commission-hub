@@ -4,8 +4,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { da } from "date-fns/locale";
-import { Hotel, Calendar, CreditCard } from "lucide-react";
+import { Hotel, Calendar, CreditCard, TriangleAlert } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
 import {
   Select,
   SelectContent,
@@ -110,6 +113,15 @@ export function HotelExpensesTab() {
 
   return (
     <div className="space-y-6">
+      {duplicateIds.size > 0 && (
+        <Alert variant="default" className="border-yellow-400/60 bg-yellow-50 dark:bg-yellow-900/20">
+          <TriangleAlert className="h-4 w-4" />
+          <AlertDescription>
+            {duplicateIds.size} mulige dubletter fundet i perioden — kontrollér før fakturering. Beløbene tælles fortsat med i totalen.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="flex items-center gap-3">
         <Select value={periodType} onValueChange={(v) => setPeriodType(v as "month" | "payroll")}>
           <SelectTrigger className="w-[200px]">
