@@ -312,6 +312,93 @@ export function ClientDBTab() {
     [clientRows]
   );
 
+  /**
+   * Gruppering pr. team. Rent visning — rækkerne er de samme som i den flade
+   * liste, og sammentællingen er en simpel sum af de viste klientrækker.
+   * Lederlønnen tages fra team-sammendraget, fordi den beregnes på teamniveau.
+   */
+  const teamGroups = useMemo(() => {
+    const map = new Map<
+      string,
+      { group: ClientDBTeamGroupSummary; rows: typeof filteredAndSortedData }
+    >();
+
+    for (const row of filteredAndSortedData) {
+      const key = row.teamId ?? "__no_team__";
+      let entry = map.get(key);
+      if (!entry) {
+        entry = {
+          group: {
+            key,
+            teamId: row.teamId,
+            teamName: row.teamName || "Uden team",
+            clientCount: 0,
+            sales: 0,
+            revenue: 0,
+            costs: 0,
+            finalDB: 0,
+            dbPercent: 0,
+            leaderCost: 0,
+            leaderHasBasis: true,
+          },
+          rows: [],
+        };
+        map.set(key, entry);
+      }
+      entry.rows.push(row);
+      entry.group.clientCount += 1;
+      entry.group.sales += row.sales;
+      entry.group.revenue += row.adjustedRevenue;
+      entry.group.costs += rowCosts(row);
+      entry.group.finalDB += row.finalDB;
+    }
+
+    for (const entry of map.values()) {
+      const { group } = entry;
+      group.dbPercent = group.revenue > 0 ? (group.finalDB / group.revenue) * 100 : 0;
+      const summary = group.teamId ? teamSummaryById[group.teamId] : undefined;
+      if (summary) {
+        group.leaderCost = summary.leader.totalCost;
+        group.leaderHasBasis = summary.leader.hasBasis;
+      } else {
+        group.leaderCost = 0;
+        group.leaderHasBasis = group.teamId === null;
+      }
+    }
+
+    return Array.from(map.values()).sort((a, b) => {
+      // Grupper uden team altid sidst, så de ikke forsvinder øverst/nederst
+      if (a.group.teamId === null) return 1;
+      if (b.group.teamId === null) return -1;
+      if (sortColumn === "clientName" || sortColumn === "teamName") {
+        return sortDirection === "asc"
+          ? a.group.teamName.localeCompare(b.group.teamName)
+          : b.group.teamName.localeCompare(a.group.teamName);
+      }
+      const pick = (g: ClientDBTeamGroupSummary) =>
+        sortColumn === "sales"
+          ? g.sales
+          : sortColumn === "revenue"
+            ? g.revenue
+            : sortColumn === "costs"
+              ? g.costs
+              : sortColumn === "dbPercent"
+                ? g.dbPercent
+                : g.finalDB;
+      return sortDirection === "asc"
+        ? pick(a.group) - pick(b.group)
+        : pick(b.group) - pick(a.group);
+    });
+  }, [filteredAndSortedData, teamSummaryById, sortColumn, sortDirection]);
+
+  const toggleGroup = (key: string) =>
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
   const isLoading = dbLoading || overhead.isLoading;
   const hiddenCount = clientRows.length - filteredAndSortedData.length;
 
