@@ -114,6 +114,8 @@ interface ClientRow {
   id: string;
   name: string;
   logo_url: string | null;
+  /** true → klientens bookinger giver lokationsudgifter i DB-beregningen */
+  has_location_costs: boolean | null;
 }
 
 interface AgentRow {
@@ -367,7 +369,7 @@ export default function MgTest() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("clients")
-        .select("id, name, logo_url")
+        .select("id, name, logo_url, has_location_costs")
         .order("name");
 
       if (error) throw error;
