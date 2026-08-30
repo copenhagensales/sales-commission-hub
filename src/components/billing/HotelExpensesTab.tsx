@@ -85,6 +85,29 @@ export function HotelExpensesTab() {
 
   const totalBookings = hotelBookings?.length || 0;
 
+  // Mulige dubletter: samme hotel, check-in, check-out, antal værelser og beløb
+  const duplicateIds = (() => {
+    const groups = new Map<string, string[]>();
+    (hotelBookings || []).forEach((bh) => {
+      const key = [
+        bh.hotel_id,
+        bh.check_in,
+        bh.check_out,
+        bh.rooms ?? 1,
+        bh.total_price ?? 0,
+      ].join("|");
+      const arr = groups.get(key) || [];
+      arr.push(bh.id);
+      groups.set(key, arr);
+    });
+    const ids = new Set<string>();
+    groups.forEach((arr) => {
+      if (arr.length > 1) arr.forEach((id) => ids.add(id));
+    });
+    return ids;
+  })();
+
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
