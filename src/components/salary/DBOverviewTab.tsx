@@ -1,235 +1,120 @@
-import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useTeamDBStats } from "@/hooks/useTeamDBStats";
-import { useAssistantHoursCalculation } from "@/hooks/useAssistantHoursCalculation";
-import { useTeamAssistantLeaders, getTeamAssistantIds, getAllAssistantIds } from "@/hooks/useTeamAssistantLeaders";
-import { useCpoRevenue } from "@/hooks/useCpoRevenue";
+import { useMemo, useState } from "react";
 import { formatCurrency } from "@/lib/calculations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, Calendar, HelpCircle, ChevronDown, ChevronRight } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import {
+  TrendingUp,
+  Calendar,
+  HelpCircle,
+  ChevronDown,
+  ChevronRight,
+  AlertTriangle,
+  Info,
+} from "lucide-react";
 import { startOfMonth, endOfMonth } from "date-fns";
 import { DBTeamDetailCard } from "./DBTeamDetailCard";
 import { DBPeriodSelector } from "./DBPeriodSelector";
 import { DBDailyBreakdown } from "./DBDailyBreakdown";
+import { useClientDbData, type DbPeriodMode, type TeamDbSummary } from "@/hooks/useClientDbData";
+import { useCalculationSettings } from "@/hooks/useCalculationSettings";
 
-type PeriodMode = "payroll" | "month" | "week" | "day" | "custom";
-interface TeamDB {
-  teamId: string;
-  teamName: string;
-  leaderId: string | null;
-  leaderName: string;
-  assistantIds: string[];
-  assistantNames: string[];
-  revenue: number;
-  sellerSalaryCosts: number;
-  leaderSalary: number;
-  assistantSalary: number;
-  expenses: number;
-  db: number;
-  percentageRate: number;
-  minimumSalary: number;
-}
-
+/**
+ * DB Oversigt pr. team.
+ *
+ * Læser fra `useClientDbData` — SAMME kilde som "DB per klient" — så et team
+ * altid får samme lederløn, assistentløn og ATP i begge faner. Omsætningen
+ * følger klientens team (`team_clients`), jf. ejerskabsreglen for salg.
+ */
 export function DBOverviewTab() {
   const [periodStart, setPeriodStart] = useState(() => startOfMonth(new Date()));
   const [periodEnd, setPeriodEnd] = useState(() => endOfMonth(new Date()));
-  const [periodMode, setPeriodMode] = useState<PeriodMode>("month");
+  const [periodMode, setPeriodMode] = useState<DbPeriodMode>("month");
   const [selectedPresetLabel, setSelectedPresetLabel] = useState<string | undefined>("Denne måned");
-  const [selectedTeam, setSelectedTeam] = useState<TeamDB | null>(null);
-  const [dailyViewTeam, setDailyViewTeam] = useState<TeamDB | null>(null);
+  const [selectedTeam, setSelectedTeam] = useState<TeamDbSummary | null>(null);
+  const [dailyViewTeam, setDailyViewTeam] = useState<TeamDbSummary | null>(null);
   const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
+  const [hideInactiveTeams, setHideInactiveTeams] = useState(true);
+
+  const { settings } = useCalculationSettings();
 
   const handlePeriodChange = (start: Date, end: Date) => {
     setPeriodStart(start);
     setPeriodEnd(end);
   };
 
-  // Get aggregated sales data from central hook
-  const { byEmployee: aggregatesByEmployee, isLoading: aggregatesLoading } = useTeamDBStats(
+  const { teamSummaries, isLoading, isCapped } = useClientDbData({
     periodStart,
     periodEnd,
-    undefined, // No specific team - we want all teams
-    undefined,
-    true
-  );
-
-  // Get CPO-based revenue from time clocks
-  const { data: cpoRevenue, isLoading: cpoLoading } = useCpoRevenue({
-    periodStart,
-    periodEnd,
-    enabled: true,
+    periodMode,
+    capAtToday: true,
   });
 
-  // First, fetch basic team structure
-  const { data: teamsBasic } = useQuery({
-    queryKey: ["teams-basic-structure"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("teams")
-        .select("id, name, team_leader_id");
-      if (error) throw error;
-      return data;
-    },
-  });
+  const teams = useMemo(() => {
+    const list = hideInactiveTeams
+      ? teamSummaries.filter(
+          (t) =>
+            t.adjustedRevenue !== 0 ||
+            t.assistantCost !== 0 ||
+            t.atpCost !== 0 ||
+            t.teamExpenses !== 0
+        )
+      : teamSummaries;
+    return [...list].sort((a, b) => b.finalDb - a.finalDb);
+  }, [teamSummaries, hideInactiveTeams]);
 
-  // Fetch team assistant leaders from junction table
-  const { data: teamAssistants = [] } = useTeamAssistantLeaders();
+  const hiddenCount = teamSummaries.length - teams.length;
 
-  // Get all unique assistant IDs for hours calculation
-  const assistantIds = useMemo(() => {
-    return getAllAssistantIds(teamAssistants);
-  }, [teamAssistants]);
-
-  // Calculate assistant salaries based on hours
-  const { data: assistantHoursData, isLoading: assistantHoursLoading } = useAssistantHoursCalculation(
-    periodStart,
-    periodEnd,
-    assistantIds
-  );
-
-  const { data: teamsDB, isLoading: teamsLoading } = useQuery<TeamDB[]>({
-    queryKey: ["teams-db-structure", periodStart.toISOString(), periodEnd.toISOString(), JSON.stringify(assistantHoursData), JSON.stringify(teamAssistants), JSON.stringify(cpoRevenue)],
-    queryFn: async (): Promise<TeamDB[]> => {
-      const teams = teamsBasic || [];
-
-      // Get leader and assistant names
-      const leaderIds = teams?.map((t: any) => t.team_leader_id).filter(Boolean) as string[];
-      const allEmployeeIds = [...new Set([...leaderIds, ...assistantIds])];
-
-      const { data: employees } = await supabase
-        .from("employee_master_data")
-        .select("id, first_name, last_name")
-        .in("id", allEmployeeIds.length > 0 ? allEmployeeIds : ["none"]);
-
-      // Get team expenses for the period
-      const { data: expenses } = await supabase
-        .from("team_expenses")
-        .select("team_id, amount")
-        .gte("expense_date", periodStart.toISOString().split("T")[0])
-        .lte("expense_date", periodEnd.toISOString().split("T")[0]);
-
-      // Get personnel salaries for team leaders
-      const { data: leaderSalaries } = await supabase
-        .from("personnel_salaries")
-        .select("employee_id, percentage_rate, minimum_salary, monthly_salary")
-        .eq("salary_type", "team_leader")
-        .eq("is_active", true)
-        .in("employee_id", leaderIds.length > 0 ? leaderIds : ["none"]);
-
-      // Get team members for each team
-      const { data: teamMembers } = await supabase
-        .from("team_members")
-        .select("team_id, employee_id");
-
-      // Calculate DB for each team using aggregated data
-      const teamsWithDB: TeamDB[] = (teams || []).map((team: any) => {
-        // Team expenses
-        const teamExpenses = expenses?.filter(e => e.team_id === team.id) || [];
-        const totalExpenses = teamExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
-
-        // Team members
-        const members = teamMembers?.filter(m => m.team_id === team.id) || [];
-        const memberIds = members.map(m => m.employee_id);
-
-        // Sum revenue and commission from aggregated data for team members
-        let revenue = 0;
-        let sellerSalaryCosts = 0;
-        
-        for (const employeeId of memberIds) {
-          const employeeData = aggregatesByEmployee[employeeId];
-          if (employeeData) {
-            revenue += employeeData.revenue;
-            sellerSalaryCosts += employeeData.commission;
-          }
-          // Add CPO-based revenue for this employee
-          if (cpoRevenue?.byEmployee[employeeId]) {
-            revenue += cpoRevenue.byEmployee[employeeId];
-          }
-        }
-
-        // Leader salary calculation
-        const leaderSalary = leaderSalaries?.find(ps => ps.employee_id === team.team_leader_id);
-        const percentageRate = Number(leaderSalary?.percentage_rate) || 0;
-        const minimumSalary = Number(leaderSalary?.minimum_salary) || 0;
-        
-        // Calculate DB before leader salary for percentage calc
-        const dbBeforeLeader = revenue - sellerSalaryCosts - totalExpenses;
-        const calculatedLeaderSalary = dbBeforeLeader * (percentageRate / 100);
-        const finalLeaderSalary = Math.max(calculatedLeaderSalary, minimumSalary);
-
-        // Assistant salary - now based on hours worked (supports multiple assistants)
-        const teamAssistantIds = getTeamAssistantIds(teamAssistants, team.id);
-        let finalAssistantSalary = 0;
-        for (const aId of teamAssistantIds) {
-          const assistantData = assistantHoursData ? assistantHoursData[aId] : null;
-          finalAssistantSalary += assistantData?.totalSalary || 0;
-        }
-
-        // Final DB
-        const db = revenue - sellerSalaryCosts - finalLeaderSalary - finalAssistantSalary - totalExpenses;
-
-        const leader = employees?.find(e => e.id === team.team_leader_id);
-        const assistantNames = teamAssistantIds
-          .map(id => {
-            const emp = employees?.find(e => e.id === id);
-            return emp ? `${emp.first_name} ${emp.last_name}` : null;
-          })
-          .filter(Boolean) as string[];
-
-        return {
-          teamId: team.id,
-          teamName: team.name,
-          leaderId: team.team_leader_id,
-          leaderName: leader ? `${leader.first_name} ${leader.last_name}` : "Ikke tildelt",
-          assistantIds: teamAssistantIds,
-          assistantNames,
-          revenue,
-          sellerSalaryCosts,
-          leaderSalary: finalLeaderSalary,
-          assistantSalary: finalAssistantSalary,
-          expenses: totalExpenses,
-          db,
-          percentageRate,
-          minimumSalary,
-        };
-      });
-
-      return teamsWithDB.sort((a, b) => b.db - a.db);
-    },
-    enabled: !aggregatesLoading && !!teamsBasic && !assistantHoursLoading && !cpoLoading,
-  });
-
-  const isLoading = teamsLoading || aggregatesLoading || assistantHoursLoading || cpoLoading;
-
-  // formatCurrency imported from @/lib/calculations
-
-  const totals = teamsDB?.reduce(
+  const totals = teams.reduce(
     (acc, t) => ({
-      revenue: acc.revenue + t.revenue,
-      sellerSalaryCosts: acc.sellerSalaryCosts + t.sellerSalaryCosts,
-      leaderSalary: acc.leaderSalary + t.leaderSalary,
-      assistantSalary: acc.assistantSalary + t.assistantSalary,
-      expenses: acc.expenses + t.expenses,
-      db: acc.db + t.db,
+      revenue: acc.revenue + t.adjustedRevenue,
+      sellerSalaryCosts: acc.sellerSalaryCosts + t.sellerSalaryCost,
+      assistantSalary: acc.assistantSalary + t.assistantCost,
+      atpCost: acc.atpCost + t.atpCost,
+      otherCosts: acc.otherCosts + t.locationCosts + t.teamExpenses + t.sickPayAmount,
+      leaderSalary: acc.leaderSalary + t.leader.totalCost,
+      db: acc.db + t.finalDb,
     }),
-    { revenue: 0, sellerSalaryCosts: 0, leaderSalary: 0, assistantSalary: 0, expenses: 0, db: 0 }
-  ) || { revenue: 0, sellerSalaryCosts: 0, leaderSalary: 0, assistantSalary: 0, expenses: 0, db: 0 };
+    {
+      revenue: 0,
+      sellerSalaryCosts: 0,
+      assistantSalary: 0,
+      atpCost: 0,
+      otherCosts: 0,
+      leaderSalary: 0,
+      db: 0,
+    }
+  );
+
+  const missingBasisTeams = teams.filter(
+    (t) => !t.leader.hasBasis || t.assistantsMissingBasis.length > 0
+  );
 
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0 pb-4">
           <div className="flex items-center gap-3">
             <TrendingUp className="h-5 w-5 text-primary" />
-            <CardTitle>Dækningsbidrag (DB) Oversigt</CardTitle>
+            <CardTitle>Dækningsbidrag (DB) oversigt</CardTitle>
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch
+              id="hide-inactive-teams"
+              checked={hideInactiveTeams}
+              onCheckedChange={setHideInactiveTeams}
+            />
+            <Label htmlFor="hide-inactive-teams" className="text-sm text-muted-foreground">
+              Skjul teams uden aktivitet
+              {hiddenCount > 0 && <span className="text-xs"> ({hiddenCount})</span>}
+            </Label>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Period selector */}
           <DBPeriodSelector
             periodStart={periodStart}
             periodEnd={periodEnd}
@@ -240,17 +125,51 @@ export function DBOverviewTab() {
             onPresetLabelChange={setSelectedPresetLabel}
           />
 
-          {/* Table */}
-          <div className="rounded-md border">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <Info className="h-3.5 w-3.5" />
+            <span>
+              Omsætningen følger klientens team. Samme grundlag som "DB per klient" — lederløn
+              og assistentløn er derfor identiske i de to faner.
+            </span>
+            {isCapped && <Badge variant="outline">Periode skåret ved i dag</Badge>}
+          </div>
+
+          {missingBasisTeams.length > 0 && (
+            <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
+              <div className="flex items-center gap-2 font-medium text-destructive">
+                <AlertTriangle className="h-4 w-4" />
+                {missingBasisTeams.length} team(s) mangler grundlag
+              </div>
+              <p className="text-muted-foreground mt-1 text-xs">
+                {missingBasisTeams.map((t) => t.teamName).join(", ")} — beløbet er ikke 0 kr., det
+                kan ikke beregnes. Ret lønrække eller procentsats under Opsætning → Personale løn.
+              </p>
+            </div>
+          )}
+
+          <div className="rounded-md border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Team</TableHead>
                   <TableHead className="text-right">Omsætning</TableHead>
                   <TableHead className="text-right">Sælgerløn</TableHead>
-                  <TableHead className="text-right">Lederløn</TableHead>
                   <TableHead className="text-right">Assist.løn</TableHead>
-                  <TableHead className="text-right">Udgifter</TableHead>
+                  <TableHead className="text-right">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger className="flex items-center gap-1 ml-auto">
+                          Øvrige
+                          <HelpCircle className="h-3 w-3 opacity-60" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          Sygefravær + lokationsudgifter + teamudgifter
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </TableHead>
+                  <TableHead className="text-right">ATP/barsel</TableHead>
+                  <TableHead className="text-right">Lederløn</TableHead>
                   <TableHead className="text-right">DB</TableHead>
                   <TableHead className="w-12"></TableHead>
                 </TableRow>
@@ -258,43 +177,80 @@ export function DBOverviewTab() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       Indlæser...
                     </TableCell>
                   </TableRow>
-                ) : !teamsDB?.length ? (
+                ) : teams.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                      Ingen teams fundet
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                      Ingen teams med aktivitet i perioden
                     </TableCell>
                   </TableRow>
                 ) : (
                   <>
-                    {teamsDB.map((team) => {
+                    {teams.map((team) => {
                       const isExpanded = expandedTeamId === team.teamId;
-                      const dbBeforeLeader = team.revenue - team.sellerSalaryCosts - team.expenses;
-                      const calculatedLeaderSalary = dbBeforeLeader * (team.percentageRate / 100);
-                      const usesMinimum = team.leaderSalary === team.minimumSalary && calculatedLeaderSalary < team.minimumSalary;
+                      const otherCosts =
+                        team.locationCosts + team.teamExpenses + team.sickPayAmount;
 
                       return (
                         <>
-                          <TableRow 
-                            key={team.teamId} 
+                          <TableRow
+                            key={team.teamId}
                             className="cursor-pointer hover:bg-muted/50"
                             onClick={() => setExpandedTeamId(isExpanded ? null : team.teamId)}
                           >
                             <TableCell className="font-medium">
                               <div className="flex items-center gap-1">
-                                {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                                {isExpanded ? (
+                                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                )}
                                 {team.teamName}
+                                {(!team.leader.hasBasis ||
+                                  team.assistantsMissingBasis.length > 0) && (
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        {!team.leader.hasBasis
+                                          ? "Lederlønnen mangler grundlag"
+                                          : "En eller flere assistenter mangler lønrække"}
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                )}
                               </div>
                             </TableCell>
-                            <TableCell className="text-right">{formatCurrency(team.revenue)}</TableCell>
-                            <TableCell className="text-right text-destructive">-{formatCurrency(team.sellerSalaryCosts)}</TableCell>
-                            <TableCell className="text-right text-destructive">-{formatCurrency(team.leaderSalary)}</TableCell>
-                            <TableCell className="text-right text-destructive">-{formatCurrency(team.assistantSalary)}</TableCell>
-                            <TableCell className="text-right text-destructive">-{formatCurrency(team.expenses)}</TableCell>
-                            <TableCell className="text-right font-medium">{formatCurrency(team.db)}</TableCell>
+                            <TableCell className="text-right tabular-nums">
+                              {formatCurrency(team.adjustedRevenue)}
+                            </TableCell>
+                            <TableCell className="text-right text-destructive tabular-nums">
+                              -{formatCurrency(team.sellerSalaryCost)}
+                            </TableCell>
+                            <TableCell className="text-right text-destructive tabular-nums">
+                              {team.assistantsMissingBasis.length > 0 && team.assistantCost === 0
+                                ? "mangler grundlag"
+                                : `-${formatCurrency(team.assistantCost)}`}
+                            </TableCell>
+                            <TableCell className="text-right text-destructive tabular-nums">
+                              -{formatCurrency(otherCosts)}
+                            </TableCell>
+                            <TableCell className="text-right text-destructive tabular-nums">
+                              -{formatCurrency(team.atpCost)}
+                            </TableCell>
+                            <TableCell className="text-right text-destructive tabular-nums">
+                              {team.leader.hasBasis
+                                ? `-${formatCurrency(team.leader.totalCost)}`
+                                : "mangler grundlag"}
+                            </TableCell>
+                            <TableCell className="text-right font-medium tabular-nums">
+                              {formatCurrency(team.finalDb)}
+                            </TableCell>
                             <TableCell>
                               <div className="flex gap-1">
                                 <Button
@@ -321,8 +277,11 @@ export function DBOverviewTab() {
                             </TableCell>
                           </TableRow>
                           {isExpanded && (
-                            <TableRow key={`${team.teamId}-expanded`} className="bg-muted/30 hover:bg-muted/30">
-                              <TableCell colSpan={8} className="py-3 px-6">
+                            <TableRow
+                              key={`${team.teamId}-expanded`}
+                              className="bg-muted/30 hover:bg-muted/30"
+                            >
+                              <TableCell colSpan={9} className="py-3 px-6">
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                                   <div>
                                     <p className="text-muted-foreground">Teamleder</p>
@@ -330,30 +289,57 @@ export function DBOverviewTab() {
                                   </div>
                                   <div>
                                     <p className="text-muted-foreground">Procentsats</p>
-                                    <p className="font-medium">{team.percentageRate}%</p>
+                                    <p className="font-medium">{team.percentageRate} %</p>
                                   </div>
                                   <div>
-                                    <p className="text-muted-foreground">Minimumsløn</p>
-                                    <p className="font-medium">{formatCurrency(team.minimumSalary)}</p>
+                                    <p className="text-muted-foreground">
+                                      Minimumsløn (prorateret)
+                                    </p>
+                                    <p className="font-medium">
+                                      {formatCurrency(team.leader.proratedMinimum)}
+                                    </p>
                                   </div>
                                   <div>
                                     <p className="text-muted-foreground">DB før lederløn</p>
-                                    <p className="font-medium">{formatCurrency(dbBeforeLeader)}</p>
+                                    <p className="font-medium">
+                                      {formatCurrency(team.dbBeforeLeader)}
+                                    </p>
                                   </div>
                                   <div>
-                                    <p className="text-muted-foreground">Beregnet ({team.percentageRate}% af DB)</p>
-                                    <p className="font-medium">{formatCurrency(calculatedLeaderSalary)}</p>
+                                    <p className="text-muted-foreground">
+                                      Beregnet ({team.percentageRate} % af DB)
+                                    </p>
+                                    <p className="font-medium">
+                                      {formatCurrency(team.leader.calculated)}
+                                    </p>
                                   </div>
                                   <div>
                                     <p className="text-muted-foreground">Endelig lederløn</p>
                                     <p className="font-medium text-destructive">
-                                      {formatCurrency(team.leaderSalary)} {usesMinimum && <span className="text-xs text-muted-foreground">(minimum)</span>}
+                                      {team.leader.hasBasis ? (
+                                        <>
+                                          {formatCurrency(team.leader.salary)}{" "}
+                                          {team.leader.usesMinimum && (
+                                            <span className="text-xs text-muted-foreground">
+                                              (minimum)
+                                            </span>
+                                          )}
+                                        </>
+                                      ) : (
+                                        "mangler grundlag"
+                                      )}
                                     </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Aktive medarbejdere</p>
+                                    <p className="font-medium">{team.activeMemberCount}</p>
                                   </div>
                                   {team.assistantNames.length > 0 && (
                                     <div>
                                       <p className="text-muted-foreground">Assistenter</p>
-                                      <p className="font-medium">{team.assistantNames.join(", ")}</p>
+                                      <p className="font-medium">
+                                        {team.assistantNames.join(", ")}
+                                      </p>
                                     </div>
                                   )}
                                 </div>
@@ -365,12 +351,27 @@ export function DBOverviewTab() {
                     })}
                     <TableRow className="bg-muted/50 font-medium">
                       <TableCell>Total</TableCell>
-                      <TableCell className="text-right">{formatCurrency(totals.revenue)}</TableCell>
-                      <TableCell className="text-right text-destructive">-{formatCurrency(totals.sellerSalaryCosts)}</TableCell>
-                      <TableCell className="text-right text-destructive">-{formatCurrency(totals.leaderSalary)}</TableCell>
-                      <TableCell className="text-right text-destructive">-{formatCurrency(totals.assistantSalary)}</TableCell>
-                      <TableCell className="text-right text-destructive">-{formatCurrency(totals.expenses)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(totals.db)}</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatCurrency(totals.revenue)}
+                      </TableCell>
+                      <TableCell className="text-right text-destructive tabular-nums">
+                        -{formatCurrency(totals.sellerSalaryCosts)}
+                      </TableCell>
+                      <TableCell className="text-right text-destructive tabular-nums">
+                        -{formatCurrency(totals.assistantSalary)}
+                      </TableCell>
+                      <TableCell className="text-right text-destructive tabular-nums">
+                        -{formatCurrency(totals.otherCosts)}
+                      </TableCell>
+                      <TableCell className="text-right text-destructive tabular-nums">
+                        -{formatCurrency(totals.atpCost)}
+                      </TableCell>
+                      <TableCell className="text-right text-destructive tabular-nums">
+                        -{formatCurrency(totals.leaderSalary)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatCurrency(totals.db)}
+                      </TableCell>
                       <TableCell></TableCell>
                     </TableRow>
                   </>
@@ -383,7 +384,11 @@ export function DBOverviewTab() {
       </Card>
 
       {selectedTeam && (
-        <DBTeamDetailCard team={selectedTeam} onClose={() => setSelectedTeam(null)} />
+        <DBTeamDetailCard
+          team={selectedTeam}
+          leaderVacationRate={settings.vacationPayRates.leader}
+          onClose={() => setSelectedTeam(null)}
+        />
       )}
 
       {dailyViewTeam && (

@@ -1,45 +1,69 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { eachDayOfInterval, format, getDay, startOfMonth, endOfMonth } from "date-fns";
-import { VACATION_PAY_RATES, calculateHoursFromShift } from "@/lib/calculations";
+import { calculateHoursFromShift } from "@/lib/calculations";
+import { useCalculationSettings } from "@/hooks/useCalculationSettings";
+import {
+  resolveCompensation,
+  type CompensationModel,
+  type MissingBasisReason,
+} from "@/lib/calculations/dbModel";
+import type { VacationPayRates } from "@/lib/calculations/calculationSettings";
 
-/** Threshold to distinguish hourly rate from monthly salary */
-const HOURLY_RATE_THRESHOLD = 1000;
-
-interface AssistantHoursData {
+export interface AssistantHoursData {
   employeeId: string;
   hourlyRate: number;
   workedHours: number;
   baseSalary: number;
-  vacationPay: number; // 12.5%
+  vacationPay: number;
   totalSalary: number;
-  isHourlyBased: boolean; // true = hourly rate, false = monthly salary
+  isHourlyBased: boolean; // true = timeløn, false = fast månedsløn
+  /** Eksplicit lønmodel fra personnel_salaries.compensation_model */
+  compensationModel: CompensationModel;
+  /**
+   * false = beløbet kunne IKKE beregnes (manglende lønrække eller manglende sats).
+   * UI skal vise "mangler grundlag" i stedet for 0 kr.
+   */
+  hasBasis: boolean;
+  missingReason: MissingBasisReason | null;
 }
 
 /**
- * Hook to calculate assistant team leader salary based on actual worked hours.
- * Fetches shifts from the shift hierarchy and excludes absence days.
- * 
- * Shift hierarchy:
- * 1. Individual shift (shift table) - highest priority
- * 2. Employee standard shift (employee_standard_shifts → team_standard_shift_days)
- * 3. Team standard shift (team_standard_shifts → team_standard_shift_days) - lowest priority
+ * Beregner assisterende teamlederes løn for en periode.
+ *
+ * Lønmodellen læses EKSPLICIT fra personnel_salaries.compensation_model —
+ * der gættes ikke længere ud fra beløbets størrelse (det tidligere
+ * HOURLY_RATE_THRESHOLD på 1000 kr. er fjernet).
+ *
+ * Timeløn beregnes ud fra vagthierarkiet:
+ * 1. Individuel vagt (shift)
+ * 2. Medarbejderens tildelte standardvagt (employee_standard_shifts)
+ * 3. Teamets standardvagt (team_standard_shifts)
+ * Fast månedsløn prorateres efter vagtdage i perioden vs. i måneden.
  */
 export function useAssistantHoursCalculation(
   periodStart: Date,
   periodEnd: Date,
   assistantIds: string[]
 ) {
+  const { settings, fingerprint, isLoading: settingsLoading } = useCalculationSettings();
+  const rates: VacationPayRates = settings.vacationPayRates;
+
   return useQuery<Record<string, AssistantHoursData>>({
-    queryKey: ["assistant-hours-calculation", periodStart.toISOString(), periodEnd.toISOString(), assistantIds.sort().join(",")],
+    queryKey: [
+      "assistant-hours-calculation",
+      periodStart.toISOString(),
+      periodEnd.toISOString(),
+      assistantIds.slice().sort().join(","),
+      fingerprint,
+    ],
     queryFn: async () => {
       if (assistantIds.length === 0) return {};
 
-      // 1. Get hourly rates for assistants from personnel_salaries
-      // Note: monthly_salary field is repurposed as hourly_rate for assistants
+      // 1. Lønrækker med eksplicit lønmodel
       const { data: salaries } = await supabase
         .from("personnel_salaries")
-        .select("employee_id, monthly_salary, hourly_rate")
+        .select("employee_id, compensation_model, monthly_salary, hourly_rate, percentage_rate, minimum_salary")
         .eq("salary_type", "assistant")
         .eq("is_active", true)
         .in("employee_id", assistantIds);
@@ -134,20 +158,12 @@ export function useAssistantHoursCalculation(
       const result: Record<string, AssistantHoursData> = {};
 
       for (const assistantId of assistantIds) {
-        const salary = salaries?.find(s => s.employee_id === assistantId);
-        const monthlySalary = Number(salary?.monthly_salary) || 0;
-        const hourlyRateFromDb = Number(salary?.hourly_rate) || 0;
-        
-        // Determine if hourly or monthly based:
-        // - Use hourly_rate if explicitly set
-        // - If only monthly_salary, check if it's below threshold (meaning it's actually an hourly rate)
-        const effectiveHourlyRate = hourlyRateFromDb > 0 
-          ? hourlyRateFromDb 
-          : (monthlySalary < HOURLY_RATE_THRESHOLD ? monthlySalary : 0);
-        const isHourlyBased = effectiveHourlyRate > 0;
-        
-        // Handle zero salary case
-        if (monthlySalary === 0 && hourlyRateFromDb === 0) {
+        const salaryRow = salaries?.find(s => s.employee_id === assistantId) ?? null;
+        const compensation = resolveCompensation(salaryRow);
+
+        // Manglende lønrække eller manglende sats → 0 kr., men markeret som
+        // "mangler grundlag" så tallet ikke stille bliver forkert.
+        if (!compensation.hasBasis) {
           result[assistantId] = {
             employeeId: assistantId,
             hourlyRate: 0,
@@ -155,16 +171,37 @@ export function useAssistantHoursCalculation(
             baseSalary: 0,
             vacationPay: 0,
             totalSalary: 0,
-            isHourlyBased: true,
+            isHourlyBased: compensation.model === "hourly",
+            compensationModel: compensation.model,
+            hasBasis: false,
+            missingReason: compensation.missingReason,
           };
           continue;
         }
-        
-        // Handle monthly salary (prorate based on workdays)
-        if (!isHourlyBased) {
+
+        // Assistenter aflønnes ikke med procent af DB — den model hører til teamledere
+        if (compensation.model === "percentage") {
+          result[assistantId] = {
+            employeeId: assistantId,
+            hourlyRate: 0,
+            workedHours: 0,
+            baseSalary: 0,
+            vacationPay: 0,
+            totalSalary: 0,
+            isHourlyBased: false,
+            compensationModel: "percentage",
+            hasBasis: false,
+            missingReason: "unsupported_model",
+          };
+          continue;
+        }
+
+        // Fast månedsløn — prorateres efter vagtdage
+        if (compensation.model === "monthly_fixed") {
+          const monthlySalary = compensation.monthlySalary;
           const monthStart = startOfMonth(periodStart);
           const monthEnd = endOfMonth(periodStart);
-          
+
           // Shift-aware proration
           const empShiftAssignment = employeeShiftAssignments?.find(a => a.employee_id === assistantId);
           const empShiftId = empShiftAssignment?.shift_id;
@@ -173,7 +210,7 @@ export function useAssistantHoursCalculation(
           const teamShift = teamStandardShifts?.find(s => s.team_id === assistantTeamId);
           const teamShiftDaysArr = teamShift?.id ? shiftDaysMap.get(teamShift.id) : undefined;
           const applicableShiftDays = empShiftDaysArr || teamShiftDaysArr;
-          
+
           const countShiftDays = (start: Date, end: Date) => {
             const days = eachDayOfInterval({ start, end });
             if (!applicableShiftDays || applicableShiftDays.length === 0) return days.length;
@@ -182,16 +219,16 @@ export function useAssistantHoursCalculation(
               return applicableShiftDays.some(sd => sd.dayOfWeek === dow);
             }).length;
           };
-          
+
           const workdaysInPeriod = countShiftDays(periodStart, periodEnd);
           const workdaysInMonth = countShiftDays(monthStart, monthEnd);
-          
-          const prorationFactor = workdaysInMonth > 0 
-            ? workdaysInPeriod / workdaysInMonth 
+
+          const prorationFactor = workdaysInMonth > 0
+            ? workdaysInPeriod / workdaysInMonth
             : 1;
           const baseSalary = Math.round(monthlySalary * prorationFactor * 100) / 100;
-          const vacationPay = baseSalary * VACATION_PAY_RATES.ASSISTANT;
-          
+          const vacationPay = baseSalary * rates.assistant;
+
           result[assistantId] = {
             employeeId: assistantId,
             hourlyRate: 0,
@@ -200,15 +237,16 @@ export function useAssistantHoursCalculation(
             vacationPay,
             totalSalary: baseSalary + vacationPay,
             isHourlyBased: false,
+            compensationModel: "monthly_fixed",
+            hasBasis: true,
+            missingReason: null,
           };
           continue;
         }
-        
-        // Hourly-based calculation continues below
-        const hourlyRate = effectiveHourlyRate;
 
-        const employee = employees?.find(e => e.id === assistantId);
-        
+        // Timeløn
+        const hourlyRate = compensation.hourlyRate;
+
         // Get employee's assigned shift (via employee_standard_shifts)
         const empShiftAssignment = employeeShiftAssignments?.find(a => a.employee_id === assistantId);
         const empShiftId = empShiftAssignment?.shift_id;
@@ -286,7 +324,7 @@ export function useAssistantHoursCalculation(
         }
 
         const baseSalary = totalHours * hourlyRate;
-        const vacationPay = baseSalary * VACATION_PAY_RATES.ASSISTANT;
+        const vacationPay = baseSalary * rates.assistant;
         const totalSalary = baseSalary + vacationPay;
 
         result[assistantId] = {
@@ -297,12 +335,15 @@ export function useAssistantHoursCalculation(
           vacationPay,
           totalSalary,
           isHourlyBased: true,
+          compensationModel: "hourly",
+          hasBasis: true,
+          missingReason: null,
         };
       }
 
       return result;
     },
-    enabled: assistantIds.length > 0,
+    enabled: assistantIds.length > 0 && !settingsLoading,
     staleTime: 60000,
   });
 }

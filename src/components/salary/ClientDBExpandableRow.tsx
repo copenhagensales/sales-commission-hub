@@ -3,7 +3,14 @@ import { TableRow, TableCell } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ChevronDown, ChevronRight, Calendar, TrendingUp, TrendingDown } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Calendar,
+  TrendingUp,
+  TrendingDown,
+  AlertTriangle,
+} from "lucide-react";
 import { formatCurrency } from "@/lib/calculations/formatting";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +24,7 @@ interface ClientDBRowData {
   locationCosts: number;
   fullMonthLocationCosts: number;
   assistantAllocation: number;
+  teamExpenseAllocation: number;
   leaderAllocation: number;
   leaderVacationPay: number;
   atpBarsselAllocation: number;
@@ -33,6 +41,11 @@ interface ClientDBRowData {
   fullMonthLeaderAllocation: number;
   fullMonthLeaderVacationPay: number;
   fullMonthAtpBarsselAllocation: number;
+  fullMonthTeamExpenseAllocation: number;
+  /** false når teamets lederløn ikke kunne beregnes */
+  leaderHasBasis: boolean;
+  /** false når en assistent på teamet mangler lønrække/sats */
+  assistantsHaveBasis: boolean;
 }
 
 interface TrendInfo {
@@ -60,15 +73,18 @@ export function ClientDBExpandableRow({
   onShowDaily,
 }: ClientDBExpandableRowProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  
-  const totalCosts = 
-    client.adjustedSellerCost + 
+
+  const totalCosts =
+    client.adjustedSellerCost +
     client.sickPayAmount +
-    client.locationCosts + 
-    client.assistantAllocation + 
-    client.leaderAllocation + 
-    client.leaderVacationPay + 
+    client.locationCosts +
+    client.teamExpenseAllocation +
+    client.assistantAllocation +
+    client.leaderAllocation +
+    client.leaderVacationPay +
     client.atpBarsselAllocation;
+
+  const missingBasis = !client.leaderHasBasis || !client.assistantsHaveBasis;
 
   const formatPercent = (value: number) => `${value.toFixed(1)}%`;
   
@@ -98,7 +114,25 @@ export function ClientDBExpandableRow({
         </TableCell>
 
         {/* Client name */}
-        <TableCell className="font-medium min-w-[140px]">{client.clientName}</TableCell>
+        <TableCell className="font-medium min-w-[140px]">
+          <div className="flex items-center gap-1.5">
+            <span className="truncate">{client.clientName}</span>
+            {missingBasis && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-destructive" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {!client.leaderHasBasis
+                      ? "Lederlønnen på teamet mangler grundlag — DB er ikke fuldt beregnet"
+                      : "En assistent på teamet mangler lønrække — DB er ikke fuldt beregnet"}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
+        </TableCell>
 
         {/* Team */}
         <TableCell className="text-muted-foreground text-sm min-w-[100px]">
@@ -214,22 +248,49 @@ export function ClientDBExpandableRow({
                 )}
               </div>
               <div>
+                <p className="text-muted-foreground text-xs mb-0.5">Teamudgifter</p>
+                <p className="font-medium text-destructive">
+                  {client.teamExpenseAllocation > 0
+                    ? `-${formatCurrency(client.teamExpenseAllocation)}`
+                    : "–"}
+                </p>
+                {client.fullMonthTeamExpenseAllocation > 0 &&
+                  client.fullMonthTeamExpenseAllocation !== client.teamExpenseAllocation && (
+                    <p className="text-xs text-muted-foreground">
+                      ({formatCurrency(client.fullMonthTeamExpenseAllocation)}/md.)
+                    </p>
+                  )}
+              </div>
+              <div>
                 <p className="text-muted-foreground text-xs mb-0.5">Assist.løn</p>
                 <p className="font-medium text-destructive">
-                  {client.assistantAllocation > 0 ? `-${formatCurrency(client.assistantAllocation)}` : "–"}
+                  {!client.assistantsHaveBasis && client.assistantAllocation === 0 ? (
+                    <span className="text-xs">mangler grundlag</span>
+                  ) : client.assistantAllocation > 0 ? (
+                    `-${formatCurrency(client.assistantAllocation)}`
+                  ) : (
+                    "–"
+                  )}
                 </p>
                 {client.fullMonthAssistantAllocation > 0 && client.fullMonthAssistantAllocation !== client.assistantAllocation && (
                   <p className="text-xs text-muted-foreground">
                     ({formatCurrency(client.fullMonthAssistantAllocation)}/md.)
                   </p>
                 )}
+                {!client.assistantsHaveBasis && client.assistantAllocation > 0 && (
+                  <p className="text-xs text-destructive">delvist grundlag</p>
+                )}
               </div>
               <div>
                 <p className="text-muted-foreground text-xs mb-0.5">Lederløn</p>
                 <p className="font-medium text-destructive">
-                  {client.leaderAllocation > 0 
-                    ? `-${formatCurrency(client.leaderAllocation + client.leaderVacationPay)}` 
-                    : "–"}
+                  {!client.leaderHasBasis ? (
+                    <span className="text-xs">mangler grundlag</span>
+                  ) : client.leaderAllocation > 0 ? (
+                    `-${formatCurrency(client.leaderAllocation + client.leaderVacationPay)}`
+                  ) : (
+                    "–"
+                  )}
                 </p>
                 {client.fullMonthLeaderAllocation > 0 && client.fullMonthLeaderAllocation !== client.leaderAllocation && (
                   <p className="text-xs text-muted-foreground">

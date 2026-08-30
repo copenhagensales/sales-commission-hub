@@ -12,6 +12,12 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { AddPersonnelDialog } from "./AddPersonnelDialog";
 import { EditPersonnelDialog } from "./EditPersonnelDialog";
+import {
+  PERSONNEL_SALARY_SELECT,
+  compensationModelLabel,
+  formatPersonnelAmount,
+  type PersonnelSalaryRow,
+} from "./personnelSalary";
 import { format, parseISO } from "date-fns";
 import { da } from "date-fns/locale";
 import {
@@ -21,23 +27,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-interface PersonnelSalary {
-  id: string;
-  employee_id: string;
-  salary_type: string;
-  monthly_salary: number;
-  percentage_rate: number | null;
-  minimum_salary: number | null;
-  start_date: string | null;
-  is_active: boolean;
-  notes: string | null;
-  employee: {
-    first_name: string;
-    last_name: string;
-    job_title: string | null;
-    salary_type: "provision" | "fixed" | "hourly" | null;
-  } | null;
-}
+type PersonnelSalary = PersonnelSalaryRow;
 
 interface TeamInfo {
   id: string;
@@ -58,18 +48,7 @@ export function TeamLeaderSalary() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("personnel_salaries")
-        .select(`
-          id,
-          employee_id,
-          salary_type,
-          monthly_salary,
-          percentage_rate,
-          minimum_salary,
-          start_date,
-          is_active,
-          notes,
-          employee:employee_master_data(first_name, last_name, job_title, salary_type)
-        `)
+        .select(PERSONNEL_SALARY_SELECT)
         .eq("salary_type", "team_leader")
         .order("created_at", { ascending: false });
 
@@ -223,9 +202,10 @@ export function TeamLeaderSalary() {
                   <TableHead>Team</TableHead>
                   <TableHead>Kunder</TableHead>
                   <TableHead>Startdato</TableHead>
+                  <TableHead>Lønmodel</TableHead>
                   <TableHead>Procentsats</TableHead>
                   <TableHead>Minimumsløn</TableHead>
-                  <TableHead>Månedsløn</TableHead>
+                  <TableHead>Beløb i beregningen</TableHead>
                   <TableHead>Aktiv</TableHead>
                   <TableHead className="w-10"></TableHead>
                 </TableRow>
@@ -256,9 +236,14 @@ export function TeamLeaderSalary() {
                       ) : "-"}
                     </TableCell>
                     <TableCell>{formatDate(salary.start_date)}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">
+                        {compensationModelLabel(salary.compensation_model)}
+                      </Badge>
+                    </TableCell>
                     <TableCell>{formatPercentage(salary.percentage_rate)}</TableCell>
                     <TableCell>{salary.minimum_salary ? formatCurrency(salary.minimum_salary) : "-"}</TableCell>
-                    <TableCell>{formatCurrency(salary.monthly_salary)}</TableCell>
+                    <TableCell>{formatPersonnelAmount(salary)}</TableCell>
                     <TableCell>
                       <Switch
                         checked={salary.is_active}

@@ -23,11 +23,25 @@ import {
 } from "@/components/ui/table";
 import { Download, MapPin, Loader2 } from "lucide-react";
 
-const FM_CLIENTS = [
-  { id: "all", label: "Alle FM-kunder" },
-  { id: "9a92ea4c-6404-4b58-be08-065e7552d552", label: "Eesy FM" },
-  { id: "5011a7cd-bf07-4838-a63f-55a12c604b40", label: "Yousee" },
-] as const;
+/**
+ * Kunder med lokationsudgifter hentes fra `clients.has_location_costs`
+ * i stedet for hardkodede UUID'er, så listen kan styres i klientadministrationen.
+ */
+function useLocationCostClients() {
+  return useQuery({
+    queryKey: ["clients-with-location-costs"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("clients")
+        .select("id, name")
+        .eq("has_location_costs", true)
+        .order("name");
+      if (error) throw error;
+      return (data ?? []) as { id: string; name: string }[];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
 
 const LOCATION_TYPES = [
   "Alle typer",
@@ -82,6 +96,19 @@ export function LocationReportTab() {
   const [periodStart, setPeriodStart] = useState("2026-01-01");
   const [periodEnd, setPeriodEnd] = useState("2026-03-20");
 
+  const { data: locationCostClients = [] } = useLocationCostClients();
+  const locationCostClientIds = useMemo(
+    () => locationCostClients.map((c) => c.id),
+    [locationCostClients]
+  );
+  const clientOptions = useMemo(
+    () => [
+      { id: "all", label: "Alle kunder med lokationsudgifter" },
+      ...locationCostClients.map((c) => ({ id: c.id, label: c.name })),
+    ],
+    [locationCostClients]
+  );
+
   // All locations query
   const { data: locations, isLoading: isLoadingLocations } = useQuery({
     queryKey: ["location-report-all", clientId, locationType],
@@ -114,7 +141,7 @@ export function LocationReportTab() {
 
   // Booked locations query
   const { data: bookings, isLoading: isLoadingBookings } = useQuery({
-    queryKey: ["location-report-booked", clientId, locationType, periodStart, periodEnd],
+    queryKey: ["location-report-booked", clientId, locationType, periodStart, periodEnd, locationCostClientIds],
     queryFn: async () => {
       let query = supabase
         .from("booking")
@@ -126,11 +153,8 @@ export function LocationReportTab() {
       if (clientId !== "all") {
         query = query.eq("client_id", clientId);
       } else {
-        // Only FM clients
-        query = query.in("client_id", [
-          "9a92ea4c-6404-4b58-be08-065e7552d552",
-          "5011a7cd-bf07-4838-a63f-55a12c604b40",
-        ]);
+        // Kun kunder markeret med lokationsudgifter
+        query = query.in("client_id", locationCostClientIds);
       }
 
       const { data, error } = await query;
@@ -142,11 +166,11 @@ export function LocationReportTab() {
       }
       return results;
     },
-    enabled: mode === "booked",
+    enabled: mode === "booked" && (clientId !== "all" || locationCostClientIds.length > 0),
   });
 
   const clientLabel = (id: string) =>
-    FM_CLIENTS.find((c) => c.id === id)?.label ?? "Ukendt";
+    clientOptions.find((c) => c.id === id)?.label ?? "Ukendt";
 
   const isLoading = mode === "all" ? isLoadingLocations : isLoadingBookings;
   const rowCount = mode === "all" ? (locations?.length ?? 0) : (bookings?.length ?? 0);
@@ -233,7 +257,7 @@ export function LocationReportTab() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {FM_CLIENTS.map((c) => (
+                {clientOptions.map((c) => (
                   <SelectItem key={c.id} value={c.id}>
                     {c.label}
                   </SelectItem>

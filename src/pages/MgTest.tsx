@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -114,6 +115,8 @@ interface ClientRow {
   id: string;
   name: string;
   logo_url: string | null;
+  /** true → klientens bookinger giver lokationsudgifter i DB-beregningen */
+  has_location_costs: boolean | null;
 }
 
 interface AgentRow {
@@ -367,7 +370,7 @@ export default function MgTest() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("clients")
-        .select("id, name, logo_url")
+        .select("id, name, logo_url, has_location_costs")
         .order("name");
 
       if (error) throw error;
@@ -2231,6 +2234,30 @@ export default function MgTest() {
     },
   });
 
+  /**
+   * "Har lokationsudgifter" styrer om klientens bookinger tælles som
+   * lokationsudgifter i DB-beregningen. Erstatter det tidligere navnematch
+   * (FM_CLIENT_NAMES), som gik i stykker hvis en klient blev omdøbt.
+   */
+  const updateClientLocationCostsMutation = useMutation({
+    mutationFn: async ({ id, hasLocationCosts }: { id: string; hasLocationCosts: boolean }) => {
+      const { error } = await supabase
+        .from("clients")
+        .update({ has_location_costs: hasLocationCosts })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Lokationsudgifter opdateret");
+      queryClient.invalidateQueries({ queryKey: ["mg-clients"] });
+      queryClient.invalidateQueries({ queryKey: ["clients-with-teams"] });
+      queryClient.invalidateQueries({ queryKey: ["revenue-by-client-clients"] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Kunne ikke opdatere lokationsudgifter");
+    },
+  });
+
   // Upload client logo
   const uploadClientLogo = async (clientId: string, file: File): Promise<string | null> => {
     const fileExt = file.name.split('.').pop();
@@ -3250,6 +3277,7 @@ export default function MgTest() {
                           <TableHead className="w-[60px]">Logo</TableHead>
                           <TableHead>Kundenavn</TableHead>
                           <TableHead>Teams</TableHead>
+                          <TableHead className="w-[170px]">Lokationsudgifter</TableHead>
                           <TableHead className="w-[200px] text-right">Handling</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -3342,6 +3370,24 @@ export default function MgTest() {
                                 ) : (
                                   <span className="text-xs text-muted-foreground">Ingen teams</span>
                                 )}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <Switch
+                                    checked={client.has_location_costs === true}
+                                    onCheckedChange={(checked) =>
+                                      updateClientLocationCostsMutation.mutate({
+                                        id: client.id,
+                                        hasLocationCosts: checked,
+                                      })
+                                    }
+                                    disabled={updateClientLocationCostsMutation.isPending}
+                                    aria-label={`Lokationsudgifter for ${client.name}`}
+                                  />
+                                  <span className="text-xs text-muted-foreground">
+                                    {client.has_location_costs ? "Ja" : "Nej"}
+                                  </span>
+                                </div>
                               </TableCell>
                               <TableCell className="text-right space-x-2">
                                 {isEditing ? (

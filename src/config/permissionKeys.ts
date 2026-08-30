@@ -215,6 +215,7 @@ export const PERMISSION_KEYS = {
 
   // ==================== LØN (under menu_section_salary) ====================
   menu_salary_types: { label: 'Løntyper', section: 'salary', parent: 'menu_section_salary' },
+  menu_salary_calculation_settings: { label: 'Beregningsindstillinger (satser)', section: 'salary', parent: 'menu_section_salary' },
 
   // ==================== DASHBOARDS (under menu_section_dashboards) ====================
   // NOTE: Individual dashboard permissions are managed via team_dashboard_permissions table

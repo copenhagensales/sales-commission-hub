@@ -10,7 +10,8 @@ import {
   UserPlus,
   DollarSign,
   PieChart,
-  TrendingUp
+  TrendingUp,
+  SlidersHorizontal
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -31,6 +32,7 @@ import { SellerSalariesTab } from "./SellerSalariesTab";
 import { CombinedSalaryTab } from "./CombinedSalaryTab";
 import { DBOverviewTab } from "./DBOverviewTab";
 import { ClientDBTab } from "./ClientDBTab";
+import { CalculationSettingsTab } from "./CalculationSettingsTab";
 
 interface SubTab {
   id: string;
@@ -79,6 +81,12 @@ const categories: Category[] = [
         label: "Nye medarbejdere",
         icon: <UserPlus className="h-4 w-4" />,
         component: <NewEmployeesTab />,
+      },
+      {
+        id: "calculation-settings",
+        label: "Beregningsindstillinger",
+        icon: <SlidersHorizontal className="h-4 w-4" />,
+        component: <CalculationSettingsTab />,
       },
     ],
   },
