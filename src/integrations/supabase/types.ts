@@ -15638,6 +15638,14 @@ export type Database = {
         Args: { p_access_type?: string; p_employee_id: string; p_field: string }
         Returns: undefined
       }
+      log_salary_access_bulk: {
+        Args: {
+          p_access_type?: string
+          p_employee_ids: string[]
+          p_field?: string
+        }
+        Returns: undefined
+      }
       map_salary_type_to_compensation_model: {
         Args: { _salary_type: string }
         Returns: string
