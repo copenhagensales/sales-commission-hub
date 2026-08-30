@@ -5,9 +5,12 @@ import { supabase } from "@/integrations/supabase/client";
  * medarbejderen. RLS i databasen afgør hvem der får rækkerne:
  *
  *  - superadmin: alle
- *  - medarbejderen selv: sin egen
+ *  - medarbejderen selv: sin egen (inkl. sin egen procentsats/minimumsløn)
  *  - ejer/rekruttering/FM-leder/teamleder: kun medarbejdere der IKKE er
- *    stab, teamleder eller assistent
+ *    stab, teamleder eller assistent, OG kun rækker uden procentsats og
+ *    minimumsløn. Teamlederens DB-sats kan derfor aldrig læses af andre end
+ *    superadmins og lederen selv — heller ikke ved direkte API-kald.
+ *    Samme roller kan hverken sætte eller ændre de to felter.
  *
  * Frontend skal derfor altid kunne håndtere at beløbet mangler (null).
  */
