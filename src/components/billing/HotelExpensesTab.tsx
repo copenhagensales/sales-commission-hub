@@ -73,7 +73,7 @@ export function HotelExpensesTab() {
   }
 
   const totalExpense = hotelBookings?.reduce((sum, bh) => {
-    return sum + (bh.price_per_night || 0);
+    return sum + (bh.total_price || 0);
   }, 0) || 0;
 
   const totalNights = hotelBookings?.reduce((sum, bh) => {
@@ -189,7 +189,7 @@ export function HotelExpensesTab() {
                   const checkOut = new Date(bh.check_out);
                   const nights = bh.booked_days?.length || Math.max(1, Math.round((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24)));
                   const rooms = bh.rooms || 1;
-                  const lineTotal = bh.price_per_night || 0;
+                  const lineTotal = bh.total_price || 0;
                   const pricePerNight = nights > 0 ? lineTotal / nights : 0;
                   const statusInfo = STATUS_LABELS[bh.status] || { label: bh.status, variant: "outline" as const };
 

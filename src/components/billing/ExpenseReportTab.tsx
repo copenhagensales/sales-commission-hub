@@ -170,11 +170,11 @@ export function ExpenseReportTab() {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("booking_hotel")
-        .select("id, price_per_night, check_in")
+        .select("id, total_price, check_in")
         .gte("check_in", periodStart)
         .lte("check_in", periodEnd);
       if (error) throw error;
-      return data as { id: string; price_per_night: number | null; check_in: string }[];
+      return data as { id: string; total_price: number | null; check_in: string }[];
     },
   });
 
@@ -294,7 +294,7 @@ export function ExpenseReportTab() {
 
   const autoHotelTotal = useMemo(() => {
     if (!hotelBookings) return 0;
-    return hotelBookings.reduce((sum: number, bh: any) => sum + (bh.price_per_night || 0), 0);
+    return hotelBookings.reduce((sum: number, bh: any) => sum + (bh.total_price || 0), 0);
   }, [hotelBookings]);
 
   // Sync fetched data + auto values + recurring copy-forward into local state

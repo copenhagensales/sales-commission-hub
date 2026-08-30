@@ -207,7 +207,7 @@ export default function LocationHistoryContent() {
         const chunk = bookingIds.slice(i, i + 200);
         const { data, error } = await (supabase as any)
           .from("booking_hotel")
-          .select("booking_id, price_per_night, booked_days")
+          .select("booking_id, total_price, booked_days")
           .in("booking_id", chunk);
         if (error) throw error;
         results.push(...(data || []));
@@ -312,7 +312,7 @@ export default function LocationHistoryContent() {
   const hotelCostByBooking = useMemo(() => {
     const map = new Map<string, number>();
     for (const h of hotelData || []) {
-      map.set(h.booking_id, (map.get(h.booking_id) || 0) + (h.price_per_night || 0));
+      map.set(h.booking_id, (map.get(h.booking_id) || 0) + (h.total_price || 0));
     }
     return map;
   }, [hotelData]);
