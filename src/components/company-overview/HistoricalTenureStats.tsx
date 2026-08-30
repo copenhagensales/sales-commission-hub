@@ -144,20 +144,20 @@ export function HistoricalTenureStats() {
         .not("employment_start_date", "is", null);
       if (empError) throw empError;
       
-      // Then get team memberships
+      // Then get team attribution. employee_team_attribution daekker baade aktive
+      // teammedlemsskaber og fratraadte medarbejderes sidste kendte team, saa
+      // denne visning (der bevidst inkluderer inaktive) bevarer teamnavnet.
       const { data: teamMemberships, error: tmError } = await supabase
-        .from("team_members")
-        .select("employee_id, team:teams(name)");
+        .from("employee_team_attribution")
+        .select("employee_id, team_name, is_current")
+        .order("is_current", { ascending: false });
       if (tmError) throw tmError;
-      
+
       // Create a map of employee_id to team name
       const employeeTeamMap = new Map<string, string>();
-      (teamMemberships || []).forEach((tm: { employee_id: string; team: { name: string } | null }) => {
-        if (tm.team?.name) {
-          // Take first team if multiple
-          if (!employeeTeamMap.has(tm.employee_id)) {
-            employeeTeamMap.set(tm.employee_id, tm.team.name);
-          }
+      (teamMemberships || []).forEach((tm) => {
+        if (tm.employee_id && tm.team_name && !employeeTeamMap.has(tm.employee_id)) {
+          employeeTeamMap.set(tm.employee_id, tm.team_name);
         }
       });
       

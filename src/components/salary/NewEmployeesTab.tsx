@@ -20,11 +20,7 @@ interface NewEmployee {
   is_staff_employee: boolean | null;
   is_active: boolean | null;
   is_freelance_consultant: boolean | null;
-  team_members: Array<{
-    teams: {
-      name: string;
-    } | null;
-  }>;
+  team_name: string | null;
 }
 
 export function NewEmployeesTab() {
@@ -56,15 +52,36 @@ export function NewEmployeesTab() {
           employment_start_date,
           is_staff_employee,
           is_active,
-          is_freelance_consultant,
-          team_members(teams(name))
+          is_freelance_consultant
         `)
         .gte("employment_start_date", startStr)
         .lte("employment_start_date", endStr)
         .order("employment_start_date", { ascending: true });
 
       if (error) throw error;
-      return data as NewEmployee[];
+
+      // Teamnavn via faelles attribution, saa fratraadte nyansatte fortsat viser
+      // deres sidste kendte team (team_members-raekken fjernes ved deaktivering).
+      const ids = (data ?? []).map((e) => e.id);
+      const teamByEmployee = new Map<string, string>();
+      if (ids.length > 0) {
+        const { data: attribution, error: attrError } = await supabase
+          .from("employee_team_attribution")
+          .select("employee_id, team_name, is_current")
+          .in("employee_id", ids)
+          .order("is_current", { ascending: false });
+        if (attrError) throw attrError;
+        (attribution ?? []).forEach((row) => {
+          if (row.employee_id && row.team_name && !teamByEmployee.has(row.employee_id)) {
+            teamByEmployee.set(row.employee_id, row.team_name);
+          }
+        });
+      }
+
+      return (data ?? []).map((e) => ({
+        ...e,
+        team_name: teamByEmployee.get(e.id) ?? null,
+      })) as NewEmployee[];
     },
     enabled: !!periodStart && !!periodEnd,
   });
@@ -77,10 +94,7 @@ export function NewEmployeesTab() {
     setDialogOpen(true);
   };
 
-  const getTeamName = (employee: NewEmployee): string => {
-    const teamMember = employee.team_members?.[0];
-    return teamMember?.teams?.name ?? "-";
-  };
+  const getTeamName = (employee: NewEmployee): string => employee.team_name ?? "-";
 
   const formatStartDate = (dateStr: string | null): string => {
     if (!dateStr) return "-";

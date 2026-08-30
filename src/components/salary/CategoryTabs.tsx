@@ -11,7 +11,8 @@ import {
   DollarSign,
   PieChart,
   TrendingUp,
-  SlidersHorizontal
+  SlidersHorizontal,
+  ShieldCheck
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -33,6 +34,8 @@ import { CombinedSalaryTab } from "./CombinedSalaryTab";
 import { DBOverviewTab } from "./DBOverviewTab";
 import { ClientDBTab } from "./ClientDBTab";
 import { CalculationSettingsTab } from "./CalculationSettingsTab";
+import { SuperadminGate } from "@/components/auth/SuperadminGate";
+import { SuperadminsTab } from "./SuperadminsTab";
 
 interface SubTab {
   id: string;
@@ -68,13 +71,21 @@ const categories: Category[] = [
         id: "personnel",
         label: "Personale løn",
         icon: <Users className="h-4 w-4" />,
-        component: <PersonnelOverviewCards />,
+        component: (
+          <SuperadminGate message="Løntal for stab, teamledere og assistenter er forbeholdt superadmins.">
+            <PersonnelOverviewCards />
+          </SuperadminGate>
+        ),
       },
       {
         id: "team-expenses",
         label: "Teamomkostninger",
         icon: <Receipt className="h-4 w-4" />,
-        component: <TeamExpensesTab />,
+        component: (
+          <SuperadminGate message="Teamomkostninger indgår i DB-beregningen og er forbeholdt superadmins.">
+            <TeamExpensesTab />
+          </SuperadminGate>
+        ),
       },
       {
         id: "new-employees",
@@ -83,10 +94,24 @@ const categories: Category[] = [
         component: <NewEmployeesTab />,
       },
       {
+        id: "superadmins",
+        label: "Superadmins",
+        icon: <ShieldCheck className="h-4 w-4" />,
+        component: (
+          <SuperadminGate message="Kun superadmins kan se og ændre listen over superadmins.">
+            <SuperadminsTab />
+          </SuperadminGate>
+        ),
+      },
+      {
         id: "calculation-settings",
         label: "Beregningsindstillinger",
         icon: <SlidersHorizontal className="h-4 w-4" />,
-        component: <CalculationSettingsTab />,
+        component: (
+          <SuperadminGate message="Beregningsindstillingerne styrer DB-beregningen og er forbeholdt superadmins.">
+            <CalculationSettingsTab />
+          </SuperadminGate>
+        ),
       },
     ],
   },
@@ -107,7 +132,11 @@ const categories: Category[] = [
         id: "combined",
         label: "Samlet oversigt",
         icon: <PieChart className="h-4 w-4" />,
-        component: <CombinedSalaryTab />,
+        component: (
+          <SuperadminGate message="Den samlede lønoversigt er forbeholdt superadmins.">
+            <CombinedSalaryTab />
+          </SuperadminGate>
+        ),
       },
     ],
   },
@@ -122,13 +151,21 @@ const categories: Category[] = [
         id: "db-overview",
         label: "DB Oversigt",
         icon: <TrendingUp className="h-4 w-4" />,
-        component: <DBOverviewTab />,
+        component: (
+          <SuperadminGate message="DB-oversigten er forbeholdt superadmins.">
+            <DBOverviewTab />
+          </SuperadminGate>
+        ),
       },
       {
         id: "client-db",
         label: "DB per klient",
         icon: <BarChart3 className="h-4 w-4" />,
-        component: <ClientDBTab />,
+        component: (
+          <SuperadminGate message="DB per klient er forbeholdt superadmins.">
+            <ClientDBTab />
+          </SuperadminGate>
+        ),
       },
     ],
   },

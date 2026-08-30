@@ -194,18 +194,17 @@ export function useQualificationStandings(seasonId: string | undefined) {
       
       let teamMap: Record<string, string> = {};
       if (employeeIds.length > 0) {
+        // employee_team_attribution bevarer fratraadtes sidste kendte team
         const { data: teamData } = await supabase
-          .from("team_members")
-          .select(`
-            employee_id,
-            team:teams(name)
-          `)
-          .in("employee_id", employeeIds);
+          .from("employee_team_attribution")
+          .select("employee_id, team_name, is_current")
+          .in("employee_id", employeeIds)
+          .order("is_current", { ascending: false });
         
         if (teamData) {
           teamData.forEach((tm: any) => {
-            if (tm.team?.name) {
-              teamMap[tm.employee_id] = tm.team.name;
+            if (tm.team_name && !teamMap[tm.employee_id]) {
+              teamMap[tm.employee_id] = tm.team_name;
             }
           });
         }
@@ -281,12 +280,14 @@ export function useMyQualificationStanding(seasonId: string | undefined) {
       let teamName: string | null = null;
       if (data?.employee?.id) {
         const { data: teamData } = await supabase
-          .from("team_members")
-          .select(`team:teams(name)`)
+          .from("employee_team_attribution")
+          .select("team_name, is_current")
           .eq("employee_id", data.employee.id)
+          .order("is_current", { ascending: false })
+          .limit(1)
           .maybeSingle();
         
-        teamName = (teamData as any)?.team?.name || null;
+        teamName = (teamData as any)?.team_name || null;
       }
       
       // Transform data with team_name

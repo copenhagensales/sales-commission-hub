@@ -407,9 +407,10 @@ export default function CphSalesDashboard() {
         .from("team_clients")
         .select("team_id, client_id, clients(name)");
 
-      // Get team_members for employee-team mapping
+      // Get employee-team mapping. employee_team_attribution bevarer
+      // fratraadtes sidste kendte team, saa historiske salg beholder teamet.
       const { data: teamMembers } = await supabase
-        .from("team_members")
+        .from("employee_team_attribution")
         .select("employee_id, team_id");
 
       // Get active employee count per team

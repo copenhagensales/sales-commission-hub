@@ -147,13 +147,33 @@ export function useLeagueTeamCompetition(season: LeagueSeason | null | undefined
         };
       }
 
-      // Alle hold + medlemmer
-      const { data: members, error: memberError } = await supabase
-        .from("team_members")
-        .select(
-          "employee_id, team:teams(id, name), employee:employee_master_data(id, first_name, last_name)"
-        );
+      // Alle hold + medlemmer. employee_team_attribution daekker baade aktive
+      // teammedlemsskaber og fratraadte medarbejderes sidste kendte team, saa en
+      // saelger der stopper midt i sæsonen bevarer sit bidrag til holdet.
+      const { data: attribution, error: memberError } = await supabase
+        .from("employee_team_attribution")
+        .select("employee_id, team_id, team_name");
       if (memberError) throw memberError;
+
+      const attributionIds = Array.from(
+        new Set((attribution ?? []).map((row) => row.employee_id).filter((id): id is string => !!id)),
+      );
+      const { data: attributionEmployees, error: employeeError } = attributionIds.length
+        ? await supabase
+            .from("employee_master_data")
+            .select("id, first_name, last_name")
+            .in("id", attributionIds)
+        : { data: [], error: null };
+      if (employeeError) throw employeeError;
+
+      const employeeById = new Map(
+        (attributionEmployees ?? []).map((e) => [e.id, e]),
+      );
+      const members = (attribution ?? []).map((row) => ({
+        employee_id: row.employee_id,
+        team: row.team_id ? { id: row.team_id, name: row.team_name } : null,
+        employee: row.employee_id ? employeeById.get(row.employee_id) ?? null : null,
+      }));
 
       const provisionTotal = await fetchTeamScopedProvision(periodStart, periodEnd);
 

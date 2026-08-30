@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchSalaryDetails } from "@/lib/salary/salaryDetails";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -220,9 +221,11 @@ export default function MyProfile() {
           .filter(Boolean)
           .join(", ");
         
+        const previewSalary = await fetchSalaryDetails(data.id);
         return {
           ...data,
           department: teamNames || data.department,
+          salary_amount: previewSalary?.amount ?? null,
         };
       }
 
@@ -263,9 +266,13 @@ export default function MyProfile() {
         .filter(Boolean)
         .join(", ");
       
+      // Egen løn hentes fra den beskyttede løntabel (egen række er altid tilladt)
+      const ownSalary = await fetchSalaryDetails(data.id);
+
       return {
         ...data,
         department: teamNames || data.department,
+        salary_amount: ownSalary?.amount ?? null,
       };
     },
   });

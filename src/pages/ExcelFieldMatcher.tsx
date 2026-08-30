@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { useDropzone } from "react-dropzone";
 import { parseExcelFile } from "@/utils/excel";
 import { supabase } from "@/integrations/supabase/client";
+import { saveSalaryDetails } from "@/lib/salary/salaryDetails";
 
 // Excel fields based on uploaded file
 const EMPLOYEE_MASTER_DATA_FIELDS = [
@@ -187,7 +188,9 @@ export default function ExcelFieldMatcher() {
           continue;
         }
 
-        const { error: insertError } = await supabase
+        const salaryAmount = employee.salary_amount ? Number(employee.salary_amount) : null;
+
+        const { data: inserted, error: insertError } = await supabase
           .from("employee_master_data")
           .insert({
             first_name: String(employee.first_name),
@@ -200,7 +203,6 @@ export default function ExcelFieldMatcher() {
             job_title: employee.job_title ? String(employee.job_title) : null,
             department: employee.department ? String(employee.department) : null,
             employment_start_date: employee.employment_start_date ? String(employee.employment_start_date) : null,
-            salary_amount: employee.salary_amount ? Number(employee.salary_amount) : null,
             weekly_hours: employee.weekly_hours ? Number(employee.weekly_hours) : null,
             standard_start_time: employee.standard_start_time ? String(employee.standard_start_time) : null,
             work_location: employee.work_location ? String(employee.work_location) : null,
@@ -208,12 +210,18 @@ export default function ExcelFieldMatcher() {
             address_postal_code: employee.address_postal_code ? String(employee.address_postal_code) : null,
             address_city: employee.address_city ? String(employee.address_city) : null,
             is_active: true,
-          });
+          })
+          .select("id")
+          .maybeSingle();
 
         if (insertError) {
           console.error("Fejl ved oprettelse:", insertError);
           errorCount++;
         } else {
+          // Lønbeløbet gemmes i den beskyttede løntabel
+          if (inserted?.id && salaryAmount !== null) {
+            await saveSalaryDetails(inserted.id, { amount: salaryAmount });
+          }
           successCount++;
         }
       }

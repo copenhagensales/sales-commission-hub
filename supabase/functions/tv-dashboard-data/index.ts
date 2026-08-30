@@ -1756,9 +1756,11 @@ async function handleTdcErhvervData(
     console.log("[TdcErhvervData] Fetched goals for", Object.keys(employeeGoals).length, "employees");
   }
 
-  // Fetch team memberships for these employees
+  // Fetch team memberships for these employees.
+  // employee_team_attribution daekker ogsaa fratraadtes sidste kendte team, saa
+  // historiske timer/provision fortsat kobles til det rigtige team.
   const { data: teamMembers } = await supabase
-    .from("team_members")
+    .from("employee_team_attribution")
     .select("employee_id, team_id")
     .in("employee_id", employeeIds);
 
@@ -2306,15 +2308,16 @@ async function handleCsTop20Data(
     });
     console.log("[CsTop20Data] Fetched goals for", Object.keys(employeeGoals).length, "employees");
     
-    // Fetch team memberships
+    // Fetch team memberships (inkl. fratraadtes sidste kendte team)
     const { data: teamMembers } = await supabase
-      .from("team_members")
-      .select("employee_id, teams(name)")
-      .in("employee_id", employeeIds);
+      .from("employee_team_attribution")
+      .select("employee_id, team_name, is_current")
+      .in("employee_id", employeeIds)
+      .order("is_current", { ascending: false });
     
     (teamMembers || []).forEach((tm: any) => {
-      const teamName = tm.teams?.name;
-      if (teamName && tm.employee_id) {
+      const teamName = tm.team_name;
+      if (teamName && tm.employee_id && !employeeTeams[tm.employee_id]) {
         employeeTeams[tm.employee_id] = teamName;
       }
     });

@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
+import { attachSalaryAmount, saveSalaryDetails } from "@/lib/salary/salaryDetails";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -220,7 +221,9 @@ export default function EmployeeMasterData() {
         .eq("is_staff_employee", false)
         .order("last_name", { ascending: true });
       if (error) throw error;
-      return data as EmployeeMasterDataRecord[];
+      // Lønbeløb ligger i den beskyttede løntabel; RLS bestemmer hvad der kommer med.
+      const withSalary = await attachSalaryAmount(data ?? []);
+      return withSalary as unknown as EmployeeMasterDataRecord[];
     },
     staleTime: 0,
     refetchOnMount: "always",
@@ -328,15 +331,25 @@ export default function EmployeeMasterData() {
 
   const saveMutation = useMutation({
     mutationFn: async (employee: NewEmployee & { id?: string }) => {
+      // Lønbeløbet gemmes i den beskyttede løntabel, ikke på det brede stamkort.
+      const { salary_amount, ...master } = employee;
       if (employee.id) {
         const { error } = await supabase
           .from("employee_master_data")
-          .update(employee)
+          .update(master)
           .eq("id", employee.id);
         if (error) throw error;
+        await saveSalaryDetails(employee.id, { amount: salary_amount ?? null });
       } else {
-        const { error } = await supabase.from("employee_master_data").insert(employee);
+        const { data, error } = await supabase
+          .from("employee_master_data")
+          .insert(master)
+          .select("id")
+          .single();
         if (error) throw error;
+        if (data?.id && salary_amount != null) {
+          await saveSalaryDetails(data.id, { amount: salary_amount });
+        }
       }
     },
     onSuccess: () => {

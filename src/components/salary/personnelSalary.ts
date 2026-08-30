@@ -92,3 +92,61 @@ export function compensationModelHelp(model: CompensationModel): string {
       return "Fast månedsløn, prorateret efter arbejdsdage når perioden ikke er en hel måned.";
   }
 }
+
+/**
+ * Løn står KUN på medarbejderens stamkort (`employee_master_data`).
+ * `personnel_salaries` er et afledt spejl, som databasen selv vedligeholder via
+ * trigger — derfor skriver løndialogerne til stamkortet, ikke til lønrækken.
+ */
+export interface MasterSalaryInput {
+  salaryType: "team_leader" | "assistant" | "staff";
+  compensationModel: CompensationModel;
+  amount: number;
+  percentageRate: number;
+  minimumSalary: number;
+  notes: string;
+  startDate?: string | null;
+  hoursSource?: "shift" | "timestamp" | null;
+}
+
+export interface MasterSalaryPayload {
+  personnel_category: string;
+  salary_type: "provision" | "fixed" | "hourly";
+  salary_start_date: string | null;
+  salary_hours_source: string;
+}
+
+/** Beløbsfelterne der hører til den beskyttede løntabel. */
+export interface SalaryDetailsPayload {
+  amount: number | null;
+  percentage_rate: number | null;
+  minimum_salary: number | null;
+  notes: string | null;
+}
+
+/** Oversætter lønformularen til stamkortets kolonner (uden beløb). */
+export function masterSalaryPayload(input: MasterSalaryInput): MasterSalaryPayload {
+  const isPercentage = input.compensationModel === "percentage";
+  return {
+    personnel_category: input.salaryType,
+    salary_type:
+      input.compensationModel === "hourly"
+        ? "hourly"
+        : isPercentage
+          ? "provision"
+          : "fixed",
+    salary_start_date: input.startDate ?? null,
+    salary_hours_source: input.hoursSource ?? "shift",
+  };
+}
+
+/** Oversætter lønformularen til beløbsfelterne i `employee_salary_details`. */
+export function salaryDetailsPayload(input: MasterSalaryInput): SalaryDetailsPayload {
+  const isPercentage = input.compensationModel === "percentage";
+  return {
+    amount: isPercentage ? null : input.amount,
+    percentage_rate: isPercentage ? input.percentageRate : null,
+    minimum_salary: isPercentage ? input.minimumSalary : null,
+    notes: input.notes || null,
+  };
+}

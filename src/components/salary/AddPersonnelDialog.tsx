@@ -25,7 +25,10 @@ import {
   amountFieldLabel,
   compensationModelHelp,
   defaultCompensationModel,
+  masterSalaryPayload,
+  salaryDetailsPayload,
 } from "./personnelSalary";
+import { saveSalaryDetails } from "@/lib/salary/salaryDetails";
 
 interface AddPersonnelDialogProps {
   open: boolean;
@@ -130,25 +133,34 @@ export function AddPersonnelDialog({
       if (missingAmount) throw new Error("Udfyld beløbet for den valgte lønmodel");
       if (missingPercentage) throw new Error("Udfyld procentsats eller minimumsløn");
 
-      const { error } = await supabase.from("personnel_salaries").insert({
-        employee_id: selectedEmployee.id,
-        salary_type: salaryType,
-        compensation_model: compensationModel,
-        monthly_salary: compensationModel === "monthly_fixed" ? parsedAmount : 0,
-        hourly_rate: compensationModel === "hourly" ? parsedAmount : 0,
-        percentage_rate: compensationModel === "percentage" ? parsedPercentage : 0,
-        minimum_salary: compensationModel === "percentage" ? parsedMinimum : 0,
-        notes: notes || null,
-        is_active: true,
-      });
+      // Lønnen gemmes på medarbejderens stamkort — den eneste kilde.
+      // Databasen spejler den selv over i personnel_salaries (beregningerne).
+      const salaryInput = {
+        salaryType,
+        compensationModel,
+        amount: parsedAmount,
+        percentageRate: parsedPercentage,
+        minimumSalary: parsedMinimum,
+        notes,
+      };
+
+      const { error } = await supabase
+        .from("employee_master_data")
+        .update(masterSalaryPayload(salaryInput))
+        .eq("id", selectedEmployee.id);
 
       if (error) throw error;
+
+      // Beløbene ligger i den beskyttede løntabel
+      await saveSalaryDetails(selectedEmployee.id, salaryDetailsPayload(salaryInput));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["personnel-salaries"] });
       queryClient.invalidateQueries({ queryKey: ["existing-personnel-salaries-all"] });
       queryClient.invalidateQueries({ queryKey: ["assistant-hours-calculation"] });
       queryClient.invalidateQueries({ queryKey: ["staff-hours-calculation"] });
+      queryClient.invalidateQueries({ queryKey: ["db-team-structure"] });
+      queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
       toast({ title: "Medarbejder tilføjet" });
       resetForm();
       onOpenChange(false);
@@ -185,6 +197,11 @@ export function AddPersonnelDialog({
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
+
+        <p className="text-xs text-muted-foreground">
+          Lønnen gemmes på medarbejderens stamkort og bruges direkte i
+          DB-beregningen — der er kun ét sted at taste den ind.
+        </p>
 
         <div className="space-y-4">
           {/* Employee search */}

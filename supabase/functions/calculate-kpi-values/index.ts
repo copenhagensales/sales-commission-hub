@@ -756,12 +756,14 @@ Deno.serve(async (req) => {
   for (const goal of (teamGoals || [])) {
     const teamId = goal.team_id;
     
+    // employee_team_attribution: aktive medlemsskaber + fratraadtes sidste kendte team,
+    // saa historiske salg fortsat henfoeres til det rigtige team.
     const { data: teamMemberData } = await supabase
-      .from("team_members")
+      .from("employee_team_attribution")
       .select("employee_id")
       .eq("team_id", teamId);
     
-    const memberIds = (teamMemberData || []).map((m: any) => m.employee_id);
+    const memberIds = [...new Set((teamMemberData || []).map((m: any) => m.employee_id))];
     if (memberIds.length === 0) continue;
     
     const teamAgentEmails: string[] = [];
@@ -912,15 +914,16 @@ Deno.serve(async (req) => {
       }
     });
 
-    // Fetch team memberships
+    // Fetch team memberships (inkl. fratraadtes sidste kendte team)
     const { data: teamMembers } = await supabase
-      .from("team_members")
-      .select("employee_id, teams(id, name)");
+      .from("employee_team_attribution")
+      .select("employee_id, team_name, is_current")
+      .order("is_current", { ascending: false });
     
     const employeeTeamMap = new Map<string, string>();
     (teamMembers || []).forEach(tm => {
-      const teamName = (tm.teams as any)?.name;
-      if (teamName && tm.employee_id) {
+      const teamName = (tm as any)?.team_name;
+      if (teamName && tm.employee_id && !employeeTeamMap.has(tm.employee_id)) {
         employeeTeamMap.set(tm.employee_id, teamName);
       }
     });
@@ -1315,9 +1318,9 @@ async function calculateTeamLeaderboard(
   const startStr = startDate.toISOString();
   const endStr = endDate.toISOString();
 
-  // Get team member employee IDs
+  // Get team member employee IDs (inkl. fratraadtes sidste kendte team)
   const { data: teamMemberData } = await supabase
-    .from("team_members")
+    .from("employee_team_attribution")
     .select("employee_id")
     .eq("team_id", teamId);
   
@@ -1827,9 +1830,10 @@ async function fetchShiftData(
   if (!shiftConfigCache) {
     console.log("[HoursCalc] Fetching shift configuration data (one-time)...");
     
-    // Fetch team members
+    // Fetch team members (inkl. fratraadtes sidste kendte team, saa historiske
+    // timer fortsat kan beregnes ud fra teamets standardvagt)
     const { data: teamMembersData } = await supabase
-      .from("team_members")
+      .from("employee_team_attribution")
       .select("employee_id, team_id");
     
     const teamMembers = (teamMembersData || []) as TeamMemberShift[];
@@ -2259,9 +2263,9 @@ async function calculateClientKpiValue(
       let employeeIds: string[] = [];
       
       if (teamIds.length > 0) {
-        // Get all team members for these teams
+        // Get all team members for these teams (inkl. fratraadte via sidste kendte team)
         const { data: teamMemberData } = await supabase
-          .from("team_members")
+          .from("employee_team_attribution")
           .select("employee_id")
           .in("team_id", teamIds);
         

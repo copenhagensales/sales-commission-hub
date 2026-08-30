@@ -9,6 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useShifts, useEmployeesForShifts, useDanishHolidays, useAbsencesForDateRange, usePendingVacationRequests, Shift, AbsenceRequest } from "@/hooks/useShiftPlanning";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { attachSalaryAmount } from "@/lib/salary/salaryDetails";
 import { useQuery } from "@tanstack/react-query";
 import { useFeatureFlag } from "@/hooks/useFeatureFlag";
 import { resolveHoursSourceBatch, type HoursSourceResult } from "@/lib/resolveHoursSource";
@@ -81,7 +82,6 @@ export default function VagtplanFMContent() {
             last_name,
             department,
             salary_type,
-            salary_amount,
             standard_start_time,
             is_active
           )
@@ -90,7 +90,7 @@ export default function VagtplanFMContent() {
 
       if (error) throw error;
       
-      return (data || [])
+      const members = (data || [])
         .filter(tm => tm.employee && tm.employee.is_active)
         .map(tm => ({
           id: tm.employee.id,
@@ -98,9 +98,11 @@ export default function VagtplanFMContent() {
           last_name: tm.employee.last_name,
           department: tm.employee.department,
           salary_type: tm.employee.salary_type,
-          salary_amount: tm.employee.salary_amount,
           standard_start_time: tm.employee.standard_start_time,
         }));
+
+      // Lønbeløb hentes fra den beskyttede løntabel (RLS afgør adgangen).
+      return attachSalaryAmount(members);
     },
     enabled: !!fieldmarketingTeamId,
   });

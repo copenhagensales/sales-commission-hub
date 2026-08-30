@@ -292,12 +292,15 @@ export default function DailyReports() {
     enabled: selectedClients.length > 0,
   });
 
-  // Fetch team memberships for employee dropdown filtering
+  // Fetch team memberships for employee dropdown filtering.
+  // employee_team_attribution daekker baade aktive teammedlemsskaber og
+  // fratraadte medarbejderes sidste kendte team, saa historiske rapporter
+  // fortsat kan filtreres paa team.
   const { data: employeeTeamMemberships = [] } = useQuery({
     queryKey: ["daily-report-employee-teams"],
     queryFn: async () => {
       const { data } = await supabase
-        .from("team_members")
+        .from("employee_team_attribution")
         .select("employee_id, team_id");
       return data || [];
     },
@@ -573,10 +576,12 @@ export default function DailyReports() {
         ? await resolveHoursSourceBatch(employeeIds)
         : null;
 
-      // Fetch team standard shift data
+      // Fetch team standard shift data.
+      // Bruger employee_team_attribution, saa fratraadte medarbejdere fortsat
+      // faar timer/vagt beregnet ud fra deres sidste kendte team.
       const { data: teamMembers } = await supabase
-        .from("team_members")
-        .select("employee_id, team_id")
+        .from("employee_team_attribution")
+        .select("employee_id, team_id, team_name")
         .in("employee_id", employeeIds);
 
       const teamIds = [...new Set(teamMembers?.map(tm => tm.team_id) || [])];
@@ -791,9 +796,12 @@ export default function DailyReports() {
 
       for (const emp of filteredEmployees) {
         const empId = emp.id;
-        const teamName = emp.team_members?.[0]?.team?.name || null;
-        
         const empTeamMembership = teamMembers?.find(tm => tm.employee_id === empId);
+        // Fratraadte har ingen team_members-raekke; fald tilbage paa attribution
+        const teamName = emp.team_members?.[0]?.team?.name
+          || empTeamMembership?.team_name
+          || null;
+        
         const empPrimaryShift = empTeamMembership 
           ? (primaryShifts?.find(ps => ps.team_id === empTeamMembership.team_id && ps.hours_source === 'shift')
              || primaryShifts?.find(ps => ps.team_id === empTeamMembership.team_id))

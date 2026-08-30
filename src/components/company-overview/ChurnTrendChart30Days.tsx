@@ -35,16 +35,20 @@ export function ChurnTrendChart30Days() {
       if (currError) throw currError;
 
       // Fetch team memberships
+      // employee_team_attribution daekker baade aktive teammedlemsskaber og
+      // fratraadte medarbejderes sidste kendte team, saa churn-tal pr. team ikke
+      // aendrer sig naar en fratraadt fjernes fra team_members.
       const { data: teamMemberships, error: tmError } = await supabase
-        .from("team_members")
-        .select("employee_id, team:teams(name)");
+        .from("employee_team_attribution")
+        .select("employee_id, team_name, is_current")
+        .order("is_current", { ascending: false });
       if (tmError) throw tmError;
 
       // Map employee_id to team name
       const employeeTeamMap = new Map<string, string>();
-      (teamMemberships || []).forEach((tm: { employee_id: string; team: { name: string } | null }) => {
-        if (tm.team?.name && !employeeTeamMap.has(tm.employee_id)) {
-          employeeTeamMap.set(tm.employee_id, tm.team.name);
+      (teamMemberships || []).forEach((tm) => {
+        if (tm.employee_id && tm.team_name && !employeeTeamMap.has(tm.employee_id)) {
+          employeeTeamMap.set(tm.employee_id, tm.team_name);
         }
       });
 
