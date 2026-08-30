@@ -220,9 +220,11 @@ export default function MyProfile() {
           .filter(Boolean)
           .join(", ");
         
+        const previewSalary = await fetchSalaryDetails(data.id);
         return {
           ...data,
           department: teamNames || data.department,
+          salary_amount: previewSalary?.amount ?? null,
         };
       }
 
