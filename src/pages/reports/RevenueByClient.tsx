@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/utils/supabasePagination";
-import { useAuth } from "@/hooks/useAuth";
+import { useHasPermission, usePositionPermissions } from "@/hooks/usePositionPermissions";
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, parseISO, startOfDay, endOfDay, differenceInDays } from "date-fns";
 import { da } from "date-fns/locale";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -19,9 +19,6 @@ import { TrendingUp, Loader2, CalendarIcon, Building2, Wallet } from "lucide-rea
 import { cn } from "@/lib/utils";
 import { calculateVacationPay } from "@/lib/calculations";
 
-// Hard-coded whitelist - ONLY these users can access this report
-const ALLOWED_EMAILS = ["km@copenhagensales.dk", "mg@copenhagensales.dk"];
-
 type PeriodType = "today" | "yesterday" | "this_week" | "last_week" | "this_month" | "custom";
 
 interface ClientRevenueData {
@@ -36,17 +33,12 @@ interface ClientRevenueData {
   locationCosts?: number;
 }
 
-// FM Client IDs for location costs
-const EESY_FM_ID = "9a92ea4c-6404-4b58-be08-065e7552d552";
-const YOUSEE_ID = "5011a7cd-bf07-4838-a63f-55a12c604b40";
-
 interface ClientPieData {
   name: string;
   value: number;
 }
 
 export default function RevenueByClient() {
-  const { user, loading: authLoading } = useAuth();
   const [period, setPeriod] = useState<PeriodType>("today");
   const [customStartDate, setCustomStartDate] = useState<Date | undefined>(undefined);
   const [customEndDate, setCustomEndDate] = useState<Date | undefined>(undefined);
@@ -55,9 +47,37 @@ export default function RevenueByClient() {
   const [cancellationPercents, setCancellationPercents] = useState<Record<string, number>>({});
   const queryClient = useQueryClient();
 
-  // Hard-coded access control (must be defined before useQuery that depends on it)
-  const userEmail = user?.email?.toLowerCase() || "";
-  const hasAccess = ALLOWED_EMAILS.includes(userEmail);
+  /**
+   * Adgang styres af rettighedssystemet (`menu_reports_revenue_by_client`) —
+   * ikke af en hardkodet e-mailliste. Rettigheden administreres på rolle- og
+   * brugerniveau som alle andre sider.
+   */
+  const { isLoading: permissionsLoading } = usePositionPermissions();
+  const hasAccess = useHasPermission("menu_reports_revenue_by_client", "view");
+  const canEditAdjustments = useHasPermission("menu_reports_revenue_by_client", "edit");
+  const authLoading = permissionsLoading;
+
+  /**
+   * Klienter markeret med "har lokationsudgifter" — erstatter de tidligere
+   * hardkodede FM-klient-UUID'er, så en omdøbning eller ny FM-klient ikke
+   * kræver kodeændring.
+   */
+  const { data: locationCostClientIds = [] } = useQuery({
+    queryKey: ["clients-with-location-costs"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("clients")
+        .select("id")
+        .eq("has_location_costs", true);
+      if (error) throw error;
+      return (data ?? []).map((c) => c.id);
+    },
+    enabled: hasAccess,
+  });
+  const locationCostClientIdSet = useMemo(
+    () => new Set(locationCostClientIds),
+    [locationCostClientIds]
+  );
 
   // Fetch saved adjustment percents
   const { data: savedPercents } = useQuery({
