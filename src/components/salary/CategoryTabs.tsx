@@ -31,6 +31,7 @@ import { SellerSalariesTab } from "./SellerSalariesTab";
 import { CombinedSalaryTab } from "./CombinedSalaryTab";
 import { DBOverviewTab } from "./DBOverviewTab";
 import { ClientDBTab } from "./ClientDBTab";
+import { CalculationSettingsTab } from "./CalculationSettingsTab";
 
 interface SubTab {
   id: string;
