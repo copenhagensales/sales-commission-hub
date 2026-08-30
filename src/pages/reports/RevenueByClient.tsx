@@ -189,7 +189,7 @@ export default function RevenueByClient() {
 
   // Fetch revenue data
   const { data: revenueData, isLoading } = useQuery({
-    queryKey: ["revenue-by-client", startDateStr, endDateStr, selectedClientId],
+    queryKey: ["revenue-by-client", startDateStr, endDateStr, selectedClientId, locationCostClientIds],
     queryFn: async () => {
       // Get TM sales with client info
       const salesData = await fetchAllRows<any>(
@@ -331,10 +331,12 @@ export default function RevenueByClient() {
       // FM sales are included in the main query above (no source filter)
       // Their sale_items contain mapped_revenue/mapped_commission from DB trigger
 
-      // Fetch booking data for Eesy FM and Yousee location costs
-      const { data: bookings } = await supabase
-        .from("booking")
-        .select(`
+      // Hent bookinger for klienter markeret med "har lokationsudgifter"
+      const bookings = locationCostClientIds.length
+        ? (
+            await supabase
+              .from("booking")
+              .select(`
           id,
           client_id,
           start_date,
@@ -344,9 +346,11 @@ export default function RevenueByClient() {
           total_price,
           location:location_id(id, daily_rate)
         `)
-        .in("client_id", [EESY_FM_ID, YOUSEE_ID])
-        .lte("start_date", endDateStr)  // Booking starts before or on period end
-        .gte("end_date", startDateStr); // Booking ends after or on period start
+              .in("client_id", locationCostClientIds)
+              .lte("start_date", endDateStr) // Booking starts before or on period end
+              .gte("end_date", startDateStr) // Booking ends after or on period start
+          ).data
+        : [];
 
       // Aggregate location costs per client
       const locationCostsByClient: Record<string, number> = {};
