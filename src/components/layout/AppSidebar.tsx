@@ -53,6 +53,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   const p = usePermissions(); // Position permissions - THE ONLY source of truth
   const { isPreviewMode } = useRolePreview();
   const { isSuperadmin } = useIsSuperadmin();
+  const { hasAccess: trygEditAccess } = useTrygEditAccess();
   
   const { data: isFieldmarketing } = useIsFieldmarketingEmployee();
   const { data: canWorkFieldmarketing } = useCanWorkFieldmarketing();
