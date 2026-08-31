@@ -1373,6 +1373,15 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                     TDC Erhverv - ret salg
                   </NavLink>
                 )}
+                {showTrygEditSales && (
+                  <NavLink to="/reports/tryg-edit-sales" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/reports/tryg-edit-sales" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <PencilLine className="h-4 w-4" />
+                    Tryg - Ret salg
+                  </NavLink>
+                )}
               </CollapsibleContent>
             </Collapsible>
           )}
