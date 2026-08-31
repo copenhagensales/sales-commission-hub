@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
-import { CalendarIcon, Copy, FileText, Pencil, Trash2 } from "lucide-react";
+import { CalendarIcon, Copy, FileText, Pencil, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { MainLayout } from "@/components/layout/MainLayout";
 import {
@@ -33,7 +33,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+
 import {
   useReportTextTemplate,
   useSaveReportTextTemplate,
@@ -102,6 +104,14 @@ function fillPhonePlaceholders(template: string, phones: string[]): string {
 }
 
 
+/** Kun cifre, uden dansk landekode foran — bruges til telefon-søgning. */
+function normalizePhone(value: string): string {
+  const digits = value.replace(/\D/g, "");
+  if (digits.startsWith("0045")) return digits.slice(4);
+  if (digits.startsWith("45") && digits.length > 8) return digits.slice(2);
+  return digits;
+}
+
 export default function TrygEditSales() {
   const { hasAccess, isLoading: loadingAccess } = useTrygEditAccess();
   const [day, setDay] = useState<Date>(new Date());
@@ -109,11 +119,14 @@ export default function TrygEditSales() {
   const [isEditingTemplate, setIsEditingTemplate] = useState(false);
   const [draftTemplate, setDraftTemplate] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [phoneSearch, setPhoneSearch] = useState("");
 
-  // Nulstil markeringer ved skift af dag
+  // Nulstil markeringer og søgning ved skift af dag
   useEffect(() => {
     setSelectedIds(new Set());
+    setPhoneSearch("");
   }, [day]);
+
 
   const { data: sales, isLoading } = useTrygKanvasSales(day, hasAccess);
   const deleteSale = useDeleteTrygKanvasSale();
@@ -191,6 +204,17 @@ export default function TrygEditSales() {
     [sales, selectedIds]
   );
 
+  /** Synlige linjer efter telefon-søgning. */
+  const visibleSales = useMemo(() => {
+    const needle = normalizePhone(phoneSearch);
+    if (!needle) return sales || [];
+    return (sales || []).filter((s) =>
+      normalizePhone(s.customerPhone || "").includes(needle)
+    );
+  }, [sales, phoneSearch]);
+
+
+
   const handleCopySelected = async () => {
     if (selectedPhones.length === 0) return;
     await copyText(fillPhonePlaceholders(template, selectedPhones));
@@ -225,7 +249,28 @@ export default function TrygEditSales() {
                   Alle salg på "Meeting -- CPH sales Kanvas" på den valgte dag.
                 </CardDescription>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={phoneSearch}
+                    onChange={(e) => setPhoneSearch(e.target.value)}
+                    placeholder="Søg telefonnummer"
+                    inputMode="tel"
+                    className="h-10 w-56 pl-9 pr-8"
+                  />
+                  {phoneSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setPhoneSearch("")}
+                      aria-label="Ryd søgning"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+
                 <Button
                   variant="outline"
                   className="gap-2"
@@ -351,8 +396,9 @@ export default function TrygEditSales() {
                           Henter salg...
                         </TableCell>
                       </TableRow>
-                    ) : (sales || []).length > 0 ? (
-                      (sales || []).map((sale) => (
+                    ) : visibleSales.length > 0 ? (
+                      visibleSales.map((sale) => (
+
                         <TableRow key={sale.saleItemId}>
                           <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground">
                             {format(new Date(sale.saleDatetime), "HH:mm")}
@@ -409,7 +455,10 @@ export default function TrygEditSales() {
                           colSpan={6}
                           className="py-16 text-center text-sm text-muted-foreground"
                         >
-                          Ingen Kanvas-salg på den valgte dag.
+                          {phoneSearch
+                            ? "Ingen salg matcher søgningen."
+                            : "Ingen Kanvas-salg på den valgte dag."}
+
                         </TableCell>
                       </TableRow>
                     )}
