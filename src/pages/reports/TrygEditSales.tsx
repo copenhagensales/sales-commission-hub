@@ -67,6 +67,18 @@ export default function TrygEditSales() {
     }
   };
 
+  const handleCopyTemplate = async (phone: string | null) => {
+    if (!phone) return;
+    try {
+      await navigator.clipboard.writeText(
+        TRYG_CANCEL_TEMPLATE.replace(PHONE_PLACEHOLDER, phone)
+      );
+      toast.success("Tekst kopieret");
+    } catch {
+      toast.error("Kunne ikke kopiere teksten");
+    }
+  };
+
   return (
     <MainLayout>
       <div className="space-y-6">
