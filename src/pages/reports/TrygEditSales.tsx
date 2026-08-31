@@ -327,6 +327,14 @@ export default function TrygEditSales() {
                                 <Copy className="h-3.5 w-3.5" />
                                 Kopiér
                               </Button>
+                              <Checkbox
+                                checked={selectedIds.has(sale.saleItemId)}
+                                onCheckedChange={() =>
+                                  toggleSelected(sale.saleItemId)
+                                }
+                                disabled={!sale.customerPhone}
+                                aria-label="Markér salg til samlet kopiering"
+                              />
                               <Button
                                 variant="ghost"
                                 size="sm"
