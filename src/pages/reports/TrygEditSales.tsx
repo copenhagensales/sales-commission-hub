@@ -107,23 +107,48 @@ export default function TrygEditSales() {
                   Alle salg på "Meeting -- CPH sales Kanvas" på den valgte dag.
                 </CardDescription>
               </div>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="gap-2">
-                    <CalendarIcon className="h-4 w-4" />
-                    {format(day, "dd/MM/yyyy", { locale: da })}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="end">
-                  <Calendar
-                    mode="single"
-                    selected={day}
-                    onSelect={(d) => d && setDay(d)}
-                    locale={da}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+              <div className="flex items-center gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="gap-2">
+                      <CalendarIcon className="h-4 w-4" />
+                      {format(day, "dd/MM/yyyy", { locale: da })}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="end">
+                    <Calendar
+                      mode="single"
+                      selected={day}
+                      onSelect={(d) => d && setDay(d)}
+                      locale={da}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="gap-2">
+                      <FileText className="h-4 w-4" />
+                      Skabelon
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80" align="end">
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Annulleringstekst</p>
+                      <Textarea
+                        readOnly
+                        value={TRYG_CANCEL_TEMPLATE}
+                        rows={4}
+                        className="resize-none text-sm"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Brug kopiér-knappen på en salgslinje for at indsætte
+                        telefonnummeret automatisk.
+                      </p>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="rounded-lg border border-border/50 overflow-x-auto">
