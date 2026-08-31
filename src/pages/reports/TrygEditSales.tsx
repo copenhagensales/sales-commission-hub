@@ -396,8 +396,9 @@ export default function TrygEditSales() {
                           Henter salg...
                         </TableCell>
                       </TableRow>
-                    ) : (sales || []).length > 0 ? (
-                      (sales || []).map((sale) => (
+                    ) : visibleSales.length > 0 ? (
+                      visibleSales.map((sale) => (
+
                         <TableRow key={sale.saleItemId}>
                           <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground">
                             {format(new Date(sale.saleDatetime), "HH:mm")}
