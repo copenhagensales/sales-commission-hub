@@ -144,6 +144,9 @@ export default function TrygEditSales() {
                           <TableCell className="whitespace-nowrap font-medium">
                             {sale.sellerName}
                           </TableCell>
+                          <TableCell className="whitespace-nowrap tabular-nums">
+                            {sale.customerPhone || "—"}
+                          </TableCell>
                           <TableCell className="w-16 text-right font-semibold text-primary tabular-nums">
                             {sale.quantity}
                           </TableCell>
