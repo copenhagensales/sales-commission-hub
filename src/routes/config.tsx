@@ -423,6 +423,7 @@ export const routes: RouteConfig[] = [
   { path: "/reports/daily", component: DailyReports, access: "role", positionPermission: "menu_reports_daily" },
   { path: "/reports/revenue-by-client", component: RevenueByClient, access: "role", positionPermission: "menu_reports_revenue_by_client" },
   { path: "/reports/tdc-erhverv-edit-sales", component: TdcErhvervEditSales, access: "role", positionPermission: "menu_reports_tdc_edit_sales" },
+  { path: "/reports/tryg-edit-sales", component: TrygEditSales, access: "role", positionPermission: "menu_reports_tryg_edit_sales" },
 
   // Security Dashboard
   { path: "/admin/security", component: SecurityDashboard, access: "role", positionPermission: "menu_security_dashboard" },
