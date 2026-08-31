@@ -100,6 +100,7 @@ import {
   Referrals,
   ReportsAdmin,
   TdcErhvervEditSales,
+  TrygEditSales,
   ReportsManagement,
   ReportsEmployee,
   DailyReports,
