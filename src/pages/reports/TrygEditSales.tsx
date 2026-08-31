@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { CalendarIcon, Copy, FileText, Pencil, Trash2 } from "lucide-react";
@@ -33,6 +33,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   useReportTextTemplate,
   useSaveReportTextTemplate,
@@ -57,6 +58,12 @@ export default function TrygEditSales() {
   const [deleteTarget, setDeleteTarget] = useState<TrygKanvasSale | null>(null);
   const [isEditingTemplate, setIsEditingTemplate] = useState(false);
   const [draftTemplate, setDraftTemplate] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Nulstil markeringer ved skift af dag
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [day]);
 
   const { data: sales, isLoading } = useTrygKanvasSales(day, hasAccess);
   const deleteSale = useDeleteTrygKanvasSale();
@@ -88,6 +95,11 @@ export default function TrygEditSales() {
     try {
       await deleteSale.mutateAsync(deleteTarget.saleId);
       toast.success("Salget er slettet");
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(deleteTarget.saleItemId);
+        return next;
+      });
       setDeleteTarget(null);
     } catch (error: unknown) {
       toast.error(
@@ -96,16 +108,41 @@ export default function TrygEditSales() {
     }
   };
 
-  const handleCopyTemplate = async (phone: string | null) => {
-    if (!phone) return;
+  const copyText = async (text: string) => {
     try {
-      await navigator.clipboard.writeText(
-        template.replace(PHONE_PLACEHOLDER, phone)
-      );
+      await navigator.clipboard.writeText(text);
       toast.success("Tekst kopieret");
     } catch {
       toast.error("Kunne ikke kopiere teksten");
     }
+  };
+
+  const handleCopyTemplate = async (phone: string | null) => {
+    if (!phone) return;
+    await copyText(template.replace(PHONE_PLACEHOLDER, phone));
+  };
+
+  const toggleSelected = (saleItemId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(saleItemId)) next.delete(saleItemId);
+      else next.add(saleItemId);
+      return next;
+    });
+  };
+
+  /** Numrene på de markerede linjer, i tabellens rækkefølge. */
+  const selectedPhones = useMemo(
+    () =>
+      (sales || [])
+        .filter((s) => selectedIds.has(s.saleItemId) && s.customerPhone)
+        .map((s) => s.customerPhone as string),
+    [sales, selectedIds]
+  );
+
+  const handleCopySelected = async () => {
+    if (selectedPhones.length === 0) return;
+    await copyText(template.replace(PHONE_PLACEHOLDER, selectedPhones.join("\n")));
   };
 
   return (
@@ -137,6 +174,17 @@ export default function TrygEditSales() {
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  onClick={handleCopySelected}
+                  disabled={selectedPhones.length === 0}
+                  title="Kopiér annulleringstekst med alle markerede numre"
+                >
+                  <Copy className="h-4 w-4" />
+                  Kopiér markerede
+                  {selectedPhones.length > 0 ? ` (${selectedPhones.length})` : ""}
+                </Button>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="gap-2">
@@ -233,7 +281,7 @@ export default function TrygEditSales() {
                       <TableHead className="w-full min-w-[240px]">
                         Produktnavn
                       </TableHead>
-                      <TableHead className="w-32 whitespace-nowrap text-right">
+                      <TableHead className="w-40 whitespace-nowrap text-right">
                         Handlinger
                       </TableHead>
                     </TableRow>
@@ -266,7 +314,7 @@ export default function TrygEditSales() {
                           <TableCell className="min-w-[240px]">
                             {sale.productName}
                           </TableCell>
-                          <TableCell className="w-32 whitespace-nowrap">
+                          <TableCell className="w-40 whitespace-nowrap">
                             <div className="flex items-center justify-end gap-1">
                               <Button
                                 variant="ghost"
@@ -279,6 +327,14 @@ export default function TrygEditSales() {
                                 <Copy className="h-3.5 w-3.5" />
                                 Kopiér
                               </Button>
+                              <Checkbox
+                                checked={selectedIds.has(sale.saleItemId)}
+                                onCheckedChange={() =>
+                                  toggleSelected(sale.saleItemId)
+                                }
+                                disabled={!sale.customerPhone}
+                                aria-label="Markér salg til samlet kopiering"
+                              />
                               <Button
                                 variant="ghost"
                                 size="sm"
