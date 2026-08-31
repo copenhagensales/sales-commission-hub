@@ -33,6 +33,7 @@ import { useHasActiveTimeClock } from "@/hooks/useHasActiveTimeClock";
 import { useTranslation } from "react-i18next";
 import { useSidebarMenuConfig, type MenuConfigItem } from "@/hooks/useSidebarMenuConfig";
 import { useIsUnitedMember } from "@/hooks/useIsUnitedMember";
+import { useTrygEditAccess } from "@/hooks/useTrygEditAccess";
 
 type NavItem = { name: string; href: string; icon: typeof Users; badgeKey?: string };
 
