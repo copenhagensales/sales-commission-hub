@@ -33,7 +33,7 @@ export function useTrygKanvasSales(day: Date, enabled = true) {
       const { data, error } = await supabase
         .from("sale_items")
         .select(
-          "id, quantity, products(name), sales!inner(id, sale_datetime, agent_email, agent_name)"
+          "id, quantity, products(name), sales!inner(id, sale_datetime, agent_email, agent_name, customer_phone)"
         )
         .eq("product_id", TRYG_KANVAS_PRODUCT_ID)
         .gte("sales.sale_datetime", start)
