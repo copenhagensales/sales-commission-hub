@@ -40,6 +40,12 @@ import {
   type TrygKanvasSale,
 } from "@/hooks/useTrygKanvasSales";
 
+const TRYG_CANCEL_TEMPLATE = `Hej Tryg,
+
+Vil i annullerer mødet på [Telefonnummer].`;
+
+const PHONE_PLACEHOLDER = "[Telefonnummer]";
+
 export default function TrygEditSales() {
   const { hasAccess, isLoading: loadingAccess } = useTrygEditAccess();
   const [day, setDay] = useState<Date>(new Date());
