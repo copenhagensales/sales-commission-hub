@@ -193,8 +193,9 @@ export default function TrygEditSales() {
 
   const handleCopySelected = async () => {
     if (selectedPhones.length === 0) return;
-    await copyText(template.replace(PHONE_PLACEHOLDER, selectedPhones.join("\n")));
+    await copyText(fillPhonePlaceholders(template, selectedPhones));
   };
+
 
   return (
     <MainLayout>
