@@ -287,9 +287,12 @@ export default function TrygEditSales() {
                       {isEditingTemplate ? (
                         <div className="space-y-2">
                           <p className="text-xs text-muted-foreground">
-                            Behold placeholderen {PHONE_PLACEHOLDER} — den
-                            erstattes automatisk med rækkens telefonnummer.
+                            Behold en placeholder: {PHONE_PLACEHOLDER} (alle
+                            numre på hver sin linje) eller [Telefonnummer1],
+                            [Telefonnummer2] osv. — de udfyldes i rækkefølge, og
+                            ubrugte linjer fjernes.
                           </p>
+
                           <div className="flex justify-end gap-2">
                             <Button
                               variant="outline"
