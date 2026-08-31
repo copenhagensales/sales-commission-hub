@@ -95,6 +95,11 @@ export default function TrygEditSales() {
     try {
       await deleteSale.mutateAsync(deleteTarget.saleId);
       toast.success("Salget er slettet");
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(deleteTarget.saleItemId);
+        return next;
+      });
       setDeleteTarget(null);
     } catch (error: unknown) {
       toast.error(
@@ -103,16 +108,41 @@ export default function TrygEditSales() {
     }
   };
 
-  const handleCopyTemplate = async (phone: string | null) => {
-    if (!phone) return;
+  const copyText = async (text: string) => {
     try {
-      await navigator.clipboard.writeText(
-        template.replace(PHONE_PLACEHOLDER, phone)
-      );
+      await navigator.clipboard.writeText(text);
       toast.success("Tekst kopieret");
     } catch {
       toast.error("Kunne ikke kopiere teksten");
     }
+  };
+
+  const handleCopyTemplate = async (phone: string | null) => {
+    if (!phone) return;
+    await copyText(template.replace(PHONE_PLACEHOLDER, phone));
+  };
+
+  const toggleSelected = (saleItemId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(saleItemId)) next.delete(saleItemId);
+      else next.add(saleItemId);
+      return next;
+    });
+  };
+
+  /** Numrene på de markerede linjer, i tabellens rækkefølge. */
+  const selectedPhones = useMemo(
+    () =>
+      (sales || [])
+        .filter((s) => selectedIds.has(s.saleItemId) && s.customerPhone)
+        .map((s) => s.customerPhone as string),
+    [sales, selectedIds]
+  );
+
+  const handleCopySelected = async () => {
+    if (selectedPhones.length === 0) return;
+    await copyText(template.replace(PHONE_PLACEHOLDER, selectedPhones.join("\n")));
   };
 
   return (
