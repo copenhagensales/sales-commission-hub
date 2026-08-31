@@ -113,6 +113,7 @@ export default function TrygEditSales() {
                     <TableRow>
                       <TableHead className="w-24 whitespace-nowrap">Tid</TableHead>
                       <TableHead className="whitespace-nowrap">Sælgernavn</TableHead>
+                      <TableHead className="w-32 whitespace-nowrap">Telefon</TableHead>
                       <TableHead className="w-16 whitespace-nowrap text-right">
                         Antal
                       </TableHead>
@@ -128,7 +129,7 @@ export default function TrygEditSales() {
                     {isLoading || loadingAccess ? (
                       <TableRow>
                         <TableCell
-                          colSpan={5}
+                          colSpan={6}
                           className="py-16 text-center text-sm text-muted-foreground"
                         >
                           Henter salg...
@@ -142,6 +143,9 @@ export default function TrygEditSales() {
                           </TableCell>
                           <TableCell className="whitespace-nowrap font-medium">
                             {sale.sellerName}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap tabular-nums">
+                            {sale.customerPhone || "—"}
                           </TableCell>
                           <TableCell className="w-16 text-right font-semibold text-primary tabular-nums">
                             {sale.quantity}
@@ -167,7 +171,7 @@ export default function TrygEditSales() {
                     ) : (
                       <TableRow>
                         <TableCell
-                          colSpan={5}
+                          colSpan={6}
                           className="py-16 text-center text-sm text-muted-foreground"
                         >
                           Ingen Kanvas-salg på den valgte dag.

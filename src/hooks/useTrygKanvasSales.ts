@@ -9,6 +9,7 @@ export interface TrygKanvasSale {
   saleItemId: string;
   saleDatetime: string;
   sellerName: string;
+  customerPhone: string | null;
   quantity: number;
   productName: string;
 }
@@ -32,7 +33,7 @@ export function useTrygKanvasSales(day: Date, enabled = true) {
       const { data, error } = await supabase
         .from("sale_items")
         .select(
-          "id, quantity, products(name), sales!inner(id, sale_datetime, agent_email, agent_name)"
+          "id, quantity, products(name), sales!inner(id, sale_datetime, agent_email, agent_name, customer_phone)"
         )
         .eq("product_id", TRYG_KANVAS_PRODUCT_ID)
         .gte("sales.sale_datetime", start)
@@ -48,6 +49,7 @@ export function useTrygKanvasSales(day: Date, enabled = true) {
           sale_datetime: string;
           agent_email: string | null;
           agent_name: string | null;
+          customer_phone: string | null;
         };
       }[];
 
@@ -83,7 +85,8 @@ export function useTrygKanvasSales(day: Date, enabled = true) {
               nameByEmail.get(email) ||
               r.sales.agent_name ||
               r.sales.agent_email ||
-              "Ukendt",
+               "Ukendt",
+            customerPhone: r.sales.customer_phone || null,
             quantity: Number(r.quantity ?? 0),
             productName: r.products?.name || "Ukendt produkt",
           };
