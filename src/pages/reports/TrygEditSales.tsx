@@ -100,7 +100,7 @@ export default function TrygEditSales() {
     if (!phone) return;
     try {
       await navigator.clipboard.writeText(
-        TRYG_CANCEL_TEMPLATE.replace(PHONE_PLACEHOLDER, phone)
+        template.replace(PHONE_PLACEHOLDER, phone)
       );
       toast.success("Tekst kopieret");
     } catch {
