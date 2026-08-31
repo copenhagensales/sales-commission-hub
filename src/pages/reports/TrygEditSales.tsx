@@ -204,6 +204,17 @@ export default function TrygEditSales() {
     [sales, selectedIds]
   );
 
+  /** Synlige linjer efter telefon-søgning. */
+  const visibleSales = useMemo(() => {
+    const needle = normalizePhone(phoneSearch);
+    if (!needle) return sales || [];
+    return (sales || []).filter((s) =>
+      normalizePhone(s.customerPhone || "").includes(needle)
+    );
+  }, [sales, phoneSearch]);
+
+
+
   const handleCopySelected = async () => {
     if (selectedPhones.length === 0) return;
     await copyText(fillPhonePlaceholders(template, selectedPhones));
