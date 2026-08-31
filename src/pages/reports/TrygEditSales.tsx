@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
-import { CalendarIcon, Trash2 } from "lucide-react";
+import { CalendarIcon, Copy, FileText, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { MainLayout } from "@/components/layout/MainLayout";
 import {
@@ -32,12 +32,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { useTrygEditAccess } from "@/hooks/useTrygEditAccess";
 import {
   useTrygKanvasSales,
   useDeleteTrygKanvasSale,
   type TrygKanvasSale,
 } from "@/hooks/useTrygKanvasSales";
+
+const TRYG_CANCEL_TEMPLATE = `Hej Tryg,
+
+Vil i annullerer mødet på [Telefonnummer].`;
+
+const PHONE_PLACEHOLDER = "[Telefonnummer]";
 
 export default function TrygEditSales() {
   const { hasAccess, isLoading: loadingAccess } = useTrygEditAccess();
@@ -57,6 +64,18 @@ export default function TrygEditSales() {
       toast.error(
         error instanceof Error ? error.message : "Kunne ikke slette salget"
       );
+    }
+  };
+
+  const handleCopyTemplate = async (phone: string | null) => {
+    if (!phone) return;
+    try {
+      await navigator.clipboard.writeText(
+        TRYG_CANCEL_TEMPLATE.replace(PHONE_PLACEHOLDER, phone)
+      );
+      toast.success("Tekst kopieret");
+    } catch {
+      toast.error("Kunne ikke kopiere teksten");
     }
   };
 
@@ -88,23 +107,48 @@ export default function TrygEditSales() {
                   Alle salg på "Meeting -- CPH sales Kanvas" på den valgte dag.
                 </CardDescription>
               </div>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="gap-2">
-                    <CalendarIcon className="h-4 w-4" />
-                    {format(day, "dd/MM/yyyy", { locale: da })}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="end">
-                  <Calendar
-                    mode="single"
-                    selected={day}
-                    onSelect={(d) => d && setDay(d)}
-                    locale={da}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+              <div className="flex items-center gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="gap-2">
+                      <CalendarIcon className="h-4 w-4" />
+                      {format(day, "dd/MM/yyyy", { locale: da })}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="end">
+                    <Calendar
+                      mode="single"
+                      selected={day}
+                      onSelect={(d) => d && setDay(d)}
+                      locale={da}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="gap-2">
+                      <FileText className="h-4 w-4" />
+                      Skabelon
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80" align="end">
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Annulleringstekst</p>
+                      <Textarea
+                        readOnly
+                        value={TRYG_CANCEL_TEMPLATE}
+                        rows={4}
+                        className="resize-none text-sm"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Brug kopiér-knappen på en salgslinje for at indsætte
+                        telefonnummeret automatisk.
+                      </p>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="rounded-lg border border-border/50 overflow-x-auto">
@@ -154,7 +198,18 @@ export default function TrygEditSales() {
                             {sale.productName}
                           </TableCell>
                           <TableCell className="w-32 whitespace-nowrap">
-                            <div className="flex items-center justify-end">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleCopyTemplate(sale.customerPhone)}
+                                disabled={!sale.customerPhone}
+                                title="Kopiér annulleringstekst"
+                                className="h-8 gap-1.5"
+                              >
+                                <Copy className="h-3.5 w-3.5" />
+                                Kopiér
+                              </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
