@@ -113,6 +113,7 @@ export default function TrygEditSales() {
                     <TableRow>
                       <TableHead className="w-24 whitespace-nowrap">Tid</TableHead>
                       <TableHead className="whitespace-nowrap">Sælgernavn</TableHead>
+                      <TableHead className="w-32 whitespace-nowrap">Telefon</TableHead>
                       <TableHead className="w-16 whitespace-nowrap text-right">
                         Antal
                       </TableHead>
