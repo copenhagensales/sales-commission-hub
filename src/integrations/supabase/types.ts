@@ -11840,6 +11840,33 @@ export type Database = {
         }
         Relationships: []
       }
+      report_text_templates: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          key: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       role_dashboard_permissions: {
         Row: {
           can_view: boolean
@@ -15024,6 +15051,10 @@ export type Database = {
       }
       auto_suggest_konto_mapping: { Args: never; Returns: number }
       can_access_confidential_contract: {
+        Args: { _user_id: string }
+        Returns: boolean
+      }
+      can_edit_report_templates: {
         Args: { _user_id: string }
         Returns: boolean
       }
