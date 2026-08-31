@@ -49,6 +49,7 @@ export function useTrygKanvasSales(day: Date, enabled = true) {
           sale_datetime: string;
           agent_email: string | null;
           agent_name: string | null;
+          customer_phone: string | null;
         };
       }[];
 
