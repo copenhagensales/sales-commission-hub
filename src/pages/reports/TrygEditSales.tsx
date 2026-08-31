@@ -169,8 +169,9 @@ export default function TrygEditSales() {
 
   const handleCopyTemplate = async (phone: string | null) => {
     if (!phone) return;
-    await copyText(template.replace(PHONE_PLACEHOLDER, phone));
+    await copyText(fillPhonePlaceholders(template, [phone]));
   };
+
 
   const toggleSelected = (saleItemId: string) => {
     setSelectedIds((prev) => {
