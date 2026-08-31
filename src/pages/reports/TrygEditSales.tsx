@@ -198,7 +198,18 @@ export default function TrygEditSales() {
                             {sale.productName}
                           </TableCell>
                           <TableCell className="w-32 whitespace-nowrap">
-                            <div className="flex items-center justify-end">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleCopyTemplate(sale.customerPhone)}
+                                disabled={!sale.customerPhone}
+                                title="Kopiér annulleringstekst"
+                                className="h-8 gap-1.5"
+                              >
+                                <Copy className="h-3.5 w-3.5" />
+                                Kopiér
+                              </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
