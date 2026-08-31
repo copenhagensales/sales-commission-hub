@@ -104,6 +104,14 @@ function fillPhonePlaceholders(template: string, phones: string[]): string {
 }
 
 
+/** Kun cifre, uden dansk landekode foran — bruges til telefon-søgning. */
+function normalizePhone(value: string): string {
+  const digits = value.replace(/\D/g, "");
+  if (digits.startsWith("0045")) return digits.slice(4);
+  if (digits.startsWith("45") && digits.length > 8) return digits.slice(2);
+  return digits;
+}
+
 export default function TrygEditSales() {
   const { hasAccess, isLoading: loadingAccess } = useTrygEditAccess();
   const [day, setDay] = useState<Date>(new Date());
@@ -111,11 +119,14 @@ export default function TrygEditSales() {
   const [isEditingTemplate, setIsEditingTemplate] = useState(false);
   const [draftTemplate, setDraftTemplate] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [phoneSearch, setPhoneSearch] = useState("");
 
-  // Nulstil markeringer ved skift af dag
+  // Nulstil markeringer og søgning ved skift af dag
   useEffect(() => {
     setSelectedIds(new Set());
+    setPhoneSearch("");
   }, [day]);
+
 
   const { data: sales, isLoading } = useTrygKanvasSales(day, hasAccess);
   const deleteSale = useDeleteTrygKanvasSale();
