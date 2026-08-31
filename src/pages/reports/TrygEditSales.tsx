@@ -129,7 +129,7 @@ export default function TrygEditSales() {
                     {isLoading || loadingAccess ? (
                       <TableRow>
                         <TableCell
-                          colSpan={5}
+                          colSpan={6}
                           className="py-16 text-center text-sm text-muted-foreground"
                         >
                           Henter salg...
@@ -171,7 +171,7 @@ export default function TrygEditSales() {
                     ) : (
                       <TableRow>
                         <TableCell
-                          colSpan={5}
+                          colSpan={6}
                           className="py-16 text-center text-sm text-muted-foreground"
                         >
                           Ingen Kanvas-salg på den valgte dag.
