@@ -245,6 +245,7 @@ export const PERMISSION_KEYS = {
   menu_reports_employee: { label: 'Medarbejderrapporter', section: 'reports', parent: 'menu_section_reports' },
   menu_reports_revenue_by_client: { label: 'Omsætning per opgave', section: 'reports', parent: 'menu_section_reports' },
   menu_reports_tdc_edit_sales: { label: 'TDC Erhverv - ret salg', section: 'reports', parent: 'menu_section_reports' },
+  menu_reports_tryg_edit_sales: { label: 'Tryg - Ret salg', section: 'reports', parent: 'menu_section_reports' },
   menu_cancellations: { label: 'Annulleringer', section: 'reports', parent: 'menu_section_reports' },
   tab_cancellations_manual: { label: 'Fane: Rediger kurv', section: 'reports', parent: 'menu_cancellations' },
   tab_cancellations_upload: { label: 'Fane: Upload/match', section: 'reports', parent: 'menu_cancellations' },

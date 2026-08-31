@@ -33,6 +33,7 @@ import { useHasActiveTimeClock } from "@/hooks/useHasActiveTimeClock";
 import { useTranslation } from "react-i18next";
 import { useSidebarMenuConfig, type MenuConfigItem } from "@/hooks/useSidebarMenuConfig";
 import { useIsUnitedMember } from "@/hooks/useIsUnitedMember";
+import { useTrygEditAccess } from "@/hooks/useTrygEditAccess";
 
 type NavItem = { name: string; href: string; icon: typeof Users; badgeKey?: string };
 
@@ -53,6 +54,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   const p = usePermissions(); // Position permissions - THE ONLY source of truth
   const { isPreviewMode } = useRolePreview();
   const { isSuperadmin } = useIsSuperadmin();
+  const { hasAccess: trygEditAccess } = useTrygEditAccess();
   
   const { data: isFieldmarketing } = useIsFieldmarketingEmployee();
   const { data: canWorkFieldmarketing } = useCanWorkFieldmarketing();
@@ -465,9 +467,12 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   // Check if any Onboarding items are visible (requires section permission) - only show for admin users
   const showOnboardingMenu = !isMenuHidden('section_onboarding') && p.canView("menu_section_onboarding") && p.canViewOnboardingAdmin;
 
+  // "Tryg - Ret salg": kun ejere samt allowlisten (Filip, Annika)
+  const showTrygEditSales = trygEditAccess;
+
   // Check if any Reports menu items are visible (requires section permission)
   const showReportsMenu = !isMenuHidden('section_rapporter') && p.canView("menu_section_reports") && 
-    (p.canViewReportsAdmin || p.canViewReportsDailyReports || p.canViewReportsManagement || p.canViewReportsEmployee || canViewCancellations || p.canViewReportsTdcEditSales);
+    (p.canViewReportsAdmin || p.canViewReportsDailyReports || p.canViewReportsManagement || p.canViewReportsEmployee || canViewCancellations || p.canViewReportsTdcEditSales || showTrygEditSales);
   
   // HARDCODED: Only Kasper, Mathias and Lone can see salary menu
   const SALARY_ALLOWED_USER_IDS = [
@@ -1371,6 +1376,15 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
                   )}>
                     <PencilLine className="h-4 w-4" />
                     TDC Erhverv - ret salg
+                  </NavLink>
+                )}
+                {showTrygEditSales && (
+                  <NavLink to="/reports/tryg-edit-sales" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/reports/tryg-edit-sales" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <PencilLine className="h-4 w-4" />
+                    Tryg - Ret salg
                   </NavLink>
                 )}
               </CollapsibleContent>

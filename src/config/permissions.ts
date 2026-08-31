@@ -778,6 +778,12 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
         description: "Adgang til at rette TDC Erhverv salg",
         hasEditOption: true,
       },
+      {
+        key: "menu_reports_tryg_edit_sales",
+        label: "Tryg - Ret salg",
+        description: "Adgang til at rette/annullere Tryg salg",
+        hasEditOption: true,
+      },
     ],
   },
 
