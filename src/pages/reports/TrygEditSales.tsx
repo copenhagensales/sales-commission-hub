@@ -174,6 +174,17 @@ export default function TrygEditSales() {
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  onClick={handleCopySelected}
+                  disabled={selectedPhones.length === 0}
+                  title="Kopiér annulleringstekst med alle markerede numre"
+                >
+                  <Copy className="h-4 w-4" />
+                  Kopiér markerede
+                  {selectedPhones.length > 0 ? ` (${selectedPhones.length})` : ""}
+                </Button>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="gap-2">
