@@ -281,7 +281,7 @@ export default function TrygEditSales() {
                       <TableHead className="w-full min-w-[240px]">
                         Produktnavn
                       </TableHead>
-                      <TableHead className="w-32 whitespace-nowrap text-right">
+                      <TableHead className="w-40 whitespace-nowrap text-right">
                         Handlinger
                       </TableHead>
                     </TableRow>
@@ -314,7 +314,7 @@ export default function TrygEditSales() {
                           <TableCell className="min-w-[240px]">
                             {sale.productName}
                           </TableCell>
-                          <TableCell className="w-32 whitespace-nowrap">
+                          <TableCell className="w-40 whitespace-nowrap">
                             <div className="flex items-center justify-end gap-1">
                               <Button
                                 variant="ghost"
