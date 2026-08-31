@@ -85,7 +85,8 @@ export function useTrygKanvasSales(day: Date, enabled = true) {
               nameByEmail.get(email) ||
               r.sales.agent_name ||
               r.sales.agent_email ||
-              "Ukendt",
+               "Ukendt",
+            customerPhone: r.sales.customer_phone || null,
             quantity: Number(r.quantity ?? 0),
             productName: r.products?.name || "Ukendt produkt",
           };
