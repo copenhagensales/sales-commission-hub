@@ -161,19 +161,59 @@ export default function TrygEditSales() {
                       Skabelon
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-80" align="end">
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium">Annulleringstekst</p>
+                  <PopoverContent className="w-[30rem] max-w-[90vw]" align="end">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-medium">Annulleringstekst</p>
+                        {!isEditingTemplate && hasAccess && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={startEditTemplate}
+                            className="h-8 gap-1.5"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Rediger
+                          </Button>
+                        )}
+                      </div>
                       <Textarea
-                        readOnly
-                        value={TRYG_CANCEL_TEMPLATE}
-                        rows={4}
-                        className="resize-none text-sm"
+                        readOnly={!isEditingTemplate}
+                        value={isEditingTemplate ? draftTemplate : template}
+                        onChange={(e) => setDraftTemplate(e.target.value)}
+                        rows={9}
+                        className="resize-y text-sm"
                       />
-                      <p className="text-xs text-muted-foreground">
-                        Brug kopiér-knappen på en salgslinje for at indsætte
-                        telefonnummeret automatisk.
-                      </p>
+                      {isEditingTemplate ? (
+                        <div className="space-y-2">
+                          <p className="text-xs text-muted-foreground">
+                            Behold placeholderen {PHONE_PLACEHOLDER} — den
+                            erstattes automatisk med rækkens telefonnummer.
+                          </p>
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setIsEditingTemplate(false)}
+                              disabled={saveTemplate.isPending}
+                            >
+                              Annuller
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={handleSaveTemplate}
+                              disabled={saveTemplate.isPending}
+                            >
+                              {saveTemplate.isPending ? "Gemmer..." : "Gem"}
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">
+                          Brug kopiér-knappen på en salgslinje for at indsætte
+                          telefonnummeret automatisk.
+                        </p>
+                      )}
                     </div>
                   </PopoverContent>
                 </Popover>
