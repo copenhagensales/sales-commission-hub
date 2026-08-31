@@ -32,6 +32,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { useTrygEditAccess } from "@/hooks/useTrygEditAccess";
 import {
   useTrygKanvasSales,
