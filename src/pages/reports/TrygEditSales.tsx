@@ -58,6 +58,12 @@ export default function TrygEditSales() {
   const [deleteTarget, setDeleteTarget] = useState<TrygKanvasSale | null>(null);
   const [isEditingTemplate, setIsEditingTemplate] = useState(false);
   const [draftTemplate, setDraftTemplate] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Nulstil markeringer ved skift af dag
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [day]);
 
   const { data: sales, isLoading } = useTrygKanvasSales(day, hasAccess);
   const deleteSale = useDeleteTrygKanvasSale();
