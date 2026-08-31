@@ -642,19 +642,12 @@ export function useEmployeesForShifts(teamId?: string) {
     queryKey: ["employees-for-shifts", teamId, user?.id],
     queryFn: async () => {
       // First check if user is owner
-      const { data: isOwner, error: ownerError } = await supabase.rpc("is_owner", { _user_id: user?.id });
-      
+      const { data: isOwner } = await supabase.rpc("is_owner", { _user_id: user?.id });
+
       // Get current employee id
-      const { data: currentEmployeeId, error: empError } = await supabase.rpc("get_current_employee_id");
-      
-      console.log("[useEmployeesForShifts] DEBUG:", {
-        userId: user?.id,
-        isOwner,
-        ownerError,
-        currentEmployeeId,
-        empError,
-        teamId
-      });
+      const { data: currentEmployeeId } = await supabase.rpc("get_current_employee_id");
+
+
       
       // Fetch all team memberships with team names for enriching employee data
       const { data: allTeamMemberships } = await supabase
@@ -701,7 +694,6 @@ export function useEmployeesForShifts(teamId?: string) {
         if (tmError) throw tmError;
         
         const employeeIds = (teamMembers || []).map(tm => tm.employee_id);
-        console.log("[useEmployeesForShifts] Team filter - found", employeeIds.length, "employees");
         return fetchEmployeesByIds(employeeIds);
       }
       
@@ -728,8 +720,6 @@ export function useEmployeesForShifts(teamId?: string) {
         });
         const ledTeams = Array.from(ledTeamsMap.values());
 
-        console.log("[useEmployeesForShifts] Led teams (leader or assistant):", ledTeams);
-
         if (ledTeams.length > 0) {
           const teamIds = ledTeams.map(t => t.id);
           
@@ -745,12 +735,10 @@ export function useEmployeesForShifts(teamId?: string) {
           const employeeIds = [...new Set((teamMembers || []).map(tm => tm.employee_id))]
             .filter(id => id !== currentEmployeeId);
           
-          console.log("[useEmployeesForShifts] Found", employeeIds.length, "team members in led teams");
           return fetchEmployeesByIds(employeeIds);
         }
         
         // Fallback: filter by manager_id if no teams led
-        console.log("[useEmployeesForShifts] No led teams, trying manager_id fallback");
         const { data, error } = await supabase
           .from("employee_master_data")
           .select("id, first_name, last_name, standard_start_time, weekly_hours, manager_id, salary_type, team_id, is_active, employment_start_date, employment_end_date")
@@ -769,7 +757,6 @@ export function useEmployeesForShifts(teamId?: string) {
       }
       
       // Owner - get all active employees
-      console.log("[useEmployeesForShifts] Owner mode - fetching all employees");
       const { data, error } = await supabase
         .from("employee_master_data")
         .select("id, first_name, last_name, standard_start_time, weekly_hours, manager_id, salary_type, team_id, is_active, employment_start_date, employment_end_date")
