@@ -9,6 +9,7 @@ export interface TrygKanvasSale {
   saleItemId: string;
   saleDatetime: string;
   sellerName: string;
+  customerPhone: string | null;
   quantity: number;
   productName: string;
 }
