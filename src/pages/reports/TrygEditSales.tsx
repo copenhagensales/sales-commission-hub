@@ -50,7 +50,57 @@ const TRYG_CANCEL_TEMPLATE = `Hej Tryg,
 Vil i annullerer mødet på [Telefonnummer].`;
 
 const PHONE_PLACEHOLDER = "[Telefonnummer]";
+const PHONE_PLACEHOLDER_RE = /\[Telefonnummer(\d*)\]/g;
 const TEMPLATE_KEY = "tryg_cancel_meeting";
+
+/**
+ * Udfylder telefon-placeholders i skabelonen.
+ * - `[Telefonnummer]` uden tal: alle numre indsættes på hver sin linje.
+ * - `[Telefonnummer1]`, `[Telefonnummer2]` ...: udfyldes i rækkefølge.
+ *   Overskydende numre tilføjes som ekstra linjer efter sidste plads,
+ *   og ubrugte placeholder-linjer fjernes helt.
+ */
+function fillPhonePlaceholders(template: string, phones: string[]): string {
+  const numberedSlots = [...template.matchAll(PHONE_PLACEHOLDER_RE)].filter(
+    (m) => m[1] !== ""
+  );
+
+  if (numberedSlots.length === 0) {
+    return template.replace(PHONE_PLACEHOLDER_RE, phones.join("\n"));
+  }
+
+  let index = 0;
+  let lastFilledLine = -1;
+  const lines = template.split("\n");
+  const output: string[] = [];
+
+  lines.forEach((line) => {
+    let removedLine = false;
+    const replaced = line.replace(PHONE_PLACEHOLDER_RE, (match, digits) => {
+      if (digits === "") return phones.join("\n");
+      const phone = phones[index++];
+      if (phone === undefined) {
+        removedLine = true;
+        return "";
+      }
+      return phone;
+    });
+
+    // Fjern linjer hvor den eneste placeholder ikke kunne udfyldes
+    if (removedLine && replaced.trim() === "") return;
+
+    output.push(replaced);
+    if (replaced !== line) lastFilledLine = output.length - 1;
+  });
+
+  // Tilføj overskydende numre lige efter sidste udfyldte plads
+  if (index < phones.length && lastFilledLine >= 0) {
+    output.splice(lastFilledLine + 1, 0, ...phones.slice(index));
+  }
+
+  return output.join("\n");
+}
+
 
 export default function TrygEditSales() {
   const { hasAccess, isLoading: loadingAccess } = useTrygEditAccess();
