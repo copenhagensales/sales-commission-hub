@@ -45,14 +45,39 @@ const TRYG_CANCEL_TEMPLATE = `Hej Tryg,
 Vil i annullerer mødet på [Telefonnummer].`;
 
 const PHONE_PLACEHOLDER = "[Telefonnummer]";
+const TEMPLATE_KEY = "tryg_cancel_meeting";
 
 export default function TrygEditSales() {
   const { hasAccess, isLoading: loadingAccess } = useTrygEditAccess();
   const [day, setDay] = useState<Date>(new Date());
   const [deleteTarget, setDeleteTarget] = useState<TrygKanvasSale | null>(null);
+  const [isEditingTemplate, setIsEditingTemplate] = useState(false);
+  const [draftTemplate, setDraftTemplate] = useState("");
 
   const { data: sales, isLoading } = useTrygKanvasSales(day, hasAccess);
   const deleteSale = useDeleteTrygKanvasSale();
+  const { body: template } = useReportTextTemplate(
+    TEMPLATE_KEY,
+    TRYG_CANCEL_TEMPLATE
+  );
+  const saveTemplate = useSaveReportTextTemplate(TEMPLATE_KEY);
+
+  const startEditTemplate = () => {
+    setDraftTemplate(template);
+    setIsEditingTemplate(true);
+  };
+
+  const handleSaveTemplate = async () => {
+    try {
+      await saveTemplate.mutateAsync(draftTemplate);
+      toast.success("Skabelonen er gemt");
+      setIsEditingTemplate(false);
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error ? error.message : "Kunne ikke gemme skabelonen"
+      );
+    }
+  };
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
