@@ -455,7 +455,10 @@ export default function TrygEditSales() {
                           colSpan={6}
                           className="py-16 text-center text-sm text-muted-foreground"
                         >
-                          Ingen Kanvas-salg på den valgte dag.
+                          {phoneSearch
+                            ? "Ingen salg matcher søgningen."
+                            : "Ingen Kanvas-salg på den valgte dag."}
+
                         </TableCell>
                       </TableRow>
                     )}
