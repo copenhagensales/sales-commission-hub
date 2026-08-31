@@ -1,0 +1,111 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+
+/** "Meeting -- CPH sales Kanvas" – det eneste produkt der vises på Tryg - Ret salg. */
+export const TRYG_KANVAS_PRODUCT_ID = "24664858-d4e3-4227-9d6f-727f9c29cae0";
+
+export interface TrygKanvasSale {
+  saleId: string;
+  saleItemId: string;
+  saleDatetime: string;
+  sellerName: string;
+  quantity: number;
+  productName: string;
+}
+
+function dayBounds(day: Date) {
+  const start = new Date(day);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(day);
+  end.setHours(23, 59, 59, 999);
+  return { start: start.toISOString(), end: end.toISOString() };
+}
+
+/** Alle salg på Kanvas-produktet for én dag, nyeste først. */
+export function useTrygKanvasSales(day: Date, enabled = true) {
+  const { start, end } = dayBounds(day);
+
+  return useQuery({
+    queryKey: ["tryg-kanvas-sales", start],
+    enabled,
+    queryFn: async (): Promise<TrygKanvasSale[]> => {
+      const { data, error } = await supabase
+        .from("sale_items")
+        .select(
+          "id, quantity, products(name), sales!inner(id, sale_datetime, agent_email, agent_name)"
+        )
+        .eq("product_id", TRYG_KANVAS_PRODUCT_ID)
+        .gte("sales.sale_datetime", start)
+        .lte("sales.sale_datetime", end);
+      if (error) throw error;
+
+      const rows = (data || []) as unknown as {
+        id: string;
+        quantity: number | null;
+        products: { name: string | null } | null;
+        sales: {
+          id: string;
+          sale_datetime: string;
+          agent_email: string | null;
+          agent_name: string | null;
+        };
+      }[];
+
+      // Sælgernavne via work_email
+      const emails = Array.from(
+        new Set(
+          rows
+            .map((r) => r.sales.agent_email?.toLowerCase())
+            .filter(Boolean) as string[]
+        )
+      );
+      const nameByEmail = new Map<string, string>();
+      if (emails.length > 0) {
+        const { data: employees } = await supabase
+          .from("employee_master_data")
+          .select("first_name, last_name, work_email")
+          .in("work_email", emails);
+        for (const e of employees || []) {
+          const email = (e.work_email || "").toLowerCase();
+          const name = [e.first_name, e.last_name].filter(Boolean).join(" ").trim();
+          if (email && name) nameByEmail.set(email, name);
+        }
+      }
+
+      return rows
+        .map((r) => {
+          const email = (r.sales.agent_email || "").toLowerCase();
+          return {
+            saleId: r.sales.id,
+            saleItemId: r.id,
+            saleDatetime: r.sales.sale_datetime,
+            sellerName:
+              nameByEmail.get(email) ||
+              r.sales.agent_name ||
+              r.sales.agent_email ||
+              "Ukendt",
+            quantity: Number(r.quantity ?? 0),
+            productName: r.products?.name || "Ukendt produkt",
+          };
+        })
+        .sort((a, b) => b.saleDatetime.localeCompare(a.saleDatetime));
+    },
+  });
+}
+
+/** Sletter en salgsregistrering (hard delete på sales-rækken). */
+export function useDeleteTrygKanvasSale() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (saleId: string) => {
+      const { error } = await supabase.from("sales").delete().eq("id", saleId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      for (const key of [["tryg-kanvas-sales"], ["sales-aggregates"]]) {
+        queryClient.invalidateQueries({ queryKey: key });
+      }
+    },
+  });
+}
