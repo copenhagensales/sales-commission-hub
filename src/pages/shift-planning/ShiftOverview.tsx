@@ -1714,11 +1714,18 @@ export default function ShiftOverview() {
                 </div>
               ))}
 
-              {(!employees || employees.length === 0) && (
+              {employeesError && (
+                <div className="text-center py-12 text-destructive text-sm">
+                  Medarbejderlisten kunne ikke hentes. Prøv at genindlæse siden — kontakt en administrator hvis fejlen fortsætter.
+                </div>
+              )}
+
+              {!employeesError && (!employees || employees.length === 0) && (
                 <div className="text-center py-12 text-muted-foreground text-sm">
                   Ingen medarbejdere fundet
                 </div>
               )}
+
             </div>
           </div>
         </div>
