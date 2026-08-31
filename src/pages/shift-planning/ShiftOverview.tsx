@@ -102,7 +102,7 @@ export default function ShiftOverview() {
     selectedDepartment
   );
   const { data: departments } = useDepartments();
-  const { data: employees } = useEmployeesForShifts(selectedDepartment);
+  const { data: employees, error: employeesError } = useEmployeesForShifts(selectedDepartment);
   const { data: holidays } = useDanishHolidays(currentDate.getFullYear());
   const { data: absences } = useAbsencesForDateRange(
     format(weekStart, "yyyy-MM-dd"),
