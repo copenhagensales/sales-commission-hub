@@ -468,7 +468,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   const showOnboardingMenu = !isMenuHidden('section_onboarding') && p.canView("menu_section_onboarding") && p.canViewOnboardingAdmin;
 
   // "Tryg - Ret salg": kun ejere samt allowlisten (Filip, Annika)
-  const showTrygEditSales = trygEditAccess && p.canViewReportsTrygEditSales;
+  const showTrygEditSales = trygEditAccess;
 
   // Check if any Reports menu items are visible (requires section permission)
   const showReportsMenu = !isMenuHidden('section_rapporter') && p.canView("menu_section_reports") && 
