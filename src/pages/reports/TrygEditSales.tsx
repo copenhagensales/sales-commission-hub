@@ -249,7 +249,28 @@ export default function TrygEditSales() {
                   Alle salg på "Meeting -- CPH sales Kanvas" på den valgte dag.
                 </CardDescription>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={phoneSearch}
+                    onChange={(e) => setPhoneSearch(e.target.value)}
+                    placeholder="Søg telefonnummer"
+                    inputMode="tel"
+                    className="h-10 w-56 pl-9 pr-8"
+                  />
+                  {phoneSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setPhoneSearch("")}
+                      aria-label="Ryd søgning"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+
                 <Button
                   variant="outline"
                   className="gap-2"
