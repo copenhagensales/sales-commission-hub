@@ -33,6 +33,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  useReportTextTemplate,
+  useSaveReportTextTemplate,
+} from "@/hooks/useReportTextTemplate";
 import { useTrygEditAccess } from "@/hooks/useTrygEditAccess";
 import {
   useTrygKanvasSales,
