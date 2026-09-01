@@ -34,15 +34,18 @@ function monthBounds(now: Date) {
   return { start: start.toISOString(), end: end.toISOString() };
 }
 
-interface SaleRow {
-  agent_email: string | null;
-  validation_status: string | null;
-  sale_items: { quantity: number | null; product_id: string | null }[] | null;
+interface TdcMonthlyGoalPayload {
+  sellers: { id: string; firstName: string | null; lastName: string | null; workEmail: string | null }[];
+  items: { agentEmail: string | null; productId: string | null; quantity: number }[];
+  warning?: string;
 }
 
 /**
  * Antal solgte produktlinjer (sum af sale_items.quantity, fiber HAP/VOK vægtet)
  * på TDC Erhverv i indeværende måned, fordelt på aktive sælgere i TDC Erhverv-teamet.
+ *
+ * Data hentes via `tv-dashboard-data` edge functionen, så boardet også virker
+ * på TV-skærme uden login (RLS-bypass med TV-adgangskode).
  */
 export function useTdcMonthlyGoal(enabled = true) {
   const now = new Date();
@@ -57,60 +60,38 @@ export function useTdcMonthlyGoal(enabled = true) {
       const goal = getTdcMonthlyGoal(now);
       const warnings: string[] = [];
 
-      // 1) Aktive medarbejdere på TDC Erhverv-teamet
-      let employees: { id: string; first_name: string | null; last_name: string | null; work_email: string | null }[] = [];
+      let payload: TdcMonthlyGoalPayload = { sellers: [], items: [] };
       try {
-        const { data: members, error: memberError } = await supabase
-          .from("team_members")
-          .select("employee_id")
-          .eq("team_id", TDC_ERHVERV_TEAM_ID);
-        if (memberError) throw memberError;
-
-        const employeeIds = (members || []).map((m) => m.employee_id).filter(Boolean) as string[];
-        if (employeeIds.length > 0) {
-          const { data, error } = await supabase
-            .from("employee_master_data")
-            .select("id, first_name, last_name, work_email")
-            .in("id", employeeIds)
-            .eq("is_active", true);
-          if (error) throw error;
-          employees = data || [];
-        }
+        const res = await tvEdgeFetch(
+          `tv-dashboard-data?action=tdc-monthly-goal&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`,
+        );
+        if (!res.ok) throw new Error(`Hentning fejlede (${res.status})`);
+        const json = (await res.json()) as TdcMonthlyGoalPayload & { error?: string };
+        if (json.error) throw new Error(json.error);
+        payload = { sellers: json.sellers || [], items: json.items || [] };
+        if (json.warning) warnings.push(json.warning);
       } catch (e) {
-        warnings.push(`Sælgerliste: ${(e as Error).message}`);
+        warnings.push((e as Error).message);
       }
 
-      // 2) Salg på TDC Erhverv i måneden (samme mønster som TDC Erhverv-boardet)
-      let rows: SaleRow[] = [];
-      try {
-        const { data, error } = await supabase
-          .from("sales")
-          .select(
-            "agent_email, validation_status, sale_datetime, client_campaigns!inner(client_id), sale_items(quantity, product_id)"
-          )
-          .eq("client_campaigns.client_id", TDC_ERHVERV_CLIENT_ID)
-          .gte("sale_datetime", start)
-          .lte("sale_datetime", end);
-        if (error) throw error;
-        rows = (data || []) as unknown as SaleRow[];
-      } catch (e) {
-        warnings.push(`Salgsdata: ${(e as Error).message}`);
-      }
+      const employees = payload.sellers.map((s) => ({
+        id: s.id,
+        first_name: s.firstName,
+        last_name: s.lastName,
+        work_email: s.workEmail,
+      }));
 
       let teamCount = 0;
       const countByEmail = new Map<string, number>();
-      for (const row of rows) {
-        const status = row.validation_status;
-        if (status === "cancelled" || status === "rejected") continue;
-        const email = (row.agent_email || "").toLowerCase();
-        for (const item of row.sale_items || []) {
-          // Fiber (HAP/VOK) vægtes som på TDC Erhverv-boardet; alle andre linjer tæller 1 pr. stk.
-          const weight = (item.product_id && FIBER_BOARD_POINTS[item.product_id]) ?? 1;
-          const qty = (item.quantity ?? 1) * weight;
-          teamCount += qty;
-          if (email) countByEmail.set(email, (countByEmail.get(email) || 0) + qty);
-        }
+      for (const item of payload.items) {
+        // Fiber (HAP/VOK) vægtes som på TDC Erhverv-boardet; alle andre linjer tæller 1 pr. stk.
+        const weight = (item.productId && FIBER_BOARD_POINTS[item.productId]) ?? 1;
+        const qty = (item.quantity ?? 1) * weight;
+        teamCount += qty;
+        const email = (item.agentEmail || "").toLowerCase();
+        if (email) countByEmail.set(email, (countByEmail.get(email) || 0) + qty);
       }
+
 
       const excluded = new Set(goal?.excludeEmployeeIds ?? []);
 
