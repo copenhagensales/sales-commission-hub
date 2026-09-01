@@ -113,41 +113,55 @@ export default function TdcMonthlyGoalBoard() {
             {(data?.sellers.length ?? 0) === 0 ? (
               <p className="text-slate-400">Ingen aktive sælgere på TDC Erhverv-teamet.</p>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-3">
-                {data!.sellers.map((s) => {
+              (() => {
+                const sellers = data!.sellers;
+                const half = Math.ceil(sellers.length / 2);
+                const columns = [sellers.slice(0, half), sellers.slice(half)];
+
+                const renderSeller = (s: typeof sellers[number]) => {
                   const sellerStatus = calcBoardProgress(s.goal, s.count, today).status;
                   return (
-                  <div key={s.employeeId}>
-                    <div className="flex items-baseline justify-between mb-1">
-                      <span
-                        className={`text-base md:text-lg font-medium truncate pr-3 ${
-                          s.goal > 0 && s.progress >= 100 ? "text-emerald-400" : "text-slate-100"
-                        }`}
-                      >
-                        {s.name}
-                      </span>
-                      <span className="text-base md:text-lg tabular-nums text-slate-300 whitespace-nowrap">
-                        {fmt(s.count)}
-                        {s.goal > 0 && (
-                          <>
-                            <span className="text-slate-500"> / {fmt(s.goal)}</span>
-                            <span className="text-slate-500 ml-3">{Math.round(s.progress)}%</span>
-                          </>
-                        )}
-                      </span>
-                    </div>
-                    {s.goal > 0 && (
-                      <div className="h-3 w-full rounded-full bg-white/5 overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all duration-700 ${statusFillClass(sellerStatus)}`}
-                          style={{ width: `${Math.min(100, s.progress)}%` }}
-                        />
+                    <div key={s.employeeId}>
+                      <div className="flex items-baseline justify-between mb-1">
+                        <span
+                          className={`text-base md:text-lg font-medium truncate pr-3 ${
+                            s.goal > 0 && s.progress >= 100 ? "text-emerald-400" : "text-slate-100"
+                          }`}
+                        >
+                          {s.name}
+                        </span>
+                        <span className="text-base md:text-lg tabular-nums text-slate-300 whitespace-nowrap">
+                          {fmt(s.count)}
+                          {s.goal > 0 && (
+                            <>
+                              <span className="text-slate-500"> / {fmt(s.goal)}</span>
+                              <span className="text-slate-500 ml-3">{Math.round(s.progress)}%</span>
+                            </>
+                          )}
+                        </span>
                       </div>
-                    )}
-                  </div>
+                      {s.goal > 0 && (
+                        <div className="h-3 w-full rounded-full bg-white/5 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-700 ${statusFillClass(sellerStatus)}`}
+                            style={{ width: `${Math.min(100, s.progress)}%` }}
+                          />
+                        </div>
+                      )}
+                    </div>
                   );
-                })}
-              </div>
+                };
+
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10">
+                    {columns.map((col, i) => (
+                      <div key={i} className="space-y-3">
+                        {col.map(renderSeller)}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()
             )}
           </div>
         </>
