@@ -144,6 +144,7 @@ import {
   ClientForecast,
   ClientForecastDetail,
   PowerdagBoard,
+  TdcMonthlyGoalBoard,
   PowerdagInput,
   PowerdagAdmin,
   SystemFeedback,
