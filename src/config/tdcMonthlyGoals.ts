@@ -19,8 +19,7 @@ export const TDC_MONTHLY_GOALS: Record<string, TdcMonthlyGoal> = {
     team: 850,
     defaultSeller: 30,
     sellers: {},
-    // Oliver Gonsalves Vatting Arentoft (olar@copenhagensales.dk)
-    excludeEmployeeIds: ["80aac0dd-794c-4a68-97ed-374dc6b4cfea"],
+    excludeEmployeeIds: [],
   },
 };
 
