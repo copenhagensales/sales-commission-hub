@@ -3,6 +3,7 @@ import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { useAutoReload, isTvMode } from "@/utils/tvMode";
 import { useTdcMonthlyGoal } from "@/hooks/useTdcMonthlyGoal";
 import { Target, Trophy, Loader2 } from "lucide-react";
+import { calcBoardProgress, statusFillClass } from "@/lib/boardProgress";
 
 function fmt(n: number) {
   return n.toLocaleString("da-DK", { maximumFractionDigits: 1 });
