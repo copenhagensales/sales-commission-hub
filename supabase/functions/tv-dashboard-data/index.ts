@@ -296,6 +296,21 @@ Deno.serve(async (req) => {
       return await handleFiberBoardStats(supabase, start, end, corsHeaders, cacheKey);
     }
 
+    // TDC Månedsmål-board (TV uden login) - bypass RLS
+    if (action === "tdc-monthly-goal") {
+      const start = url.searchParams.get("start") || "";
+      const end = url.searchParams.get("end") || "";
+      const cacheKey = `tdc-monthly-goal-${start}-${end}`;
+      const cached = getCached<any>(cacheKey);
+      if (cached) {
+        return new Response(JSON.stringify(cached), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return await handleTdcMonthlyGoal(supabase, start, end, corsHeaders, cacheKey);
+    }
+
+
     // Get today's date range
     const today = new Date();
     const todayStr = today.toISOString().split("T")[0];
