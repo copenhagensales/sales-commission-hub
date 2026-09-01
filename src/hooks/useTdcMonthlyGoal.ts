@@ -81,7 +81,7 @@ export function useTdcMonthlyGoal(enabled = true) {
       const { data: items, error: itemError } = await supabase
         .from("sale_items")
         .select(
-          "quantity, sales!inner(agent_email, validation_status, sale_datetime, client_campaigns!inner(client_id))"
+          "quantity, product_id, sales!inner(agent_email, validation_status, sale_datetime, client_campaigns!inner(client_id))"
         )
         .eq("sales.client_campaigns.client_id", TDC_ERHVERV_CLIENT_ID)
         .gte("sales.sale_datetime", start)
