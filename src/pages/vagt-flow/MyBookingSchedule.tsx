@@ -24,11 +24,23 @@ export default function MyBookingSchedule() {
   const weekEnd = addDays(weekStart, 6);
   const weekNumber = getISOWeek(weekStart);
 
-  // Get employee_id from auth user
+  // Get employee_id from auth user (auth_user_id first, email as fallback)
   const { data: employeeId } = useQuery({
-    queryKey: ["my-employee-id", user?.email],
+    queryKey: ["my-employee-id", user?.id, user?.email],
     queryFn: async () => {
-      if (!user?.email) return null;
+      if (!user) return null;
+
+      if (user.id) {
+        const { data: byAuthId } = await supabase
+          .from("employee_master_data")
+          .select("id")
+          .eq("auth_user_id", user.id)
+          .eq("is_active", true)
+          .maybeSingle();
+        if (byAuthId?.id) return byAuthId.id;
+      }
+
+      if (!user.email) return null;
       const { data } = await supabase
         .from("employee_master_data")
         .select("id")
@@ -37,8 +49,9 @@ export default function MyBookingSchedule() {
         .maybeSingle();
       return data?.id ?? null;
     },
-    enabled: !!user?.email,
+    enabled: !!user,
   });
+
 
   // Fetch employee name for notifications
   const { data: employeeName } = useQuery({
