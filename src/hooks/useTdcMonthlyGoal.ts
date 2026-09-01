@@ -85,8 +85,7 @@ export function useTdcMonthlyGoal(enabled = true) {
         )
         .eq("sales.client_campaigns.client_id", TDC_ERHVERV_CLIENT_ID)
         .gte("sales.sale_datetime", start)
-        .lte("sales.sale_datetime", end)
-        .or("validation_status.neq.rejected,validation_status.is.null", { foreignTable: "sales" });
+        .lte("sales.sale_datetime", end);
       if (itemError) throw itemError;
 
       const rows = (items || []) as unknown as SaleItemRow[];
@@ -95,7 +94,7 @@ export function useTdcMonthlyGoal(enabled = true) {
       const countByEmail = new Map<string, number>();
       for (const row of rows) {
         const status = row.sales?.validation_status;
-        if (status === "cancelled") continue;
+        if (status === "cancelled" || status === "rejected") continue;
         // Fiber (HAP/VOK) vægtes som på TDC Erhverv-boardet; alle andre linjer tæller 1 pr. stk.
         const weight = (row.product_id && FIBER_BOARD_POINTS[row.product_id]) ?? 1;
         const qty = (row.quantity ?? 1) * weight;
