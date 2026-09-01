@@ -4,7 +4,7 @@ import { useTdcMonthlyGoal } from "@/hooks/useTdcMonthlyGoal";
 import { Target, Trophy, Loader2 } from "lucide-react";
 
 function fmt(n: number) {
-  return n.toLocaleString("da-DK");
+  return n.toLocaleString("da-DK", { maximumFractionDigits: 1 });
 }
 
 function barColor(progress: number) {
@@ -78,23 +78,29 @@ export default function TdcMonthlyGoalBoard() {
                     <div className="flex items-baseline justify-between mb-1.5">
                       <span
                         className={`text-lg md:text-xl font-medium ${
-                          s.progress >= 100 ? "text-emerald-400" : "text-slate-100"
+                          s.goal > 0 && s.progress >= 100 ? "text-emerald-400" : "text-slate-100"
                         }`}
                       >
                         {s.name}
                       </span>
                       <span className="text-lg md:text-xl tabular-nums text-slate-300">
                         {fmt(s.count)}
-                        <span className="text-slate-500"> / {fmt(s.goal)}</span>
-                        <span className="text-slate-500 ml-3">{Math.round(s.progress)}%</span>
+                        {s.goal > 0 && (
+                          <>
+                            <span className="text-slate-500"> / {fmt(s.goal)}</span>
+                            <span className="text-slate-500 ml-3">{Math.round(s.progress)}%</span>
+                          </>
+                        )}
                       </span>
                     </div>
-                    <div className="h-4 w-full rounded-full bg-white/5 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-700 ${barColor(s.progress)}`}
-                        style={{ width: `${Math.min(100, s.progress)}%` }}
-                      />
-                    </div>
+                    {s.goal > 0 && (
+                      <div className="h-4 w-full rounded-full bg-white/5 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-700 ${barColor(s.progress)}`}
+                          style={{ width: `${Math.min(100, s.progress)}%` }}
+                        />
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

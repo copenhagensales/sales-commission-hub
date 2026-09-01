@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { TDC_ERHVERV_CLIENT_ID, TDC_ERHVERV_TEAM_ID } from "@/hooks/useTdcErhvervSales";
 import { getTdcMonthlyGoal, getTdcSellerGoal, type TdcMonthlyGoal } from "@/config/tdcMonthlyGoals";
+import { FIBER_BOARD_POINTS } from "@/config/fiberBoardPoints";
 
 export interface TdcMonthlyGoalSeller {
   employeeId: string;
@@ -33,6 +34,7 @@ function monthBounds(now: Date) {
 
 interface SaleItemRow {
   quantity: number | null;
+  product_id: string | null;
   sales: {
     agent_email: string | null;
     validation_status: string | null;
@@ -79,7 +81,7 @@ export function useTdcMonthlyGoal(enabled = true) {
       const { data: items, error: itemError } = await supabase
         .from("sale_items")
         .select(
-          "quantity, sales!inner(agent_email, validation_status, sale_datetime, client_campaigns!inner(client_id))"
+          "quantity, product_id, sales!inner(agent_email, validation_status, sale_datetime, client_campaigns!inner(client_id))"
         )
         .eq("sales.client_campaigns.client_id", TDC_ERHVERV_CLIENT_ID)
         .gte("sales.sale_datetime", start)
@@ -94,7 +96,9 @@ export function useTdcMonthlyGoal(enabled = true) {
       for (const row of rows) {
         const status = row.sales?.validation_status;
         if (status === "cancelled") continue;
-        const qty = row.quantity ?? 1;
+        // Fiber (HAP/VOK) vægtes som på TDC Erhverv-boardet; alle andre linjer tæller 1 pr. stk.
+        const weight = (row.product_id && FIBER_BOARD_POINTS[row.product_id]) ?? 1;
+        const qty = (row.quantity ?? 1) * weight;
         teamCount += qty;
         const email = (row.sales?.agent_email || "").toLowerCase();
         if (email) countByEmail.set(email, (countByEmail.get(email) || 0) + qty);
