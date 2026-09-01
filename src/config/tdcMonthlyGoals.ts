@@ -10,13 +10,17 @@ export interface TdcMonthlyGoal {
   team: number;
   defaultSeller: number;
   sellers?: Record<string, number>;
+  /** Medarbejder-id'er der ikke skal vises som sælgere på boardet. */
+  excludeEmployeeIds?: string[];
 }
 
 export const TDC_MONTHLY_GOALS: Record<string, TdcMonthlyGoal> = {
   "2026-09": {
     team: 850,
-    defaultSeller: 0,
+    defaultSeller: 30,
     sellers: {},
+    // Oliver Gonsalves Vatting Arentoft (olar@copenhagensales.dk)
+    excludeEmployeeIds: ["80aac0dd-794c-4a68-97ed-374dc6b4cfea"],
   },
 };
 
