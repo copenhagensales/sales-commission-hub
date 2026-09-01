@@ -55,19 +55,36 @@ export default function TdcMonthlyGoalBoard() {
                 <Trophy className="h-7 w-7 text-yellow-400" />
                 <span className="text-xl md:text-2xl font-semibold text-slate-200">Fælles mål</span>
               </div>
-              <div className="text-right">
-                <div className="text-4xl md:text-6xl font-bold tabular-nums">
-                  {fmt(data?.teamCount ?? 0)}
-                  <span className="text-slate-500 text-2xl md:text-4xl"> / {fmt(data?.teamGoal ?? 0)}</span>
-                </div>
-                <div className="text-slate-400 text-lg">
-                  {Math.round(data?.teamProgress ?? 0)}% opnået
-                  {(data?.teamGoal ?? 0) > 0 && (
-                    <> · forventet {fmt(Math.round(teamProgressInfo.forventet))}</>
-                  )}
-                  {(data?.teamGoal ?? 0) > 0 && (data?.teamCount ?? 0) < (data?.teamGoal ?? 0) && (
-                    <> · {fmt((data?.teamGoal ?? 0) - (data?.teamCount ?? 0))} tilbage</>
-                  )}
+              <div className="flex items-end gap-6 md:gap-10">
+                {(data?.teamGoal ?? 0) > 0 && (
+                  <div className="text-right">
+                    <div
+                      className={`text-3xl md:text-5xl font-bold tabular-nums ${
+                        teamProgressInfo.gab <= 0 ? "text-emerald-400" : statusTextClass(teamProgressInfo.status)
+                      }`}
+                    >
+                      {teamProgressInfo.gab <= 0 ? "+" : "−"}
+                      {fmt(Math.abs(Math.round(teamProgressInfo.gab * 10) / 10))}
+                    </div>
+                    <div className="text-slate-400 text-base md:text-lg">
+                      {teamProgressInfo.gab <= 0 ? "foran på dagen" : "bagud på dagen"}
+                    </div>
+                  </div>
+                )}
+                <div className="text-right">
+                  <div className="text-4xl md:text-6xl font-bold tabular-nums">
+                    {fmt(data?.teamCount ?? 0)}
+                    <span className="text-slate-500 text-2xl md:text-4xl"> / {fmt(data?.teamGoal ?? 0)}</span>
+                  </div>
+                  <div className="text-slate-400 text-lg">
+                    {Math.round(data?.teamProgress ?? 0)}% opnået
+                    {(data?.teamGoal ?? 0) > 0 && (
+                      <> · forventet {fmt(Math.round(teamProgressInfo.forventet))}</>
+                    )}
+                    {(data?.teamGoal ?? 0) > 0 && (data?.teamCount ?? 0) < (data?.teamGoal ?? 0) && (
+                      <> · {fmt((data?.teamGoal ?? 0) - (data?.teamCount ?? 0))} tilbage</>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
