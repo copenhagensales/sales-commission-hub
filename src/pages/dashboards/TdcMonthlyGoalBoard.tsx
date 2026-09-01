@@ -88,7 +88,7 @@ export default function TdcMonthlyGoalBoard() {
                 </div>
               </div>
             </div>
-            <div className="relative h-8 w-full rounded-full bg-white/5 overflow-hidden">
+            <div className="relative h-10 md:h-12 w-full rounded-full bg-white/5 overflow-hidden">
               {/* Ghost-fyld: forventet niveau */}
               {(data?.teamGoal ?? 0) > 0 && (
                 <div
@@ -119,6 +119,34 @@ export default function TdcMonthlyGoalBoard() {
                 </span>
               </div>
             )}
+
+            {/* Dagsbokse: én pr. dag i måneden med dagens salg */}
+            {(data?.days.length ?? 0) > 0 && (
+              <div className="mt-3 flex gap-1 md:gap-1.5">
+                {data!.days.map((d) => (
+                  <div
+                    key={d.date}
+                    className={`flex-1 min-w-0 rounded-md border px-0.5 py-1 text-center ${
+                      d.isToday
+                        ? "border-sky-400 bg-sky-400/10"
+                        : d.isWeekend
+                          ? "border-white/5 bg-white/[0.02]"
+                          : "border-white/10 bg-white/5"
+                    }`}
+                  >
+                    <div className="text-[10px] md:text-xs text-slate-500 tabular-nums leading-none">{d.day}</div>
+                    <div
+                      className={`text-sm md:text-lg font-semibold tabular-nums leading-tight ${
+                        d.count > 0 ? "text-slate-100" : d.isFuture ? "text-slate-700" : "text-slate-600"
+                      }`}
+                    >
+                      {d.isFuture ? "" : fmt(d.count)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {(data?.teamGoal ?? 0) === 0 && (
               <p className="text-amber-400 text-sm mt-3">Månedsmål mangler for denne måned.</p>
             )}
