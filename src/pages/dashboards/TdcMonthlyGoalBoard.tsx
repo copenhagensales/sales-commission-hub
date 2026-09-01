@@ -57,20 +57,32 @@ export default function TdcMonthlyGoalBoard() {
               </div>
               <div className="flex items-end gap-6 md:gap-10">
                 {(data?.teamGoal ?? 0) > 0 && (
-                  <div className="text-right">
-                    <div
-                      className={`text-3xl md:text-5xl font-bold tabular-nums ${
-                        teamProgressInfo.gab <= 0 ? "text-emerald-400" : statusTextClass(teamProgressInfo.status)
-                      }`}
-                    >
-                      {teamProgressInfo.gab <= 0 ? "+" : "−"}
-                      {fmt(Math.abs(Math.round(teamProgressInfo.gab * 10) / 10))}
+                  <>
+                    <div className="text-right">
+                      <div className="text-3xl md:text-5xl font-bold tabular-nums text-slate-100">
+                        {fmt(Math.abs(Math.round(teamProgressInfo.gab * 10) / 10))}
+                      </div>
+                      <div className="text-slate-400 text-base md:text-lg">
+                        {teamProgressInfo.gab > 0
+                          ? "bagud på target"
+                          : teamProgressInfo.gab < 0
+                            ? "foran target"
+                            : "på target"}
+                      </div>
                     </div>
-                    <div className="text-slate-400 text-base md:text-lg">
-                      {teamProgressInfo.gab <= 0 ? "foran på dagen" : "bagud på dagen"}
+                    <div className="text-right">
+                      <div
+                        className={`text-3xl md:text-5xl font-bold tabular-nums ${statusTextClass(teamProgressInfo.status)}`}
+                      >
+                        {teamProgressInfo.indeks === null ? "—" : `${Math.round(teamProgressInfo.indeks)}%`}
+                      </div>
+                      {teamProgressInfo.indeks !== null && (
+                        <div className="text-slate-400 text-base md:text-lg">indeks · 100 = på target</div>
+                      )}
                     </div>
-                  </div>
+                  </>
                 )}
+
                 <div className="text-right">
                   <div className="text-4xl md:text-6xl font-bold tabular-nums">
                     {fmt(data?.teamCount ?? 0)}
