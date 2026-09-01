@@ -50,7 +50,8 @@ function countHverdage(start: Date, end: Date): number {
 
 /**
  * Beregner om man er foran, på eller bag target ift. hvor mange hverdage
- * der er gået i måneden. Dagen i dag tæller IKKE med (kun helt overståede dage).
+ * der er gået i måneden. Dagen i dag tæller MED som fuld arbejdsdag,
+ * så baseline er mål/arbejdsdage pr. hverdag.
  */
 export function calcBoardProgress(mål: number, faktisk: number, dato: Date): BoardProgress {
   const monthStart = new Date(dato.getFullYear(), dato.getMonth(), 1);
@@ -58,8 +59,10 @@ export function calcBoardProgress(mål: number, faktisk: number, dato: Date): Bo
 
   const arbejdsdageTotal = countHverdage(monthStart, monthEnd);
 
-  const dayBeforeToday = new Date(dato.getFullYear(), dato.getMonth(), dato.getDate() - 1);
-  const arbejdsdageGaaet = dayBeforeToday < monthStart ? 0 : countHverdage(monthStart, dayBeforeToday);
+  // I dag tæller med som fuld arbejdsdag (er i dag weekend/helligdag,
+  // tælles kun de forudgående hverdage, da countHverdage filtrerer den fra).
+  const today = new Date(dato.getFullYear(), dato.getMonth(), dato.getDate());
+  const arbejdsdageGaaet = countHverdage(monthStart, today);
 
   const forventet = arbejdsdageTotal > 0 ? mål * (arbejdsdageGaaet / arbejdsdageTotal) : 0;
   const gab = forventet - faktisk;
