@@ -17,7 +17,7 @@ function barColor(progress: number) {
 export default function TdcMonthlyGoalBoard() {
   const tv = isTvMode();
   useAutoReload(tv, 5 * 60_000);
-  const { data, isLoading } = useTdcMonthlyGoal();
+  const { data, isLoading, error } = useTdcMonthlyGoal();
 
   const content = (
     <div className="min-h-screen w-full bg-slate-950 text-white p-6 md:p-10">
