@@ -17,7 +17,7 @@ function barColor(progress: number) {
 export default function TdcMonthlyGoalBoard() {
   const tv = isTvMode();
   useAutoReload(tv, 5 * 60_000);
-  const { data, isLoading } = useTdcMonthlyGoal();
+  const { data, isLoading, error } = useTdcMonthlyGoal();
 
   const content = (
     <div className="min-h-screen w-full bg-slate-950 text-white p-6 md:p-10">
@@ -28,6 +28,12 @@ export default function TdcMonthlyGoalBoard() {
         </div>
         <Target className="h-10 w-10 md:h-14 md:w-14 text-sky-400" />
       </div>
+
+      {(error || data?.warning) && (
+        <p className="text-rose-400 text-sm mb-4">
+          Datafejl: {(error as Error | null)?.message ?? data?.warning}
+        </p>
+      )}
 
       {isLoading ? (
         <div className="flex items-center justify-center py-24">
