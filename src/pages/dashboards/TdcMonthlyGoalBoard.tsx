@@ -21,6 +21,11 @@ export default function TdcMonthlyGoalBoard() {
   useAutoReload(tv, 5 * 60_000);
   const { data, isLoading, error } = useTdcMonthlyGoal();
 
+  const today = new Date();
+  const teamProgressInfo = calcBoardProgress(data?.teamGoal ?? 0, data?.teamCount ?? 0, today);
+  const teamMarkerPct = Math.min(100, Math.max(0, teamProgressInfo.forventetPct));
+
+
   const content = (
     <div className="min-h-screen w-full bg-slate-950 text-white p-6 md:p-10">
       <div className="flex items-center justify-between mb-8">
