@@ -62,18 +62,46 @@ export default function TdcMonthlyGoalBoard() {
                 </div>
                 <div className="text-slate-400 text-lg">
                   {Math.round(data?.teamProgress ?? 0)}% opnået
+                  {(data?.teamGoal ?? 0) > 0 && (
+                    <> · forventet {fmt(Math.round(teamProgressInfo.forventet))}</>
+                  )}
                   {(data?.teamGoal ?? 0) > 0 && (data?.teamCount ?? 0) < (data?.teamGoal ?? 0) && (
                     <> · {fmt((data?.teamGoal ?? 0) - (data?.teamCount ?? 0))} tilbage</>
                   )}
                 </div>
               </div>
             </div>
-            <div className="h-8 w-full rounded-full bg-white/5 overflow-hidden">
+            <div className="relative h-8 w-full rounded-full bg-white/5 overflow-hidden">
+              {/* Ghost-fyld: forventet niveau */}
+              {(data?.teamGoal ?? 0) > 0 && (
+                <div
+                  className={`absolute inset-y-0 left-0 rounded-full opacity-25 ${barColor(data?.teamProgress ?? 0)}`}
+                  style={{ width: `${teamMarkerPct}%` }}
+                />
+              )}
+              {/* Faktisk fyld */}
               <div
-                className={`h-full rounded-full transition-all duration-700 ${barColor(data?.teamProgress ?? 0)}`}
+                className={`absolute inset-y-0 left-0 rounded-full transition-all duration-700 ${barColor(data?.teamProgress ?? 0)}`}
                 style={{ width: `${Math.min(100, data?.teamProgress ?? 0)}%` }}
               />
+              {/* Markør for forventet */}
+              {(data?.teamGoal ?? 0) > 0 && (
+                <div
+                  className="absolute inset-y-0 w-0.5 rounded-full bg-slate-100"
+                  style={{ left: `calc(${teamMarkerPct}% - 1px)` }}
+                />
+              )}
             </div>
+            {(data?.teamGoal ?? 0) > 0 && (
+              <div className="relative h-5 mt-1">
+                <span
+                  className="absolute text-xs text-slate-400 -translate-x-1/2 whitespace-nowrap"
+                  style={{ left: `${teamMarkerPct}%` }}
+                >
+                  forventet
+                </span>
+              </div>
+            )}
             {(data?.teamGoal ?? 0) === 0 && (
               <p className="text-amber-400 text-sm mt-3">Månedsmål mangler for denne måned.</p>
             )}
