@@ -139,13 +139,14 @@ export default function TdcMonthlyGoalBoard() {
                     {s.goal > 0 && (
                       <div className="h-3 w-full rounded-full bg-white/5 overflow-hidden">
                         <div
-                          className={`h-full rounded-full transition-all duration-700 ${barColor(s.progress)}`}
+                          className={`h-full rounded-full transition-all duration-700 ${statusFillClass(sellerStatus)}`}
                           style={{ width: `${Math.min(100, s.progress)}%` }}
                         />
                       </div>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
