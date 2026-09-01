@@ -752,7 +752,11 @@ export default function EmployeeMasterData() {
           teamCount={teamCount}
           positionCount={positionCount}
           pendingStartCount={notStartedYetCount}
+          activeTotalCount={activeTotalCount}
+          fullTimeCount={fullTimeCount}
           partTimeCount={partTimeCount}
+          fullTimeFreelanceCount={fullTimeFreelanceCount}
+          partTimeFreelanceCount={partTimeFreelanceCount}
         />
 
 
