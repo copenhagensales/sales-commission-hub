@@ -1,21 +1,48 @@
-# Fix: runtime-fejl på TDC Månedsmål-tavlen
+# Olivia Goldschmidt ser ikke sine vagter (Min vagtplan, Fieldmarketing)
 
-## Symptom
-`Uncaught TypeError: Cannot read properties of undefined (reading 'length')` i `src/pages/dashboards/TdcMonthlyGoalBoard.tsx`, når tavlen renderes.
+## Rod-årsag (bekræftet)
 
-## Rod-årsag (bekræftet i koden)
-Linje 124: `{(data?.days.length ?? 0) > 0 && (` — optional chaining dækker kun `data`, ikke `days`. Findes et `data`-objekt i React Query-cachen fra før `days` blev tilføjet til `useTdcMonthlyGoal` (samme queryKey `["tdc-monthly-goal", <måned>]`), er `data.days` `undefined`, og `.length` kaster. Samme mønster bruges på linje 158 for `data?.sellers.length`.
+Hun har vagter i databasen — 8 bekræftede `booking_assignment`-rækker (26/8–4/9 2026, alle `booking.status = confirmed`).
 
-## Ændring
-Kun `src/pages/dashboards/TdcMonthlyGoalBoard.tsx` (grøn zone, ren præsentation):
+Problemet er identitetsopslaget:
 
-- `data?.days.length` → `data?.days?.length`, og `data!.days.map(...)` → `(data.days ?? []).map(...)`.
-- `data?.sellers.length` → `data?.sellers?.length`, og `data!.sellers` → `data.sellers ?? []`.
+- Login-mail (auth): `oliviagoldschmidt@gmail.com`
+- `employee_master_data`: `private_email = oliviaskiligoldschmidt@gmail.com`, `work_email = olgo@copenhagensales.dk`
 
-Ingen ændring i beregningslogik, hook, edge function eller data.
+`src/pages/vagt-flow/MyBookingSchedule.tsx:32-38` finder medarbejderen udelukkende via
+`private_email.ilike / work_email.ilike` på login-mailen. Ingen af de to matcher hendes login-mail,
+så `employeeId` bliver `null`, og vagt-forespørgslen kører aldrig (`enabled: !!employeeId`).
+Siden viser derfor "Ingen vagt" hver dag uden fejl.
 
-## Verifikation
-Åbn `/dashboards/tdc-monthly-goal` og bekræft at tavlen renderer uden konsolfejl, at dagsboksene vises, og at fælles- og individuelle mål er uændrede.
+Hendes `auth_user_id` (`6678b2cf-…`) står korrekt på medarbejderrækken — det er kun mail-matchet der fejler.
 
-## Note om baseline (dit spørgsmål)
-Baseline er 850 / 22 hverdage i september 2026 = 38,64 pr. hverdag (vises afrundet som 39). Ingen ændring foreslået her.
+## Plan
+
+### 1. Ret data (løser hendes problem med det samme)
+
+Opdatér `private_email` på hendes medarbejderrække til den mail hun faktisk logger ind med,
+`oliviagoldschmidt@gmail.com`. Ingen andre felter røres, ingen løn- eller salgsdata påvirkes.
+
+### 2. Ret årsagen, så det ikke sker for andre (frontend)
+
+I `MyBookingSchedule.tsx` slås medarbejderen først op via `auth_user_id` (`user.id`), og først
+hvis det ikke giver et resultat falder den tilbage til mail-matchet. Det gør siden robust over for
+mail-uoverensstemmelser for alle FM-medarbejdere, ikke kun Olivia.
+
+### 3. Verifikation
+
+- Kør et opslag som hendes bruger og bekræft at de 8 assignments returneres.
+- Åbn Min vagtplan for uge 36 og bekræft at 31/8–4/9 vises.
+- Bekræft at en anden FM-medarbejder (hvor mailen matcher) stadig ser sine vagter uændret.
+
+## Teknisk resume
+
+- Data: `UPDATE employee_master_data SET private_email = 'oliviagoldschmidt@gmail.com' WHERE id = '29b7a229-…'`
+- Kode: `src/pages/vagt-flow/MyBookingSchedule.tsx` (kun opslaget af `employeeId`)
+- Ingen ændringer i RLS, lønberegning eller booking-data.
+
+## Åbent spørgsmål
+
+Samme mail-baserede opslag bruges også i `useVagtEmployee`, `useIsFieldmarketingEmployee` og
+`useCanWorkFieldmarketing`. Skal `auth_user_id`-først-logikken udbredes til dem i samme omgang,
+eller holder vi denne leverance til vagtplanen?
