@@ -2691,7 +2691,7 @@ async function handleTdcMonthlyGoal(
     }
 
     // Salgslinjer på TDC Erhverv i perioden
-    const items: { agentEmail: string | null; productId: string | null; quantity: number }[] = [];
+    const items: { agentEmail: string | null; productId: string | null; quantity: number; saleDate: string | null }[] = [];
     try {
       const pageSize = 1000;
       let from = 0;
@@ -2699,7 +2699,7 @@ async function handleTdcMonthlyGoal(
         const { data, error } = await supabase
           .from("sales")
           .select(
-            "agent_email, validation_status, client_campaigns!inner(client_id), sale_items(quantity, product_id)",
+            "agent_email, validation_status, sale_datetime, client_campaigns!inner(client_id), sale_items(quantity, product_id)",
           )
           .eq("client_campaigns.client_id", TDC_ERHVERV_CLIENT_ID_EF)
           .gte("sale_datetime", startIso)
