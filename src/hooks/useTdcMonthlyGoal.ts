@@ -34,6 +34,7 @@ function monthBounds(now: Date) {
 
 interface SaleItemRow {
   quantity: number | null;
+  product_id: string | null;
   sales: {
     agent_email: string | null;
     validation_status: string | null;
