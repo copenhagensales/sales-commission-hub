@@ -114,7 +114,9 @@ export default function TdcMonthlyGoalBoard() {
               <p className="text-slate-400">Ingen aktive sælgere på TDC Erhverv-teamet.</p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-3">
-                {data!.sellers.map((s) => (
+                {data!.sellers.map((s) => {
+                  const sellerStatus = calcBoardProgress(s.goal, s.count, today).status;
+                  return (
                   <div key={s.employeeId}>
                     <div className="flex items-baseline justify-between mb-1">
                       <span
