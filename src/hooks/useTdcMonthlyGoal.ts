@@ -96,7 +96,9 @@ export function useTdcMonthlyGoal(enabled = true) {
       for (const row of rows) {
         const status = row.sales?.validation_status;
         if (status === "cancelled") continue;
-        const qty = row.quantity ?? 1;
+        // Fiber (HAP/VOK) vægtes som på TDC Erhverv-boardet; alle andre linjer tæller 1 pr. stk.
+        const weight = (row.product_id && FIBER_BOARD_POINTS[row.product_id]) ?? 1;
+        const qty = (row.quantity ?? 1) * weight;
         teamCount += qty;
         const email = (row.sales?.agent_email || "").toLowerCase();
         if (email) countByEmail.set(email, (countByEmail.get(email) || 0) + qty);
