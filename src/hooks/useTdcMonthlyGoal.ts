@@ -47,7 +47,7 @@ function monthBounds(now: Date) {
 
 interface TdcMonthlyGoalPayload {
   sellers: { id: string; firstName: string | null; lastName: string | null; workEmail: string | null }[];
-  items: { agentEmail: string | null; productId: string | null; quantity: number }[];
+  items: { agentEmail: string | null; productId: string | null; quantity: number; saleDate?: string | null }[];
   warning?: string;
 }
 
