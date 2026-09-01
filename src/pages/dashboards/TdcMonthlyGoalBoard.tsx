@@ -4,7 +4,7 @@ import { useTdcMonthlyGoal } from "@/hooks/useTdcMonthlyGoal";
 import { Target, Trophy, Loader2 } from "lucide-react";
 
 function fmt(n: number) {
-  return n.toLocaleString("da-DK");
+  return n.toLocaleString("da-DK", { maximumFractionDigits: 1 });
 }
 
 function barColor(progress: number) {
