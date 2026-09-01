@@ -73,6 +73,7 @@ interface EmployeeMasterDataRecord {
   parking_spot_id: string | null;
   parking_monthly_cost: number | null;
   working_hours_model: string | null;
+  is_freelance_consultant?: boolean | null;
   weekly_hours: number | null;
   standard_start_time: string | null;
   is_active: boolean;
