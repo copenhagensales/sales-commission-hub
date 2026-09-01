@@ -12,6 +12,16 @@ export interface TdcMonthlyGoalSeller {
   progress: number;
 }
 
+export interface TdcMonthlyGoalDay {
+  /** YYYY-MM-DD */
+  date: string;
+  day: number;
+  count: number;
+  isWeekend: boolean;
+  isToday: boolean;
+  isFuture: boolean;
+}
+
 export interface TdcMonthlyGoalData {
   monthLabel: string;
   goal: TdcMonthlyGoal | null;
@@ -19,6 +29,7 @@ export interface TdcMonthlyGoalData {
   teamGoal: number;
   teamProgress: number;
   sellers: TdcMonthlyGoalSeller[];
+  days: TdcMonthlyGoalDay[];
   /** Sat hvis en delforespørgsel fejlede — målene vises stadig. */
   warning?: string;
 }
