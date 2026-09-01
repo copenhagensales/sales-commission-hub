@@ -2710,11 +2710,16 @@ async function handleTdcMonthlyGoal(
         for (const row of data as any[]) {
           const status = row.validation_status;
           if (status === "cancelled" || status === "rejected") continue;
+          // Dansk kalenderdato (Europe/Copenhagen) for salget
+          const saleDate = row.sale_datetime
+            ? new Date(row.sale_datetime).toLocaleDateString("en-CA", { timeZone: "Europe/Copenhagen" })
+            : null;
           for (const item of row.sale_items || []) {
             items.push({
               agentEmail: row.agent_email ? String(row.agent_email).toLowerCase() : null,
               productId: item.product_id ?? null,
               quantity: Number(item.quantity ?? 1),
+              saleDate,
             });
           }
         }
