@@ -79,18 +79,18 @@ export default function TdcMonthlyGoalBoard() {
             {(data?.sellers.length ?? 0) === 0 ? (
               <p className="text-slate-400">Ingen aktive sælgere på TDC Erhverv-teamet.</p>
             ) : (
-              <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-3">
                 {data!.sellers.map((s) => (
                   <div key={s.employeeId}>
-                    <div className="flex items-baseline justify-between mb-1.5">
+                    <div className="flex items-baseline justify-between mb-1">
                       <span
-                        className={`text-lg md:text-xl font-medium ${
+                        className={`text-base md:text-lg font-medium truncate pr-3 ${
                           s.goal > 0 && s.progress >= 100 ? "text-emerald-400" : "text-slate-100"
                         }`}
                       >
                         {s.name}
                       </span>
-                      <span className="text-lg md:text-xl tabular-nums text-slate-300">
+                      <span className="text-base md:text-lg tabular-nums text-slate-300 whitespace-nowrap">
                         {fmt(s.count)}
                         {s.goal > 0 && (
                           <>
@@ -101,7 +101,7 @@ export default function TdcMonthlyGoalBoard() {
                       </span>
                     </div>
                     {s.goal > 0 && (
-                      <div className="h-4 w-full rounded-full bg-white/5 overflow-hidden">
+                      <div className="h-3 w-full rounded-full bg-white/5 overflow-hidden">
                         <div
                           className={`h-full rounded-full transition-all duration-700 ${barColor(s.progress)}`}
                           style={{ width: `${Math.min(100, s.progress)}%` }}
