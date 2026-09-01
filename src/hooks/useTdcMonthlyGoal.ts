@@ -85,8 +85,7 @@ export function useTdcMonthlyGoal(enabled = true) {
         )
         .eq("sales.client_campaigns.client_id", TDC_ERHVERV_CLIENT_ID)
         .gte("sales.sale_datetime", start)
-        .lte("sales.sale_datetime", end)
-        .or("validation_status.neq.rejected,validation_status.is.null", { foreignTable: "sales" });
+        .lte("sales.sale_datetime", end);
       if (itemError) throw itemError;
 
       const rows = (items || []) as unknown as SaleItemRow[];
