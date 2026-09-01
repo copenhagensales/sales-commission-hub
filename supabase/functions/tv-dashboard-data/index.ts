@@ -2629,3 +2629,102 @@ async function handleFiberBoardStats(
   }
 }
 
+
+// TDC Månedsmål-board: sælgere på TDC Erhverv-teamet + antal salgslinjer pr. agent-email.
+// Returnerer rå byggeklodser — mål og fiber-vægtning håndteres i frontend.
+const TDC_ERHVERV_CLIENT_ID_EF = "20744525-7466-4b2c-afa7-6ee09a9112b0";
+const TDC_ERHVERV_TEAM_ID_EF = "ee967dfd-04c8-465e-bda7-f1c47094bae0";
+
+async function handleTdcMonthlyGoal(
+  supabase: any,
+  startIso: string,
+  endIso: string,
+  corsHeaders: Record<string, string>,
+  cacheKey?: string,
+) {
+  try {
+    const warnings: string[] = [];
+    let sellers: any[] = [];
+
+    try {
+      const { data: members, error: memberError } = await supabase
+        .from("team_members")
+        .select("employee_id")
+        .eq("team_id", TDC_ERHVERV_TEAM_ID_EF);
+      if (memberError) throw memberError;
+
+      const employeeIds = (members || [])
+        .map((m: any) => m.employee_id)
+        .filter(Boolean);
+
+      if (employeeIds.length > 0) {
+        const { data, error } = await supabase
+          .from("employee_master_data")
+          .select("id, first_name, last_name, work_email")
+          .in("id", employeeIds)
+          .eq("is_active", true);
+        if (error) throw error;
+        sellers = (data || []).map((e: any) => ({
+          id: e.id,
+          firstName: e.first_name,
+          lastName: e.last_name,
+          workEmail: e.work_email,
+        }));
+      }
+    } catch (e: any) {
+      warnings.push(`Sælgerliste: ${e?.message || "ukendt fejl"}`);
+    }
+
+    // Salgslinjer på TDC Erhverv i perioden
+    const items: { agentEmail: string | null; productId: string | null; quantity: number }[] = [];
+    try {
+      const pageSize = 1000;
+      let from = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from("sales")
+          .select(
+            "agent_email, validation_status, client_campaigns!inner(client_id), sale_items(quantity, product_id)",
+          )
+          .eq("client_campaigns.client_id", TDC_ERHVERV_CLIENT_ID_EF)
+          .gte("sale_datetime", startIso)
+          .lte("sale_datetime", endIso)
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        for (const row of data as any[]) {
+          const status = row.validation_status;
+          if (status === "cancelled" || status === "rejected") continue;
+          for (const item of row.sale_items || []) {
+            items.push({
+              agentEmail: row.agent_email ? String(row.agent_email).toLowerCase() : null,
+              productId: item.product_id ?? null,
+              quantity: Number(item.quantity ?? 1),
+            });
+          }
+        }
+        if (data.length < pageSize) break;
+        from += pageSize;
+      }
+    } catch (e: any) {
+      warnings.push(`Salgsdata: ${e?.message || "ukendt fejl"}`);
+    }
+
+    const payload = {
+      sellers,
+      items,
+      warning: warnings.length > 0 ? warnings.join(" · ") : undefined,
+    };
+
+    if (cacheKey) setCache(cacheKey, payload);
+    return new Response(JSON.stringify(payload), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (err: any) {
+    console.error("[handleTdcMonthlyGoal] error:", err);
+    return new Response(JSON.stringify({ error: err?.message || "unknown" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+}
