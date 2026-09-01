@@ -2691,7 +2691,7 @@ async function handleTdcMonthlyGoal(
     }
 
     // Salgslinjer på TDC Erhverv i perioden
-    const items: { agentEmail: string | null; productId: string | null; quantity: number }[] = [];
+    const items: { agentEmail: string | null; productId: string | null; quantity: number; saleDate: string | null }[] = [];
     try {
       const pageSize = 1000;
       let from = 0;
@@ -2699,7 +2699,7 @@ async function handleTdcMonthlyGoal(
         const { data, error } = await supabase
           .from("sales")
           .select(
-            "agent_email, validation_status, client_campaigns!inner(client_id), sale_items(quantity, product_id)",
+            "agent_email, validation_status, sale_datetime, client_campaigns!inner(client_id), sale_items(quantity, product_id)",
           )
           .eq("client_campaigns.client_id", TDC_ERHVERV_CLIENT_ID_EF)
           .gte("sale_datetime", startIso)
@@ -2710,11 +2710,16 @@ async function handleTdcMonthlyGoal(
         for (const row of data as any[]) {
           const status = row.validation_status;
           if (status === "cancelled" || status === "rejected") continue;
+          // Dansk kalenderdato (Europe/Copenhagen) for salget
+          const saleDate = row.sale_datetime
+            ? new Date(row.sale_datetime).toLocaleDateString("en-CA", { timeZone: "Europe/Copenhagen" })
+            : null;
           for (const item of row.sale_items || []) {
             items.push({
               agentEmail: row.agent_email ? String(row.agent_email).toLowerCase() : null,
               productId: item.product_id ?? null,
               quantity: Number(item.quantity ?? 1),
+              saleDate,
             });
           }
         }

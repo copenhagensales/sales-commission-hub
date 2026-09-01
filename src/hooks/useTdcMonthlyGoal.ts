@@ -12,6 +12,16 @@ export interface TdcMonthlyGoalSeller {
   progress: number;
 }
 
+export interface TdcMonthlyGoalDay {
+  /** YYYY-MM-DD */
+  date: string;
+  day: number;
+  count: number;
+  isWeekend: boolean;
+  isToday: boolean;
+  isFuture: boolean;
+}
+
 export interface TdcMonthlyGoalData {
   monthLabel: string;
   goal: TdcMonthlyGoal | null;
@@ -19,6 +29,7 @@ export interface TdcMonthlyGoalData {
   teamGoal: number;
   teamProgress: number;
   sellers: TdcMonthlyGoalSeller[];
+  days: TdcMonthlyGoalDay[];
   /** Sat hvis en delforespørgsel fejlede — målene vises stadig. */
   warning?: string;
 }
@@ -36,7 +47,7 @@ function monthBounds(now: Date) {
 
 interface TdcMonthlyGoalPayload {
   sellers: { id: string; firstName: string | null; lastName: string | null; workEmail: string | null }[];
-  items: { agentEmail: string | null; productId: string | null; quantity: number }[];
+  items: { agentEmail: string | null; productId: string | null; quantity: number; saleDate?: string | null }[];
   warning?: string;
 }
 
@@ -83,6 +94,7 @@ export function useTdcMonthlyGoal(enabled = true) {
 
       let teamCount = 0;
       const countByEmail = new Map<string, number>();
+      const countByDate = new Map<string, number>();
       for (const item of payload.items) {
         // Fiber (HAP/VOK) vægtes som på TDC Erhverv-boardet; alle andre linjer tæller 1 pr. stk.
         const weight = (item.productId && FIBER_BOARD_POINTS[item.productId]) ?? 1;
@@ -90,7 +102,27 @@ export function useTdcMonthlyGoal(enabled = true) {
         teamCount += qty;
         const email = (item.agentEmail || "").toLowerCase();
         if (email) countByEmail.set(email, (countByEmail.get(email) || 0) + qty);
+        if (item.saleDate) countByDate.set(item.saleDate, (countByDate.get(item.saleDate) || 0) + qty);
       }
+
+      // Én boks pr. dag i måneden
+      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      const todayDay = now.getDate();
+      const days: TdcMonthlyGoalDay[] = Array.from({ length: daysInMonth }, (_, i) => {
+        const dayNum = i + 1;
+        const d = new Date(now.getFullYear(), now.getMonth(), dayNum);
+        const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
+        const dow = d.getDay();
+        return {
+          date: iso,
+          day: dayNum,
+          count: countByDate.get(iso) || 0,
+          isWeekend: dow === 0 || dow === 6,
+          isToday: dayNum === todayDay,
+          isFuture: dayNum > todayDay,
+        };
+      });
+
 
 
       const excluded = new Set(goal?.excludeEmployeeIds ?? []);
@@ -120,6 +152,7 @@ export function useTdcMonthlyGoal(enabled = true) {
         teamGoal,
         teamProgress: teamGoal > 0 ? (teamCount / teamGoal) * 100 : 0,
         sellers,
+        days,
         warning: warnings.length > 0 ? warnings.join(" · ") : undefined,
       };
     },
