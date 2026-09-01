@@ -73,6 +73,7 @@ interface EmployeeMasterDataRecord {
   parking_spot_id: string | null;
   parking_monthly_cost: number | null;
   working_hours_model: string | null;
+  is_freelance_consultant?: boolean | null;
   weekly_hours: number | null;
   standard_start_time: string | null;
   is_active: boolean;
@@ -705,9 +706,15 @@ export default function EmployeeMasterData() {
   const localActiveStarted = employees.filter((e) => e.is_active).length - localNotStarted;
   const notStartedYetCount = headcount?.pendingStarts ?? localNotStarted;
   const activeCount = headcount?.activeStartedExclStaff ?? Math.max(0, localActiveStarted);
-  const partTimeCount = employees.filter(
-    (e) => e.is_active && !isNotStartedYet(e) && e.working_hours_model === "deltid"
-  ).length;
+  // Tre-delt tæller: alle aktive rækker i employee_master_data, delt på arbejdstidsmodel.
+  const activeEmployees = employees.filter((e) => e.is_active);
+  const activeTotalCount = activeEmployees.length;
+  const partTimeEmployees = activeEmployees.filter((e) => e.working_hours_model === "deltid");
+  const fullTimeEmployees = activeEmployees.filter((e) => e.working_hours_model !== "deltid");
+  const partTimeCount = partTimeEmployees.length;
+  const fullTimeCount = fullTimeEmployees.length;
+  const partTimeFreelanceCount = partTimeEmployees.filter((e) => e.is_freelance_consultant).length;
+  const fullTimeFreelanceCount = fullTimeEmployees.filter((e) => e.is_freelance_consultant).length;
   const staffCount = headcount?.staffActive ?? cachedStaffCount;
   const teamCount = cachedTeamCount;
   const positionCount = cachedPositionCount > 0 ? cachedPositionCount : jobPositions.length;
@@ -745,7 +752,11 @@ export default function EmployeeMasterData() {
           teamCount={teamCount}
           positionCount={positionCount}
           pendingStartCount={notStartedYetCount}
+          activeTotalCount={activeTotalCount}
+          fullTimeCount={fullTimeCount}
           partTimeCount={partTimeCount}
+          fullTimeFreelanceCount={fullTimeFreelanceCount}
+          partTimeFreelanceCount={partTimeFreelanceCount}
         />
 
 
