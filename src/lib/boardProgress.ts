@@ -79,6 +79,18 @@ export function calcBoardProgress(mål: number, faktisk: number, dato: Date): Bo
   };
 }
 
+/** Tailwind-klasse til tekstfarve efter status. */
+export function statusTextClass(status: ProgressStatus): string {
+  switch (status) {
+    case "on-track":
+      return "text-emerald-400";
+    case "efter":
+      return "text-amber-400";
+    default:
+      return "text-rose-400";
+  }
+}
+
 /** Tailwind-klasse til fyldfarve efter status. */
 export function statusFillClass(status: ProgressStatus): string {
   switch (status) {
