@@ -3,6 +3,7 @@ import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { useAutoReload, isTvMode } from "@/utils/tvMode";
 import { useTdcMonthlyGoal } from "@/hooks/useTdcMonthlyGoal";
 import { Target, Trophy, Loader2 } from "lucide-react";
+import { calcBoardProgress, statusFillClass } from "@/lib/boardProgress";
 
 function fmt(n: number) {
   return n.toLocaleString("da-DK", { maximumFractionDigits: 1 });
@@ -19,6 +20,11 @@ export default function TdcMonthlyGoalBoard() {
   const tv = isTvMode();
   useAutoReload(tv, 5 * 60_000);
   const { data, isLoading, error } = useTdcMonthlyGoal();
+
+  const today = new Date();
+  const teamProgressInfo = calcBoardProgress(data?.teamGoal ?? 0, data?.teamCount ?? 0, today);
+  const teamMarkerPct = Math.min(100, Math.max(0, teamProgressInfo.forventetPct));
+
 
   const content = (
     <div className="min-h-screen w-full bg-slate-950 text-white p-6 md:p-10">
@@ -56,18 +62,46 @@ export default function TdcMonthlyGoalBoard() {
                 </div>
                 <div className="text-slate-400 text-lg">
                   {Math.round(data?.teamProgress ?? 0)}% opnået
+                  {(data?.teamGoal ?? 0) > 0 && (
+                    <> · forventet {fmt(Math.round(teamProgressInfo.forventet))}</>
+                  )}
                   {(data?.teamGoal ?? 0) > 0 && (data?.teamCount ?? 0) < (data?.teamGoal ?? 0) && (
                     <> · {fmt((data?.teamGoal ?? 0) - (data?.teamCount ?? 0))} tilbage</>
                   )}
                 </div>
               </div>
             </div>
-            <div className="h-8 w-full rounded-full bg-white/5 overflow-hidden">
+            <div className="relative h-8 w-full rounded-full bg-white/5 overflow-hidden">
+              {/* Ghost-fyld: forventet niveau */}
+              {(data?.teamGoal ?? 0) > 0 && (
+                <div
+                  className={`absolute inset-y-0 left-0 rounded-full opacity-25 ${barColor(data?.teamProgress ?? 0)}`}
+                  style={{ width: `${teamMarkerPct}%` }}
+                />
+              )}
+              {/* Faktisk fyld */}
               <div
-                className={`h-full rounded-full transition-all duration-700 ${barColor(data?.teamProgress ?? 0)}`}
+                className={`absolute inset-y-0 left-0 rounded-full transition-all duration-700 ${barColor(data?.teamProgress ?? 0)}`}
                 style={{ width: `${Math.min(100, data?.teamProgress ?? 0)}%` }}
               />
+              {/* Markør for forventet */}
+              {(data?.teamGoal ?? 0) > 0 && (
+                <div
+                  className="absolute inset-y-0 w-0.5 rounded-full bg-slate-100"
+                  style={{ left: `calc(${teamMarkerPct}% - 1px)` }}
+                />
+              )}
             </div>
+            {(data?.teamGoal ?? 0) > 0 && (
+              <div className="relative h-5 mt-1">
+                <span
+                  className="absolute text-xs text-slate-400 -translate-x-1/2 whitespace-nowrap"
+                  style={{ left: `${teamMarkerPct}%` }}
+                >
+                  forventet
+                </span>
+              </div>
+            )}
             {(data?.teamGoal ?? 0) === 0 && (
               <p className="text-amber-400 text-sm mt-3">Månedsmål mangler for denne måned.</p>
             )}
@@ -80,7 +114,9 @@ export default function TdcMonthlyGoalBoard() {
               <p className="text-slate-400">Ingen aktive sælgere på TDC Erhverv-teamet.</p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-3">
-                {data!.sellers.map((s) => (
+                {data!.sellers.map((s) => {
+                  const sellerStatus = calcBoardProgress(s.goal, s.count, today).status;
+                  return (
                   <div key={s.employeeId}>
                     <div className="flex items-baseline justify-between mb-1">
                       <span
@@ -103,13 +139,14 @@ export default function TdcMonthlyGoalBoard() {
                     {s.goal > 0 && (
                       <div className="h-3 w-full rounded-full bg-white/5 overflow-hidden">
                         <div
-                          className={`h-full rounded-full transition-all duration-700 ${barColor(s.progress)}`}
+                          className={`h-full rounded-full transition-all duration-700 ${statusFillClass(sellerStatus)}`}
                           style={{ width: `${Math.min(100, s.progress)}%` }}
                         />
                       </div>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
