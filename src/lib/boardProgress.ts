@@ -5,14 +5,15 @@
  * Bruger kun læsende hjælpefunktioner derfra.
  */
 
-/** Tærskler i "dagspace" (mål pr. hverdag). Juster her, ikke i logikken. */
-export const ON_TRACK_DAGE = 1;
-export const EFTER_DAGE = 2;
+/** Indeks-tærskler i procent. Juster her, ikke i logikken. */
+export const INDEKS_FORAN = 110;
+export const INDEKS_ON_TRACK = 95;
+export const INDEKS_EFTER = 85;
 
 /** Helligdage (ISO YYYY-MM-DD) der ikke tælles som hverdage. Tom indtil videre. */
 export const HELLIGDAGE: string[] = [];
 
-export type ProgressStatus = "on-track" | "efter" | "bagud";
+export type ProgressStatus = "foran" | "on-track" | "efter" | "bagud" | "ukendt";
 
 export interface BoardProgress {
   /** Forventet antal på nuværende tidspunkt i måneden. */
@@ -23,10 +24,13 @@ export interface BoardProgress {
   gab: number;
   /** Mål pr. hverdag. */
   dagspace: number;
+  /** Faktisk i procent af forventet. Null når forventet er 0. */
+  indeks: number | null;
   arbejdsdageTotal: number;
   arbejdsdageGaaet: number;
   status: ProgressStatus;
 }
+
 
 function isoDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
