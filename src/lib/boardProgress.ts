@@ -50,7 +50,8 @@ function countHverdage(start: Date, end: Date): number {
 
 /**
  * Beregner om man er foran, på eller bag target ift. hvor mange hverdage
- * der er gået i måneden. Dagen i dag tæller IKKE med (kun helt overståede dage).
+ * der er gået i måneden. Dagen i dag tæller MED som fuld arbejdsdag,
+ * så baseline er mål/arbejdsdage pr. hverdag.
  */
 export function calcBoardProgress(mål: number, faktisk: number, dato: Date): BoardProgress {
   const monthStart = new Date(dato.getFullYear(), dato.getMonth(), 1);
