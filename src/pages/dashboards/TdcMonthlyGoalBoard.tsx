@@ -1,4 +1,5 @@
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { useAutoReload, isTvMode } from "@/utils/tvMode";
 import { useTdcMonthlyGoal } from "@/hooks/useTdcMonthlyGoal";
 import { Target, Trophy, Loader2 } from "lucide-react";
@@ -118,5 +119,10 @@ export default function TdcMonthlyGoalBoard() {
   );
 
   if (tv) return content;
-  return <DashboardShell>{content}</DashboardShell>;
+  return (
+    <DashboardShell>
+      <DashboardHeader title="TDC Månedsmål" subtitle={data?.monthLabel ?? ""} />
+      {content}
+    </DashboardShell>
+  );
 }
