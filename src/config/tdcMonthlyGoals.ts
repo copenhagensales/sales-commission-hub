@@ -14,7 +14,7 @@ export interface TdcMonthlyGoal {
 
 export const TDC_MONTHLY_GOALS: Record<string, TdcMonthlyGoal> = {
   "2026-09": {
-    team: 0,
+    team: 850,
     defaultSeller: 0,
     sellers: {},
   },
