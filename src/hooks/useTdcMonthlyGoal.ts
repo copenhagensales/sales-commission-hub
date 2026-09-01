@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { TDC_ERHVERV_CLIENT_ID, TDC_ERHVERV_TEAM_ID } from "@/hooks/useTdcErhvervSales";
+import { tvEdgeFetch } from "@/utils/tvEdgeFetch";
 import { getTdcMonthlyGoal, getTdcSellerGoal, type TdcMonthlyGoal } from "@/config/tdcMonthlyGoals";
 import { FIBER_BOARD_POINTS } from "@/config/fiberBoardPoints";
+
 
 export interface TdcMonthlyGoalSeller {
   employeeId: string;
