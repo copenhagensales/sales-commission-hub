@@ -119,5 +119,10 @@ export default function TdcMonthlyGoalBoard() {
   );
 
   if (tv) return content;
-  return <DashboardShell>{content}</DashboardShell>;
+  return (
+    <DashboardShell>
+      <DashboardHeader title="TDC Månedsmål" subtitle={data?.monthLabel ?? ""} />
+      {content}
+    </DashboardShell>
+  );
 }
