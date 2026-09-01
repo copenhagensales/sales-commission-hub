@@ -152,6 +152,7 @@ export function useTdcMonthlyGoal(enabled = true) {
         teamGoal,
         teamProgress: teamGoal > 0 ? (teamCount / teamGoal) * 100 : 0,
         sellers,
+        days,
         warning: warnings.length > 0 ? warnings.join(" · ") : undefined,
       };
     },
