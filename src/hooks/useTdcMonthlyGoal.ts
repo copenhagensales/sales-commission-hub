@@ -104,7 +104,10 @@ export function useTdcMonthlyGoal(enabled = true) {
         if (email) countByEmail.set(email, (countByEmail.get(email) || 0) + qty);
       }
 
+      const excluded = new Set(goal?.excludeEmployeeIds ?? []);
+
       const sellers: TdcMonthlyGoalSeller[] = employees
+        .filter((e) => !excluded.has(e.id))
         .map((e) => {
           const name = [e.first_name, e.last_name].filter(Boolean).join(" ").trim() || (e.work_email ?? "Ukendt");
           const count = countByEmail.get((e.work_email || "").toLowerCase()) || 0;
