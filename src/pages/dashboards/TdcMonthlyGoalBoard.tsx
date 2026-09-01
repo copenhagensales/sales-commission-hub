@@ -29,6 +29,12 @@ export default function TdcMonthlyGoalBoard() {
         <Target className="h-10 w-10 md:h-14 md:w-14 text-sky-400" />
       </div>
 
+      {(error || data?.warning) && (
+        <p className="text-rose-400 text-sm mb-4">
+          Datafejl: {(error as Error | null)?.message ?? data?.warning}
+        </p>
+      )}
+
       {isLoading ? (
         <div className="flex items-center justify-center py-24">
           <Loader2 className="h-10 w-10 animate-spin text-sky-400" />
