@@ -60,7 +60,7 @@ export default function TdcMonthlyGoalBoard() {
                   <>
                     <div className="text-right">
                       <div className="text-3xl md:text-5xl font-bold tabular-nums text-slate-100">
-                        {fmt(Math.abs(Math.round(teamProgressInfo.gab * 10) / 10))}
+                        {teamProgressInfo.gab > 0 ? "−" : ""}{fmt(Math.abs(Math.round(teamProgressInfo.gab * 10) / 10))}
                       </div>
                       <div className="text-slate-400 text-base md:text-lg">
                         {teamProgressInfo.gab > 0 ? "bagud på dagen" : "foran på dagen"}
