@@ -23,6 +23,7 @@ import UnitedDashboard from "@/pages/UnitedDashboard";
 import SalesOverviewAll from "@/pages/dashboards/SalesOverviewAll";
 import TvLeagueDashboard from "@/pages/tv-board/TvLeagueDashboard";
 import PowerdagBoard from "@/pages/dashboards/PowerdagBoard";
+import TdcMonthlyGoalBoard from "@/pages/dashboards/TdcMonthlyGoalBoard";
 
 // Map dashboard slugs to components
 const dashboardComponents: Record<string, React.ComponentType> = {
