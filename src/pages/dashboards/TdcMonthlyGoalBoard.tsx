@@ -28,12 +28,12 @@ export default function TdcMonthlyGoalBoard() {
 
   const content = (
     <div className="min-h-screen w-full bg-slate-950 text-white p-6 md:p-10">
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-5">
         <div>
-          <h1 className="text-3xl md:text-5xl font-bold tracking-tight">TDC Månedsmål</h1>
-          <p className="text-slate-400 mt-1 text-lg">{data?.monthLabel ?? ""}</p>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">TDC Månedsmål</h1>
+          <p className="text-slate-400 mt-0.5 text-base">{data?.monthLabel ?? ""}</p>
         </div>
-        <Target className="h-10 w-10 md:h-14 md:w-14 text-sky-400" />
+        <Target className="h-8 w-8 md:h-10 md:w-10 text-sky-400" />
       </div>
 
       {(error || data?.warning) && (
