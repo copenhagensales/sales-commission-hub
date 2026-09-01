@@ -17,8 +17,25 @@ export interface TdcMonthlyGoal {
 export const TDC_MONTHLY_GOALS: Record<string, TdcMonthlyGoal> = {
   "2026-09": {
     team: 850,
-    defaultSeller: 30,
-    sellers: {},
+    defaultSeller: 0,
+    sellers: {
+      "Mathias Victor Andersen": 130,
+      "Jacob Østergaard Hansen": 105,
+      "Sune Novrman": 80,
+      "Matias Heller Frederiksen": 55,
+      "Andreas Walther Christensen": 50,
+      "Niklas Krøyer-Strube": 40,
+      "August Bach Pedersen": 80,
+      "Thomas Wehage": 25,
+      "Lukas nielsen": 45,
+      "Zean Romeo Ayvaz": 30,
+      "Julius Rødsø Langkilde": 45,
+      "Storm Søegaard": 20,
+      "Thorbjørn Hansen-Larsen": 80,
+      "Jonathan Gabriely Givskov Hove": 10,
+      "Nicholaj Michael Wester": 60,
+      "Oliver Gonsalves Vatting Arentoft": 5,
+    },
     excludeEmployeeIds: [],
   },
 };
@@ -28,8 +45,16 @@ export function getTdcMonthlyGoal(date: Date): TdcMonthlyGoal | null {
   return TDC_MONTHLY_GOALS[key] ?? null;
 }
 
+/** Normaliserer navne: trim, kollapser gentagne mellemrum, lowercase. */
+function normalizeName(name: string): string {
+  return name.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
 export function getTdcSellerGoal(goal: TdcMonthlyGoal | null, sellerName: string): number {
   if (!goal) return 0;
-  const explicit = goal.sellers?.[sellerName];
-  return typeof explicit === "number" ? explicit : goal.defaultSeller;
+  const target = normalizeName(sellerName);
+  for (const [key, value] of Object.entries(goal.sellers ?? {})) {
+    if (normalizeName(key) === target) return value;
+  }
+  return goal.defaultSeller;
 }
