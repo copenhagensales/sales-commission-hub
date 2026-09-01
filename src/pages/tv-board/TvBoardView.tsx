@@ -15,12 +15,14 @@ import UnitedDashboard from "@/pages/UnitedDashboard";
 import SalesOverviewAll from "@/pages/dashboards/SalesOverviewAll";
 import TvLeagueDashboard from "@/pages/tv-board/TvLeagueDashboard";
 import PowerdagBoard from "@/pages/dashboards/PowerdagBoard";
+import TdcMonthlyGoalBoard from "@/pages/dashboards/TdcMonthlyGoalBoard";
 
 const dashboardComponents: Record<string, React.ComponentType> = {
   "cph-sales": CphSalesDashboard,
   "fieldmarketing": FieldmarketingDashboardFull,
   "eesy-tm": EesyTmDashboard,
   "tdc-erhverv": TdcErhvervDashboard,
+  "tdc-monthly-goal": TdcMonthlyGoalBoard,
   "relatel": RelatelDashboard,
   "united": UnitedDashboard,
   "cs-top-20": CsTop20Dashboard,

@@ -1,0 +1,110 @@
+import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { useAutoReload, isTvMode } from "@/utils/tvMode";
+import { useTdcMonthlyGoal } from "@/hooks/useTdcMonthlyGoal";
+import { Target, Trophy, Loader2 } from "lucide-react";
+
+function fmt(n: number) {
+  return n.toLocaleString("da-DK");
+}
+
+function barColor(progress: number) {
+  if (progress >= 100) return "bg-emerald-400";
+  if (progress >= 75) return "bg-sky-400";
+  if (progress >= 50) return "bg-amber-400";
+  return "bg-rose-400";
+}
+
+export default function TdcMonthlyGoalBoard() {
+  const tv = isTvMode();
+  useAutoReload(tv, 5 * 60_000);
+  const { data, isLoading } = useTdcMonthlyGoal();
+
+  const content = (
+    <div className="min-h-screen w-full bg-slate-950 text-white p-6 md:p-10">
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-3xl md:text-5xl font-bold tracking-tight">TDC Månedsmål</h1>
+          <p className="text-slate-400 mt-1 text-lg">{data?.monthLabel ?? ""}</p>
+        </div>
+        <Target className="h-10 w-10 md:h-14 md:w-14 text-sky-400" />
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-24">
+          <Loader2 className="h-10 w-10 animate-spin text-sky-400" />
+        </div>
+      ) : (
+        <>
+          {/* Fælles mål */}
+          <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-6 md:p-8 mb-8">
+            <div className="flex items-end justify-between mb-4 flex-wrap gap-2">
+              <div className="flex items-center gap-3">
+                <Trophy className="h-7 w-7 text-yellow-400" />
+                <span className="text-xl md:text-2xl font-semibold text-slate-200">Fælles mål</span>
+              </div>
+              <div className="text-right">
+                <div className="text-4xl md:text-6xl font-bold tabular-nums">
+                  {fmt(data?.teamCount ?? 0)}
+                  <span className="text-slate-500 text-2xl md:text-4xl"> / {fmt(data?.teamGoal ?? 0)}</span>
+                </div>
+                <div className="text-slate-400 text-lg">
+                  {Math.round(data?.teamProgress ?? 0)}% opnået
+                  {(data?.teamGoal ?? 0) > 0 && (data?.teamCount ?? 0) < (data?.teamGoal ?? 0) && (
+                    <> · {fmt((data?.teamGoal ?? 0) - (data?.teamCount ?? 0))} tilbage</>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="h-8 w-full rounded-full bg-white/5 overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-700 ${barColor(data?.teamProgress ?? 0)}`}
+                style={{ width: `${Math.min(100, data?.teamProgress ?? 0)}%` }}
+              />
+            </div>
+            {(data?.teamGoal ?? 0) === 0 && (
+              <p className="text-amber-400 text-sm mt-3">Månedsmål mangler for denne måned.</p>
+            )}
+          </div>
+
+          {/* Individuelle mål */}
+          <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-6 md:p-8">
+            <h2 className="text-xl md:text-2xl font-semibold text-slate-200 mb-5">Individuelle mål</h2>
+            {(data?.sellers.length ?? 0) === 0 ? (
+              <p className="text-slate-400">Ingen aktive sælgere på TDC Erhverv-teamet.</p>
+            ) : (
+              <div className="space-y-4">
+                {data!.sellers.map((s) => (
+                  <div key={s.employeeId}>
+                    <div className="flex items-baseline justify-between mb-1.5">
+                      <span
+                        className={`text-lg md:text-xl font-medium ${
+                          s.progress >= 100 ? "text-emerald-400" : "text-slate-100"
+                        }`}
+                      >
+                        {s.name}
+                      </span>
+                      <span className="text-lg md:text-xl tabular-nums text-slate-300">
+                        {fmt(s.count)}
+                        <span className="text-slate-500"> / {fmt(s.goal)}</span>
+                        <span className="text-slate-500 ml-3">{Math.round(s.progress)}%</span>
+                      </span>
+                    </div>
+                    <div className="h-4 w-full rounded-full bg-white/5 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-700 ${barColor(s.progress)}`}
+                        style={{ width: `${Math.min(100, s.progress)}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+
+  if (tv) return content;
+  return <DashboardShell>{content}</DashboardShell>;
+}
