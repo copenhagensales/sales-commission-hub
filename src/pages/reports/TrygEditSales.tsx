@@ -115,26 +115,36 @@ function normalizePhone(value: string): string {
 export default function TrygEditSales() {
   const { hasAccess, isLoading: loadingAccess } = useTrygEditAccess();
   const [day, setDay] = useState<Date>(new Date());
+  const [rangeFrom, setRangeFrom] = useState<Date>(new Date());
+  const [rangeTo, setRangeTo] = useState<Date>(new Date());
   const [deleteTarget, setDeleteTarget] = useState<TrygKanvasSale | null>(null);
   const [isEditingTemplate, setIsEditingTemplate] = useState(false);
   const [draftTemplate, setDraftTemplate] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [phoneSearch, setPhoneSearch] = useState("");
 
-  // Nulstil markeringer og søgning ved skift af dag
+  // Nulstil markeringer og søgning ved skift af dag — perioden følger dagen
   useEffect(() => {
     setSelectedIds(new Set());
     setPhoneSearch("");
+    setRangeFrom(day);
+    setRangeTo(day);
   }, [day]);
 
 
-  const { data: sales, isLoading } = useTrygKanvasSales(day, hasAccess);
+  const { data: sales, isLoading } = useTrygKanvasSales(day, undefined, hasAccess);
+  const { data: rangeSalesData, isLoading: isLoadingRange } = useTrygKanvasSales(
+    rangeFrom,
+    rangeTo,
+    hasAccess
+  );
   const deleteSale = useDeleteTrygKanvasSale();
   const { body: template } = useReportTextTemplate(
     TEMPLATE_KEY,
     TRYG_CANCEL_TEMPLATE
   );
   const saveTemplate = useSaveReportTextTemplate(TEMPLATE_KEY);
+
 
   const startEditTemplate = () => {
     setDraftTemplate(template);
