@@ -144,6 +144,7 @@ export default function TrygEditSales() {
     hasAccess
   );
   const deleteSale = useDeleteTrygKanvasSale();
+  const deleteSales = useDeleteTrygKanvasSales();
   const { body: template } = useReportTextTemplate(
     TEMPLATE_KEY,
     TRYG_CANCEL_TEMPLATE
