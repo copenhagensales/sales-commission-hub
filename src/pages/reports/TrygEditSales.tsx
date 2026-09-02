@@ -29,6 +29,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TrygSalesTable } from "@/components/reports/TrygSalesTable";
+import { SendTrygMailDialog } from "@/components/reports/SendTrygMailDialog";
 
 import {
   useReportTextTemplate,
