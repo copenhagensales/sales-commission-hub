@@ -37,8 +37,6 @@ interface StatusProps extends CommonProps {
   isPending: boolean;
   /** Vis dato-kolonne når perioden dækker mere end én dag. */
   showDate?: boolean;
-  /** Ekstra handling i tabelhovedet, til venstre for "Handlinger". */
-  headerAction?: React.ReactNode;
 }
 
 
