@@ -309,6 +309,79 @@ export default function TrygEditSales() {
     await copyText(fillPhonePlaceholders(template, selectedPhones));
   };
 
+  const setQuickRange = (from: Date, to: Date) => {
+    setRangeFrom(from);
+    setRangeTo(to);
+  };
+
+  const today = new Date();
+  const periodPicker = (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-sm text-muted-foreground">Periode:</span>
+      {(
+        [
+          ["Fra", rangeFrom, setRangeFrom],
+          ["Til", rangeTo, setRangeTo],
+        ] as const
+      ).map(([label, value, setValue]) => (
+        <Popover key={label}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="h-9 gap-2">
+              <CalendarIcon className="h-4 w-4" />
+              {label}: {format(value, "dd/MM/yyyy", { locale: da })}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="single"
+              selected={value}
+              onSelect={(d) => d && setValue(d)}
+              locale={da}
+              initialFocus
+            />
+          </PopoverContent>
+        </Popover>
+      ))}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-9"
+          onClick={() => setQuickRange(today, today)}
+        >
+          I dag
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-9"
+          onClick={() => setQuickRange(subDays(today, 6), today)}
+        >
+          Sidste 7 dage
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-9"
+          onClick={() => setQuickRange(startOfMonth(today), today)}
+        >
+          Denne måned
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-9"
+          onClick={() => {
+            const prev = subMonths(today, 1);
+            setQuickRange(startOfMonth(prev), endOfMonth(prev));
+          }}
+        >
+          Sidste måned
+        </Button>
+      </div>
+    </div>
+  );
+
 
   return (
     <MainLayout>
