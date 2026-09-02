@@ -39,6 +39,7 @@ import { useTrygEditAccess } from "@/hooks/useTrygEditAccess";
 import {
   useTrygKanvasSales,
   useDeleteTrygKanvasSale,
+  useDeleteTrygKanvasSales,
   type TrygKanvasSale,
 } from "@/hooks/useTrygKanvasSales";
 import {
