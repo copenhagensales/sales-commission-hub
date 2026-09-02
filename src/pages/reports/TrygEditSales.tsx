@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { endOfMonth, format, startOfMonth, subDays, subMonths } from "date-fns";
 import { da } from "date-fns/locale";
-import { CalendarIcon, Check, Copy, FileText, Pencil, Search, X } from "lucide-react";
+import { CalendarIcon, Check, Copy, FileText, Mail, Pencil, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { MainLayout } from "@/components/layout/MainLayout";
 import {
