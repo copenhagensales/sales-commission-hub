@@ -596,7 +596,22 @@ export default function TrygEditSales() {
                 </TabsContent>
 
                 <TabsContent value="rejected" className="space-y-4">
-                  {periodPicker}
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    {periodPicker}
+                    <Button
+                      size="lg"
+                      className="gap-2 text-sm font-semibold ml-auto"
+                      onClick={() => setIsMailOpen(true)}
+                      disabled={rejectedPhones.length === 0}
+                      title="Send annulleringsmail til Tryg med numrene på de afviste salg i perioden"
+                    >
+                      <Mail className="h-5 w-5" />
+                      Send til Tryg
+                      {rejectedPhones.length > 0
+                        ? ` (${rejectedPhones.length})`
+                        : ""}
+                    </Button>
+                  </div>
                   <TrygSalesTable
                     mode="status"
                     sales={rejectedSales}
@@ -606,22 +621,6 @@ export default function TrygEditSales() {
                     onUndo={clearStatus}
                     isPending={clearReview.isPending}
                     showDate={showDateColumn}
-                    headerAction={
-                      <Button
-                        size="sm"
-                        className="h-7 gap-1.5 text-xs font-medium"
-                        onClick={() => setIsMailOpen(true)}
-                        disabled={rejectedPhones.length === 0}
-                        title="Send annulleringsmail til Tryg med numrene på de afviste salg i perioden"
-                      >
-                        <Mail className="h-3.5 w-3.5" />
-                        Send til Tryg
-                        {rejectedPhones.length > 0
-                          ? ` (${rejectedPhones.length})`
-                          : ""}
-                      </Button>
-                    }
-
                   />
                 </TabsContent>
 

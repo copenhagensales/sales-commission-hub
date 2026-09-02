@@ -37,8 +37,6 @@ interface StatusProps extends CommonProps {
   isPending: boolean;
   /** Vis dato-kolonne når perioden dækker mere end én dag. */
   showDate?: boolean;
-  /** Ekstra handling i tabelhovedet, til venstre for "Handlinger". */
-  headerAction?: React.ReactNode;
 }
 
 
@@ -99,11 +97,6 @@ export function TrygSalesTable(props: Props) {
                     <X className="h-3.5 w-3.5" />
                     Afvis markerede
                   </Button>
-                  <span>Handlinger</span>
-                </div>
-              ) : props.headerAction ? (
-                <div className="flex items-center justify-end gap-1.5">
-                  {props.headerAction}
                   <span>Handlinger</span>
                 </div>
               ) : (
