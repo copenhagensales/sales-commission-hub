@@ -14,20 +14,23 @@ export interface TrygKanvasSale {
   productName: string;
 }
 
-function dayBounds(day: Date) {
-  const start = new Date(day);
+function dayBounds(from: Date, to?: Date) {
+  const start = new Date(from);
   start.setHours(0, 0, 0, 0);
-  const end = new Date(day);
+  const end = new Date(to ?? from);
   end.setHours(23, 59, 59, 999);
   return { start: start.toISOString(), end: end.toISOString() };
 }
 
-/** Alle salg på Kanvas-produktet for én dag, nyeste først. */
-export function useTrygKanvasSales(day: Date, enabled = true) {
-  const { start, end } = dayBounds(day);
+/**
+ * Alle salg på Kanvas-produktet, nyeste først.
+ * Uden `to` hentes kun `from`-dagen; med `to` hentes hele perioden.
+ */
+export function useTrygKanvasSales(from: Date, to?: Date, enabled = true) {
+  const { start, end } = dayBounds(from, to);
 
   return useQuery({
-    queryKey: ["tryg-kanvas-sales", start],
+    queryKey: ["tryg-kanvas-sales", start, end],
     enabled,
     queryFn: async (): Promise<TrygKanvasSale[]> => {
       const { data, error } = await supabase
@@ -39,6 +42,7 @@ export function useTrygKanvasSales(day: Date, enabled = true) {
         .gte("sales.sale_datetime", start)
         .lte("sales.sale_datetime", end);
       if (error) throw error;
+
 
       const rows = (data || []) as unknown as {
         id: string;

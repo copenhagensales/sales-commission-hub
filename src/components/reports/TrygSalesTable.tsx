@@ -35,6 +35,8 @@ interface StatusProps extends CommonProps {
   reviews: Map<string, TrygSaleReview>;
   onUndo: (saleItemId: string) => void;
   isPending: boolean;
+  /** Vis dato-kolonne når perioden dækker mere end én dag. */
+  showDate?: boolean;
 }
 
 type Props = ReviewProps | StatusProps;
@@ -42,14 +44,20 @@ type Props = ReviewProps | StatusProps;
 /** Fælles tabel-skabelon for de tre faner på "Tryg - Ret salg". */
 export function TrygSalesTable(props: Props) {
   const { sales, isLoading, emptyText, mode } = props;
-  const colSpan = mode === "review" ? 6 : 8;
+  const showDate = mode === "status" && props.showDate === true;
+  const colSpan = (mode === "review" ? 6 : 8) + (showDate ? 1 : 0);
+
 
   return (
     <div className="rounded-lg border border-border/50 overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
+            {showDate && (
+              <TableHead className="w-24 whitespace-nowrap">Dato</TableHead>
+            )}
             <TableHead className="w-24 whitespace-nowrap">Tid</TableHead>
+
             <TableHead className="whitespace-nowrap">Sælgernavn</TableHead>
             <TableHead className="w-32 whitespace-nowrap">Telefon</TableHead>
             <TableHead className="w-16 whitespace-nowrap text-right">
@@ -112,6 +120,12 @@ export function TrygSalesTable(props: Props) {
                 mode === "status" ? props.reviews.get(sale.saleItemId) : undefined;
               return (
                 <TableRow key={sale.saleItemId}>
+                  {showDate && (
+                    <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground">
+                      {format(new Date(sale.saleDatetime), "dd/MM/yyyy")}
+                    </TableCell>
+                  )}
+
                   <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground">
                     {format(new Date(sale.saleDatetime), "HH:mm")}
                   </TableCell>

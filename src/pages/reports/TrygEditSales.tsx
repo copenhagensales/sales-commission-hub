@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { format } from "date-fns";
+import { endOfMonth, format, startOfMonth, subDays, subMonths } from "date-fns";
 import { da } from "date-fns/locale";
 import { CalendarIcon, Check, Copy, FileText, Pencil, Search, X } from "lucide-react";
 import { toast } from "sonner";
@@ -115,26 +115,36 @@ function normalizePhone(value: string): string {
 export default function TrygEditSales() {
   const { hasAccess, isLoading: loadingAccess } = useTrygEditAccess();
   const [day, setDay] = useState<Date>(new Date());
+  const [rangeFrom, setRangeFrom] = useState<Date>(new Date());
+  const [rangeTo, setRangeTo] = useState<Date>(new Date());
   const [deleteTarget, setDeleteTarget] = useState<TrygKanvasSale | null>(null);
   const [isEditingTemplate, setIsEditingTemplate] = useState(false);
   const [draftTemplate, setDraftTemplate] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [phoneSearch, setPhoneSearch] = useState("");
 
-  // Nulstil markeringer og søgning ved skift af dag
+  // Nulstil markeringer og søgning ved skift af dag — perioden følger dagen
   useEffect(() => {
     setSelectedIds(new Set());
     setPhoneSearch("");
+    setRangeFrom(day);
+    setRangeTo(day);
   }, [day]);
 
 
-  const { data: sales, isLoading } = useTrygKanvasSales(day, hasAccess);
+  const { data: sales, isLoading } = useTrygKanvasSales(day, undefined, hasAccess);
+  const { data: rangeSalesData, isLoading: isLoadingRange } = useTrygKanvasSales(
+    rangeFrom,
+    rangeTo,
+    hasAccess
+  );
   const deleteSale = useDeleteTrygKanvasSale();
   const { body: template } = useReportTextTemplate(
     TEMPLATE_KEY,
     TRYG_CANCEL_TEMPLATE
   );
   const saveTemplate = useSaveReportTextTemplate(TEMPLATE_KEY);
+
 
   const startEditTemplate = () => {
     setDraftTemplate(template);
@@ -200,23 +210,46 @@ export default function TrygEditSales() {
     [sales, selectedIds]
   );
 
-  /** Synlige linjer efter telefon-søgning. */
-  const visibleSales = useMemo(() => {
+  const matchesSearch = (phone: string | null) => {
     const needle = normalizePhone(phoneSearch);
-    if (!needle) return sales || [];
-    return (sales || []).filter((s) =>
-      normalizePhone(s.customerPhone || "").includes(needle)
-    );
-  }, [sales, phoneSearch]);
-  /** Status pr. salgslinje for dagens salg. */
+    if (!needle) return true;
+    return normalizePhone(phone || "").includes(needle);
+  };
+
+  /** Synlige linjer for Gennemgang (den valgte dag) efter telefon-søgning. */
+  const visibleSales = useMemo(
+    () => (sales || []).filter((s) => matchesSearch(s.customerPhone)),
+    [sales, phoneSearch]
+  );
+
+  /** Synlige linjer for status-fanerne (den valgte periode). */
+  const visibleRangeSales = useMemo(
+    () => (rangeSalesData || []).filter((s) => matchesSearch(s.customerPhone)),
+    [rangeSalesData, phoneSearch]
+  );
+
+  /** Status pr. salgslinje — dagen (Gennemgang) og perioden (status-faner). */
   const saleItemIds = useMemo(
     () => (sales || []).map((s) => s.saleItemId),
     [sales]
   );
+  const rangeSaleItemIds = useMemo(
+    () => (rangeSalesData || []).map((s) => s.saleItemId),
+    [rangeSalesData]
+  );
   const { data: reviewMap } = useTrygSaleReviews(saleItemIds, hasAccess);
+  const { data: rangeReviewMap } = useTrygSaleReviews(
+    rangeSaleItemIds,
+    hasAccess
+  );
   const reviews = reviewMap ?? new Map();
+  const rangeReviews = rangeReviewMap ?? new Map();
   const setReview = useSetTrygSaleReview();
   const clearReview = useClearTrygSaleReview();
+
+  /** Perioden dækker mere end én dag → vis dato-kolonne. */
+  const showDateColumn =
+    format(rangeFrom, "yyyy-MM-dd") !== format(rangeTo, "yyyy-MM-dd");
 
   const pendingSales = useMemo(
     () => visibleSales.filter((s) => !reviews.has(s.saleItemId)),
@@ -224,18 +257,19 @@ export default function TrygEditSales() {
   );
   const rejectedSales = useMemo(
     () =>
-      visibleSales.filter(
-        (s) => reviews.get(s.saleItemId)?.status === "rejected"
+      visibleRangeSales.filter(
+        (s) => rangeReviews.get(s.saleItemId)?.status === "rejected"
       ),
-    [visibleSales, reviews]
+    [visibleRangeSales, rangeReviews]
   );
   const approvedSales = useMemo(
     () =>
-      visibleSales.filter(
-        (s) => reviews.get(s.saleItemId)?.status === "approved"
+      visibleRangeSales.filter(
+        (s) => rangeReviews.get(s.saleItemId)?.status === "approved"
       ),
-    [visibleSales, reviews]
+    [visibleRangeSales, rangeReviews]
   );
+
 
   const applyStatus = async (ids: string[], status: TrygReviewStatus) => {
     if (ids.length === 0) return;
@@ -274,6 +308,79 @@ export default function TrygEditSales() {
     if (selectedPhones.length === 0) return;
     await copyText(fillPhonePlaceholders(template, selectedPhones));
   };
+
+  const setQuickRange = (from: Date, to: Date) => {
+    setRangeFrom(from);
+    setRangeTo(to);
+  };
+
+  const today = new Date();
+  const periodPicker = (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-sm text-muted-foreground">Periode:</span>
+      {(
+        [
+          ["Fra", rangeFrom, setRangeFrom],
+          ["Til", rangeTo, setRangeTo],
+        ] as const
+      ).map(([label, value, setValue]) => (
+        <Popover key={label}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="h-9 gap-2">
+              <CalendarIcon className="h-4 w-4" />
+              {label}: {format(value, "dd/MM/yyyy", { locale: da })}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="single"
+              selected={value}
+              onSelect={(d) => d && setValue(d)}
+              locale={da}
+              initialFocus
+            />
+          </PopoverContent>
+        </Popover>
+      ))}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-9"
+          onClick={() => setQuickRange(today, today)}
+        >
+          I dag
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-9"
+          onClick={() => setQuickRange(subDays(today, 6), today)}
+        >
+          Sidste 7 dage
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-9"
+          onClick={() => setQuickRange(startOfMonth(today), today)}
+        >
+          Denne måned
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-9"
+          onClick={() => {
+            const prev = subMonths(today, 1);
+            setQuickRange(startOfMonth(prev), endOfMonth(prev));
+          }}
+        >
+          Sidste måned
+        </Button>
+      </div>
+    </div>
+  );
 
 
   return (
@@ -460,29 +567,34 @@ export default function TrygEditSales() {
                   />
                 </TabsContent>
 
-                <TabsContent value="rejected">
+                <TabsContent value="rejected" className="space-y-4">
+                  {periodPicker}
                   <TrygSalesTable
                     mode="status"
                     sales={rejectedSales}
-                    isLoading={isLoading || loadingAccess}
-                    emptyText="Ingen afviste salg på den valgte dag."
-                    reviews={reviews}
+                    isLoading={isLoadingRange || loadingAccess}
+                    emptyText="Ingen afviste salg i den valgte periode."
+                    reviews={rangeReviews}
                     onUndo={clearStatus}
                     isPending={clearReview.isPending}
+                    showDate={showDateColumn}
                   />
                 </TabsContent>
 
-                <TabsContent value="approved">
+                <TabsContent value="approved" className="space-y-4">
+                  {periodPicker}
                   <TrygSalesTable
                     mode="status"
                     sales={approvedSales}
-                    isLoading={isLoading || loadingAccess}
-                    emptyText="Ingen godkendte salg på den valgte dag."
-                    reviews={reviews}
+                    isLoading={isLoadingRange || loadingAccess}
+                    emptyText="Ingen godkendte salg i den valgte periode."
+                    reviews={rangeReviews}
                     onUndo={clearStatus}
                     isPending={clearReview.isPending}
+                    showDate={showDateColumn}
                   />
                 </TabsContent>
+
               </Tabs>
             </CardContent>
 
