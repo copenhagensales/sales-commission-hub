@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
-import { CalendarIcon, Copy, FileText, Pencil, Search, Trash2, X } from "lucide-react";
+import { CalendarIcon, Check, Copy, FileText, Pencil, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { MainLayout } from "@/components/layout/MainLayout";
 import {
@@ -381,7 +381,7 @@ export default function TrygEditSales() {
                       <TableHead className="w-full min-w-[240px]">
                         Produktnavn
                       </TableHead>
-                      <TableHead className="w-40 whitespace-nowrap text-right">
+                      <TableHead className="w-[22rem] whitespace-nowrap text-right">
                         Handlinger
                       </TableHead>
                     </TableRow>
@@ -415,8 +415,26 @@ export default function TrygEditSales() {
                           <TableCell className="min-w-[240px]">
                             {sale.productName}
                           </TableCell>
-                          <TableCell className="w-40 whitespace-nowrap">
+                          <TableCell className="w-[22rem] whitespace-nowrap">
                             <div className="flex items-center justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                title="Afvis salg"
+                                className="h-8 gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                                Afvis
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                title="Godkend salg"
+                                className="h-8 gap-1.5 text-emerald-600 hover:text-emerald-600 hover:bg-emerald-500/10 dark:text-emerald-400 dark:hover:text-emerald-400"
+                              >
+                                <Check className="h-3.5 w-3.5" />
+                                Godkendt
+                              </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
