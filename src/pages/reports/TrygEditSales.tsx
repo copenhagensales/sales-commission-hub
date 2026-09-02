@@ -494,29 +494,34 @@ export default function TrygEditSales() {
                   />
                 </TabsContent>
 
-                <TabsContent value="rejected">
+                <TabsContent value="rejected" className="space-y-4">
+                  {periodPicker}
                   <TrygSalesTable
                     mode="status"
                     sales={rejectedSales}
-                    isLoading={isLoading || loadingAccess}
-                    emptyText="Ingen afviste salg på den valgte dag."
-                    reviews={reviews}
+                    isLoading={isLoadingRange || loadingAccess}
+                    emptyText="Ingen afviste salg i den valgte periode."
+                    reviews={rangeReviews}
                     onUndo={clearStatus}
                     isPending={clearReview.isPending}
+                    showDate={showDateColumn}
                   />
                 </TabsContent>
 
-                <TabsContent value="approved">
+                <TabsContent value="approved" className="space-y-4">
+                  {periodPicker}
                   <TrygSalesTable
                     mode="status"
                     sales={approvedSales}
-                    isLoading={isLoading || loadingAccess}
-                    emptyText="Ingen godkendte salg på den valgte dag."
-                    reviews={reviews}
+                    isLoading={isLoadingRange || loadingAccess}
+                    emptyText="Ingen godkendte salg i den valgte periode."
+                    reviews={rangeReviews}
                     onUndo={clearStatus}
                     isPending={clearReview.isPending}
+                    showDate={showDateColumn}
                   />
                 </TabsContent>
+
               </Tabs>
             </CardContent>
 
