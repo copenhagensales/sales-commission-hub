@@ -210,23 +210,46 @@ export default function TrygEditSales() {
     [sales, selectedIds]
   );
 
-  /** Synlige linjer efter telefon-søgning. */
-  const visibleSales = useMemo(() => {
+  const matchesSearch = (phone: string | null) => {
     const needle = normalizePhone(phoneSearch);
-    if (!needle) return sales || [];
-    return (sales || []).filter((s) =>
-      normalizePhone(s.customerPhone || "").includes(needle)
-    );
-  }, [sales, phoneSearch]);
-  /** Status pr. salgslinje for dagens salg. */
+    if (!needle) return true;
+    return normalizePhone(phone || "").includes(needle);
+  };
+
+  /** Synlige linjer for Gennemgang (den valgte dag) efter telefon-søgning. */
+  const visibleSales = useMemo(
+    () => (sales || []).filter((s) => matchesSearch(s.customerPhone)),
+    [sales, phoneSearch]
+  );
+
+  /** Synlige linjer for status-fanerne (den valgte periode). */
+  const visibleRangeSales = useMemo(
+    () => (rangeSalesData || []).filter((s) => matchesSearch(s.customerPhone)),
+    [rangeSalesData, phoneSearch]
+  );
+
+  /** Status pr. salgslinje — dagen (Gennemgang) og perioden (status-faner). */
   const saleItemIds = useMemo(
     () => (sales || []).map((s) => s.saleItemId),
     [sales]
   );
+  const rangeSaleItemIds = useMemo(
+    () => (rangeSalesData || []).map((s) => s.saleItemId),
+    [rangeSalesData]
+  );
   const { data: reviewMap } = useTrygSaleReviews(saleItemIds, hasAccess);
+  const { data: rangeReviewMap } = useTrygSaleReviews(
+    rangeSaleItemIds,
+    hasAccess
+  );
   const reviews = reviewMap ?? new Map();
+  const rangeReviews = rangeReviewMap ?? new Map();
   const setReview = useSetTrygSaleReview();
   const clearReview = useClearTrygSaleReview();
+
+  /** Perioden dækker mere end én dag → vis dato-kolonne. */
+  const showDateColumn =
+    format(rangeFrom, "yyyy-MM-dd") !== format(rangeTo, "yyyy-MM-dd");
 
   const pendingSales = useMemo(
     () => visibleSales.filter((s) => !reviews.has(s.saleItemId)),
@@ -234,18 +257,19 @@ export default function TrygEditSales() {
   );
   const rejectedSales = useMemo(
     () =>
-      visibleSales.filter(
-        (s) => reviews.get(s.saleItemId)?.status === "rejected"
+      visibleRangeSales.filter(
+        (s) => rangeReviews.get(s.saleItemId)?.status === "rejected"
       ),
-    [visibleSales, reviews]
+    [visibleRangeSales, rangeReviews]
   );
   const approvedSales = useMemo(
     () =>
-      visibleSales.filter(
-        (s) => reviews.get(s.saleItemId)?.status === "approved"
+      visibleRangeSales.filter(
+        (s) => rangeReviews.get(s.saleItemId)?.status === "approved"
       ),
-    [visibleSales, reviews]
+    [visibleRangeSales, rangeReviews]
   );
+
 
   const applyStatus = async (ids: string[], status: TrygReviewStatus) => {
     if (ids.length === 0) return;
