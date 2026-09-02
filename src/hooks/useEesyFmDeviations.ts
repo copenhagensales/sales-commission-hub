@@ -234,6 +234,21 @@ function campaignMatchesProduct(product: string | null, campaign: string | null)
   return mode === "without" ? !free : free;
 }
 
+const PRODUCT_FLAG_SUBSCRIPTION = norm("Fri tale + 60 GB data (5G) (6 mdr. binding)");
+
+/**
+ * Produkt-regel: "Fri tale + 60 GB data (5G) (6 mdr. binding)" må ikke
+ * være solgt på en Nuuday-operator.
+ */
+function productMatchesOperator(
+  subscriptionName: string | null,
+  operator: string | null,
+): boolean {
+  if (norm(subscriptionName) !== PRODUCT_FLAG_SUBSCRIPTION) return true;
+  return !isNuudayOperator(operator);
+}
+
+
 
 
 /**
