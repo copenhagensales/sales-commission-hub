@@ -381,7 +381,7 @@ export default function TrygEditSales() {
                       <TableHead className="w-full min-w-[240px]">
                         Produktnavn
                       </TableHead>
-                      <TableHead className="w-40 whitespace-nowrap text-right">
+                      <TableHead className="w-[22rem] whitespace-nowrap text-right">
                         Handlinger
                       </TableHead>
                     </TableRow>
