@@ -30,6 +30,19 @@ describe("calcBoardProgress", () => {
     expect(p.status).toBe("foran");
   });
 
+  it("indeks 104 -> gul on-track, indeks 105 -> grøn foran", () => {
+    // 11/22 hverdage gået, forventet = 425
+    const onTrack = calcBoardProgress(850, 425 * 1.04, new Date(2026, 8, 15));
+    expect(onTrack.status).toBe("on-track");
+    const foran = calcBoardProgress(850, 425 * 1.05, new Date(2026, 8, 15));
+    expect(foran.status).toBe("foran");
+  });
+
+  it("indeks 90 -> efter, indeks 84 -> bagud", () => {
+    expect(calcBoardProgress(850, 425 * 0.9, new Date(2026, 8, 15)).status).toBe("efter");
+    expect(calcBoardProgress(850, 425 * 0.84, new Date(2026, 8, 15)).status).toBe("bagud");
+  });
+
   it("mål 0 -> indeks null, ukendt", () => {
     const p = calcBoardProgress(0, 0, new Date(2026, 8, 15));
     expect(p.indeks).toBeNull();
