@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
-import { CalendarIcon, Check, Copy, FileText, Pencil, Search, Trash2, X } from "lucide-react";
+import { CalendarIcon, Check, Copy, FileText, Pencil, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { MainLayout } from "@/components/layout/MainLayout";
 import {
@@ -180,10 +180,6 @@ export default function TrygEditSales() {
     }
   };
 
-  const handleCopyTemplate = async (phone: string | null) => {
-    if (!phone) return;
-    await copyText(fillPhonePlaceholders(template, [phone]));
-  };
 
 
   const toggleSelected = (saleItemId: string) => {
