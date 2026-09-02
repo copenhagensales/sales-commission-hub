@@ -46,6 +46,13 @@ export const DASHBOARD_LIST: DashboardConfig[] = [
     description: "TDC Erhverv månedsmål – fælles og individuelle progressbarer",
     permissionKey: "menu_dashboard_tdc_monthly_goal"
   },
+  {
+    slug: "relatel-monthly-goal",
+    name: "Relatel Månedsmål",
+    path: "/dashboards/relatel-monthly-goal",
+    description: "Relatel månedsmål – fælles og individuelle progressbarer",
+    permissionKey: "menu_dashboard_relatel_monthly_goal"
+  },
   { 
     slug: "relatel", 
     name: "Relatel", 
