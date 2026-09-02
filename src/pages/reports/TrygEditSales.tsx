@@ -336,6 +336,35 @@ export default function TrygEditSales() {
     locale: da,
   })}`;
 
+  /** Opsummering af de afviste salg der slettes — vises i bekræftelsen. */
+  const rejectedSummary = useMemo(() => {
+    const sellers = Array.from(new Set(rejectedSales.map((s) => s.sellerName)));
+    return {
+      count: rejectedSales.length,
+      sellers,
+      commission: rejectedSales.reduce((sum, s) => sum + s.mappedCommission, 0),
+      revenue: rejectedSales.reduce((sum, s) => sum + s.mappedRevenue, 0),
+    };
+  }, [rejectedSales]);
+
+  const handleDeleteRejected = async () => {
+    if (rejectedSales.length === 0) return;
+    try {
+      const deleted = await deleteSales.mutateAsync(
+        rejectedSales.map((s) => s.saleId)
+      );
+      toast.success(`${deleted} salg er slettet permanent`);
+      setIsDeleteRejectedOpen(false);
+    } catch (error: unknown) {
+      queryClient.invalidateQueries({ queryKey: ["tryg-kanvas-sales"] });
+      const message =
+        error && typeof error === "object" && "message" in error
+          ? String((error as { message?: unknown }).message)
+          : "Kunne ikke slette salgene";
+      toast.error(`Kunne ikke slette salgene: ${message}`);
+    }
+  };
+
 
   const setQuickRange = (from: Date, to: Date) => {
     setRangeFrom(from);
