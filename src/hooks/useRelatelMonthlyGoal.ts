@@ -3,6 +3,7 @@ import { tvEdgeFetch } from "@/utils/tvEdgeFetch";
 import {
   getRelatelMonthlyGoal,
   getRelatelSellerGoal,
+  RELATEL_MONTHLY_GOAL_EXCLUDED_PRODUCT_IDS,
   type RelatelMonthlyGoal,
 } from "@/config/relatelMonthlyGoals";
 import { MONTHLY_GOAL_EXCLUDED_PRODUCT_IDS } from "@/config/tdcMonthlyGoals";
