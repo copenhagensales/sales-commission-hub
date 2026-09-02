@@ -472,16 +472,6 @@ export default function TrygEditSales() {
                   Kopiér markerede
                   {selectedPhones.length > 0 ? ` (${selectedPhones.length})` : ""}
                 </Button>
-                <Button
-                  className="gap-2"
-                  onClick={() => setIsMailOpen(true)}
-                  disabled={selectedPhones.length === 0}
-                  title="Send annulleringsmail til Tryg med alle markerede numre"
-                >
-                  <Mail className="h-4 w-4" />
-                  Send til Tryg
-                  {selectedPhones.length > 0 ? ` (${selectedPhones.length})` : ""}
-                </Button>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="gap-2">
