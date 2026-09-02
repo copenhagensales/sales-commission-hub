@@ -734,6 +734,68 @@ export default function TrygEditSales() {
           </AlertDialogContent>
         </AlertDialog>
 
+        <AlertDialog
+          open={isDeleteRejectedOpen}
+          onOpenChange={(open) => !open && setIsDeleteRejectedOpen(false)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                Slet {rejectedSummary.count} afviste salg permanent?
+              </AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-2 text-sm">
+                  <p>
+                    Du er ved at slette{" "}
+                    <strong>{rejectedSummary.count} afviste Kanvas-salg</strong>{" "}
+                    i perioden{" "}
+                    {format(rangeFrom, "dd/MM/yyyy", { locale: da })} –{" "}
+                    {format(rangeTo, "dd/MM/yyyy", { locale: da })}. Kun de salg
+                    der vises på fanen "Afviste salg" bliver berørt.
+                  </p>
+                  <p>
+                    Sælgere:{" "}
+                    {rejectedSummary.sellers.join(", ") || "ingen"}
+                  </p>
+                  <p>
+                    Følgende forsvinder fra boards, rapporter og løngrundlag:{" "}
+                    <strong>
+                      {rejectedSummary.commission.toLocaleString("da-DK")} kr
+                      provision
+                    </strong>{" "}
+                    og{" "}
+                    <strong>
+                      {rejectedSummary.revenue.toLocaleString("da-DK")} kr
+                      omsætning
+                    </strong>
+                    .
+                  </p>
+                  <p className="font-semibold text-destructive">
+                    Handlingen er permanent og kan ikke fortrydes.
+                  </p>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleteSales.isPending}>
+                Annuller
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleDeleteRejected();
+                }}
+                disabled={deleteSales.isPending || rejectedSummary.count === 0}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deleteSales.isPending
+                  ? "Sletter..."
+                  : `Ja, slet ${rejectedSummary.count} salg`}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         <SendTrygMailDialog
           open={isMailOpen}
           onOpenChange={setIsMailOpen}
