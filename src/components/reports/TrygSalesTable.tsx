@@ -53,7 +53,11 @@ export function TrygSalesTable(props: Props) {
       <Table>
         <TableHeader>
           <TableRow>
+            {showDate && (
+              <TableHead className="w-24 whitespace-nowrap">Dato</TableHead>
+            )}
             <TableHead className="w-24 whitespace-nowrap">Tid</TableHead>
+
             <TableHead className="whitespace-nowrap">Sælgernavn</TableHead>
             <TableHead className="w-32 whitespace-nowrap">Telefon</TableHead>
             <TableHead className="w-16 whitespace-nowrap text-right">
