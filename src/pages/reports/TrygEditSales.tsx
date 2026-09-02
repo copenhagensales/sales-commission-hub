@@ -125,6 +125,7 @@ export default function TrygEditSales() {
   const [draftTemplate, setDraftTemplate] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [phoneSearch, setPhoneSearch] = useState("");
+  const [isMailOpen, setIsMailOpen] = useState(false);
 
   // Nulstil markeringer og søgning ved skift af dag — perioden følger dagen
   useEffect(() => {
