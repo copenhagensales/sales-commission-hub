@@ -100,10 +100,11 @@ export function calcBoardProgress(mål: number, faktisk: number, dato: Date): Bo
 export function statusTextClass(status: ProgressStatus): string {
   switch (status) {
     case "foran":
-    case "on-track":
       return "text-emerald-400";
+    case "on-track":
+      return "text-yellow-400";
     case "efter":
-      return "text-amber-400";
+      return "text-orange-400";
     case "ukendt":
       return "text-slate-300";
     default:
@@ -115,10 +116,11 @@ export function statusTextClass(status: ProgressStatus): string {
 export function statusFillClass(status: ProgressStatus): string {
   switch (status) {
     case "foran":
-    case "on-track":
       return "bg-emerald-400";
+    case "on-track":
+      return "bg-yellow-400";
     case "efter":
-      return "bg-amber-400";
+      return "bg-orange-400";
     case "ukendt":
       return "bg-slate-600";
     default:
