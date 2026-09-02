@@ -35,6 +35,8 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TrygSalesTable } from "@/components/reports/TrygSalesTable";
 
 import {
   useReportTextTemplate,
@@ -46,6 +48,13 @@ import {
   useDeleteTrygKanvasSale,
   type TrygKanvasSale,
 } from "@/hooks/useTrygKanvasSales";
+import {
+  useTrygSaleReviews,
+  useSetTrygSaleReview,
+  useClearTrygSaleReview,
+  type TrygReviewStatus,
+} from "@/hooks/useTrygSaleReviews";
+
 
 const TRYG_CANCEL_TEMPLATE = `Hej Tryg,
 
