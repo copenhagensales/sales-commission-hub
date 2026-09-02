@@ -50,7 +50,7 @@ function monthBounds(now: Date) {
 }
 
 interface RelatelMonthlyGoalPayload {
-  sellers: { id: string; firstName: string | null; lastName: string | null; workEmail: string | null }[];
+  sellers: { id: string; firstName: string | null; lastName: string | null; workEmail: string | null; emails?: string[] }[];
   items: { agentEmail: string | null; productId: string | null; quantity: number; saleDate?: string | null }[];
   warning?: string;
 }
@@ -94,6 +94,7 @@ export function useRelatelMonthlyGoal(enabled = true) {
         first_name: s.firstName,
         last_name: s.lastName,
         work_email: s.workEmail,
+        emails: s.emails ?? [],
       }));
 
       let teamCount = 0;
@@ -138,7 +139,12 @@ export function useRelatelMonthlyGoal(enabled = true) {
         .filter((e) => !excluded.has(e.id))
         .map((e) => {
           const name = [e.first_name, e.last_name].filter(Boolean).join(" ").trim() || (e.work_email ?? "Ukendt");
-          const count = countByEmail.get((e.work_email || "").toLowerCase()) || 0;
+          // Salg matches på alle sælgerens mails (dialer-mails via agent-mapping + work_email)
+          const emails = new Set<string>(
+            [...(e.emails ?? []), e.work_email ?? ""].filter(Boolean).map((m) => m.toLowerCase()),
+          );
+          let count = 0;
+          for (const m of emails) count += countByEmail.get(m) || 0;
           const sellerGoal = getRelatelSellerGoal(goal, name);
           return {
             employeeId: e.id,
