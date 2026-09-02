@@ -14432,7 +14432,7 @@ export type Database = {
           reviewed_at: string
           reviewed_by: string | null
           reviewed_by_name: string | null
-          sale_item_id: string
+          sale_id: string
           status: string
           updated_at: string
         }
@@ -14441,7 +14441,7 @@ export type Database = {
           reviewed_at?: string
           reviewed_by?: string | null
           reviewed_by_name?: string | null
-          sale_item_id: string
+          sale_id: string
           status: string
           updated_at?: string
         }
@@ -14450,16 +14450,16 @@ export type Database = {
           reviewed_at?: string
           reviewed_by?: string | null
           reviewed_by_name?: string | null
-          sale_item_id?: string
+          sale_id?: string
           status?: string
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "tryg_sale_reviews_sale_item_id_fkey"
-            columns: ["sale_item_id"]
+            foreignKeyName: "tryg_sale_reviews_sale_id_fkey"
+            columns: ["sale_id"]
             isOneToOne: true
-            referencedRelation: "sale_items"
+            referencedRelation: "sales"
             referencedColumns: ["id"]
           },
         ]
