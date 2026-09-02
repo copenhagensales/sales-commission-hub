@@ -13,8 +13,10 @@
 - Adgang uændret: kun de brugere der i dag har adgang til "Tryg - Ret salg".
 
 ## Konsekvenser (verificeret i databasen)
-- `sales` er forælder til `sale_items`, `tryg_sale_reviews` og `cancellation_queue` med ON DELETE CASCADE — de tilhørende linjer forsvinder sammen med salget.
-- `commission_transactions.sale_id` er ON DELETE SET NULL. Der findes i dag 0 provisionsposter og 0 annulleringsposter på Kanvas-produktet, så sletningen efterlader ingen løse provisionsposter. Sletning af salg med provisionsposter vil ikke være muligt uden en bevidst udvidelse.
+- Provisionen på disse salg ligger på `sale_items.mapped_commission` (Kanvas-produktet i alt: 6.094 linjer, 593.400 kr provision, 1.635.850 kr omsætning). `sale_items` har ON DELETE CASCADE, så en sletning fjerner **også provisionen** for sælgeren på det salg. Det er hensigten med knappen, men det betyder at løn for en periode ændrer sig, hvis man sletter salg tilbage i tiden.
+- Derfor: bekræftelsesboksen viser antal salg, sælgere og **summen af provision og omsætning der forsvinder**, så man ikke ved et uheld ændrer et allerede afregnet løngrundlag.
+- `tryg_sale_reviews` og `cancellation_queue` cascader også — statusmarkeringen forsvinder sammen med salget.
+- `commission_transactions.sale_id` er ON DELETE SET NULL, men tabellen er tom (0 rækker i hele systemet), så der efterlades ingen løse provisionsposter.
 
 ## Teknisk
 - `src/hooks/useTrygKanvasSales.ts`: udvid med en mutation der sletter en liste af salgs-id'er (`sales.delete().in("id", ids)`), i batches, og invaliderer `tryg-kanvas-sales`, `tryg-sale-reviews` og `sales-aggregates`.
