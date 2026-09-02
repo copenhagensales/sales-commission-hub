@@ -430,15 +430,25 @@ export default function TrygEditSales() {
                                 <Check className="h-3.5 w-3.5" />
                                 Godkend
                               </Button>
-                              <Checkbox
-                                checked={selectedIds.has(sale.saleItemId)}
-                                onCheckedChange={() =>
-                                  toggleSelected(sale.saleItemId)
-                                }
-                                disabled={!sale.customerPhone}
-                                aria-label="Markér salg til samlet kopiering"
-                                className="border-muted-foreground/40 data-[state=unchecked]:bg-muted"
-                              />
+                              <label
+                                className={`flex h-8 cursor-pointer items-center gap-2 rounded-md border px-2.5 text-xs font-medium transition-colors ${
+                                  selectedIds.has(sale.saleItemId)
+                                    ? "border-primary bg-primary/10 text-primary"
+                                    : "border-input bg-muted text-muted-foreground hover:bg-muted/70"
+                                } ${!sale.customerPhone ? "pointer-events-none opacity-50" : ""}`}
+                              >
+                                <Checkbox
+                                  checked={selectedIds.has(sale.saleItemId)}
+                                  onCheckedChange={() =>
+                                    toggleSelected(sale.saleItemId)
+                                  }
+                                  disabled={!sale.customerPhone}
+                                  aria-label="Markér salg til samlet kopiering"
+                                  className="h-5 w-5 border-muted-foreground/50"
+                                />
+                                Markér
+                              </label>
+
 
                             </div>
                           </TableCell>
