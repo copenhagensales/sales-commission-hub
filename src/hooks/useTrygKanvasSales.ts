@@ -12,6 +12,10 @@ export interface TrygKanvasSale {
   customerPhone: string | null;
   quantity: number;
   productName: string;
+  /** Provision på salgslinjen — vises i sletnings-bekræftelsen. */
+  mappedCommission: number;
+  /** Omsætning på salgslinjen — vises i sletnings-bekræftelsen. */
+  mappedRevenue: number;
 }
 
 function dayBounds(from: Date, to?: Date) {
@@ -36,7 +40,7 @@ export function useTrygKanvasSales(from: Date, to?: Date, enabled = true) {
       const { data, error } = await supabase
         .from("sale_items")
         .select(
-          "id, quantity, products(name), sales!inner(id, sale_datetime, agent_email, agent_name, customer_phone)"
+          "id, quantity, mapped_commission, mapped_revenue, products(name), sales!inner(id, sale_datetime, agent_email, agent_name, customer_phone)"
         )
         .eq("product_id", TRYG_KANVAS_PRODUCT_ID)
         .gte("sales.sale_datetime", start)
@@ -47,6 +51,8 @@ export function useTrygKanvasSales(from: Date, to?: Date, enabled = true) {
       const rows = (data || []) as unknown as {
         id: string;
         quantity: number | null;
+        mapped_commission: number | null;
+        mapped_revenue: number | null;
         products: { name: string | null } | null;
         sales: {
           id: string;
@@ -93,12 +99,20 @@ export function useTrygKanvasSales(from: Date, to?: Date, enabled = true) {
             customerPhone: r.sales.customer_phone || null,
             quantity: Number(r.quantity ?? 0),
             productName: r.products?.name || "Ukendt produkt",
+            mappedCommission: Number(r.mapped_commission ?? 0),
+            mappedRevenue: Number(r.mapped_revenue ?? 0),
           };
         })
         .sort((a, b) => b.saleDatetime.localeCompare(a.saleDatetime));
     },
   });
 }
+
+const INVALIDATE_KEYS = [
+  ["tryg-kanvas-sales"],
+  ["tryg-sale-reviews"],
+  ["sales-aggregates"],
+];
 
 /** Sletter en salgsregistrering (hard delete på sales-rækken). */
 export function useDeleteTrygKanvasSale() {
@@ -110,7 +124,35 @@ export function useDeleteTrygKanvasSale() {
       if (error) throw error;
     },
     onSuccess: () => {
-      for (const key of [["tryg-kanvas-sales"], ["sales-aggregates"]]) {
+      for (const key of INVALIDATE_KEYS) {
+        queryClient.invalidateQueries({ queryKey: key });
+      }
+    },
+  });
+}
+
+/**
+ * Sletter en eksplicit liste af salg (hard delete). Bruges kun til de afviste
+ * Kanvas-salg på "Tryg - Ret salg" — id'erne kommer altid fra den viste liste.
+ */
+export function useDeleteTrygKanvasSales() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (saleIds: string[]) => {
+      const ids = Array.from(new Set(saleIds.filter(Boolean)));
+      if (ids.length === 0) throw new Error("Ingen salg valgt til sletning.");
+
+      // Batches så URL'en ikke bliver for lang ved store perioder.
+      for (let i = 0; i < ids.length; i += 50) {
+        const batch = ids.slice(i, i + 50);
+        const { error } = await supabase.from("sales").delete().in("id", batch);
+        if (error) throw error;
+      }
+      return ids.length;
+    },
+    onSuccess: () => {
+      for (const key of INVALIDATE_KEYS) {
         queryClient.invalidateQueries({ queryKey: key });
       }
     },

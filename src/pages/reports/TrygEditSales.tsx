@@ -2,7 +2,17 @@ import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { endOfMonth, format, startOfMonth, subDays, subMonths } from "date-fns";
 import { da } from "date-fns/locale";
-import { CalendarIcon, Check, Copy, FileText, Mail, Pencil, Search, X } from "lucide-react";
+import {
+  CalendarIcon,
+  Check,
+  Copy,
+  FileText,
+  Mail,
+  Pencil,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { MainLayout } from "@/components/layout/MainLayout";
 import {
@@ -39,6 +49,7 @@ import { useTrygEditAccess } from "@/hooks/useTrygEditAccess";
 import {
   useTrygKanvasSales,
   useDeleteTrygKanvasSale,
+  useDeleteTrygKanvasSales,
   type TrygKanvasSale,
 } from "@/hooks/useTrygKanvasSales";
 import {
@@ -126,6 +137,7 @@ export default function TrygEditSales() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [phoneSearch, setPhoneSearch] = useState("");
   const [isMailOpen, setIsMailOpen] = useState(false);
+  const [isDeleteRejectedOpen, setIsDeleteRejectedOpen] = useState(false);
 
   // Nulstil markeringer og søgning ved skift af dag — perioden følger dagen
   useEffect(() => {
@@ -143,6 +155,7 @@ export default function TrygEditSales() {
     hasAccess
   );
   const deleteSale = useDeleteTrygKanvasSale();
+  const deleteSales = useDeleteTrygKanvasSales();
   const { body: template } = useReportTextTemplate(
     TEMPLATE_KEY,
     TRYG_CANCEL_TEMPLATE
@@ -335,6 +348,35 @@ export default function TrygEditSales() {
   const mailSubject = `Annullering af Kanvas-møder - ${format(day, "dd/MM/yyyy", {
     locale: da,
   })}`;
+
+  /** Opsummering af de afviste salg der slettes — vises i bekræftelsen. */
+  const rejectedSummary = useMemo(() => {
+    const sellers = Array.from(new Set(rejectedSales.map((s) => s.sellerName)));
+    return {
+      count: rejectedSales.length,
+      sellers,
+      commission: rejectedSales.reduce((sum, s) => sum + s.mappedCommission, 0),
+      revenue: rejectedSales.reduce((sum, s) => sum + s.mappedRevenue, 0),
+    };
+  }, [rejectedSales]);
+
+  const handleDeleteRejected = async () => {
+    if (rejectedSales.length === 0) return;
+    try {
+      const deleted = await deleteSales.mutateAsync(
+        rejectedSales.map((s) => s.saleId)
+      );
+      toast.success(`${deleted} salg er slettet permanent`);
+      setIsDeleteRejectedOpen(false);
+    } catch (error: unknown) {
+      queryClient.invalidateQueries({ queryKey: ["tryg-kanvas-sales"] });
+      const message =
+        error && typeof error === "object" && "message" in error
+          ? String((error as { message?: unknown }).message)
+          : "Kunne ikke slette salgene";
+      toast.error(`Kunne ikke slette salgene: ${message}`);
+    }
+  };
 
 
   const setQuickRange = (from: Date, to: Date) => {
@@ -611,6 +653,20 @@ export default function TrygEditSales() {
                         ? ` (${rejectedPhones.length})`
                         : ""}
                     </Button>
+                    <Button
+                      variant="destructive"
+                      size="lg"
+                      className="gap-2 text-sm font-semibold"
+                      onClick={() => setIsDeleteRejectedOpen(true)}
+                      disabled={rejectedSales.length === 0}
+                      title="Slet de afviste salg permanent fra systemet"
+                    >
+                      <Trash2 className="h-5 w-5" />
+                      Slet salg
+                      {rejectedSales.length > 0
+                        ? ` (${rejectedSales.length})`
+                        : ""}
+                    </Button>
                   </div>
                   <TrygSalesTable
                     mode="status"
@@ -673,6 +729,68 @@ export default function TrygEditSales() {
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
                 {deleteSale.isPending ? "Sletter..." : "Bekræft sletning"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog
+          open={isDeleteRejectedOpen}
+          onOpenChange={(open) => !open && setIsDeleteRejectedOpen(false)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                Slet {rejectedSummary.count} afviste salg permanent?
+              </AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-2 text-sm">
+                  <p>
+                    Du er ved at slette{" "}
+                    <strong>{rejectedSummary.count} afviste Kanvas-salg</strong>{" "}
+                    i perioden{" "}
+                    {format(rangeFrom, "dd/MM/yyyy", { locale: da })} –{" "}
+                    {format(rangeTo, "dd/MM/yyyy", { locale: da })}. Kun de salg
+                    der vises på fanen "Afviste salg" bliver berørt.
+                  </p>
+                  <p>
+                    Sælgere:{" "}
+                    {rejectedSummary.sellers.join(", ") || "ingen"}
+                  </p>
+                  <p>
+                    Følgende forsvinder fra boards, rapporter og løngrundlag:{" "}
+                    <strong>
+                      {rejectedSummary.commission.toLocaleString("da-DK")} kr
+                      provision
+                    </strong>{" "}
+                    og{" "}
+                    <strong>
+                      {rejectedSummary.revenue.toLocaleString("da-DK")} kr
+                      omsætning
+                    </strong>
+                    .
+                  </p>
+                  <p className="font-semibold text-destructive">
+                    Handlingen er permanent og kan ikke fortrydes.
+                  </p>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleteSales.isPending}>
+                Annuller
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleDeleteRejected();
+                }}
+                disabled={deleteSales.isPending || rejectedSummary.count === 0}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deleteSales.isPending
+                  ? "Sletter..."
+                  : `Ja, slet ${rejectedSummary.count} salg`}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
