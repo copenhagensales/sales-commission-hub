@@ -643,6 +643,20 @@ export default function TrygEditSales() {
                         ? ` (${rejectedPhones.length})`
                         : ""}
                     </Button>
+                    <Button
+                      variant="destructive"
+                      size="lg"
+                      className="gap-2 text-sm font-semibold"
+                      onClick={() => setIsDeleteRejectedOpen(true)}
+                      disabled={rejectedSales.length === 0}
+                      title="Slet de afviste salg permanent fra systemet"
+                    >
+                      <Trash2 className="h-5 w-5" />
+                      Slet salg
+                      {rejectedSales.length > 0
+                        ? ` (${rejectedSales.length})`
+                        : ""}
+                    </Button>
                   </div>
                   <TrygSalesTable
                     mode="status"
