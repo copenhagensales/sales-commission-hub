@@ -170,7 +170,7 @@ export default function TrygEditSales() {
       toast.success("Salget er slettet");
       setSelectedIds((prev) => {
         const next = new Set(prev);
-        next.delete(deleteTarget.saleItemId);
+        next.delete(deleteTarget.saleId);
         return next;
       });
       setDeleteTarget(null);
@@ -192,11 +192,11 @@ export default function TrygEditSales() {
 
 
 
-  const toggleSelected = (saleItemId: string) => {
+  const toggleSelected = (saleId: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(saleItemId)) next.delete(saleItemId);
-      else next.add(saleItemId);
+      if (next.has(saleId)) next.delete(saleId);
+      else next.add(saleId);
       return next;
     });
   };
@@ -205,7 +205,7 @@ export default function TrygEditSales() {
   const selectedPhones = useMemo(
     () =>
       (sales || [])
-        .filter((s) => selectedIds.has(s.saleItemId) && s.customerPhone)
+        .filter((s) => selectedIds.has(s.saleId) && s.customerPhone)
         .map((s) => s.customerPhone as string),
     [sales, selectedIds]
   );
@@ -229,15 +229,15 @@ export default function TrygEditSales() {
   );
 
   /** Status pr. salgslinje — dagen (Gennemgang) og perioden (status-faner). */
-  const saleItemIds = useMemo(
-    () => (sales || []).map((s) => s.saleItemId),
+  const saleIds = useMemo(
+    () => (sales || []).map((s) => s.saleId),
     [sales]
   );
   const rangeSaleItemIds = useMemo(
-    () => (rangeSalesData || []).map((s) => s.saleItemId),
+    () => (rangeSalesData || []).map((s) => s.saleId),
     [rangeSalesData]
   );
-  const { data: reviewMap } = useTrygSaleReviews(saleItemIds, hasAccess);
+  const { data: reviewMap } = useTrygSaleReviews(saleIds, hasAccess);
   const { data: rangeReviewMap } = useTrygSaleReviews(
     rangeSaleItemIds,
     hasAccess
@@ -252,20 +252,20 @@ export default function TrygEditSales() {
     format(rangeFrom, "yyyy-MM-dd") !== format(rangeTo, "yyyy-MM-dd");
 
   const pendingSales = useMemo(
-    () => visibleSales.filter((s) => !reviews.has(s.saleItemId)),
+    () => visibleSales.filter((s) => !reviews.has(s.saleId)),
     [visibleSales, reviews]
   );
   const rejectedSales = useMemo(
     () =>
       visibleRangeSales.filter(
-        (s) => rangeReviews.get(s.saleItemId)?.status === "rejected"
+        (s) => rangeReviews.get(s.saleId)?.status === "rejected"
       ),
     [visibleRangeSales, rangeReviews]
   );
   const approvedSales = useMemo(
     () =>
       visibleRangeSales.filter(
-        (s) => rangeReviews.get(s.saleItemId)?.status === "approved"
+        (s) => rangeReviews.get(s.saleId)?.status === "approved"
       ),
     [visibleRangeSales, rangeReviews]
   );
@@ -274,7 +274,7 @@ export default function TrygEditSales() {
   const applyStatus = async (ids: string[], status: TrygReviewStatus) => {
     if (ids.length === 0) return;
     try {
-      await setReview.mutateAsync({ saleItemIds: ids, status });
+      await setReview.mutateAsync({ saleIds: ids, status });
       setSelectedIds((prev) => {
         const next = new Set(prev);
         ids.forEach((id) => next.delete(id));
@@ -292,9 +292,9 @@ export default function TrygEditSales() {
     }
   };
 
-  const clearStatus = async (saleItemId: string) => {
+  const clearStatus = async (saleId: string) => {
     try {
-      await clearReview.mutateAsync([saleItemId]);
+      await clearReview.mutateAsync([saleId]);
       toast.success("Status fjernet — linjen ligger i Gennemgang igen");
     } catch (error: unknown) {
       toast.error(
