@@ -414,19 +414,18 @@ export default function TrygEditSales() {
                           <TableCell className="w-64 whitespace-nowrap">
                             <div className="flex items-center justify-end gap-1">
                               <Button
-                                variant="ghost"
+                                variant="destructive"
                                 size="sm"
                                 title="Afvis salg"
-                                className="h-8 gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                className="h-8 gap-1.5 font-medium"
                               >
                                 <X className="h-3.5 w-3.5" />
                                 Afvis
                               </Button>
                               <Button
-                                variant="ghost"
                                 size="sm"
                                 title="Godkend salg"
-                                className="h-8 gap-1.5 text-emerald-600 hover:text-emerald-600 hover:bg-emerald-500/10 dark:text-emerald-400 dark:hover:text-emerald-400"
+                                className="h-8 gap-1.5 font-medium bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700"
                               >
                                 <Check className="h-3.5 w-3.5" />
                                 Godkendt
@@ -438,7 +437,9 @@ export default function TrygEditSales() {
                                 }
                                 disabled={!sale.customerPhone}
                                 aria-label="Markér salg til samlet kopiering"
+                                className="border-muted-foreground/40 data-[state=unchecked]:bg-muted"
                               />
+
                             </div>
                           </TableCell>
                         </TableRow>
