@@ -684,7 +684,7 @@ export default function TrygEditSales() {
           onOpenChange={setIsMailOpen}
           defaultSubject={mailSubject}
           defaultBody={mailBody}
-          phones={selectedPhones}
+          phones={rejectedPhones}
         />
       </div>
     </MainLayout>
