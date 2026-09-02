@@ -120,6 +120,12 @@ export function TrygSalesTable(props: Props) {
                 mode === "status" ? props.reviews.get(sale.saleItemId) : undefined;
               return (
                 <TableRow key={sale.saleItemId}>
+                  {showDate && (
+                    <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground">
+                      {format(new Date(sale.saleDatetime), "dd/MM/yyyy")}
+                    </TableCell>
+                  )}
+
                   <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground">
                     {format(new Date(sale.saleDatetime), "HH:mm")}
                   </TableCell>
