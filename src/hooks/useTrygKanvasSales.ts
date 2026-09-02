@@ -95,6 +95,8 @@ export function useTrygKanvasSales(from: Date, to?: Date, enabled = true) {
             customerPhone: r.sales.customer_phone || null,
             quantity: Number(r.quantity ?? 0),
             productName: r.products?.name || "Ukendt produkt",
+            mappedCommission: Number(r.mapped_commission ?? 0),
+            mappedRevenue: Number(r.mapped_revenue ?? 0),
           };
         })
         .sort((a, b) => b.saleDatetime.localeCompare(a.saleDatetime));
