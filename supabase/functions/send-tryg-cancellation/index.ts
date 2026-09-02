@@ -124,9 +124,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return jsonResponse(500, { error: "M365_SENDER_EMAIL er ikke konfigureret" });
     }
 
+    // Outlook ignorerer white-space:pre-wrap, så linjeskift konverteres til <br>
     const htmlBody = `<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;font-size:14px;color:#111827;white-space:pre-wrap;">${escapeHtml(
       body,
-    )}</div>`;
+    ).replace(/\r\n|\r|\n/g, "<br>")}</div>`;
 
     const accessToken = await getM365AccessToken();
 
