@@ -4,18 +4,26 @@ import { supabase } from "@/integrations/supabase/client";
 export type TrygReviewStatus = "approved" | "rejected";
 
 export interface TrygSaleReview {
-  saleItemId: string;
+  saleId: string;
   status: TrygReviewStatus;
   reviewedByName: string | null;
   reviewedAt: string;
 }
 
+interface ReviewRow {
+  sale_id: string;
+  status: string;
+  reviewed_by_name: string | null;
+  reviewed_at: string;
+}
+
 /**
- * Statusser (godkendt/afvist) for Tryg Kanvas-salgslinjer.
+ * Statusser (godkendt/afvist) for Tryg Kanvas-salg.
  * Statussen ligger i `tryg_sale_reviews` og påvirker ikke salget selv.
+ * Nøglen er salgets id (`sales.id`), fordi salgslinjer kan genskabes med nye id'er.
  */
-export function useTrygSaleReviews(saleItemIds: string[], enabled = true) {
-  const ids = [...saleItemIds].sort();
+export function useTrygSaleReviews(saleIds: string[], enabled = true) {
+  const ids = [...saleIds].sort();
 
   return useQuery({
     queryKey: ["tryg-sale-reviews", ids.join(",")],
@@ -23,14 +31,15 @@ export function useTrygSaleReviews(saleItemIds: string[], enabled = true) {
     queryFn: async (): Promise<Map<string, TrygSaleReview>> => {
       const { data, error } = await supabase
         .from("tryg_sale_reviews")
-        .select("sale_item_id, status, reviewed_by_name, reviewed_at")
-        .in("sale_item_id", ids);
+        .select("sale_id, status, reviewed_by_name, reviewed_at")
+        .in("sale_id", ids)
+        .returns<ReviewRow[]>();
       if (error) throw error;
 
       const map = new Map<string, TrygSaleReview>();
       for (const row of data || []) {
-        map.set(row.sale_item_id, {
-          saleItemId: row.sale_item_id,
+        map.set(row.sale_id, {
+          saleId: row.sale_id,
           status: row.status as TrygReviewStatus,
           reviewedByName: row.reviewed_by_name,
           reviewedAt: row.reviewed_at,
@@ -61,22 +70,22 @@ async function currentReviewer(): Promise<{ id: string | null; name: string | nu
   return { id: user.id, name: name || user.email || null };
 }
 
-/** Sætter status på en eller flere salgslinjer (upsert). */
+/** Sætter status på et eller flere salg (upsert). */
 export function useSetTrygSaleReview() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({
-      saleItemIds,
+      saleIds,
       status,
     }: {
-      saleItemIds: string[];
+      saleIds: string[];
       status: TrygReviewStatus;
     }) => {
-      if (saleItemIds.length === 0) return;
+      if (saleIds.length === 0) return;
       const reviewer = await currentReviewer();
-      const rows = saleItemIds.map((id) => ({
-        sale_item_id: id,
+      const rows = saleIds.map((id) => ({
+        sale_id: id,
         status,
         reviewed_by: reviewer.id,
         reviewed_by_name: reviewer.name,
@@ -84,7 +93,7 @@ export function useSetTrygSaleReview() {
       }));
       const { error } = await supabase
         .from("tryg_sale_reviews")
-        .upsert(rows, { onConflict: "sale_item_id" });
+        .upsert(rows, { onConflict: "sale_id" });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -98,12 +107,12 @@ export function useClearTrygSaleReview() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (saleItemIds: string[]) => {
-      if (saleItemIds.length === 0) return;
+    mutationFn: async (saleIds: string[]) => {
+      if (saleIds.length === 0) return;
       const { error } = await supabase
         .from("tryg_sale_reviews")
         .delete()
-        .in("sale_item_id", saleItemIds);
+        .in("sale_id", saleIds);
       if (error) throw error;
     },
     onSuccess: () => {
