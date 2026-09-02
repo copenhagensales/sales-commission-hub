@@ -378,8 +378,28 @@ export default function TrygEditSales() {
                         Produktnavn
                       </TableHead>
                       <TableHead className="w-64 whitespace-nowrap text-right">
-                        Handlinger
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Button
+                            size="sm"
+                            className="h-7 gap-1.5 text-xs font-medium bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700"
+                            disabled={selectedIds.size === 0}
+                          >
+                            <Check className="h-3.5 w-3.5" />
+                            Godkend markerede
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="h-7 gap-1.5 text-xs font-medium"
+                            disabled={selectedIds.size === 0}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                            Afvis markerede
+                          </Button>
+                          <span>Handlinger</span>
+                        </div>
                       </TableHead>
+
                     </TableRow>
                   </TableHeader>
                   <TableBody>
