@@ -318,10 +318,20 @@ export default function TrygEditSales() {
     await copyText(fillPhonePlaceholders(template, selectedPhones));
   };
 
-  const mailBody = useMemo(
-    () => fillPhonePlaceholders(template, selectedPhones),
-    [template, selectedPhones]
+  /** Numrene på alle afviste salg i den valgte periode. */
+  const rejectedPhones = useMemo(
+    () =>
+      rejectedSales
+        .filter((s) => s.customerPhone)
+        .map((s) => s.customerPhone as string),
+    [rejectedSales]
   );
+
+  const mailBody = useMemo(
+    () => fillPhonePlaceholders(template, rejectedPhones),
+    [template, rejectedPhones]
+  );
+
   const mailSubject = `Annullering af Kanvas-møder - ${format(day, "dd/MM/yyyy", {
     locale: da,
   })}`;
