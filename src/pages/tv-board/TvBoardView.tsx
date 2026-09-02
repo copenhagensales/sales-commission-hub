@@ -16,6 +16,7 @@ import SalesOverviewAll from "@/pages/dashboards/SalesOverviewAll";
 import TvLeagueDashboard from "@/pages/tv-board/TvLeagueDashboard";
 import PowerdagBoard from "@/pages/dashboards/PowerdagBoard";
 import TdcMonthlyGoalBoard from "@/pages/dashboards/TdcMonthlyGoalBoard";
+import RelatelMonthlyGoalBoard from "@/pages/dashboards/RelatelMonthlyGoalBoard";
 
 const dashboardComponents: Record<string, React.ComponentType> = {
   "cph-sales": CphSalesDashboard,
@@ -23,6 +24,7 @@ const dashboardComponents: Record<string, React.ComponentType> = {
   "eesy-tm": EesyTmDashboard,
   "tdc-erhverv": TdcErhvervDashboard,
   "tdc-monthly-goal": TdcMonthlyGoalBoard,
+  "relatel-monthly-goal": RelatelMonthlyGoalBoard,
   "relatel": RelatelDashboard,
   "united": UnitedDashboard,
   "cs-top-20": CsTop20Dashboard,

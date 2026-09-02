@@ -230,6 +230,7 @@ export const PERMISSION_KEYS = {
   menu_dashboard_eesy_tm: { label: 'Eesy TM', section: 'dashboards', parent: 'menu_section_dashboards' },
   menu_dashboard_tdc_erhverv: { label: 'TDC Erhverv', section: 'dashboards', parent: 'menu_section_dashboards' },
   menu_dashboard_tdc_monthly_goal: { label: 'TDC Månedsmål', section: 'dashboards', parent: 'menu_section_dashboards' },
+  menu_dashboard_relatel_monthly_goal: { label: 'Relatel Månedsmål', section: 'dashboards', parent: 'menu_section_dashboards' },
   menu_dashboard_relatel: { label: 'Relatel', section: 'dashboards', parent: 'menu_section_dashboards' },
   menu_dashboard_united: { label: 'United', section: 'dashboards', parent: 'menu_section_dashboards' },
   menu_dashboard_test: { label: 'Test Dashboard', section: 'dashboards', parent: 'menu_section_dashboards' },

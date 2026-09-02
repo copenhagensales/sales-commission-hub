@@ -307,7 +307,36 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      return await handleTdcMonthlyGoal(supabase, start, end, corsHeaders, cacheKey);
+      return await handleMonthlyGoal(
+        supabase,
+        TDC_ERHVERV_CLIENT_ID_EF,
+        TDC_ERHVERV_TEAM_ID_EF,
+        start,
+        end,
+        corsHeaders,
+        cacheKey,
+      );
+    }
+
+    if (action === "relatel-monthly-goal") {
+      const start = url.searchParams.get("start") || "";
+      const end = url.searchParams.get("end") || "";
+      const cacheKey = `relatel-monthly-goal-${start}-${end}`;
+      const cached = getCached<any>(cacheKey);
+      if (cached) {
+        return new Response(JSON.stringify(cached), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return await handleMonthlyGoal(
+        supabase,
+        RELATEL_CLIENT_ID_EF,
+        RELATEL_TEAM_ID_EF,
+        start,
+        end,
+        corsHeaders,
+        cacheKey,
+      );
     }
 
 
@@ -2649,9 +2678,13 @@ async function handleFiberBoardStats(
 // Returnerer rå byggeklodser — mål og fiber-vægtning håndteres i frontend.
 const TDC_ERHVERV_CLIENT_ID_EF = "20744525-7466-4b2c-afa7-6ee09a9112b0";
 const TDC_ERHVERV_TEAM_ID_EF = "ee967dfd-04c8-465e-bda7-f1c47094bae0";
+const RELATEL_CLIENT_ID_EF = "0ff8476d-16d8-4150-aee9-48ac90ec962d";
+const RELATEL_TEAM_ID_EF = "f4210d48-5062-4e3a-b945-7ff1d5a874dd";
 
-async function handleTdcMonthlyGoal(
+async function handleMonthlyGoal(
   supabase: any,
+  clientId: string,
+  teamId: string,
   startIso: string,
   endIso: string,
   corsHeaders: Record<string, string>,
@@ -2665,7 +2698,7 @@ async function handleTdcMonthlyGoal(
       const { data: members, error: memberError } = await supabase
         .from("team_members")
         .select("employee_id")
-        .eq("team_id", TDC_ERHVERV_TEAM_ID_EF);
+        .eq("team_id", teamId);
       if (memberError) throw memberError;
 
       const employeeIds = (members || [])
@@ -2690,7 +2723,7 @@ async function handleTdcMonthlyGoal(
       warnings.push(`Sælgerliste: ${e?.message || "ukendt fejl"}`);
     }
 
-    // Salgslinjer på TDC Erhverv i perioden
+    // Salgslinjer på klienten i perioden
     const items: { agentEmail: string | null; productId: string | null; quantity: number; saleDate: string | null }[] = [];
     try {
       const pageSize = 1000;
@@ -2701,7 +2734,7 @@ async function handleTdcMonthlyGoal(
           .select(
             "agent_email, validation_status, sale_datetime, client_campaigns!inner(client_id), sale_items(quantity, product_id)",
           )
-          .eq("client_campaigns.client_id", TDC_ERHVERV_CLIENT_ID_EF)
+          .eq("client_campaigns.client_id", clientId)
           .gte("sale_datetime", startIso)
           .lte("sale_datetime", endIso)
           .range(from, from + pageSize - 1);
@@ -2741,7 +2774,7 @@ async function handleTdcMonthlyGoal(
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err: any) {
-    console.error("[handleTdcMonthlyGoal] error:", err);
+    console.error("[handleMonthlyGoal] error:", err);
     return new Response(JSON.stringify({ error: err?.message || "unknown" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
