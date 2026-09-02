@@ -53,21 +53,20 @@ export const RELATEL_MONTHLY_GOAL_EXCLUDED_PRODUCT_IDS: ReadonlySet<string> = ne
 
 export const RELATEL_MONTHLY_GOALS: Record<string, RelatelMonthlyGoal> = {
   "2026-09": {
-    team: 850,
+    team: 650,
     defaultSeller: 0,
-    // Foreløbige (vilkårlige) targets — justeres når de rigtige tal er oplyst.
     sellers: {
-      "Anders Schjødt Kristensen": 90,
-      "Benjamin Nickolaj Andersen": 90,
-      "Emillio Pedersen": 80,
-      "Frederik Bülow Donner": 80,
-      "Gustav Fyrstenborg Diebel": 80,
-      "Jacob Lykke Nielson": 80,
-      "Noah Zylber": 75,
-      "Rasmus Quiding Fricke": 75,
-      "Samuel Juul": 70,
-      "Simon Sejer Linddal Sørensen": 70,
-      "Thorbjørn Mindedal Weichert": 60,
+      "Anders Schjødt Kristensen": 70,
+      "Benjamin Nickolaj Andersen": 75,
+      "Emillio Pedersen": 55,
+      "Frederik Bülow Donner": 70,
+      "Gustav Fyrstenborg Diebel": 55,
+      "Jacob Lykke Nielson": 65,
+      "Noah Zylber": 55,
+      "Rasmus Quiding Fricke": 65,
+      "Samuel Juul": 30,
+      "Simon Sejer Linddal Sørensen": 40,
+      "Thorbjørn Mindedal Weichert": 70,
     },
     excludeEmployeeIds: [],
   },
