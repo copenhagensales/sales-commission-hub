@@ -35,6 +35,8 @@ interface StatusProps extends CommonProps {
   reviews: Map<string, TrygSaleReview>;
   onUndo: (saleItemId: string) => void;
   isPending: boolean;
+  /** Vis dato-kolonne når perioden dækker mere end én dag. */
+  showDate?: boolean;
 }
 
 type Props = ReviewProps | StatusProps;
@@ -42,7 +44,9 @@ type Props = ReviewProps | StatusProps;
 /** Fælles tabel-skabelon for de tre faner på "Tryg - Ret salg". */
 export function TrygSalesTable(props: Props) {
   const { sales, isLoading, emptyText, mode } = props;
-  const colSpan = mode === "review" ? 6 : 8;
+  const showDate = mode === "status" && props.showDate === true;
+  const colSpan = (mode === "review" ? 6 : 8) + (showDate ? 1 : 0);
+
 
   return (
     <div className="rounded-lg border border-border/50 overflow-x-auto">
