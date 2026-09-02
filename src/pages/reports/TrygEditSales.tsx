@@ -217,7 +217,66 @@ export default function TrygEditSales() {
       normalizePhone(s.customerPhone || "").includes(needle)
     );
   }, [sales, phoneSearch]);
+  /** Status pr. salgslinje for dagens salg. */
+  const saleItemIds = useMemo(
+    () => (sales || []).map((s) => s.saleItemId),
+    [sales]
+  );
+  const { data: reviewMap } = useTrygSaleReviews(saleItemIds, hasAccess);
+  const reviews = reviewMap ?? new Map();
+  const setReview = useSetTrygSaleReview();
+  const clearReview = useClearTrygSaleReview();
 
+  const pendingSales = useMemo(
+    () => visibleSales.filter((s) => !reviews.has(s.saleItemId)),
+    [visibleSales, reviews]
+  );
+  const rejectedSales = useMemo(
+    () =>
+      visibleSales.filter(
+        (s) => reviews.get(s.saleItemId)?.status === "rejected"
+      ),
+    [visibleSales, reviews]
+  );
+  const approvedSales = useMemo(
+    () =>
+      visibleSales.filter(
+        (s) => reviews.get(s.saleItemId)?.status === "approved"
+      ),
+    [visibleSales, reviews]
+  );
+
+  const applyStatus = async (ids: string[], status: TrygReviewStatus) => {
+    if (ids.length === 0) return;
+    try {
+      await setReview.mutateAsync({ saleItemIds: ids, status });
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        ids.forEach((id) => next.delete(id));
+        return next;
+      });
+      toast.success(
+        status === "approved"
+          ? `${ids.length} salg godkendt`
+          : `${ids.length} salg afvist`
+      );
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error ? error.message : "Kunne ikke gemme status"
+      );
+    }
+  };
+
+  const clearStatus = async (saleItemId: string) => {
+    try {
+      await clearReview.mutateAsync([saleItemId]);
+      toast.success("Status fjernet — linjen ligger i Gennemgang igen");
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error ? error.message : "Kunne ikke fjerne status"
+      );
+    }
+  };
 
 
   const handleCopySelected = async () => {
