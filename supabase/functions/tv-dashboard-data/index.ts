@@ -2712,12 +2712,33 @@ async function handleMonthlyGoal(
           .in("id", employeeIds)
           .eq("is_active", true);
         if (error) throw error;
-        sellers = (data || []).map((e: any) => ({
-          id: e.id,
-          firstName: e.first_name,
-          lastName: e.last_name,
-          workEmail: e.work_email,
-        }));
+
+        // Dialer-mails pr. medarbejder via employee_agent_mapping -> agents.email.
+        // Nødvendigt fordi salgets agent_email ofte ikke er medarbejderens work_email.
+        const emailsByEmployee = new Map<string, Set<string>>();
+        const { data: mappings, error: mapError } = await supabase
+          .from("employee_agent_mapping")
+          .select("employee_id, agents(email)")
+          .in("employee_id", employeeIds);
+        if (mapError) throw mapError;
+        for (const m of (mappings || []) as any[]) {
+          const email = m.agents?.email ? String(m.agents.email).toLowerCase() : null;
+          if (!email || !m.employee_id) continue;
+          if (!emailsByEmployee.has(m.employee_id)) emailsByEmployee.set(m.employee_id, new Set());
+          emailsByEmployee.get(m.employee_id)!.add(email);
+        }
+
+        sellers = (data || []).map((e: any) => {
+          const emails = new Set<string>(emailsByEmployee.get(e.id) ?? []);
+          if (e.work_email) emails.add(String(e.work_email).toLowerCase());
+          return {
+            id: e.id,
+            firstName: e.first_name,
+            lastName: e.last_name,
+            workEmail: e.work_email,
+            emails: Array.from(emails),
+          };
+        });
       }
     } catch (e: any) {
       warnings.push(`Sælgerliste: ${e?.message || "ukendt fejl"}`);
