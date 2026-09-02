@@ -22,9 +22,9 @@ interface CommonProps {
 interface ReviewProps extends CommonProps {
   mode: "review";
   selectedIds: Set<string>;
-  onToggleSelected: (saleItemId: string) => void;
-  onApprove: (saleItemId: string) => void;
-  onReject: (saleItemId: string) => void;
+  onToggleSelected: (saleId: string) => void;
+  onApprove: (saleId: string) => void;
+  onReject: (saleId: string) => void;
   onApproveSelected: () => void;
   onRejectSelected: () => void;
   isPending: boolean;
@@ -33,7 +33,7 @@ interface ReviewProps extends CommonProps {
 interface StatusProps extends CommonProps {
   mode: "status";
   reviews: Map<string, TrygSaleReview>;
-  onUndo: (saleItemId: string) => void;
+  onUndo: (saleId: string) => void;
   isPending: boolean;
   /** Vis dato-kolonne når perioden dækker mere end én dag. */
   showDate?: boolean;
@@ -117,9 +117,9 @@ export function TrygSalesTable(props: Props) {
           ) : sales.length > 0 ? (
             sales.map((sale) => {
               const review =
-                mode === "status" ? props.reviews.get(sale.saleItemId) : undefined;
+                mode === "status" ? props.reviews.get(sale.saleId) : undefined;
               return (
-                <TableRow key={sale.saleItemId}>
+                <TableRow key={sale.saleId}>
                   {showDate && (
                     <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground">
                       {format(new Date(sale.saleDatetime), "dd/MM/yyyy")}
@@ -162,7 +162,7 @@ export function TrygSalesTable(props: Props) {
                           title="Afvis salg"
                           className="h-8 gap-1.5 font-medium"
                           disabled={props.isPending}
-                          onClick={() => props.onReject(sale.saleItemId)}
+                          onClick={() => props.onReject(sale.saleId)}
                         >
                           <X className="h-3.5 w-3.5" />
                           Afvis
@@ -172,22 +172,22 @@ export function TrygSalesTable(props: Props) {
                           title="Godkend salg"
                           className="h-8 gap-1.5 font-medium bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700"
                           disabled={props.isPending}
-                          onClick={() => props.onApprove(sale.saleItemId)}
+                          onClick={() => props.onApprove(sale.saleId)}
                         >
                           <Check className="h-3.5 w-3.5" />
                           Godkend
                         </Button>
                         <label
                           className={`flex h-8 cursor-pointer items-center gap-2 rounded-md border px-2.5 text-xs font-medium transition-colors ${
-                            props.selectedIds.has(sale.saleItemId)
+                            props.selectedIds.has(sale.saleId)
                               ? "border-primary bg-primary/10 text-primary"
                               : "border-input bg-muted text-muted-foreground hover:bg-muted/70"
                           } ${!sale.customerPhone ? "pointer-events-none opacity-50" : ""}`}
                         >
                           <Checkbox
-                            checked={props.selectedIds.has(sale.saleItemId)}
+                            checked={props.selectedIds.has(sale.saleId)}
                             onCheckedChange={() =>
-                              props.onToggleSelected(sale.saleItemId)
+                              props.onToggleSelected(sale.saleId)
                             }
                             disabled={!sale.customerPhone}
                             aria-label="Markér salg"
@@ -203,7 +203,7 @@ export function TrygSalesTable(props: Props) {
                           size="sm"
                           className="h-8 gap-1.5"
                           disabled={props.isPending}
-                          onClick={() => props.onUndo(sale.saleItemId)}
+                          onClick={() => props.onUndo(sale.saleId)}
                           title="Fortryd — send tilbage til Gennemgang"
                         >
                           <RotateCcw className="h-3.5 w-3.5" />
