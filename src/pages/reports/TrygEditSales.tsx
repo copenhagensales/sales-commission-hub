@@ -662,6 +662,14 @@ export default function TrygEditSales() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        <SendTrygMailDialog
+          open={isMailOpen}
+          onOpenChange={setIsMailOpen}
+          defaultSubject={mailSubject}
+          defaultBody={mailBody}
+          phones={selectedPhones}
+        />
       </div>
     </MainLayout>
   );
