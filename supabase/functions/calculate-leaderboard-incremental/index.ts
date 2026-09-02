@@ -140,7 +140,10 @@ async function calculateLeaderboard(
   const entries: LeaderboardEntry[] = [];
   
   for (const [agentKey, stats] of agentStats) {
-    if (stats.sales === 0 && stats.crossSales === 0) continue;
+    // Behold saelgeren hvis der er provision, ogsaa naar ingen af produkterne
+    // taeller som salg (fx Internetfilter og fiber-produkter med
+    // counts_as_sale = false). Ellers forsvinder provisionen fra boardet.
+    if (stats.sales === 0 && stats.crossSales === 0 && stats.commission <= 0) continue;
     
     const employeeId = emailToEmployeeId.get(agentKey) || "";
     const empInfo = employeeId ? employeeMap.get(employeeId) : null;
