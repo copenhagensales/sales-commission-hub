@@ -100,6 +100,12 @@ export function useTrygKanvasSales(from: Date, to?: Date, enabled = true) {
   });
 }
 
+const INVALIDATE_KEYS = [
+  ["tryg-kanvas-sales"],
+  ["tryg-sale-reviews"],
+  ["sales-aggregates"],
+];
+
 /** Sletter en salgsregistrering (hard delete på sales-rækken). */
 export function useDeleteTrygKanvasSale() {
   const queryClient = useQueryClient();
@@ -110,7 +116,35 @@ export function useDeleteTrygKanvasSale() {
       if (error) throw error;
     },
     onSuccess: () => {
-      for (const key of [["tryg-kanvas-sales"], ["sales-aggregates"]]) {
+      for (const key of INVALIDATE_KEYS) {
+        queryClient.invalidateQueries({ queryKey: key });
+      }
+    },
+  });
+}
+
+/**
+ * Sletter en eksplicit liste af salg (hard delete). Bruges kun til de afviste
+ * Kanvas-salg på "Tryg - Ret salg" — id'erne kommer altid fra den viste liste.
+ */
+export function useDeleteTrygKanvasSales() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (saleIds: string[]) => {
+      const ids = Array.from(new Set(saleIds.filter(Boolean)));
+      if (ids.length === 0) throw new Error("Ingen salg valgt til sletning.");
+
+      // Batches så URL'en ikke bliver for lang ved store perioder.
+      for (let i = 0; i < ids.length; i += 50) {
+        const batch = ids.slice(i, i + 50);
+        const { error } = await supabase.from("sales").delete().in("id", batch);
+        if (error) throw error;
+      }
+      return ids.length;
+    },
+    onSuccess: () => {
+      for (const key of INVALIDATE_KEYS) {
         queryClient.invalidateQueries({ queryKey: key });
       }
     },
