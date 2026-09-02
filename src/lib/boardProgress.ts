@@ -6,7 +6,7 @@
  */
 
 /** Indeks-tærskler i procent. Juster her, ikke i logikken. */
-export const INDEKS_FORAN = 110;
+export const INDEKS_FORAN = 105;
 export const INDEKS_ON_TRACK = 95;
 export const INDEKS_EFTER = 85;
 
