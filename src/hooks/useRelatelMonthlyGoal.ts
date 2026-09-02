@@ -100,8 +100,13 @@ export function useRelatelMonthlyGoal(enabled = true) {
       const countByEmail = new Map<string, number>();
       const countByDate = new Map<string, number>();
       for (const item of payload.items) {
-        // Ekskluderede produkter (fx Internetfilter) tælles ikke med i månedsmålet
-        if (item.productId && MONTHLY_GOAL_EXCLUDED_PRODUCT_IDS.has(item.productId)) continue;
+        // Ekskluderede produkter (fx Internetfilter og Relatel-specifikke produkter) tælles ikke med
+        if (
+          item.productId &&
+          (MONTHLY_GOAL_EXCLUDED_PRODUCT_IDS.has(item.productId) ||
+            RELATEL_MONTHLY_GOAL_EXCLUDED_PRODUCT_IDS.has(item.productId))
+        )
+          continue;
         const qty = item.quantity ?? 1;
         teamCount += qty;
         const email = (item.agentEmail || "").toLowerCase();
