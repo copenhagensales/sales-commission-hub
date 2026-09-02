@@ -1,28 +1,42 @@
-# Indeks-afrunding og synligt indeks pr. sælger
+# Relatel Månedsmål — kopi af TDC-boardet
 
-Farverne på tavlen er korrekte i dag — ingen sælgere ligger i det gule bånd (indeks 95-104). Mathias Victor Andersen er tættest med indeks 84,6, hvilket er 0,4 point under orange-grænsen på 85. To justeringer gør tavlen mere gennemskuelig.
+Nyt board "Relatel Månedsmål" bygget som en 1:1 kopi af "TDC Månedsmål", men med Relatel-klienten og Relatel-teamets sælgere.
 
-## 1. Afrund indeks før status
+## Hvad boardet viser
+Samme layout som TDC-boardet: fælles progressbar med indeks, "foran/bagud på dagen", dagsbokse pr. dag i måneden og individuelle mål i to kolonner.
 
-I dag sammenlignes det rå decimaltal (84,6) med tærsklerne, mens tallet vises afrundet (85%). Det giver en tavle der viser "85%" i rød. Statusberegningen skal bruge samme afrundede heltal som vises.
+- Fælles mål september 2026: **850 salg**
+- Individuelle mål: **vilkårlige startværdier** (justeres senere), fordelt på de 11 aktive Relatel-sælgere:
 
-`src/lib/boardProgress.ts`
-- `indeks` beregnes uændret (decimaltal, bruges til visning/afrunding).
-- Status udledes af `Math.round(indeks)` i stedet for det rå tal.
-- Effekt: Mathias Victor rykker fra rød til orange. Ingen andre skifter farve.
-- Test tilføjes i `src/lib/boardProgress.test.ts` for grænsetilfældet 84,6 -> orange.
+| Sælger | Foreløbigt mål |
+| --- | --- |
+| Anders Schjødt Kristensen | 90 |
+| Benjamin Nickolaj Andersen | 90 |
+| Emillio Pedersen | 80 |
+| Frederik Bülow Donner | 80 |
+| Gustav Fyrstenborg Diebel | 80 |
+| Jacob Lykke Nielson | 80 |
+| Noah Zylber | 75 |
+| Rasmus Quiding Fricke | 75 |
+| Samuel Juul | 70 |
+| Simon Sejer Linddal Sørensen | 70 |
+| Thorbjørn Mindedal Weichert | 60 |
 
-## 2. Vis indeks på sælgerrækkerne
+## Tælleregel
+Sum af `sale_items.quantity` på Relatel-salg i måneden. Annullerede/afviste salg tælles ikke. Ingen fiber-vægtning (den er TDC-specifik) — hver linje tæller sin quantity.
 
-I dag vises "opnået i procent" (fx 8%) ved sælgerne, mens baren farves efter indeks. To forskellige tal, og farven kan ikke verificeres af den der ser tavlen.
+## Filer
+Nye:
+- `src/config/relatelMonthlyGoals.ts` — mål pr. måned (samme struktur som `tdcMonthlyGoals.ts`)
+- `src/hooks/useRelatelMonthlyGoal.ts` — kopi af TDC-hooket uden fiber-vægtning
+- `src/pages/dashboards/RelatelMonthlyGoalBoard.tsx` — kopi af TDC-boardet med ny titel
 
-`src/pages/dashboards/TdcMonthlyGoalBoard.tsx`
-- Efter `10 / 130` vises indekset i statusfarven, fx `indeks 85`, i stedet for de nuværende `8%`.
-- Sælgere uden mål (mål 0) er uændrede — ingen bar, intet indeks.
-- Ingen ændring i layout, kolonner eller fælles mål-boksen.
+Ændres (kun registrering):
+- `supabase/functions/tv-dashboard-data/index.ts` — ny action `relatel-monthly-goal` (genbruger samme handler, parametriseret med klient-id `0ff8476d…` og team-id `f4210d48…`)
+- `src/config/dashboards.ts` — slug `relatel-monthly-goal`, permission `menu_dashboard_relatel_monthly_goal`
+- `src/config/permissionKeys.ts` — ny nøgle
+- `src/routes/pages.ts` + `src/routes/config.tsx` — rute `/dashboards/relatel-monthly-goal`
+- `src/pages/tv-board/TvBoardView.tsx` + `TvBoardDirect.tsx` — så boardet kan vælges på en TV-skærm
 
-Hvis du vil beholde "% opnået" og have indekset som ekstra tal, siger du til — så vises begge.
-
-## Zone
-
-Grøn zone: kun board-beregning og præsentation. Ingen ændringer i hooks, data, pricing eller lønlogik.
+## Teknisk
+Ingen databaseændringer, ingen ændringer i eksisterende TDC-board, hooks eller lønlogik. `boardProgress.ts` genbruges uændret, så indeks/farvelogik er identisk på de to boards.
