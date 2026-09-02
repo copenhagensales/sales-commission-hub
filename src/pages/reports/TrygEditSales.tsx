@@ -318,6 +318,15 @@ export default function TrygEditSales() {
     await copyText(fillPhonePlaceholders(template, selectedPhones));
   };
 
+  const mailBody = useMemo(
+    () => fillPhonePlaceholders(template, selectedPhones),
+    [template, selectedPhones]
+  );
+  const mailSubject = `Annullering af Kanvas-møder - ${format(day, "dd/MM/yyyy", {
+    locale: da,
+  })}`;
+
+
   const setQuickRange = (from: Date, to: Date) => {
     setRangeFrom(from);
     setRangeTo(to);
