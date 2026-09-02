@@ -1,6 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { tvEdgeFetch } from "@/utils/tvEdgeFetch";
-import { getTdcMonthlyGoal, getTdcSellerGoal, type TdcMonthlyGoal } from "@/config/tdcMonthlyGoals";
+import {
+  getTdcMonthlyGoal,
+  getTdcSellerGoal,
+  MONTHLY_GOAL_EXCLUDED_PRODUCT_IDS,
+  type TdcMonthlyGoal,
+} from "@/config/tdcMonthlyGoals";
 import { FIBER_BOARD_POINTS } from "@/config/fiberBoardPoints";
 
 
@@ -96,6 +101,8 @@ export function useTdcMonthlyGoal(enabled = true) {
       const countByEmail = new Map<string, number>();
       const countByDate = new Map<string, number>();
       for (const item of payload.items) {
+        // Ekskluderede produkter (fx Internetfilter) tælles ikke med i månedsmålet
+        if (item.productId && MONTHLY_GOAL_EXCLUDED_PRODUCT_IDS.has(item.productId)) continue;
         // Fiber (HAP/VOK) vægtes som på TDC Erhverv-boardet; alle andre linjer tæller 1 pr. stk.
         const weight = (item.productId && FIBER_BOARD_POINTS[item.productId]) ?? 1;
         const qty = (item.quantity ?? 1) * weight;

@@ -14,6 +14,16 @@ export interface TdcMonthlyGoal {
   excludeEmployeeIds?: string[];
 }
 
+/**
+ * Produkter der ikke tælles med på månedsmål-boardene.
+ * Internetfilter findes som to produktrækker (én på TDC Erhverv-kampagnen og én
+ * uden kampagne med trailing mellemrum i navnet) — begge skal ekskluderes.
+ */
+export const MONTHLY_GOAL_EXCLUDED_PRODUCT_IDS: ReadonlySet<string> = new Set([
+  "67d0440b-032f-4e09-a348-ff61b8980cff",
+  "82573835-02d7-45d1-b7ca-376849baf1fd",
+]);
+
 export const TDC_MONTHLY_GOALS: Record<string, TdcMonthlyGoal> = {
   "2026-09": {
     team: 850,
