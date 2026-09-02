@@ -99,11 +99,6 @@ export function TrygSalesTable(props: Props) {
                   </Button>
                   <span>Handlinger</span>
                 </div>
-              ) : props.headerAction ? (
-                <div className="flex items-center justify-end gap-1.5">
-                  {props.headerAction}
-                  <span>Handlinger</span>
-                </div>
               ) : (
                 "Handlinger"
               )}
