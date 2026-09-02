@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { endOfMonth, format, startOfMonth, subDays, subMonths } from "date-fns";
 import { da } from "date-fns/locale";
-import { CalendarIcon, Check, Copy, FileText, Pencil, Search, X } from "lucide-react";
+import { CalendarIcon, Check, Copy, FileText, Mail, Pencil, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { MainLayout } from "@/components/layout/MainLayout";
 import {
@@ -29,6 +29,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TrygSalesTable } from "@/components/reports/TrygSalesTable";
+import { SendTrygMailDialog } from "@/components/reports/SendTrygMailDialog";
 
 import {
   useReportTextTemplate,
@@ -124,6 +125,7 @@ export default function TrygEditSales() {
   const [draftTemplate, setDraftTemplate] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [phoneSearch, setPhoneSearch] = useState("");
+  const [isMailOpen, setIsMailOpen] = useState(false);
 
   // Nulstil markeringer og søgning ved skift af dag — perioden følger dagen
   useEffect(() => {
@@ -316,6 +318,15 @@ export default function TrygEditSales() {
     await copyText(fillPhonePlaceholders(template, selectedPhones));
   };
 
+  const mailBody = useMemo(
+    () => fillPhonePlaceholders(template, selectedPhones),
+    [template, selectedPhones]
+  );
+  const mailSubject = `Annullering af Kanvas-møder - ${format(day, "dd/MM/yyyy", {
+    locale: da,
+  })}`;
+
+
   const setQuickRange = (from: Date, to: Date) => {
     setRangeFrom(from);
     setRangeTo(to);
@@ -449,6 +460,16 @@ export default function TrygEditSales() {
                 >
                   <Copy className="h-4 w-4" />
                   Kopiér markerede
+                  {selectedPhones.length > 0 ? ` (${selectedPhones.length})` : ""}
+                </Button>
+                <Button
+                  className="gap-2"
+                  onClick={() => setIsMailOpen(true)}
+                  disabled={selectedPhones.length === 0}
+                  title="Send annulleringsmail til Tryg med alle markerede numre"
+                >
+                  <Mail className="h-4 w-4" />
+                  Send til Tryg
                   {selectedPhones.length > 0 ? ` (${selectedPhones.length})` : ""}
                 </Button>
                 <Popover>
@@ -641,6 +662,14 @@ export default function TrygEditSales() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        <SendTrygMailDialog
+          open={isMailOpen}
+          onOpenChange={setIsMailOpen}
+          defaultSubject={mailSubject}
+          defaultBody={mailBody}
+          phones={selectedPhones}
+        />
       </div>
     </MainLayout>
   );
