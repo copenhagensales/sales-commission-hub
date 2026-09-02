@@ -428,7 +428,7 @@ export default function TrygEditSales() {
                                 className="h-8 gap-1.5 font-medium bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700"
                               >
                                 <Check className="h-3.5 w-3.5" />
-                                Godkendt
+                                Godkend
                               </Button>
                               <Checkbox
                                 checked={selectedIds.has(sale.saleItemId)}
