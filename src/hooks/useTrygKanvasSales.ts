@@ -47,6 +47,8 @@ export function useTrygKanvasSales(from: Date, to?: Date, enabled = true) {
       const rows = (data || []) as unknown as {
         id: string;
         quantity: number | null;
+        mapped_commission: number | null;
+        mapped_revenue: number | null;
         products: { name: string | null } | null;
         sales: {
           id: string;
