@@ -318,10 +318,20 @@ export default function TrygEditSales() {
     await copyText(fillPhonePlaceholders(template, selectedPhones));
   };
 
-  const mailBody = useMemo(
-    () => fillPhonePlaceholders(template, selectedPhones),
-    [template, selectedPhones]
+  /** Numrene på alle afviste salg i den valgte periode. */
+  const rejectedPhones = useMemo(
+    () =>
+      rejectedSales
+        .filter((s) => s.customerPhone)
+        .map((s) => s.customerPhone as string),
+    [rejectedSales]
   );
+
+  const mailBody = useMemo(
+    () => fillPhonePlaceholders(template, rejectedPhones),
+    [template, rejectedPhones]
+  );
+
   const mailSubject = `Annullering af Kanvas-møder - ${format(day, "dd/MM/yyyy", {
     locale: da,
   })}`;
@@ -462,16 +472,6 @@ export default function TrygEditSales() {
                   Kopiér markerede
                   {selectedPhones.length > 0 ? ` (${selectedPhones.length})` : ""}
                 </Button>
-                <Button
-                  className="gap-2"
-                  onClick={() => setIsMailOpen(true)}
-                  disabled={selectedPhones.length === 0}
-                  title="Send annulleringsmail til Tryg med alle markerede numre"
-                >
-                  <Mail className="h-4 w-4" />
-                  Send til Tryg
-                  {selectedPhones.length > 0 ? ` (${selectedPhones.length})` : ""}
-                </Button>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="gap-2">
@@ -606,6 +606,22 @@ export default function TrygEditSales() {
                     onUndo={clearStatus}
                     isPending={clearReview.isPending}
                     showDate={showDateColumn}
+                    headerAction={
+                      <Button
+                        size="sm"
+                        className="h-7 gap-1.5 text-xs font-medium"
+                        onClick={() => setIsMailOpen(true)}
+                        disabled={rejectedPhones.length === 0}
+                        title="Send annulleringsmail til Tryg med numrene på de afviste salg i perioden"
+                      >
+                        <Mail className="h-3.5 w-3.5" />
+                        Send til Tryg
+                        {rejectedPhones.length > 0
+                          ? ` (${rejectedPhones.length})`
+                          : ""}
+                      </Button>
+                    }
+
                   />
                 </TabsContent>
 
@@ -668,7 +684,7 @@ export default function TrygEditSales() {
           onOpenChange={setIsMailOpen}
           defaultSubject={mailSubject}
           defaultBody={mailBody}
-          phones={selectedPhones}
+          phones={rejectedPhones}
         />
       </div>
     </MainLayout>
