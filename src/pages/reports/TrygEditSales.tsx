@@ -11,14 +11,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -34,7 +26,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TrygSalesTable } from "@/components/reports/TrygSalesTable";
 
 import {
   useReportTextTemplate,
@@ -46,6 +39,13 @@ import {
   useDeleteTrygKanvasSale,
   type TrygKanvasSale,
 } from "@/hooks/useTrygKanvasSales";
+import {
+  useTrygSaleReviews,
+  useSetTrygSaleReview,
+  useClearTrygSaleReview,
+  type TrygReviewStatus,
+} from "@/hooks/useTrygSaleReviews";
+
 
 const TRYG_CANCEL_TEMPLATE = `Hej Tryg,
 
@@ -208,7 +208,66 @@ export default function TrygEditSales() {
       normalizePhone(s.customerPhone || "").includes(needle)
     );
   }, [sales, phoneSearch]);
+  /** Status pr. salgslinje for dagens salg. */
+  const saleItemIds = useMemo(
+    () => (sales || []).map((s) => s.saleItemId),
+    [sales]
+  );
+  const { data: reviewMap } = useTrygSaleReviews(saleItemIds, hasAccess);
+  const reviews = reviewMap ?? new Map();
+  const setReview = useSetTrygSaleReview();
+  const clearReview = useClearTrygSaleReview();
 
+  const pendingSales = useMemo(
+    () => visibleSales.filter((s) => !reviews.has(s.saleItemId)),
+    [visibleSales, reviews]
+  );
+  const rejectedSales = useMemo(
+    () =>
+      visibleSales.filter(
+        (s) => reviews.get(s.saleItemId)?.status === "rejected"
+      ),
+    [visibleSales, reviews]
+  );
+  const approvedSales = useMemo(
+    () =>
+      visibleSales.filter(
+        (s) => reviews.get(s.saleItemId)?.status === "approved"
+      ),
+    [visibleSales, reviews]
+  );
+
+  const applyStatus = async (ids: string[], status: TrygReviewStatus) => {
+    if (ids.length === 0) return;
+    try {
+      await setReview.mutateAsync({ saleItemIds: ids, status });
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        ids.forEach((id) => next.delete(id));
+        return next;
+      });
+      toast.success(
+        status === "approved"
+          ? `${ids.length} salg godkendt`
+          : `${ids.length} salg afvist`
+      );
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error ? error.message : "Kunne ikke gemme status"
+      );
+    }
+  };
+
+  const clearStatus = async (saleItemId: string) => {
+    try {
+      await clearReview.mutateAsync([saleItemId]);
+      toast.success("Status fjernet — linjen ligger i Gennemgang igen");
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error ? error.message : "Kunne ikke fjerne status"
+      );
+    }
+  };
 
 
   const handleCopySelected = async () => {
@@ -364,133 +423,69 @@ export default function TrygEditSales() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="rounded-lg border border-border/50 overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-24 whitespace-nowrap">Tid</TableHead>
-                      <TableHead className="whitespace-nowrap">Sælgernavn</TableHead>
-                      <TableHead className="w-32 whitespace-nowrap">Telefon</TableHead>
-                      <TableHead className="w-16 whitespace-nowrap text-right">
-                        Antal
-                      </TableHead>
-                      <TableHead className="w-full min-w-[240px]">
-                        Produktnavn
-                      </TableHead>
-                      <TableHead className="w-64 whitespace-nowrap text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <Button
-                            size="sm"
-                            className="h-7 gap-1.5 text-xs font-medium bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700"
-                            disabled={selectedIds.size === 0}
-                          >
-                            <Check className="h-3.5 w-3.5" />
-                            Godkend markerede
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            className="h-7 gap-1.5 text-xs font-medium"
-                            disabled={selectedIds.size === 0}
-                          >
-                            <X className="h-3.5 w-3.5" />
-                            Afvis markerede
-                          </Button>
-                          <span>Handlinger</span>
-                        </div>
-                      </TableHead>
+              <Tabs defaultValue="review">
+                <TabsList className="mb-4">
+                  <TabsTrigger value="review">
+                    Gennemgang ({pendingSales.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="rejected">
+                    Afviste salg ({rejectedSales.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="approved">
+                    Godkendte salg ({approvedSales.length})
+                  </TabsTrigger>
+                </TabsList>
 
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {isLoading || loadingAccess ? (
-                      <TableRow>
-                        <TableCell
-                          colSpan={6}
-                          className="py-16 text-center text-sm text-muted-foreground"
-                        >
-                          Henter salg...
-                        </TableCell>
-                      </TableRow>
-                    ) : visibleSales.length > 0 ? (
-                      visibleSales.map((sale) => (
+                <TabsContent value="review">
+                  <TrygSalesTable
+                    mode="review"
+                    sales={pendingSales}
+                    isLoading={isLoading || loadingAccess}
+                    emptyText={
+                      phoneSearch
+                        ? "Ingen salg matcher søgningen."
+                        : "Ingen Kanvas-salg til gennemgang på den valgte dag."
+                    }
+                    selectedIds={selectedIds}
+                    onToggleSelected={toggleSelected}
+                    onApprove={(id) => applyStatus([id], "approved")}
+                    onReject={(id) => applyStatus([id], "rejected")}
+                    onApproveSelected={() =>
+                      applyStatus(Array.from(selectedIds), "approved")
+                    }
+                    onRejectSelected={() =>
+                      applyStatus(Array.from(selectedIds), "rejected")
+                    }
+                    isPending={setReview.isPending}
+                  />
+                </TabsContent>
 
-                        <TableRow key={sale.saleItemId}>
-                          <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground">
-                            {format(new Date(sale.saleDatetime), "HH:mm")}
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap font-medium">
-                            {sale.sellerName}
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap tabular-nums">
-                            {sale.customerPhone || "—"}
-                          </TableCell>
-                          <TableCell className="w-16 text-right font-semibold text-primary tabular-nums">
-                            {sale.quantity}
-                          </TableCell>
-                          <TableCell className="min-w-[240px]">
-                            {sale.productName}
-                          </TableCell>
-                          <TableCell className="w-64 whitespace-nowrap">
-                            <div className="flex items-center justify-end gap-1">
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                title="Afvis salg"
-                                className="h-8 gap-1.5 font-medium"
-                              >
-                                <X className="h-3.5 w-3.5" />
-                                Afvis
-                              </Button>
-                              <Button
-                                size="sm"
-                                title="Godkend salg"
-                                className="h-8 gap-1.5 font-medium bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700"
-                              >
-                                <Check className="h-3.5 w-3.5" />
-                                Godkend
-                              </Button>
-                              <label
-                                className={`flex h-8 cursor-pointer items-center gap-2 rounded-md border px-2.5 text-xs font-medium transition-colors ${
-                                  selectedIds.has(sale.saleItemId)
-                                    ? "border-primary bg-primary/10 text-primary"
-                                    : "border-input bg-muted text-muted-foreground hover:bg-muted/70"
-                                } ${!sale.customerPhone ? "pointer-events-none opacity-50" : ""}`}
-                              >
-                                <Checkbox
-                                  checked={selectedIds.has(sale.saleItemId)}
-                                  onCheckedChange={() =>
-                                    toggleSelected(sale.saleItemId)
-                                  }
-                                  disabled={!sale.customerPhone}
-                                  aria-label="Markér salg til samlet kopiering"
-                                  className="h-5 w-5 border-muted-foreground/50"
-                                />
-                                Markér
-                              </label>
+                <TabsContent value="rejected">
+                  <TrygSalesTable
+                    mode="status"
+                    sales={rejectedSales}
+                    isLoading={isLoading || loadingAccess}
+                    emptyText="Ingen afviste salg på den valgte dag."
+                    reviews={reviews}
+                    onUndo={clearStatus}
+                    isPending={clearReview.isPending}
+                  />
+                </TabsContent>
 
-
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell
-                          colSpan={6}
-                          className="py-16 text-center text-sm text-muted-foreground"
-                        >
-                          {phoneSearch
-                            ? "Ingen salg matcher søgningen."
-                            : "Ingen Kanvas-salg på den valgte dag."}
-
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
+                <TabsContent value="approved">
+                  <TrygSalesTable
+                    mode="status"
+                    sales={approvedSales}
+                    isLoading={isLoading || loadingAccess}
+                    emptyText="Ingen godkendte salg på den valgte dag."
+                    reviews={reviews}
+                    onUndo={clearStatus}
+                    isPending={clearReview.isPending}
+                  />
+                </TabsContent>
+              </Tabs>
             </CardContent>
+
           </Card>
         )}
 

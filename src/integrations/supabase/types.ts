@@ -14426,6 +14426,44 @@ export type Database = {
         }
         Relationships: []
       }
+      tryg_sale_reviews: {
+        Row: {
+          created_at: string
+          reviewed_at: string
+          reviewed_by: string | null
+          reviewed_by_name: string | null
+          sale_item_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          reviewed_at?: string
+          reviewed_by?: string | null
+          reviewed_by_name?: string | null
+          sale_item_id: string
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          reviewed_at?: string
+          reviewed_by?: string | null
+          reviewed_by_name?: string | null
+          sale_item_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tryg_sale_reviews_sale_item_id_fkey"
+            columns: ["sale_item_id"]
+            isOneToOne: true
+            referencedRelation: "sale_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tv_board_access: {
         Row: {
           access_code: string
