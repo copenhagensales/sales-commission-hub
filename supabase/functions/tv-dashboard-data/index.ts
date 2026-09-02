@@ -307,7 +307,36 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      return await handleTdcMonthlyGoal(supabase, start, end, corsHeaders, cacheKey);
+      return await handleMonthlyGoal(
+        supabase,
+        TDC_ERHVERV_CLIENT_ID_EF,
+        TDC_ERHVERV_TEAM_ID_EF,
+        start,
+        end,
+        corsHeaders,
+        cacheKey,
+      );
+    }
+
+    if (action === "relatel-monthly-goal") {
+      const start = url.searchParams.get("start") || "";
+      const end = url.searchParams.get("end") || "";
+      const cacheKey = `relatel-monthly-goal-${start}-${end}`;
+      const cached = getCached<any>(cacheKey);
+      if (cached) {
+        return new Response(JSON.stringify(cached), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return await handleMonthlyGoal(
+        supabase,
+        RELATEL_CLIENT_ID_EF,
+        RELATEL_TEAM_ID_EF,
+        start,
+        end,
+        corsHeaders,
+        cacheKey,
+      );
     }
 
 
