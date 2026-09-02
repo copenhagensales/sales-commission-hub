@@ -234,6 +234,21 @@ function campaignMatchesProduct(product: string | null, campaign: string | null)
   return mode === "without" ? !free : free;
 }
 
+const PRODUCT_FLAG_SUBSCRIPTION = norm("Fri tale + 60 GB data (5G) (6 mdr. binding)");
+
+/**
+ * Produkt-regel: "Fri tale + 60 GB data (5G) (6 mdr. binding)" må ikke
+ * være solgt på en Nuuday-operator.
+ */
+function productMatchesOperator(
+  subscriptionName: string | null,
+  operator: string | null,
+): boolean {
+  if (norm(subscriptionName) !== PRODUCT_FLAG_SUBSCRIPTION) return true;
+  return !isNuudayOperator(operator);
+}
+
+
 
 
 /**
@@ -347,7 +362,8 @@ export function useEesyFmDeviations(
       const okMatch = matches.find(
         (m) =>
           campaignMatchesProduct(sale.productName, m.campaignName) &&
-          operatorMatchesProduct(sale.productName, m.operator),
+          operatorMatchesProduct(sale.productName, m.operator) &&
+          productMatchesOperator(m.subscriptionName, m.operator),
       );
       if (okMatch) {
         ok.push(toRow(sale, okMatch, ""));
@@ -358,7 +374,9 @@ export function useEesyFmDeviations(
       const labels: string[] = [];
       if (!campaignMatchesProduct(sale.productName, first.campaignName)) labels.push("Kampagne");
       if (!operatorMatchesProduct(sale.productName, first.operator)) labels.push("Operator");
+      if (!productMatchesOperator(first.subscriptionName, first.operator)) labels.push("Produkt");
       result.push(toRow(sale, first, labels.join(" + ") || "Kampagne"));
+
     }
 
     return { rows: result, okRows: ok };
