@@ -12,6 +12,10 @@ export interface TrygKanvasSale {
   customerPhone: string | null;
   quantity: number;
   productName: string;
+  /** Provision på salgslinjen — vises i sletnings-bekræftelsen. */
+  mappedCommission: number;
+  /** Omsætning på salgslinjen — vises i sletnings-bekræftelsen. */
+  mappedRevenue: number;
 }
 
 function dayBounds(from: Date, to?: Date) {
