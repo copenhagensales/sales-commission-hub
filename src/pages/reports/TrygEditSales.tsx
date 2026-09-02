@@ -286,9 +286,14 @@ export default function TrygEditSales() {
           : `${ids.length} salg afvist`
       );
     } catch (error: unknown) {
-      toast.error(
-        error instanceof Error ? error.message : "Kunne ikke gemme status"
-      );
+      // Salget kan være forsvundet siden listen blev hentet — hent den forfra.
+      queryClient.invalidateQueries({ queryKey: ["tryg-kanvas-sales"] });
+      queryClient.invalidateQueries({ queryKey: ["tryg-sale-reviews"] });
+      const message =
+        error && typeof error === "object" && "message" in error
+          ? String((error as { message?: unknown }).message)
+          : "Kunne ikke gemme status";
+      toast.error(`Kunne ikke gemme status: ${message}`);
     }
   };
 
