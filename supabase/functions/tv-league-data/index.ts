@@ -77,6 +77,22 @@ async function buildTeamCompetition(
     .select("employee_id, team_id, team_name");
   if (attributionError) throw attributionError;
 
+  // Samme filter som hooken: kun medarbejdere der findes i employee_master_data
+  const attributionIds = Array.from(
+    new Set((attribution || []).map((r: any) => r.employee_id).filter(Boolean)),
+  );
+  const knownEmployees = new Set<string>();
+  if (attributionIds.length) {
+    const { data: employees, error: employeeError } = await supabase
+      .from("employee_master_data")
+      .select("id")
+      .in("id", attributionIds);
+    if (employeeError) throw employeeError;
+    for (const e of employees || []) knownEmployees.add(e.id);
+  }
+
+
+
   const idByName = new Map<string, string>();
   for (const row of attribution || []) {
     if (row.team_id && row.team_name && !idByName.has(row.team_name)) {
