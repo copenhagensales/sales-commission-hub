@@ -922,6 +922,7 @@ export default function TvLeagueDashboard() {
                         borderClass="border-emerald-500/40" gradientClass="from-emerald-500/5 to-transparent"
                       />
                     </div>
+                    <TvTeamCompetitionBars data={data.teamCompetition} />
                     <div>
                       <h3 className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-2">
                         🔥 Seneste indtjening (300+ kr samlet)
@@ -933,16 +934,14 @@ export default function TvLeagueDashboard() {
                 {mobileTab === "movements" && (
                   <SceneMovements
                     movements={data.movements}
-                    topLastHour={data.topLastHour}
-                    todayTopEarners={data.todayTopEarners || []}
+                    teamCompetition={data.teamCompetition}
                     activeLast15Min={data.activeLast15Min || 0}
                   />
                 )}
                 {mobileTab === "records" && (
                   <SceneRecords
-                    records={data.records}
                     longestStreak={data.longestStreak}
-                    teamRankings={data.teamRankings || []}
+                    teamCompetition={data.teamCompetition}
                     todayLeagueTotal={data.todayLeagueTotal || 0}
                   />
                 )}
@@ -954,8 +953,10 @@ export default function TvLeagueDashboard() {
                     totalDivisions={data.divisions.filter(d => d.division <= 4).length}
                     todayLeagueTotal={data.todayLeagueTotal || 0}
                     activeLast15Min={data.activeLast15Min || 0}
+                    teamCompetition={data.teamCompetition}
                   />
                 )}
+
               </motion.div>
             </AnimatePresence>
           </div>
