@@ -3,17 +3,10 @@ import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { useAutoReload, isTvMode } from "@/utils/tvMode";
 import { useTdcMonthlyGoal } from "@/hooks/useTdcMonthlyGoal";
 import { Target, Trophy, Loader2 } from "lucide-react";
-import { calcBoardProgress, statusFillClass, statusTextClass } from "@/lib/boardProgress";
+import { calcBoardProgress, indeksBarClass, statusFillClass, statusTextClass } from "@/lib/boardProgress";
 
 function fmt(n: number) {
   return n.toLocaleString("da-DK", { maximumFractionDigits: 1 });
-}
-
-function barColor(progress: number) {
-  if (progress >= 100) return "bg-emerald-400";
-  if (progress >= 75) return "bg-sky-400";
-  if (progress >= 50) return "bg-amber-400";
-  return "bg-rose-400";
 }
 
 export default function TdcMonthlyGoalBoard() {
