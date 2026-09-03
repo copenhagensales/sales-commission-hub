@@ -93,13 +93,13 @@ export default function TdcMonthlyGoalBoard() {
               {/* Ghost-fyld: forventet niveau */}
               {(data?.teamGoal ?? 0) > 0 && (
                 <div
-                  className={`absolute inset-y-0 left-0 rounded-full opacity-25 ${barColor(data?.teamProgress ?? 0)}`}
+                  className={`absolute inset-y-0 left-0 rounded-full opacity-25 ${indeksBarClass(teamProgressInfo.status)}`}
                   style={{ width: `${teamMarkerPct}%` }}
                 />
               )}
               {/* Faktisk fyld */}
               <div
-                className={`absolute inset-y-0 left-0 rounded-full transition-all duration-700 ${barColor(data?.teamProgress ?? 0)}`}
+                className={`absolute inset-y-0 left-0 rounded-full transition-all duration-700 ${indeksBarClass(teamProgressInfo.status)}`}
                 style={{ width: `${Math.min(100, data?.teamProgress ?? 0)}%` }}
               />
               {/* Markør for forventet */}
