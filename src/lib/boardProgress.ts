@@ -128,3 +128,20 @@ export function statusFillClass(status: ProgressStatus): string {
   }
 }
 
+/**
+ * Trafiklys til progressbaren: grøn ved indeks >= 105, gul 95-104,
+ * rød under 95. Neutral grå når indeks er ukendt.
+ */
+export function indeksBarClass(status: ProgressStatus): string {
+  switch (status) {
+    case "foran":
+      return "bg-emerald-400";
+    case "on-track":
+      return "bg-yellow-400";
+    case "ukendt":
+      return "bg-slate-600";
+    default:
+      return "bg-rose-400";
+  }
+}
+
