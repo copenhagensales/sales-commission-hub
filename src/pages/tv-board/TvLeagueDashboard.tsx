@@ -455,63 +455,8 @@ function SceneMovements({
         </div>
       </div>
 
-      <div>
-        <h3 className="text-xs 2xl:text-sm font-medium text-amber-400 mb-2 2xl:mb-3 flex items-center gap-2">
-          <Zap className="h-3 w-3 2xl:h-4 2xl:w-4" /> Mest tjent sidste time
-        </h3>
-        <div className="space-y-1.5 2xl:space-y-2">
-          {topLastHour.map((e, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1 }}
-              className="flex items-center gap-2 2xl:gap-3 px-2 2xl:px-3 py-1.5 2xl:py-2 rounded-lg bg-amber-500/10 border border-amber-500/20"
-            >
-              <span className="text-sm 2xl:text-lg">{i === 0 ? "⚡" : i === 1 ? "🔥" : "💫"}</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-white font-medium truncate text-xs 2xl:text-sm">{e.name}</p>
-                <p className="text-amber-400/70 text-[10px] 2xl:text-xs">{e.sales} salg</p>
-              </div>
-              <span className="text-amber-400 font-bold tabular-nums text-xs 2xl:text-sm">{formatKr(e.provision)}</span>
-            </motion.div>
-          ))}
-          {topLastHour.length === 0 && (
-            <p className="text-slate-600 text-xs 2xl:text-sm italic">Ingen salg den seneste time</p>
-          )}
-        </div>
-      </div>
+      <TvTeamCompetitionBars data={teamCompetition} />
 
-      {/* Today's Top 5 */}
-      <div>
-        <h3 className="text-xs 2xl:text-sm font-medium text-sky-400 mb-2 2xl:mb-3 flex items-center gap-2">
-          <Trophy className="h-3 w-3 2xl:h-4 2xl:w-4" /> Dagens Top 5
-        </h3>
-        <div className="space-y-1.5 2xl:space-y-2">
-          {todayTopEarners.map((e, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.08 }}
-              className="flex items-center gap-2 2xl:gap-3 px-2 2xl:px-3 py-1.5 2xl:py-2 rounded-lg bg-sky-500/10 border border-sky-500/20"
-            >
-              <span className={`text-sm 2xl:text-base font-black tabular-nums w-5 text-center ${
-                i === 0 ? "text-yellow-400" : i === 1 ? "text-slate-300" : i === 2 ? "text-orange-400" : "text-slate-500"
-              }`}>
-                {e.rank}
-              </span>
-              <div className="flex-1 min-w-0">
-                <p className="text-white font-medium truncate text-xs 2xl:text-sm">{e.name}</p>
-              </div>
-              <span className="text-sky-400 font-bold tabular-nums text-xs 2xl:text-sm">{formatKr(e.provision)}</span>
-            </motion.div>
-          ))}
-          {todayTopEarners.length === 0 && (
-            <p className="text-slate-600 text-xs 2xl:text-sm italic">Ingen salg i dag endnu</p>
-          )}
-        </div>
-      </div>
     </div>
   );
 }
