@@ -91,6 +91,8 @@ interface LeaguePayload {
   longestStreak: { name: string; employeeId: string; streak: number } | null;
   raceToTop: RaceEntry[];
   activeLast15Min: number;
+  teamCompetition?: TvTeamCompetitionData | null;
+
   updatedAt: string;
 }
 
