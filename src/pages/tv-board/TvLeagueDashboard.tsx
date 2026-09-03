@@ -6,6 +6,8 @@ import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { isTvMode } from "@/utils/tvMode";
+import { TvTeamCompetitionBars, type TvTeamCompetitionData } from "@/components/league/TvTeamCompetitionBars";
+
 
 // ─── Types ────────────────────────────────────────────────────
 interface PlayerEntry {
