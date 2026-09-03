@@ -105,6 +105,8 @@ async function buildTeamCompetition(
 
   for (const row of attribution || []) {
     if (!row.team_id || !row.employee_id) continue;
+    if (!knownEmployees.has(row.employee_id)) continue;
+
     if (TEAM_COMPETITION_EXCLUDED_TEAMS.includes(row.team_name)) continue;
 
     const aliasName = TEAM_COMPETITION_TEAM_ALIASES[row.team_name];
