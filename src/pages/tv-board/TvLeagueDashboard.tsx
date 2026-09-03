@@ -376,15 +376,14 @@ function SceneDivisions({ divisions }: { divisions: DivisionData[] }) {
 // Scene B: Movements + Top last hour + Today's Top 5
 function SceneMovements({
   movements,
-  topLastHour,
-  todayTopEarners,
+  teamCompetition,
   activeLast15Min,
 }: {
   movements: { risers: Movement[]; fallers: Movement[] };
-  topLastHour: { name: string; provision: number; sales: number }[];
-  todayTopEarners: TopEarner[];
+  teamCompetition?: TvTeamCompetitionData | null;
   activeLast15Min: number;
 }) {
+
   return (
     <div className="h-full flex flex-col gap-3 2xl:gap-5 overflow-y-auto">
       <div className="flex items-center justify-between">
