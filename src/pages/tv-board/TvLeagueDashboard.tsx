@@ -6,6 +6,8 @@ import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { isTvMode } from "@/utils/tvMode";
+import { TvTeamCompetitionBars, type TvTeamCompetitionData } from "@/components/league/TvTeamCompetitionBars";
+
 
 // ─── Types ────────────────────────────────────────────────────
 interface PlayerEntry {
@@ -89,6 +91,8 @@ interface LeaguePayload {
   longestStreak: { name: string; employeeId: string; streak: number } | null;
   raceToTop: RaceEntry[];
   activeLast15Min: number;
+  teamCompetition?: TvTeamCompetitionData | null;
+
   updatedAt: string;
 }
 
@@ -376,15 +380,14 @@ function SceneDivisions({ divisions }: { divisions: DivisionData[] }) {
 // Scene B: Movements + Top last hour + Today's Top 5
 function SceneMovements({
   movements,
-  topLastHour,
-  todayTopEarners,
+  teamCompetition,
   activeLast15Min,
 }: {
   movements: { risers: Movement[]; fallers: Movement[] };
-  topLastHour: { name: string; provision: number; sales: number }[];
-  todayTopEarners: TopEarner[];
+  teamCompetition?: TvTeamCompetitionData | null;
   activeLast15Min: number;
 }) {
+
   return (
     <div className="h-full flex flex-col gap-3 2xl:gap-5 overflow-y-auto">
       <div className="flex items-center justify-between">
@@ -455,81 +458,23 @@ function SceneMovements({
         </div>
       </div>
 
-      <div>
-        <h3 className="text-xs 2xl:text-sm font-medium text-amber-400 mb-2 2xl:mb-3 flex items-center gap-2">
-          <Zap className="h-3 w-3 2xl:h-4 2xl:w-4" /> Mest tjent sidste time
-        </h3>
-        <div className="space-y-1.5 2xl:space-y-2">
-          {topLastHour.map((e, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1 }}
-              className="flex items-center gap-2 2xl:gap-3 px-2 2xl:px-3 py-1.5 2xl:py-2 rounded-lg bg-amber-500/10 border border-amber-500/20"
-            >
-              <span className="text-sm 2xl:text-lg">{i === 0 ? "⚡" : i === 1 ? "🔥" : "💫"}</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-white font-medium truncate text-xs 2xl:text-sm">{e.name}</p>
-                <p className="text-amber-400/70 text-[10px] 2xl:text-xs">{e.sales} salg</p>
-              </div>
-              <span className="text-amber-400 font-bold tabular-nums text-xs 2xl:text-sm">{formatKr(e.provision)}</span>
-            </motion.div>
-          ))}
-          {topLastHour.length === 0 && (
-            <p className="text-slate-600 text-xs 2xl:text-sm italic">Ingen salg den seneste time</p>
-          )}
-        </div>
-      </div>
+      <TvTeamCompetitionBars data={teamCompetition} />
 
-      {/* Today's Top 5 */}
-      <div>
-        <h3 className="text-xs 2xl:text-sm font-medium text-sky-400 mb-2 2xl:mb-3 flex items-center gap-2">
-          <Trophy className="h-3 w-3 2xl:h-4 2xl:w-4" /> Dagens Top 5
-        </h3>
-        <div className="space-y-1.5 2xl:space-y-2">
-          {todayTopEarners.map((e, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.08 }}
-              className="flex items-center gap-2 2xl:gap-3 px-2 2xl:px-3 py-1.5 2xl:py-2 rounded-lg bg-sky-500/10 border border-sky-500/20"
-            >
-              <span className={`text-sm 2xl:text-base font-black tabular-nums w-5 text-center ${
-                i === 0 ? "text-yellow-400" : i === 1 ? "text-slate-300" : i === 2 ? "text-orange-400" : "text-slate-500"
-              }`}>
-                {e.rank}
-              </span>
-              <div className="flex-1 min-w-0">
-                <p className="text-white font-medium truncate text-xs 2xl:text-sm">{e.name}</p>
-              </div>
-              <span className="text-sky-400 font-bold tabular-nums text-xs 2xl:text-sm">{formatKr(e.provision)}</span>
-            </motion.div>
-          ))}
-          {todayTopEarners.length === 0 && (
-            <p className="text-slate-600 text-xs 2xl:text-sm italic">Ingen salg i dag endnu</p>
-          )}
-        </div>
-      </div>
     </div>
   );
 }
 
 // Scene C: Records (expanded)
 function SceneRecords({
-  records,
   longestStreak,
-  teamRankings,
+  teamCompetition,
   todayLeagueTotal,
 }: {
-  records: LeaguePayload["records"];
   longestStreak: LeaguePayload["longestStreak"];
-  teamRankings: TeamRanking[];
+  teamCompetition?: TvTeamCompetitionData | null;
   todayLeagueTotal: number;
 }) {
-  const maxAvg = Math.max(...records.divisionAverages.map((d) => d.average), 1);
-  const maxTeam = Math.max(...teamRankings.map((t) => t.totalProvision), 1);
+
 
   return (
     <div className="h-full flex flex-col gap-3 2xl:gap-5 overflow-y-auto">
@@ -560,89 +505,8 @@ function SceneRecords({
         </div>
       </div>
 
-      {/* Highest provision */}
-      <div className="p-3 2xl:p-4 rounded-2xl bg-gradient-to-br from-yellow-500/10 to-amber-500/5 border border-yellow-500/20">
-        <div className="flex items-center gap-2 mb-1">
-          <Trophy className="h-4 w-4 2xl:h-5 2xl:w-5 text-yellow-400" />
-          <span className="text-[10px] 2xl:text-xs text-yellow-400/80 font-medium">Højeste provision i sæsonen</span>
-        </div>
-        <p className="text-xl 2xl:text-3xl font-black text-white tabular-nums">{formatKr(records.highestProvision)}</p>
-        <p className="text-slate-400 text-[10px] 2xl:text-xs mt-0.5">{records.highestProvisionName}</p>
-      </div>
+      <TvTeamCompetitionBars data={teamCompetition} />
 
-      {/* Team Rankings */}
-      <div>
-        <h3 className="text-xs 2xl:text-sm font-medium text-slate-400 mb-2 2xl:mb-3 flex items-center gap-2">
-          <Users className="h-3 w-3 2xl:h-4 2xl:w-4" /> Team Ranking
-        </h3>
-        <div className="space-y-2 2xl:space-y-2.5">
-          {teamRankings.map((t, i) => {
-            const pct = (t.totalProvision / maxTeam) * 100;
-            return (
-              <motion.div
-                key={t.teamId}
-                initial={{ opacity: 0, x: -15 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.1 }}
-                className="flex items-center gap-2 2xl:gap-3"
-              >
-                <span className="text-sm 2xl:text-base font-black text-slate-500 w-5 text-center">{i + 1}</span>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between mb-0.5">
-                    <span className="text-xs 2xl:text-sm text-white font-medium truncate">{t.name}</span>
-                    <span className="text-[10px] 2xl:text-xs text-slate-400 tabular-nums">{formatKr(t.totalProvision)}</span>
-                  </div>
-                  <div className="bg-slate-800 rounded-full h-2 2xl:h-2.5 overflow-hidden">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${pct}%` }}
-                      transition={{ duration: 0.8, delay: i * 0.1 }}
-                      className={`h-full rounded-full ${
-                        i === 0 ? "bg-gradient-to-r from-yellow-500 to-amber-500" :
-                        i === 1 ? "bg-gradient-to-r from-slate-400 to-slate-300" :
-                        "bg-gradient-to-r from-orange-500 to-orange-400"
-                      }`}
-                    />
-                  </div>
-                </div>
-              </motion.div>
-            );
-          })}
-          {teamRankings.length === 0 && (
-            <p className="text-slate-600 text-xs 2xl:text-sm italic">Ingen team-data</p>
-          )}
-        </div>
-      </div>
-
-      {/* Division averages */}
-      <div>
-        <h3 className="text-xs 2xl:text-sm font-medium text-slate-400 mb-2 2xl:mb-3 flex items-center gap-2">
-          <BarChart3 className="h-3 w-3 2xl:h-4 2xl:w-4" /> Gennemsnit per division
-        </h3>
-        <div className="space-y-2 2xl:space-y-2.5">
-          {records.divisionAverages.slice(0, 4).map((d) => {
-            const pct = (d.average / maxAvg) * 100;
-            return (
-              <div key={d.division} className="flex items-center gap-2 2xl:gap-3">
-                <span className="text-xs 2xl:text-sm text-slate-500 w-20 2xl:w-24 shrink-0 truncate">{getDivisionName(d.division)}</span>
-                <div className="flex-1 bg-slate-800 rounded-full h-4 2xl:h-5 overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${pct}%` }}
-                    transition={{ duration: 0.8, delay: d.division * 0.1 }}
-                    className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full flex items-center justify-end px-2"
-                  >
-                    <span className="text-[9px] 2xl:text-[10px] font-bold text-white tabular-nums">
-                      {formatKr(Math.round(d.average))}
-                    </span>
-                  </motion.div>
-                </div>
-                <span className="text-[10px] 2xl:text-xs text-slate-600 w-10 2xl:w-12 text-right">{d.playerCount} sp.</span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
     </div>
   );
 }
@@ -655,6 +519,7 @@ function SceneLeagueOverview({
   totalDivisions,
   todayLeagueTotal,
   activeLast15Min,
+  teamCompetition,
 }: {
   raceToTop: RaceEntry[];
   divisions: DivisionData[];
@@ -662,7 +527,9 @@ function SceneLeagueOverview({
   totalDivisions: number;
   todayLeagueTotal: number;
   activeLast15Min: number;
+  teamCompetition?: TvTeamCompetitionData | null;
 }) {
+
   const maxProv = Math.max(...raceToTop.map((r) => r.provision), 1);
 
   // Division battle: total provision per division
@@ -698,6 +565,10 @@ function SceneLeagueOverview({
           </motion.div>
         ))}
       </div>
+
+      <TvTeamCompetitionBars data={teamCompetition} />
+
+
 
       {/* Race to #1 */}
       <div>
@@ -922,6 +793,7 @@ export default function TvLeagueDashboard() {
                         borderClass="border-emerald-500/40" gradientClass="from-emerald-500/5 to-transparent"
                       />
                     </div>
+                    <TvTeamCompetitionBars data={data.teamCompetition} />
                     <div>
                       <h3 className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-2">
                         🔥 Seneste indtjening (300+ kr samlet)
@@ -933,16 +805,14 @@ export default function TvLeagueDashboard() {
                 {mobileTab === "movements" && (
                   <SceneMovements
                     movements={data.movements}
-                    topLastHour={data.topLastHour}
-                    todayTopEarners={data.todayTopEarners || []}
+                    teamCompetition={data.teamCompetition}
                     activeLast15Min={data.activeLast15Min || 0}
                   />
                 )}
                 {mobileTab === "records" && (
                   <SceneRecords
-                    records={data.records}
                     longestStreak={data.longestStreak}
-                    teamRankings={data.teamRankings || []}
+                    teamCompetition={data.teamCompetition}
                     todayLeagueTotal={data.todayLeagueTotal || 0}
                   />
                 )}
@@ -954,8 +824,10 @@ export default function TvLeagueDashboard() {
                     totalDivisions={data.divisions.filter(d => d.division <= 4).length}
                     todayLeagueTotal={data.todayLeagueTotal || 0}
                     activeLast15Min={data.activeLast15Min || 0}
+                    teamCompetition={data.teamCompetition}
                   />
                 )}
+
               </motion.div>
             </AnimatePresence>
           </div>
@@ -1061,6 +933,9 @@ export default function TvLeagueDashboard() {
                         gradientClass="from-emerald-500/5 to-transparent"
                       />
                     </div>
+                    <div className="mb-2 2xl:mb-4">
+                      <TvTeamCompetitionBars data={data.teamCompetition} />
+                    </div>
                     <div className="flex-1 min-h-0">
                       <h3 className="text-[10px] 2xl:text-xs font-medium text-slate-500 uppercase tracking-wider mb-2 2xl:mb-3">
                         🔥 Seneste indtjening (300+ kr samlet)
@@ -1072,16 +947,14 @@ export default function TvLeagueDashboard() {
                 {currentLeftScene === "movements" && (
                   <SceneMovements
                     movements={data.movements}
-                    topLastHour={data.topLastHour}
-                    todayTopEarners={data.todayTopEarners || []}
+                    teamCompetition={data.teamCompetition}
                     activeLast15Min={data.activeLast15Min || 0}
                   />
                 )}
                 {currentLeftScene === "records" && (
                   <SceneRecords
-                    records={data.records}
                     longestStreak={data.longestStreak}
-                    teamRankings={data.teamRankings || []}
+                    teamCompetition={data.teamCompetition}
                     todayLeagueTotal={data.todayLeagueTotal || 0}
                   />
                 )}
@@ -1093,8 +966,10 @@ export default function TvLeagueDashboard() {
                     totalDivisions={data.divisions.filter(d => d.division <= 4).length}
                     todayLeagueTotal={data.todayLeagueTotal || 0}
                     activeLast15Min={data.activeLast15Min || 0}
+                    teamCompetition={data.teamCompetition}
                   />
                 )}
+
               </motion.div>
             </AnimatePresence>
           </div>

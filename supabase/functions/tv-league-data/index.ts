@@ -17,6 +17,133 @@ function formatName(first: string | null, last: string | null): string {
   if (!l) return f;
   return `${f} ${l.charAt(0).toUpperCase()}.`;
 }
+// ─── Holdkonkurrence (1:1 med src/hooks/useLeagueTeamCompetition.ts) ───
+const TEAM_COMPETITION_EXCLUDED_TEAMS = ["Stab"];
+const TEAM_COMPETITION_TEAM_ALIASES: Record<string, string> = {
+  "YouSee FM": "Fieldmarketing",
+  "Yousee FM": "Fieldmarketing",
+  "Eesy FM": "Fieldmarketing",
+};
+const TEAM_COMPETITION_COUNTING_PLAYERS = 5;
+
+function toDateOnly(d: Date): string {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function toCopenhagenDate(d: Date): Date {
+  return new Date(d.toLocaleString("en-US", { timeZone: "Europe/Copenhagen" }));
+}
+
+function toCopenhagenDateOnly(ts: string | null | undefined): string | null {
+  if (!ts) return null;
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return null;
+  return toDateOnly(toCopenhagenDate(d));
+}
+
+async function buildTeamCompetition(
+  supabase: any,
+  season: any,
+  now: Date,
+): Promise<{ hasStarted: boolean; teams: any[] }> {
+  const startDate =
+    toCopenhagenDateOnly(season.qualification_source_start || season.qualification_start_at) ||
+    season.start_date;
+  if (!startDate) return { hasStarted: false, teams: [] };
+
+  const todayStr = toDateOnly(toCopenhagenDate(now));
+  if (todayStr < startDate) return { hasStarted: false, teams: [] };
+
+  const endDate = season.end_date && season.end_date < todayStr ? season.end_date : todayStr;
+
+  const { data: provisionRows, error: provisionError } = await supabase.rpc(
+    "get_league_team_provision",
+    { p_start: `${startDate}T00:00:00+00:00`, p_end: `${endDate}T23:59:59+00:00` },
+  );
+  if (provisionError) throw provisionError;
+
+  const provisionMap = new Map<string, number>();
+  for (const row of provisionRows || []) {
+    if (row.team_id && row.employee_id) {
+      provisionMap.set(`${row.team_id}|${row.employee_id}`, Number(row.total_commission) || 0);
+    }
+  }
+
+  const { data: attribution, error: attributionError } = await supabase
+    .from("employee_team_attribution")
+    .select("employee_id, team_id, team_name");
+  if (attributionError) throw attributionError;
+
+  // Samme filter som hooken: kun medarbejdere der findes i employee_master_data
+  const attributionIds = Array.from(
+    new Set((attribution || []).map((r: any) => r.employee_id).filter(Boolean)),
+  );
+  const knownEmployees = new Set<string>();
+  if (attributionIds.length) {
+    const { data: employees, error: employeeError } = await supabase
+      .from("employee_master_data")
+      .select("id")
+      .in("id", attributionIds);
+    if (employeeError) throw employeeError;
+    for (const e of employees || []) knownEmployees.add(e.id);
+  }
+
+
+
+  const idByName = new Map<string, string>();
+  for (const row of attribution || []) {
+    if (row.team_id && row.team_name && !idByName.has(row.team_name)) {
+      idByName.set(row.team_name, row.team_id);
+    }
+  }
+
+  const teamMap = new Map<string, { name: string; provisions: number[] }>();
+  const seen = new Set<string>();
+
+  for (const row of attribution || []) {
+    if (!row.team_id || !row.employee_id) continue;
+    if (!knownEmployees.has(row.employee_id)) continue;
+
+    if (TEAM_COMPETITION_EXCLUDED_TEAMS.includes(row.team_name)) continue;
+
+    const aliasName = TEAM_COMPETITION_TEAM_ALIASES[row.team_name];
+    const aliasId = aliasName ? idByName.get(aliasName) : undefined;
+    const effectiveTeamId = aliasId || row.team_id;
+    const effectiveTeamName = aliasId ? aliasName! : row.team_name;
+
+    const dedupeKey = `${effectiveTeamId}|${row.employee_id}`;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+
+    const provision = Math.max(
+      provisionMap.get(`${effectiveTeamId}|${row.employee_id}`) ?? 0,
+      provisionMap.get(`${row.team_id}|${row.employee_id}`) ?? 0,
+    );
+
+    if (!teamMap.has(effectiveTeamId)) {
+      teamMap.set(effectiveTeamId, { name: effectiveTeamName, provisions: [] });
+    }
+    teamMap.get(effectiveTeamId)!.provisions.push(provision);
+  }
+
+  const teams = Array.from(teamMap.entries())
+    .map(([teamId, value]) => ({
+      teamId,
+      name: value.name,
+      provision: [...value.provisions]
+        .sort((a, b) => b - a)
+        .slice(0, TEAM_COMPETITION_COUNTING_PLAYERS)
+        .reduce((sum, v) => sum + v, 0),
+    }))
+    .sort((a, b) => b.provision - a.provision)
+    .map((t, i) => ({ ...t, rank: i + 1 }));
+
+  return { hasStarted: true, teams };
+}
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -38,14 +165,14 @@ Deno.serve(async (req) => {
     // 1. Find active season
     const { data: season } = await supabase
       .from("league_seasons")
-      .select("id, status, config, qualification_source_start, qualification_source_end, start_date")
+      .select("id, status, config, qualification_source_start, qualification_source_end, qualification_start_at, start_date, end_date")
       .in("status", ["qualification", "active"])
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
     if (!season) {
-      const empty = { top3: [], divisions: [], movements: [], topLastHour: [], recentEarners: [], records: { highestProvision: 0, highestProvisionName: "", divisionAverages: [] }, prizeLeaders: null, seasonStatus: "none", todayTopEarners: [], teamRankings: [], todayLeagueTotal: 0, longestStreak: null, raceToTop: [], activeLast15Min: 0 };
+      const empty = { top3: [], divisions: [], movements: [], topLastHour: [], recentEarners: [], records: { highestProvision: 0, highestProvisionName: "", divisionAverages: [] }, prizeLeaders: null, seasonStatus: "none", todayTopEarners: [], teamRankings: [], teamCompetition: { hasStarted: false, teams: [] }, todayLeagueTotal: 0, longestStreak: null, raceToTop: [], activeLast15Min: 0 };
       cached = { data: empty, ts: Date.now() };
       return new Response(JSON.stringify(empty), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -63,7 +190,7 @@ Deno.serve(async (req) => {
       .order("overall_rank", { ascending: true });
 
     if (!standings || standings.length === 0) {
-      const empty = { top3: [], divisions: [], movements: [], topLastHour: [], recentEarners: [], records: { highestProvision: 0, highestProvisionName: "", divisionAverages: [] }, prizeLeaders: null, seasonStatus: season.status, todayTopEarners: [], teamRankings: [], todayLeagueTotal: 0, longestStreak: null, raceToTop: [], activeLast15Min: 0 };
+      const empty = { top3: [], divisions: [], movements: [], topLastHour: [], recentEarners: [], records: { highestProvision: 0, highestProvisionName: "", divisionAverages: [] }, prizeLeaders: null, seasonStatus: season.status, todayTopEarners: [], teamRankings: [], teamCompetition: { hasStarted: false, teams: [] }, todayLeagueTotal: 0, longestStreak: null, raceToTop: [], activeLast15Min: 0 };
       cached = { data: empty, ts: Date.now() };
       return new Response(JSON.stringify(empty), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -512,6 +639,9 @@ Deno.serve(async (req) => {
       prizeLeaders = { bestRound, talent, comeback };
     }
 
+    // === TEAM COMPETITION (samme logik som useLeagueTeamCompetition) ===
+    const teamCompetition = await buildTeamCompetition(supabase, season, now);
+
     const payload = {
       seasonId: season.id,
       seasonStatus: season.status,
@@ -526,12 +656,14 @@ Deno.serve(async (req) => {
       prizeLeaders,
       todayTopEarners,
       teamRankings,
+      teamCompetition,
       todayLeagueTotal,
       longestStreak,
       raceToTop,
       activeLast15Min,
       updatedAt: now.toISOString(),
     };
+
 
     cached = { data: payload, ts: Date.now() };
 
