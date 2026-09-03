@@ -518,18 +518,15 @@ function SceneMovements({
 
 // Scene C: Records (expanded)
 function SceneRecords({
-  records,
   longestStreak,
-  teamRankings,
+  teamCompetition,
   todayLeagueTotal,
 }: {
-  records: LeaguePayload["records"];
   longestStreak: LeaguePayload["longestStreak"];
-  teamRankings: TeamRanking[];
+  teamCompetition?: TvTeamCompetitionData | null;
   todayLeagueTotal: number;
 }) {
-  const maxAvg = Math.max(...records.divisionAverages.map((d) => d.average), 1);
-  const maxTeam = Math.max(...teamRankings.map((t) => t.totalProvision), 1);
+
 
   return (
     <div className="h-full flex flex-col gap-3 2xl:gap-5 overflow-y-auto">
