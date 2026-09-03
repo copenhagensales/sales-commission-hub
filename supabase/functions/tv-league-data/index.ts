@@ -512,6 +512,9 @@ Deno.serve(async (req) => {
       prizeLeaders = { bestRound, talent, comeback };
     }
 
+    // === TEAM COMPETITION (samme logik som useLeagueTeamCompetition) ===
+    const teamCompetition = await buildTeamCompetition(supabase, season, now);
+
     const payload = {
       seasonId: season.id,
       seasonStatus: season.status,
@@ -526,12 +529,14 @@ Deno.serve(async (req) => {
       prizeLeaders,
       todayTopEarners,
       teamRankings,
+      teamCompetition,
       todayLeagueTotal,
       longestStreak,
       raceToTop,
       activeLast15Min,
       updatedAt: now.toISOString(),
     };
+
 
     cached = { data: payload, ts: Date.now() };
 
