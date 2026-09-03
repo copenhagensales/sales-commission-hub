@@ -655,6 +655,7 @@ function SceneLeagueOverview({
   totalDivisions,
   todayLeagueTotal,
   activeLast15Min,
+  teamCompetition,
 }: {
   raceToTop: RaceEntry[];
   divisions: DivisionData[];
@@ -662,7 +663,9 @@ function SceneLeagueOverview({
   totalDivisions: number;
   todayLeagueTotal: number;
   activeLast15Min: number;
+  teamCompetition?: TvTeamCompetitionData | null;
 }) {
+
   const maxProv = Math.max(...raceToTop.map((r) => r.provision), 1);
 
   // Division battle: total provision per division
