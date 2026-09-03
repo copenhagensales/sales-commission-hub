@@ -172,7 +172,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (!season) {
-      const empty = { top3: [], divisions: [], movements: [], topLastHour: [], recentEarners: [], records: { highestProvision: 0, highestProvisionName: "", divisionAverages: [] }, prizeLeaders: null, seasonStatus: "none", todayTopEarners: [], teamRankings: [], todayLeagueTotal: 0, longestStreak: null, raceToTop: [], activeLast15Min: 0 };
+      const empty = { top3: [], divisions: [], movements: [], topLastHour: [], recentEarners: [], records: { highestProvision: 0, highestProvisionName: "", divisionAverages: [] }, prizeLeaders: null, seasonStatus: "none", todayTopEarners: [], teamRankings: [], teamCompetition: { hasStarted: false, teams: [] }, todayLeagueTotal: 0, longestStreak: null, raceToTop: [], activeLast15Min: 0 };
       cached = { data: empty, ts: Date.now() };
       return new Response(JSON.stringify(empty), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -190,7 +190,7 @@ Deno.serve(async (req) => {
       .order("overall_rank", { ascending: true });
 
     if (!standings || standings.length === 0) {
-      const empty = { top3: [], divisions: [], movements: [], topLastHour: [], recentEarners: [], records: { highestProvision: 0, highestProvisionName: "", divisionAverages: [] }, prizeLeaders: null, seasonStatus: season.status, todayTopEarners: [], teamRankings: [], todayLeagueTotal: 0, longestStreak: null, raceToTop: [], activeLast15Min: 0 };
+      const empty = { top3: [], divisions: [], movements: [], topLastHour: [], recentEarners: [], records: { highestProvision: 0, highestProvisionName: "", divisionAverages: [] }, prizeLeaders: null, seasonStatus: season.status, todayTopEarners: [], teamRankings: [], teamCompetition: { hasStarted: false, teams: [] }, todayLeagueTotal: 0, longestStreak: null, raceToTop: [], activeLast15Min: 0 };
       cached = { data: empty, ts: Date.now() };
       return new Response(JSON.stringify(empty), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
