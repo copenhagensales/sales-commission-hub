@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calcBoardProgress } from "./boardProgress";
+import { calcBoardProgress, indeksBarClass } from "./boardProgress";
 
 // September 2026: 22 hverdage. 1/9 = tirsdag (1 hverdag gået).
 // 15/9 = tirsdag (11 hverdage gået).
@@ -47,5 +47,27 @@ describe("calcBoardProgress", () => {
     const p = calcBoardProgress(0, 0, new Date(2026, 8, 15));
     expect(p.indeks).toBeNull();
     expect(p.status).toBe("ukendt");
+  });
+});
+
+describe("indeksBarClass", () => {
+  const d = new Date(2026, 8, 15); // forventet = 425
+
+  it("indeks 105 -> grøn", () => {
+    expect(indeksBarClass(calcBoardProgress(850, 425 * 1.05, d).status)).toBe("bg-emerald-400");
+  });
+
+  it("indeks 95-104 -> gul", () => {
+    expect(indeksBarClass(calcBoardProgress(850, 425 * 0.95, d).status)).toBe("bg-yellow-400");
+    expect(indeksBarClass(calcBoardProgress(850, 425 * 1.04, d).status)).toBe("bg-yellow-400");
+  });
+
+  it("indeks under 95 -> rød (både efter og bagud)", () => {
+    expect(indeksBarClass(calcBoardProgress(850, 425 * 0.9, d).status)).toBe("bg-rose-400");
+    expect(indeksBarClass(calcBoardProgress(850, 425 * 0.5, d).status)).toBe("bg-rose-400");
+  });
+
+  it("ukendt -> neutral", () => {
+    expect(indeksBarClass("ukendt")).toBe("bg-slate-600");
   });
 });
