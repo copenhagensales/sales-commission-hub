@@ -702,6 +702,10 @@ function SceneLeagueOverview({
         ))}
       </div>
 
+      <TvTeamCompetitionBars data={teamCompetition} />
+
+
+
       {/* Race to #1 */}
       <div>
         <h3 className="text-xs 2xl:text-sm font-medium text-amber-400 mb-2 2xl:mb-3 flex items-center gap-2">
