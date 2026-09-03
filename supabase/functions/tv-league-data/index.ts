@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
     // 1. Find active season
     const { data: season } = await supabase
       .from("league_seasons")
-      .select("id, status, config, qualification_source_start, qualification_source_end, start_date")
+      .select("id, status, config, qualification_source_start, qualification_source_end, qualification_start_at, start_date, end_date")
       .in("status", ["qualification", "active"])
       .order("created_at", { ascending: false })
       .limit(1)
