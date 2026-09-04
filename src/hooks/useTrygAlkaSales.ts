@@ -73,13 +73,13 @@ export function useTrygAlkaSales(day: Date, enabled = true) {
       const [bySale, byProduct] = await Promise.all([
         supabase
           .from("sale_items")
-          .select(SELECT)
+          .select(SELECT_BY_SALE)
           .in("sales.client_campaign_id", campaignIds)
           .gte("sales.sale_datetime", start)
           .lte("sales.sale_datetime", end),
         supabase
           .from("sale_items")
-          .select(SELECT)
+          .select(SELECT_BY_PRODUCT)
           .in("products.client_campaign_id", campaignIds)
           .not("product_id", "is", null)
           .gte("sales.sale_datetime", start)
