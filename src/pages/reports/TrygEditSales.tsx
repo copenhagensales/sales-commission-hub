@@ -618,6 +618,8 @@ export default function TrygEditSales() {
                   </PopoverContent>
                 </Popover>
               </div>
+              )}
+
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="review">
