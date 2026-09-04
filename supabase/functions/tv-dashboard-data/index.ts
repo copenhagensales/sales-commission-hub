@@ -2809,3 +2809,124 @@ async function handleMonthlyGoal(
     });
   }
 }
+
+// ============= MÅNEDSMÅL: FØRSTE MÅLOPNÅER =============
+// Låser permanent hvilken sælger der først nåede sit individuelle månedsmål.
+// UNIQUE(board_key, month_key) sikrer, at pladsen ikke kan overtages senere.
+const MONTHLY_GOAL_BOARD_KEYS = new Set(["tdc-monthly-goal", "relatel-monthly-goal"]);
+
+async function handleMonthlyGoalFirstAchiever(
+  supabase: any,
+  req: Request,
+  corsHeaders: Record<string, string>,
+) {
+  try {
+    if (req.method !== "POST") {
+      return new Response(JSON.stringify({ error: "Method not allowed" }), {
+        status: 405,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const body = await req.json().catch(() => null);
+    const boardKey = typeof body?.boardKey === "string" ? body.boardKey : "";
+    const monthKey = typeof body?.monthKey === "string" ? body.monthKey : "";
+    const rawCandidates = Array.isArray(body?.candidates) ? body.candidates : [];
+
+    if (!MONTHLY_GOAL_BOARD_KEYS.has(boardKey) || !/^\d{4}-\d{2}$/.test(monthKey)) {
+      return new Response(JSON.stringify({ error: "Ugyldig boardKey eller monthKey" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: existing, error: readError } = await supabase
+      .from("monthly_goal_first_achievers")
+      .select("employee_id, employee_name, achieved_at")
+      .eq("board_key", boardKey)
+      .eq("month_key", monthKey)
+      .maybeSingle();
+    if (readError) throw readError;
+
+    if (existing) {
+      return new Response(
+        JSON.stringify({
+          firstAchiever: {
+            employeeId: existing.employee_id,
+            employeeName: existing.employee_name,
+            achievedAt: existing.achieved_at,
+          },
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // Kandidater der har nået deres mål — vælg den med højeste opnåelse
+    const achieved = rawCandidates
+      .map((c: any) => ({
+        employeeId: typeof c?.employeeId === "string" ? c.employeeId : "",
+        employeeName: typeof c?.employeeName === "string" ? c.employeeName.slice(0, 200) : "",
+        count: Number(c?.count ?? 0),
+        goal: Number(c?.goal ?? 0),
+      }))
+      .filter(
+        (c: any) =>
+          /^[0-9a-f-]{36}$/i.test(c.employeeId) &&
+          c.employeeName.length > 0 &&
+          Number.isFinite(c.count) &&
+          Number.isFinite(c.goal) &&
+          c.goal > 0 &&
+          c.count >= c.goal,
+      )
+      .sort((a: any, b: any) => b.count / b.goal - a.count / a.goal || b.count - a.count);
+
+    if (achieved.length === 0) {
+      return new Response(JSON.stringify({ firstAchiever: null }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const winner = achieved[0];
+    const { error: insertError } = await supabase
+      .from("monthly_goal_first_achievers")
+      .upsert(
+        {
+          board_key: boardKey,
+          month_key: monthKey,
+          employee_id: winner.employeeId,
+          employee_name: winner.employeeName,
+          achieved_count: winner.count,
+          goal: winner.goal,
+        },
+        { onConflict: "board_key,month_key", ignoreDuplicates: true },
+      );
+    if (insertError) throw insertError;
+
+    const { data: locked, error: reReadError } = await supabase
+      .from("monthly_goal_first_achievers")
+      .select("employee_id, employee_name, achieved_at")
+      .eq("board_key", boardKey)
+      .eq("month_key", monthKey)
+      .maybeSingle();
+    if (reReadError) throw reReadError;
+
+    return new Response(
+      JSON.stringify({
+        firstAchiever: locked
+          ? {
+              employeeId: locked.employee_id,
+              employeeName: locked.employee_name,
+              achievedAt: locked.achieved_at,
+            }
+          : null,
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  } catch (err: any) {
+    console.error("[handleMonthlyGoalFirstAchiever] error:", err);
+    return new Response(JSON.stringify({ error: err?.message || "unknown" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+}
