@@ -212,9 +212,11 @@ export default function TdcMonthlyGoalBoard() {
                         <div className="h-3 w-full rounded-full bg-white/5 overflow-hidden">
                           <div
                             className={`h-full rounded-full transition-all duration-700 ${
-                              gold
-                                ? "bg-gradient-to-r from-amber-500 via-yellow-300 to-amber-400"
-                                : statusFillClass(sellerStatus)
+                              exempt
+                                ? "bg-gradient-to-r from-amber-950 via-amber-800 to-yellow-900"
+                                : gold
+                                  ? "bg-gradient-to-r from-amber-500 via-yellow-300 to-amber-400"
+                                  : statusFillClass(sellerStatus)
                             }`}
                             style={{ width: `${Math.min(100, s.progress)}%` }}
                           />
