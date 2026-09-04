@@ -52,6 +52,8 @@ import {
   useDeleteTrygKanvasSales,
   type TrygKanvasSale,
 } from "@/hooks/useTrygKanvasSales";
+import { useTrygAlkaSales } from "@/hooks/useTrygAlkaSales";
+
 import {
   useTrygSaleReviews,
   useSetTrygSaleReview,
