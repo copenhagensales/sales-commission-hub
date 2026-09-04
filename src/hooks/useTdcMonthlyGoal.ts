@@ -197,7 +197,7 @@ export function useTdcMonthlyGoal(enabled = true) {
 
       const sellersWithMedal = sellers.map((s) => ({
         ...s,
-        isFirstAchiever: firstAchieverId != null && s.employeeId === firstAchieverId,
+        isFirstAchiever: !s.isCrownExempt && firstAchieverId != null && s.employeeId === firstAchieverId,
       }));
 
       const teamGoal = goal?.team ?? 0;

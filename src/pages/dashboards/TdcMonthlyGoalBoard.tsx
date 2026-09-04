@@ -166,26 +166,37 @@ export default function TdcMonthlyGoalBoard() {
 
                 const renderSeller = (s: typeof sellers[number]) => {
                   const sellerStatus = calcBoardProgress(s.goal, s.count, today).status;
-                  const gold = !!s.isFirstAchiever;
+                  const exempt = !!s.isCrownExempt;
+                  const gold = !exempt && !!s.isFirstAchiever;
                   return (
                     <div key={s.employeeId}>
                       <div className="flex items-baseline justify-between mb-1">
                         <span
                           className={`text-base md:text-lg font-medium truncate pr-3 flex items-center gap-2 ${
-                            gold
-                              ? "text-amber-300"
-                              : s.goal > 0 && s.progress >= 100
-                                ? "text-emerald-400"
-                                : "text-slate-100"
+                            exempt
+                              ? "text-amber-700"
+                              : gold
+                                ? "text-amber-300"
+                                : s.goal > 0 && s.progress >= 100
+                                  ? "text-emerald-400"
+                                  : "text-slate-100"
                           }`}
                         >
                           <span className="truncate">{s.name}</span>
-                          {gold && (
+                          {exempt ? (
+                            <span
+                              className="text-lg md:text-xl shrink-0 leading-none"
+                              role="img"
+                              aria-label="Uden for kronekonkurrencen"
+                            >
+                              💩
+                            </span>
+                          ) : gold ? (
                             <Medal
                               className="h-5 w-5 md:h-6 md:w-6 shrink-0 text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.6)]"
                               aria-label="Første der nåede sit mål"
                             />
-                          )}
+                          ) : null}
                         </span>
                         <span className="text-base md:text-lg tabular-nums text-slate-300 whitespace-nowrap">
                           {fmt(s.count)}
