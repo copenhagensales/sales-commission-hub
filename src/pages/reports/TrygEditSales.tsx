@@ -52,6 +52,8 @@ import {
   useDeleteTrygKanvasSales,
   type TrygKanvasSale,
 } from "@/hooks/useTrygKanvasSales";
+import { useTrygAlkaSales } from "@/hooks/useTrygAlkaSales";
+
 import {
   useTrygSaleReviews,
   useSetTrygSaleReview,
@@ -239,6 +241,25 @@ export default function TrygEditSales() {
     () => (sales || []).filter((s) => matchesSearch(s.customerPhone)),
     [sales, phoneSearch]
   );
+
+  /** "Alle tryg & alka salg" — ren visning for den valgte dag. */
+  const { data: trygAlkaSales, isLoading: isLoadingTrygAlka } = useTrygAlkaSales(
+    day,
+    hasAccess && view === "tryg-alka"
+  );
+  const visibleTrygAlkaSales = useMemo(
+    () => (trygAlkaSales || []).filter((s) => matchesSearch(s.customerPhone)),
+    [trygAlkaSales, phoneSearch]
+  );
+  const trygAlkaClientNames = useMemo(
+    () =>
+      new Map<string, string>(
+        (trygAlkaSales || []).map((s) => [s.saleItemId, s.clientName])
+      ),
+    [trygAlkaSales]
+  );
+
+
 
   /** Synlige linjer for status-fanerne (den valgte periode). */
   const visibleRangeSales = useMemo(
@@ -624,14 +645,64 @@ export default function TrygEditSales() {
                 </Popover>
               </div>
               )}
+              {view === "tryg-alka" && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={phoneSearch}
+                      onChange={(e) => setPhoneSearch(e.target.value)}
+                      placeholder="Søg telefonnummer"
+                      inputMode="tel"
+                      className="h-10 w-56 pl-9 pr-8"
+                    />
+                    {phoneSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setPhoneSearch("")}
+                        aria-label="Ryd søgning"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="gap-2">
+                        <CalendarIcon className="h-4 w-4" />
+                        {format(day, "dd/MM/yyyy", { locale: da })}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                      <Calendar
+                        mode="single"
+                        selected={day}
+                        onSelect={(d) => d && setDay(d)}
+                        locale={da}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              )}
 
             </CardHeader>
             <CardContent>
               {view === "tryg-alka" ? (
-                <div className="rounded-lg border border-border/50 py-16 text-center text-sm text-muted-foreground">
-                  Indhold til "Alle tryg &amp; alka salg" tilføjes.
-                </div>
+                <TrygSalesTable
+                  mode="plain"
+                  sales={visibleTrygAlkaSales}
+                  clientNames={trygAlkaClientNames}
+                  isLoading={isLoadingTrygAlka || loadingAccess}
+                  emptyText={
+                    phoneSearch
+                      ? "Ingen salg matcher søgningen."
+                      : "Ingen Tryg- eller ALKA-salg på den valgte dag."
+                  }
+                />
               ) : (
+
               <Tabs defaultValue="review">
 
                 <TabsList className="mb-4">

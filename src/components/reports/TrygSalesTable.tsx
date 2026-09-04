@@ -39,14 +39,27 @@ interface StatusProps extends CommonProps {
   showDate?: boolean;
 }
 
+/** Ren visning uden status-markering og uden handlinger pr. linje. */
+interface PlainProps extends CommonProps {
+  mode: "plain";
+  /** Kunde-navn pr. salgslinje (fx Tryg / ALKA). */
+  clientNames?: Map<string, string>;
+}
 
-type Props = ReviewProps | StatusProps;
 
-/** Fælles tabel-skabelon for de tre faner på "Tryg - Ret salg". */
+type Props = ReviewProps | StatusProps | PlainProps;
+
+/** Fælles tabel-skabelon for fanerne på "Tryg - Ret salg". */
 export function TrygSalesTable(props: Props) {
   const { sales, isLoading, emptyText, mode } = props;
   const showDate = mode === "status" && props.showDate === true;
-  const colSpan = (mode === "review" ? 6 : 8) + (showDate ? 1 : 0);
+  const showClient = mode === "plain" && props.clientNames !== undefined;
+  const colSpan =
+    (mode === "review" ? 6 : mode === "status" ? 8 : 5) +
+    (showDate ? 1 : 0) +
+    (showClient ? 1 : 0);
+
+
 
 
   return (
@@ -65,6 +78,9 @@ export function TrygSalesTable(props: Props) {
               Antal
             </TableHead>
             <TableHead className="w-full min-w-[240px]">Produktnavn</TableHead>
+            {showClient && (
+              <TableHead className="w-28 whitespace-nowrap">Kunde</TableHead>
+            )}
             {mode === "status" && (
               <>
                 <TableHead className="w-40 whitespace-nowrap">
@@ -75,35 +91,37 @@ export function TrygSalesTable(props: Props) {
                 </TableHead>
               </>
             )}
-            <TableHead className="w-64 whitespace-nowrap text-right">
-              {mode === "review" ? (
-                <div className="flex items-center justify-end gap-1.5">
-                  <Button
-                    size="sm"
-                    className="h-7 gap-1.5 text-xs font-medium bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700"
-                    disabled={props.selectedIds.size === 0 || props.isPending}
-                    onClick={props.onApproveSelected}
-                  >
-                    <Check className="h-3.5 w-3.5" />
-                    Godkend markerede
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    className="h-7 gap-1.5 text-xs font-medium"
-                    disabled={props.selectedIds.size === 0 || props.isPending}
-                    onClick={props.onRejectSelected}
-                  >
-                    <X className="h-3.5 w-3.5" />
-                    Afvis markerede
-                  </Button>
-                  <span>Handlinger</span>
-                </div>
-              ) : (
-                "Handlinger"
-              )}
+            {mode !== "plain" && (
+              <TableHead className="w-64 whitespace-nowrap text-right">
+                {mode === "review" ? (
+                  <div className="flex items-center justify-end gap-1.5">
+                    <Button
+                      size="sm"
+                      className="h-7 gap-1.5 text-xs font-medium bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700"
+                      disabled={props.selectedIds.size === 0 || props.isPending}
+                      onClick={props.onApproveSelected}
+                    >
+                      <Check className="h-3.5 w-3.5" />
+                      Godkend markerede
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="h-7 gap-1.5 text-xs font-medium"
+                      disabled={props.selectedIds.size === 0 || props.isPending}
+                      onClick={props.onRejectSelected}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                      Afvis markerede
+                    </Button>
+                    <span>Handlinger</span>
+                  </div>
+                ) : (
+                  "Handlinger"
+                )}
+              </TableHead>
+            )}
 
-            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -121,7 +139,7 @@ export function TrygSalesTable(props: Props) {
               const review =
                 mode === "status" ? props.reviews.get(sale.saleId) : undefined;
               return (
-                <TableRow key={sale.saleId}>
+                <TableRow key={sale.saleItemId || sale.saleId}>
                   {showDate && (
                     <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground">
                       {format(new Date(sale.saleDatetime), "dd/MM/yyyy")}
@@ -143,6 +161,13 @@ export function TrygSalesTable(props: Props) {
                   <TableCell className="min-w-[240px]">
                     {sale.productName}
                   </TableCell>
+                  {showClient && (
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {(mode === "plain" &&
+                        props.clientNames?.get(sale.saleItemId)) ||
+                        "—"}
+                    </TableCell>
+                  )}
                   {mode === "status" && (
                     <>
                       <TableCell className="whitespace-nowrap text-muted-foreground">
@@ -155,8 +180,8 @@ export function TrygSalesTable(props: Props) {
                       </TableCell>
                     </>
                   )}
-                  <TableCell className="w-64 whitespace-nowrap">
-                    {mode === "review" ? (
+                  {mode === "review" && (
+                    <TableCell className="w-64 whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1">
                         <Button
                           variant="destructive"
@@ -198,7 +223,10 @@ export function TrygSalesTable(props: Props) {
                           Markér
                         </label>
                       </div>
-                    ) : (
+                    </TableCell>
+                  )}
+                  {mode === "status" && (
+                    <TableCell className="w-64 whitespace-nowrap">
                       <div className="flex items-center justify-end">
                         <Button
                           variant="outline"
@@ -212,8 +240,9 @@ export function TrygSalesTable(props: Props) {
                           Fortryd
                         </Button>
                       </div>
-                    )}
-                  </TableCell>
+                    </TableCell>
+                  )}
+
                 </TableRow>
               );
             })
