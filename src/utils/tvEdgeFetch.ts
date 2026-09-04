@@ -10,7 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
  *
  * Uden en af de to afvises kaldet med 401 af edge functionen.
  */
-export async function tvEdgeFetch(pathWithQuery: string): Promise<Response> {
+export async function tvEdgeFetch(pathWithQuery: string, init?: RequestInit): Promise<Response> {
   const base = import.meta.env.VITE_SUPABASE_URL;
   const url = new URL(`${base}/functions/v1/${pathWithQuery.replace(/^\/+/, "")}`);
 
@@ -24,9 +24,13 @@ export async function tvEdgeFetch(pathWithQuery: string): Promise<Response> {
   const token = data.session?.access_token;
 
   return fetch(url.toString(), {
+    ...init,
     headers: {
       apikey: anonKey,
       Authorization: `Bearer ${token ?? anonKey}`,
+      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...(init?.headers ?? {}),
     },
   });
 }
+
