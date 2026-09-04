@@ -240,6 +240,24 @@ export default function TrygEditSales() {
     [sales, phoneSearch]
   );
 
+  /** "Alle tryg & alka salg" — ren visning for den valgte dag. */
+  const { data: trygAlkaSales, isLoading: isLoadingTrygAlka } = useTrygAlkaSales(
+    day,
+    hasAccess && view === "tryg-alka"
+  );
+  const visibleTrygAlkaSales = useMemo(
+    () => (trygAlkaSales || []).filter((s) => matchesSearch(s.customerPhone)),
+    [trygAlkaSales, phoneSearch]
+  );
+  const trygAlkaClientNames = useMemo(
+    () =>
+      new Map(
+        (trygAlkaSales || []).map((s) => [s.saleItemId, s.clientName] as const)
+      ),
+    [trygAlkaSales]
+  );
+
+
   /** Synlige linjer for status-fanerne (den valgte periode). */
   const visibleRangeSales = useMemo(
     () => (rangeSalesData || []).filter((s) => matchesSearch(s.customerPhone)),
