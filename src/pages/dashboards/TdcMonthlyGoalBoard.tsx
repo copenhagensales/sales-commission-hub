@@ -2,7 +2,7 @@ import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { useAutoReload, isTvMode } from "@/utils/tvMode";
 import { useTdcMonthlyGoal } from "@/hooks/useTdcMonthlyGoal";
-import { Target, Trophy, Loader2 } from "lucide-react";
+import { Target, Trophy, Loader2, Medal } from "lucide-react";
 import { calcBoardProgress, indeksBarClass, statusFillClass, statusTextClass } from "@/lib/boardProgress";
 
 function fmt(n: number) {
