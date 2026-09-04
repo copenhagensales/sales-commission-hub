@@ -17,6 +17,8 @@ export interface TdcMonthlyGoalSeller {
   progress: number;
   /** Første sælger i måneden der nåede sit individuelle mål (låst i databasen). */
   isFirstAchiever?: boolean;
+  /** Deltager ikke i kronekonkurrencen og vises altid nederst. */
+  isCrownExempt?: boolean;
 }
 
 
