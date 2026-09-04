@@ -18,8 +18,10 @@ function dayBounds(day: Date) {
   return { start: start.toISOString(), end: end.toISOString() };
 }
 
-const SELECT =
-  "id, quantity, mapped_commission, mapped_revenue, products(name, client_campaign_id), sales!inner(id, sale_datetime, agent_email, agent_name, customer_phone, client_campaign_id)";
+const SALES_PART =
+  "sales!inner(id, sale_datetime, agent_email, agent_name, customer_phone, client_campaign_id)";
+const SELECT_BY_SALE = `id, quantity, mapped_commission, mapped_revenue, products(name, client_campaign_id), ${SALES_PART}`;
+const SELECT_BY_PRODUCT = `id, quantity, mapped_commission, mapped_revenue, products!inner(name, client_campaign_id), ${SALES_PART}`;
 
 type Row = {
   id: string;
