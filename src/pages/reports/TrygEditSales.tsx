@@ -522,8 +522,9 @@ export default function TrygEditSales() {
                 <CardDescription>
                   {view === "kanvas"
                     ? 'Alle salg på "Meeting -- CPH sales Kanvas" på den valgte dag.'
-                    : "Indhold tilføjes."}
+                    : "Alle salg på kunderne Tryg og ALKA på den valgte dag."}
                 </CardDescription>
+
               </div>
               {view === "kanvas" && (
               <div className="flex flex-wrap items-center gap-2">
