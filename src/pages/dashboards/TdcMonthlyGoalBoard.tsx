@@ -166,15 +166,26 @@ export default function TdcMonthlyGoalBoard() {
 
                 const renderSeller = (s: typeof sellers[number]) => {
                   const sellerStatus = calcBoardProgress(s.goal, s.count, today).status;
+                  const gold = !!s.isFirstAchiever;
                   return (
                     <div key={s.employeeId}>
                       <div className="flex items-baseline justify-between mb-1">
                         <span
-                          className={`text-base md:text-lg font-medium truncate pr-3 ${
-                            s.goal > 0 && s.progress >= 100 ? "text-emerald-400" : "text-slate-100"
+                          className={`text-base md:text-lg font-medium truncate pr-3 flex items-center gap-2 ${
+                            gold
+                              ? "text-amber-300"
+                              : s.goal > 0 && s.progress >= 100
+                                ? "text-emerald-400"
+                                : "text-slate-100"
                           }`}
                         >
-                          {s.name}
+                          <span className="truncate">{s.name}</span>
+                          {gold && (
+                            <Medal
+                              className="h-5 w-5 md:h-6 md:w-6 shrink-0 text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.6)]"
+                              aria-label="Første der nåede sit mål"
+                            />
+                          )}
                         </span>
                         <span className="text-base md:text-lg tabular-nums text-slate-300 whitespace-nowrap">
                           {fmt(s.count)}
@@ -189,7 +200,11 @@ export default function TdcMonthlyGoalBoard() {
                       {s.goal > 0 && (
                         <div className="h-3 w-full rounded-full bg-white/5 overflow-hidden">
                           <div
-                            className={`h-full rounded-full transition-all duration-700 ${statusFillClass(sellerStatus)}`}
+                            className={`h-full rounded-full transition-all duration-700 ${
+                              gold
+                                ? "bg-gradient-to-r from-amber-500 via-yellow-300 to-amber-400"
+                                : statusFillClass(sellerStatus)
+                            }`}
                             style={{ width: `${Math.min(100, s.progress)}%` }}
                           />
                         </div>
@@ -197,6 +212,7 @@ export default function TdcMonthlyGoalBoard() {
                     </div>
                   );
                 };
+
 
                 return (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10">
