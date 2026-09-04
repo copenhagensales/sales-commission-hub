@@ -128,6 +128,7 @@ function normalizePhone(value: string): string {
 export default function TrygEditSales() {
   const { hasAccess, isLoading: loadingAccess } = useTrygEditAccess();
   const queryClient = useQueryClient();
+  const [view, setView] = useState<"kanvas" | "tryg-alka">("kanvas");
   const [day, setDay] = useState<Date>(new Date());
   const [rangeFrom, setRangeFrom] = useState<Date>(new Date());
   const [rangeTo, setRangeTo] = useState<Date>(new Date());
@@ -475,14 +476,33 @@ export default function TrygEditSales() {
         ) : (
           <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
             <CardHeader className="flex flex-row items-start justify-between gap-4">
-              <div>
-                <CardTitle className="text-xl">Kanvas-møder</CardTitle>
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant={view === "kanvas" ? "secondary" : "ghost"}
+                    className="h-9 px-3 text-xl font-semibold tracking-tight"
+                    onClick={() => setView("kanvas")}
+                  >
+                    Kanvas-møder
+                  </Button>
+                  <Button
+                    variant={view === "tryg-alka" ? "secondary" : "ghost"}
+                    className="h-9 px-3 text-xl font-semibold tracking-tight"
+                    onClick={() => setView("tryg-alka")}
+                  >
+                    Alle tryg &amp; alka salg
+                  </Button>
+                </div>
                 <CardDescription>
-                  Alle salg på "Meeting -- CPH sales Kanvas" på den valgte dag.
+                  {view === "kanvas"
+                    ? 'Alle salg på "Meeting -- CPH sales Kanvas" på den valgte dag.'
+                    : "Indhold tilføjes."}
                 </CardDescription>
               </div>
+              {view === "kanvas" && (
               <div className="flex flex-wrap items-center gap-2">
                 <div className="relative">
+
                   <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     value={phoneSearch}
@@ -598,9 +618,17 @@ export default function TrygEditSales() {
                   </PopoverContent>
                 </Popover>
               </div>
+              )}
+
             </CardHeader>
             <CardContent>
+              {view === "tryg-alka" ? (
+                <div className="rounded-lg border border-border/50 py-16 text-center text-sm text-muted-foreground">
+                  Indhold til "Alle tryg &amp; alka salg" tilføjes.
+                </div>
+              ) : (
               <Tabs defaultValue="review">
+
                 <TabsList className="mb-4">
                   <TabsTrigger value="review">
                     Gennemgang ({pendingSales.length})
@@ -695,6 +723,8 @@ export default function TrygEditSales() {
                 </TabsContent>
 
               </Tabs>
+              )}
+
             </CardContent>
 
           </Card>
