@@ -622,7 +622,13 @@ export default function TrygEditSales() {
 
             </CardHeader>
             <CardContent>
+              {view === "tryg-alka" ? (
+                <div className="rounded-lg border border-border/50 py-16 text-center text-sm text-muted-foreground">
+                  Indhold til "Alle tryg &amp; alka salg" tilføjes.
+                </div>
+              ) : (
               <Tabs defaultValue="review">
+
                 <TabsList className="mb-4">
                   <TabsTrigger value="review">
                     Gennemgang ({pendingSales.length})
