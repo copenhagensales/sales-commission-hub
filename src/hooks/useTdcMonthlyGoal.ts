@@ -17,6 +17,8 @@ export interface TdcMonthlyGoalSeller {
   progress: number;
   /** Første sælger i måneden der nåede sit individuelle mål (låst i databasen). */
   isFirstAchiever?: boolean;
+  /** Deltager ikke i kronekonkurrencen og vises altid nederst. */
+  isCrownExempt?: boolean;
 }
 
 
@@ -137,6 +139,7 @@ export function useTdcMonthlyGoal(enabled = true) {
 
 
       const excluded = new Set(goal?.excludeEmployeeIds ?? []);
+      const crownExempt = new Set(goal?.crownExemptEmployeeIds ?? []);
 
       const sellers: TdcMonthlyGoalSeller[] = employees
         .filter((e) => !excluded.has(e.id))
@@ -155,9 +158,17 @@ export function useTdcMonthlyGoal(enabled = true) {
             count,
             goal: sellerGoal,
             progress: sellerGoal > 0 ? (count / sellerGoal) * 100 : 0,
+            isCrownExempt: crownExempt.has(e.id),
           };
         })
-        .sort((a, b) => b.progress - a.progress || b.count - a.count || a.name.localeCompare(b.name, "da-DK"));
+        // Kronefritagne sælgere låses nederst, uanset procent
+        .sort(
+          (a, b) =>
+            Number(!!a.isCrownExempt) - Number(!!b.isCrownExempt) ||
+            b.progress - a.progress ||
+            b.count - a.count ||
+            a.name.localeCompare(b.name, "da-DK"),
+        );
 
       // Første målopnåer låses server-side, så pladsen ikke kan overhales senere
       let firstAchieverId: string | null = null;
@@ -168,7 +179,7 @@ export function useTdcMonthlyGoal(enabled = true) {
             boardKey: "tdc-monthly-goal",
             monthKey,
             candidates: sellers
-              .filter((s) => s.goal > 0 && s.count >= s.goal)
+              .filter((s) => !s.isCrownExempt && s.goal > 0 && s.count >= s.goal)
               .map((s) => ({ employeeId: s.employeeId, employeeName: s.name, count: s.count, goal: s.goal })),
           }),
         });
@@ -186,7 +197,7 @@ export function useTdcMonthlyGoal(enabled = true) {
 
       const sellersWithMedal = sellers.map((s) => ({
         ...s,
-        isFirstAchiever: firstAchieverId != null && s.employeeId === firstAchieverId,
+        isFirstAchiever: !s.isCrownExempt && firstAchieverId != null && s.employeeId === firstAchieverId,
       }));
 
       const teamGoal = goal?.team ?? 0;
