@@ -12,6 +12,11 @@ export interface TdcMonthlyGoal {
   sellers?: Record<string, number>;
   /** Medarbejder-id'er der ikke skal vises som sælgere på boardet. */
   excludeEmployeeIds?: string[];
+  /**
+   * Medarbejder-id'er der vises på boardet, men ikke deltager i kronekonkurrencen.
+   * De placeres altid nederst og markeres særskilt i UI'et.
+   */
+  crownExemptEmployeeIds?: string[];
 }
 
 /**
@@ -47,6 +52,8 @@ export const TDC_MONTHLY_GOALS: Record<string, TdcMonthlyGoal> = {
       "Oliver Gonsalves Vatting Arentoft": 5,
     },
     excludeEmployeeIds: [],
+    // Oliver har kun et mål på 5 salg og deltager derfor ikke i kronekonkurrencen
+    crownExemptEmployeeIds: ["80aac0dd-794c-4a68-97ed-374dc6b4cfea"],
   },
 };
 
