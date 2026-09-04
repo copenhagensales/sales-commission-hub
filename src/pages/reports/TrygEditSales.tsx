@@ -128,6 +128,7 @@ function normalizePhone(value: string): string {
 export default function TrygEditSales() {
   const { hasAccess, isLoading: loadingAccess } = useTrygEditAccess();
   const queryClient = useQueryClient();
+  const [view, setView] = useState<"kanvas" | "tryg-alka">("kanvas");
   const [day, setDay] = useState<Date>(new Date());
   const [rangeFrom, setRangeFrom] = useState<Date>(new Date());
   const [rangeTo, setRangeTo] = useState<Date>(new Date());
