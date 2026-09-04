@@ -10320,6 +10320,39 @@ export type Database = {
           },
         ]
       }
+      monthly_goal_first_achievers: {
+        Row: {
+          achieved_at: string
+          achieved_count: number
+          board_key: string
+          employee_id: string
+          employee_name: string
+          goal: number
+          id: string
+          month_key: string
+        }
+        Insert: {
+          achieved_at?: string
+          achieved_count: number
+          board_key: string
+          employee_id: string
+          employee_name: string
+          goal: number
+          id?: string
+          month_key: string
+        }
+        Update: {
+          achieved_at?: string
+          achieved_count?: number
+          board_key?: string
+          employee_id?: string
+          employee_name?: string
+          goal?: number
+          id?: string
+          month_key?: string
+        }
+        Relationships: []
+      }
       onboarding_coaching_tasks: {
         Row: {
           assigned_drill_id: string | null
