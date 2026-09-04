@@ -134,7 +134,7 @@ export function TrygSalesTable(props: Props) {
               const review =
                 mode === "status" ? props.reviews.get(sale.saleId) : undefined;
               return (
-                <TableRow key={sale.saleId}>
+                <TableRow key={sale.saleItemId || sale.saleId}>
                   {showDate && (
                     <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground">
                       {format(new Date(sale.saleDatetime), "dd/MM/yyyy")}
