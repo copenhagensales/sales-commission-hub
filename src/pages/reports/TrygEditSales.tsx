@@ -251,11 +251,12 @@ export default function TrygEditSales() {
   );
   const trygAlkaClientNames = useMemo(
     () =>
-      new Map(
-        (trygAlkaSales || []).map((s) => [s.saleItemId, s.clientName] as const)
+      new Map<string, string>(
+        (trygAlkaSales || []).map((s) => [s.saleItemId, s.clientName])
       ),
     [trygAlkaSales]
   );
+
 
 
   /** Synlige linjer for status-fanerne (den valgte periode). */
