@@ -15,7 +15,10 @@ export interface TdcMonthlyGoalSeller {
   count: number;
   goal: number;
   progress: number;
+  /** Første sælger i måneden der nåede sit individuelle mål (låst i databasen). */
+  isFirstAchiever?: boolean;
 }
+
 
 export interface TdcMonthlyGoalDay {
   /** YYYY-MM-DD */
