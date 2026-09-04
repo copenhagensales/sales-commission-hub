@@ -159,6 +159,32 @@ export function useTdcMonthlyGoal(enabled = true) {
         })
         .sort((a, b) => b.progress - a.progress || b.count - a.count || a.name.localeCompare(b.name, "da-DK"));
 
+      // Første målopnåer låses server-side, så pladsen ikke kan overhales senere
+      let firstAchieverId: string | null = null;
+      try {
+        const res = await tvEdgeFetch("tv-dashboard-data?action=monthly-goal-first-achiever", {
+          method: "POST",
+          body: JSON.stringify({
+            boardKey: "tdc-monthly-goal",
+            monthKey,
+            candidates: sellers
+              .filter((s) => s.goal > 0 && s.count >= s.goal)
+              .map((s) => ({ employeeId: s.employeeId, employeeName: s.name, count: s.count, goal: s.goal })),
+          }),
+        });
+        if (res.ok) {
+          const json = (await res.json()) as { firstAchiever?: { employeeId: string } | null };
+          firstAchieverId = json.firstAchiever?.employeeId ?? null;
+        }
+      } catch {
+        // Medaljen er kosmetisk — boardet vises uanset
+      }
+
+      const sellersWithMedal = sellers.map((s) => ({
+        ...s,
+        isFirstAchiever: firstAchieverId != null && s.employeeId === firstAchieverId,
+      }));
+
       const teamGoal = goal?.team ?? 0;
 
       return {
@@ -167,10 +193,11 @@ export function useTdcMonthlyGoal(enabled = true) {
         teamCount,
         teamGoal,
         teamProgress: teamGoal > 0 ? (teamCount / teamGoal) * 100 : 0,
-        sellers,
+        sellers: sellersWithMedal,
         days,
         warning: warnings.length > 0 ? warnings.join(" · ") : undefined,
       };
+
     },
   });
 }
