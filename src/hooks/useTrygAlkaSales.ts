@@ -18,9 +18,29 @@ function dayBounds(day: Date) {
   return { start: start.toISOString(), end: end.toISOString() };
 }
 
+const SELECT =
+  "id, quantity, mapped_commission, mapped_revenue, products(name, client_campaign_id), sales!inner(id, sale_datetime, agent_email, agent_name, customer_phone, client_campaign_id)";
+
+type Row = {
+  id: string;
+  quantity: number | null;
+  mapped_commission: number | null;
+  mapped_revenue: number | null;
+  products: { name: string | null; client_campaign_id: string | null } | null;
+  sales: {
+    id: string;
+    sale_datetime: string;
+    agent_email: string | null;
+    agent_name: string | null;
+    customer_phone: string | null;
+    client_campaign_id: string | null;
+  };
+};
+
 /**
- * Alle salg på produkter under kunderne Tryg og ALKA for én dag, nyeste først.
- * Ren læsning — bruges kun til visningen på "Tryg - Ret salg".
+ * Alle salg under kunderne Tryg og ALKA for én dag, nyeste først.
+ * Kunden kan sidde på salget (typisk) eller på produktets kampagne — begge spor
+ * hentes og forenes. Ren læsning — bruges kun til visningen på "Tryg - Ret salg".
  */
 export function useTrygAlkaSales(day: Date, enabled = true) {
   const { start, end } = dayBounds(day);
@@ -29,56 +49,61 @@ export function useTrygAlkaSales(day: Date, enabled = true) {
     queryKey: ["tryg-alka-sales", start, end],
     enabled,
     queryFn: async (): Promise<TrygAlkaSale[]> => {
-      // 1) Produkter der hører til Tryg / ALKA
-      const { data: products, error: productError } = await supabase
-        .from("products")
-        .select(
-          "id, name, client_campaigns!inner(client_id, clients!inner(name))"
-        )
-        .in("client_campaigns.client_id", [TRYG_CLIENT_ID, ALKA_CLIENT_ID]);
-      if (productError) throw productError;
+      // 1) Kampagner under Tryg / ALKA
+      const { data: campaigns, error: campaignError } = await supabase
+        .from("client_campaigns")
+        .select("id, client_id, clients!inner(name)")
+        .in("client_id", [TRYG_CLIENT_ID, ALKA_CLIENT_ID]);
+      if (campaignError) throw campaignError;
 
-      const productRows = (products || []) as unknown as {
+      const campaignRows = (campaigns || []) as unknown as {
         id: string;
-        name: string | null;
-        client_campaigns: { clients: { name: string | null } | null } | null;
+        clients: { name: string | null } | null;
       }[];
-
-      const productInfo = new Map<string, { name: string; client: string }>();
-      for (const p of productRows) {
-        productInfo.set(p.id, {
-          name: p.name || "Ukendt produkt",
-          client: p.client_campaigns?.clients?.name || "Ukendt kunde",
-        });
+      const clientByCampaign = new Map<string, string>();
+      for (const c of campaignRows) {
+        clientByCampaign.set(c.id, c.clients?.name || "Ukendt kunde");
       }
-      const productIds = Array.from(productInfo.keys());
-      if (productIds.length === 0) return [];
+      const campaignIds = Array.from(clientByCampaign.keys());
+      if (campaignIds.length === 0) return [];
 
-      // 2) Salgslinjer på de produkter inden for dagen
-      const { data, error } = await supabase
-        .from("sale_items")
-        .select(
-          "id, product_id, quantity, mapped_commission, mapped_revenue, sales!inner(id, sale_datetime, agent_email, agent_name, customer_phone)"
-        )
-        .in("product_id", productIds)
-        .gte("sales.sale_datetime", start)
-        .lte("sales.sale_datetime", end);
-      if (error) throw error;
+      // 2) To spor: kunden på salget, og kunden på produktets kampagne
+      const [bySale, byProduct] = await Promise.all([
+        supabase
+          .from("sale_items")
+          .select(SELECT)
+          .in("sales.client_campaign_id", campaignIds)
+          .gte("sales.sale_datetime", start)
+          .lte("sales.sale_datetime", end),
+        supabase
+          .from("sale_items")
+          .select(SELECT)
+          .in("products.client_campaign_id", campaignIds)
+          .not("product_id", "is", null)
+          .gte("sales.sale_datetime", start)
+          .lte("sales.sale_datetime", end),
+      ]);
+      if (bySale.error) throw bySale.error;
+      if (byProduct.error) throw byProduct.error;
 
-      const rows = (data || []) as unknown as {
-        id: string;
-        product_id: string | null;
-        quantity: number | null;
-        mapped_commission: number | null;
-        mapped_revenue: number | null;
-        sales: {
-          id: string;
-          sale_datetime: string;
-          agent_email: string | null;
-          agent_name: string | null;
-          customer_phone: string | null;
-        };
-      }[];
+      const byId = new Map<string, Row>();
+      for (const r of (bySale.data || []) as unknown as Row[]) byId.set(r.id, r);
+      for (const r of (byProduct.data || []) as unknown as Row[]) {
+        // Produkt-sporet kan give rækker uden kampagne-match på produktet, når
+        // PostgREST ikke filtrerer den indlejrede relation — filtrér her.
+        if (!r.products?.client_campaign_id) continue;
+        if (!clientByCampaign.has(r.products.client_campaign_id)) continue;
+        if (!byId.has(r.id)) byId.set(r.id, r);
+      }
+      const rows = Array.from(byId.values()).filter((r) => {
+        const saleCamp = r.sales.client_campaign_id;
+        const prodCamp = r.products?.client_campaign_id;
+        return (
+          (saleCamp && clientByCampaign.has(saleCamp)) ||
+          (prodCamp && clientByCampaign.has(prodCamp))
+        );
+      });
+      if (rows.length === 0) return [];
 
       // 3) Sælgernavne via work_email (samme logik som Kanvas-visningen)
       const emails = Array.from(
@@ -104,7 +129,12 @@ export function useTrygAlkaSales(day: Date, enabled = true) {
       return rows
         .map((r) => {
           const email = (r.sales.agent_email || "").toLowerCase();
-          const info = r.product_id ? productInfo.get(r.product_id) : undefined;
+          const saleCamp = r.sales.client_campaign_id;
+          const prodCamp = r.products?.client_campaign_id;
+          const clientName =
+            (saleCamp ? clientByCampaign.get(saleCamp) : undefined) ||
+            (prodCamp ? clientByCampaign.get(prodCamp) : undefined) ||
+            "Ukendt kunde";
           return {
             saleId: r.sales.id,
             saleItemId: r.id,
@@ -116,8 +146,8 @@ export function useTrygAlkaSales(day: Date, enabled = true) {
               "Ukendt",
             customerPhone: r.sales.customer_phone || null,
             quantity: Number(r.quantity ?? 0),
-            productName: info?.name || "Ukendt produkt",
-            clientName: info?.client || "Ukendt kunde",
+            productName: r.products?.name || "Ukendt produkt",
+            clientName,
             mappedCommission: Number(r.mapped_commission ?? 0),
             mappedRevenue: Number(r.mapped_revenue ?? 0),
           };
