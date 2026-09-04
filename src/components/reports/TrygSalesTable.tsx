@@ -156,6 +156,13 @@ export function TrygSalesTable(props: Props) {
                   <TableCell className="min-w-[240px]">
                     {sale.productName}
                   </TableCell>
+                  {showClient && (
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {(mode === "plain" &&
+                        props.clientNames?.get(sale.saleItemId)) ||
+                        "—"}
+                    </TableCell>
+                  )}
                   {mode === "status" && (
                     <>
                       <TableCell className="whitespace-nowrap text-muted-foreground">
@@ -168,8 +175,8 @@ export function TrygSalesTable(props: Props) {
                       </TableCell>
                     </>
                   )}
-                  <TableCell className="w-64 whitespace-nowrap">
-                    {mode === "review" ? (
+                  {mode === "review" && (
+                    <TableCell className="w-64 whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1">
                         <Button
                           variant="destructive"
@@ -211,7 +218,10 @@ export function TrygSalesTable(props: Props) {
                           Markér
                         </label>
                       </div>
-                    ) : (
+                    </TableCell>
+                  )}
+                  {mode === "status" && (
+                    <TableCell className="w-64 whitespace-nowrap">
                       <div className="flex items-center justify-end">
                         <Button
                           variant="outline"
@@ -225,8 +235,9 @@ export function TrygSalesTable(props: Props) {
                           Fortryd
                         </Button>
                       </div>
-                    )}
-                  </TableCell>
+                    </TableCell>
+                  )}
+
                 </TableRow>
               );
             })
