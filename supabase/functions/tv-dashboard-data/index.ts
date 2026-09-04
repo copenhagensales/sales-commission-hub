@@ -339,6 +339,13 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Første sælger der når sit individuelle månedsmål — låses permanent i DB
+    if (action === "monthly-goal-first-achiever") {
+      return await handleMonthlyGoalFirstAchiever(supabase, req, corsHeaders);
+    }
+
+
+
 
     // Get today's date range
     const today = new Date();
