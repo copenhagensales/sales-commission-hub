@@ -477,22 +477,27 @@ export default function TrygEditSales() {
           <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
             <CardHeader className="flex flex-row items-start justify-between gap-4">
               <div className="space-y-2">
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex flex-wrap items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
                   <Button
-                    variant={view === "kanvas" ? "secondary" : "ghost"}
-                    className="h-9 px-3 text-xl font-semibold tracking-tight"
+                    variant={view === "kanvas" ? "default" : "outline"}
+                    className={`h-10 px-4 text-lg font-semibold tracking-tight ${
+                      view === "kanvas" ? "shadow-sm" : "bg-background"
+                    }`}
                     onClick={() => setView("kanvas")}
                   >
                     Kanvas-møder
                   </Button>
                   <Button
-                    variant={view === "tryg-alka" ? "secondary" : "ghost"}
-                    className="h-9 px-3 text-xl font-semibold tracking-tight"
+                    variant={view === "tryg-alka" ? "default" : "outline"}
+                    className={`h-10 px-4 text-lg font-semibold tracking-tight ${
+                      view === "tryg-alka" ? "shadow-sm" : "bg-background"
+                    }`}
                     onClick={() => setView("tryg-alka")}
                   >
                     Alle tryg &amp; alka salg
                   </Button>
                 </div>
+
                 <CardDescription>
                   {view === "kanvas"
                     ? 'Alle salg på "Meeting -- CPH sales Kanvas" på den valgte dag.'
