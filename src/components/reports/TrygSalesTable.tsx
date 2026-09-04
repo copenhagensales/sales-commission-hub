@@ -78,6 +78,9 @@ export function TrygSalesTable(props: Props) {
               Antal
             </TableHead>
             <TableHead className="w-full min-w-[240px]">Produktnavn</TableHead>
+            {showClient && (
+              <TableHead className="w-28 whitespace-nowrap">Kunde</TableHead>
+            )}
             {mode === "status" && (
               <>
                 <TableHead className="w-40 whitespace-nowrap">
@@ -88,35 +91,37 @@ export function TrygSalesTable(props: Props) {
                 </TableHead>
               </>
             )}
-            <TableHead className="w-64 whitespace-nowrap text-right">
-              {mode === "review" ? (
-                <div className="flex items-center justify-end gap-1.5">
-                  <Button
-                    size="sm"
-                    className="h-7 gap-1.5 text-xs font-medium bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700"
-                    disabled={props.selectedIds.size === 0 || props.isPending}
-                    onClick={props.onApproveSelected}
-                  >
-                    <Check className="h-3.5 w-3.5" />
-                    Godkend markerede
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    className="h-7 gap-1.5 text-xs font-medium"
-                    disabled={props.selectedIds.size === 0 || props.isPending}
-                    onClick={props.onRejectSelected}
-                  >
-                    <X className="h-3.5 w-3.5" />
-                    Afvis markerede
-                  </Button>
-                  <span>Handlinger</span>
-                </div>
-              ) : (
-                "Handlinger"
-              )}
+            {mode !== "plain" && (
+              <TableHead className="w-64 whitespace-nowrap text-right">
+                {mode === "review" ? (
+                  <div className="flex items-center justify-end gap-1.5">
+                    <Button
+                      size="sm"
+                      className="h-7 gap-1.5 text-xs font-medium bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700"
+                      disabled={props.selectedIds.size === 0 || props.isPending}
+                      onClick={props.onApproveSelected}
+                    >
+                      <Check className="h-3.5 w-3.5" />
+                      Godkend markerede
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="h-7 gap-1.5 text-xs font-medium"
+                      disabled={props.selectedIds.size === 0 || props.isPending}
+                      onClick={props.onRejectSelected}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                      Afvis markerede
+                    </Button>
+                    <span>Handlinger</span>
+                  </div>
+                ) : (
+                  "Handlinger"
+                )}
+              </TableHead>
+            )}
 
-            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
