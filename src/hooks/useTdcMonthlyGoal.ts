@@ -175,10 +175,14 @@ export function useTdcMonthlyGoal(enabled = true) {
         if (res.ok) {
           const json = (await res.json()) as { firstAchiever?: { employeeId: string } | null };
           firstAchieverId = json.firstAchiever?.employeeId ?? null;
+        } else {
+          // Fejlen skal være synlig på boardet — ellers forsvinder medaljen lydløst
+          warnings.push(`Medalje-status kunne ikke hentes (${res.status})`);
         }
-      } catch {
-        // Medaljen er kosmetisk — boardet vises uanset
+      } catch (e) {
+        warnings.push(`Medalje-status kunne ikke hentes: ${(e as Error).message}`);
       }
+
 
       const sellersWithMedal = sellers.map((s) => ({
         ...s,
