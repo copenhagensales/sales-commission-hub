@@ -723,6 +723,8 @@ export default function TrygEditSales() {
                 </TabsContent>
 
               </Tabs>
+              )}
+
             </CardContent>
 
           </Card>
