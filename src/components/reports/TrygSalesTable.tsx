@@ -39,14 +39,27 @@ interface StatusProps extends CommonProps {
   showDate?: boolean;
 }
 
+/** Ren visning uden status-markering og uden handlinger pr. linje. */
+interface PlainProps extends CommonProps {
+  mode: "plain";
+  /** Kunde-navn pr. salgslinje (fx Tryg / ALKA). */
+  clientNames?: Map<string, string>;
+}
 
-type Props = ReviewProps | StatusProps;
 
-/** Fælles tabel-skabelon for de tre faner på "Tryg - Ret salg". */
+type Props = ReviewProps | StatusProps | PlainProps;
+
+/** Fælles tabel-skabelon for fanerne på "Tryg - Ret salg". */
 export function TrygSalesTable(props: Props) {
   const { sales, isLoading, emptyText, mode } = props;
   const showDate = mode === "status" && props.showDate === true;
-  const colSpan = (mode === "review" ? 6 : 8) + (showDate ? 1 : 0);
+  const showClient = mode === "plain" && props.clientNames !== undefined;
+  const colSpan =
+    (mode === "review" ? 6 : mode === "status" ? 8 : 5) +
+    (showDate ? 1 : 0) +
+    (showClient ? 1 : 0);
+
+
 
 
   return (
