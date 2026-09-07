@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { formatEmploymentPeriod, formatTenure } from "../_shared/employment-tenure.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -52,6 +53,7 @@ En medarbejder er blevet deaktiveret i systemet.
 Medarbejder: {{employee_name}}
 Team: {{team_name}}
 Email: {{employee_email}}
+Ansat: {{employment_period}}
 Dato: {{deactivation_date}}
 Deaktiveret af: {{actor_name}}
 
@@ -247,18 +249,24 @@ serve(async (req: Request) => {
     // ---- Employee + team resolution (server-side, snapshot-safe) ----
     let employeeName = body.employee_name || "Ukendt medarbejder";
     let employeeEmail = body.employee_email || "";
+    let employmentStart: string | null = null;
+    let employmentEnd: string | null = null;
     let teamId: string | null = body.team_id ?? null;
 
     if (employee_id) {
       const { data: employee } = await admin
         .from("employee_master_data")
-        .select("first_name, last_name, work_email, private_email, team_id, last_team_id")
+        .select(
+          "first_name, last_name, work_email, private_email, team_id, last_team_id, employment_start_date, employment_end_date",
+        )
         .eq("id", employee_id)
         .maybeSingle();
 
       if (employee) {
         employeeName = `${employee.first_name ?? ""} ${employee.last_name ?? ""}`.trim() || employeeName;
         employeeEmail = employee.work_email || employee.private_email || employeeEmail;
+        employmentStart = employee.employment_start_date ?? null;
+        employmentEnd = employee.employment_end_date ?? null;
         if (!teamId) teamId = employee.team_id ?? null;
         if (!teamId) {
           const { data: membership } = await admin
@@ -351,6 +359,8 @@ serve(async (req: Request) => {
       .replace(/\{\{team_name\}\}/g, teamName)
       .replace(/\{\{employee_email\}\}/g, employeeEmail || "Ikke angivet")
       .replace(/\{\{deactivation_date\}\}/g, deactivationDate)
+      .replace(/\{\{employment_period\}\}/g, formatEmploymentPeriod(employmentStart, employmentEnd))
+      .replace(/\{\{tenure\}\}/g, formatTenure(employmentStart, employmentEnd) || "Ikke angivet")
       .replace(/\{\{actor_name\}\}/g, actorName);
 
     if (is_followup) {

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { formatEmploymentPeriod, formatTenure } from "../_shared/employment-tenure.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -131,7 +132,7 @@ serve(async (req: Request) => {
         employee_id,
         team_id,
         recipients,
-        employee_master_data!inner(first_name, last_name, work_email, private_email),
+        employee_master_data!inner(first_name, last_name, work_email, private_email, employment_start_date, employment_end_date),
         teams(name)
       `)
       .eq("status", "sent")
@@ -169,6 +170,8 @@ serve(async (req: Request) => {
         last_name: string;
         work_email: string | null;
         private_email: string | null;
+        employment_start_date: string | null;
+        employment_end_date: string | null;
       };
       const teamData = reminder.teams as unknown as { name: string } | null;
 
@@ -183,6 +186,14 @@ serve(async (req: Request) => {
         .replace(/\{\{team_name\}\}/g, teamData?.name || "Ingen team")
         .replace(/\{\{employee_email\}\}/g, employeeData.work_email || employeeData.private_email || "Ikke angivet")
         .replace(/\{\{deactivation_date\}\}/g, deactivationDate)
+        .replace(
+          /\{\{employment_period\}\}/g,
+          formatEmploymentPeriod(employeeData.employment_start_date, employeeData.employment_end_date),
+        )
+        .replace(
+          /\{\{tenure\}\}/g,
+          formatTenure(employeeData.employment_start_date, employeeData.employment_end_date) || "Ikke angivet",
+        )
         .replace(/\{\{actor_name\}\}/g, "System");
 
       emailBody = `⚠️ PÅMINDELSE - Denne handling er stadig ikke udført!\n\n${emailBody}`;
