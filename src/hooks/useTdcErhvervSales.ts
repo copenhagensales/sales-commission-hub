@@ -98,8 +98,10 @@ export function useTdcErhvervSales(day: Date, enabled = true) {
 
       for (const row of rows) {
         const opp = extractOpp(row.raw_payload);
-        const key = opp || `__no_opp__${row.id}`;
         const email = (row.agent_email || "").toLowerCase();
+        // Samme OPP kan være registreret af to forskellige sælgere – gruppér
+        // derfor pr. OPP + sælger, så hver sælgers salg står for sig selv.
+        const key = opp ? `${opp}__${email}` : `__no_opp__${row.id}`;
         const sellerName =
           nameByEmail.get(email) || row.agent_name || row.agent_email || "Ukendt";
 
