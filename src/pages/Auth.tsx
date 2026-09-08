@@ -277,22 +277,23 @@ export default function Auth() {
   const handleMicrosoftSignIn = async () => {
     setMsLoading(true);
     try {
-      const { lovable } = await import("@/integrations/lovable");
-      const result = await lovable.auth.signInWithOAuth("microsoft", {
-        redirect_uri: window.location.origin,
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "azure",
+        options: {
+          scopes: "email openid profile",
+          redirectTo: `${window.location.origin}/auth`,
+        },
       });
 
-      if (result.error) {
+      if (error) {
         toast({
           title: "Microsoft-login fejlede",
-          description: result.error.message || "Prøv igen om et øjeblik.",
+          description: error.message || "Prøv igen om et øjeblik.",
           variant: "destructive",
         });
         setMsLoading(false);
-        return;
       }
-
-      if (result.redirected) return;
+      // Ved succes redirecter browseren til Microsoft - ingen yderligere handling her.
     } catch (err: any) {
       toast({
         title: "Microsoft-login fejlede",
@@ -302,6 +303,7 @@ export default function Auth() {
       setMsLoading(false);
     }
   };
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
