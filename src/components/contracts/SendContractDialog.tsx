@@ -606,6 +606,41 @@ export function SendContractDialog({
                 </div>
 
                 <div className="space-y-2">
+                  <Label>Ikrafttrædelsesdato</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-[260px] justify-start text-left font-normal",
+                          !effectiveDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {effectiveDate
+                          ? format(effectiveDate, "d. MMMM yyyy", { locale: da })
+                          : "Vælg dato"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={effectiveDate}
+                        onSelect={setEffectiveDate}
+                        locale={da}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <p className="text-xs text-muted-foreground">
+                    Bruges hvor kontrakten skriver tiltrædelses-/startdato. Ændrer ikke
+                    medarbejderens stamkort.
+                  </p>
+                </div>
+
+
+                <div className="space-y-2">
                   <Label>Noter (kun intern)</Label>
                   <Textarea
                     value={notes}
