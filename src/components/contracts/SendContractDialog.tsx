@@ -195,6 +195,18 @@ export function SendContractDialog({
   const [assistMaanedslon, setAssistMaanedslon] = useState("");
   const [assistBonus, setAssistBonus] = useState("");
   const [assistTeam, setAssistTeam] = useState("");
+  const [effectiveDate, setEffectiveDate] = useState<Date | undefined>(
+    employee.employment_start_date ? new Date(employee.employment_start_date) : undefined
+  );
+
+  // Hold datoen i sync med medarbejderen når dialogen åbnes for en ny person
+  useEffect(() => {
+    if (open) {
+      setEffectiveDate(
+        employee.employment_start_date ? new Date(employee.employment_start_date) : undefined
+      );
+    }
+  }, [open, employee.id, employee.employment_start_date]);
 
   // Check if current user is authorized to mark contracts as confidential
   useEffect(() => {
