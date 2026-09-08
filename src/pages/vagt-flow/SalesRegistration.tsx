@@ -227,8 +227,6 @@ const SalesRegistration = () => {
     setIsCallbackMode(false);
     setCallbackDate(undefined);
     setProductSelections([]);
-    setComment("");
-    setCommentError(false);
   };
 
   // Auto-set location when today's booking is loaded
@@ -350,14 +348,13 @@ const SalesRegistration = () => {
           : p
       )
     );
-    if (!value) setCommentError(false);
   };
 
   const setAllClaims = (value: boolean) => {
     setProductSelections((prev) =>
       prev.map((p) => ({ ...p, claimFlags: p.claimFlags.map(() => value) }))
     );
-    if (!value) setCommentError(false);
+    
   };
 
   const claimFlagsFlat = productSelections.flatMap((p) => p.claimFlags);
@@ -663,7 +660,6 @@ const SalesRegistration = () => {
                     setCallbackDate(date);
                     setIsCallbackMode(true);
                     setProductSelections([]);
-                    setComment("");
                   }
                 }}
                 disabled={(date) => date > new Date() || date < new Date("2024-01-01")}
