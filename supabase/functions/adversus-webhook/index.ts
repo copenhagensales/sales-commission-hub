@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sanitizePayload } from "../_shared/sanitize.ts";
+import { stripNoteFields } from "../_shared/strip-notes.ts";
 import { verifyWebhookSecret } from "../_shared/webhook-auth.ts";
 
 const corsHeaders = {
@@ -213,7 +214,7 @@ serve(async (req) => {
       .insert({
         external_id: externalId,
         event_type: body.type || 'result',
-        payload: body,
+        payload: stripNoteFields(body),
         processed: false,
         received_at: new Date().toISOString(),
       })

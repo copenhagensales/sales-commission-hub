@@ -202,11 +202,11 @@ serve(async (req) => {
 
         const phone = leadData.phone || leadData.contactPhone || leadData.mobile || null;
 
-        const updatedPayload = {
+        const updatedPayload = stripNoteFields({
           ...sale.raw_payload,
           leadResultFields,
           leadResultData,
-        };
+        });
 
         await supabase.from("sales").update({
           raw_payload: updatedPayload,
