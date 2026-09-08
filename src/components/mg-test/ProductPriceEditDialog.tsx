@@ -161,7 +161,7 @@ export function ProductPriceEditDialog({
       return { 
         effectiveDateStr: changeType === "retroactive" 
           ? undefined 
-          : effectiveDate?.toISOString().split("T")[0]
+          : effectiveDate ? format(effectiveDate, "yyyy-MM-dd") : undefined
       };
     },
     onSuccess: (data) => {
