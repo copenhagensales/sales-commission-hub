@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable/index";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -277,23 +278,26 @@ export default function Auth() {
   const handleMicrosoftSignIn = async () => {
     setMsLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "azure",
-        options: {
-          scopes: "email openid profile",
-          redirectTo: `${window.location.origin}/auth`,
-        },
+      const result = await lovable.auth.signInWithOAuth("microsoft", {
+        redirect_uri: `${window.location.origin}/auth`,
       });
 
-      if (error) {
+      if (result.error) {
         toast({
           title: "Microsoft-login fejlede",
-          description: error.message || "Prøv igen om et øjeblik.",
+          description: result.error.message || "Prøv igen om et øjeblik.",
           variant: "destructive",
         });
         setMsLoading(false);
+        return;
       }
-      // Ved succes redirecter browseren til Microsoft - ingen yderligere handling her.
+
+      if (result.redirected) {
+        // Browseren sendes videre til Microsoft.
+        return;
+      }
+
+      // Session er sat - auth-listeneren håndterer resten.
     } catch (err: any) {
       toast({
         title: "Microsoft-login fejlede",
