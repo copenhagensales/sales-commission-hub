@@ -131,7 +131,7 @@ async function processWebhookPayload(
           provider: provider,
           received_at: new Date().toISOString(),
         }
-      },
+      }),
       processed: false,
       received_at: new Date().toISOString(),
     })
