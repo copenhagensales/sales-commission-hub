@@ -433,6 +433,7 @@ export function SendContractDialog({
       assistMaanedslon,
       assistBonus,
       assistTeam,
+      effectiveDate,
     ]
   );
 
