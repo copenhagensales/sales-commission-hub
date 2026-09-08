@@ -90,24 +90,58 @@ export function ProductPriceEditDialog({
 
         if (historyError) throw historyError;
       } else {
-        // Only add to history with specific effective date
+        // Date-scoped change: the new price becomes a pricing rule with
+        // effective_from, so historical sales keep the old base price.
         if (!effectiveDate) throw new Error("Dato er påkrævet");
 
-        const effectiveDateStr = effectiveDate.toISOString().split("T")[0];
-        const today = new Date().toISOString().split("T")[0];
+        // Format in local time — toISOString() would shift the date one day back.
+        const effectiveDateStr = format(effectiveDate, "yyyy-MM-dd");
 
-        // If effective date is today or in the past, also update the product
-        if (effectiveDateStr <= today) {
-          const { error: updateError } = await supabase
-            .from("products")
-            .update({
-              commission_dkk: commission,
-              revenue_dkk: revenue,
-            })
-            .eq("id", productId);
+        // Close any open-ended universal rule on this product so the two periods
+        // do not overlap (effective_to is exclusive in the matching logic).
+        const { data: openRules, error: openRulesError } = await supabase
+          .from("product_pricing_rules")
+          .select("id, conditions, campaign_mapping_ids, effective_from, effective_to")
+          .eq("product_id", productId)
+          .eq("is_active", true)
+          .is("effective_to", null);
 
-          if (updateError) throw updateError;
+        if (openRulesError) throw openRulesError;
+
+        const universalOpenRules = (openRules ?? []).filter(
+          (r) =>
+            Object.keys((r.conditions as Record<string, unknown>) || {}).length === 0 &&
+            (!r.campaign_mapping_ids || r.campaign_mapping_ids.length === 0) &&
+            (!r.effective_from || r.effective_from < effectiveDateStr),
+        );
+
+        if (universalOpenRules.length > 0) {
+          const { error: closeError } = await supabase
+            .from("product_pricing_rules")
+            .update({ effective_to: effectiveDateStr })
+            .in(
+              "id",
+              universalOpenRules.map((r) => r.id),
+            );
+
+          if (closeError) throw closeError;
         }
+
+        // Create the new price as a date-scoped rule (product base price untouched)
+        const { error: ruleError } = await supabase
+          .from("product_pricing_rules")
+          .insert({
+            product_id: productId,
+            name: `Pris fra ${format(effectiveDate, "d. MMMM yyyy", { locale: da })}`,
+            conditions: {},
+            commission_dkk: commission,
+            revenue_dkk: revenue,
+            priority: 0,
+            is_active: true,
+            effective_from: effectiveDateStr,
+          });
+
+        if (ruleError) throw ruleError;
 
         // Add to history
         const { error: historyError } = await supabase
@@ -127,7 +161,7 @@ export function ProductPriceEditDialog({
       return { 
         effectiveDateStr: changeType === "retroactive" 
           ? undefined 
-          : effectiveDate?.toISOString().split("T")[0]
+          : effectiveDate ? format(effectiveDate, "yyyy-MM-dd") : undefined
       };
     },
     onSuccess: (data) => {
