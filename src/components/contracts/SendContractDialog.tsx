@@ -11,7 +11,10 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
-import { Send, Eye, AlertTriangle, Lock } from "lucide-react";
+import { Send, Eye, AlertTriangle, Lock, Calendar as CalendarIcon } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
 import { getPublicUrl } from "@/lib/getPublicUrl";
@@ -195,6 +198,18 @@ export function SendContractDialog({
   const [assistMaanedslon, setAssistMaanedslon] = useState("");
   const [assistBonus, setAssistBonus] = useState("");
   const [assistTeam, setAssistTeam] = useState("");
+  const [effectiveDate, setEffectiveDate] = useState<Date | undefined>(
+    employee.employment_start_date ? new Date(employee.employment_start_date) : undefined
+  );
+
+  // Hold datoen i sync med medarbejderen når dialogen åbnes for en ny person
+  useEffect(() => {
+    if (open) {
+      setEffectiveDate(
+        employee.employment_start_date ? new Date(employee.employment_start_date) : undefined
+      );
+    }
+  }, [open, employee.id, employee.employment_start_date]);
 
   // Check if current user is authorized to mark contracts as confidential
   useEffect(() => {
@@ -256,8 +271,10 @@ export function SendContractDialog({
       .join(", ");
 
     const fullName = `${employee.first_name} ${employee.last_name}`;
-    const startDateFormatted = employee.employment_start_date
-      ? format(new Date(employee.employment_start_date), "d. MMMM yyyy", { locale: da })
+    // Ikrafttrædelsesdato vælges i dialogen (default = stamkortets startdato).
+    // Ændrer aldrig stamkortet — bruges kun i kontraktteksten.
+    const startDateFormatted = effectiveDate
+      ? format(effectiveDate, "d. MMMM yyyy", { locale: da })
       : "[Startdato ikke angivet]";
 
     // Define all replacement mappings
@@ -419,6 +436,7 @@ export function SendContractDialog({
       assistMaanedslon,
       assistBonus,
       assistTeam,
+      effectiveDate,
     ]
   );
 
@@ -534,6 +552,9 @@ export function SendContractDialog({
     setAssistMaanedslon("");
     setAssistBonus("");
     setAssistTeam("");
+    setEffectiveDate(
+      employee.employment_start_date ? new Date(employee.employment_start_date) : undefined
+    );
   };
 
   return (
@@ -589,6 +610,41 @@ export function SendContractDialog({
                     onChange={(e) => setCustomTitle(e.target.value)}
                   />
                 </div>
+
+                <div className="space-y-2">
+                  <Label>Ikrafttrædelsesdato</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-[260px] justify-start text-left font-normal",
+                          !effectiveDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {effectiveDate
+                          ? format(effectiveDate, "d. MMMM yyyy", { locale: da })
+                          : "Vælg dato"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={effectiveDate}
+                        onSelect={setEffectiveDate}
+                        locale={da}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <p className="text-xs text-muted-foreground">
+                    Bruges hvor kontrakten skriver tiltrædelses-/startdato. Ændrer ikke
+                    medarbejderens stamkort.
+                  </p>
+                </div>
+
 
                 <div className="space-y-2">
                   <Label>Noter (kun intern)</Label>
