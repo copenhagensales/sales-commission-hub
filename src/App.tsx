@@ -78,11 +78,14 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
 // AppModeProvider wrapper that needs to be inside BrowserRouter
 import { AppModeProvider } from "@/contexts/AppModeContext";
 import { useMgTestRealtimeSync } from "@/hooks/useMgTestRealtimeSync";
+import { useMicrosoftLoginGuard } from "@/hooks/useMicrosoftLoginGuard";
 
 const RealtimeListeners = () => {
   useMgTestRealtimeSync();
+  useMicrosoftLoginGuard();
   return null;
 };
+
 
 const AppContent = () => (
   <AppModeProvider>
