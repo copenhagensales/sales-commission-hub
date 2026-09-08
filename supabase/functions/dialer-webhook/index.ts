@@ -195,7 +195,7 @@ async function processWebhookPayload(
       validation_status: 'pending',
       source: dialerName,
       integration_type: provider,
-      raw_payload: {
+      raw_payload: stripNoteFields({
         ...payload.rawPayload,
         _webhook_parsed: {
           leadId: payload.leadId,
@@ -205,7 +205,7 @@ async function processWebhookPayload(
           campaignId: payload.campaignId,
           campaignName: payload.campaignName,
         }
-      },
+      }),
     })
     .select()
     .single();
