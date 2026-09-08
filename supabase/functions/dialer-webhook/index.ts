@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { parseWebhook, StandardWebhookPayload } from "./parsers/factory.ts";
 import { verifyWebhookSecret } from "../_shared/webhook-auth.ts";
+import { stripNoteFields } from "../_shared/strip-notes.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -103,7 +104,7 @@ async function processWebhookPayload(
     .insert({
       external_id: payload.externalId,
       event_type: payload.eventType,
-      payload: {
+      payload: stripNoteFields({
         ...payload.rawPayload,
         // Canonical campaign_status enum - SOURCE OF TRUTH for filtering/reporting
         campaign_status: payload.campaignStatus,
@@ -130,7 +131,7 @@ async function processWebhookPayload(
           provider: provider,
           received_at: new Date().toISOString(),
         }
-      },
+      }),
       processed: false,
       received_at: new Date().toISOString(),
     })
@@ -194,7 +195,7 @@ async function processWebhookPayload(
       validation_status: 'pending',
       source: dialerName,
       integration_type: provider,
-      raw_payload: {
+      raw_payload: stripNoteFields({
         ...payload.rawPayload,
         _webhook_parsed: {
           leadId: payload.leadId,
@@ -204,7 +205,7 @@ async function processWebhookPayload(
           campaignId: payload.campaignId,
           campaignName: payload.campaignName,
         }
-      },
+      }),
     })
     .select()
     .single();

@@ -2,6 +2,7 @@ import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { StandardSale, PricingRule, NumericCondition } from "../types.ts"
 import { chunk, fetchAllPaginated } from "../utils/batch.ts"
 import { applyDataMappings, hasActiveMappings } from "./normalize.ts"
+import { stripNoteFields } from "../../_shared/strip-notes.ts"
 
 /**
  * Check if a condition value is a NumericCondition object
@@ -503,7 +504,7 @@ async function processSalesBatch(
         dialer_campaign_id: sale.campaignId || null,
         source: sale.dialerName,
         integration_type: sale.integrationType,
-        raw_payload: sale.rawPayload || null,
+        raw_payload: sale.rawPayload ? stripNoteFields(sale.rawPayload) : null,
         normalized_data: sale.normalizedData || null,
         updated_at: new Date().toISOString(),
         validation_status: 'pending',  // Eksplicit default for at undgå NULL

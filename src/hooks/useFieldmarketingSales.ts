@@ -196,7 +196,6 @@ interface CreateSaleParams {
   client_id: string;
   product_name: string;
   phone_number: string;
-  comment?: string;
   registered_at?: string;
   claim_reimport?: boolean;
 }
@@ -237,8 +236,8 @@ export function useCreateFieldmarketingSale() {
             fm_location_id: sale.location_id,
             fm_client_id: sale.client_id,
             fm_product_name: sale.product_name,
-            fm_comment: sale.comment || null,
             fm_claim_reimport: sale.claim_reimport === true,
+            // fm_comment / kommentar: GDPR – fritekstnoter må ikke gemmes
           }
         };
       }));
