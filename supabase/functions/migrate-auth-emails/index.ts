@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
   // Hent alle aktive medarbejdere med work_email + auth_user_id
   const { data: employees, error: empErr } = await svc
     .from("employee_master_data")
-    .select("id, full_name, work_email, auth_user_id")
+    .select("id, first_name, last_name, work_email, auth_user_id")
     .eq("is_active", true)
     .not("work_email", "is", null)
     .not("auth_user_id", "is", null);
@@ -74,14 +74,14 @@ Deno.serve(async (req) => {
     const work = (e.work_email as string).trim().toLowerCase();
     const authUser = byId.get(e.auth_user_id as string);
     if (!authUser) {
-      missingAuthUser.push({ name: e.full_name as string, auth_user_id: e.auth_user_id as string });
+      missingAuthUser.push({ name: `${e.first_name ?? ""} ${e.last_name ?? ""}`.trim(), auth_user_id: e.auth_user_id as string });
       continue;
     }
     if (authUser.email === work) continue; // matcher allerede
 
     const row: Row = {
       employee_id: e.id as string,
-      name: e.full_name as string,
+      name: `${e.first_name ?? ""} ${e.last_name ?? ""}`.trim(),
       work_email: work,
       auth_user_id: e.auth_user_id as string,
       current_email: authUser.email,
