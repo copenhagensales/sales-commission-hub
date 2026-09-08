@@ -166,6 +166,7 @@ export default function Auth() {
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [diagnostics, setDiagnostics] = useState<string[]>([]);
   const [failedAttempts, setFailedAttempts] = useState(0);
+  const [msLoading, setMsLoading] = useState(false);
   const [diagSummary, setDiagSummary] = useState<DiagnosticSummary | null>(null);
   const { toast } = useToast();
   const { mustChangePassword, clearMustChangePassword, user, loading: authLoading } = useAuth();
