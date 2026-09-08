@@ -871,6 +871,37 @@ export default function Auth() {
             </Button>
           </form>
 
+          {/* Microsoft sign-in */}
+          {!showPasswordChangeForm && !isResetMode && (
+            <>
+              <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-border" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-card px-2 text-muted-foreground">eller</span>
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                disabled={msLoading || loading}
+                onClick={handleMicrosoftSignIn}
+              >
+                <svg className="mr-2 h-4 w-4" viewBox="0 0 23 23" aria-hidden="true">
+                  <path fill="#f35325" d="M1 1h10v10H1z" />
+                  <path fill="#81bc06" d="M12 1h10v10H12z" />
+                  <path fill="#05a6f0" d="M1 12h10v10H1z" />
+                  <path fill="#ffba08" d="M12 12h10v10H12z" />
+                </svg>
+                {msLoading ? "Åbner Microsoft..." : "Log ind med Microsoft"}
+              </Button>
+            </>
+          )}
+
+
           {/* Footer links */}
           {!showPasswordChangeForm && (
             <div className="mt-6 text-center">
