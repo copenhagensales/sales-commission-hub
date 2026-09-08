@@ -166,6 +166,7 @@ export default function Auth() {
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [diagnostics, setDiagnostics] = useState<string[]>([]);
   const [failedAttempts, setFailedAttempts] = useState(0);
+  const [msLoading, setMsLoading] = useState(false);
   const [diagSummary, setDiagSummary] = useState<DiagnosticSummary | null>(null);
   const { toast } = useToast();
   const { mustChangePassword, clearMustChangePassword, user, loading: authLoading } = useAuth();
@@ -271,6 +272,35 @@ export default function Auth() {
     localStorage.clear();
     sessionStorage.clear();
     window.location.reload();
+  };
+
+  const handleMicrosoftSignIn = async () => {
+    setMsLoading(true);
+    try {
+      const { lovable } = await import("@/integrations/lovable");
+      const result = await lovable.auth.signInWithOAuth("microsoft", {
+        redirect_uri: window.location.origin,
+      });
+
+      if (result.error) {
+        toast({
+          title: "Microsoft-login fejlede",
+          description: result.error.message || "Prøv igen om et øjeblik.",
+          variant: "destructive",
+        });
+        setMsLoading(false);
+        return;
+      }
+
+      if (result.redirected) return;
+    } catch (err: any) {
+      toast({
+        title: "Microsoft-login fejlede",
+        description: err?.message || "Ukendt fejl",
+        variant: "destructive",
+      });
+      setMsLoading(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -870,6 +900,37 @@ export default function Auth() {
               {getButtonText()}
             </Button>
           </form>
+
+          {/* Microsoft sign-in */}
+          {!showPasswordChangeForm && !isResetMode && (
+            <>
+              <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-border" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-card px-2 text-muted-foreground">eller</span>
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                disabled={msLoading || loading}
+                onClick={handleMicrosoftSignIn}
+              >
+                <svg className="mr-2 h-4 w-4" viewBox="0 0 23 23" aria-hidden="true">
+                  <path fill="#f35325" d="M1 1h10v10H1z" />
+                  <path fill="#81bc06" d="M12 1h10v10H12z" />
+                  <path fill="#05a6f0" d="M1 12h10v10H1z" />
+                  <path fill="#ffba08" d="M12 12h10v10H12z" />
+                </svg>
+                {msLoading ? "Åbner Microsoft..." : "Log ind med Microsoft"}
+              </Button>
+            </>
+          )}
+
 
           {/* Footer links */}
           {!showPasswordChangeForm && (
