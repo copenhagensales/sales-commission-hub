@@ -552,6 +552,9 @@ export function SendContractDialog({
     setAssistMaanedslon("");
     setAssistBonus("");
     setAssistTeam("");
+    setEffectiveDate(
+      employee.employment_start_date ? new Date(employee.employment_start_date) : undefined
+    );
   };
 
   return (
