@@ -256,8 +256,10 @@ export function SendContractDialog({
       .join(", ");
 
     const fullName = `${employee.first_name} ${employee.last_name}`;
-    const startDateFormatted = employee.employment_start_date
-      ? format(new Date(employee.employment_start_date), "d. MMMM yyyy", { locale: da })
+    // Ikrafttrædelsesdato vælges i dialogen (default = stamkortets startdato).
+    // Ændrer aldrig stamkortet — bruges kun i kontraktteksten.
+    const startDateFormatted = effectiveDate
+      ? format(effectiveDate, "d. MMMM yyyy", { locale: da })
       : "[Startdato ikke angivet]";
 
     // Define all replacement mappings
