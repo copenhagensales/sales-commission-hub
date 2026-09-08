@@ -54,9 +54,7 @@ const SalesRegistration = () => {
   const { position } = usePermissions();
   const isOwner = position?.name?.toLowerCase() === "ejer";
   const [locationId, setLocationId] = useState<string>("");
-  const [comment, setComment] = useState("");
-  const [commentError, setCommentError] = useState(false);
-  const commentRef = useRef<HTMLTextAreaElement>(null);
+  // GDPR: Kommentar-/notefelt fjernet – fritekstnoter må ikke gemmes.
   const [productSelections, setProductSelections] = useState<ProductSelection[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedBookingId, setSelectedBookingId] = useState<string>("");
@@ -394,13 +392,6 @@ const SalesRegistration = () => {
       return;
     }
 
-    if (hasAnyClaim && !comment.trim()) {
-      setCommentError(true);
-      toast.error("Kommentar er påkrævet ved Claim/Reimport");
-      commentRef.current?.focus();
-      commentRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-      return;
-    }
 
 
 
@@ -424,7 +415,7 @@ const SalesRegistration = () => {
           client_id: clientId,
           product_name: selection.productName,
           phone_number: phone.trim(),
-          comment: comment || undefined,
+          
           claim_reimport: selection.claimFlags[index] === true,
               registered_at: isCallbackMode && callbackDate 
                 ? format(callbackDate, "yyyy-MM-dd'T'12:00:00")
@@ -440,9 +431,6 @@ const SalesRegistration = () => {
       toast.success(`${salesRecords.length} salg registreret${dateInfo}!`);
 
       // Reset form
-      
-      setComment("");
-        setCommentError(false);
       setProductSelections([]);
     } catch (error: any) {
       console.error("Error saving sales:", error);
@@ -463,37 +451,7 @@ const SalesRegistration = () => {
     <div className="grid gap-6 md:grid-cols-2">
       {/* Left column - Form fields */}
       <div className="space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Salgsoplysninger</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-
-            {/* Kommentar */}
-            <div className="space-y-2">
-              <Label htmlFor="comment">
-                Kommentar{hasAnyClaim && " *"}
-              </Label>
-              <Textarea
-                id="comment"
-                ref={commentRef}
-                placeholder="Eventuelle bemærkninger..."
-                value={comment}
-                onChange={(e) => {
-                  setComment(e.target.value);
-                  if (commentError) setCommentError(false);
-                }}
-                rows={3}
-                className={commentError ? "border-destructive focus-visible:ring-destructive" : undefined}
-              />
-              {hasAnyClaim && (
-                <p className={`text-xs ${commentError ? "text-destructive" : "text-muted-foreground"}`}>
-                  Kommentar er påkrævet ved Claim/Reimport
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+        {/* GDPR: Kommentar-felt fjernet – fritekstnoter må ikke gemmes. */}
 
         {/* Phone numbers for selected products */}
         {productSelections.length > 0 && (
