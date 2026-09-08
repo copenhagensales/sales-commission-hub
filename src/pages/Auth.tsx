@@ -274,6 +274,35 @@ export default function Auth() {
     window.location.reload();
   };
 
+  const handleMicrosoftSignIn = async () => {
+    setMsLoading(true);
+    try {
+      const { lovable } = await import("@/integrations/lovable");
+      const result = await lovable.auth.signInWithOAuth("microsoft", {
+        redirect_uri: window.location.origin,
+      });
+
+      if (result.error) {
+        toast({
+          title: "Microsoft-login fejlede",
+          description: result.error.message || "Prøv igen om et øjeblik.",
+          variant: "destructive",
+        });
+        setMsLoading(false);
+        return;
+      }
+
+      if (result.redirected) return;
+    } catch (err: any) {
+      toast({
+        title: "Microsoft-login fejlede",
+        description: err?.message || "Ukendt fejl",
+        variant: "destructive",
+      });
+      setMsLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
