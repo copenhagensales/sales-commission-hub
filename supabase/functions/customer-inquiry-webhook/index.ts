@@ -75,6 +75,7 @@ async function sendNotificationEmail(inquiry: { name: string; company?: string; 
       toRecipients: [
         { emailAddress: { address: "mg@copenhagensales.dk" } },
         { emailAddress: { address: "km@copenhagensales.dk" } },
+        { emailAddress: { address: "some@copenhagensales.dk" } },
       ],
     },
     saveToSentItems: false,
