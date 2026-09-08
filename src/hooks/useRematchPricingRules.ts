@@ -34,10 +34,16 @@ interface RematchResult {
 export function useRematchPricingRules() {
   return useMutation<RematchResult, Error, RematchParams>({
     mutationFn: async ({ productId, effectiveFromDate, dryRun = false }) => {
+      // The edge function expects `min_sale_datetime` (ISO timestamp). Convert the
+      // date-only cutoff to midnight so only sales on/after that date are rematched.
+      const minSaleDatetime = effectiveFromDate
+        ? new Date(`${effectiveFromDate}T00:00:00`).toISOString()
+        : undefined;
+
       const response = await supabase.functions.invoke("rematch-pricing-rules", {
         body: {
           product_id: productId,
-          effective_from_date: effectiveFromDate,
+          min_sale_datetime: minSaleDatetime,
           dry_run: dryRun,
         },
       });
