@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { parseWebhook, StandardWebhookPayload } from "./parsers/factory.ts";
 import { verifyWebhookSecret } from "../_shared/webhook-auth.ts";
+import { stripNoteFields } from "../_shared/strip-notes.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -103,7 +104,7 @@ async function processWebhookPayload(
     .insert({
       external_id: payload.externalId,
       event_type: payload.eventType,
-      payload: {
+      payload: stripNoteFields({
         ...payload.rawPayload,
         // Canonical campaign_status enum - SOURCE OF TRUTH for filtering/reporting
         campaign_status: payload.campaignStatus,
