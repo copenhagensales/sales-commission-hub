@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { stripNoteFields } from "../_shared/strip-notes.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -166,7 +167,7 @@ async function healAdversus(
         throw new Error("API returned empty lead data");
       }
 
-      const updatedPayload = {
+      const updatedPayload = stripNoteFields({
         ...rawPayload,
         leadResultFields,
         leadResultData,
@@ -176,7 +177,7 @@ async function healAdversus(
         ...(leadData.status ? { leadStatus: leadData.status } : {}),
         ...(leadData.campaignId ? { leadCampaignId: leadData.campaignId } : {}),
         ...(leadData.contactId ? { contactId: leadData.contactId } : {}),
-      };
+      });
 
       await supabase.from("sales").update({
         raw_payload: updatedPayload,
@@ -277,10 +278,10 @@ async function healEnreach(
 
       const leadData = leads[0];
       const rawPayload = sale.raw_payload || {};
-      const updatedPayload = {
+      const updatedPayload = stripNoteFields({
         ...rawPayload,
         data: leadData,
-      };
+      });
 
       await supabase.from("sales").update({
         raw_payload: updatedPayload,
