@@ -200,7 +200,22 @@ Deno.serve(async (req) => {
     // ===== PART 2: Campaign-based sales cleanup =====
     let campaignSalesAnonymized = 0;
     let campaignSalesDeleted = 0;
-    const campaignResults: { campaign_id: string; mode: string; count: number }[] = [];
+    let campaignSalesSkippedUnmapped = 0;
+    let referencesPreserved = 0;
+    let commissionsBackfilled = 0;
+    let normalizedKeysStripped = 0;
+    const campaignResults: {
+      campaign_id: string;
+      mode: string;
+      count: number;
+      skipped_unmapped?: number;
+      references_preserved?: number;
+      commissions_backfilled?: number;
+      normalized_stripped?: number;
+    }[] = [];
+    // client_id -> retention days, derived from the campaign policies. Used by
+    // the system-copy sections below.
+    const clientRetentionDays = new Map<string, number>();
 
     try {
       const { data: campaignPolicies, error: cpError } = await supabase
@@ -213,12 +228,34 @@ Deno.serve(async (req) => {
       } else if (campaignPolicies && campaignPolicies.length > 0) {
         log("INFO", `Found ${campaignPolicies.length} active campaign retention policies`);
 
+        // Map campaigns to their client so the system-copy sections can reuse
+        // the same retention window.
+        const campaignIds = (campaignPolicies as CampaignRetentionPolicy[])
+          .map((p) => p.client_campaign_id)
+          .filter(Boolean);
+        if (campaignIds.length > 0) {
+          const { data: campaignRows } = await supabase
+            .from("client_campaigns")
+            .select("id, client_id")
+            .in("id", campaignIds);
+          const campaignToClient = new Map<string, string>(
+            (campaignRows ?? []).map((c: { id: string; client_id: string }) => [c.id, c.client_id])
+          );
+          for (const policy of campaignPolicies as CampaignRetentionPolicy[]) {
+            const clientId = campaignToClient.get(policy.client_campaign_id);
+            if (!clientId || !policy.retention_days || policy.retention_days <= 0) continue;
+            // Strictest (shortest) window wins per client.
+            const current = clientRetentionDays.get(clientId);
+            if (current === undefined || policy.retention_days < current) {
+              clientRetentionDays.set(clientId, policy.retention_days);
+            }
+          }
+        }
+
         for (const policy of campaignPolicies as CampaignRetentionPolicy[]) {
           if (!policy.retention_days || policy.retention_days <= 0) continue;
 
-          const cutoff = new Date();
-          cutoff.setDate(cutoff.getDate() - policy.retention_days);
-          const cutoffISO = cutoff.toISOString();
+          const cutoffISO = cutoffIso(policy.retention_days);
 
           log("INFO", `Campaign ${policy.client_campaign_id}: mode=${policy.cleanup_mode}, cutoff=${cutoffISO}`);
 
@@ -237,6 +274,13 @@ Deno.serve(async (req) => {
 
             if (salesToDelete && salesToDelete.length > 0) {
               const saleIds = salesToDelete.map((s: { id: string }) => s.id);
+
+              if (dryRun) {
+                campaignSalesDeleted += saleIds.length;
+                campaignResults.push({ campaign_id: policy.client_campaign_id, mode: "delete_all", count: saleIds.length });
+                log("INFO", `[DRY RUN] Would delete ${saleIds.length} sales for campaign ${policy.client_campaign_id}`);
+                continue;
+              }
 
               // Delete sale_items first (foreign key)
               const { error: siDelErr } = await supabase
@@ -272,10 +316,12 @@ Deno.serve(async (req) => {
           } else if (policy.cleanup_mode === "anonymize_customer") {
             const { data: salesToAnon, error: selErr } = await supabase
               .from("sales")
-              .select("id")
+              .select(
+                "id, raw_payload, normalized_data, customer_phone, external_reference_number, external_sales_id"
+              )
               .eq("client_campaign_id", policy.client_campaign_id)
               .lt("sale_datetime", cutoffISO)
-              .or("customer_phone.neq.null,raw_payload.neq.null");
+              .or("customer_phone.not.is.null,raw_payload.not.is.null");
 
             if (selErr) {
               log("WARN", `Error selecting sales for anonymization (campaign ${policy.client_campaign_id}): ${selErr.message}`);
@@ -284,28 +330,123 @@ Deno.serve(async (req) => {
 
             if (salesToAnon && salesToAnon.length > 0) {
               let anonCount = 0;
+              let skippedUnmapped = 0;
+              let refsThisCampaign = 0;
+              let commissionsThisCampaign = 0;
+              let normalizedThisCampaign = 0;
+
               for (const sale of salesToAnon) {
-                const { error: updErr } = await supabase
-                  .from("sales")
-                  .update({
-                    customer_phone: null,
-                    customer_company: "Anonymiseret",
-                    raw_payload: null,
-                  })
-                  .eq("id", sale.id);
+                const saleId = sale.id as string;
+                const payload = sale.raw_payload;
+
+                // --- 1) Safeguard: only touch fully mapped sales ---
+                const { data: items, error: itemsErr } = await supabase
+                  .from("sale_items")
+                  .select("id, needs_mapping, mapped_commission, adversus_external_id, adversus_product_title")
+                  .eq("sale_id", saleId);
+
+                if (itemsErr) {
+                  log("WARN", `Could not read sale_items for sale ${saleId}: ${itemsErr.message}`);
+                  skippedUnmapped++;
+                  continue;
+                }
+
+                // Commission present only in the payload lines (e.g. Relatel
+                // totalProvision)? Persist it to sale_items first.
+                const payloadCommissions = extractPayloadLineCommissions(payload);
+                for (const item of items ?? []) {
+                  if (item.mapped_commission !== null && item.mapped_commission !== undefined) continue;
+                  const match =
+                    payloadCommissions.find(
+                      (l) => l.lineId && item.adversus_external_id && l.lineId === String(item.adversus_external_id)
+                    ) ??
+                    payloadCommissions.find(
+                      (l) => l.title && item.adversus_product_title && l.title === item.adversus_product_title
+                    );
+                  if (!match) continue;
+
+                  const { error: ciErr } = await db
+                    .from("sale_items")
+                    .update({ mapped_commission: match.commission })
+                    .eq("id", item.id);
+
+                  if (ciErr) {
+                    log("WARN", `Could not backfill commission on sale_item ${item.id}: ${ciErr.message}`);
+                  } else {
+                    item.mapped_commission = match.commission;
+                    commissionsThisCampaign++;
+                  }
+                }
+
+                const unmapped = (items ?? []).some(
+                  (i) => i.needs_mapping === true || i.mapped_commission === null || i.mapped_commission === undefined
+                );
+                if (!items || items.length === 0 || unmapped) {
+                  skippedUnmapped++;
+                  log("INFO", `Skipping sale ${saleId} — sale_items not fully mapped`);
+                  continue;
+                }
+
+                // --- 2) Preserve business references before dropping payload ---
+                const patch: Record<string, unknown> = {
+                  customer_phone: null,
+                  customer_company: "Anonymiseret",
+                  raw_payload: null,
+                };
+
+                if (!sale.external_reference_number) {
+                  const opp = extractOppNumber(payload);
+                  if (opp) {
+                    patch.external_reference_number = opp;
+                    refsThisCampaign++;
+                  }
+                }
+                if (!sale.external_sales_id) {
+                  const salesId = extractSalesId(payload);
+                  if (salesId) {
+                    patch.external_sales_id = salesId;
+                    refsThisCampaign++;
+                  }
+                }
+
+                // --- 3) Strip identity keys from normalized_data ---
+                const stripped = stripKeys(sale.normalized_data, NORMALIZED_IDENTITY_KEYS);
+                if (stripped.changed) {
+                  patch.normalized_data = stripped.result;
+                  normalizedThisCampaign += stripped.removed.length;
+                }
+
+                const { error: updErr } = await db.from("sales").update(patch).eq("id", saleId);
 
                 if (updErr) {
-                  log("WARN", `Failed to anonymize sale ${sale.id}: ${updErr.message}`);
+                  log("WARN", `Failed to anonymize sale ${saleId}: ${updErr.message}`);
                 } else {
                   anonCount++;
                 }
               }
+
               campaignSalesAnonymized += anonCount;
-              campaignResults.push({ campaign_id: policy.client_campaign_id, mode: "anonymize_customer", count: anonCount });
-              log("INFO", `Anonymized ${anonCount} sales for campaign ${policy.client_campaign_id}`);
+              campaignSalesSkippedUnmapped += skippedUnmapped;
+              referencesPreserved += refsThisCampaign;
+              commissionsBackfilled += commissionsThisCampaign;
+              normalizedKeysStripped += normalizedThisCampaign;
+              campaignResults.push({
+                campaign_id: policy.client_campaign_id,
+                mode: "anonymize_customer",
+                count: anonCount,
+                skipped_unmapped: skippedUnmapped,
+                references_preserved: refsThisCampaign,
+                commissions_backfilled: commissionsThisCampaign,
+                normalized_stripped: normalizedThisCampaign,
+              });
+              log(
+                "INFO",
+                `Campaign ${policy.client_campaign_id}: anonymized ${anonCount}, skipped_unmapped ${skippedUnmapped}`
+              );
             }
           }
         }
+
       } else {
         log("INFO", "No active campaign retention policies found");
       }
