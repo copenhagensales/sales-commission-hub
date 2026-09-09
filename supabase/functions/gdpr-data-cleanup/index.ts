@@ -174,7 +174,7 @@ Deno.serve(async (req) => {
             delete updatedNormalized[field.field_key];
             updatedNormalized[`_gdpr_cleaned_${field.field_key}`] = new Date().toISOString();
 
-            const { error: updateError } = await supabase
+            const { error: updateError } = await db
               .from("sales")
               .update({ normalized_data: updatedNormalized })
               .eq("id", sale.id);
@@ -673,7 +673,7 @@ Deno.serve(async (req) => {
                 }
 
                 for (const row of rows ?? []) {
-                  const { error: updErr } = await supabase
+                  const { error: updErr } = await db
                     .from("customer_inquiries")
                     .update({
                       name: "Anonymiseret",
@@ -694,7 +694,7 @@ Deno.serve(async (req) => {
                 break;
               }
 
-              const { error: delErr, count } = await supabase
+              const { error: delErr, count } = await db
                 .from("customer_inquiries")
                 .delete({ count: "exact" })
                 .lt("created_at", cutoffISO);
@@ -732,11 +732,11 @@ Deno.serve(async (req) => {
                 for (const candidate of expiredCandidates) {
                   if (policy.cleanup_mode === "delete_all") {
                     // Delete applications first (foreign key)
-                    await supabase.from("applications").delete().eq("candidate_id", candidate.id);
+                    await db.from("applications").delete().eq("candidate_id", candidate.id);
                     // Delete call_records referencing this candidate
-                    await supabase.from("call_records").delete().eq("candidate_id", candidate.id);
+                    await db.from("call_records").delete().eq("candidate_id", candidate.id);
 
-                    const { error: delErr } = await supabase
+                    const { error: delErr } = await db
                       .from("candidates")
                       .delete()
                       .eq("id", candidate.id);
@@ -749,7 +749,7 @@ Deno.serve(async (req) => {
                   } else {
                     // Default: anonymize. created_at, status, source, heard_about_us,
                     // applied_position and team_id are kept for recruitment statistics.
-                    const { error: updateError } = await supabase
+                    const { error: updateError } = await db
                       .from("candidates")
                       .update({
                         first_name: "Anonymiseret",
@@ -801,7 +801,7 @@ Deno.serve(async (req) => {
                       continue;
                     }
 
-                    const { error: updErr } = await supabase
+                    const { error: updErr } = await db
                       .from("employee_master_data")
                       .update(employeeAnonymizationPatch)
                       .eq("id", emp.id);
@@ -814,7 +814,7 @@ Deno.serve(async (req) => {
                     continue;
                   }
 
-                  const { error: delErr } = await supabase
+                  const { error: delErr } = await db
                     .from("employee_master_data")
                     .delete()
                     .eq("id", emp.id);
@@ -833,7 +833,7 @@ Deno.serve(async (req) => {
             }
 
             case "integration_logs": {
-              const { error: delErr, count } = await supabase
+              const { error: delErr, count } = await db
                 .from("integration_logs")
                 .delete({ count: "exact" })
                 .lt("created_at", cutoffISO);
@@ -863,7 +863,7 @@ Deno.serve(async (req) => {
                 }
 
                 for (const row of rows ?? []) {
-                  const { error: updErr } = await supabase
+                  const { error: updErr } = await db
                     .from("login_events")
                     .update({
                       user_email: ANON_EMAIL,
@@ -884,7 +884,7 @@ Deno.serve(async (req) => {
                 break;
               }
 
-              const { error: delErr, count } = await supabase
+              const { error: delErr, count } = await db
                 .from("login_events")
                 .delete({ count: "exact" })
                 .lt("logged_in_at", cutoffISO);
@@ -899,7 +899,7 @@ Deno.serve(async (req) => {
             }
 
             case "password_reset_tokens": {
-              const { error: delErr, count } = await supabase
+              const { error: delErr, count } = await db
                 .from("password_reset_tokens")
                 .delete({ count: "exact" })
                 .lt("created_at", cutoffISO);
@@ -928,7 +928,7 @@ Deno.serve(async (req) => {
                 }
 
                 for (const row of rows ?? []) {
-                  const { error: updErr } = await supabase
+                  const { error: updErr } = await db
                     .from("communication_logs")
                     .update({ content: null, phone_number: null })
                     .eq("id", row.id);
@@ -943,7 +943,7 @@ Deno.serve(async (req) => {
                 break;
               }
 
-              const { error: delErr, count } = await supabase
+              const { error: delErr, count } = await db
                 .from("communication_logs")
                 .delete({ count: "exact" })
                 .lt("created_at", cutoffISO);
