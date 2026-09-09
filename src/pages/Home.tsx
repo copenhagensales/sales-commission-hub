@@ -491,16 +491,38 @@ const Home = () => {
       <div className="min-h-screen bg-background px-4 pb-16 pt-6 md:px-10 md:pt-8">
         <div className="flex flex-col gap-8">
           {/* Topbar */}
-          <div className="flex flex-col gap-3 border-b-2 border-[hsl(var(--cph-onyx))] pb-6">
-            <div className="flex items-center gap-2.5">
-              <span className="h-2 w-2 rounded-full bg-[hsl(var(--cph-emerald))] ring-2 ring-[hsl(var(--cph-onyx))]" />
-              <span className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-foreground/70">
-                {format(new Date(), "EEEE d. MMMM", { locale: da })} · Live
-              </span>
+          <div className="flex items-end justify-between gap-4 border-b-2 border-[hsl(var(--cph-onyx))] pb-6">
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-2.5">
+                <span className="h-2 w-2 rounded-full bg-[hsl(var(--cph-emerald))] ring-2 ring-[hsl(var(--cph-onyx))]" />
+                <span className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-foreground/70">
+                  {format(new Date(), "EEEE d. MMMM", { locale: da })} · Live
+                </span>
+              </div>
+              <h1 className="text-[clamp(28px,4vw,40px)] font-extrabold leading-[1.05] tracking-[-0.02em] text-foreground">
+                {greetingLabel}, {firstName}
+              </h1>
             </div>
-            <h1 className="text-[clamp(28px,4vw,40px)] font-extrabold leading-[1.05] tracking-[-0.02em] text-foreground">
-              {greetingLabel}, {firstName}
-            </h1>
+
+            <div className="relative shrink-0">
+              <Avatar className="h-12 w-12 border-2 border-[hsl(var(--cph-onyx))] md:h-14 md:w-14">
+                <AvatarImage
+                  src={
+                    lookupAvatar({
+                      employeeId: employee?.id,
+                      name: [employee?.first_name, employee?.last_name].filter(Boolean).join(" "),
+                    }) ?? undefined
+                  }
+                  alt={firstName}
+                  className="object-cover"
+                />
+                <AvatarFallback className="bg-[hsl(var(--cph-onyx))] text-sm font-extrabold uppercase text-[hsl(var(--cph-light-blue))]">
+                  {[employee?.first_name?.[0], employee?.last_name?.[0]].filter(Boolean).join("") ||
+                    firstName[0]?.toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-[hsl(var(--cph-emerald))] ring-2 ring-background" />
+            </div>
           </div>
 
         {/* Kontrakt der afventer underskrift */}
