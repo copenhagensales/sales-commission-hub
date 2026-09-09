@@ -265,7 +265,7 @@ export function EventGallery() {
 
 
   return (
-    <section className="relative overflow-hidden rounded-3xl bg-[hsl(var(--cph-onyx))] p-4 text-[hsl(var(--cph-light-blue))] md:p-5">
+    <section className="relative overflow-hidden rounded-3xl bg-[hsl(var(--cph-onyx))] p-5 text-[hsl(var(--cph-light-blue))] md:p-6">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0"
