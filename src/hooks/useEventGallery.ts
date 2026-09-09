@@ -104,6 +104,54 @@ export function useUploadEventPhotos() {
   });
 }
 
+export function useUpdateEventPhoto() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      title,
+      eventDate,
+    }: {
+      id: string;
+      title: string;
+      eventDate: string;
+    }) => {
+      const { error } = await supabase
+        .from("event_gallery_photos")
+        .update({
+          title: title.trim() || null,
+          event_date: eventDate || null,
+        })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["event-gallery-photos"] });
+    },
+  });
+}
+
+/** Gemmer den viste rækkefølge som sort_order (0-indekseret). */
+export function useReorderEventPhotos() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (orderedIds: string[]) => {
+      for (let index = 0; index < orderedIds.length; index++) {
+        const { error } = await supabase
+          .from("event_gallery_photos")
+          .update({ sort_order: index })
+          .eq("id", orderedIds[index]);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["event-gallery-photos"] });
+    },
+  });
+}
+
 export function useDeleteEventPhoto() {
   const queryClient = useQueryClient();
 
@@ -121,3 +169,4 @@ export function useDeleteEventPhoto() {
     },
   });
 }
+
