@@ -12324,6 +12324,8 @@ export type Database = {
           enrichment_error: string | null
           enrichment_last_attempt: string | null
           enrichment_status: string | null
+          external_reference_number: string | null
+          external_sales_id: string | null
           id: string
           integration_type: string | null
           internal_reference: string | null
@@ -12350,6 +12352,8 @@ export type Database = {
           enrichment_error?: string | null
           enrichment_last_attempt?: string | null
           enrichment_status?: string | null
+          external_reference_number?: string | null
+          external_sales_id?: string | null
           id?: string
           integration_type?: string | null
           internal_reference?: string | null
@@ -12376,6 +12380,8 @@ export type Database = {
           enrichment_error?: string | null
           enrichment_last_attempt?: string | null
           enrichment_status?: string | null
+          external_reference_number?: string | null
+          external_sales_id?: string | null
           id?: string
           integration_type?: string | null
           internal_reference?: string | null

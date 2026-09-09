@@ -5,6 +5,18 @@ import {
   EMPLOYEE_ANONYMIZED_FIRST_NAME,
   EMPLOYEE_ANONYMIZED_LAST_NAME,
 } from "../_shared/employee-anonymization.ts";
+import {
+  ADVERSUS_EVENTS_RETENTION_DAYS,
+  CANCELLATION_IDENTITY_KEYS,
+  cutoffIso,
+  extractOppNumber,
+  extractPayloadLineCommissions,
+  extractSalesId,
+  FALLBACK_RETENTION_DAYS,
+  NORMALIZED_IDENTITY_KEYS,
+  stripKeys,
+} from "../_shared/gdpr-sales-privacy.ts";
+
 
 interface FieldDefinition {
   id: string;
@@ -30,6 +42,49 @@ interface DataRetentionPolicy {
   is_active: boolean;
 }
 
+
+interface CleanupLogEntry {
+  action: string;
+  records_affected: number;
+  details?: Record<string, unknown>;
+}
+
+/**
+ * Dry-run wrapper: selects are delegated to the real client, while every write
+ * becomes a no-op. Row-count deletes are translated into an equivalent
+ * head-count select so the dry run can report exactly what it would remove.
+ */
+function makeDryRunClient(sb: ReturnType<typeof createClient>) {
+  const noopChain = (): any => {
+    const chain: any = new Proxy(function () {}, {
+      get(_target, prop) {
+        if (prop === "then") {
+          return (resolve: (v: unknown) => unknown) =>
+            Promise.resolve({ data: null, error: null, count: 0 }).then(resolve);
+        }
+        return () => chain;
+      },
+      apply() {
+        return chain;
+      },
+    });
+    return chain;
+  };
+
+  return {
+    from(table: string) {
+      return {
+        select: (...args: unknown[]) => (sb.from(table) as any).select(...args),
+        // Count what would be deleted instead of deleting it.
+        delete: () => (sb.from(table) as any).select("id", { count: "exact", head: true }),
+        update: () => noopChain(),
+        insert: () => Promise.resolve({ data: null, error: null }),
+        upsert: () => Promise.resolve({ data: null, error: null }),
+      };
+    },
+  } as unknown as ReturnType<typeof createClient>;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -48,8 +103,27 @@ Deno.serve(async (req) => {
     console.log(JSON.stringify({ type, msg, data, timestamp: new Date().toISOString() }));
   };
 
+  // Dry run: compute and report everything, write nothing.
+  let dryRun = false;
   try {
-    log("INFO", "Starting GDPR data cleanup job");
+    if (req.method === "POST") {
+      const body = await req.json().catch(() => null);
+      dryRun = body?.dry_run === true;
+    }
+  } catch (_e) {
+    dryRun = false;
+  }
+
+  // Every mutation in this function goes through `db`.
+  const db = dryRun ? makeDryRunClient(supabase) : supabase;
+  const cleanupLog: CleanupLogEntry[] = [];
+  const addLog = (action: string, records_affected: number, details?: Record<string, unknown>) => {
+    if (records_affected > 0) cleanupLog.push({ action, records_affected, details });
+  };
+
+  try {
+    log("INFO", `Starting GDPR data cleanup job${dryRun ? " (DRY RUN — no writes)" : ""}`);
+
 
     // ===== PART 1: Field retention cleanup (legacy logic — kept as-is) =====
     const { data: fields, error: fieldsError } = await supabase
@@ -100,7 +174,7 @@ Deno.serve(async (req) => {
             delete updatedNormalized[field.field_key];
             updatedNormalized[`_gdpr_cleaned_${field.field_key}`] = new Date().toISOString();
 
-            const { error: updateError } = await supabase
+            const { error: updateError } = await db
               .from("sales")
               .update({ normalized_data: updatedNormalized })
               .eq("id", sale.id);
@@ -126,7 +200,22 @@ Deno.serve(async (req) => {
     // ===== PART 2: Campaign-based sales cleanup =====
     let campaignSalesAnonymized = 0;
     let campaignSalesDeleted = 0;
-    const campaignResults: { campaign_id: string; mode: string; count: number }[] = [];
+    let campaignSalesSkippedUnmapped = 0;
+    let referencesPreserved = 0;
+    let commissionsBackfilled = 0;
+    let normalizedKeysStripped = 0;
+    const campaignResults: {
+      campaign_id: string;
+      mode: string;
+      count: number;
+      skipped_unmapped?: number;
+      references_preserved?: number;
+      commissions_backfilled?: number;
+      normalized_stripped?: number;
+    }[] = [];
+    // client_id -> retention days, derived from the campaign policies. Used by
+    // the system-copy sections below.
+    const clientRetentionDays = new Map<string, number>();
 
     try {
       const { data: campaignPolicies, error: cpError } = await supabase
@@ -139,12 +228,34 @@ Deno.serve(async (req) => {
       } else if (campaignPolicies && campaignPolicies.length > 0) {
         log("INFO", `Found ${campaignPolicies.length} active campaign retention policies`);
 
+        // Map campaigns to their client so the system-copy sections can reuse
+        // the same retention window.
+        const campaignIds = (campaignPolicies as CampaignRetentionPolicy[])
+          .map((p) => p.client_campaign_id)
+          .filter(Boolean);
+        if (campaignIds.length > 0) {
+          const { data: campaignRows } = await supabase
+            .from("client_campaigns")
+            .select("id, client_id")
+            .in("id", campaignIds);
+          const campaignToClient = new Map<string, string>(
+            (campaignRows ?? []).map((c: { id: string; client_id: string }) => [c.id, c.client_id])
+          );
+          for (const policy of campaignPolicies as CampaignRetentionPolicy[]) {
+            const clientId = campaignToClient.get(policy.client_campaign_id);
+            if (!clientId || !policy.retention_days || policy.retention_days <= 0) continue;
+            // Strictest (shortest) window wins per client.
+            const current = clientRetentionDays.get(clientId);
+            if (current === undefined || policy.retention_days < current) {
+              clientRetentionDays.set(clientId, policy.retention_days);
+            }
+          }
+        }
+
         for (const policy of campaignPolicies as CampaignRetentionPolicy[]) {
           if (!policy.retention_days || policy.retention_days <= 0) continue;
 
-          const cutoff = new Date();
-          cutoff.setDate(cutoff.getDate() - policy.retention_days);
-          const cutoffISO = cutoff.toISOString();
+          const cutoffISO = cutoffIso(policy.retention_days);
 
           log("INFO", `Campaign ${policy.client_campaign_id}: mode=${policy.cleanup_mode}, cutoff=${cutoffISO}`);
 
@@ -163,6 +274,13 @@ Deno.serve(async (req) => {
 
             if (salesToDelete && salesToDelete.length > 0) {
               const saleIds = salesToDelete.map((s: { id: string }) => s.id);
+
+              if (dryRun) {
+                campaignSalesDeleted += saleIds.length;
+                campaignResults.push({ campaign_id: policy.client_campaign_id, mode: "delete_all", count: saleIds.length });
+                log("INFO", `[DRY RUN] Would delete ${saleIds.length} sales for campaign ${policy.client_campaign_id}`);
+                continue;
+              }
 
               // Delete sale_items first (foreign key)
               const { error: siDelErr } = await supabase
@@ -198,10 +316,16 @@ Deno.serve(async (req) => {
           } else if (policy.cleanup_mode === "anonymize_customer") {
             const { data: salesToAnon, error: selErr } = await supabase
               .from("sales")
-              .select("id")
+              .select(
+                "id, raw_payload, normalized_data, customer_phone, external_reference_number, external_sales_id"
+              )
               .eq("client_campaign_id", policy.client_campaign_id)
               .lt("sale_datetime", cutoffISO)
-              .or("customer_phone.neq.null,raw_payload.neq.null");
+              .or("customer_phone.not.is.null,raw_payload.not.is.null")
+              // Oldest first, batched. Anonymised sales drop out of this filter,
+              // so consecutive nightly runs work through the backlog safely.
+              .order("sale_datetime", { ascending: true })
+              .limit(500);
 
             if (selErr) {
               log("WARN", `Error selecting sales for anonymization (campaign ${policy.client_campaign_id}): ${selErr.message}`);
@@ -210,34 +334,332 @@ Deno.serve(async (req) => {
 
             if (salesToAnon && salesToAnon.length > 0) {
               let anonCount = 0;
+              let skippedUnmapped = 0;
+              let refsThisCampaign = 0;
+              let commissionsThisCampaign = 0;
+              let normalizedThisCampaign = 0;
+
               for (const sale of salesToAnon) {
-                const { error: updErr } = await supabase
-                  .from("sales")
-                  .update({
-                    customer_phone: null,
-                    customer_company: "Anonymiseret",
-                    raw_payload: null,
-                  })
-                  .eq("id", sale.id);
+                const saleId = sale.id as string;
+                const payload = sale.raw_payload;
+
+                // --- 1) Safeguard: only touch fully mapped sales ---
+                const { data: items, error: itemsErr } = await supabase
+                  .from("sale_items")
+                  .select("id, needs_mapping, mapped_commission, adversus_external_id, adversus_product_title")
+                  .eq("sale_id", saleId);
+
+                if (itemsErr) {
+                  log("WARN", `Could not read sale_items for sale ${saleId}: ${itemsErr.message}`);
+                  skippedUnmapped++;
+                  continue;
+                }
+
+                // Commission present only in the payload lines (e.g. Relatel
+                // totalProvision)? Persist it to sale_items first.
+                const payloadCommissions = extractPayloadLineCommissions(payload);
+                for (const item of items ?? []) {
+                  if (item.mapped_commission !== null && item.mapped_commission !== undefined) continue;
+                  const match =
+                    payloadCommissions.find(
+                      (l) => l.lineId && item.adversus_external_id && l.lineId === String(item.adversus_external_id)
+                    ) ??
+                    payloadCommissions.find(
+                      (l) => l.title && item.adversus_product_title && l.title === item.adversus_product_title
+                    );
+                  if (!match) continue;
+
+                  const { error: ciErr } = await db
+                    .from("sale_items")
+                    .update({ mapped_commission: match.commission })
+                    .eq("id", item.id);
+
+                  if (ciErr) {
+                    log("WARN", `Could not backfill commission on sale_item ${item.id}: ${ciErr.message}`);
+                  } else {
+                    item.mapped_commission = match.commission;
+                    commissionsThisCampaign++;
+                  }
+                }
+
+                const unmapped = (items ?? []).some(
+                  (i) => i.needs_mapping === true || i.mapped_commission === null || i.mapped_commission === undefined
+                );
+                if (!items || items.length === 0 || unmapped) {
+                  skippedUnmapped++;
+                  log("INFO", `Skipping sale ${saleId} — sale_items not fully mapped`);
+                  continue;
+                }
+
+                // --- 2) Preserve business references before dropping payload ---
+                const patch: Record<string, unknown> = {
+                  customer_phone: null,
+                  customer_company: "Anonymiseret",
+                  raw_payload: null,
+                };
+
+                if (!sale.external_reference_number) {
+                  const opp = extractOppNumber(payload);
+                  if (opp) {
+                    patch.external_reference_number = opp;
+                    refsThisCampaign++;
+                  }
+                }
+                if (!sale.external_sales_id) {
+                  const salesId = extractSalesId(payload);
+                  if (salesId) {
+                    patch.external_sales_id = salesId;
+                    refsThisCampaign++;
+                  }
+                }
+
+                // --- 3) Strip identity keys from normalized_data ---
+                const stripped = stripKeys(sale.normalized_data, NORMALIZED_IDENTITY_KEYS);
+                if (stripped.changed) {
+                  patch.normalized_data = stripped.result;
+                  normalizedThisCampaign += stripped.removed.length;
+                }
+
+                const { error: updErr } = await db.from("sales").update(patch).eq("id", saleId);
 
                 if (updErr) {
-                  log("WARN", `Failed to anonymize sale ${sale.id}: ${updErr.message}`);
+                  log("WARN", `Failed to anonymize sale ${saleId}: ${updErr.message}`);
                 } else {
                   anonCount++;
                 }
               }
+
               campaignSalesAnonymized += anonCount;
-              campaignResults.push({ campaign_id: policy.client_campaign_id, mode: "anonymize_customer", count: anonCount });
-              log("INFO", `Anonymized ${anonCount} sales for campaign ${policy.client_campaign_id}`);
+              campaignSalesSkippedUnmapped += skippedUnmapped;
+              referencesPreserved += refsThisCampaign;
+              commissionsBackfilled += commissionsThisCampaign;
+              normalizedKeysStripped += normalizedThisCampaign;
+              campaignResults.push({
+                campaign_id: policy.client_campaign_id,
+                mode: "anonymize_customer",
+                count: anonCount,
+                skipped_unmapped: skippedUnmapped,
+                references_preserved: refsThisCampaign,
+                commissions_backfilled: commissionsThisCampaign,
+                normalized_stripped: normalizedThisCampaign,
+              });
+              log(
+                "INFO",
+                `Campaign ${policy.client_campaign_id}: anonymized ${anonCount}, skipped_unmapped ${skippedUnmapped}`
+              );
             }
           }
         }
+
       } else {
         log("INFO", "No active campaign retention policies found");
       }
     } catch (cpErr) {
       log("WARN", `Campaign cleanup error: ${cpErr instanceof Error ? cpErr.message : String(cpErr)}`);
     }
+
+    addLog("campaign_sales_anonymized", campaignSalesAnonymized, { campaigns: campaignResults });
+    addLog("campaign_sales_deleted", campaignSalesDeleted, { campaigns: campaignResults });
+    addLog("sales_references_preserved", referencesPreserved);
+    addLog("sale_items_commission_backfilled", commissionsBackfilled);
+    addLog("sales_normalized_keys_stripped", normalizedKeysStripped);
+
+    // ===== PART 2B: System copies of the same personal data =====
+    // Retention window per client comes from the campaign policies; when no
+    // policy covers the client we fall back to FALLBACK_RETENTION_DAYS.
+    let fmSalesAnonymized = 0;
+    let eesyRowsAnonymized = 0;
+    let cancellationRowsAnonymized = 0;
+    let adversusEventsDeleted = 0;
+    const systemCopyResults: { table: string; count: number; retention_days: number }[] = [];
+
+    const retentionForClient = (clientId: string | null | undefined): number =>
+      (clientId && clientRetentionDays.get(clientId)) || FALLBACK_RETENTION_DAYS;
+
+    // --- a) fieldmarketing_sales.phone_number ---
+    // Set-based per client so the PostgREST 1000-row page limit cannot hide rows.
+    try {
+      const mappedClientIds = [...clientRetentionDays.keys()];
+      const fmGroups: { label: string; days: number; clientId: string | null }[] = mappedClientIds.map(
+        (clientId) => ({ label: clientId, days: clientRetentionDays.get(clientId)!, clientId })
+      );
+      fmGroups.push({ label: "fallback", days: FALLBACK_RETENTION_DAYS, clientId: null });
+
+      for (const group of fmGroups) {
+        const cutoff = cutoffIso(group.days);
+
+        const applyFilters = (builder: any) => {
+          let q = builder.not("phone_number", "is", null).lt("registered_at", cutoff);
+          if (group.clientId) {
+            q = q.eq("client_id", group.clientId);
+          } else if (mappedClientIds.length > 0) {
+            q = q.or(`client_id.is.null,client_id.not.in.(${mappedClientIds.join(",")})`);
+          }
+          return q;
+        };
+
+        const { count, error: cntErr } = await applyFilters(
+          supabase.from("fieldmarketing_sales").select("id", { count: "exact", head: true })
+        );
+
+        if (cntErr) {
+          log("WARN", `Error counting fieldmarketing_sales (${group.label}): ${cntErr.message}`);
+          continue;
+        }
+        const affected = count ?? 0;
+        if (affected === 0) continue;
+
+        if (!dryRun) {
+          const { error: updErr } = await applyFilters(
+            supabase.from("fieldmarketing_sales").update({ phone_number: null })
+          );
+          if (updErr) {
+            log("WARN", `Failed to clear fieldmarketing_sales phones (${group.label}): ${updErr.message}`);
+            continue;
+          }
+        }
+
+        fmSalesAnonymized += affected;
+        systemCopyResults.push({
+          table: "fieldmarketing_sales",
+          count: affected,
+          retention_days: group.days,
+        });
+      }
+      log("INFO", `fieldmarketing_sales phone numbers cleared: ${fmSalesAnonymized}`);
+    } catch (e) {
+      log("WARN", `fieldmarketing_sales cleanup error: ${e instanceof Error ? e.message : String(e)}`);
+    }
+
+
+    // --- b) eesy_fm_powerbi_rows phone columns (set-based) ---
+    try {
+      const eesyCutoffDate = cutoffIso(FALLBACK_RETENTION_DAYS).slice(0, 10);
+      const eesyFilters = (builder: any) =>
+        builder.lt("sale_date", eesyCutoffDate).or("phone_raw.not.is.null,phone_normalized.not.is.null");
+
+      const { count, error: cntErr } = await eesyFilters(
+        supabase.from("eesy_fm_powerbi_rows").select("id", { count: "exact", head: true })
+      );
+
+      if (cntErr) {
+        log("WARN", `Error counting eesy_fm_powerbi_rows: ${cntErr.message}`);
+      } else {
+        const affected = count ?? 0;
+        if (affected > 0) {
+          let ok = true;
+          if (!dryRun) {
+            const { error: updErr } = await eesyFilters(
+              supabase.from("eesy_fm_powerbi_rows").update({ phone_raw: null, phone_normalized: null })
+            );
+            if (updErr) {
+              ok = false;
+              log("WARN", `Failed to clear eesy_fm_powerbi_rows phones: ${updErr.message}`);
+            }
+          }
+          if (ok) {
+            eesyRowsAnonymized = affected;
+            systemCopyResults.push({
+              table: "eesy_fm_powerbi_rows",
+              count: affected,
+              retention_days: FALLBACK_RETENTION_DAYS,
+            });
+          }
+        }
+        log("INFO", `eesy_fm_powerbi_rows phone numbers cleared: ${eesyRowsAnonymized}`);
+      }
+    } catch (e) {
+      log("WARN", `eesy_fm_powerbi_rows cleanup error: ${e instanceof Error ? e.message : String(e)}`);
+    }
+
+    // --- c) cancellation_queue.uploaded_data identity keys ---
+    // Per-row JSON surgery, so the rows are paged through explicitly.
+    try {
+      const pageSize = 500;
+      let offset = 0;
+      let done = false;
+
+      while (!done) {
+        const { data: cqRows, error: cqErr } = await supabase
+          .from("cancellation_queue")
+          .select("id, client_id, created_at, uploaded_data")
+          .not("uploaded_data", "is", null)
+          .order("created_at", { ascending: true })
+          .range(offset, offset + pageSize - 1);
+
+        if (cqErr) {
+          log("WARN", `Error selecting cancellation_queue: ${cqErr.message}`);
+          break;
+        }
+        if (!cqRows || cqRows.length === 0) break;
+        if (cqRows.length < pageSize) done = true;
+        offset += cqRows.length;
+
+        for (const row of cqRows) {
+          const days = retentionForClient(row.client_id as string | null);
+          const cutoff = cutoffIso(days);
+          if (!row.created_at || String(row.created_at) >= cutoff) continue;
+
+          const stripped = stripKeys(row.uploaded_data, CANCELLATION_IDENTITY_KEYS);
+          if (!stripped.changed) continue;
+
+          const { error: updErr } = await db
+            .from("cancellation_queue")
+            .update({ uploaded_data: stripped.result })
+            .eq("id", row.id);
+
+          if (updErr) {
+            log("WARN", `Failed to anonymize cancellation_queue ${row.id}: ${updErr.message}`);
+          } else {
+            cancellationRowsAnonymized++;
+          }
+        }
+      }
+
+      if (cancellationRowsAnonymized > 0) {
+        systemCopyResults.push({
+          table: "cancellation_queue",
+          count: cancellationRowsAnonymized,
+          retention_days: FALLBACK_RETENTION_DAYS,
+        });
+      }
+      log("INFO", `cancellation_queue rows cleaned: ${cancellationRowsAnonymized}`);
+    } catch (e) {
+      log("WARN", `cancellation_queue cleanup error: ${e instanceof Error ? e.message : String(e)}`);
+    }
+
+
+    // --- d) adversus_events: processing artefacts, deleted after 90 days ---
+    try {
+      const eventCutoff = cutoffIso(ADVERSUS_EVENTS_RETENTION_DAYS);
+      const { error: delErr, count } = await db
+        .from("adversus_events")
+        .delete({ count: "exact" })
+        .lt("received_at", eventCutoff);
+
+      if (delErr) {
+        log("WARN", `Error deleting adversus_events: ${delErr.message}`);
+      } else {
+        adversusEventsDeleted = count ?? 0;
+        if (adversusEventsDeleted > 0) {
+          systemCopyResults.push({
+            table: "adversus_events",
+            count: adversusEventsDeleted,
+            retention_days: ADVERSUS_EVENTS_RETENTION_DAYS,
+          });
+        }
+        log("INFO", `adversus_events deleted: ${adversusEventsDeleted}`);
+      }
+    } catch (e) {
+      log("WARN", `adversus_events cleanup error: ${e instanceof Error ? e.message : String(e)}`);
+    }
+
+    addLog("fieldmarketing_sales_phone_cleared", fmSalesAnonymized);
+    addLog("eesy_fm_powerbi_rows_phone_cleared", eesyRowsAnonymized);
+    addLog("cancellation_queue_uploaded_data_cleaned", cancellationRowsAnonymized);
+    addLog("adversus_events_deleted", adversusEventsDeleted);
+
+
 
     // ===== PART 3: General data type cleanup =====
     // cleanup_mode:
@@ -290,7 +712,7 @@ Deno.serve(async (req) => {
                 }
 
                 for (const row of rows ?? []) {
-                  const { error: updErr } = await supabase
+                  const { error: updErr } = await db
                     .from("customer_inquiries")
                     .update({
                       name: "Anonymiseret",
@@ -311,7 +733,7 @@ Deno.serve(async (req) => {
                 break;
               }
 
-              const { error: delErr, count } = await supabase
+              const { error: delErr, count } = await db
                 .from("customer_inquiries")
                 .delete({ count: "exact" })
                 .lt("created_at", cutoffISO);
@@ -349,11 +771,11 @@ Deno.serve(async (req) => {
                 for (const candidate of expiredCandidates) {
                   if (policy.cleanup_mode === "delete_all") {
                     // Delete applications first (foreign key)
-                    await supabase.from("applications").delete().eq("candidate_id", candidate.id);
+                    await db.from("applications").delete().eq("candidate_id", candidate.id);
                     // Delete call_records referencing this candidate
-                    await supabase.from("call_records").delete().eq("candidate_id", candidate.id);
+                    await db.from("call_records").delete().eq("candidate_id", candidate.id);
 
-                    const { error: delErr } = await supabase
+                    const { error: delErr } = await db
                       .from("candidates")
                       .delete()
                       .eq("id", candidate.id);
@@ -366,7 +788,7 @@ Deno.serve(async (req) => {
                   } else {
                     // Default: anonymize. created_at, status, source, heard_about_us,
                     // applied_position and team_id are kept for recruitment statistics.
-                    const { error: updateError } = await supabase
+                    const { error: updateError } = await db
                       .from("candidates")
                       .update({
                         first_name: "Anonymiseret",
@@ -418,7 +840,7 @@ Deno.serve(async (req) => {
                       continue;
                     }
 
-                    const { error: updErr } = await supabase
+                    const { error: updErr } = await db
                       .from("employee_master_data")
                       .update(employeeAnonymizationPatch)
                       .eq("id", emp.id);
@@ -431,7 +853,7 @@ Deno.serve(async (req) => {
                     continue;
                   }
 
-                  const { error: delErr } = await supabase
+                  const { error: delErr } = await db
                     .from("employee_master_data")
                     .delete()
                     .eq("id", emp.id);
@@ -450,7 +872,7 @@ Deno.serve(async (req) => {
             }
 
             case "integration_logs": {
-              const { error: delErr, count } = await supabase
+              const { error: delErr, count } = await db
                 .from("integration_logs")
                 .delete({ count: "exact" })
                 .lt("created_at", cutoffISO);
@@ -480,7 +902,7 @@ Deno.serve(async (req) => {
                 }
 
                 for (const row of rows ?? []) {
-                  const { error: updErr } = await supabase
+                  const { error: updErr } = await db
                     .from("login_events")
                     .update({
                       user_email: ANON_EMAIL,
@@ -501,7 +923,7 @@ Deno.serve(async (req) => {
                 break;
               }
 
-              const { error: delErr, count } = await supabase
+              const { error: delErr, count } = await db
                 .from("login_events")
                 .delete({ count: "exact" })
                 .lt("logged_in_at", cutoffISO);
@@ -516,7 +938,7 @@ Deno.serve(async (req) => {
             }
 
             case "password_reset_tokens": {
-              const { error: delErr, count } = await supabase
+              const { error: delErr, count } = await db
                 .from("password_reset_tokens")
                 .delete({ count: "exact" })
                 .lt("created_at", cutoffISO);
@@ -545,7 +967,7 @@ Deno.serve(async (req) => {
                 }
 
                 for (const row of rows ?? []) {
-                  const { error: updErr } = await supabase
+                  const { error: updErr } = await db
                     .from("communication_logs")
                     .update({ content: null, phone_number: null })
                     .eq("id", row.id);
@@ -560,7 +982,7 @@ Deno.serve(async (req) => {
                 break;
               }
 
-              const { error: delErr, count } = await supabase
+              const { error: delErr, count } = await db
                 .from("communication_logs")
                 .delete({ count: "exact" })
                 .lt("created_at", cutoffISO);
@@ -586,7 +1008,16 @@ Deno.serve(async (req) => {
     }
 
 
-    // ===== PART 4: Summary and audit log =====
+    // ===== PART 4: Summary, audit log and gdpr_cleanup_log =====
+    addLog("sales_field_retention_cleaned", totalFieldsCleaned, { fields: fieldCleanupResults });
+    addLog("candidates_processed", candidatesProcessed);
+    addLog("customer_inquiries_deleted", customerInquiriesDeleted);
+    addLog("customer_inquiries_anonymized", customerInquiriesAnonymized);
+    addLog("communication_logs_anonymized", communicationLogsAnonymized);
+    addLog("login_events_anonymized", loginEventsAnonymized);
+    addLog("inactive_employees_deleted", inactiveEmployeesDeleted);
+    addLog("inactive_employees_anonymized", inactiveEmployeesAnonymized);
+
     const totalActions =
       totalFieldsCleaned +
       campaignSalesAnonymized +
@@ -597,29 +1028,45 @@ Deno.serve(async (req) => {
       communicationLogsAnonymized +
       loginEventsAnonymized +
       inactiveEmployeesDeleted +
-      inactiveEmployeesAnonymized;
+      inactiveEmployeesAnonymized +
+      fmSalesAnonymized +
+      eesyRowsAnonymized +
+      cancellationRowsAnonymized +
+      adversusEventsDeleted;
 
-    log("INFO", `GDPR cleanup complete. Fields: ${totalFieldsCleaned}, Campaign anon: ${campaignSalesAnonymized}, Campaign del: ${campaignSalesDeleted}, Candidates: ${candidatesProcessed}, Inquiries del/anon: ${customerInquiriesDeleted}/${customerInquiriesAnonymized}, Comm logs anon: ${communicationLogsAnonymized}, Login events anon: ${loginEventsAnonymized}, Employees del/anon: ${inactiveEmployeesDeleted}/${inactiveEmployeesAnonymized}`);
+    log("INFO", `GDPR cleanup complete${dryRun ? " (DRY RUN)" : ""}. Fields: ${totalFieldsCleaned}, Campaign anon: ${campaignSalesAnonymized}, Campaign del: ${campaignSalesDeleted}, Skipped unmapped: ${campaignSalesSkippedUnmapped}, Candidates: ${candidatesProcessed}, Inquiries del/anon: ${customerInquiriesDeleted}/${customerInquiriesAnonymized}, Comm logs anon: ${communicationLogsAnonymized}, Login events anon: ${loginEventsAnonymized}, Employees del/anon: ${inactiveEmployeesDeleted}/${inactiveEmployeesAnonymized}, FM phones: ${fmSalesAnonymized}, Eesy rows: ${eesyRowsAnonymized}, Cancellation rows: ${cancellationRowsAnonymized}, Adversus events: ${adversusEventsDeleted}`);
 
-    if (totalActions > 0) {
+    const summaryDetails = {
+      dry_run: dryRun,
+      fields_cleaned: totalFieldsCleaned,
+      field_results: fieldCleanupResults,
+      campaign_sales_anonymized: campaignSalesAnonymized,
+      campaign_sales_deleted: campaignSalesDeleted,
+      campaign_sales_skipped_unmapped: campaignSalesSkippedUnmapped,
+      campaign_results: campaignResults,
+      references_preserved: referencesPreserved,
+      commissions_backfilled: commissionsBackfilled,
+      normalized_keys_stripped: normalizedKeysStripped,
+      system_copy_results: systemCopyResults,
+      fieldmarketing_sales_phone_cleared: fmSalesAnonymized,
+      eesy_fm_powerbi_rows_phone_cleared: eesyRowsAnonymized,
+      cancellation_queue_uploaded_data_cleaned: cancellationRowsAnonymized,
+      adversus_events_deleted: adversusEventsDeleted,
+      candidates_processed: candidatesProcessed,
+      customer_inquiries_deleted: customerInquiriesDeleted,
+      customer_inquiries_anonymized: customerInquiriesAnonymized,
+      communication_logs_anonymized: communicationLogsAnonymized,
+      login_events_anonymized: loginEventsAnonymized,
+      inactive_employees_deleted: inactiveEmployeesDeleted,
+      inactive_employees_anonymized: inactiveEmployeesAnonymized,
+      timestamp: new Date().toISOString(),
+    };
+
+    if (totalActions > 0 && !dryRun) {
       try {
         const { error: auditError } = await supabase.from("audit_logs").insert({
           action: "gdpr_data_cleanup",
-          details: {
-            fields_cleaned: totalFieldsCleaned,
-            field_results: fieldCleanupResults,
-            campaign_sales_anonymized: campaignSalesAnonymized,
-            campaign_sales_deleted: campaignSalesDeleted,
-            campaign_results: campaignResults,
-            candidates_processed: candidatesProcessed,
-            customer_inquiries_deleted: customerInquiriesDeleted,
-            customer_inquiries_anonymized: customerInquiriesAnonymized,
-            communication_logs_anonymized: communicationLogsAnonymized,
-            login_events_anonymized: loginEventsAnonymized,
-            inactive_employees_deleted: inactiveEmployeesDeleted,
-            inactive_employees_anonymized: inactiveEmployeesAnonymized,
-            timestamp: new Date().toISOString(),
-          },
+          details: summaryDetails,
         });
         if (auditError) {
           log("WARN", "Could not write to audit_logs table", auditError.message);
@@ -627,14 +1074,40 @@ Deno.serve(async (req) => {
       } catch (_e) {
         log("WARN", "Could not write to audit_logs table (table may not exist)");
       }
+
+      // One row per performed action. Dry runs are never logged here.
+      if (cleanupLog.length > 0) {
+        const runAt = new Date().toISOString();
+        const { error: logError } = await supabase.from("gdpr_cleanup_log").insert(
+          cleanupLog.map((entry) => ({
+            run_at: runAt,
+            action: entry.action,
+            records_affected: entry.records_affected,
+            details: entry.details ?? {},
+            triggered_by: "gdpr-data-cleanup",
+          }))
+        );
+        if (logError) {
+          log("WARN", `Could not write to gdpr_cleanup_log: ${logError.message}`);
+        }
+      }
     }
 
     return new Response(
       JSON.stringify({
         success: true,
+        dryRun,
         fieldsCleaned: totalFieldsCleaned,
         campaignSalesAnonymized,
         campaignSalesDeleted,
+        campaignSalesSkippedUnmapped,
+        referencesPreserved,
+        commissionsBackfilled,
+        normalizedKeysStripped,
+        fmSalesAnonymized,
+        eesyRowsAnonymized,
+        cancellationRowsAnonymized,
+        adversusEventsDeleted,
         candidatesProcessed,
         customerInquiriesDeleted,
         customerInquiriesAnonymized,
@@ -644,10 +1117,15 @@ Deno.serve(async (req) => {
         inactiveEmployeesAnonymized,
         fieldResults: fieldCleanupResults,
         campaignResults,
-        message: `GDPR cleanup complete. ${totalActions} total actions performed.`,
+        systemCopyResults,
+        plannedLogEntries: dryRun ? cleanupLog : undefined,
+        message: dryRun
+          ? `DRY RUN — ${totalActions} actions would be performed. Nothing was written.`
+          : `GDPR cleanup complete. ${totalActions} total actions performed.`,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
+
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
