@@ -377,6 +377,90 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
 
   const liveSalesCount = liveData?.totals.sales ?? 0;
 
+  // ========== COPENHAGEN SALES VISUEL STIL (kun præsentation) ==========
+  if (config.features?.theme === "cph") {
+    const toCphKpi = (k: typeof kpiCards[number]): CphKpi => ({
+      label: k.label,
+      value: k.value,
+      sub: k.sub,
+      suffix: tvMode ? k.tvSuffix : k.suffix,
+    });
+    const cphSubtitle = useCached
+      ? `Lønperiode ${periodLabel} · Uge ${format(today, "w", { locale: da })}`
+      : selectedPeriod.label;
+
+    return (
+      <DashboardShell>
+        <CphBoardFrame
+          title={config.title}
+          subtitle={cphSubtitle}
+          tvMode={tvMode}
+          rightContent={
+            <DashboardPeriodSelector
+              selectedPeriod={selectedPeriod}
+              onPeriodChange={setSelectedPeriod}
+              disabled={tvMode}
+            />
+          }
+          primaryKpis={
+            useCached
+              ? kpiCards.slice(0, primaryKpiCount).map(toCphKpi)
+              : [{ label: "Salg", value: isLoading ? "..." : liveSalesCount, sub: selectedPeriod.label }]
+          }
+          secondaryKpis={useCached ? kpiCards.slice(primaryKpiCount).map(toCphKpi) : undefined}
+        >
+          {useCached ? (
+            <>
+              <CphLeaderboard
+                title="Top lønperiode"
+                sellers={sortedPayrollSellers}
+                isLoading={isLoading}
+                tvMode={tvMode}
+                light
+                showCrossSales={showCrossSales || hasSecondary}
+                crossSalesLabel={hasSecondary ? secondaryLabel : undefined}
+                showFiber={showFiber}
+                maxRows={tvMode ? 10 : undefined}
+              />
+              <CphLeaderboard
+                title="Top uge"
+                sellers={sortedWeeklySellers}
+                isLoading={isLoading}
+                tvMode={tvMode}
+                showCrossSales={showCrossSales || hasSecondary}
+                crossSalesLabel={hasSecondary ? secondaryLabel : undefined}
+                showFiber={showFiber}
+                maxRows={tvMode ? 10 : undefined}
+              />
+              <CphLeaderboard
+                title="Top i dag"
+                sellers={sortedDailySellers}
+                isLoading={isLoading}
+                tvMode={tvMode}
+                showCrossSales={showCrossSales || hasSecondary}
+                crossSalesLabel={hasSecondary ? secondaryLabel : undefined}
+                showFiber={showFiber}
+                maxRows={tvMode ? 10 : undefined}
+              />
+            </>
+          ) : (
+            <div className="lg:col-span-3">
+              <CphLeaderboard
+                title={`Top – ${selectedPeriod.label}`}
+                sellers={liveSellers}
+                isLoading={isLoading}
+                tvMode={false}
+                light
+              />
+            </div>
+          )}
+        </CphBoardFrame>
+      </DashboardShell>
+    );
+  }
+
+
+
   return (
     <DashboardShell>
       <div className={tvMode
