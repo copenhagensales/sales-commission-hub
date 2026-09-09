@@ -133,7 +133,8 @@ export function SupplierReportTab() {
         .from("booking")
         .select(`
           *,
-          location(id, name, address_city, daily_rate, type, external_id)
+          location(id, name, address_city, daily_rate, type, external_id),
+          location_placements(id, name, daily_rate)
         `)
         .eq("status", "confirmed")
         .lte("start_date", format(periodEnd, "yyyy-MM-dd"))
@@ -200,41 +201,14 @@ export function SupplierReportTab() {
   const discountType = discountRules?.[0]?.discount_type || "placements";
 
   // Count actual booked days using booked_days array, clipped to a period
-  const countBookedDays = (booking: any, clipStart?: Date, clipEnd?: Date): number => {
-    const bookedDays = booking.booked_days as number[] | null;
-    const bookStart = new Date(booking.start_date);
-    const bookEnd = new Date(booking.end_date);
-    const start = clipStart ? maxDate([bookStart, clipStart]) : bookStart;
-    const end = clipEnd ? minDate([bookEnd, clipEnd]) : bookEnd;
-    if (start > end) return 0;
-    if (!bookedDays || bookedDays.length === 0) {
-      return differenceInDays(end, start) + 1;
-    }
-    let count = 0;
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const isoDay = d.getDay() === 0 ? 6 : d.getDay() - 1;
-      if (bookedDays.includes(isoDay)) count++;
-    }
-    return count || 0;
-  };
+  const countBookedDays = (booking: any, clipStart?: Date, clipEnd?: Date): number =>
+    countBookedDaysShared(booking, clipStart, clipEnd);
 
-  // Count total (unclipped) booked days for proration
-  const countTotalBookedDays = (booking: any): number => {
-    return countBookedDays(booking);
-  };
+  // Helper to calculate booking total, clipped to the reporting period.
+  // Identisk med DB-funktionen booking_gross_amount (se src/utils/bookingGross.ts).
+  const calcBookingTotal = (booking: any, clipStart?: Date, clipEnd?: Date) =>
+    bookingGross(booking, clipStart, clipEnd);
 
-  // Helper to calculate booking total, clipped to the reporting period
-  const calcBookingTotal = (booking: any, clipStart?: Date, clipEnd?: Date) => {
-    const clippedDays = countBookedDays(booking, clipStart, clipEnd);
-    if (booking.total_price != null) {
-      const totalDays = countTotalBookedDays(booking);
-      const ratio = totalDays > 0 ? clippedDays / totalDays : 1;
-      const proratedTotal = booking.total_price * ratio;
-      return { total: proratedTotal, days: clippedDays, dailyRate: clippedDays > 0 ? proratedTotal / clippedDays : booking.total_price, usesTotalPrice: true };
-    }
-    const dailyRate = booking.daily_rate_override ?? booking.location?.daily_rate ?? 1000;
-    return { total: dailyRate * clippedDays, days: clippedDays, dailyRate, usesTotalPrice: false };
-  };
 
   // Get booked weekdays grouped by ISO week, clipped to period
   const getBookedWeekdays = (booking: any, clipStart?: Date, clipEnd?: Date): Map<number, Set<number>> => {
