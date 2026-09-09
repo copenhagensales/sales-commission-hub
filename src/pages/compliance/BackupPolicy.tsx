@@ -9,9 +9,9 @@ export default function BackupPolicy() {
     <MainLayout>
       <ComplianceDocument
         title="Backup- og gendannelsespolitik (GDPR)"
-        version="0.1"
+        version="1.0"
         documentDate="9. september 2026"
-        statusLabel="UDKAST — til godkendelse af Mathias og Lone"
+        statusLabel="GODKENDT — 9. september 2026 af Mathias Dandanel Grubak og Lone Mikkelsen"
       >
         <DocSection heading="1. Formål">
           <p>
