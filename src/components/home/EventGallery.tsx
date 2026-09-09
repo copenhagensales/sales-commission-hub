@@ -34,13 +34,7 @@ import {
   type PhotoLikeState,
 } from "@/hooks/useEventGallery";
 
-const SLOT_PLACEHOLDERS = [
-  "Foto 1",
-  "Foto 2",
-  "Foto 3",
-  "Foto 4",
-  "Foto 5",
-];
+const SLOT_PLACEHOLDERS = ["Foto 1", "Foto 2", "Foto 3", "Foto 4"];
 
 function PhotoSlot({
   photo,
@@ -161,7 +155,7 @@ function PhotoSlot({
 }
 
 export function EventGallery() {
-  const { data: photos = [] } = useEventGalleryPhotos(5);
+  const { data: photos = [] } = useEventGalleryPhotos(4);
   const { data: canManage = false } = useCanManageEventGallery();
   const uploadMutation = useUploadEventPhotos();
   const deleteMutation = useDeleteEventPhoto();
@@ -292,30 +286,15 @@ export function EventGallery() {
         )}
       </div>
 
-      <div className="relative grid grid-cols-2 gap-2.5 sm:auto-rows-[104px] sm:grid-cols-4 md:auto-rows-[120px]">
-        <div className="col-span-2 row-span-2 aspect-[16/10] sm:aspect-auto">
-          <PhotoSlot
-            photo={slots[0].photo}
-            placeholder={slots[0].placeholder}
-            canManage={canManage}
-            canMoveBack={false}
-            canMoveForward={photos.length > 1}
-            onDelete={handleDelete}
-            onAdd={openDialog}
-            onEdit={openEdit}
-            onMove={handleMove}
-            like={slots[0].photo ? likes[slots[0].photo.id] : undefined}
-            onToggleLike={handleToggleLike}
-          />
-        </div>
-        {slots.slice(1).map((slot, index) => (
-          <div key={index} className="aspect-[4/3] sm:aspect-auto sm:min-h-[104px]">
+      <div className="relative grid grid-cols-2 gap-2.5 md:grid-cols-4">
+        {slots.map((slot, index) => (
+          <div key={index} className="aspect-[4/3]">
             <PhotoSlot
               photo={slot.photo}
               placeholder={slot.placeholder}
               canManage={canManage}
-              canMoveBack
-              canMoveForward={index + 2 < photos.length}
+              canMoveBack={index > 0}
+              canMoveForward={index + 1 < photos.length}
               onDelete={handleDelete}
               onAdd={openDialog}
               onEdit={openEdit}
@@ -325,7 +304,6 @@ export function EventGallery() {
             />
           </div>
         ))}
-
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
