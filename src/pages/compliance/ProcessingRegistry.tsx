@@ -162,8 +162,10 @@ export default function ProcessingRegistry() {
             </li>
           </ul>
           <p className="text-muted-foreground">
-            Databehandleraftalerne samles i én fælles mappe. Status pr. leverandør
-            opdateres i DPA-oversigten, når aftalen er arkiveret.
+            Databehandleraftalerne arkiveres som PDF direkte i DPA-oversigten med
+            angivelse af arkiveringsdato. Filerne ligger i et lukket arkiv, hvor
+            kun ejere og superadmins kan uploade, åbne og slette dem. Status pr.
+            leverandør opdateres i DPA-oversigten, når aftalen er arkiveret.
           </p>
         </DocSection>
 
