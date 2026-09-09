@@ -56,6 +56,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   const { isPreviewMode } = useRolePreview();
   const { isSuperadmin } = useIsSuperadmin();
   const { hasAccess: trygEditAccess } = useTrygEditAccess();
+  const { count: complianceReviewCount } = useComplianceReviewStatus();
   
   const { data: isFieldmarketing } = useIsFieldmarketingEmployee();
   const { data: canWorkFieldmarketing } = useCanWorkFieldmarketing();
