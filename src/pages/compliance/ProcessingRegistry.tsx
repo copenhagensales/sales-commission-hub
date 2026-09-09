@@ -132,7 +132,7 @@ export default function ProcessingRegistry() {
           <ul className="list-disc pl-6 space-y-1 text-muted-foreground">
             <li>
               Lovable — udviklings- og driftsplatform. Se DPA-oversigten; status:
-              mangler arkivering.
+              aktiveret.
             </li>
             <li>
               Supabase — hosting, database og auth. Region: eu-west-3 (Paris, EU),
