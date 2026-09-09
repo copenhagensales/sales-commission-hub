@@ -46,7 +46,10 @@ export default function Auth() {
   };
 
   return (
-    <div className="grid min-h-screen grid-cols-1 bg-[#0d1526] lg:grid-cols-2 font-['Plus_Jakarta_Sans',system-ui,sans-serif]">
+    <div
+      className="grid min-h-screen grid-cols-1 bg-[#0d1526] lg:grid-cols-2 antialiased"
+      style={{ fontFamily: "'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" }}
+    >
       {/* Brandpanel */}
       <div className="relative flex flex-col justify-between gap-12 overflow-hidden px-8 py-14 sm:px-14 bg-[radial-gradient(120%_100%_at_0%_0%,#16233d_0%,#0d1526_55%,#0a1120_100%)]">
         <div className="pointer-events-none absolute -left-32 -top-36 h-[520px] w-[520px] animate-pulse rounded-full bg-[radial-gradient(closest-side,rgba(232,178,58,0.20),rgba(232,178,58,0))]" />
