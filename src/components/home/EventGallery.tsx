@@ -34,13 +34,7 @@ import {
   type PhotoLikeState,
 } from "@/hooks/useEventGallery";
 
-const SLOT_PLACEHOLDERS = [
-  "Foto 1",
-  "Foto 2",
-  "Foto 3",
-  "Foto 4",
-  "Foto 5",
-];
+const SLOT_PLACEHOLDERS = ["Foto 1", "Foto 2", "Foto 3", "Foto 4"];
 
 function PhotoSlot({
   photo,
