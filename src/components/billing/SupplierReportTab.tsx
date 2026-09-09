@@ -551,6 +551,15 @@ export function SupplierReportTab() {
         isExcluded: loc.isExcluded,
         minDate: loc.minDate,
         maxDate: loc.maxDate,
+        // Revisionsspor for de låste satser (annual_revenue)
+        lockedPercents: loc.lockedPercents ?? [],
+        isMixedDiscount: !!loc.isMixedDiscount,
+        missingLocked: !!loc.missingLocked,
+        bookingsLocked: (loc.bookingAmounts ?? []).map((b: any) => ({
+          bookingId: b.id,
+          amount: b.amount,
+          lockedPercent: b.lockedPercent,
+        })),
       }));
 
       const { data: userData } = await supabase.auth.getUser();
@@ -560,7 +569,7 @@ export function SupplierReportTab() {
         period_start: format(periodStart, "yyyy-MM-dd"),
         period_end: format(periodEnd, "yyyy-MM-dd"),
         total_amount: totalAmountAll,
-        discount_percent: appliedDiscount,
+        discount_percent: isAnnualRevenue ? effectiveDiscountPercent : appliedDiscount,
         discount_amount: totalDiscountAmount,
         final_amount: finalAmount,
         unique_locations: totalPlacements,
