@@ -148,17 +148,11 @@ export default function Auth() {
           <div className="my-8 h-px bg-white/[0.08]" />
 
           <p className="text-[14px] leading-relaxed text-[#8a97b1]">
-            Kun for medarbejdere hos Copenhagen Sales. Kan du ikke logge ind, så{" "}
-            <a
-              href="mailto:kontor@copenhagensales.dk"
-              className="text-[#E8B23A] hover:text-[#f7cd72]"
-            >
-              skriv til kontoret
-            </a>{" "}
-            eller kig forbi.
+            Kun for medarbejdere hos Copenhagen Sales. Kan du ikke logge ind, så kontakt din
+            teamleder.
           </p>
           <p className="mt-2.5 text-[12px] font-semibold tracking-wide text-[#5d6a81]">
-            Stork v2.4 · Copenhagen Sales A/S
+            Stork · Copenhagen Sales
           </p>
         </div>
       </div>
