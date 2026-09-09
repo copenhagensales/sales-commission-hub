@@ -148,12 +148,12 @@ function PhotoSlot({
       type="button"
       onClick={canManage ? onAdd : undefined}
       disabled={!canManage}
-      className="flex h-full w-full flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-[hsl(var(--cph-light-blue)/0.25)] bg-[hsl(var(--cph-light-blue)/0.06)] px-3 py-6 text-center text-[12px] text-[hsl(var(--cph-light-blue)/0.6)] transition-colors enabled:hover:bg-[hsl(var(--cph-light-blue)/0.12)]"
+      className="flex h-full w-full flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-[hsl(var(--cph-light-blue)/0.25)] bg-[hsl(var(--cph-light-blue)/0.06)] px-2 py-3 text-center text-[11px] text-[hsl(var(--cph-light-blue)/0.6)] transition-colors enabled:hover:bg-[hsl(var(--cph-light-blue)/0.12)]"
     >
       {canManage ? (
-        <ImagePlus className="h-5 w-5" />
+        <ImagePlus className="h-4 w-4" />
       ) : (
-        <ImageIcon className="h-5 w-5" />
+        <ImageIcon className="h-4 w-4" />
       )}
       <span>{placeholder}</span>
     </button>
