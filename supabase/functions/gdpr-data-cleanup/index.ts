@@ -5,6 +5,18 @@ import {
   EMPLOYEE_ANONYMIZED_FIRST_NAME,
   EMPLOYEE_ANONYMIZED_LAST_NAME,
 } from "../_shared/employee-anonymization.ts";
+import {
+  ADVERSUS_EVENTS_RETENTION_DAYS,
+  CANCELLATION_IDENTITY_KEYS,
+  cutoffIso,
+  extractOppNumber,
+  extractPayloadLineCommissions,
+  extractSalesId,
+  FALLBACK_RETENTION_DAYS,
+  NORMALIZED_IDENTITY_KEYS,
+  stripKeys,
+} from "../_shared/gdpr-sales-privacy.ts";
+
 
 interface FieldDefinition {
   id: string;
