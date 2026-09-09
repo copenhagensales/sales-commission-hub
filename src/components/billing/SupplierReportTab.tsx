@@ -767,7 +767,16 @@ export function SupplierReportTab() {
                             {loc.isExcluded ? (
                               <span className="text-xs text-muted-foreground italic">Separat</span>
                             ) : (
-                              <span className="text-green-600">-{loc.discount}%</span>
+                              <div className="flex flex-col items-end">
+                                <span className="text-green-600 tabular-nums">
+                                  -{loc.discount.toLocaleString("da-DK", { maximumFractionDigits: 2 })}%
+                                </span>
+                                {loc.isMixedDiscount && (
+                                  <span className="text-[10px] text-muted-foreground">
+                                    blandet ({loc.lockedPercents.join(" / ")}%)
+                                  </span>
+                                )}
+                              </div>
                             )}
                           </TableCell>
                           <TableCell className="text-right font-semibold">
@@ -789,7 +798,12 @@ export function SupplierReportTab() {
                     {discountRules && discountRules.length > 0 && (
                       <>
                         <TableCell className="text-right font-bold text-green-600">
-                          -{totalDiscountAmount.toLocaleString("da-DK")} kr
+                          <div className="flex flex-col items-end">
+                            <span>-{totalDiscountAmount.toLocaleString("da-DK")} kr</span>
+                            <span className="text-[10px] font-normal text-muted-foreground">
+                              effektiv {effectiveDiscountPercent.toLocaleString("da-DK", { maximumFractionDigits: 2 })}%
+                            </span>
+                          </div>
                         </TableCell>
                         <TableCell className="text-right font-bold">
                           {finalAmount.toLocaleString("da-DK")} kr
@@ -799,8 +813,14 @@ export function SupplierReportTab() {
                   </TableRow>
                 </TableFooter>
               </Table>
+              {isAnnualRevenue && anyMissingLocked && (
+                <p className="mt-3 text-sm text-destructive">
+                  En eller flere bookinger mangler en låst rabatsats og regnes med 0 % rabat. Ret det før rapporten godkendes.
+                </p>
+              )}
             </CardContent>
           </Card>
+
 
           {/* Discount section - only show when discount rules exist */}
           {discountRules && discountRules.length > 0 && (
