@@ -20,6 +20,7 @@ import {
 import { format, addDays } from "date-fns";
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
+import { bookingGross } from "@/utils/bookingGross";
 
 interface Placement {
   id: string;
@@ -165,7 +166,7 @@ export default function LocationProfitabilityContent() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("booking")
-        .select("id, location_id, booked_days, daily_rate_override, placement_id, start_date, end_date, client_id, client:clients!client_id(name), location!inner(id, name, daily_rate)")
+        .select("id, location_id, booked_days, daily_rate_override, placement_id, start_date, end_date, client_id, total_price, discount_percent_locked, client:clients!client_id(name), location!inner(id, name, daily_rate), location_placements(daily_rate)")
         .eq("week_number", week)
         .eq("year", year);
       if (error) throw error;
@@ -351,6 +352,8 @@ export default function LocationProfitabilityContent() {
     const locationMap = new Map<string, LocationSalesData & { clientId: string }>();
     // Per locId → list of (clientId, bookedDays) for sale attribution
     const clientsByLocation = new Map<string, Array<{ clientId: string; bookedDays: number[] }>>();
+    // Brutto/netto lokationsomkostning pr. række (låst rabatsats pr. booking)
+    const costByRow = new Map<string, { gross: number; net: number; missingLocked: boolean }>();
 
     for (const booking of bookings) {
       const loc = booking.location as any;
@@ -362,6 +365,21 @@ export default function LocationProfitabilityContent() {
       const locPlacements = placementsByLocation.get(locId) || [];
       const selectedPlacement = locPlacements.find(p => p.id === booking.placement_id);
       const effectiveRate = booking.daily_rate_override ?? selectedPlacement?.daily_rate ?? loc?.daily_rate ?? 0;
+
+      // Brutto/netto pr. booking - netto bruger bookingens LÅSTE rabatsats
+      const grossInfo = bookingGross(booking as any);
+      const lockedPercent =
+        (booking as any).discount_percent_locked == null
+          ? null
+          : Number((booking as any).discount_percent_locked);
+      const bookingNet =
+        lockedPercent == null ? grossInfo.total : grossInfo.total * (1 - lockedPercent / 100);
+      const cost = costByRow.get(key) ?? { gross: 0, net: 0, missingLocked: false };
+      cost.gross += grossInfo.total;
+      cost.net += bookingNet;
+      if (lockedPercent == null) cost.missingLocked = true;
+      costByRow.set(key, cost);
+
 
       if (!locationMap.has(key)) {
         locationMap.set(key, {
@@ -450,11 +468,15 @@ export default function LocationProfitabilityContent() {
         const totalSales = Object.values(loc.dailyBreakdown).reduce((s, d) => s + d.sales, 0);
         const sellerCost = totalCommission * (1 + VACATION_PAY_RATES.SELLER);
         const locationCost = loc.dailyRate * loc.bookedDays.length;
+        const cost = costByRow.get(key);
+        const locationCostGross = cost?.gross ?? locationCost;
+        const locationCostNet = cost?.net ?? locationCost;
+        const missingLockedDiscount = cost?.missingLocked ?? false;
         const hotelCost = hotelCostByLocation.get(key) || 0;
         const dietCost = dietCostByLocation.get(key) || 0;
         const db = totalRevenue - sellerCost - locationCost - hotelCost - dietCost;
         const dbPerDay = loc.bookedDays.length > 0 ? db / loc.bookedDays.length : 0;
-        return { ...loc, rowKey: key, totalRevenue, totalCommission, totalSales, sellerCost, locationCost, hotelCost, dietCost, db, dbPerDay };
+        return { ...loc, rowKey: key, totalRevenue, totalCommission, totalSales, sellerCost, locationCost, locationCostGross, locationCostNet, missingLockedDiscount, hotelCost, dietCost, db, dbPerDay };
       })
       .sort((a, b) => b.db - a.db);
   }, [bookings, salesData, placements, hotelCostByLocation, dietCostByLocation]);
@@ -558,7 +580,19 @@ export default function LocationProfitabilityContent() {
             <TableCell className="text-right">{loc.totalSales}</TableCell>
             <TableCell className="text-right">{formatKr(loc.totalRevenue)}</TableCell>
             <TableCell className="text-right">{formatKr(loc.sellerCost)}</TableCell>
-            <TableCell className="text-right">{formatKr(loc.locationCost)}</TableCell>
+            <TableCell className="text-right">
+              <div className="flex flex-col items-end">
+                <span>{formatKr(loc.locationCost)}</span>
+                {loc.locationCostNet < loc.locationCostGross && (
+                  <span className="text-[10px] text-muted-foreground">
+                    netto {formatKr(loc.locationCostNet)}
+                  </span>
+                )}
+                {loc.missingLockedDiscount && (
+                  <span className="text-[10px] text-destructive">ukendt rabatsats</span>
+                )}
+              </div>
+            </TableCell>
             <TableCell className="text-right">{formatKr(loc.hotelCost)}</TableCell>
             <TableCell className="text-right">{formatKr(loc.dietCost)}</TableCell>
             <TableCell className={`text-right font-semibold ${loc.db >= 0 ? "text-emerald-600" : "text-destructive"}`}>

@@ -28,6 +28,7 @@ import { useBookingHotels, useUpdateBookingHotel, type BookingHotel } from "@/ho
 import { AssignHotelDialog } from "@/components/vagt-flow/AssignHotelDialog";
 import { Textarea } from "@/components/ui/textarea";
 import { TimeSelect } from "@/components/ui/time-select";
+import { BookingEconomySummary } from "@/components/vagt-flow/BookingEconomySummary";
 
 interface Employee {
   id: string;
@@ -1502,6 +1503,13 @@ export function EditBookingDialog({
                 )}
               </div>
             </div>
+
+            {/* Brutto, låst rabatsats og netto */}
+            <div className="pt-3 border-t">
+              <BookingEconomySummary bookingId={booking?.id} />
+            </div>
+
+
 
             {/* Comment field */}
             <div className="space-y-2 pt-3 border-t">

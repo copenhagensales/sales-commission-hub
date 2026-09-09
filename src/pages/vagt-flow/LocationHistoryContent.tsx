@@ -21,6 +21,7 @@ import {
 import { format, startOfMonth, startOfYear, subMonths, addDays } from "date-fns";
 import { da } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { bookingGross } from "@/utils/bookingGross";
 
 // ── Helpers (same as LocationProfitabilityContent) ──
 
@@ -133,6 +134,9 @@ interface AggregatedLocation {
   totalCommission: number;
   sellerCost: number;
   locationCost: number;
+  locationCostGross: number;
+  locationCostNet: number;
+  missingLockedDiscount: boolean;
   hotelCost: number;
   dietCost: number;
   db: number;
@@ -173,7 +177,7 @@ export default function LocationHistoryContent() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("booking")
-        .select("id, location_id, booked_days, daily_rate_override, placement_id, week_number, year, start_date, end_date, client_id, client:clients!client_id(name), location:location!booking_location_id_fkey(id, name, daily_rate, type)")
+        .select("id, location_id, booked_days, daily_rate_override, placement_id, week_number, year, start_date, end_date, client_id, total_price, discount_percent_locked, client:clients!client_id(name), location:location!booking_location_id_fkey(id, name, daily_rate, type), location_placements(daily_rate)")
         .gte("start_date", startStr)
         .lte("end_date", endStr);
       if (error) throw error;
@@ -337,6 +341,8 @@ export default function LocationHistoryContent() {
       week: number; year: number;
       revenue: number; commission: number; sales: number; days: number;
       locationCost: number; hotelCost: number; dietCost: number;
+      /** Brutto/netto ud fra bookingernes låste rabatsatser */
+      locationCostGross: number; locationCostNet: number; missingLockedDiscount: boolean;
     }
 
     const locAgg = new Map<string, {
@@ -354,7 +360,7 @@ export default function LocationHistoryContent() {
 
     const ensureWeek = (weeks: Map<string, WeekBucket>, w: number, y: number) => {
       const key = `${y}-${w}`;
-      if (!weeks.has(key)) weeks.set(key, { week: w, year: y, revenue: 0, commission: 0, sales: 0, days: 0, locationCost: 0, hotelCost: 0, dietCost: 0 });
+      if (!weeks.has(key)) weeks.set(key, { week: w, year: y, revenue: 0, commission: 0, sales: 0, days: 0, locationCost: 0, hotelCost: 0, dietCost: 0, locationCostGross: 0, locationCostNet: 0, missingLockedDiscount: false });
       return weeks.get(key)!;
     };
 
@@ -383,6 +389,18 @@ export default function LocationHistoryContent() {
       const days = (b.booked_days || []).length;
       wb.days += days;
       wb.locationCost += effectiveRate * days;
+
+      // Brutto/netto pr. booking - netto bruger bookingens LÅSTE rabatsats
+      const grossInfo = bookingGross(b as any);
+      const lockedPercent =
+        (b as any).discount_percent_locked == null
+          ? null
+          : Number((b as any).discount_percent_locked);
+      wb.locationCostGross += grossInfo.total;
+      wb.locationCostNet +=
+        lockedPercent == null ? grossInfo.total : grossInfo.total * (1 - lockedPercent / 100);
+      if (lockedPercent == null) wb.missingLockedDiscount = true;
+
       wb.hotelCost += hotelCostByBooking.get(b.id) || 0;
       wb.dietCost += dietCostByBooking.get(b.id) || 0;
     }
@@ -455,6 +473,7 @@ export default function LocationHistoryContent() {
     return Array.from(locAgg.entries()).map(([groupKey, entry]) => {
       let totalRevenue = 0, totalCommission = 0, totalSales = 0, totalDays = 0;
       let totalLocCost = 0, totalHotelCost = 0, totalDietCost = 0;
+      let totalLocCostGross = 0, totalLocCostNet = 0, anyMissingLocked = false;
 
       const weeklyBreakdown = Array.from(entry.weeks.values())
         .sort((a, b) => a.year - b.year || a.week - b.week)
@@ -467,6 +486,9 @@ export default function LocationHistoryContent() {
           totalSales += wb.sales;
           totalDays += wb.days;
           totalLocCost += wb.locationCost;
+          totalLocCostGross += wb.locationCostGross;
+          totalLocCostNet += wb.locationCostNet;
+          if (wb.missingLockedDiscount) anyMissingLocked = true;
           totalHotelCost += wb.hotelCost;
           totalDietCost += wb.dietCost;
           const salesPerDay = wb.days > 0 ? wb.sales / wb.days : 0;
@@ -493,6 +515,9 @@ export default function LocationHistoryContent() {
         totalCommission,
         sellerCost,
         locationCost: totalLocCost,
+        locationCostGross: totalLocCostGross,
+        locationCostNet: totalLocCostNet,
+        missingLockedDiscount: anyMissingLocked,
         hotelCost: totalHotelCost,
         dietCost: totalDietCost,
         db,
@@ -660,7 +685,19 @@ export default function LocationHistoryContent() {
             <TableCell className="text-right font-semibold">{loc.salesPerDay.toFixed(1).replace(".", ",")}</TableCell>
             <TableCell className="text-right">{formatKr(loc.totalRevenue)}</TableCell>
             <TableCell className="text-right">{formatKr(loc.sellerCost)}</TableCell>
-            <TableCell className="text-right">{formatKr(loc.locationCost)}</TableCell>
+            <TableCell className="text-right">
+              <div className="flex flex-col items-end">
+                <span>{formatKr(loc.locationCost)}</span>
+                {loc.locationCostNet < loc.locationCostGross && (
+                  <span className="text-[10px] text-muted-foreground">
+                    netto {formatKr(loc.locationCostNet)}
+                  </span>
+                )}
+                {loc.missingLockedDiscount && (
+                  <span className="text-[10px] text-destructive">ukendt rabatsats</span>
+                )}
+              </div>
+            </TableCell>
             <TableCell className="text-right">{formatKr(loc.hotelCost)}</TableCell>
             <TableCell className="text-right">{formatKr(loc.dietCost)}</TableCell>
             <TableCell className={`text-right font-semibold ${loc.db >= 0 ? "text-emerald-600" : "text-destructive"}`}>

@@ -27,6 +27,8 @@ import {
 } from "@/components/ui/table";
 import { toast } from "sonner";
 import { downloadSupplierReportPdf } from "@/utils/supplierReportPdfGenerator";
+import { bookingGross, countBookedDays as countBookedDaysShared } from "@/utils/bookingGross";
+import { useSupplierDiscountStatus } from "@/hooks/useSupplierDiscountStatus";
 
 interface DiscountRule {
   id: string;
@@ -111,6 +113,7 @@ export function SupplierReportTab() {
         .select(`
           *,
           location(id, name, address_city, daily_rate, type, external_id),
+          location_placements(id, name, daily_rate),
           clients(id, name)
         `)
         .eq("status", "confirmed")
@@ -132,7 +135,8 @@ export function SupplierReportTab() {
         .from("booking")
         .select(`
           *,
-          location(id, name, address_city, daily_rate, type, external_id)
+          location(id, name, address_city, daily_rate, type, external_id),
+          location_placements(id, name, daily_rate)
         `)
         .eq("status", "confirmed")
         .lte("start_date", format(periodEnd, "yyyy-MM-dd"))
@@ -199,41 +203,14 @@ export function SupplierReportTab() {
   const discountType = discountRules?.[0]?.discount_type || "placements";
 
   // Count actual booked days using booked_days array, clipped to a period
-  const countBookedDays = (booking: any, clipStart?: Date, clipEnd?: Date): number => {
-    const bookedDays = booking.booked_days as number[] | null;
-    const bookStart = new Date(booking.start_date);
-    const bookEnd = new Date(booking.end_date);
-    const start = clipStart ? maxDate([bookStart, clipStart]) : bookStart;
-    const end = clipEnd ? minDate([bookEnd, clipEnd]) : bookEnd;
-    if (start > end) return 0;
-    if (!bookedDays || bookedDays.length === 0) {
-      return differenceInDays(end, start) + 1;
-    }
-    let count = 0;
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const isoDay = d.getDay() === 0 ? 6 : d.getDay() - 1;
-      if (bookedDays.includes(isoDay)) count++;
-    }
-    return count || 0;
-  };
+  const countBookedDays = (booking: any, clipStart?: Date, clipEnd?: Date): number =>
+    countBookedDaysShared(booking, clipStart, clipEnd);
 
-  // Count total (unclipped) booked days for proration
-  const countTotalBookedDays = (booking: any): number => {
-    return countBookedDays(booking);
-  };
+  // Helper to calculate booking total, clipped to the reporting period.
+  // Identisk med DB-funktionen booking_gross_amount (se src/utils/bookingGross.ts).
+  const calcBookingTotal = (booking: any, clipStart?: Date, clipEnd?: Date) =>
+    bookingGross(booking, clipStart, clipEnd);
 
-  // Helper to calculate booking total, clipped to the reporting period
-  const calcBookingTotal = (booking: any, clipStart?: Date, clipEnd?: Date) => {
-    const clippedDays = countBookedDays(booking, clipStart, clipEnd);
-    if (booking.total_price != null) {
-      const totalDays = countTotalBookedDays(booking);
-      const ratio = totalDays > 0 ? clippedDays / totalDays : 1;
-      const proratedTotal = booking.total_price * ratio;
-      return { total: proratedTotal, days: clippedDays, dailyRate: clippedDays > 0 ? proratedTotal / clippedDays : booking.total_price, usesTotalPrice: true };
-    }
-    const dailyRate = booking.daily_rate_override ?? booking.location?.daily_rate ?? 1000;
-    return { total: dailyRate * clippedDays, days: clippedDays, dailyRate, usesTotalPrice: false };
-  };
 
   // Get booked weekdays grouped by ISO week, clipped to period
   const getBookedWeekdays = (booking: any, clipStart?: Date, clipEnd?: Date): Map<number, Set<number>> => {
@@ -362,7 +339,7 @@ export function SupplierReportTab() {
   // Group bookings by location, clipped to current period
   const bookingsByLocation = bookings?.reduce((acc: any, booking: any) => {
     const locationId = booking.location_id;
-    const { total, days, dailyRate, usesTotalPrice } = calcBookingTotal(booking, periodStart, periodEnd);
+    const { total, days, dailyRate, usesTotalPrice, missingRate } = calcBookingTotal(booking, periodStart, periodEnd);
 
     if (days === 0) return acc; // Skip bookings with no days in period
 
@@ -371,10 +348,13 @@ export function SupplierReportTab() {
         location: booking.location,
         client: booking.clients,
         bookings: [],
+        // Beløb pr. booking i perioden - bruges til de låste rabatsatser
+        bookingAmounts: [] as Array<{ id: string; amount: number; lockedPercent: number | null }>,
         totalDays: 0,
         totalAmount: 0,
         dailyRate,
         usesTotalPrice,
+        missingRate: false,
         minDate: booking.start_date,
         maxDate: booking.end_date,
         weekdaysByWeek: new Map<number, Set<number>>(),
@@ -382,8 +362,16 @@ export function SupplierReportTab() {
     }
 
     acc[locationId].bookings.push(booking);
+    acc[locationId].bookingAmounts.push({
+      id: booking.id,
+      amount: total,
+      lockedPercent:
+        booking.discount_percent_locked == null ? null : Number(booking.discount_percent_locked),
+    });
     acc[locationId].totalDays += days;
     acc[locationId].totalAmount += total;
+    if (missingRate) acc[locationId].missingRate = true;
+
 
     // Merge weekdays (clipped to period)
     const bWeeks = getBookedWeekdays(booking, periodStart, periodEnd);
@@ -437,26 +425,25 @@ export function SupplierReportTab() {
 
   const totalAmountAll = locationEntries.reduce((sum, loc) => sum + loc.totalAmount, 0);
 
+  const isAnnualRevenue = discountType === "annual_revenue";
+
+  // Leverandørens aktuelle status (kun annual_revenue) - gælder NYE bookinger
+  const { data: discountStatus } = useSupplierDiscountStatus(
+    selectedLocationType,
+    isAnnualRevenue
+  );
+
   // Calculate discount based on type
+  // annual_revenue bruger IKKE et periodetrin: hver booking har sin låste sats.
   let appliedDiscount = 0;
   let appliedRule: DiscountRule | null = null;
 
-  if (discountRules && discountRules.length > 0) {
+  if (discountRules && discountRules.length > 0 && !isAnnualRevenue) {
     if (discountType === "monthly_revenue") {
       // Monthly revenue: use current period's total non-excluded amount
       const sortedRules = [...discountRules].sort((a, b) => (b.min_revenue ?? 0) - (a.min_revenue ?? 0));
       for (const rule of sortedRules) {
         if (totalAmountNonExcluded >= (rule.min_revenue ?? 0)) {
-          appliedDiscount = Number(rule.discount_percent);
-          appliedRule = rule;
-          break;
-        }
-      }
-    } else if (discountType === "annual_revenue") {
-      // Sort by min_revenue desc for staircase lookup
-      const sortedRules = [...discountRules].sort((a, b) => (b.min_revenue ?? 0) - (a.min_revenue ?? 0));
-      for (const rule of sortedRules) {
-        if (ytdRevenue >= (rule.min_revenue ?? 0)) {
           appliedDiscount = Number(rule.discount_percent);
           appliedRule = rule;
           break;
@@ -480,8 +467,44 @@ export function SupplierReportTab() {
     const locName = loc.location?.name?.toLowerCase() || "";
     const exc = exceptionMap.get(locName);
 
+    if (isAnnualRevenue) {
+      // Låste satser pr. booking. Undtagelser er ALLEREDE indregnet i den låste sats,
+      // så de må ikke anvendes igen her.
+      const amounts: Array<{ id: string; amount: number; lockedPercent: number | null }> =
+        loc.bookingAmounts ?? [];
+      let discountAmount = 0;
+      const percents = new Set<number>();
+      let missingLocked = false;
+
+      for (const b of amounts) {
+        if (b.lockedPercent == null) {
+          missingLocked = true; // regnes som 0 % - fejlen skal fanges, ikke skjules
+          continue;
+        }
+        percents.add(b.lockedPercent);
+        discountAmount += b.amount * (b.lockedPercent / 100);
+      }
+
+      totalDiscountAmount += discountAmount;
+      const isMixed = percents.size > 1 || (missingLocked && percents.size > 0);
+      const weightedPercent = loc.totalAmount > 0 ? (discountAmount / loc.totalAmount) * 100 : 0;
+      const singlePercent = percents.size === 1 ? [...percents][0] : null;
+
+      return {
+        ...loc,
+        discount: singlePercent ?? weightedPercent,
+        isMixedDiscount: isMixed,
+        missingLocked,
+        lockedPercents: [...percents].sort((a, b) => a - b),
+        discountAmount,
+        finalAmount: loc.totalAmount - discountAmount,
+        isExcluded: exc?.exception_type === "excluded",
+        maxDiscount: exc?.exception_type === "max_discount" ? exc.max_discount_percent ?? null : null,
+      };
+    }
+
     if (exc?.exception_type === "excluded") {
-      return { ...loc, discount: 0, discountAmount: 0, finalAmount: loc.totalAmount, isExcluded: true, maxDiscount: null };
+      return { ...loc, discount: 0, discountAmount: 0, finalAmount: loc.totalAmount, isExcluded: true, maxDiscount: null, isMixedDiscount: false, missingLocked: false, lockedPercents: [] };
     }
 
     let effectiveDiscount = appliedDiscount;
@@ -495,6 +518,9 @@ export function SupplierReportTab() {
     return {
       ...loc,
       discount: effectiveDiscount,
+      isMixedDiscount: false,
+      missingLocked: false,
+      lockedPercents: [],
       discountAmount,
       finalAmount: loc.totalAmount - discountAmount,
       isExcluded: false,
@@ -503,6 +529,10 @@ export function SupplierReportTab() {
   });
 
   const finalAmount = totalAmountAll - totalDiscountAmount;
+  // Effektiv rabatprocent for perioden (vægtet)
+  const effectiveDiscountPercent = totalAmountAll > 0 ? (totalDiscountAmount / totalAmountAll) * 100 : 0;
+  const anyMissingLocked = locationDiscounts.some((l: any) => l.missingLocked);
+
 
   // Approve mutation
   const approveMutation = useMutation({
@@ -521,6 +551,15 @@ export function SupplierReportTab() {
         isExcluded: loc.isExcluded,
         minDate: loc.minDate,
         maxDate: loc.maxDate,
+        // Revisionsspor for de låste satser (annual_revenue)
+        lockedPercents: loc.lockedPercents ?? [],
+        isMixedDiscount: !!loc.isMixedDiscount,
+        missingLocked: !!loc.missingLocked,
+        bookingsLocked: (loc.bookingAmounts ?? []).map((b: any) => ({
+          bookingId: b.id,
+          amount: b.amount,
+          lockedPercent: b.lockedPercent,
+        })),
       }));
 
       const { data: userData } = await supabase.auth.getUser();
@@ -530,7 +569,7 @@ export function SupplierReportTab() {
         period_start: format(periodStart, "yyyy-MM-dd"),
         period_end: format(periodEnd, "yyyy-MM-dd"),
         total_amount: totalAmountAll,
-        discount_percent: appliedDiscount,
+        discount_percent: isAnnualRevenue ? effectiveDiscountPercent : appliedDiscount,
         discount_amount: totalDiscountAmount,
         final_amount: finalAmount,
         unique_locations: totalPlacements,
@@ -667,13 +706,19 @@ export function SupplierReportTab() {
                   {locationDiscounts.map((loc: any) => (
                     <TableRow key={loc.location?.id} className={loc.isExcluded ? "opacity-60" : ""}>
                       <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           {loc.location?.name}
                           {loc.isExcluded && (
                             <Badge variant="destructive" className="text-xs">Udelukket</Badge>
                           )}
                           {loc.maxDiscount != null && !loc.isExcluded && (
                             <Badge variant="outline" className="text-xs">Max {loc.maxDiscount}%</Badge>
+                          )}
+                          {loc.missingLocked && (
+                            <Badge variant="destructive" className="text-xs">Ingen låst sats</Badge>
+                          )}
+                          {loc.missingRate && (
+                            <Badge variant="destructive" className="text-xs">Mangler dagspris</Badge>
                           )}
                         </div>
                       </TableCell>
@@ -722,7 +767,16 @@ export function SupplierReportTab() {
                             {loc.isExcluded ? (
                               <span className="text-xs text-muted-foreground italic">Separat</span>
                             ) : (
-                              <span className="text-green-600">-{loc.discount}%</span>
+                              <div className="flex flex-col items-end">
+                                <span className="text-green-600 tabular-nums">
+                                  -{loc.discount.toLocaleString("da-DK", { maximumFractionDigits: 2 })}%
+                                </span>
+                                {loc.isMixedDiscount && (
+                                  <span className="text-[10px] text-muted-foreground">
+                                    blandet ({loc.lockedPercents.join(" / ")}%)
+                                  </span>
+                                )}
+                              </div>
                             )}
                           </TableCell>
                           <TableCell className="text-right font-semibold">
@@ -744,7 +798,12 @@ export function SupplierReportTab() {
                     {discountRules && discountRules.length > 0 && (
                       <>
                         <TableCell className="text-right font-bold text-green-600">
-                          -{totalDiscountAmount.toLocaleString("da-DK")} kr
+                          <div className="flex flex-col items-end">
+                            <span>-{totalDiscountAmount.toLocaleString("da-DK")} kr</span>
+                            <span className="text-[10px] font-normal text-muted-foreground">
+                              effektiv {effectiveDiscountPercent.toLocaleString("da-DK", { maximumFractionDigits: 2 })}%
+                            </span>
+                          </div>
                         </TableCell>
                         <TableCell className="text-right font-bold">
                           {finalAmount.toLocaleString("da-DK")} kr
@@ -754,8 +813,14 @@ export function SupplierReportTab() {
                   </TableRow>
                 </TableFooter>
               </Table>
+              {isAnnualRevenue && anyMissingLocked && (
+                <p className="mt-3 text-sm text-destructive">
+                  En eller flere bookinger mangler en låst rabatsats og regnes med 0 % rabat. Ret det før rapporten godkendes.
+                </p>
+              )}
             </CardContent>
           </Card>
+
 
           {/* Discount section - only show when discount rules exist */}
           {discountRules && discountRules.length > 0 && (
@@ -823,37 +888,55 @@ export function SupplierReportTab() {
                 </div>
               ) : discountType === "annual_revenue" ? (
                 <div className="space-y-4">
-                  {/* Annual revenue overview */}
+                  {/* Annual revenue: satsen låses pr. booking, ikke pr. periode */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
-                      <p className="text-sm text-muted-foreground">Kumulativ årsomsætning</p>
-                      <p className="text-2xl font-bold">{ytdRevenue.toLocaleString("da-DK")} kr</p>
+                      <p className="text-sm text-muted-foreground">Kumuleret grundlag i år</p>
+                      <p className="text-2xl font-bold">
+                        {(discountStatus?.basis ?? 0).toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
+                      </p>
+                      <p className="text-xs text-muted-foreground">Bekræftede bookinger oprettet i år</p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Rabattrin</p>
+                      <p className="text-sm text-muted-foreground">Nuværende sats</p>
                       <p className="text-2xl font-bold">
-                        {appliedDiscount > 0 ? `${appliedDiscount}%` : "Ingen"}
+                        {(discountStatus?.currentPercent ?? 0) > 0 ? `${discountStatus?.currentPercent}%` : "Ingen"}
                       </p>
-                      {appliedRule && (
-                        <p className="text-xs text-muted-foreground">{appliedRule.description}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Gælder NYE bookinger - ikke denne periode
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Næste trin</p>
+                      <p className="text-2xl font-bold">
+                        {discountStatus?.nextPercent != null ? `${discountStatus.nextPercent}%` : "Højeste nået"}
+                      </p>
+                      {discountStatus?.nextMinRevenue != null && (
+                        <p className="text-xs text-muted-foreground">
+                          Mangler {(discountStatus.remainingToNext ?? 0).toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
+                          {" "}(fra {discountStatus.nextMinRevenue.toLocaleString("da-DK")} kr)
+                        </p>
                       )}
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Rabatbeløb</p>
+                      <p className="text-sm text-muted-foreground">Effektiv rabat i denne periode</p>
                       <p className="text-2xl font-bold text-green-600">
-                        -{totalDiscountAmount.toLocaleString("da-DK")} kr
+                        {effectiveDiscountPercent.toLocaleString("da-DK", { maximumFractionDigits: 2 })}%
                       </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Total efter rabat</p>
-                      <p className="text-2xl font-bold">{finalAmount.toLocaleString("da-DK")} kr</p>
+                      <p className="text-xs text-muted-foreground">
+                        -{totalDiscountAmount.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr af {totalAmountAll.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
+                      </p>
                     </div>
                   </div>
 
-                  {/* Staircase visualization */}
+                  <p className="text-xs text-muted-foreground">
+                    Hver booking faktureres med den sats, der var optjent da bookingen blev oprettet. Satsen ændres ikke bagudrettet.
+                  </p>
+
+                  {/* Staircase visualization - markerer leverandørens NUVÆRENDE trin */}
                   {discountRules && discountRules.length > 0 && (
                     <div className="border rounded-lg p-4">
-                      <h3 className="text-sm font-medium mb-2">Rabattrappe</h3>
+                      <h3 className="text-sm font-medium mb-2">Rabattrappe (nuværende trin markeret)</h3>
                       <div className="space-y-2">
                         {[...discountRules]
                           .sort((a, b) => (a.min_revenue ?? 0) - (b.min_revenue ?? 0))
@@ -861,7 +944,7 @@ export function SupplierReportTab() {
                             <div
                               key={rule.id}
                               className={`flex items-center justify-between p-2 rounded ${
-                                appliedRule?.id === rule.id
+                                discountStatus?.currentRuleId === rule.id
                                   ? "bg-primary/10 border border-primary"
                                   : "bg-muted/50"
                               }`}
@@ -940,11 +1023,19 @@ export function SupplierReportTab() {
                     finalAmount: loc.finalAmount,
                     isExcluded: loc.isExcluded,
                     maxDiscount: loc.maxDiscount,
+                    lockedPercents: loc.lockedPercents ?? [],
+                    isMixedDiscount: !!loc.isMixedDiscount,
+                    missingLocked: !!loc.missingLocked,
                   })),
                   discountType,
                   hasDiscountRules: !!(discountRules && discountRules.length > 0),
                   minDaysPerLocation,
-                  totals: { subtotal: totalAmountAll, discountAmount: totalDiscountAmount, finalAmount },
+                  totals: {
+                    subtotal: totalAmountAll,
+                    discountAmount: totalDiscountAmount,
+                    finalAmount,
+                    effectivePercent: effectiveDiscountPercent,
+                  },
                   discountInfo: {
                     uniquePlacements: totalPlacements,
                     discountPercent: appliedDiscount,
@@ -952,6 +1043,16 @@ export function SupplierReportTab() {
                     ytdRevenue,
                     monthlyRevenue: totalAmountNonExcluded,
                     staircaseSteps,
+                    currentBasis: discountStatus?.basis ?? null,
+                    currentPercent: discountStatus?.currentPercent ?? null,
+                    currentRuleId: discountStatus?.currentRuleId ?? null,
+                    nextPercent: discountStatus?.nextPercent ?? null,
+                    nextMinRevenue: discountStatus?.nextMinRevenue ?? null,
+                    remainingToNext: discountStatus?.remainingToNext ?? null,
+                    staircaseIds: (discountRules || [])
+                      .slice()
+                      .sort((a, b) => (a.min_revenue ?? 0) - (b.min_revenue ?? 0))
+                      .map((r) => r.id),
                   },
                   exceptions: (locationExceptions || []).map(exc => ({
                     name: exc.location_name,
@@ -972,6 +1073,7 @@ export function SupplierReportTab() {
                 const headers = [
                   "Lokation", "ID", "By", "Uger & Dage", "Dage", "Beløb",
                   ...(hasDiscount ? ["Rabat %", "Rabat", "Efter rabat"] : []),
+                  ...(isAnnualRevenue ? ["Låst sats"] : []),
                 ];
                 const rows = locationDiscounts.map((loc: any) => {
                   const weekText = [...(loc.weekdaysByWeek as Map<number, Set<number>>).entries()]
@@ -982,6 +1084,13 @@ export function SupplierReportTab() {
                       return `Uge ${week}: ${isFullWeek ? "Man–Fre" : sorted.map(d => WEEKDAY_NAMES_SHORT[d]).join(", ")}`;
                     })
                     .join(" | ");
+                  const lockedText = loc.missingLocked
+                    ? "Ingen låst sats"
+                    : (loc.lockedPercents ?? []).length > 1
+                      ? `Blandet: ${loc.lockedPercents.join(" / ")}%`
+                      : (loc.lockedPercents ?? []).length === 1
+                        ? `${loc.lockedPercents[0]}%`
+                        : "";
                   return [
                     loc.location?.name || "",
                     loc.location?.external_id || "",
@@ -990,6 +1099,7 @@ export function SupplierReportTab() {
                     loc.totalDays,
                     loc.totalAmount,
                     ...(hasDiscount ? [loc.discount, loc.discountAmount, loc.finalAmount] : []),
+                    ...(isAnnualRevenue ? [lockedText] : []),
                   ];
                 });
 
@@ -1015,11 +1125,16 @@ export function SupplierReportTab() {
                 if (hasDiscount) {
                   const sumDisc = locationDiscounts.reduce((s: number, l: any) => s + (l.discountAmount || 0), 0);
                   const sumFinal = locationDiscounts.reduce((s: number, l: any) => s + (l.finalAmount || 0), 0);
-                  totalRow.push("", sumDisc, sumFinal);
+                  totalRow.push(
+                    `${effectiveDiscountPercent.toLocaleString("da-DK", { maximumFractionDigits: 2 })}% effektiv`,
+                    sumDisc,
+                    sumFinal
+                  );
                 }
+                if (isAnnualRevenue) totalRow.push("");
 
                 const allData = [...metaRows, headers, ...rows, totalRow];
-                const colWidths = [25, 10, 15, 40, 8, 12, ...(hasDiscount ? [10, 12, 12] : [])];
+                const colWidths = [25, 10, 15, 40, 8, 12, ...(hasDiscount ? [10, 12, 12] : []), ...(isAnnualRevenue ? [16] : [])];
                 const boldRowIdxs = [0, 1, 3, allData.length - 1];
                 await downloadExcelAoa(
                   `Leverandorrapport_${selectedLocationType}_${filePeriod}.xlsx`,

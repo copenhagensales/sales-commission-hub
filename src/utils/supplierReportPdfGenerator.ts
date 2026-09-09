@@ -23,6 +23,10 @@ interface LocationRow {
   finalAmount: number;
   isExcluded: boolean;
   maxDiscount: number | null;
+  /** Låste satser pr. booking (annual_revenue) */
+  lockedPercents?: number[];
+  isMixedDiscount?: boolean;
+  missingLocked?: boolean;
 }
 
 interface SupplierReportPdfConfig {
@@ -36,6 +40,8 @@ interface SupplierReportPdfConfig {
     subtotal: number;
     discountAmount: number;
     finalAmount: number;
+    /** Vægtet effektiv rabatprocent for perioden */
+    effectivePercent?: number;
   };
   discountInfo: {
     uniquePlacements: number;
@@ -44,6 +50,14 @@ interface SupplierReportPdfConfig {
     ytdRevenue?: number;
     monthlyRevenue?: number;
     staircaseSteps?: Array<{ minRevenue: number; discountPercent: number }>;
+    /** Leverandørens aktuelle status (annual_revenue) */
+    currentBasis?: number | null;
+    currentPercent?: number | null;
+    currentRuleId?: string | null;
+    nextPercent?: number | null;
+    nextMinRevenue?: number | null;
+    remainingToNext?: number | null;
+    staircaseIds?: string[];
   };
   exceptions: Array<{ name: string; type: string; maxDiscount: number | null }>;
 }
@@ -93,6 +107,7 @@ export function downloadSupplierReportPdf(config: SupplierReportPdfConfig) {
           ${loc.locationName}
           ${loc.isExcluded ? ' <span class="badge badge-excluded">Udelukket</span>' : ""}
           ${loc.maxDiscount != null && !loc.isExcluded ? ` <span class="badge badge-max">Max ${loc.maxDiscount}%</span>` : ""}
+          ${loc.missingLocked ? ' <span class="badge badge-excluded">Ingen låst sats</span>' : ""}
         </td>
         <td>${loc.externalId || "-"}</td>
         <td>${loc.city || "-"}</td>
@@ -104,7 +119,15 @@ export function downloadSupplierReportPdf(config: SupplierReportPdfConfig) {
         <td class="num">${fmtKr(loc.amount)}</td>
         ${
           showDiscount
-            ? `<td class="num accent">${loc.isExcluded ? '<span class="muted">Separat</span>' : `-${loc.discount}%`}</td>
+            ? `<td class="num accent">${
+                loc.isExcluded
+                  ? '<span class="muted">Separat</span>'
+                  : `-${loc.discount.toLocaleString("da-DK", { maximumFractionDigits: 2 })}%${
+                      loc.isMixedDiscount
+                        ? `<br><span class="muted">blandet (${(loc.lockedPercents ?? []).join(" / ")}%)</span>`
+                        : ""
+                    }`
+              }</td>
                <td class="num">${loc.isExcluded ? "-" : fmtKr(loc.finalAmount)}</td>`
             : ""
         }
@@ -137,7 +160,9 @@ export function downloadSupplierReportPdf(config: SupplierReportPdfConfig) {
           ${config.discountInfo.staircaseSteps
             .map(
               (s) => {
-                const lookupValue = isMonthlyRevenue ? (config.discountInfo.monthlyRevenue ?? config.totals.subtotal) : (config.discountInfo.ytdRevenue ?? 0);
+                const lookupValue = isMonthlyRevenue
+                  ? (config.discountInfo.monthlyRevenue ?? config.totals.subtotal)
+                  : (config.discountInfo.currentBasis ?? config.discountInfo.ytdRevenue ?? 0);
                 return `<div class="staircase-step ${lookupValue >= s.minRevenue ? "active" : ""}">${s.discountPercent}%<br><span class="step-label">${fmtKr(s.minRevenue)}+</span></div>`;
               }
             )
@@ -177,20 +202,26 @@ export function downloadSupplierReportPdf(config: SupplierReportPdfConfig) {
     ? `
       <div class="kpi-grid">
         <div class="kpi-card">
-          <span class="kpi-label">Kumulativ årsomsætning</span>
-          <span class="kpi-value">${fmtKr(config.discountInfo.ytdRevenue ?? 0)}</span>
+          <span class="kpi-label">Kumuleret grundlag i år</span>
+          <span class="kpi-value">${fmtKr(config.discountInfo.currentBasis ?? config.discountInfo.ytdRevenue ?? 0)}</span>
         </div>
         <div class="kpi-card">
-          <span class="kpi-label">Nuværende rabattrin</span>
-          <span class="kpi-value">${config.discountInfo.discountPercent > 0 ? `${config.discountInfo.discountPercent}%` : "Ingen"}</span>
+          <span class="kpi-label">Nuværende sats (nye bookinger)</span>
+          <span class="kpi-value">${(config.discountInfo.currentPercent ?? 0) > 0 ? `${config.discountInfo.currentPercent}%` : "Ingen"}</span>
         </div>
         <div class="kpi-card">
-          <span class="kpi-label">Samlet rabat (denne md)</span>
-          <span class="kpi-value accent">-${fmtKr(config.totals.discountAmount)}</span>
+          <span class="kpi-label">Næste trin</span>
+          <span class="kpi-value">${config.discountInfo.nextPercent != null ? `${config.discountInfo.nextPercent}%` : "Højeste nået"}</span>
+          ${
+            config.discountInfo.nextMinRevenue != null
+              ? `<p class="placement-note">Mangler ${fmtKr(config.discountInfo.remainingToNext ?? 0)}</p>`
+              : ""
+          }
         </div>
         <div class="kpi-card highlight">
-          <span class="kpi-label">Total efter rabat</span>
-          <span class="kpi-value">${fmtKr(config.totals.finalAmount)}</span>
+          <span class="kpi-label">Effektiv rabat i perioden</span>
+          <span class="kpi-value">${(config.totals.effectivePercent ?? 0).toLocaleString("da-DK", { maximumFractionDigits: 2 })}%</span>
+          <p class="placement-note">-${fmtKr(config.totals.discountAmount)} · netto ${fmtKr(config.totals.finalAmount)}</p>
         </div>
       </div>
       ${staircaseHtml}`
