@@ -788,18 +788,32 @@ const Home = () => {
                         <HoverCardTrigger asChild>
                           <div className="flex cursor-pointer items-center gap-2.5">
                             <div className="flex">
-                              {attendees.slice(0, 3).map((a, i) => (
-                                <span
-                                  key={a.id}
-                                  className={`flex h-7 w-7 items-center justify-center rounded-full border-2 border-card text-[10px] font-extrabold ${
-                                    i % 2 === 0
-                                      ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]"
-                                      : "bg-[hsl(var(--cph-light-blue))] text-[hsl(var(--cph-onyx))]"
-                                  } ${i > 0 ? "-ml-2" : ""}`}
-                                >
-                                  {initials(a)}
-                                </span>
-                              ))}
+                              {attendees.slice(0, 3).map((a, i) => {
+                                const attendeeAvatar = lookupAvatar({
+                                  employeeId: (a.employee as any)?.id ?? a.employee_id,
+                                  name: `${(a.employee as any)?.first_name ?? ""} ${(a.employee as any)?.last_name ?? ""}`,
+                                });
+                                return (
+                                  <span
+                                    key={a.id}
+                                    className={`flex h-7 w-7 items-center justify-center overflow-hidden rounded-full border-2 border-card text-[10px] font-extrabold ${
+                                      i % 2 === 0
+                                        ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]"
+                                        : "bg-[hsl(var(--cph-light-blue))] text-[hsl(var(--cph-onyx))]"
+                                    } ${i > 0 ? "-ml-2" : ""}`}
+                                  >
+                                    {attendeeAvatar ? (
+                                      <img
+                                        src={attendeeAvatar}
+                                        alt={initials(a)}
+                                        className="h-full w-full rounded-full object-cover"
+                                      />
+                                    ) : (
+                                      initials(a)
+                                    )}
+                                  </span>
+                                );
+                              })}
                               {attendees.length > 3 && (
                                 <span className="-ml-2 flex h-7 w-7 items-center justify-center rounded-full border-2 border-card bg-[hsl(var(--cph-light-blue))] text-[10px] font-extrabold text-[hsl(var(--cph-onyx))]">
                                   +{attendees.length - 3}
