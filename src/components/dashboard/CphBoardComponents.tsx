@@ -118,9 +118,10 @@ export function CphLeaderboard({
   const rows = maxRows ? sellers.slice(0, maxRows) : sellers;
   const fg = light ? ONYX : LIGHT;
   const fgDim = light ? ONYX_DIM : LIGHT_DIM;
-  const cols = `${tvMode ? "38px 46px" : "28px 34px"} minmax(0,1fr) ${tvMode ? "66px" : "48px"}${
-    showCrossSales ? (tvMode ? " 62px" : " 48px") : ""
-  }${showFiber ? (tvMode ? " 70px" : " 52px") : ""} auto`;
+  const cols = `${tvMode ? "38px 46px" : "22px 30px"} minmax(0,1fr) ${tvMode ? "66px" : "36px"}${
+    showCrossSales ? (tvMode ? " 62px" : " 34px") : ""
+  }${showFiber ? (tvMode ? " 70px" : " 38px") : ""} auto`;
+
 
   return (
     <div
