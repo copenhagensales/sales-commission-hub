@@ -9,6 +9,8 @@ interface ComplianceDocumentProps {
   version: string;
   documentDate: string;
   statusLabel: string;
+  /** "draft" (default) = amber, "approved" = emerald */
+  statusTone?: "draft" | "approved";
   children: ReactNode;
 }
 

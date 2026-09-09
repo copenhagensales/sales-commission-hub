@@ -71,6 +71,14 @@ export default function BackupPolicy() {
             stadig matcher denne politik.
           </p>
         </DocSection>
+
+        <DocSection heading="6. Godkendelse">
+          <p>
+            Politikken er godkendt 9. september 2026 af Mathias Dandanel Grubak
+            (adm. dir.) og Lone Mikkelsen (systemejer). Version 1.0 er gældende,
+            indtil den revideres ved den årlige gennemgang.
+          </p>
+        </DocSection>
       </ComplianceDocument>
     </MainLayout>
   );
