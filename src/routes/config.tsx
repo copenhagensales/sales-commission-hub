@@ -165,6 +165,7 @@ import {
   ComplianceContractAccessLog,
   ComplianceBackupPolicy,
   ComplianceProcessingRegistry,
+  ComplianceDpaOverview,
   ShortLinkRedirect,
   PublicUnsubscribe,
   MenuEditor,
@@ -496,6 +497,7 @@ export const routes: RouteConfig[] = [
   { path: "/compliance/contract-access-log", component: ComplianceContractAccessLog, access: "role", positionPermission: "menu_compliance_admin" },
   { path: "/compliance/documents/backup-policy", component: ComplianceBackupPolicy, access: "role", positionPermission: "menu_compliance_admin" },
   { path: "/compliance/documents/processing-registry", component: ComplianceProcessingRegistry, access: "role", positionPermission: "menu_compliance_admin" },
+  { path: "/compliance/documents/dpa-overview", component: ComplianceDpaOverview, access: "role", positionPermission: "menu_compliance_admin" },
 
   // Menu Editor (owner only)
   { path: "/admin/menu-editor", component: MenuEditor, access: "role", positionPermission: "menu_permissions" },

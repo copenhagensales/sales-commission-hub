@@ -150,6 +150,16 @@ export default function ComplianceOverview() {
       href: "/compliance/documents/processing-registry",
       permKey: "menu_compliance_admin",
     },
+    {
+      title: "Databehandleraftaler (DPA) — oversigt og status",
+      description:
+        "Oversigt pr. leverandør med DPA-link, hvad der skal arkiveres, og status på arkivering.",
+      icon: FileText,
+      badge: "Udkast 0.1",
+      badgeColor: "bg-amber-500/10 text-amber-700 border-amber-500/30",
+      href: "/compliance/documents/dpa-overview",
+      permKey: "menu_compliance_admin",
+    },
   ];
 
   const visibleDocuments = documents.filter((doc) => p.canView(doc.permKey));
