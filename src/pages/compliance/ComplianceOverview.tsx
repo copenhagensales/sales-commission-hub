@@ -208,6 +208,44 @@ export default function ComplianceOverview() {
             </Card>
           ))}
         </div>
+
+        {visibleDocuments.length > 0 && (
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <h2 className="text-2xl font-semibold text-foreground">Compliance-dokumenter</h2>
+              <p className="text-sm text-muted-foreground">
+                Formelle dokumenter til godkendelse. Kan læses her og printes eller gemmes som PDF.
+              </p>
+            </div>
+            <div className="grid gap-6 md:grid-cols-2">
+              {visibleDocuments.map((doc) => (
+                <Card
+                  key={doc.href}
+                  className="cursor-pointer hover:shadow-md transition-all hover:scale-[1.02] group"
+                  onClick={() => navigate(doc.href)}
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <doc.icon className="h-6 w-6 text-primary" />
+                      <Badge variant="outline" className={doc.badgeColor}>
+                        {doc.badge}
+                      </Badge>
+                    </div>
+                    <CardTitle className="text-lg">{doc.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <CardDescription className="text-sm leading-relaxed">
+                      {doc.description}
+                    </CardDescription>
+                    <div className="flex items-center gap-1 mt-4 text-sm text-primary font-medium group-hover:gap-2 transition-all">
+                      Åbn dokument <ArrowRight className="h-4 w-4" />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </MainLayout>
   );
