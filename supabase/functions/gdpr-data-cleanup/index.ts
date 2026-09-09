@@ -473,43 +473,60 @@ Deno.serve(async (req) => {
       (clientId && clientRetentionDays.get(clientId)) || FALLBACK_RETENTION_DAYS;
 
     // --- a) fieldmarketing_sales.phone_number ---
+    // Set-based per client so the PostgREST 1000-row page limit cannot hide rows.
     try {
-      const { data: fmRows, error: fmErr } = await supabase
-        .from("fieldmarketing_sales")
-        .select("id, client_id, registered_at")
-        .not("phone_number", "is", null);
+      const mappedClientIds = [...clientRetentionDays.keys()];
+      const fmGroups: { label: string; days: number; clientId: string | null }[] = mappedClientIds.map(
+        (clientId) => ({ label: clientId, days: clientRetentionDays.get(clientId)!, clientId })
+      );
+      fmGroups.push({ label: "fallback", days: FALLBACK_RETENTION_DAYS, clientId: null });
 
-      if (fmErr) {
-        log("WARN", `Error selecting fieldmarketing_sales: ${fmErr.message}`);
-      } else {
-        for (const row of fmRows ?? []) {
-          const days = retentionForClient(row.client_id as string | null);
-          const cutoff = cutoffIso(days);
-          if (!row.registered_at || String(row.registered_at) >= cutoff) continue;
+      for (const group of fmGroups) {
+        const cutoff = cutoffIso(group.days);
 
-          const { error: updErr } = await db
-            .from("fieldmarketing_sales")
-            .update({ phone_number: null })
-            .eq("id", row.id);
+        const applyFilters = (builder: any) => {
+          let q = builder.not("phone_number", "is", null).lt("registered_at", cutoff);
+          if (group.clientId) {
+            q = q.eq("client_id", group.clientId);
+          } else if (mappedClientIds.length > 0) {
+            q = q.or(`client_id.is.null,client_id.not.in.(${mappedClientIds.join(",")})`);
+          }
+          return q;
+        };
 
+        const { count, error: cntErr } = await applyFilters(
+          supabase.from("fieldmarketing_sales").select("id", { count: "exact", head: true })
+        );
+
+        if (cntErr) {
+          log("WARN", `Error counting fieldmarketing_sales (${group.label}): ${cntErr.message}`);
+          continue;
+        }
+        const affected = count ?? 0;
+        if (affected === 0) continue;
+
+        if (!dryRun) {
+          const { error: updErr } = await applyFilters(
+            supabase.from("fieldmarketing_sales").update({ phone_number: null })
+          );
           if (updErr) {
-            log("WARN", `Failed to anonymize fieldmarketing_sales ${row.id}: ${updErr.message}`);
-          } else {
-            fmSalesAnonymized++;
+            log("WARN", `Failed to clear fieldmarketing_sales phones (${group.label}): ${updErr.message}`);
+            continue;
           }
         }
-        if (fmSalesAnonymized > 0) {
-          systemCopyResults.push({
-            table: "fieldmarketing_sales",
-            count: fmSalesAnonymized,
-            retention_days: FALLBACK_RETENTION_DAYS,
-          });
-        }
-        log("INFO", `fieldmarketing_sales phone numbers cleared: ${fmSalesAnonymized}`);
+
+        fmSalesAnonymized += affected;
+        systemCopyResults.push({
+          table: "fieldmarketing_sales",
+          count: affected,
+          retention_days: group.days,
+        });
       }
+      log("INFO", `fieldmarketing_sales phone numbers cleared: ${fmSalesAnonymized}`);
     } catch (e) {
       log("WARN", `fieldmarketing_sales cleanup error: ${e instanceof Error ? e.message : String(e)}`);
     }
+
 
     // --- b) eesy_fm_powerbi_rows phone columns ---
     try {
