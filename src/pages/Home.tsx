@@ -694,7 +694,7 @@ const Home = () => {
               </Dialog>
             </div>
           </CardHeader>
-          <CardContent className="flex h-full flex-col px-6 pb-6">
+          <CardContent className="flex flex-col px-6 pb-6">
             {companyEvents.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
                 <CalendarX className="mb-2 h-8 w-8 opacity-50" />
@@ -719,7 +719,7 @@ const Home = () => {
                   `${a.employee?.first_name?.[0] ?? ""}${a.employee?.last_name?.[0] ?? ""}`.toUpperCase();
 
                 return (
-                  <div className="flex h-full flex-col gap-5">
+                  <div className="flex flex-col gap-5">
                     {/* Fremhævet begivenhed */}
                     <div className="flex items-start gap-4">
                       <div className="min-w-[60px] flex-none rounded-2xl bg-[hsl(var(--cph-onyx))] px-3.5 py-2.5 text-center text-[hsl(var(--cph-light-blue))]">
@@ -832,7 +832,7 @@ const Home = () => {
                     )}
 
                     {/* Deltag / afbud */}
-                    <div className="mt-auto flex gap-2">
+                    <div className="flex gap-2">
                       <button
                         type="button"
                         onClick={() =>
