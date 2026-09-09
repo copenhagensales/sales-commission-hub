@@ -1,11 +1,13 @@
 import { useMemo } from "react";
 import {
   COMPLIANCE_DOCUMENTS,
+  COMPLIANCE_REVIEW_AREAS,
   DPA_REQUIRED_VENDORS,
   REVIEW_WARNING_DAYS,
   type ComplianceDocumentMeta,
 } from "@/config/complianceDocuments";
 import { useDpaDocuments } from "@/hooks/useDpaDocuments";
+import { useComplianceAreaReviews } from "@/hooks/useComplianceAreaReviews";
 
 export type ComplianceItemSeverity = "overdue" | "due_soon" | "missing";
 
@@ -38,6 +40,7 @@ function formatDa(date: Date): string {
  */
 export function useComplianceReviewStatus() {
   const { data: dpaDocuments = [], isLoading } = useDpaDocuments();
+  const { data: areaReviews = [], isLoading: isLoadingReviews } = useComplianceAreaReviews();
 
   const items = useMemo<ComplianceReviewItem[]>(() => {
     const now = new Date();
@@ -78,13 +81,50 @@ export function useComplianceReviewStatus() {
       }
     }
 
+    const latestByArea = new Map<string, string>();
+    for (const r of areaReviews) {
+      if (!latestByArea.has(r.area_key)) latestByArea.set(r.area_key, r.reviewed_at);
+    }
+    for (const area of COMPLIANCE_REVIEW_AREAS) {
+      const last = latestByArea.get(area.key);
+      if (!last) {
+        result.push({
+          key: `area-${area.key}`,
+          title: `Mangler gennemgang: ${area.title}`,
+          detail: "Ingen gennemgang er registreret endnu. Bekræft gennemgangen på compliance-forsiden.",
+          href: area.href,
+          severity: "missing",
+        });
+        continue;
+      }
+      const due = addMonths(new Date(last), area.reviewIntervalMonths);
+      const daysLeft = Math.ceil((due.getTime() - now.getTime()) / 86_400_000);
+      if (daysLeft < 0) {
+        result.push({
+          key: `area-${area.key}`,
+          title: `Gennemgang overskredet: ${area.title}`,
+          detail: `Skulle være gennemgået ${formatDa(due)}. Gennemgå og bekræft på ny.`,
+          href: area.href,
+          severity: "overdue",
+        });
+      } else if (daysLeft <= REVIEW_WARNING_DAYS) {
+        result.push({
+          key: `area-${area.key}`,
+          title: `Gennemgang forfalder snart: ${area.title}`,
+          detail: `Skal gennemgås inden ${formatDa(due)}.`,
+          href: area.href,
+          severity: "due_soon",
+        });
+      }
+    }
+
     return result;
-  }, [dpaDocuments]);
+  }, [dpaDocuments, areaReviews]);
 
   return {
     items,
     count: items.length,
     hasOverdue: items.some((i) => i.severity === "overdue"),
-    isLoading,
+    isLoading: isLoading || isLoadingReviews,
   };
 }
