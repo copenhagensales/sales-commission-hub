@@ -86,6 +86,21 @@ function PhotoSlot({
             )}
           </div>
         )}
+        <button
+          type="button"
+          onClick={() => onToggleLike(photo, !!like?.likedByMe)}
+          aria-label={like?.likedByMe ? "Fjern like" : "Like billedet"}
+          className="absolute left-2 top-2 flex items-center gap-1.5 rounded-xl bg-[hsl(var(--cph-onyx)/0.8)] px-2.5 py-1.5 text-[12px] font-extrabold text-[hsl(var(--cph-light-blue))] transition-colors hover:bg-[hsl(var(--cph-onyx)/0.95)]"
+        >
+          <Heart
+            className={
+              like?.likedByMe
+                ? "h-3.5 w-3.5 fill-[hsl(var(--cph-emerald))] text-[hsl(var(--cph-emerald))]"
+                : "h-3.5 w-3.5"
+            }
+          />
+          <span className="tabular-nums">{like?.count ?? 0}</span>
+        </button>
         {canManage && (
           <div className="absolute right-2 top-2 flex flex-wrap items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
             <button
