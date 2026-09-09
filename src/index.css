@@ -207,7 +207,9 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    font-family: 'Figtree', ui-sans-serif, system-ui, sans-serif;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
   }
 
   /* Custom scrollbar styling - applied globally */
@@ -268,7 +270,7 @@
   }
 
   .kpi-card {
-    @apply relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-card to-card/80 p-6 shadow-xl;
+    @apply relative overflow-hidden rounded-3xl bg-card p-7;
   }
 
   .status-active {
