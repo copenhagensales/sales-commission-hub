@@ -178,6 +178,7 @@ export function EventGallery() {
   const [title, setTitle] = useState("");
   const [eventDate, setEventDate] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const [editPhoto, setEditPhoto] = useState<EventGalleryPhoto | null>(null);
   const [editTitle, setEditTitle] = useState("");
