@@ -1,7 +1,7 @@
 import React from "react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
-import cphLogo from "@/assets/cph-sales-logo-dark.png";
+import cphLogo from "@/assets/cph-sales-logo.png";
 import { formatNumber } from "@/lib/calculations";
 import type { LeaderboardSeller } from "@/components/dashboard/TvDashboardComponents";
 
@@ -31,14 +31,14 @@ const getInitials = (name: string) => {
 };
 
 function CphKpiCard({ kpi, emphasis, tvMode }: { kpi: CphKpi; emphasis?: boolean; tvMode: boolean }) {
-  const bigSize = tvMode ? (emphasis ? 104 : 64) : emphasis ? 64 : 44;
+  const bigSize = tvMode ? (emphasis ? 84 : 56) : emphasis ? 64 : 44;
   return (
     <div
       className="flex flex-col justify-between rounded-[20px]"
       style={{
         background: emphasis ? LIGHT : SURFACE,
         color: emphasis ? ONYX : LIGHT,
-        padding: tvMode ? "24px 28px" : "18px 20px",
+        padding: tvMode ? "18px 26px" : "18px 20px",
       }}
     >
       <div
@@ -71,7 +71,7 @@ function CphSecondaryKpi({ kpi, tvMode }: { kpi: CphKpi; tvMode: boolean }) {
   return (
     <div
       className="flex items-center justify-between gap-4 rounded-[20px]"
-      style={{ background: SURFACE, color: LIGHT, padding: tvMode ? "20px 24px" : "14px 18px" }}
+      style={{ background: SURFACE, color: LIGHT, padding: tvMode ? "14px 24px" : "14px 18px" }}
     >
       <div
         className="font-extrabold uppercase"
@@ -82,7 +82,7 @@ function CphSecondaryKpi({ kpi, tvMode }: { kpi: CphKpi; tvMode: boolean }) {
       <div className="flex items-baseline gap-3">
         <div
           className="font-extrabold"
-          style={{ fontSize: tvMode ? 44 : 28, lineHeight: 1, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}
+          style={{ fontSize: tvMode ? 38 : 28, lineHeight: 1, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}
         >
           {kpi.value}
         </div>
@@ -125,11 +125,11 @@ export function CphLeaderboard({
 
   return (
     <div
-      className="flex min-h-0 flex-col rounded-[20px]"
+      className="flex min-h-0 flex-col overflow-hidden rounded-[20px]"
       style={{
         background: light ? LIGHT : SURFACE,
         color: fg,
-        padding: tvMode ? "22px 26px" : "18px 20px",
+        padding: tvMode ? "18px 26px" : "18px 20px",
       }}
     >
       <div
@@ -152,7 +152,7 @@ export function CphLeaderboard({
         style={{
           gridTemplateColumns: cols,
           columnGap: 14,
-          padding: tvMode ? "16px 0 10px" : "12px 0 8px",
+          padding: tvMode ? "12px 0 8px" : "12px 0 8px",
           fontSize: tvMode ? 15 : 10,
           letterSpacing: tvMode ? "0.08em" : "0.02em",
           color: fgDim,
@@ -192,7 +192,7 @@ export function CphLeaderboard({
                 style={{
                   gridTemplateColumns: cols,
                   columnGap: 14,
-                  padding: tvMode ? (isTop ? "14px 14px 14px 10px" : "16px 0") : isTop ? "10px 10px 10px 8px" : "10px 0",
+                  padding: tvMode ? (isTop ? "10px 14px 10px 10px" : "12px 0") : isTop ? "10px 10px 10px 8px" : "10px 0",
                   margin: isTop ? (tvMode ? "0 -14px 0 -10px" : "0 -10px 0 -8px") : undefined,
                   background: isTop ? (light ? ONYX : "hsl(var(--cph-light-blue) / 0.12)") : undefined,
                   color: isTop && light ? LIGHT : undefined,
@@ -202,7 +202,7 @@ export function CphLeaderboard({
                 <span
                   className={index < 3 ? "font-extrabold" : ""}
                   style={{
-                    fontSize: tvMode ? (isTop ? 26 : 24) : 15,
+                    fontSize: tvMode ? (isTop ? 24 : 22) : 15,
                     textAlign: "center",
                     color: isTop ? EMERALD : index < 3 ? undefined : fgDim,
                   }}
@@ -232,7 +232,7 @@ export function CphLeaderboard({
                 </span>
                 <span
                   className={index < 3 ? "truncate font-extrabold" : "truncate"}
-                  style={{ fontSize: tvMode ? (isTop ? 25 : 24) : 15 }}
+                  style={{ fontSize: tvMode ? (isTop ? 23 : 22) : 15 }}
                 >
                   {seller.displayName || seller.name}
                 </span>
@@ -269,7 +269,7 @@ export function CphLeaderboard({
                 <span
                   className="font-extrabold"
                   style={{
-                    fontSize: tvMode ? (isTop ? 28 : 26) : 16,
+                    fontSize: tvMode ? (isTop ? 26 : 24) : 16,
                     textAlign: "right",
                     letterSpacing: "-0.02em",
                     minWidth: tvMode ? 118 : 66,
@@ -322,8 +322,8 @@ export function CphBoardFrame({
         background: ONYX,
         color: LIGHT,
         fontVariantNumeric: "tabular-nums",
-        padding: tvMode ? "32px 40px 28px" : "20px 20px 28px",
-        gap: tvMode ? 24 : 16,
+        padding: tvMode ? "24px 40px 24px" : "20px 20px 28px",
+        gap: tvMode ? 18 : 16,
       }}
     >
       <div
@@ -337,7 +337,7 @@ export function CphBoardFrame({
 
       <header
         className="relative flex flex-wrap items-center justify-between gap-6"
-        style={{ paddingBottom: tvMode ? 20 : 12 }}
+        style={{ paddingBottom: tvMode ? 12 : 12 }}
       >
         <div className="flex items-center gap-6">
           <img src={cphLogo} alt="Copenhagen Sales" style={{ width: tvMode ? 132 : 92, height: "auto" }} />
