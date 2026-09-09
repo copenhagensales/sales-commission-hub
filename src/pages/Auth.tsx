@@ -89,8 +89,8 @@ export default function Auth() {
           <ul className="mt-1 flex flex-col gap-3">
             {[
               "Provision og bonus i realtid",
-              "Overblik over din pipeline",
-              "Historik på alle udbetalinger",
+              "Dashboards med dine resultater",
+              "Følg Ligaen og konkurrencerne",
             ].map((t) => (
               <li key={t} className="flex items-center gap-3 text-[15px] font-medium text-[#c8d2e4]">
                 <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-[#E8B23A]" />
@@ -101,8 +101,6 @@ export default function Auth() {
         </div>
 
         <div className="relative flex flex-wrap items-center gap-2.5 text-[13px] font-semibold text-[#6f7d95]">
-          <span>Udbetaling sidste bankdag i måneden</span>
-          <span className="h-1 w-1 rounded-full bg-[#3a4560]" />
           <span>Intern adgang</span>
         </div>
       </div>
