@@ -175,7 +175,7 @@ function ArchiveCell({
             onClick={() => inputRef.current?.click()}
           >
             <Upload className="h-3.5 w-3.5 mr-2" />
-            {busy ? "Uploader..." : "Upload PDF"}
+            {busy ? "Uploader..." : "Upload fil"}
           </Button>
         </div>
       )}
