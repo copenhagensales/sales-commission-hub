@@ -124,6 +124,9 @@ export function CphLeaderboard({
     showFiber ? (tvMode ? " minmax(70px,auto)" : " minmax(44px,auto)") : ""
   } ${tvMode ? "minmax(130px,auto)" : "minmax(72px,auto)"}`;
   const colGap = tvMode ? 14 : showCrossSales || showFiber ? 10 : 14;
+  const padL = tvMode ? 10 : 8;
+  const padR = tvMode ? 14 : 10;
+
 
 
 
