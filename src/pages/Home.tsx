@@ -504,23 +504,19 @@ const Home = () => {
         <PendingPulseSurveyBanner />
 
 
-        {/* ZONE 1: Hero Performance Card - Full Width with integrated CTA */}
-        <HeroPerformanceCard
-          firstName={firstName}
-          periodCommission={personalStats?.periodCommission || 0}
-          targetAmount={targetAmount}
-          progressPercent={progressPercent}
-          hasGoal={hasGoal}
-          vacationPay={vacationPay}
-          isEnrolledInLeague={isEnrolledInLeague}
-        />
-
-        {/* ZONE 2: League + Recognitions side by side */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
-          {/* Compact League View */}
-          <CompactLeagueView />
-
-          {/* Daily Commission Chart */}
+        {/* ZONE 1: Hero + seneste 10 dage */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <HeroPerformanceCard
+              firstName={firstName}
+              periodCommission={personalStats?.periodCommission || 0}
+              targetAmount={targetAmount}
+              progressPercent={progressPercent}
+              hasGoal={hasGoal}
+              vacationPay={vacationPay}
+              isEnrolledInLeague={isEnrolledInLeague}
+            />
+          </div>
           <DailyCommissionChart
             dailyData={personalWeeklyStats?.dailyBreakdown || []}
           />
@@ -545,7 +541,7 @@ const Home = () => {
                       <p className="font-medium">{celebration.name}</p>
                       <p className="text-sm text-muted-foreground">
                         {celebration.type === 'anniversary' 
-                          ? `${celebration.years} års jubilæum 🏆`
+                          ? `${celebration.years} års jubilæum`
                           : `Tillykke med fødselsdagen!`
                         }
                       </p>
@@ -558,9 +554,14 @@ const Home = () => {
           </Card>
         )}
 
+        {/* ZONE 2: Liga + kommende begivenheder */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <CompactLeagueView />
+          </div>
 
-        {/* ZONE 3: Upcoming Events - Full Width */}
-        <Card className="border border-border border-l-4 border-l-[hsl(var(--cph-emerald))] bg-card rounded-3xl">
+        <Card className="border border-border bg-card rounded-3xl">
+
           <CardHeader className="pb-2 px-3 md:px-6 pt-3 md:pt-6">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-1.5 md:gap-2 text-sm md:text-base font-semibold">
