@@ -425,26 +425,25 @@ export function SupplierReportTab() {
 
   const totalAmountAll = locationEntries.reduce((sum, loc) => sum + loc.totalAmount, 0);
 
+  const isAnnualRevenue = discountType === "annual_revenue";
+
+  // Leverandørens aktuelle status (kun annual_revenue) - gælder NYE bookinger
+  const { data: discountStatus } = useSupplierDiscountStatus(
+    selectedLocationType,
+    isAnnualRevenue
+  );
+
   // Calculate discount based on type
+  // annual_revenue bruger IKKE et periodetrin: hver booking har sin låste sats.
   let appliedDiscount = 0;
   let appliedRule: DiscountRule | null = null;
 
-  if (discountRules && discountRules.length > 0) {
+  if (discountRules && discountRules.length > 0 && !isAnnualRevenue) {
     if (discountType === "monthly_revenue") {
       // Monthly revenue: use current period's total non-excluded amount
       const sortedRules = [...discountRules].sort((a, b) => (b.min_revenue ?? 0) - (a.min_revenue ?? 0));
       for (const rule of sortedRules) {
         if (totalAmountNonExcluded >= (rule.min_revenue ?? 0)) {
-          appliedDiscount = Number(rule.discount_percent);
-          appliedRule = rule;
-          break;
-        }
-      }
-    } else if (discountType === "annual_revenue") {
-      // Sort by min_revenue desc for staircase lookup
-      const sortedRules = [...discountRules].sort((a, b) => (b.min_revenue ?? 0) - (a.min_revenue ?? 0));
-      for (const rule of sortedRules) {
-        if (ytdRevenue >= (rule.min_revenue ?? 0)) {
           appliedDiscount = Number(rule.discount_percent);
           appliedRule = rule;
           break;
@@ -468,8 +467,44 @@ export function SupplierReportTab() {
     const locName = loc.location?.name?.toLowerCase() || "";
     const exc = exceptionMap.get(locName);
 
+    if (isAnnualRevenue) {
+      // Låste satser pr. booking. Undtagelser er ALLEREDE indregnet i den låste sats,
+      // så de må ikke anvendes igen her.
+      const amounts: Array<{ id: string; amount: number; lockedPercent: number | null }> =
+        loc.bookingAmounts ?? [];
+      let discountAmount = 0;
+      const percents = new Set<number>();
+      let missingLocked = false;
+
+      for (const b of amounts) {
+        if (b.lockedPercent == null) {
+          missingLocked = true; // regnes som 0 % - fejlen skal fanges, ikke skjules
+          continue;
+        }
+        percents.add(b.lockedPercent);
+        discountAmount += b.amount * (b.lockedPercent / 100);
+      }
+
+      totalDiscountAmount += discountAmount;
+      const isMixed = percents.size > 1 || (missingLocked && percents.size > 0);
+      const weightedPercent = loc.totalAmount > 0 ? (discountAmount / loc.totalAmount) * 100 : 0;
+      const singlePercent = percents.size === 1 ? [...percents][0] : null;
+
+      return {
+        ...loc,
+        discount: singlePercent ?? weightedPercent,
+        isMixedDiscount: isMixed,
+        missingLocked,
+        lockedPercents: [...percents].sort((a, b) => a - b),
+        discountAmount,
+        finalAmount: loc.totalAmount - discountAmount,
+        isExcluded: exc?.exception_type === "excluded",
+        maxDiscount: exc?.exception_type === "max_discount" ? exc.max_discount_percent ?? null : null,
+      };
+    }
+
     if (exc?.exception_type === "excluded") {
-      return { ...loc, discount: 0, discountAmount: 0, finalAmount: loc.totalAmount, isExcluded: true, maxDiscount: null };
+      return { ...loc, discount: 0, discountAmount: 0, finalAmount: loc.totalAmount, isExcluded: true, maxDiscount: null, isMixedDiscount: false, missingLocked: false, lockedPercents: [] };
     }
 
     let effectiveDiscount = appliedDiscount;
@@ -483,6 +518,9 @@ export function SupplierReportTab() {
     return {
       ...loc,
       discount: effectiveDiscount,
+      isMixedDiscount: false,
+      missingLocked: false,
+      lockedPercents: [],
       discountAmount,
       finalAmount: loc.totalAmount - discountAmount,
       isExcluded: false,
@@ -491,6 +529,10 @@ export function SupplierReportTab() {
   });
 
   const finalAmount = totalAmountAll - totalDiscountAmount;
+  // Effektiv rabatprocent for perioden (vægtet)
+  const effectiveDiscountPercent = totalAmountAll > 0 ? (totalDiscountAmount / totalAmountAll) * 100 : 0;
+  const anyMissingLocked = locationDiscounts.some((l: any) => l.missingLocked);
+
 
   // Approve mutation
   const approveMutation = useMutation({
