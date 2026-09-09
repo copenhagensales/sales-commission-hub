@@ -191,6 +191,7 @@ export default function ComplianceOverview() {
             </div>
           </CardContent>
         </Card>
+        {p.canView("menu_compliance_admin") && <ComplianceReviewAlert />}
 
         <div className="grid gap-6 md:grid-cols-3">
           {cards.filter((card) => p.canView(card.permKey)).map((card) => (
