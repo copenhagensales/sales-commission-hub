@@ -1,4 +1,7 @@
+@import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400;800&display=swap');
+
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
 
 @import url("https://fonts.googleapis.com/css2?family=Montserrat&display=swap");
 
@@ -22,87 +25,95 @@
 
 @layer base {
   :root {
-    /* Dark theme matching sidebar */
-    --background: 222 47% 9%;
-    --foreground: 0 0% 98%;
+    /* Copenhagen Sales brand tokens */
+    --cph-light-blue: 186 28% 92%;
+    --cph-onyx: 218 8% 20%;
+    --cph-onyx-pressed: 210 9% 13%;
+    --cph-emerald: 147 73% 55%;
+    --cph-white: 0 0% 100%;
 
-    --card: 222 47% 12%;
-    --card-foreground: 0 0% 98%;
+    --background: 186 28% 92%;
+    --foreground: 218 8% 20%;
 
-    --popover: 222 47% 15%;
-    --popover-foreground: 0 0% 98%;
+    --card: 0 0% 100%;
+    --card-foreground: 218 8% 20%;
 
-    --primary: 161 93% 40%;
-    --primary-foreground: 0 0% 98%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 218 8% 20%;
 
-    --secondary: 222 30% 20%;
-    --secondary-foreground: 0 0% 98%;
+    --primary: 218 8% 20%;
+    --primary-foreground: 186 28% 92%;
 
-    --muted: 222 30% 25%;
-    --muted-foreground: 0 0% 70%;
+    --secondary: 186 28% 92%;
+    --secondary-foreground: 218 8% 20%;
 
-    --accent: 161 60% 25%;
-    --accent-foreground: 0 0% 98%;
+    --muted: 186 28% 92%;
+    --muted-foreground: 218 8% 38%;
 
-    --destructive: 0 72% 50%;
-    --destructive-foreground: 0 0% 98%;
+    --accent: 186 28% 92%;
+    --accent-foreground: 218 8% 20%;
 
-    --border: 222 30% 20%;
-    --input: 222 30% 18%;
-    --ring: 161 93% 40%;
+    --destructive: 355 100% 35%;
+    --destructive-foreground: 0 0% 100%;
 
-    --radius: 0.75rem;
+    --border: 214 12% 87%;
+    --input: 214 12% 82%;
+    --ring: 147 73% 55%;
+
+    --radius: 1.5rem;
 
     /* Status colors */
-    --success: 142 71% 45%;
-    --success-foreground: 0 0% 98%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 9%;
-    --danger: 0 84% 60%;
-    --danger-foreground: 0 0% 98%;
+    --success: 147 73% 40%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 40%;
+    --warning-foreground: 0 0% 100%;
+    --danger: 355 100% 35%;
+    --danger-foreground: 0 0% 100%;
 
     /* Recruitment status colors */
-    --status-new: 217 91% 60%;
-    --status-progress: 43 96% 56%;
-    --status-success: 142 76% 36%;
-    --status-rejected: 0 84% 60%;
-    --status-warning: 38 92% 50%;
+    --status-new: 218 8% 20%;
+    --status-progress: 38 92% 40%;
+    --status-success: 147 73% 40%;
+    --status-rejected: 355 100% 35%;
+    --status-warning: 38 92% 40%;
 
     /* Role colors */
-    --role-fieldmarketing: 262 83% 58%;
-    --role-salgskonsulent: 173 80% 40%;
+    --role-fieldmarketing: 218 8% 20%;
+    --role-salgskonsulent: 147 73% 40%;
 
     /* KPI colors */
-    --kpi-positive: 142 71% 45%;
-    --kpi-negative: 0 84% 60%;
-    --kpi-neutral: 217 91% 60%;
+    --kpi-positive: 147 73% 40%;
+    --kpi-negative: 355 100% 35%;
+    --kpi-neutral: 218 8% 20%;
 
-    /* Sidebar */
-    --sidebar-background: 222 47% 9%;
-    --sidebar-foreground: 0 0% 98%;
-    --sidebar-primary: 161 93% 40%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 222 30% 20%;
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 222 30% 20%;
-    --sidebar-ring: 161 93% 40%;
+    /* Sidebar - Onyx */
+    --sidebar-background: 218 8% 20%;
+    --sidebar-foreground: 186 28% 92%;
+    --sidebar-primary: 147 73% 55%;
+    --sidebar-primary-foreground: 218 8% 20%;
+    --sidebar-accent: 186 28% 92%;
+    --sidebar-accent-foreground: 218 8% 20%;
+    --sidebar-border: 218 8% 28%;
+    --sidebar-ring: 147 73% 55%;
 
-    --chart-1: 161 93% 40%;
-    --chart-2: 142 71% 45%;
-    --chart-3: 172 66% 50%;
-    --chart-4: 38 92% 50%;
-    --chart-5: 0 0% 55%;
-    --font-sans: 'Work Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
-    --font-serif: 'Lora', ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
+    --chart-1: 218 8% 20%;
+    --chart-2: 147 73% 40%;
+    --chart-3: 218 8% 45%;
+
+    --chart-4: 218 8% 65%;
+    --chart-5: 218 8% 80%;
+    --font-sans: 'Figtree', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+    --font-serif: 'Figtree', ui-sans-serif, system-ui, sans-serif;
     --font-mono: 'Inconsolata', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-    --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
-    --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
-    --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
-    --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
-    --shadow-md: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 2px 4px -1px hsl(0 0% 0% / 0.1);
-    --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 4px 6px -1px hsl(0 0% 0% / 0.1);
-    --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 8px 10px -1px hsl(0 0% 0% / 0.1);
-    --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+    --shadow-2xs: none;
+    --shadow-xs: none;
+    --shadow-sm: none;
+    --shadow: none;
+    --shadow-md: none;
+    --shadow-lg: none;
+    --shadow-xl: none;
+    --shadow-2xl: none;
+
     --tracking-normal: 0em;
     --spacing: 0.25rem;
   }
@@ -196,7 +207,9 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    font-family: 'Figtree', ui-sans-serif, system-ui, sans-serif;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
   }
 
   /* Custom scrollbar styling - applied globally */
@@ -257,7 +270,7 @@
   }
 
   .kpi-card {
-    @apply relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-card to-card/80 p-6 shadow-xl;
+    @apply relative overflow-hidden rounded-3xl bg-card p-7;
   }
 
   .status-active {

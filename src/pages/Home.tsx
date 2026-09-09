@@ -403,6 +403,15 @@ const Home = () => {
 
   const firstName = employee?.first_name || "kollega";
 
+  const greetingLabel = (() => {
+    const hour = new Date().getHours();
+    if (hour < 10) return "Godmorgen";
+    if (hour < 12) return "God formiddag";
+    if (hour < 17) return "God eftermiddag";
+    return "Godaften";
+  })();
+
+
   const formatCelebrationDate = (date: Date, isToday: boolean) => {
     if (isToday) return "I dag";
     return format(date, "d. MMM", { locale: da });
@@ -473,12 +482,27 @@ const Home = () => {
         periodCommission={personalStats?.periodCommission || 0}
       />
 
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 p-3 md:p-8 space-y-3 md:space-y-6">
+      <div className="min-h-screen bg-background px-4 pb-16 pt-6 md:px-10 md:pt-8">
+        <div className="flex flex-col gap-8">
+          {/* Topbar */}
+          <div className="flex flex-col gap-3 border-b-2 border-[hsl(var(--cph-onyx))] pb-6">
+            <div className="flex items-center gap-2.5">
+              <span className="h-2 w-2 rounded-full bg-[hsl(var(--cph-emerald))] ring-2 ring-[hsl(var(--cph-onyx))]" />
+              <span className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-foreground/70">
+                {format(new Date(), "EEEE d. MMMM", { locale: da })} · Live
+              </span>
+            </div>
+            <h1 className="text-[clamp(28px,4vw,40px)] font-extrabold leading-[1.05] tracking-[-0.02em] text-foreground">
+              {greetingLabel}, {firstName}
+            </h1>
+          </div>
+
         {/* Kontrakt der afventer underskrift */}
         <PendingContractBanner employeeId={employee?.id} />
 
         {/* Pulsmåling der mangler besvarelse */}
         <PendingPulseSurveyBanner />
+
 
         {/* ZONE 1: Hero Performance Card - Full Width with integrated CTA */}
         <HeroPerformanceCard
@@ -504,7 +528,7 @@ const Home = () => {
 
         {/* Today's Celebrations - Only if there are any */}
         {todayCelebrations.length > 0 && (
-          <Card className="border-0 shadow-lg bg-gradient-to-r from-primary/10 via-accent/10 to-primary/5 animate-fade-in">
+          <Card className="border border-border bg-card rounded-3xl animate-fade-in">
             <CardContent className="py-4">
               <div className="flex flex-wrap items-center gap-4">
                 {todayCelebrations.map((celebration, idx) => (
@@ -513,7 +537,7 @@ const Home = () => {
                     className="flex items-center gap-3 px-4 py-2 rounded-xl bg-background/80 border border-primary/20"
                   >
                     {celebration.type === 'birthday' ? (
-                      <span className="text-2xl">🎂</span>
+                      <Cake className="w-5 h-5 text-foreground" />
                     ) : (
                       <Award className="w-5 h-5 text-warning" />
                     )}
@@ -522,11 +546,11 @@ const Home = () => {
                       <p className="text-sm text-muted-foreground">
                         {celebration.type === 'anniversary' 
                           ? `${celebration.years} års jubilæum 🏆`
-                          : `Tillykke med fødselsdagen! 🎈`
+                          : `Tillykke med fødselsdagen!`
                         }
                       </p>
                     </div>
-                    <span className="text-xl">🎉</span>
+                    <PartyPopper className="w-5 h-5 text-foreground" />
                   </div>
                 ))}
               </div>
@@ -536,7 +560,7 @@ const Home = () => {
 
 
         {/* ZONE 3: Upcoming Events - Full Width */}
-        <Card className="border-l-4 border-l-primary border-0 shadow-lg bg-card/80 backdrop-blur-sm">
+        <Card className="border border-border border-l-4 border-l-[hsl(var(--cph-emerald))] bg-card rounded-3xl">
           <CardHeader className="pb-2 px-3 md:px-6 pt-3 md:pt-6">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-1.5 md:gap-2 text-sm md:text-base font-semibold">
@@ -829,7 +853,7 @@ const Home = () => {
         {/* Collapsible Upcoming Celebrations */}
         {upcomingCelebrations.length > 0 && (
           <Collapsible open={celebrationsOpen} onOpenChange={setCelebrationsOpen}>
-            <Card className="border-0 shadow-lg bg-card/80 backdrop-blur-sm">
+            <Card className="border border-border bg-card rounded-3xl">
               <CollapsibleTrigger asChild>
                 <CardHeader className="pb-2 cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg">
                   <div className="flex items-center justify-between">
@@ -855,7 +879,7 @@ const Home = () => {
                         }`}
                       >
                         {celebration.type === 'birthday' ? (
-                          <span className="text-base">🎂</span>
+                          <Cake className="w-4 h-4 text-foreground" />
                         ) : (
                           <Award className="w-3.5 h-3.5 md:w-4 md:h-4 text-amber-500" />
                         )}
@@ -877,7 +901,9 @@ const Home = () => {
             </Card>
           </Collapsible>
         )}
+        </div>
       </div>
+
     </MainLayout>
   );
 };
