@@ -528,36 +528,39 @@ Deno.serve(async (req) => {
     }
 
 
-    // --- b) eesy_fm_powerbi_rows phone columns ---
+    // --- b) eesy_fm_powerbi_rows phone columns (set-based) ---
     try {
-      const eesyCutoff = cutoffIso(FALLBACK_RETENTION_DAYS);
-      const { data: eesyRows, error: eesyErr } = await supabase
-        .from("eesy_fm_powerbi_rows")
-        .select("id")
-        .lt("sale_date", eesyCutoff.slice(0, 10))
-        .or("phone_raw.not.is.null,phone_normalized.not.is.null");
+      const eesyCutoffDate = cutoffIso(FALLBACK_RETENTION_DAYS).slice(0, 10);
+      const eesyFilters = (builder: any) =>
+        builder.lt("sale_date", eesyCutoffDate).or("phone_raw.not.is.null,phone_normalized.not.is.null");
 
-      if (eesyErr) {
-        log("WARN", `Error selecting eesy_fm_powerbi_rows: ${eesyErr.message}`);
+      const { count, error: cntErr } = await eesyFilters(
+        supabase.from("eesy_fm_powerbi_rows").select("id", { count: "exact", head: true })
+      );
+
+      if (cntErr) {
+        log("WARN", `Error counting eesy_fm_powerbi_rows: ${cntErr.message}`);
       } else {
-        for (const row of eesyRows ?? []) {
-          const { error: updErr } = await db
-            .from("eesy_fm_powerbi_rows")
-            .update({ phone_raw: null, phone_normalized: null })
-            .eq("id", row.id);
-
-          if (updErr) {
-            log("WARN", `Failed to anonymize eesy_fm_powerbi_rows ${row.id}: ${updErr.message}`);
-          } else {
-            eesyRowsAnonymized++;
+        const affected = count ?? 0;
+        if (affected > 0) {
+          let ok = true;
+          if (!dryRun) {
+            const { error: updErr } = await eesyFilters(
+              supabase.from("eesy_fm_powerbi_rows").update({ phone_raw: null, phone_normalized: null })
+            );
+            if (updErr) {
+              ok = false;
+              log("WARN", `Failed to clear eesy_fm_powerbi_rows phones: ${updErr.message}`);
+            }
           }
-        }
-        if (eesyRowsAnonymized > 0) {
-          systemCopyResults.push({
-            table: "eesy_fm_powerbi_rows",
-            count: eesyRowsAnonymized,
-            retention_days: FALLBACK_RETENTION_DAYS,
-          });
+          if (ok) {
+            eesyRowsAnonymized = affected;
+            systemCopyResults.push({
+              table: "eesy_fm_powerbi_rows",
+              count: affected,
+              retention_days: FALLBACK_RETENTION_DAYS,
+            });
+          }
         }
         log("INFO", `eesy_fm_powerbi_rows phone numbers cleared: ${eesyRowsAnonymized}`);
       }
@@ -566,16 +569,29 @@ Deno.serve(async (req) => {
     }
 
     // --- c) cancellation_queue.uploaded_data identity keys ---
+    // Per-row JSON surgery, so the rows are paged through explicitly.
     try {
-      const { data: cqRows, error: cqErr } = await supabase
-        .from("cancellation_queue")
-        .select("id, client_id, created_at, uploaded_data")
-        .not("uploaded_data", "is", null);
+      const pageSize = 500;
+      let offset = 0;
+      let done = false;
 
-      if (cqErr) {
-        log("WARN", `Error selecting cancellation_queue: ${cqErr.message}`);
-      } else {
-        for (const row of cqRows ?? []) {
+      while (!done) {
+        const { data: cqRows, error: cqErr } = await supabase
+          .from("cancellation_queue")
+          .select("id, client_id, created_at, uploaded_data")
+          .not("uploaded_data", "is", null)
+          .order("created_at", { ascending: true })
+          .range(offset, offset + pageSize - 1);
+
+        if (cqErr) {
+          log("WARN", `Error selecting cancellation_queue: ${cqErr.message}`);
+          break;
+        }
+        if (!cqRows || cqRows.length === 0) break;
+        if (cqRows.length < pageSize) done = true;
+        offset += cqRows.length;
+
+        for (const row of cqRows) {
           const days = retentionForClient(row.client_id as string | null);
           const cutoff = cutoffIso(days);
           if (!row.created_at || String(row.created_at) >= cutoff) continue;
@@ -594,18 +610,20 @@ Deno.serve(async (req) => {
             cancellationRowsAnonymized++;
           }
         }
-        if (cancellationRowsAnonymized > 0) {
-          systemCopyResults.push({
-            table: "cancellation_queue",
-            count: cancellationRowsAnonymized,
-            retention_days: FALLBACK_RETENTION_DAYS,
-          });
-        }
-        log("INFO", `cancellation_queue rows cleaned: ${cancellationRowsAnonymized}`);
       }
+
+      if (cancellationRowsAnonymized > 0) {
+        systemCopyResults.push({
+          table: "cancellation_queue",
+          count: cancellationRowsAnonymized,
+          retention_days: FALLBACK_RETENTION_DAYS,
+        });
+      }
+      log("INFO", `cancellation_queue rows cleaned: ${cancellationRowsAnonymized}`);
     } catch (e) {
       log("WARN", `cancellation_queue cleanup error: ${e instanceof Error ? e.message : String(e)}`);
     }
+
 
     // --- d) adversus_events: processing artefacts, deleted after 90 days ---
     try {
