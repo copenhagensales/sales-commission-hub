@@ -4,6 +4,7 @@ import { Shield, Users, FileText, Lock, ArrowRight, Bell, ClipboardList, AlertTr
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { usePermissions } from "@/hooks/usePositionPermissions";
+import { ComplianceReviewAlert } from "@/components/compliance/ComplianceReviewAlert";
 
 export default function ComplianceOverview() {
   const navigate = useNavigate();
@@ -190,6 +191,7 @@ export default function ComplianceOverview() {
             </div>
           </CardContent>
         </Card>
+        {p.canView("menu_compliance_admin") && <ComplianceReviewAlert />}
 
         <div className="grid gap-6 md:grid-cols-3">
           {cards.filter((card) => p.canView(card.permKey)).map((card) => (

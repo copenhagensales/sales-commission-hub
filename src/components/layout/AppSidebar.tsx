@@ -34,6 +34,7 @@ import { useTranslation } from "react-i18next";
 import { useSidebarMenuConfig, type MenuConfigItem } from "@/hooks/useSidebarMenuConfig";
 import { useIsUnitedMember } from "@/hooks/useIsUnitedMember";
 import { useTrygEditAccess } from "@/hooks/useTrygEditAccess";
+import { useComplianceReviewStatus } from "@/hooks/useComplianceReviewStatus";
 
 type NavItem = { name: string; href: string; icon: typeof Users; badgeKey?: string };
 
@@ -55,6 +56,7 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
   const { isPreviewMode } = useRolePreview();
   const { isSuperadmin } = useIsSuperadmin();
   const { hasAccess: trygEditAccess } = useTrygEditAccess();
+  const { count: complianceReviewCount } = useComplianceReviewStatus();
   
   const { data: isFieldmarketing } = useIsFieldmarketingEmployee();
   const { data: canWorkFieldmarketing } = useCanWorkFieldmarketing();
@@ -1991,7 +1993,12 @@ export function AppSidebar({ isMobile = false, onNavigate, isCollapsed = false, 
               )}
             >
               <ShieldCheck className="h-5 w-5" />
-              Compliance
+              <span className="flex-1">Compliance</span>
+              {p.canView("menu_compliance_admin") && complianceReviewCount > 0 && (
+                <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs">
+                  {complianceReviewCount > 99 ? "99+" : complianceReviewCount}
+                </Badge>
+              )}
             </NavLink>
           )}
           <button onClick={() => { handleLogout(); handleNavClick(); }} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent/50">
