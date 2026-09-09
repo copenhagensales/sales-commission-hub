@@ -9,9 +9,10 @@ export default function BackupPolicy() {
     <MainLayout>
       <ComplianceDocument
         title="Backup- og gendannelsespolitik (GDPR)"
-        version="0.1"
+        version="1.0"
         documentDate="9. september 2026"
-        statusLabel="UDKAST — til godkendelse af Mathias og Lone"
+        statusLabel="GODKENDT - 9. september 2026 af Mathias Dandanel Grubak og Lone Mikkelsen"
+        statusTone="approved"
       >
         <DocSection heading="1. Formål">
           <p>
@@ -69,6 +70,14 @@ export default function BackupPolicy() {
           <p>
             Systemejer Lone Mikkelsen påser årligt, at backup-indstillingerne
             stadig matcher denne politik.
+          </p>
+        </DocSection>
+
+        <DocSection heading="6. Godkendelse">
+          <p>
+            Politikken er godkendt 9. september 2026 af Mathias Dandanel Grubak
+            (adm. dir.) og Lone Mikkelsen (systemejer). Version 1.0 er gældende,
+            indtil den revideres ved den årlige gennemgang.
           </p>
         </DocSection>
       </ComplianceDocument>
