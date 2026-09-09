@@ -1084,6 +1084,13 @@ export function SupplierReportTab() {
                       return `Uge ${week}: ${isFullWeek ? "Man–Fre" : sorted.map(d => WEEKDAY_NAMES_SHORT[d]).join(", ")}`;
                     })
                     .join(" | ");
+                  const lockedText = loc.missingLocked
+                    ? "Ingen låst sats"
+                    : (loc.lockedPercents ?? []).length > 1
+                      ? `Blandet: ${loc.lockedPercents.join(" / ")}%`
+                      : (loc.lockedPercents ?? []).length === 1
+                        ? `${loc.lockedPercents[0]}%`
+                        : "";
                   return [
                     loc.location?.name || "",
                     loc.location?.external_id || "",
@@ -1092,6 +1099,7 @@ export function SupplierReportTab() {
                     loc.totalDays,
                     loc.totalAmount,
                     ...(hasDiscount ? [loc.discount, loc.discountAmount, loc.finalAmount] : []),
+                    ...(isAnnualRevenue ? [lockedText] : []),
                   ];
                 });
 
