@@ -97,12 +97,6 @@ function ArchiveCell({
 
   const handleFile = async (file: File | undefined) => {
     if (!file) return;
-    const isPdf =
-      file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
-    if (!isPdf) {
-      toast.error("Aftalen skal arkiveres som PDF");
-      return;
-    }
     if (file.size > 25 * 1024 * 1024) {
       toast.error("Filen må højst være 25 MB");
       return;
@@ -170,7 +164,7 @@ function ArchiveCell({
           <input
             ref={inputRef}
             type="file"
-            accept="application/pdf,.pdf"
+            
             className="hidden"
             onChange={(e) => handleFile(e.target.files?.[0])}
           />
@@ -181,7 +175,7 @@ function ArchiveCell({
             onClick={() => inputRef.current?.click()}
           >
             <Upload className="h-3.5 w-3.5 mr-2" />
-            {busy ? "Uploader..." : "Upload PDF"}
+            {busy ? "Uploader..." : "Upload fil"}
           </Button>
         </div>
       )}
@@ -262,10 +256,12 @@ export default function DpaOverview() {
 
         <DocSection heading="Arkivering">
           <p className="text-muted-foreground">
-            Aftalerne arkiveres som PDF direkte i Stork via kolonnen "Arkiveret
-            fil", og arkiveringsdatoen vises ved hver fil. Filerne ligger i et
-            lukket arkiv, hvor kun ejere og superadmins kan uploade, åbne og
-            slette dem. Maks. 25 MB pr. fil.
+            Aftalerne arkiveres direkte i Stork via kolonnen "Arkiveret fil" —
+            PDF anbefales, men alle filtyper kan uploades (fx dateret
+            screenshot eller Word). Arkiveringsdatoen vises ved hver fil, og der
+            kan lægges flere filer pr. leverandør. Filerne ligger i et lukket
+            arkiv, hvor kun ejere og superadmins kan uploade, åbne og slette
+            dem. Maks. 25 MB pr. fil.
           </p>
           <p className="text-muted-foreground">
             Status opdateres pr. leverandør, når aftalen er arkiveret.
