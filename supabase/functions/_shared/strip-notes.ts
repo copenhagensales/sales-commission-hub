@@ -16,6 +16,16 @@
 
 const NOTE_REGEX = /note|bemærk|kommentar/i;
 
+/**
+ * GDPR (Kaspers beslutning): CVR-berigelsesfelter der aldrig må persisteres.
+ * Fjernes både som labels i masterData-arrays og som nøgler i masterDataFields-objekter.
+ */
+const BLOCKED_FIELD_LABELS = new Set(["antal ansatte", "reklamebeskyttet"]);
+
+function isBlockedLabel(label: string): boolean {
+  return BLOCKED_FIELD_LABELS.has(label.trim().toLowerCase());
+}
+
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
@@ -24,6 +34,7 @@ function isLabelValueItem(v: unknown): v is { label: unknown; value?: unknown } 
   return isPlainObject(v) && "label" in v;
 }
 
+
 export function stripNoteFields<T>(input: T): T {
   if (input === null || input === undefined) return input;
 
@@ -31,7 +42,7 @@ export function stripNoteFields<T>(input: T): T {
     // Filter {label,value} items whose label matches note pattern; recurse into the rest
     const filtered = input.filter((item) => {
       if (isLabelValueItem(item) && typeof item.label === "string") {
-        return !NOTE_REGEX.test(item.label);
+        return !NOTE_REGEX.test(item.label) && !isBlockedLabel(item.label);
       }
       return true;
     });
@@ -43,6 +54,8 @@ export function stripNoteFields<T>(input: T): T {
     for (const [key, value] of Object.entries(input)) {
       if (key.toLowerCase() === "fm_comment") continue;
       if (NOTE_REGEX.test(key)) continue;
+      if (isBlockedLabel(key)) continue;
+
       out[key] = stripNoteFields(value);
     }
     return out as unknown as T;
