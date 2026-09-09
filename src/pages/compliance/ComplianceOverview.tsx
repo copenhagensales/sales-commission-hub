@@ -4,6 +4,7 @@ import { Shield, Users, FileText, Lock, ArrowRight, Bell, ClipboardList, AlertTr
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { usePermissions } from "@/hooks/usePositionPermissions";
+import { ComplianceReviewAlert } from "@/components/compliance/ComplianceReviewAlert";
 
 export default function ComplianceOverview() {
   const navigate = useNavigate();
