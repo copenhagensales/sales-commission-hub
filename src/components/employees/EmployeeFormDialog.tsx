@@ -13,6 +13,21 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Loader2, Check, Camera, User, MapPin, Briefcase, Wallet, Palmtree, Settings } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  findExistingEmployeeByEmail,
+  type ExistingEmployeeMatch,
+} from "@/lib/employees/findExistingEmployeeByEmail";
+import { activateEmployee, resolveActivationStartDate } from "@/lib/employees/activateEmployee";
 
 interface EmployeeMasterDataRecord {
   id: string;
