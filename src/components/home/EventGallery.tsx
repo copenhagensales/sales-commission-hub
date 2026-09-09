@@ -28,7 +28,10 @@ import {
   useDeleteEventPhoto,
   useUpdateEventPhoto,
   useReorderEventPhotos,
+  useEventPhotoLikes,
+  useToggleEventPhotoLike,
   type EventGalleryPhoto,
+  type PhotoLikeState,
 } from "@/hooks/useEventGallery";
 
 const SLOT_PLACEHOLDERS = [
