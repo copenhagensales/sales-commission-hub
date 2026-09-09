@@ -188,7 +188,9 @@ export default function UnitedDashboard() {
         title: "United – Overblik",
         features: {
           showMonth: false,
+          theme: "cph",
           aggregateClientIds: clientIds.length > 0 ? clientIds : undefined,
+
         },
         extraContent: <UnitedClientBreakdown clients={united?.clients || []} />,
       }}

@@ -31,7 +31,11 @@ export default function FieldmarketingDashboardFull() {
         slug: "fieldmarketing",
         clientId: active.clientId,
         title: `Fieldmarketing – ${active.label}`,
+        features: {
+          theme: "cph",
+        },
         extraContent: tabSelector,
+
       }}
     />
   );

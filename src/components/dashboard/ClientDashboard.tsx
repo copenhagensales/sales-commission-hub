@@ -410,6 +410,8 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
               : [{ label: "Salg", value: isLoading ? "..." : liveSalesCount, sub: selectedPeriod.label }]
           }
           secondaryKpis={useCached ? kpiCards.slice(primaryKpiCount).map(toCphKpi) : undefined}
+          extraContent={config.extraContent}
+
         >
           {useCached ? (
             <>

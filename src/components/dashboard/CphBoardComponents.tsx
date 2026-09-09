@@ -118,9 +118,11 @@ export function CphLeaderboard({
   const rows = maxRows ? sellers.slice(0, maxRows) : sellers;
   const fg = light ? ONYX : LIGHT;
   const fgDim = light ? ONYX_DIM : LIGHT_DIM;
-  const cols = `${tvMode ? "38px 46px" : "22px 30px"} minmax(0,1fr) ${tvMode ? "66px" : "36px"}${
-    showCrossSales ? (tvMode ? " 62px" : " 34px") : ""
-  }${showFiber ? (tvMode ? " 70px" : " 38px") : ""} auto`;
+  const cols = `${tvMode ? "38px 46px" : "20px 28px"} minmax(0,1fr) ${tvMode ? "66px" : "32px"}${
+    showCrossSales ? (tvMode ? " 62px" : " 32px") : ""
+  }${showFiber ? (tvMode ? " 70px" : " 32px") : ""} ${tvMode ? "auto" : "minmax(56px,auto)"}`;
+  const colGap = tvMode ? 14 : showCrossSales || showFiber ? 8 : 14;
+
 
 
   return (
@@ -151,7 +153,7 @@ export function CphLeaderboard({
         className="grid items-center font-extrabold uppercase"
         style={{
           gridTemplateColumns: cols,
-          columnGap: 14,
+          columnGap: colGap,
           padding: tvMode ? "12px 0 8px" : "12px 0 8px",
           fontSize: tvMode ? 15 : 10,
           letterSpacing: tvMode ? "0.08em" : "0.02em",
@@ -191,7 +193,7 @@ export function CphLeaderboard({
                 className="grid items-center"
                 style={{
                   gridTemplateColumns: cols,
-                  columnGap: 14,
+                  columnGap: colGap,
                   padding: tvMode ? (isTop ? "10px 14px 10px 10px" : "12px 0") : isTop ? "10px 10px 10px 8px" : "10px 0",
                   margin: isTop ? (tvMode ? "0 -14px 0 -10px" : "0 -10px 0 -8px") : undefined,
                   background: isTop ? (light ? ONYX : "hsl(var(--cph-light-blue) / 0.12)") : undefined,
@@ -294,6 +296,7 @@ interface CphBoardFrameProps {
   rightContent?: React.ReactNode;
   primaryKpis: CphKpi[];
   secondaryKpis?: CphKpi[];
+  extraContent?: React.ReactNode;
   children: React.ReactNode;
 }
 
@@ -304,8 +307,10 @@ export function CphBoardFrame({
   rightContent,
   primaryKpis,
   secondaryKpis,
+  extraContent,
   children,
 }: CphBoardFrameProps) {
+
   const now = new Date();
   const kpiCols = tvMode
     ? `1.35fr ${primaryKpis.slice(1).map(() => "1fr").join(" ")}`
@@ -413,6 +418,10 @@ export function CphBoardFrame({
           ))}
         </section>
       )}
+
+      {extraContent ? <section className="relative">{extraContent}</section> : null}
+
+
 
       <section
         className={

@@ -13,6 +13,8 @@ export default function RelatelDashboard() {
           showMonth: true,
           crossSales: true,
           liveMode: true,
+          theme: "cph",
+
         },
       }}
     />

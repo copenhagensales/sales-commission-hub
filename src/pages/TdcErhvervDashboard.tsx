@@ -12,6 +12,8 @@ export default function TdcErhvervDashboard() {
           salesPerHour: true,
           showMonth: true,
           fiberBoard: true,
+          theme: "cph",
+
         },
       }}
     />
