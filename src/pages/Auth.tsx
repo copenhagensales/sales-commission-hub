@@ -9,8 +9,15 @@ export default function Auth() {
 
   const greeting = useMemo(() => {
     const h = new Date().getHours();
-    return h < 10 ? "Godmorgen" : h < 17 ? "Goddag" : "Godaften";
+    if (h < 5) return "God nat";
+    if (h < 10) return "Godmorgen";
+    if (h < 12) return "God formiddag";
+    if (h < 14) return "God middag";
+    if (h < 18) return "God eftermiddag";
+    if (h < 22) return "Godaften";
+    return "God nat";
   }, []);
+
 
   const handleMicrosoftSignIn = async () => {
     setMsLoading(true);
