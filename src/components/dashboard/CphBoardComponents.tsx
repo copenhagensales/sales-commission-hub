@@ -247,7 +247,7 @@ export function CphLeaderboard({
                     style={{
                       fontSize: tvMode ? 20 : 14,
                       textAlign: "right",
-                      color: isTop && !light ? LIGHT_DIM : fgDim,
+                      color: isTop ? LIGHT_DIM : fgDim,
                       fontVariantNumeric: "tabular-nums",
                     }}
                   >
@@ -259,7 +259,7 @@ export function CphLeaderboard({
                     style={{
                       fontSize: tvMode ? 20 : 14,
                       textAlign: "right",
-                      color: isTop && !light ? LIGHT_DIM : fgDim,
+                      color: isTop ? LIGHT_DIM : fgDim,
                       fontVariantNumeric: "tabular-nums",
                     }}
                   >
