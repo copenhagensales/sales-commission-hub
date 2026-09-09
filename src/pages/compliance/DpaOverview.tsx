@@ -194,9 +194,10 @@ export default function DpaOverview() {
     <MainLayout>
       <ComplianceDocument
         title="Databehandleraftaler (DPA) — oversigt og status"
-        version="0.1"
+        version="1.0"
         documentDate="9. september 2026"
-        statusLabel="UDKAST — til godkendelse af Mathias og Lone"
+        statusLabel="GODKENDT - 9. september 2026 af Mathias Dandanel Grubak og Lone Mikkelsen"
+        statusTone="approved"
       >
         <DocSection heading="Oversigt over databehandlere">
           <div className="overflow-x-auto rounded-md border">
