@@ -28,6 +28,7 @@ import { useBookingHotels, useUpdateBookingHotel, type BookingHotel } from "@/ho
 import { AssignHotelDialog } from "@/components/vagt-flow/AssignHotelDialog";
 import { Textarea } from "@/components/ui/textarea";
 import { TimeSelect } from "@/components/ui/time-select";
+import { BookingEconomySummary } from "@/components/vagt-flow/BookingEconomySummary";
 
 interface Employee {
   id: string;
