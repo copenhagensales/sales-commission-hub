@@ -101,8 +101,6 @@ export default function Auth() {
         </div>
 
         <div className="relative flex flex-wrap items-center gap-2.5 text-[13px] font-semibold text-[#6f7d95]">
-          <span>Udbetaling sidste bankdag i måneden</span>
-          <span className="h-1 w-1 rounded-full bg-[#3a4560]" />
           <span>Intern adgang</span>
         </div>
       </div>
