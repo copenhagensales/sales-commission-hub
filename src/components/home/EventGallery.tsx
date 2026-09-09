@@ -6,6 +6,7 @@ import {
   Pencil,
   ArrowLeft,
   ArrowRight,
+  Heart,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
@@ -27,7 +28,10 @@ import {
   useDeleteEventPhoto,
   useUpdateEventPhoto,
   useReorderEventPhotos,
+  useEventPhotoLikes,
+  useToggleEventPhotoLike,
   type EventGalleryPhoto,
+  type PhotoLikeState,
 } from "@/hooks/useEventGallery";
 
 const SLOT_PLACEHOLDERS = [
@@ -48,6 +52,8 @@ function PhotoSlot({
   onAdd,
   onEdit,
   onMove,
+  like,
+  onToggleLike,
 }: {
   photo?: EventGalleryPhoto;
   placeholder: string;
@@ -58,6 +64,8 @@ function PhotoSlot({
   onAdd: () => void;
   onEdit: (photo: EventGalleryPhoto) => void;
   onMove: (photo: EventGalleryPhoto, direction: -1 | 1) => void;
+  like?: PhotoLikeState;
+  onToggleLike: (photo: EventGalleryPhoto, liked: boolean) => void;
 }) {
   if (photo?.url) {
     return (
@@ -78,6 +86,21 @@ function PhotoSlot({
             )}
           </div>
         )}
+        <button
+          type="button"
+          onClick={() => onToggleLike(photo, !!like?.likedByMe)}
+          aria-label={like?.likedByMe ? "Fjern like" : "Like billedet"}
+          className="absolute left-2 top-2 flex items-center gap-1.5 rounded-xl bg-[hsl(var(--cph-onyx)/0.8)] px-2.5 py-1.5 text-[12px] font-extrabold text-[hsl(var(--cph-light-blue))] transition-colors hover:bg-[hsl(var(--cph-onyx)/0.95)]"
+        >
+          <Heart
+            className={
+              like?.likedByMe
+                ? "h-3.5 w-3.5 fill-[hsl(var(--cph-emerald))] text-[hsl(var(--cph-emerald))]"
+                : "h-3.5 w-3.5"
+            }
+          />
+          <span className="tabular-nums">{like?.count ?? 0}</span>
+        </button>
         {canManage && (
           <div className="absolute right-2 top-2 flex flex-wrap items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
             <button
@@ -144,6 +167,15 @@ export function EventGallery() {
   const deleteMutation = useDeleteEventPhoto();
   const updateMutation = useUpdateEventPhoto();
   const reorderMutation = useReorderEventPhotos();
+  const { data: likes = {} } = useEventPhotoLikes(photos.map((p) => p.id));
+  const toggleLikeMutation = useToggleEventPhotoLike();
+
+  const handleToggleLike = (photo: EventGalleryPhoto, liked: boolean) => {
+    toggleLikeMutation.mutate(
+      { photoId: photo.id, liked },
+      { onError: () => toast.error("Kunne ikke gemme dit like") }
+    );
+  };
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
@@ -272,6 +304,8 @@ export function EventGallery() {
             onAdd={openDialog}
             onEdit={openEdit}
             onMove={handleMove}
+            like={slots[0].photo ? likes[slots[0].photo.id] : undefined}
+            onToggleLike={handleToggleLike}
           />
         </div>
         {slots.slice(1).map((slot, index) => (
@@ -286,6 +320,8 @@ export function EventGallery() {
               onAdd={openDialog}
               onEdit={openEdit}
               onMove={handleMove}
+              like={slot.photo ? likes[slot.photo.id] : undefined}
+              onToggleLike={handleToggleLike}
             />
           </div>
         ))}

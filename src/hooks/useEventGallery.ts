@@ -152,6 +152,76 @@ export function useReorderEventPhotos() {
   });
 }
 
+export interface PhotoLikeState {
+  count: number;
+  likedByMe: boolean;
+}
+
+/** Likes pr. billede samt om den aktuelle bruger har liket. */
+export function useEventPhotoLikes(photoIds: string[]) {
+  const { user } = useAuth();
+  const key = [...photoIds].sort().join(",");
+
+  return useQuery({
+    queryKey: ["event-gallery-photo-likes", key, user?.id],
+    queryFn: async (): Promise<Record<string, PhotoLikeState>> => {
+      if (photoIds.length === 0) return {};
+      const { data, error } = await supabase
+        .from("event_gallery_photo_likes")
+        .select("photo_id, user_id")
+        .in("photo_id", photoIds);
+      if (error) throw error;
+
+      const result: Record<string, PhotoLikeState> = {};
+      for (const id of photoIds) result[id] = { count: 0, likedByMe: false };
+      for (const row of data || []) {
+        const entry = result[row.photo_id];
+        if (!entry) continue;
+        entry.count += 1;
+        if (user?.id && row.user_id === user.id) entry.likedByMe = true;
+      }
+      return result;
+    },
+    enabled: photoIds.length > 0,
+    staleTime: 30000,
+  });
+}
+
+export function useToggleEventPhotoLike() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({
+      photoId,
+      liked,
+    }: {
+      photoId: string;
+      liked: boolean;
+    }) => {
+      if (!user?.id) throw new Error("Ingen bruger");
+
+      if (liked) {
+        const { error } = await supabase
+          .from("event_gallery_photo_likes")
+          .delete()
+          .eq("photo_id", photoId)
+          .eq("user_id", user.id);
+        if (error) throw error;
+        return;
+      }
+
+      const { error } = await supabase
+        .from("event_gallery_photo_likes")
+        .insert({ photo_id: photoId, user_id: user.id });
+      if (error && error.code !== "23505") throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["event-gallery-photo-likes"] });
+    },
+  });
+}
+
 export function useDeleteEventPhoto() {
   const queryClient = useQueryClient();
 
