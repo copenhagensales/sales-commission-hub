@@ -266,8 +266,12 @@ export function EventGallery() {
             photo={slots[0].photo}
             placeholder={slots[0].placeholder}
             canManage={canManage}
+            canMoveBack={false}
+            canMoveForward={photos.length > 1}
             onDelete={handleDelete}
             onAdd={openDialog}
+            onEdit={openEdit}
+            onMove={handleMove}
           />
         </div>
         {slots.slice(1).map((slot, index) => (
@@ -276,11 +280,16 @@ export function EventGallery() {
               photo={slot.photo}
               placeholder={slot.placeholder}
               canManage={canManage}
+              canMoveBack
+              canMoveForward={index + 2 < photos.length}
               onDelete={handleDelete}
               onAdd={openDialog}
+              onEdit={openEdit}
+              onMove={handleMove}
             />
           </div>
         ))}
+
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
