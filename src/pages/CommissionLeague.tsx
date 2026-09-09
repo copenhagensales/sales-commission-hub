@@ -302,7 +302,7 @@ export default function CommissionLeague() {
   if (seasonLoading || enrollmentLoading) {
     return (
       <MainLayout>
-        <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="cph-board min-h-screen bg-slate-900 flex items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       </MainLayout>
@@ -313,7 +313,7 @@ export default function CommissionLeague() {
   if (!season) {
     return (
       <MainLayout>
-        <div className="min-h-screen bg-slate-900 p-6">
+        <div className="cph-board min-h-screen bg-slate-900 p-6">
           <div className="max-w-4xl mx-auto">
             <Card className="bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700">
               <CardContent className="py-16 text-center">
@@ -386,7 +386,7 @@ export default function CommissionLeague() {
           todayProvision={myTodayProvision}
         />
       )}
-      <div className="min-h-screen bg-slate-900 p-2 sm:p-4 md:p-6">
+      <div className="cph-board min-h-screen bg-slate-900 p-2 sm:p-4 md:p-6">
         <div className="max-w-6xl mx-auto space-y-3 sm:space-y-6">
           {/* Header - Hero with gradient */}
           <div ref={headerRef}>

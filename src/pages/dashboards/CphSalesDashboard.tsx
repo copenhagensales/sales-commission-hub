@@ -1286,7 +1286,7 @@ export default function CphSalesDashboard() {
   // In TV mode, render without layout to skip lock checks
   if (tvMode) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 p-4">
+      <div className="cph-board min-h-screen p-4">
         {content}
       </div>
     );
