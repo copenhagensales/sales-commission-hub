@@ -580,7 +580,19 @@ export default function LocationProfitabilityContent() {
             <TableCell className="text-right">{loc.totalSales}</TableCell>
             <TableCell className="text-right">{formatKr(loc.totalRevenue)}</TableCell>
             <TableCell className="text-right">{formatKr(loc.sellerCost)}</TableCell>
-            <TableCell className="text-right">{formatKr(loc.locationCost)}</TableCell>
+            <TableCell className="text-right">
+              <div className="flex flex-col items-end">
+                <span>{formatKr(loc.locationCost)}</span>
+                {loc.locationCostNet < loc.locationCostGross && (
+                  <span className="text-[10px] text-muted-foreground">
+                    netto {formatKr(loc.locationCostNet)}
+                  </span>
+                )}
+                {loc.missingLockedDiscount && (
+                  <span className="text-[10px] text-destructive">ukendt rabatsats</span>
+                )}
+              </div>
+            </TableCell>
             <TableCell className="text-right">{formatKr(loc.hotelCost)}</TableCell>
             <TableCell className="text-right">{formatKr(loc.dietCost)}</TableCell>
             <TableCell className={`text-right font-semibold ${loc.db >= 0 ? "text-emerald-600" : "text-destructive"}`}>
