@@ -310,7 +310,7 @@ const Home = () => {
 
   // Toggle attendance mutation
   const toggleAttendanceMutation = useMutation({
-    mutationFn: async ({ eventId, status }: { eventId: string; status: 'attending' | 'not_attending' }) => {
+    mutationFn: async ({ eventId, status }: { eventId: string; status: 'attending' | 'maybe' | 'not_attending' }) => {
       if (!employee?.id) throw new Error("Ikke logget ind");
       
       const { error } = await supabase
@@ -338,10 +338,10 @@ const Home = () => {
   };
 
   // Helper to get current user's attendance status
-  const getMyAttendance = (eventId: string): 'attending' | 'not_attending' | null => {
+  const getMyAttendance = (eventId: string): 'attending' | 'maybe' | 'not_attending' | null => {
     if (!employee?.id) return null;
     const myAttendance = eventAttendees.find(a => a.event_id === eventId && a.employee_id === employee.id);
-    return myAttendance?.status as 'attending' | 'not_attending' | null;
+    return myAttendance?.status as 'attending' | 'maybe' | 'not_attending' | null;
   };
 
   // Add event mutation
@@ -858,6 +858,23 @@ const Home = () => {
                             ? "Tilmeldt"
                             : "Tilmeld"
                           : "Deltager"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          toggleAttendanceMutation.mutate({
+                            eventId: featured.id,
+                            status: "maybe",
+                          })
+                        }
+                        disabled={toggleAttendanceMutation.isPending}
+                        className={`flex-1 rounded-xl px-3 py-2.5 text-[14px] font-extrabold transition-colors ${
+                          myStatus === "maybe"
+                            ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]"
+                            : "border border-[hsl(var(--cph-onyx)/0.22)] text-foreground hover:bg-[hsl(var(--cph-onyx)/0.06)]"
+                        }`}
+                      >
+                        Måske
                       </button>
                       <button
                         type="button"

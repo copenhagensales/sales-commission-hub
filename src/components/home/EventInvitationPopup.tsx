@@ -118,7 +118,7 @@ export function EventInvitationPopup({ employeeId, teamId }: EventInvitationPopu
 
   // Mutation to set attendance
   const attendMutation = useMutation({
-    mutationFn: async ({ eventId, status }: { eventId: string; status: 'attending' | 'not_attending' }) => {
+    mutationFn: async ({ eventId, status }: { eventId: string; status: 'attending' | 'maybe' | 'not_attending' }) => {
       if (!employeeId) throw new Error("No employee ID");
       
       const { error } = await supabase
@@ -144,6 +144,20 @@ export function EventInvitationPopup({ employeeId, teamId }: EventInvitationPopu
       await attendMutation.mutateAsync({ eventId: event.id, status: 'attending' });
       await markSeenMutation.mutateAsync(event.id);
       toast.success("Du deltager i begivenheden!");
+      moveToNext();
+    } catch {
+      toast.error("Der opstod en fejl");
+    }
+  };
+
+  const handleMaybe = async () => {
+    const event = pendingInvitations[currentIndex];
+    if (!event) return;
+
+    try {
+      await attendMutation.mutateAsync({ eventId: event.id, status: 'maybe' });
+      await markSeenMutation.mutateAsync(event.id);
+      toast.success("Svar registreret: Måske");
       moveToNext();
     } catch {
       toast.error("Der opstod en fejl");
@@ -228,6 +242,15 @@ export function EventInvitationPopup({ employeeId, teamId }: EventInvitationPopu
           >
             <ThumbsUp className="w-4 h-4" />
             Deltager
+          </Button>
+          <Button
+            variant="outline"
+            className="flex-1 gap-2"
+            onClick={handleMaybe}
+            disabled={isProcessing}
+          >
+            <HelpCircle className="w-4 h-4" />
+            Måske
           </Button>
           <Button
             variant="outline"
