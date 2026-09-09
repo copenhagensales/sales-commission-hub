@@ -1073,6 +1073,7 @@ export function SupplierReportTab() {
                 const headers = [
                   "Lokation", "ID", "By", "Uger & Dage", "Dage", "Beløb",
                   ...(hasDiscount ? ["Rabat %", "Rabat", "Efter rabat"] : []),
+                  ...(isAnnualRevenue ? ["Låst sats"] : []),
                 ];
                 const rows = locationDiscounts.map((loc: any) => {
                   const weekText = [...(loc.weekdaysByWeek as Map<number, Set<number>>).entries()]
