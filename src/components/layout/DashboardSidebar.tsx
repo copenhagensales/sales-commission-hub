@@ -141,7 +141,7 @@ export function DashboardSidebar({ isMobile = false, onNavigate, isCollapsed = f
               variant="outline" 
               size="sm" 
               onClick={handleGoToMain}
-              className="gap-2"
+              className="gap-2 rounded-2xl border-[hsl(var(--cph-emerald)/0.5)] bg-[hsl(var(--cph-emerald)/0.16)] text-[hsl(var(--cph-emerald))] hover:bg-[hsl(var(--cph-emerald)/0.26)] hover:text-[hsl(var(--cph-emerald))]"
             >
               <Home className="h-4 w-4" />
               Hovedsystem
