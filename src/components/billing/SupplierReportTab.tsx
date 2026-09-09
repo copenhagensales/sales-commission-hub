@@ -1023,11 +1023,19 @@ export function SupplierReportTab() {
                     finalAmount: loc.finalAmount,
                     isExcluded: loc.isExcluded,
                     maxDiscount: loc.maxDiscount,
+                    lockedPercents: loc.lockedPercents ?? [],
+                    isMixedDiscount: !!loc.isMixedDiscount,
+                    missingLocked: !!loc.missingLocked,
                   })),
                   discountType,
                   hasDiscountRules: !!(discountRules && discountRules.length > 0),
                   minDaysPerLocation,
-                  totals: { subtotal: totalAmountAll, discountAmount: totalDiscountAmount, finalAmount },
+                  totals: {
+                    subtotal: totalAmountAll,
+                    discountAmount: totalDiscountAmount,
+                    finalAmount,
+                    effectivePercent: effectiveDiscountPercent,
+                  },
                   discountInfo: {
                     uniquePlacements: totalPlacements,
                     discountPercent: appliedDiscount,
@@ -1035,6 +1043,16 @@ export function SupplierReportTab() {
                     ytdRevenue,
                     monthlyRevenue: totalAmountNonExcluded,
                     staircaseSteps,
+                    currentBasis: discountStatus?.basis ?? null,
+                    currentPercent: discountStatus?.currentPercent ?? null,
+                    currentRuleId: discountStatus?.currentRuleId ?? null,
+                    nextPercent: discountStatus?.nextPercent ?? null,
+                    nextMinRevenue: discountStatus?.nextMinRevenue ?? null,
+                    remainingToNext: discountStatus?.remainingToNext ?? null,
+                    staircaseIds: (discountRules || [])
+                      .slice()
+                      .sort((a, b) => (a.min_revenue ?? 0) - (b.min_revenue ?? 0))
+                      .map((r) => r.id),
                   },
                   exceptions: (locationExceptions || []).map(exc => ({
                     name: exc.location_name,
