@@ -888,37 +888,55 @@ export function SupplierReportTab() {
                 </div>
               ) : discountType === "annual_revenue" ? (
                 <div className="space-y-4">
-                  {/* Annual revenue overview */}
+                  {/* Annual revenue: satsen låses pr. booking, ikke pr. periode */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
-                      <p className="text-sm text-muted-foreground">Kumulativ årsomsætning</p>
-                      <p className="text-2xl font-bold">{ytdRevenue.toLocaleString("da-DK")} kr</p>
+                      <p className="text-sm text-muted-foreground">Kumuleret grundlag i år</p>
+                      <p className="text-2xl font-bold">
+                        {(discountStatus?.basis ?? 0).toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
+                      </p>
+                      <p className="text-xs text-muted-foreground">Bekræftede bookinger oprettet i år</p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Rabattrin</p>
+                      <p className="text-sm text-muted-foreground">Nuværende sats</p>
                       <p className="text-2xl font-bold">
-                        {appliedDiscount > 0 ? `${appliedDiscount}%` : "Ingen"}
+                        {(discountStatus?.currentPercent ?? 0) > 0 ? `${discountStatus?.currentPercent}%` : "Ingen"}
                       </p>
-                      {appliedRule && (
-                        <p className="text-xs text-muted-foreground">{appliedRule.description}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Gælder NYE bookinger - ikke denne periode
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Næste trin</p>
+                      <p className="text-2xl font-bold">
+                        {discountStatus?.nextPercent != null ? `${discountStatus.nextPercent}%` : "Højeste nået"}
+                      </p>
+                      {discountStatus?.nextMinRevenue != null && (
+                        <p className="text-xs text-muted-foreground">
+                          Mangler {(discountStatus.remainingToNext ?? 0).toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
+                          {" "}(fra {discountStatus.nextMinRevenue.toLocaleString("da-DK")} kr)
+                        </p>
                       )}
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Rabatbeløb</p>
+                      <p className="text-sm text-muted-foreground">Effektiv rabat i denne periode</p>
                       <p className="text-2xl font-bold text-green-600">
-                        -{totalDiscountAmount.toLocaleString("da-DK")} kr
+                        {effectiveDiscountPercent.toLocaleString("da-DK", { maximumFractionDigits: 2 })}%
                       </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Total efter rabat</p>
-                      <p className="text-2xl font-bold">{finalAmount.toLocaleString("da-DK")} kr</p>
+                      <p className="text-xs text-muted-foreground">
+                        -{totalDiscountAmount.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr af {totalAmountAll.toLocaleString("da-DK", { maximumFractionDigits: 0 })} kr
+                      </p>
                     </div>
                   </div>
 
-                  {/* Staircase visualization */}
+                  <p className="text-xs text-muted-foreground">
+                    Hver booking faktureres med den sats, der var optjent da bookingen blev oprettet. Satsen ændres ikke bagudrettet.
+                  </p>
+
+                  {/* Staircase visualization - markerer leverandørens NUVÆRENDE trin */}
                   {discountRules && discountRules.length > 0 && (
                     <div className="border rounded-lg p-4">
-                      <h3 className="text-sm font-medium mb-2">Rabattrappe</h3>
+                      <h3 className="text-sm font-medium mb-2">Rabattrappe (nuværende trin markeret)</h3>
                       <div className="space-y-2">
                         {[...discountRules]
                           .sort((a, b) => (a.min_revenue ?? 0) - (b.min_revenue ?? 0))
@@ -926,7 +944,7 @@ export function SupplierReportTab() {
                             <div
                               key={rule.id}
                               className={`flex items-center justify-between p-2 rounded ${
-                                appliedRule?.id === rule.id
+                                discountStatus?.currentRuleId === rule.id
                                   ? "bg-primary/10 border border-primary"
                                   : "bg-muted/50"
                               }`}
