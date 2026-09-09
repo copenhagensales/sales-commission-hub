@@ -131,6 +131,12 @@ function ArchiveCell({
 
   const handleFile = async (file: File | undefined) => {
     if (!file) return;
+    const isPdf =
+      file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+    if (!isPdf) {
+      toast.error("Aftalen skal arkiveres som PDF");
+      return;
+    }
     if (file.size > 25 * 1024 * 1024) {
       toast.error("Filen må højst være 25 MB");
       return;
