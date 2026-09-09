@@ -321,7 +321,11 @@ Deno.serve(async (req) => {
               )
               .eq("client_campaign_id", policy.client_campaign_id)
               .lt("sale_datetime", cutoffISO)
-              .or("customer_phone.not.is.null,raw_payload.not.is.null");
+              .or("customer_phone.not.is.null,raw_payload.not.is.null")
+              // Oldest first, batched. Anonymised sales drop out of this filter,
+              // so consecutive nightly runs work through the backlog safely.
+              .order("sale_datetime", { ascending: true })
+              .limit(500);
 
             if (selErr) {
               log("WARN", `Error selecting sales for anonymization (campaign ${policy.client_campaign_id}): ${selErr.message}`);
