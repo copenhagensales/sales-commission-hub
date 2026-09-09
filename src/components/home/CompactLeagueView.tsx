@@ -113,13 +113,21 @@ export function CompactLeagueView() {
                     {rank}
                   </span>
                   <span
-                    className={`flex h-10 w-10 flex-none items-center justify-center rounded-full text-[13px] font-extrabold ${
+                    className={`flex h-10 w-10 flex-none items-center justify-center overflow-hidden rounded-full text-[13px] font-extrabold ${
                       rank === 1
                         ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-emerald))] ring-2 ring-[hsl(var(--cph-emerald))]"
                         : "bg-[hsl(var(--cph-light-blue))] text-[hsl(var(--cph-onyx))]"
                     }`}
                   >
-                    {getInitials(name)}
+                    {lookupAvatar({ employeeId: standing.employee_id, name }) ? (
+                      <img
+                        src={lookupAvatar({ employeeId: standing.employee_id, name }) as string}
+                        alt={name}
+                        className="h-full w-full rounded-full object-cover"
+                      />
+                    ) : (
+                      getInitials(name)
+                    )}
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[15px] font-extrabold text-foreground">
