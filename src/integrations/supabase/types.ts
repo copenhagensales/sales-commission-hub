@@ -3473,6 +3473,53 @@ export type Database = {
           },
         ]
       }
+      client_agreement_documents: {
+        Row: {
+          client_id: string
+          content_type: string | null
+          created_at: string
+          doc_type: string
+          file_name: string
+          file_size: number | null
+          id: string
+          note: string | null
+          storage_path: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          client_id: string
+          content_type?: string | null
+          created_at?: string
+          doc_type: string
+          file_name: string
+          file_size?: number | null
+          id?: string
+          note?: string | null
+          storage_path: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          client_id?: string
+          content_type?: string | null
+          created_at?: string
+          doc_type?: string
+          file_name?: string
+          file_size?: number | null
+          id?: string
+          note?: string | null
+          storage_path?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_agreement_documents_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_campaigns: {
         Row: {
           client_id: string
