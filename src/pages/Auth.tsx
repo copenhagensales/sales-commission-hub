@@ -93,7 +93,7 @@ export default function Auth() {
             Dine tal. Opdateret hver dag.
           </h1>
           <p className="max-w-[400px] text-[20px] leading-relaxed text-[#a8b4ca]">
-            Provisionssystemet for Copenhagen Sales. Se optjening, bonus og udbetalinger — samlet ét
+            Provisionssystemet for Copenhagen Sales. Se optjening, bonus og udbetalinger - samlet ét
             sted.
           </p>
           <ul className="mt-1 flex flex-col gap-3">
