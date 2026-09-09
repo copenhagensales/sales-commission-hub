@@ -30,36 +30,24 @@ export default function BackupPolicy() {
             forbindelsesopsætning. Instansstørrelse: Large. Databasen er
             hostet-managed, og backup styres af platformen — ikke af Stork-koden.
           </p>
-          <ul className="list-disc pl-6 space-y-1 text-muted-foreground">
-            <li>
-              Backup-frekvens: <Confirm>aflæses i Supabase-dashboardet</Confirm>
-            </li>
-            <li>
-              Point-in-time recovery (PITR) aktiveret ja/nej:{" "}
-              <Confirm>aflæses i Supabase-dashboardet</Confirm>
-            </li>
-            <li>
-              Opbevaringsperiode for backups:{" "}
-              <Confirm>aflæses i Supabase-dashboardet</Confirm>
-            </li>
-          </ul>
-          <p className="text-muted-foreground">
-            Værdierne kan ikke aflæses programmatisk fra systemet og skal derfor
-            bekræftes manuelt af systemejer, inden dokumentet godkendes.
+          <p>
+            Backup styres af platformen (Supabase managed). Gendannelsesvinduet
+            rækker maksimalt 14 dage tilbage - aflæst i Supabase-dashboardet 9.
+            september 2026, hvor ældste gendannelsespunkt var 26. august 2026.
           </p>
         </DocSection>
 
         <DocSection heading="3. Politik">
           <p>
-            Backups opbevares maksimalt{" "}
-            <Confirm>X dage — den faktiske platformværdi indsættes</Confirm>.
-            Efter denne periode er anonymisering udført i Stork også effektiv i
-            alle eksisterende backups, da ældre backups er roteret ud.
-            Anonymisering anses derfor først for fuldt irreversibel{" "}
-            <Confirm>X</Confirm> dage efter kørsel — dette er accepteret og
-            dokumenteret.
+            Backups opbevares maksimalt 14 dage. Efter denne periode er
+            anonymisering udført i Stork også effektiv i alle eksisterende
+            backups, da ældre backups er roteret ud. Anonymisering anses derfor
+            først for fuldt irreversibel 14 dage efter kørsel - dette er
+            accepteret og dokumenteret. Bekræftet af Kasper Mikkelsen 9.
+            september 2026.
           </p>
         </DocSection>
+
 
         <DocSection heading="4. Gendannelse">
           <p>
