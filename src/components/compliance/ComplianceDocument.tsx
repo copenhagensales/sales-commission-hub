@@ -44,7 +44,11 @@ export function ComplianceDocument({
       <header className="space-y-3 border-b pb-5">
         <Badge
           variant="outline"
-          className="bg-amber-500/10 text-amber-700 border-amber-500/30"
+          className={
+            statusTone === "approved"
+              ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/30"
+              : "bg-amber-500/10 text-amber-700 border-amber-500/30"
+          }
         >
           {statusLabel}
         </Badge>
