@@ -102,7 +102,7 @@ export default function Auth() {
             </h1>
 
             <p className="max-w-[560px] text-[clamp(17px,1.4vw,21px)] leading-relaxed text-white/60">
-              Provisionssystemet for Copenhagen Sales. Se optjening, bonus og udbetalinger - samlet
+              Provisionssystemet for Copenhagen Sales. Se optjening, bonus og salg - samlet
               ét sted.
             </p>
 
