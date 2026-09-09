@@ -1,30 +1,24 @@
-# Hvorfor beskeden vises — og hvad der skal rettes
+# Fjern klientvagten der smider Microsoft-login ud
 
-## Hvad du ser
-Beskeden "Login med adgangskode er lukket" kommer fra vagten i `src/hooks/usePasswordLoginBlock.ts` (linje 14-21), som kaldes globalt i `src/App.tsx:87`. Den læser `session.user.app_metadata.provider` og logger brugeren ud, hvis værdien ikke er præcis `azure`.
+## Hvorfor beskeden kom
+Beskeden "Login med adgangskode er lukket" kommer fra `src/hooks/usePasswordLoginBlock.ts` (linje 14-21), kaldt globalt i `src/App.tsx:87`. Den logger brugeren ud, hvis `session.user.app_metadata.provider` ikke er præcis `azure`.
 
-## Bekræftet i data
-Forespørgsel mod `auth.users`: **323 af 323 konti har `provider = 'email'`**. Ingen konto har `azure`/`microsoft` som primær provider endnu.
+Bekræftet i data: **323 af 323 konti i `auth.users` har `provider = 'email'`**. Det felt beskriver hvordan kontoen oprindeligt blev oprettet — ikke hvordan man loggede ind lige nu. Derfor blev du logget ud og fik beskeden, selv om du trykkede på Microsoft-knappen. Med den vagt aktiv vil ingen kunne logge ind.
 
-Konsekvens: vagten rammer alle. Din session var oprettet med adgangskode, så du blev logget ud og fik beskeden. Værre: `app_metadata.provider` er kontoens *første* provider, ikke den metode man loggede ind med nu. Når en eksisterende bruger logger ind via Microsoft og identiteten kobles til den samme konto, står `provider` fortsat som `email` — og vagten vil så smide korrekt Microsoft-login ud igen. Det er en reel risiko for at låse alle ude.
+Email/password-provideren er nu slået fra i Cloud, så håndhævelsen ligger korrekt server-side.
 
-## Forslag til rettelse (kun denne fil)
-Ret vagten til at vurdere **den aktuelle session**, ikke kontoens historiske provider:
+## Ændring
+1. Fjern kaldet `usePasswordLoginBlock()` i `src/App.tsx` og slet `src/hooks/usePasswordLoginBlock.ts`.
+2. Intet andet ændres.
 
-1. Læs `amr` (authentication method reference) fra access-tokenets payload. Log kun ud, hvis den seneste metode er `password`.
-2. Fallback hvis `amr` mangler: log kun ud, hvis brugeren slet ikke har en Microsoft-identitet (`user.identities` uden `azure`/`microsoft`) OG providermetadata er `email`.
-3. Fjern udlogning ved `INITIAL_SESSION`, hvor metoden ikke kan afgøres — undgå at smide gyldige sessioner ud ved sideskift/reload.
+## Bevares uændret
+- `useMicrosoftLoginGuard` (matcher Microsoft-logins mod `employee_master_data`, afviser ukendte og dubletter).
+- Reset-endpoints svarer fortsat HTTP 410.
+- `disable_signup = true`.
+- Loginsiden med kun Microsoft-knappen og infoteksten.
+- Auth-konti, user IDs, roller, rettigheder, RLS, provision og løn.
 
-Server-siden er uændret: reset-endpoints svarer fortsat 410, `disable_signup = true` står, og `useMicrosoftLoginGuard` røres ikke.
-
-## Åbent punkt du skal beslutte
-Email/password-provideren er stadig aktiv i Cloud → Users → Auth Settings → Sign In Methods → Email (kan ikke slås fra herfra). Alternativ til den skrøbelige klientvagt: slå provideren fra der, og fjern `usePasswordLoginBlock` helt. Det er den robuste løsning — vælg:
-
-- **A**: Ret vagten som beskrevet ovenfor (beholder klientlaget).
-- **B**: Du slår Email-provideren fra i Cloud, og jeg fjerner vagten helt.
-- **C**: Begge.
-
-## Teknisk
-- Filer i scope: `src/hooks/usePasswordLoginBlock.ts` (rettes), evt. `src/App.tsx` (fjern kald, kun ved B).
-- Ingen ændringer i auth-konti, user IDs, roller, RLS, provision eller løn.
-- Verifikation efter ændring: log ind via Microsoft og bekræft at session holder; kontrollér at `amr`-læsningen ikke fejler for sessioner uden felt.
+## Verifikation
+- Typecheck.
+- Ingen forekomster af `usePasswordLoginBlock` i kodebasen.
+- Du logger ind via Microsoft og bliver ikke smidt ud; ingen fejltoast.
