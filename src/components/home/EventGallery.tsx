@@ -35,7 +35,7 @@ import {
 } from "@/hooks/useEventGallery";
 
 const SLOT_PLACEHOLDERS = [
-  "Hovedbillede fra seneste event",
+  "Foto 1",
   "Foto 2",
   "Foto 3",
   "Foto 4",
