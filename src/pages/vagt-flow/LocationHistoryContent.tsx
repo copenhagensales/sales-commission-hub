@@ -21,6 +21,7 @@ import {
 import { format, startOfMonth, startOfYear, subMonths, addDays } from "date-fns";
 import { da } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { bookingGross } from "@/utils/bookingGross";
 
 // ── Helpers (same as LocationProfitabilityContent) ──
 
