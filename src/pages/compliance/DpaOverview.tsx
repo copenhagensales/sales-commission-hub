@@ -78,18 +78,6 @@ const rows: DpaRow[] = [
       "Den signerede DPA fra onboarding, eller rekvirér via legal@adversus.io",
     status: "Tjek onboarding-dokumenter / rekvirér",
   },
-  {
-    vendor: "Twilio",
-    purpose: "SMS/telefoni",
-    link: {
-      href: "https://www.twilio.com/en-us/legal/data-protection-addendum",
-      label: "twilio.com — data protection addendum",
-    },
-    linkNote:
-      "Automatisk inkorporeret i Terms of Service, inkl. Standard Contractual Clauses.",
-    archive: "Dateret PDF af siden",
-    status: "Mangler arkivering",
-  },
 ];
 
 function ArchiveCell({
