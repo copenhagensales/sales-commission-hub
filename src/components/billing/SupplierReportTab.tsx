@@ -706,13 +706,19 @@ export function SupplierReportTab() {
                   {locationDiscounts.map((loc: any) => (
                     <TableRow key={loc.location?.id} className={loc.isExcluded ? "opacity-60" : ""}>
                       <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           {loc.location?.name}
                           {loc.isExcluded && (
                             <Badge variant="destructive" className="text-xs">Udelukket</Badge>
                           )}
                           {loc.maxDiscount != null && !loc.isExcluded && (
                             <Badge variant="outline" className="text-xs">Max {loc.maxDiscount}%</Badge>
+                          )}
+                          {loc.missingLocked && (
+                            <Badge variant="destructive" className="text-xs">Ingen låst sats</Badge>
+                          )}
+                          {loc.missingRate && (
+                            <Badge variant="destructive" className="text-xs">Mangler dagspris</Badge>
                           )}
                         </div>
                       </TableCell>
