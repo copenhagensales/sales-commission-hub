@@ -277,15 +277,15 @@ export function CphLeaderboard({
                   </span>
                 )}
                 <span
-                  className="font-extrabold"
+                  className="whitespace-nowrap font-extrabold"
                   style={{
                     fontSize: tvMode ? (isTop ? 26 : 24) : 16,
                     textAlign: "right",
                     letterSpacing: "-0.02em",
-                    minWidth: tvMode ? 118 : 66,
                     fontVariantNumeric: "tabular-nums",
                   }}
                 >
+
                   {formatNumber(Math.round(seller.commission))}
                 </span>
               </div>
