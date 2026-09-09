@@ -225,7 +225,7 @@ export default function SalesOverviewAll() {
 
   // Normal dashboard content
   const normalContent = (
-    <div className="space-y-6">
+    <div className="cph-board space-y-6 rounded-[20px] p-6">
       {/* Unified header with clock */}
       <div className="flex items-center justify-between">
         <div>
