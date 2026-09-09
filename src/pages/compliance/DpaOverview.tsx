@@ -276,7 +276,7 @@ export default function DpaOverview() {
             Status opdateres pr. leverandør, når aftalen er arkiveret.
           </p>
           <p className="font-medium text-foreground">
-            Gennemgås juridisk af Mathias/Lone før markering som komplet.
+            Gennemgås juridisk af Mathias før markering som komplet.
           </p>
         </DocSection>
       </ComplianceDocument>
