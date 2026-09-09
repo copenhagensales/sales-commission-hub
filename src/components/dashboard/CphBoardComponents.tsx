@@ -118,10 +118,16 @@ export function CphLeaderboard({
   const rows = maxRows ? sellers.slice(0, maxRows) : sellers;
   const fg = light ? ONYX : LIGHT;
   const fgDim = light ? ONYX_DIM : LIGHT_DIM;
-  const cols = `${tvMode ? "38px 46px" : "20px 28px"} minmax(0,1fr) ${tvMode ? "66px" : "32px"}${
-    showCrossSales ? (tvMode ? " 62px" : " 32px") : ""
-  }${showFiber ? (tvMode ? " 70px" : " 32px") : ""} ${tvMode ? "auto" : "minmax(56px,auto)"}`;
-  const colGap = tvMode ? 14 : showCrossSales || showFiber ? 8 : 14;
+  const cols = `${tvMode ? "38px 46px" : "20px 28px"} minmax(0,1fr) ${
+    tvMode ? "minmax(66px,auto)" : "minmax(38px,auto)"
+  }${showCrossSales ? (tvMode ? " minmax(62px,auto)" : " minmax(44px,auto)") : ""}${
+    showFiber ? (tvMode ? " minmax(70px,auto)" : " minmax(44px,auto)") : ""
+  } ${tvMode ? "minmax(130px,auto)" : "minmax(72px,auto)"}`;
+  const colGap = tvMode ? 14 : showCrossSales || showFiber ? 10 : 14;
+  const padL = tvMode ? 10 : 8;
+  const padR = tvMode ? 14 : 10;
+
+
 
 
 
@@ -154,7 +160,7 @@ export function CphLeaderboard({
         style={{
           gridTemplateColumns: cols,
           columnGap: colGap,
-          padding: tvMode ? "12px 0 8px" : "12px 0 8px",
+          padding: tvMode ? `12px ${padR}px 8px ${padL}px` : `12px ${padR}px 8px ${padL}px`,
           fontSize: tvMode ? 15 : 10,
           letterSpacing: tvMode ? "0.08em" : "0.02em",
           color: fgDim,
@@ -162,11 +168,12 @@ export function CphLeaderboard({
       >
         <span>#</span>
         <span />
-        <span>Navn</span>
+        <span className="truncate">Navn</span>
         <span style={{ textAlign: "right" }}>Salg</span>
         {showCrossSales && <span style={{ textAlign: "right" }}>{crossSalesLabel}</span>}
         {showFiber && <span style={{ textAlign: "right" }}>Fiber</span>}
-        <span style={{ textAlign: "right", minWidth: tvMode ? 118 : 66 }}>Provision</span>
+        <span style={{ textAlign: "right" }}>Provision</span>
+
       </div>
 
       {isLoading ? (
@@ -194,8 +201,9 @@ export function CphLeaderboard({
                 style={{
                   gridTemplateColumns: cols,
                   columnGap: colGap,
-                  padding: tvMode ? (isTop ? "10px 14px 10px 10px" : "12px 0") : isTop ? "10px 10px 10px 8px" : "10px 0",
-                  margin: isTop ? (tvMode ? "0 -14px 0 -10px" : "0 -10px 0 -8px") : undefined,
+                  padding: `${tvMode ? 12 : 10}px ${padR}px ${tvMode ? 12 : 10}px ${padL}px`,
+                  margin: undefined,
+
                   background: isTop ? (light ? ONYX : "hsl(var(--cph-light-blue) / 0.12)") : undefined,
                   color: isTop && light ? LIGHT : undefined,
                   borderRadius: isTop ? 16 : undefined,
@@ -269,15 +277,15 @@ export function CphLeaderboard({
                   </span>
                 )}
                 <span
-                  className="font-extrabold"
+                  className="whitespace-nowrap font-extrabold"
                   style={{
                     fontSize: tvMode ? (isTop ? 26 : 24) : 16,
                     textAlign: "right",
                     letterSpacing: "-0.02em",
-                    minWidth: tvMode ? 118 : 66,
                     fontVariantNumeric: "tabular-nums",
                   }}
                 >
+
                   {formatNumber(Math.round(seller.commission))}
                 </span>
               </div>
