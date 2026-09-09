@@ -6,6 +6,8 @@ import {
   Pencil,
   ArrowLeft,
   ArrowRight,
+  ChevronLeft,
+  ChevronRight,
   Heart,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -155,7 +157,7 @@ function PhotoSlot({
 }
 
 export function EventGallery() {
-  const { data: photos = [] } = useEventGalleryPhotos(4);
+  const { data: photos = [] } = useEventGalleryPhotos(24);
   const { data: canManage = false } = useCanManageEventGallery();
   const uploadMutation = useUploadEventPhotos();
   const deleteMutation = useDeleteEventPhoto();
@@ -176,6 +178,7 @@ export function EventGallery() {
   const [title, setTitle] = useState("");
   const [eventDate, setEventDate] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const [editPhoto, setEditPhoto] = useState<EventGalleryPhoto | null>(null);
   const [editTitle, setEditTitle] = useState("");
@@ -252,11 +255,23 @@ export function EventGallery() {
     );
   };
 
-  const slots = SLOT_PLACEHOLDERS.map((placeholder, index) => ({
-    placeholder,
-    photo: photos[index],
-  }));
+  // Vis mindst 4 felter, ellers alle billeder i vandret scroll
+  const slots =
+    photos.length >= SLOT_PLACEHOLDERS.length
+      ? photos.map((photo, index) => ({
+          photo,
+          placeholder: `Foto ${index + 1}`,
+        }))
+      : SLOT_PLACEHOLDERS.map((placeholder, index) => ({
+          placeholder,
+          photo: photos[index],
+        }));
 
+  const scrollByCards = (direction: -1 | 1) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollBy({ left: direction * Math.round(el.clientWidth * 0.8), behavior: "smooth" });
+  };
 
   return (
     <section className="relative overflow-hidden rounded-3xl bg-[hsl(var(--cph-onyx))] p-5 text-[hsl(var(--cph-light-blue))] md:p-6">
@@ -275,20 +290,48 @@ export function EventGallery() {
           <span className="inline-block h-3.5 w-[3px] rounded-sm bg-[hsl(var(--cph-emerald))]" />
           Seneste event
         </h2>
-        {canManage && (
-          <Button
-            onClick={openDialog}
-            className="h-auto gap-2 rounded-xl bg-[hsl(var(--cph-light-blue))] px-3.5 py-2 text-[13px] font-extrabold text-[hsl(var(--cph-onyx))] hover:bg-white"
-          >
-            <ImagePlus className="h-4 w-4" />
-            Læg billeder op
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {photos.length > SLOT_PLACEHOLDERS.length && (
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => scrollByCards(-1)}
+                aria-label="Vis tidligere billeder"
+                className="rounded-xl bg-[hsl(var(--cph-light-blue)/0.12)] p-2 text-[hsl(var(--cph-light-blue))] transition-colors hover:bg-[hsl(var(--cph-light-blue)/0.22)]"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollByCards(1)}
+                aria-label="Vis flere billeder"
+                className="rounded-xl bg-[hsl(var(--cph-light-blue)/0.12)] p-2 text-[hsl(var(--cph-light-blue))] transition-colors hover:bg-[hsl(var(--cph-light-blue)/0.22)]"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+          {canManage && (
+            <Button
+              onClick={openDialog}
+              className="h-auto gap-2 rounded-xl bg-[hsl(var(--cph-light-blue))] px-3.5 py-2 text-[13px] font-extrabold text-[hsl(var(--cph-onyx))] hover:bg-white"
+            >
+              <ImagePlus className="h-4 w-4" />
+              Læg billeder op
+            </Button>
+          )}
+        </div>
       </div>
 
-      <div className="relative grid grid-cols-2 gap-2.5 md:grid-cols-4">
+      <div
+        ref={scrollRef}
+        className="relative flex snap-x snap-mandatory gap-2.5 overflow-x-auto pb-1 [scrollbar-width:thin]"
+      >
         {slots.map((slot, index) => (
-          <div key={index} className="aspect-[4/3]">
+          <div
+            key={slot.photo?.id ?? `slot-${index}`}
+            className="aspect-[4/3] w-[calc(50%-5px)] shrink-0 snap-start md:w-[calc(25%-8px)]"
+          >
             <PhotoSlot
               photo={slot.photo}
               placeholder={slot.placeholder}
