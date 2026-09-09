@@ -23,6 +23,7 @@ export function ComplianceDocument({
   version,
   documentDate,
   statusLabel,
+  statusTone = "draft",
   children,
 }: ComplianceDocumentProps) {
   const navigate = useNavigate();
