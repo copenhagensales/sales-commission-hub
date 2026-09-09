@@ -352,6 +352,8 @@ export default function LocationProfitabilityContent() {
     const locationMap = new Map<string, LocationSalesData & { clientId: string }>();
     // Per locId → list of (clientId, bookedDays) for sale attribution
     const clientsByLocation = new Map<string, Array<{ clientId: string; bookedDays: number[] }>>();
+    // Brutto/netto lokationsomkostning pr. række (låst rabatsats pr. booking)
+    const costByRow = new Map<string, { gross: number; net: number; missingLocked: boolean }>();
 
     for (const booking of bookings) {
       const loc = booking.location as any;
