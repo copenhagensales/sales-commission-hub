@@ -710,7 +710,7 @@ export function PricingRuleEditor({
                 {isCompanionCondition(value) ? (
                   <>
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-medium text-sm">{key}</span>
+                      <span className="font-medium text-sm">{displayConditionKey(key)}</span>
                       <Button
                         variant="ghost"
                         size="icon"
