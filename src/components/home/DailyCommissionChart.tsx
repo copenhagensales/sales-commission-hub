@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { BarChart } from "lucide-react";
+
 import { formatCurrency } from "@/lib/calculations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -51,20 +51,21 @@ export function DailyCommissionChart({ dailyData }: DailyCommissionChartProps) {
   // Get motivational message
   const getMotivationalMessage = () => {
     const todayData = workdayData.find((d) => d.isToday);
-    
+
     if (hasStreak) {
-      return { emoji: "", text: "Du er på en streak!" };
+      return { headline: "Du er på en streak!", text: "Tre stærke dage i træk." };
     }
     if (todayData && todayData.commission > average) {
-      return { emoji: "", text: "Stærk dag!" };
+      return { headline: "Stærk dag!", text: "Du ligger over dit eget snit." };
     }
     if (daysAboveAverage >= workdayData.length / 2) {
-      return { emoji: "", text: `${daysAboveAverage} dage over snit` };
+      return { headline: `${daysAboveAverage} dage over snit.`, text: "Hold tempoet." };
     }
-    return { emoji: "💡", text: "Tid til comeback!" };
+    return { headline: "Tid til comeback.", text: "Næste salg tegner den næste søjle." };
   };
 
   const motivation = getMotivationalMessage();
+
 
   const chartConfig = {
     commission: {
@@ -86,36 +87,38 @@ export function DailyCommissionChart({ dailyData }: DailyCommissionChartProps) {
 
   if (workdayData.length === 0) {
     return (
-      <Card className="border border-border bg-card rounded-3xl">
-        <CardHeader className="pb-2 px-3 md:px-6 pt-3 md:pt-6">
-          <CardTitle className="flex items-center gap-2 text-sm md:text-base font-semibold">
-            <BarChart className="w-4 h-4 text-primary" />
-            Dine seneste 10 dage
+      <Card className="border-0 bg-card rounded-3xl">
+        <CardHeader className="px-6 pb-2 pt-6">
+          <CardTitle className="flex items-center gap-2.5 text-[15px] font-extrabold">
+            <span className="inline-block h-3.5 w-[3px] rounded-sm bg-[hsl(var(--cph-onyx))]" />
+            Seneste 10 dage
           </CardTitle>
         </CardHeader>
-        <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
-          <p className="text-xs md:text-sm text-muted-foreground">
-            Ingen salgsdata tilgængelig endnu.
+        <CardContent className="px-6 pb-6">
+          <p className="text-[14px] text-foreground/70">
+            <strong className="font-extrabold text-foreground">Tid til comeback.</strong> Første
+            salg tegner den første søjle.
           </p>
         </CardContent>
       </Card>
     );
   }
 
+
   return (
-    <Card className="border border-border bg-card rounded-3xl">
-      <CardHeader className="pb-2 px-3 md:px-6 pt-3 md:pt-6">
-        <div className="flex items-center justify-between gap-2">
-          <CardTitle className="flex items-center gap-1.5 md:gap-2 text-sm md:text-base font-semibold">
-            <BarChart className="w-3.5 h-3.5 md:w-4 md:h-4 text-primary" />
-            <span className="hidden sm:inline">Dine seneste 10 dage</span>
-            <span className="sm:hidden">Seneste 10 dage</span>
+    <Card className="border-0 bg-card rounded-3xl">
+      <CardHeader className="px-6 pb-2 pt-6">
+        <div className="flex items-baseline justify-between gap-2">
+          <CardTitle className="flex items-center gap-2.5 text-[15px] font-extrabold">
+            <span className="inline-block h-3.5 w-[3px] rounded-sm bg-[hsl(var(--cph-onyx))]" />
+            Seneste 10 dage
           </CardTitle>
-          <span className="text-[10px] md:text-xs text-muted-foreground whitespace-nowrap">
-            Snit: {formatCurrency(average)}/dag
+          <span className="whitespace-nowrap text-[13px] text-foreground/70 tabular-nums">
+            Snit {formatCurrency(average)}/dag
           </span>
         </div>
       </CardHeader>
+
       <CardContent className="pb-3 md:pb-4 px-2 md:px-6">
         <ChartContainer config={chartConfig} className="h-[120px] md:h-[140px] w-full">
           <RechartsBarChart
@@ -161,11 +164,12 @@ export function DailyCommissionChart({ dailyData }: DailyCommissionChartProps) {
           </RechartsBarChart>
         </ChartContainer>
 
-        {/* Motivational feedback - larger emoji on mobile */}
-        <div className="mt-2 md:mt-3 flex items-center justify-center md:justify-start gap-2 text-sm">
-          <span className="text-lg md:text-base">{motivation.emoji}</span>
-          <span className="text-xs md:text-sm text-muted-foreground">{motivation.text}</span>
-        </div>
+        {/* Motiverende feedback */}
+        <p className="mt-3 text-[14px] leading-[1.5] text-foreground/70">
+          <strong className="font-extrabold text-foreground">{motivation.headline}</strong>{" "}
+          {motivation.text}
+        </p>
+
       </CardContent>
     </Card>
   );

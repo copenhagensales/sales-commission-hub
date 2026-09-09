@@ -54,6 +54,8 @@ import { DailyCommissionChart } from "@/components/home/DailyCommissionChart";
 import { StickyPerformanceBar } from "@/components/home/StickyPerformanceBar";
 import { PendingContractBanner } from "@/components/home/PendingContractBanner";
 import { PendingPulseSurveyBanner } from "@/components/home/PendingPulseSurveyBanner";
+import { EventGallery } from "@/components/home/EventGallery";
+
 import { getPayrollPeriod, getVacationPayRate } from "@/lib/calculations";
 
 
@@ -504,23 +506,19 @@ const Home = () => {
         <PendingPulseSurveyBanner />
 
 
-        {/* ZONE 1: Hero Performance Card - Full Width with integrated CTA */}
-        <HeroPerformanceCard
-          firstName={firstName}
-          periodCommission={personalStats?.periodCommission || 0}
-          targetAmount={targetAmount}
-          progressPercent={progressPercent}
-          hasGoal={hasGoal}
-          vacationPay={vacationPay}
-          isEnrolledInLeague={isEnrolledInLeague}
-        />
-
-        {/* ZONE 2: League + Recognitions side by side */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
-          {/* Compact League View */}
-          <CompactLeagueView />
-
-          {/* Daily Commission Chart */}
+        {/* ZONE 1: Hero + seneste 10 dage */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <HeroPerformanceCard
+              firstName={firstName}
+              periodCommission={personalStats?.periodCommission || 0}
+              targetAmount={targetAmount}
+              progressPercent={progressPercent}
+              hasGoal={hasGoal}
+              vacationPay={vacationPay}
+              isEnrolledInLeague={isEnrolledInLeague}
+            />
+          </div>
           <DailyCommissionChart
             dailyData={personalWeeklyStats?.dailyBreakdown || []}
           />
@@ -545,7 +543,7 @@ const Home = () => {
                       <p className="font-medium">{celebration.name}</p>
                       <p className="text-sm text-muted-foreground">
                         {celebration.type === 'anniversary' 
-                          ? `${celebration.years} års jubilæum 🏆`
+                          ? `${celebration.years} års jubilæum`
                           : `Tillykke med fødselsdagen!`
                         }
                       </p>
@@ -558,15 +556,21 @@ const Home = () => {
           </Card>
         )}
 
+        {/* ZONE 2: Liga + kommende begivenheder */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <CompactLeagueView />
+          </div>
 
-        {/* ZONE 3: Upcoming Events - Full Width */}
-        <Card className="border border-border border-l-4 border-l-[hsl(var(--cph-emerald))] bg-card rounded-3xl">
-          <CardHeader className="pb-2 px-3 md:px-6 pt-3 md:pt-6">
+        <Card className="h-full border-0 bg-card rounded-3xl">
+
+          <CardHeader className="px-6 pb-2 pt-6">
             <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-1.5 md:gap-2 text-sm md:text-base font-semibold">
-                <Calendar className="w-3.5 h-3.5 md:w-4 md:h-4 text-primary" />
-                Kommende begivenheder
+              <CardTitle className="flex items-center gap-2.5 text-[15px] font-extrabold">
+                <span className="inline-block h-3.5 w-[3px] rounded-sm bg-[hsl(var(--cph-onyx))]" />
+                Næste begivenhed
               </CardTitle>
+
               <Dialog open={addEventOpen} onOpenChange={setAddEventOpen}>
                 <DialogTrigger asChild>
                   <Button variant="ghost" size="sm" className="h-8 w-8 md:h-7 md:w-7 p-0">
@@ -849,58 +853,71 @@ const Home = () => {
             </div>
           </CardContent>
         </Card>
+        </div>
 
-        {/* Collapsible Upcoming Celebrations */}
+        {/* ZONE 3: Billeder fra seneste event */}
+        <EventGallery />
+
+        {/* ZONE 4: Fødselsdage & jubilæer */}
         {upcomingCelebrations.length > 0 && (
-          <Collapsible open={celebrationsOpen} onOpenChange={setCelebrationsOpen}>
-            <Card className="border border-border bg-card rounded-3xl">
-              <CollapsibleTrigger asChild>
-                <CardHeader className="pb-2 cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                      <PartyPopper className="w-4 h-4 text-primary" />
-                      Kommende fødselsdage & jubilæer
-                      <Badge variant="secondary" className="text-xs">{upcomingCelebrations.length}</Badge>
-                    </CardTitle>
-                    <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${celebrationsOpen ? 'rotate-180' : ''}`} />
-                  </div>
-                </CardHeader>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <CardContent className="pt-0 px-3 md:px-6 pb-3 md:pb-6">
-                  <div className="flex flex-wrap gap-1.5 md:gap-2">
-                    {upcomingCelebrations.map((celebration, idx) => (
-                      <div 
-                        key={idx}
-                        className={`flex items-center gap-1.5 md:gap-2 px-2.5 md:px-3 py-1.5 md:py-2 rounded-lg text-xs md:text-sm border ${
-                          celebration.type === 'birthday' 
-                            ? 'bg-primary/10 border-primary/20' 
-                            : 'bg-amber-500/10 border-amber-500/20'
+          <section className="rounded-3xl bg-card p-6 md:px-8">
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+              <h2 className="flex items-center gap-2.5 text-[15px] font-extrabold text-foreground">
+                <span className="inline-block h-3.5 w-[3px] rounded-sm bg-[hsl(var(--cph-onyx))]" />
+                Fødselsdage &amp; jubilæer
+                <span className="font-normal text-foreground/70">· næste 14 dage</span>
+              </h2>
+              <span className="text-[13px] text-foreground/70">
+                {upcomingCelebrations.length} kollegaer
+              </span>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {upcomingCelebrations.map((celebration, idx) => {
+                const isAnniversary = celebration.type === 'anniversary';
+                return (
+                  <div
+                    key={idx}
+                    className={`flex items-center gap-3 rounded-2xl px-3.5 py-3 ${
+                      isAnniversary
+                        ? 'bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]'
+                        : 'bg-[hsl(var(--cph-light-blue))] text-[hsl(var(--cph-onyx))]'
+                    }`}
+                  >
+                    <span
+                      className={`flex h-9 w-9 flex-none items-center justify-center rounded-full text-[12px] font-extrabold ${
+                        isAnniversary
+                          ? 'bg-[hsl(var(--cph-light-blue))] text-[hsl(var(--cph-onyx))]'
+                          : 'bg-white text-[hsl(var(--cph-onyx))]'
+                      }`}
+                    >
+                      {celebration.name
+                        .split(' ')
+                        .map((part) => part[0])
+                        .slice(0, 2)
+                        .join('')
+                        .toUpperCase()}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[14px] font-extrabold">{celebration.name}</p>
+                      <p
+                        className={`text-[12px] ${
+                          isAnniversary
+                            ? 'font-extrabold text-[hsl(var(--cph-emerald))]'
+                            : 'text-[hsl(var(--cph-onyx)/0.76)]'
                         }`}
                       >
-                        {celebration.type === 'birthday' ? (
-                          <Cake className="w-4 h-4 text-foreground" />
-                        ) : (
-                          <Award className="w-3.5 h-3.5 md:w-4 md:h-4 text-amber-500" />
-                        )}
-                        <span className="font-medium">{celebration.name}</span>
-                        {celebration.type === 'anniversary' && (
-                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-500/30 text-amber-600 dark:text-amber-400">
-                            {celebration.years} år
-                          </Badge>
-                        )}
-                        <span className="text-muted-foreground hidden sm:inline">•</span>
-                        <span className="text-muted-foreground">
-                          {formatCelebrationDate(celebration.date, celebration.isToday)}
-                        </span>
-                      </div>
-                    ))}
+                        {isAnniversary
+                          ? `${celebration.years} års jubilæum · ${formatCelebrationDate(celebration.date, celebration.isToday)}`
+                          : `Fødselsdag · ${formatCelebrationDate(celebration.date, celebration.isToday)}`}
+                      </p>
+                    </div>
                   </div>
-                </CardContent>
-              </CollapsibleContent>
-            </Card>
-          </Collapsible>
+                );
+              })}
+            </div>
+          </section>
         )}
+
         </div>
       </div>
 

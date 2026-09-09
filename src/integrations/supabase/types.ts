@@ -7533,6 +7533,36 @@ export type Database = {
           },
         ]
       }
+      event_gallery_photos: {
+        Row: {
+          created_at: string
+          event_date: string | null
+          id: string
+          sort_order: number
+          storage_path: string
+          title: string | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_date?: string | null
+          id?: string
+          sort_order?: number
+          storage_path: string
+          title?: string | null
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_date?: string | null
+          id?: string
+          sort_order?: number
+          storage_path?: string
+          title?: string | null
+          uploaded_by?: string | null
+        }
+        Relationships: []
+      }
       event_invitation_views: {
         Row: {
           employee_id: string
@@ -15193,6 +15223,7 @@ export type Database = {
         Args: { _user_id: string }
         Returns: boolean
       }
+      can_manage_event_gallery: { Args: { _user_id: string }; Returns: boolean }
       can_manage_permissions: { Args: { _user_id: string }; Returns: boolean }
       can_view_employee: {
         Args: { _employee_id: string; _user_id: string }

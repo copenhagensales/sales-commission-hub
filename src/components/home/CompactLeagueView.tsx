@@ -1,8 +1,7 @@
 import { Link } from "react-router-dom";
-import { Trophy, ArrowRight, Users, Medal } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+
 import { 
   useActiveSeason, 
   useMyEnrollment, 
@@ -76,54 +75,62 @@ export function CompactLeagueView() {
     ? getNeighborStandings(allStandings, currentEmployeeId || null)
     : { visibleStandings: allStandings.slice(0, 3), myIndex: -1 };
 
+  const getInitials = (name: string) =>
+    name
+      .split(" ")
+      .map((part) => part[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase();
+
   return (
-    <Card className="border border-border bg-card rounded-3xl">
-      <CardHeader className="pb-2 px-3 md:px-6 pt-3 md:pt-6">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-1.5 md:gap-2 text-sm md:text-base font-semibold">
-            <Trophy className="w-3.5 h-3.5 md:w-4 md:h-4 text-[hsl(var(--cph-emerald))]" />
-            Din liga-position
+    <Card className="h-full border-0 bg-card rounded-3xl">
+      <CardHeader className="px-6 pb-2 pt-6">
+        <div className="flex items-baseline justify-between gap-3">
+          <CardTitle className="flex items-center gap-2.5 text-[15px] font-extrabold">
+            <span className="inline-block h-3.5 w-[3px] rounded-sm bg-[hsl(var(--cph-onyx))]" />
+            Liga · denne periode
           </CardTitle>
-          <div className="flex items-center gap-1 text-[10px] md:text-xs text-muted-foreground">
-            <Users className="w-3 h-3" />
-            <span>{enrollmentCount} tilmeldt</span>
-          </div>
+          <span className="text-[13px] text-foreground/70">{enrollmentCount} tilmeldt</span>
         </div>
       </CardHeader>
-      
-      <CardContent className="space-y-2 md:space-y-3 px-3 md:px-6 pb-3 md:pb-6">
+
+      <CardContent className="px-6 pb-6">
         {visibleStandings.length > 0 && (
-          <div className="space-y-1">
+          <div className="divide-y divide-[hsl(var(--cph-onyx)/0.1)] border-t border-[hsl(var(--cph-onyx)/0.1)]">
             {visibleStandings.map((standing, index) => {
               const isMe = standing.employee_id === currentEmployeeId;
-              const rank = standing.overall_rank || (index + 1);
-              const medal = isPodium(rank);
-              
+              const rank = standing.overall_rank || index + 1;
+              const name = formatPlayerName(standing.employee);
+
               return (
-                <div 
-                  key={standing.id} 
-                  className={`flex items-center justify-between py-2 md:py-1.5 px-2 md:px-2 rounded-lg text-xs md:text-sm ${
-                    isMe 
-                      ? "bg-primary/10 border border-primary/20 font-medium" 
-                      : "text-muted-foreground"
-                  }`}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    {medal ? (
-                      <span className="w-5 flex-shrink-0 flex items-center justify-center">
-                        <Medal className={`w-4 h-4 ${rank === 1 ? "text-[hsl(var(--cph-emerald))]" : "text-foreground/60"}`} />
-                      </span>
-                    ) : (
-                      <span className="text-[10px] md:text-xs font-medium w-5 text-center flex-shrink-0">
-                        #{rank}
-                      </span>
-                    )}
-                    <span className={`truncate ${isMe ? "text-foreground" : ""}`}>
-                      {formatPlayerName(standing.employee)}
-                      {isMe && <span className="text-primary ml-1">(dig)</span>}
-                    </span>
+                <div key={standing.id} className="flex items-center gap-4 py-4">
+                  <span
+                    className={`w-6 text-[20px] font-extrabold tracking-[-0.02em] tabular-nums ${
+                      rank === 1 ? "text-foreground" : "text-foreground/70"
+                    }`}
+                  >
+                    {rank}
+                  </span>
+                  <span
+                    className={`flex h-10 w-10 flex-none items-center justify-center rounded-full text-[13px] font-extrabold ${
+                      rank === 1
+                        ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-emerald))] ring-2 ring-[hsl(var(--cph-emerald))]"
+                        : "bg-[hsl(var(--cph-light-blue))] text-[hsl(var(--cph-onyx))]"
+                    }`}
+                  >
+                    {getInitials(name)}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[15px] font-extrabold text-foreground">
+                      {name}
+                      {isMe && <span className="ml-1 font-normal text-foreground/70">(dig)</span>}
+                    </p>
+                    <p className="text-[13px] text-foreground/70">
+                      {standing.deals_count ? `${standing.deals_count} salg` : "Ingen salg endnu"}
+                    </p>
                   </div>
-                  <span className={`tabular-nums flex-shrink-0 ml-2 ${isMe ? "text-foreground" : ""}`}>
+                  <span className="text-[20px] font-extrabold tracking-[-0.02em] tabular-nums text-foreground">
                     {formatProvision(standing.current_provision || 0)}
                   </span>
                 </div>
@@ -132,13 +139,17 @@ export function CompactLeagueView() {
           </div>
         )}
 
-        <Link to="/commission-league">
-          <Button variant="outline" size="sm" className="w-full gap-2 mt-1 md:mt-2 h-10 md:h-9 text-xs md:text-sm">
+        <div className="mt-4 flex justify-end">
+          <Link
+            to="/commission-league"
+            className="flex items-center gap-1.5 text-[14px] font-extrabold text-foreground hover:opacity-70"
+          >
             Se fuld liga
-            <ArrowRight className="w-3 h-3" />
-          </Button>
-        </Link>
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
       </CardContent>
     </Card>
   );
 }
+
