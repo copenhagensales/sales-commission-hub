@@ -775,6 +775,25 @@
   background: hsl(var(--cph-onyx)) !important;
   color: hsl(var(--cph-light-blue)) !important;
   font-variant-numeric: tabular-nums;
+
+  /* Semantiske tokens re-themes lokalt, så shadcn-kort m.m. følger stilen */
+  --background: var(--cph-onyx);
+  --foreground: var(--cph-light-blue);
+  --card: 218 8% 24%;
+  --card-foreground: var(--cph-light-blue);
+  --popover: 218 8% 24%;
+  --popover-foreground: var(--cph-light-blue);
+  --primary: var(--cph-emerald);
+  --primary-foreground: var(--cph-onyx);
+  --secondary: 218 8% 26%;
+  --secondary-foreground: var(--cph-light-blue);
+  --muted: 218 8% 26%;
+  --muted-foreground: 186 18% 78%;
+  --accent: var(--cph-emerald);
+  --accent-foreground: var(--cph-onyx);
+  --border: 186 14% 34%;
+  --input: 186 14% 34%;
+  --ring: var(--cph-emerald);
 }
 
 /* Baggrundsflader */
