@@ -276,24 +276,24 @@ export function EventGallery() {
         }}
       />
 
-      <div className="relative mb-3 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2 text-[13px] font-extrabold">
-          <span className="inline-block h-3 w-[3px] rounded-sm bg-[hsl(var(--cph-emerald))]" />
+      <div className="relative mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2.5 text-[14px] font-extrabold">
+          <span className="inline-block h-3.5 w-[3px] rounded-sm bg-[hsl(var(--cph-emerald))]" />
           Seneste event
         </h2>
         {canManage && (
           <Button
             onClick={openDialog}
-            className="h-auto gap-1.5 rounded-xl bg-[hsl(var(--cph-light-blue))] px-3 py-1.5 text-[12px] font-extrabold text-[hsl(var(--cph-onyx))] hover:bg-white"
+            className="h-auto gap-2 rounded-xl bg-[hsl(var(--cph-light-blue))] px-3.5 py-2 text-[13px] font-extrabold text-[hsl(var(--cph-onyx))] hover:bg-white"
           >
-            <ImagePlus className="h-3.5 w-3.5" />
+            <ImagePlus className="h-4 w-4" />
             Læg billeder op
           </Button>
         )}
       </div>
 
-      <div className="relative grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
-        <div className="aspect-[4/3] md:aspect-[4/3]">
+      <div className="relative grid grid-cols-2 gap-2.5 sm:grid-cols-4 md:auto-rows-[104px] md:grid-cols-4">
+        <div className="col-span-2 row-span-2 aspect-[16/10] sm:aspect-auto">
           <PhotoSlot
             photo={slots[0].photo}
             placeholder={slots[0].placeholder}
