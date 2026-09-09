@@ -343,6 +343,40 @@ export function EventGallery() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!editPhoto} onOpenChange={(open) => !open && setEditPhoto(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rediger billede</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label htmlFor="gallery-edit-title">Titel</Label>
+              <Input
+                id="gallery-edit-title"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                placeholder="Fx Firmadag hos Suitclub"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="gallery-edit-date">Dato for begivenheden</Label>
+              <Input
+                id="gallery-edit-date"
+                type="date"
+                value={editDate}
+                onChange={(e) => setEditDate(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={handleSaveEdit} disabled={updateMutation.isPending}>
+              {updateMutation.isPending ? "Gemmer..." : "Gem"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </section>
   );
 }
