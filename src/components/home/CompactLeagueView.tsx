@@ -59,6 +59,7 @@ export function CompactLeagueView() {
   const { data: currentEmployeeId } = useCurrentEmployeeId();
   const { data: allStandings = [] } = useQualificationStandings(season?.id);
   const { data: enrollmentCount = 0 } = useEnrollmentCount(season?.id);
+  const lookupAvatar = useAvatarLookup();
 
   const formatProvision = (amount: number) => {
     return new Intl.NumberFormat("da-DK", {
