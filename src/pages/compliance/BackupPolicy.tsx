@@ -2,7 +2,6 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import {
   ComplianceDocument,
   DocSection,
-  Confirm,
 } from "@/components/compliance/ComplianceDocument";
 
 export default function BackupPolicy() {
