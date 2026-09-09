@@ -356,7 +356,7 @@ export default function LocationHistoryContent() {
 
     const ensureWeek = (weeks: Map<string, WeekBucket>, w: number, y: number) => {
       const key = `${y}-${w}`;
-      if (!weeks.has(key)) weeks.set(key, { week: w, year: y, revenue: 0, commission: 0, sales: 0, days: 0, locationCost: 0, hotelCost: 0, dietCost: 0 });
+      if (!weeks.has(key)) weeks.set(key, { week: w, year: y, revenue: 0, commission: 0, sales: 0, days: 0, locationCost: 0, hotelCost: 0, dietCost: 0, locationCostGross: 0, locationCostNet: 0, missingLockedDiscount: false });
       return weeks.get(key)!;
     };
 
