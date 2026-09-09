@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { BarChart } from "lucide-react";
+
 import { formatCurrency } from "@/lib/calculations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
