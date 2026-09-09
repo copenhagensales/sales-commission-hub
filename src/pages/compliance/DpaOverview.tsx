@@ -212,7 +212,10 @@ export default function DpaOverview() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((row) => (
+                {rows.map((row) => {
+                  const vendorDocs = byVendor(row.vendor);
+                  const isArchived = vendorDocs.length > 0;
+                  return (
                   <TableRow key={row.vendor} className="align-top">
                     <TableCell className="font-medium">{row.vendor}</TableCell>
                     <TableCell className="text-muted-foreground">{row.purpose}</TableCell>
