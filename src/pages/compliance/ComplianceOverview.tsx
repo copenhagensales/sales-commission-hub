@@ -1,6 +1,6 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Shield, Users, FileText, Lock, ArrowRight, Bell, ClipboardList, AlertTriangle, Globe, Clock, Search, GraduationCap, Brain, Eye } from "lucide-react";
+import { Shield, Users, FileText, Lock, ArrowRight, Bell, ClipboardList, AlertTriangle, Globe, Clock, Search, GraduationCap, Brain, Eye, Database } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { usePermissions } from "@/hooks/usePositionPermissions";
@@ -129,6 +129,31 @@ export default function ComplianceOverview() {
     },
   ];
 
+  const documents = [
+    {
+      title: "Backup- og gendannelsespolitik (GDPR)",
+      description:
+        "Backup-retention, hvornår anonymisering er fuldt irreversibel, og hvem der må gendanne data.",
+      icon: Database,
+      badge: "Udkast 0.1",
+      badgeColor: "bg-amber-500/10 text-amber-700 border-amber-500/30",
+      href: "/compliance/documents/backup-policy",
+      permKey: "menu_compliance_admin",
+    },
+    {
+      title: "Fortegnelse over behandlingsaktiviteter (art. 30) og risikovurdering",
+      description:
+        "Roller, behandlingsaktiviteter, databehandlere, sikkerhedsforanstaltninger og åbne punkter.",
+      icon: ClipboardList,
+      badge: "Udkast 0.1",
+      badgeColor: "bg-amber-500/10 text-amber-700 border-amber-500/30",
+      href: "/compliance/documents/processing-registry",
+      permKey: "menu_compliance_admin",
+    },
+  ];
+
+  const visibleDocuments = documents.filter((doc) => p.canView(doc.permKey));
+
   return (
     <MainLayout>
       <div className="max-w-4xl mx-auto space-y-8 p-6">
@@ -183,6 +208,44 @@ export default function ComplianceOverview() {
             </Card>
           ))}
         </div>
+
+        {visibleDocuments.length > 0 && (
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <h2 className="text-2xl font-semibold text-foreground">Compliance-dokumenter</h2>
+              <p className="text-sm text-muted-foreground">
+                Formelle dokumenter til godkendelse. Kan læses her og printes eller gemmes som PDF.
+              </p>
+            </div>
+            <div className="grid gap-6 md:grid-cols-2">
+              {visibleDocuments.map((doc) => (
+                <Card
+                  key={doc.href}
+                  className="cursor-pointer hover:shadow-md transition-all hover:scale-[1.02] group"
+                  onClick={() => navigate(doc.href)}
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <doc.icon className="h-6 w-6 text-primary" />
+                      <Badge variant="outline" className={doc.badgeColor}>
+                        {doc.badge}
+                      </Badge>
+                    </div>
+                    <CardTitle className="text-lg">{doc.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <CardDescription className="text-sm leading-relaxed">
+                      {doc.description}
+                    </CardDescription>
+                    <div className="flex items-center gap-1 mt-4 text-sm text-primary font-medium group-hover:gap-2 transition-all">
+                      Åbn dokument <ArrowRight className="h-4 w-4" />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </MainLayout>
   );
