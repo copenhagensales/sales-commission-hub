@@ -114,7 +114,106 @@ const rows: DpaRow[] = [
   },
 ];
 
+function ArchiveCell({
+  vendor,
+  documents,
+  canManage,
+}: {
+  vendor: string;
+  documents: DpaDocument[];
+  canManage: boolean;
+}) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [busy, setBusy] = useState(false);
+  const uploadMut = useUploadDpaDocument();
+  const deleteMut = useDeleteDpaDocument();
+  const openMut = useOpenDpaDocument();
+
+  const handleFile = async (file: File | undefined) => {
+    if (!file) return;
+    if (file.size > 25 * 1024 * 1024) {
+      toast.error("Filen må højst være 25 MB");
+      return;
+    }
+    setBusy(true);
+    try {
+      await uploadMut.mutateAsync({ vendor, file });
+      toast.success(`Aftalen er arkiveret for ${vendor}`);
+    } catch {
+      toast.error("Kunne ikke arkivere filen");
+    } finally {
+      setBusy(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      {documents.length === 0 && (
+        <p className="text-muted-foreground">Ingen fil arkiveret</p>
+      )}
+      {documents.map((doc) => (
+        <div key={doc.id} className="flex items-start gap-1">
+          <button
+            type="button"
+            onClick={() => openMut.mutate(doc.storage_path)}
+            className="flex items-start gap-1 text-left text-primary underline break-all"
+          >
+            <FileText className="h-4 w-4 shrink-0" />
+            <span>{doc.file_name}</span>
+          </button>
+          {canManage && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 shrink-0"
+              onClick={async () => {
+                if (!window.confirm(`Slet ${doc.file_name} fra arkivet?`)) return;
+                try {
+                  await deleteMut.mutateAsync(doc);
+                  toast.success("Filen er slettet fra arkivet");
+                } catch {
+                  toast.error("Kunne ikke slette filen");
+                }
+              }}
+            >
+              <Trash2 className="h-3.5 w-3.5 text-destructive" />
+            </Button>
+          )}
+        </div>
+      ))}
+
+      {canManage && (
+        <div data-no-print>
+          <input
+            ref={inputRef}
+            type="file"
+            accept=".pdf,.png,.jpg,.jpeg,.docx"
+            className="hidden"
+            onChange={(e) => handleFile(e.target.files?.[0])}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={busy}
+            onClick={() => inputRef.current?.click()}
+          >
+            <Upload className="h-3.5 w-3.5 mr-2" />
+            {busy ? "Uploader..." : "Upload aftale"}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DpaOverview() {
+  const { data: documents } = useDpaDocuments();
+  const { data: canManage } = useCanManageDpaDocuments();
+
+  const byVendor = (vendor: string) =>
+    (documents || []).filter((doc) => doc.vendor === vendor);
+
   return (
     <MainLayout>
       <ComplianceDocument
