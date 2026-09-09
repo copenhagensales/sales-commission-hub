@@ -202,7 +202,10 @@ Deno.serve(async (req) => {
       if (drErr) throw new Error(`system_roles (dup): ${drErr.message}`);
 
       for (const r of dupRoles ?? []) {
-        if (keptRoleSet.has(r.role as string)) {
+        // system_roles har unique(user_id): stamkort-kontoen kan kun have én række,
+        // og dens eksisterende rolle må aldrig overskrives. Kun hvis stamkort-kontoen
+        // slet ingen rolle har, flyttes dubletrækken — ellers slettes den.
+        if (keptRoleSet.size > 0) {
           const { error } = await svc.from("system_roles").delete().eq("id", r.id);
           if (error) throw new Error(`system_roles delete: ${error.message}`);
           rolesDeleted++;
@@ -215,6 +218,7 @@ Deno.serve(async (req) => {
           keptRoleSet.add(r.role as string);
           rolesMoved++;
         }
+
       }
       detail.duplicate_roles = (dupRoles ?? []).map((r) => r.role);
 
