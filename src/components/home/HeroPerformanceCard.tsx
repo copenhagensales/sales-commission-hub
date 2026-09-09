@@ -2,7 +2,6 @@ import { useMemo, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { TrendingUp, Target, ArrowRight, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 interface HeroPerformanceCardProps {
   firstName: string;
@@ -51,13 +50,6 @@ export function HeroPerformanceCard({
     return () => clearInterval(timer);
   }, [progressPercent, periodCommission]);
 
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Godmorgen";
-    if (hour < 17) return "God eftermiddag";
-    return "God aften";
-  };
-
   const formatCommission = (amount: number) => {
     return new Intl.NumberFormat("da-DK", {
       style: "decimal",
@@ -69,30 +61,11 @@ export function HeroPerformanceCard({
   // Get contextual motivational message based on progress
   const motivationalMessage = useMemo(() => {
     if (!hasGoal) return "Sæt et mål for at tracke din fremgang";
-    if (progressPercent >= 120) return "Du er on fire! 🔥";
+    if (progressPercent >= 120) return "Du er i topform!";
     if (progressPercent >= 100) return "Mål nået! Går du efter rekorden?";
     if (progressPercent >= 80) return "Målstregen er i sigte!";
     if (progressPercent >= 50) return "Du er på vej - keep going!";
     return "Hver samtale tæller!";
-  }, [progressPercent, hasGoal]);
-
-  // Get performance emoji based on progress
-  const performanceEmoji = useMemo(() => {
-    if (!hasGoal) return "👋";
-    if (progressPercent >= 120) return "🔥";
-    if (progressPercent >= 100) return "🏆";
-    if (progressPercent >= 80) return "💪";
-    if (progressPercent >= 50) return "📈";
-    return "🚀";
-  }, [progressPercent, hasGoal]);
-
-  // Get performance tier for gradient styling
-  const performanceTier = useMemo(() => {
-    if (!hasGoal) return 'none';
-    if (progressPercent >= 100) return 'flying';
-    if (progressPercent >= 80) return 'ahead';
-    if (progressPercent >= 50) return 'warmup';
-    return 'start';
   }, [progressPercent, hasGoal]);
 
   // Get contextual CTA
@@ -124,21 +97,6 @@ export function HeroPerformanceCard({
       icon: Trophy,
     };
   }, [hasGoal, progressPercent]);
-
-  // SVG progress ring calculations - responsive sizes
-  const ringSize = { mobile: 88, desktop: 140 };
-  const strokeWidth = { mobile: 8, desktop: 10 };
-  
-  const getCircleProps = (size: number, stroke: number) => {
-    const radius = (size - stroke) / 2;
-    const circumference = 2 * Math.PI * radius;
-    const cappedProgress = Math.min(animatedPercent, 100);
-    const strokeDashoffset = circumference - (cappedProgress / 100) * circumference;
-    return { radius, circumference, strokeDashoffset };
-  };
-
-  const mobileCircle = getCircleProps(ringSize.mobile, strokeWidth.mobile);
-  const desktopCircle = getCircleProps(ringSize.desktop, strokeWidth.desktop);
 
   return (
     <section className="relative overflow-hidden rounded-3xl bg-[hsl(var(--cph-onyx))] p-6 md:p-10 text-[hsl(var(--cph-light-blue))]">
