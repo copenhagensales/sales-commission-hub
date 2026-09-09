@@ -89,8 +89,8 @@ export default function Auth() {
           <ul className="mt-1 flex flex-col gap-3">
             {[
               "Provision og bonus i realtid",
-              "Overblik over din pipeline",
-              "Historik på alle udbetalinger",
+              "Dashboards med dine resultater",
+              "Følg Ligaen og konkurrencerne",
             ].map((t) => (
               <li key={t} className="flex items-center gap-3 text-[15px] font-medium text-[#c8d2e4]">
                 <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-[#E8B23A]" />
