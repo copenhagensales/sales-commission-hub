@@ -1125,11 +1125,16 @@ export function SupplierReportTab() {
                 if (hasDiscount) {
                   const sumDisc = locationDiscounts.reduce((s: number, l: any) => s + (l.discountAmount || 0), 0);
                   const sumFinal = locationDiscounts.reduce((s: number, l: any) => s + (l.finalAmount || 0), 0);
-                  totalRow.push("", sumDisc, sumFinal);
+                  totalRow.push(
+                    `${effectiveDiscountPercent.toLocaleString("da-DK", { maximumFractionDigits: 2 })}% effektiv`,
+                    sumDisc,
+                    sumFinal
+                  );
                 }
+                if (isAnnualRevenue) totalRow.push("");
 
                 const allData = [...metaRows, headers, ...rows, totalRow];
-                const colWidths = [25, 10, 15, 40, 8, 12, ...(hasDiscount ? [10, 12, 12] : [])];
+                const colWidths = [25, 10, 15, 40, 8, 12, ...(hasDiscount ? [10, 12, 12] : []), ...(isAnnualRevenue ? [16] : [])];
                 const boldRowIdxs = [0, 1, 3, allData.length - 1];
                 await downloadExcelAoa(
                   `Leverandorrapport_${selectedLocationType}_${filePeriod}.xlsx`,
