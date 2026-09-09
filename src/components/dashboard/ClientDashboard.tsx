@@ -337,7 +337,10 @@ export default function ClientDashboard({ config }: { config: ClientDashboardCon
     kpiCards.push({ label: "Salg/time (løn)", value: payrollSalesPerHour.toFixed(2), sub: `${payrollHours.toFixed(1)} timer`, icon: TrendingUp });
   }
 
+  const primaryKpiCount = kpiCards.length;
+
   // Secondary client KPI cards (e.g. Hiper on Eesy TM)
+
   if (hasSecondary) {
     kpiCards.push({
       label: `${secondaryLabel} i dag`,
