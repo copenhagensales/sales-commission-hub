@@ -59,7 +59,7 @@ const categories: Category[] = [
     label: "Opsætning",
     icon: <Settings className="h-4 w-4" />,
     description: "Administration af lønarter og personale",
-    colorClass: "data-[state=active]:bg-muted",
+    colorClass: "",
     subTabs: [
       {
         id: "salary-types",
@@ -120,7 +120,7 @@ const categories: Category[] = [
     label: "Lønberegning",
     icon: <Calculator className="h-4 w-4" />,
     description: "Beregning af provisioner og lønninger",
-    colorClass: "data-[state=active]:bg-primary/10 data-[state=active]:text-primary",
+    colorClass: "",
     subTabs: [
       {
         id: "seller-salaries",
@@ -145,7 +145,7 @@ const categories: Category[] = [
     label: "Rapporter",
     icon: <BarChart3 className="h-4 w-4" />,
     description: "DB-oversigt og analyse",
-    colorClass: "data-[state=active]:bg-orange-100 data-[state=active]:text-orange-700 dark:data-[state=active]:bg-orange-900/30 dark:data-[state=active]:text-orange-400",
+    colorClass: "",
     subTabs: [
       {
         id: "db-overview",
@@ -241,20 +241,22 @@ export function CategoryTabs() {
     <div className="space-y-6">
       {/* Desktop: Main category tabs */}
       <Tabs value={activeCategory} onValueChange={setActiveCategory}>
-        <TabsList className="grid w-full grid-cols-3 h-auto p-1">
+        <TabsList className="grid w-full grid-cols-3 h-auto gap-1 rounded-2xl border border-border/80 bg-card p-1.5 shadow-sm ring-1 ring-foreground/5">
           {categories.map((cat) => (
             <TabsTrigger
               key={cat.id}
               value={cat.id}
               className={cn(
-                "flex items-center gap-2 py-3 px-4 transition-all",
+                "flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-muted-foreground transition-all",
+                "hover:bg-muted/60 hover:text-foreground",
+                "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none",
                 cat.colorClass
               )}
             >
               {cat.icon}
               <div className="text-left hidden sm:block">
-                <div className="font-medium">{cat.label}</div>
-                <div className="text-[10px] text-muted-foreground font-normal">
+                <div className="font-semibold leading-tight">{cat.label}</div>
+                <div className="text-[10px] font-normal leading-tight opacity-70">
                   {cat.description}
                 </div>
               </div>
@@ -267,12 +269,12 @@ export function CategoryTabs() {
           <TabsContent key={cat.id} value={cat.id} className="mt-6">
             {/* Sub-tabs for each category */}
             <Tabs value={activeSubTabs[cat.id]} onValueChange={handleSubTabChange}>
-              <TabsList className="mb-4">
+              <TabsList className="mb-4 h-auto flex-wrap justify-start gap-1 rounded-xl border border-border/80 bg-card p-1.5 shadow-sm ring-1 ring-foreground/5">
                 {cat.subTabs.map((sub) => (
                   <TabsTrigger
                     key={sub.id}
                     value={sub.id}
-                    className="flex items-center gap-2"
+                    className="flex items-center gap-2 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:bg-muted/60 hover:text-foreground data-[state=active]:bg-secondary data-[state=active]:text-secondary-foreground data-[state=active]:font-semibold data-[state=active]:shadow-none"
                   >
                     {sub.icon}
                     <span>{sub.label}</span>
