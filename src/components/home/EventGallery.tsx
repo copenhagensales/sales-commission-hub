@@ -1,5 +1,12 @@
 import { useRef, useState } from "react";
-import { ImagePlus, Trash2, Image as ImageIcon } from "lucide-react";
+import {
+  ImagePlus,
+  Trash2,
+  Image as ImageIcon,
+  Pencil,
+  ArrowLeft,
+  ArrowRight,
+} from "lucide-react";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import { da } from "date-fns/locale";
@@ -18,6 +25,8 @@ import {
   useCanManageEventGallery,
   useUploadEventPhotos,
   useDeleteEventPhoto,
+  useUpdateEventPhoto,
+  useReorderEventPhotos,
   type EventGalleryPhoto,
 } from "@/hooks/useEventGallery";
 
@@ -33,14 +42,22 @@ function PhotoSlot({
   photo,
   placeholder,
   canManage,
+  canMoveBack,
+  canMoveForward,
   onDelete,
   onAdd,
+  onEdit,
+  onMove,
 }: {
   photo?: EventGalleryPhoto;
   placeholder: string;
   canManage: boolean;
+  canMoveBack?: boolean;
+  canMoveForward?: boolean;
   onDelete: (photo: EventGalleryPhoto) => void;
   onAdd: () => void;
+  onEdit: (photo: EventGalleryPhoto) => void;
+  onMove: (photo: EventGalleryPhoto, direction: -1 | 1) => void;
 }) {
   if (photo?.url) {
     return (
@@ -62,14 +79,42 @@ function PhotoSlot({
           </div>
         )}
         {canManage && (
-          <button
-            type="button"
-            onClick={() => onDelete(photo)}
-            aria-label="Fjern billede"
-            className="absolute right-2 top-2 rounded-lg bg-[hsl(var(--cph-onyx)/0.8)] p-1.5 text-[hsl(var(--cph-light-blue))] opacity-0 transition-opacity group-hover:opacity-100"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
+          <div className="absolute right-2 top-2 flex flex-wrap items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+            <button
+              type="button"
+              onClick={() => onMove(photo, -1)}
+              disabled={!canMoveBack}
+              aria-label="Flyt billedet frem i rækkefølgen"
+              className="rounded-lg bg-[hsl(var(--cph-onyx)/0.8)] p-1.5 text-[hsl(var(--cph-light-blue))] disabled:opacity-30"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onMove(photo, 1)}
+              disabled={!canMoveForward}
+              aria-label="Flyt billedet tilbage i rækkefølgen"
+              className="rounded-lg bg-[hsl(var(--cph-onyx)/0.8)] p-1.5 text-[hsl(var(--cph-light-blue))] disabled:opacity-30"
+            >
+              <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onEdit(photo)}
+              aria-label="Rediger billedet"
+              className="rounded-lg bg-[hsl(var(--cph-onyx)/0.8)] p-1.5 text-[hsl(var(--cph-light-blue))]"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onDelete(photo)}
+              aria-label="Fjern billede"
+              className="rounded-lg bg-[hsl(var(--cph-onyx)/0.8)] p-1.5 text-[hsl(var(--cph-light-blue))]"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
         )}
       </div>
     );
@@ -97,6 +142,8 @@ export function EventGallery() {
   const { data: canManage = false } = useCanManageEventGallery();
   const uploadMutation = useUploadEventPhotos();
   const deleteMutation = useDeleteEventPhoto();
+  const updateMutation = useUpdateEventPhoto();
+  const reorderMutation = useReorderEventPhotos();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
@@ -104,11 +151,52 @@ export function EventGallery() {
   const [eventDate, setEventDate] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const [editPhoto, setEditPhoto] = useState<EventGalleryPhoto | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDate, setEditDate] = useState("");
+
   const openDialog = () => {
     setFiles([]);
     setTitle("");
     setEventDate("");
     setDialogOpen(true);
+  };
+
+  const openEdit = (photo: EventGalleryPhoto) => {
+    setEditPhoto(photo);
+    setEditTitle(photo.title || "");
+    setEditDate(photo.event_date || "");
+  };
+
+  const handleSaveEdit = () => {
+    if (!editPhoto) return;
+    updateMutation.mutate(
+      { id: editPhoto.id, title: editTitle, eventDate: editDate },
+      {
+        onSuccess: () => {
+          toast.success("Billedet er opdateret");
+          setEditPhoto(null);
+        },
+        onError: () => toast.error("Kunne ikke opdatere billedet"),
+      }
+    );
+  };
+
+  const handleMove = (photo: EventGalleryPhoto, direction: -1 | 1) => {
+    const currentIndex = photos.findIndex((p) => p.id === photo.id);
+    const targetIndex = currentIndex + direction;
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= photos.length) return;
+
+    const ordered = photos.map((p) => p.id);
+    [ordered[currentIndex], ordered[targetIndex]] = [
+      ordered[targetIndex],
+      ordered[currentIndex],
+    ];
+
+    reorderMutation.mutate(ordered, {
+      onSuccess: () => toast.success("Rækkefølgen er gemt"),
+      onError: () => toast.error("Kunne ikke ændre rækkefølgen"),
+    });
   };
 
   const handleUpload = () => {
@@ -142,6 +230,7 @@ export function EventGallery() {
     placeholder,
     photo: photos[index],
   }));
+
 
   return (
     <section className="relative overflow-hidden rounded-3xl bg-[hsl(var(--cph-onyx))] p-6 text-[hsl(var(--cph-light-blue))] md:p-8">
@@ -177,8 +266,12 @@ export function EventGallery() {
             photo={slots[0].photo}
             placeholder={slots[0].placeholder}
             canManage={canManage}
+            canMoveBack={false}
+            canMoveForward={photos.length > 1}
             onDelete={handleDelete}
             onAdd={openDialog}
+            onEdit={openEdit}
+            onMove={handleMove}
           />
         </div>
         {slots.slice(1).map((slot, index) => (
@@ -187,11 +280,16 @@ export function EventGallery() {
               photo={slot.photo}
               placeholder={slot.placeholder}
               canManage={canManage}
+              canMoveBack
+              canMoveForward={index + 2 < photos.length}
               onDelete={handleDelete}
               onAdd={openDialog}
+              onEdit={openEdit}
+              onMove={handleMove}
             />
           </div>
         ))}
+
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -245,6 +343,40 @@ export function EventGallery() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!editPhoto} onOpenChange={(open) => !open && setEditPhoto(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rediger billede</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label htmlFor="gallery-edit-title">Titel</Label>
+              <Input
+                id="gallery-edit-title"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                placeholder="Fx Firmadag hos Suitclub"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="gallery-edit-date">Dato for begivenheden</Label>
+              <Input
+                id="gallery-edit-date"
+                type="date"
+                value={editDate}
+                onChange={(e) => setEditDate(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={handleSaveEdit} disabled={updateMutation.isPending}>
+              {updateMutation.isPending ? "Gemmer..." : "Gem"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </section>
   );
 }
