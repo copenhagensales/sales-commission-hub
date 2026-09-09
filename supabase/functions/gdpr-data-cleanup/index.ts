@@ -587,9 +587,19 @@ Deno.serve(async (req) => {
 
 
     // ===== PART 4: Summary and audit log =====
-    const totalActions = totalFieldsCleaned + campaignSalesAnonymized + campaignSalesDeleted + candidatesProcessed + customerInquiriesDeleted + inactiveEmployeesDeleted;
+    const totalActions =
+      totalFieldsCleaned +
+      campaignSalesAnonymized +
+      campaignSalesDeleted +
+      candidatesProcessed +
+      customerInquiriesDeleted +
+      customerInquiriesAnonymized +
+      communicationLogsAnonymized +
+      loginEventsAnonymized +
+      inactiveEmployeesDeleted +
+      inactiveEmployeesAnonymized;
 
-    log("INFO", `GDPR cleanup complete. Fields: ${totalFieldsCleaned}, Campaign anon: ${campaignSalesAnonymized}, Campaign del: ${campaignSalesDeleted}, Candidates: ${candidatesProcessed}, Inquiries: ${customerInquiriesDeleted}, Employees: ${inactiveEmployeesDeleted}`);
+    log("INFO", `GDPR cleanup complete. Fields: ${totalFieldsCleaned}, Campaign anon: ${campaignSalesAnonymized}, Campaign del: ${campaignSalesDeleted}, Candidates: ${candidatesProcessed}, Inquiries del/anon: ${customerInquiriesDeleted}/${customerInquiriesAnonymized}, Comm logs anon: ${communicationLogsAnonymized}, Login events anon: ${loginEventsAnonymized}, Employees del/anon: ${inactiveEmployeesDeleted}/${inactiveEmployeesAnonymized}`);
 
     if (totalActions > 0) {
       await supabase.from("audit_logs").insert({
@@ -602,7 +612,11 @@ Deno.serve(async (req) => {
           campaign_results: campaignResults,
           candidates_processed: candidatesProcessed,
           customer_inquiries_deleted: customerInquiriesDeleted,
+          customer_inquiries_anonymized: customerInquiriesAnonymized,
+          communication_logs_anonymized: communicationLogsAnonymized,
+          login_events_anonymized: loginEventsAnonymized,
           inactive_employees_deleted: inactiveEmployeesDeleted,
+          inactive_employees_anonymized: inactiveEmployeesAnonymized,
           timestamp: new Date().toISOString(),
         },
       }).catch(() => {
@@ -618,13 +632,18 @@ Deno.serve(async (req) => {
         campaignSalesDeleted,
         candidatesProcessed,
         customerInquiriesDeleted,
+        customerInquiriesAnonymized,
+        communicationLogsAnonymized,
+        loginEventsAnonymized,
         inactiveEmployeesDeleted,
+        inactiveEmployeesAnonymized,
         fieldResults: fieldCleanupResults,
         campaignResults,
         message: `GDPR cleanup complete. ${totalActions} total actions performed.`,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
+
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     log("ERROR", `GDPR cleanup failed: ${errorMessage}`);
