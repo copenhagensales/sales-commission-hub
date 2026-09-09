@@ -99,8 +99,18 @@ export function HeroPerformanceCard({
   }, [hasGoal, progressPercent]);
 
   return (
-    <section className="relative overflow-hidden rounded-3xl bg-[hsl(var(--cph-onyx))] p-6 md:p-10 text-[hsl(var(--cph-light-blue))]">
+    <section className="relative h-full overflow-hidden rounded-3xl bg-[hsl(var(--cph-onyx))] p-6 md:p-10 text-[hsl(var(--cph-light-blue))]">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          backgroundImage:
+            "linear-gradient(hsl(var(--cph-light-blue)/0.03) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--cph-light-blue)/0.03) 1px, transparent 1px)",
+          backgroundSize: "56px 56px",
+        }}
+      />
       {/* Top row: KPI + supporting numbers */}
+
       <div className="relative flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
         <div>
           <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[hsl(var(--cph-emerald))]">
