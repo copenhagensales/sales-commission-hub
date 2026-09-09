@@ -239,6 +239,8 @@ export const ComplianceGdprAwareness = lazyPage(() => import("@/pages/compliance
 export const ComplianceAiGovernance = lazyPage(() => import("@/pages/compliance/AiGovernance"));
 export const ComplianceSensitiveAccessLog = lazyPage(() => import("@/pages/compliance/SensitiveAccessLog"));
 export const ComplianceContractAccessLog = lazyPage(() => import("@/pages/compliance/ContractAccessLog"));
+export const ComplianceBackupPolicy = lazyPage(() => import("@/pages/compliance/BackupPolicy"));
+export const ComplianceProcessingRegistry = lazyPage(() => import("@/pages/compliance/ProcessingRegistry"));
 
 export const ShortLinkRedirect = lazyPage(() => import("@/pages/ShortLinkRedirect"));
 export const MenuEditor = lazyPage(() => import("@/pages/MenuEditor"));
