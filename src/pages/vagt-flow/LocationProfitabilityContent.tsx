@@ -165,7 +165,7 @@ export default function LocationProfitabilityContent() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("booking")
-        .select("id, location_id, booked_days, daily_rate_override, placement_id, start_date, end_date, client_id, client:clients!client_id(name), location!inner(id, name, daily_rate)")
+        .select("id, location_id, booked_days, daily_rate_override, placement_id, start_date, end_date, client_id, total_price, discount_percent_locked, client:clients!client_id(name), location!inner(id, name, daily_rate), location_placements(daily_rate)")
         .eq("week_number", week)
         .eq("year", year);
       if (error) throw error;
