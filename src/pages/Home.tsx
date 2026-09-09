@@ -26,7 +26,9 @@ import {
   Info,
   CalendarX,
   Pencil,
+  Check,
 } from "lucide-react";
+
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
