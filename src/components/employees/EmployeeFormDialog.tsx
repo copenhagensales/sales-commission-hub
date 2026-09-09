@@ -13,6 +13,21 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Loader2, Check, Camera, User, MapPin, Briefcase, Wallet, Palmtree, Settings } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  findExistingEmployeeByEmail,
+  type ExistingEmployeeMatch,
+} from "@/lib/employees/findExistingEmployeeByEmail";
+import { activateEmployee, resolveActivationStartDate } from "@/lib/employees/activateEmployee";
 
 interface EmployeeMasterDataRecord {
   id: string;
@@ -128,7 +143,38 @@ export function EmployeeFormDialog({
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [duplicateMatch, setDuplicateMatch] = useState<ExistingEmployeeMatch | null>(null);
+  const [reactivating, setReactivating] = useState(false);
   const [openSections, setOpenSections] = useState<string[]>(["identity"]);
+
+  const handleReactivate = async () => {
+    if (!duplicateMatch) return;
+    setReactivating(true);
+    try {
+      const { date } = await resolveActivationStartDate(
+        duplicateMatch.id,
+        duplicateMatch.employment_start_date
+      );
+      await activateEmployee({ employeeId: duplicateMatch.id, startDate: date });
+      queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
+      toast({
+        title: "Medarbejder genaktiveret",
+        description: `${duplicateMatch.first_name} ${duplicateMatch.last_name} er aktiv igen på sit eksisterende stamkort.`,
+      });
+      setDuplicateMatch(null);
+      onSuccess();
+      onOpenChange(false);
+    } catch (error) {
+      toast({
+        title: t("employees.toast.error"),
+        description: (error as Error).message,
+        variant: "destructive",
+      });
+    } finally {
+      setReactivating(false);
+    }
+  };
+
 
   // Initialize form data when editing employee changes
   useEffect(() => {
@@ -292,9 +338,16 @@ export function EmployeeFormDialog({
           });
         }
       } else {
+        const match = await findExistingEmployeeByEmail(formData.work_email, formData.private_email);
+        if (match) {
+          setSaving(false);
+          setDuplicateMatch(match);
+          return;
+        }
         const { error } = await supabase.from("employee_master_data").insert(formData);
         if (error) throw error;
       }
+
 
       
       queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
@@ -754,6 +807,33 @@ export function EmployeeFormDialog({
           </Button>
         </div>
       </DialogContent>
+
+      <AlertDialog open={!!duplicateMatch} onOpenChange={(o) => !o && setDuplicateMatch(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Medarbejderen findes allerede</AlertDialogTitle>
+            <AlertDialogDescription>
+              {duplicateMatch?.is_active
+                ? `${duplicateMatch?.first_name} ${duplicateMatch?.last_name} er allerede oprettet og aktiv. Ret det eksisterende stamkort i stedet for at oprette en ny medarbejder.`
+                : `${duplicateMatch?.first_name} ${duplicateMatch?.last_name} findes allerede som inaktiv. Genaktivér det eksisterende stamkort, så løn, kontrakter, teamhistorik og login bevares.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Luk</AlertDialogCancel>
+            {duplicateMatch && !duplicateMatch.is_active && (
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleReactivate();
+                }}
+                disabled={reactivating}
+              >
+                {reactivating ? "Genaktiverer..." : "Genaktivér medarbejder"}
+              </AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }
