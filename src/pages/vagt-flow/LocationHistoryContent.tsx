@@ -337,6 +337,8 @@ export default function LocationHistoryContent() {
       week: number; year: number;
       revenue: number; commission: number; sales: number; days: number;
       locationCost: number; hotelCost: number; dietCost: number;
+      /** Brutto/netto ud fra bookingernes låste rabatsatser */
+      locationCostGross: number; locationCostNet: number; missingLockedDiscount: boolean;
     }
 
     const locAgg = new Map<string, {
