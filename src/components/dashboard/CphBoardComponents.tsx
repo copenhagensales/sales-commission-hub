@@ -201,8 +201,9 @@ export function CphLeaderboard({
                 style={{
                   gridTemplateColumns: cols,
                   columnGap: colGap,
-                  padding: tvMode ? (isTop ? "10px 14px 10px 10px" : "12px 0") : isTop ? "10px 10px 10px 8px" : "10px 0",
-                  margin: isTop ? (tvMode ? "0 -14px 0 -10px" : "0 -10px 0 -8px") : undefined,
+                  padding: `${tvMode ? 12 : 10}px ${padR}px ${tvMode ? 12 : 10}px ${padL}px`,
+                  margin: undefined,
+
                   background: isTop ? (light ? ONYX : "hsl(var(--cph-light-blue) / 0.12)") : undefined,
                   color: isTop && light ? LIGHT : undefined,
                   borderRadius: isTop ? 16 : undefined,
