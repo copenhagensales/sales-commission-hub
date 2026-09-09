@@ -833,6 +833,15 @@ const Home = () => {
                             {attendees.map((a) => (
                               <div key={a.id} className="flex items-center gap-2 text-sm">
                                 <Avatar className="h-5 w-5">
+                                  <AvatarImage
+                                    src={
+                                      lookupAvatar({
+                                        employeeId: (a.employee as any)?.id ?? a.employee_id,
+                                        name: `${(a.employee as any)?.first_name ?? ""} ${(a.employee as any)?.last_name ?? ""}`,
+                                      }) || undefined
+                                    }
+                                    alt={initials(a)}
+                                  />
                                   <AvatarFallback className="text-[10px]">
                                     {initials(a)}
                                   </AvatarFallback>
