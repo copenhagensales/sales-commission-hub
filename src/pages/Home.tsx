@@ -562,14 +562,15 @@ const Home = () => {
             <CompactLeagueView />
           </div>
 
-        <Card className="border border-border bg-card rounded-3xl">
+        <Card className="h-full border-0 bg-card rounded-3xl">
 
-          <CardHeader className="pb-2 px-3 md:px-6 pt-3 md:pt-6">
+          <CardHeader className="px-6 pb-2 pt-6">
             <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-1.5 md:gap-2 text-sm md:text-base font-semibold">
-                <Calendar className="w-3.5 h-3.5 md:w-4 md:h-4 text-primary" />
-                Kommende begivenheder
+              <CardTitle className="flex items-center gap-2.5 text-[15px] font-extrabold">
+                <span className="inline-block h-3.5 w-[3px] rounded-sm bg-[hsl(var(--cph-onyx))]" />
+                Næste begivenhed
               </CardTitle>
+
               <Dialog open={addEventOpen} onOpenChange={setAddEventOpen}>
                 <DialogTrigger asChild>
                   <Button variant="ghost" size="sm" className="h-8 w-8 md:h-7 md:w-7 p-0">
