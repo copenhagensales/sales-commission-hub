@@ -6,6 +6,8 @@ import {
   Pencil,
   ArrowLeft,
   ArrowRight,
+  ChevronLeft,
+  ChevronRight,
   Heart,
 } from "lucide-react";
 import { toast } from "sonner";
