@@ -339,7 +339,7 @@ export function SupplierReportTab() {
   // Group bookings by location, clipped to current period
   const bookingsByLocation = bookings?.reduce((acc: any, booking: any) => {
     const locationId = booking.location_id;
-    const { total, days, dailyRate, usesTotalPrice } = calcBookingTotal(booking, periodStart, periodEnd);
+    const { total, days, dailyRate, usesTotalPrice, missingRate } = calcBookingTotal(booking, periodStart, periodEnd);
 
     if (days === 0) return acc; // Skip bookings with no days in period
 
@@ -348,10 +348,13 @@ export function SupplierReportTab() {
         location: booking.location,
         client: booking.clients,
         bookings: [],
+        // Beløb pr. booking i perioden - bruges til de låste rabatsatser
+        bookingAmounts: [] as Array<{ id: string; amount: number; lockedPercent: number | null }>,
         totalDays: 0,
         totalAmount: 0,
         dailyRate,
         usesTotalPrice,
+        missingRate: false,
         minDate: booking.start_date,
         maxDate: booking.end_date,
         weekdaysByWeek: new Map<number, Set<number>>(),
@@ -359,8 +362,16 @@ export function SupplierReportTab() {
     }
 
     acc[locationId].bookings.push(booking);
+    acc[locationId].bookingAmounts.push({
+      id: booking.id,
+      amount: total,
+      lockedPercent:
+        booking.discount_percent_locked == null ? null : Number(booking.discount_percent_locked),
+    });
     acc[locationId].totalDays += days;
     acc[locationId].totalAmount += total;
+    if (missingRate) acc[locationId].missingRate = true;
+
 
     // Merge weekdays (clipped to period)
     const bWeeks = getBookedWeekdays(booking, periodStart, periodEnd);
