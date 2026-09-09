@@ -111,6 +111,7 @@ export function SupplierReportTab() {
         .select(`
           *,
           location(id, name, address_city, daily_rate, type, external_id),
+          location_placements(id, name, daily_rate),
           clients(id, name)
         `)
         .eq("status", "confirmed")
