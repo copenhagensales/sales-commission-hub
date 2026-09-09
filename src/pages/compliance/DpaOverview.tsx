@@ -90,15 +90,6 @@ const rows: DpaRow[] = [
     archive: "Dateret PDF af siden",
     status: "Mangler arkivering",
   },
-  {
-    vendor: "Visma e-conomic",
-    purpose: "Økonomi",
-    link: { href: "https://www.e-conomic.dk/sikkerhed/dpa", label: "e-conomic.dk/sikkerhed/dpa" },
-    linkNote:
-      "Dansk art. 28-aftale. Personaliseret version med egne virksomhedsoplysninger kan downloades i e-conomic: Alle indstillinger → Stamoplysninger → \"Download databehandleraftale\".",
-    archive: "Den personaliserede PDF (opgave: Lone)",
-    status: "Mangler arkivering",
-  },
 ];
 
 function ArchiveCell({
