@@ -35,17 +35,12 @@ export function useConfirmComplianceReview() {
     mutationFn: async ({ areaKey, note }: { areaKey: string; note?: string }) => {
       if (!user?.id) throw new Error("Ingen aktiv bruger");
 
-      const { data: employee } = await supabase
-        .from("employee_master_data")
-        .select("full_name")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
       const name =
-        employee?.full_name ||
         (user.user_metadata?.full_name as string | undefined) ||
+        (user.user_metadata?.name as string | undefined) ||
         user.email ||
         null;
+
 
       const { error } = await supabase.from("compliance_area_reviews").insert({
         area_key: areaKey,
