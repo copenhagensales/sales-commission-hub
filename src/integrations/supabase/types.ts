@@ -4444,6 +4444,36 @@ export type Database = {
         }
         Relationships: []
       }
+      compliance_area_reviews: {
+        Row: {
+          area_key: string
+          created_at: string
+          id: string
+          note: string | null
+          reviewed_at: string
+          reviewed_by: string | null
+          reviewed_by_name: string | null
+        }
+        Insert: {
+          area_key: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          reviewed_at?: string
+          reviewed_by?: string | null
+          reviewed_by_name?: string | null
+        }
+        Update: {
+          area_key?: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          reviewed_at?: string
+          reviewed_by?: string | null
+          reviewed_by_name?: string | null
+        }
+        Relationships: []
+      }
       compliance_notification_recipients: {
         Row: {
           created_at: string
