@@ -7533,6 +7533,35 @@ export type Database = {
           },
         ]
       }
+      event_gallery_photo_likes: {
+        Row: {
+          created_at: string
+          id: string
+          photo_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          photo_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          photo_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_gallery_photo_likes_photo_id_fkey"
+            columns: ["photo_id"]
+            isOneToOne: false
+            referencedRelation: "event_gallery_photos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_gallery_photos: {
         Row: {
           created_at: string
