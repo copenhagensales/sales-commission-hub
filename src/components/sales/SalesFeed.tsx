@@ -1016,6 +1016,10 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
                           <div className="col-span-3 min-w-0">
                             <div className="flex items-center gap-3">
                               <Avatar className="h-9 w-9 shrink-0">
+                                <AvatarImage
+                                  src={lookupAvatar({ name: sale.agent_name }) || undefined}
+                                  alt={sale.agent_name || "Agent"}
+                                />
                                 <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
                                   {getInitials(sale.agent_name)}
                                 </AvatarFallback>
