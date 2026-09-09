@@ -3,7 +3,7 @@ import {
   ComplianceDocument,
   DocSection,
   DocSubSection,
-  Confirm,
+  
 } from "@/components/compliance/ComplianceDocument";
 
 export default function ProcessingRegistry() {
