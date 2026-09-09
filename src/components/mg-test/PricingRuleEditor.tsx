@@ -838,7 +838,7 @@ export function PricingRuleEditor({
             <SelectContent>
               {availableKeys.map((key) => (
                 <SelectItem key={key} value={key}>
-                  {key}
+                  {displayConditionKey(key)}
                 </SelectItem>
               ))}
             </SelectContent>
