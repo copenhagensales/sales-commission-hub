@@ -48,7 +48,19 @@ const CONDITION_OPTIONS: Record<string, string[]> = {
   "A-kasse salg": ["Ja", "Nej"],
   "Forening": ["Fagforening med lønsikring", "Ase Lønmodtager"],
   "Lønsikring": ["Lønsikring Udvidet", "Lønsikring Super"],
+
+  // Mødeform (Adversus-felt "Hvilket type møde") – bruges bl.a. på Tryg-produkter
+  "Hvilket type møde": ["Telefonmøde", "Onlinemøde"],
 };
+
+// Visningsnavne i UI'et. Den gemte nøgle er uændret, så den matcher dialer-feltet 1:1.
+const CONDITION_DISPLAY_LABELS: Record<string, string> = {
+  "Hvilket type møde": "Type møde",
+};
+
+function displayConditionKey(key: string): string {
+  return CONDITION_DISPLAY_LABELS[key] || key;
+}
 
 // Keys that use numeric comparison instead of dropdown
 const NUMERIC_CONDITION_KEYS = ["Dækningssum"];
