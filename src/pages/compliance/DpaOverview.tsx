@@ -280,12 +280,10 @@ export default function DpaOverview() {
 
         <DocSection heading="Arkivering">
           <p className="text-muted-foreground">
-            Dokumenterne arkiveres samlet ét sted. Compliance-sektionen understøtter
-            i dag ikke filupload, så aftalerne lægges i en fælles mappe:{" "}
-            <span className="font-medium text-amber-700">
-              Arkiveres i [mappe — udfyldes]
-            </span>
-            .
+            Aftalerne arkiveres direkte i Stork via kolonnen "Arkiveret fil".
+            Filerne ligger i et lukket arkiv, hvor kun ejere og superadmins kan
+            uploade, åbne og slette dem. Maks. 25 MB pr. fil (PDF, billede eller
+            Word).
           </p>
           <p className="text-muted-foreground">
             Status opdateres pr. leverandør, når aftalen er arkiveret.
