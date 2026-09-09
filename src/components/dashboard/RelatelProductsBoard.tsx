@@ -82,6 +82,7 @@ export default function RelatelProductsBoard() {
           />
         </div>
       </div>
+      </div>
     </DashboardShell>
   );
 }
