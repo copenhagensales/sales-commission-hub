@@ -720,6 +720,10 @@ export default function BookWeekContent() {
                 </Select>
               </div>
             )}
+
+            {/* Leverandørrabat - kun ved annual_revenue-leverandører */}
+            <SupplierDiscountPanel locationType={selectedLocation?.type} />
+
             {/* Date range picker for markets */}
             {isMarketLocation ? (
               <div className="p-3 rounded-lg bg-muted/50 space-y-3">
