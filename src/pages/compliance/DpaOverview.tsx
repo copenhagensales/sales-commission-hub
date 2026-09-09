@@ -230,7 +230,8 @@ export default function DpaOverview() {
                   <TableHead className="w-[130px]">Leverandør</TableHead>
                   <TableHead className="w-[200px]">Rolle/formål</TableHead>
                   <TableHead>DPA-link</TableHead>
-                  <TableHead className="w-[220px]">Hvad der skal arkiveres</TableHead>
+                  <TableHead className="w-[200px]">Hvad der skal arkiveres</TableHead>
+                  <TableHead className="w-[200px]">Arkiveret fil</TableHead>
                   <TableHead className="w-[180px]">Status</TableHead>
                 </TableRow>
               </TableHeader>
