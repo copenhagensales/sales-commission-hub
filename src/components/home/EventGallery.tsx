@@ -309,7 +309,7 @@ export function EventGallery() {
           />
         </div>
         {slots.slice(1).map((slot, index) => (
-          <div key={index} className="aspect-[4/3]">
+          <div key={index} className="aspect-[4/3] sm:aspect-auto sm:min-h-[104px]">
             <PhotoSlot
               photo={slot.photo}
               placeholder={slot.placeholder}
