@@ -35,7 +35,7 @@ import {
 } from "@/hooks/useEventGallery";
 
 const SLOT_PLACEHOLDERS = [
-  "Hovedbillede fra seneste event",
+  "Foto 1",
   "Foto 2",
   "Foto 3",
   "Foto 4",
@@ -69,7 +69,7 @@ function PhotoSlot({
 }) {
   if (photo?.url) {
     return (
-      <div className="group relative h-full w-full overflow-hidden rounded-2xl bg-[hsl(var(--cph-light-blue)/0.06)]">
+      <div className="group relative h-full w-full overflow-hidden rounded-xl bg-[hsl(var(--cph-light-blue)/0.06)]">
         <img
           src={photo.url}
           alt={photo.title || "Billede fra seneste event"}
@@ -148,12 +148,12 @@ function PhotoSlot({
       type="button"
       onClick={canManage ? onAdd : undefined}
       disabled={!canManage}
-      className="flex h-full w-full flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-[hsl(var(--cph-light-blue)/0.25)] bg-[hsl(var(--cph-light-blue)/0.06)] px-3 py-6 text-center text-[12px] text-[hsl(var(--cph-light-blue)/0.6)] transition-colors enabled:hover:bg-[hsl(var(--cph-light-blue)/0.12)]"
+      className="flex h-full w-full flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-[hsl(var(--cph-light-blue)/0.25)] bg-[hsl(var(--cph-light-blue)/0.06)] px-2 py-3 text-center text-[11px] text-[hsl(var(--cph-light-blue)/0.6)] transition-colors enabled:hover:bg-[hsl(var(--cph-light-blue)/0.12)]"
     >
       {canManage ? (
-        <ImagePlus className="h-5 w-5" />
+        <ImagePlus className="h-4 w-4" />
       ) : (
-        <ImageIcon className="h-5 w-5" />
+        <ImageIcon className="h-4 w-4" />
       )}
       <span>{placeholder}</span>
     </button>
@@ -265,7 +265,7 @@ export function EventGallery() {
 
 
   return (
-    <section className="relative overflow-hidden rounded-3xl bg-[hsl(var(--cph-onyx))] p-6 text-[hsl(var(--cph-light-blue))] md:p-8">
+    <section className="relative overflow-hidden rounded-3xl bg-[hsl(var(--cph-onyx))] p-4 text-[hsl(var(--cph-light-blue))] md:p-5">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0"
@@ -276,24 +276,24 @@ export function EventGallery() {
         }}
       />
 
-      <div className="relative mb-5 flex flex-wrap items-center justify-between gap-4">
-        <h2 className="flex items-center gap-2.5 text-[15px] font-extrabold">
-          <span className="inline-block h-3.5 w-[3px] rounded-sm bg-[hsl(var(--cph-emerald))]" />
+      <div className="relative mb-3 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2 text-[13px] font-extrabold">
+          <span className="inline-block h-3 w-[3px] rounded-sm bg-[hsl(var(--cph-emerald))]" />
           Seneste event
         </h2>
         {canManage && (
           <Button
             onClick={openDialog}
-            className="h-auto gap-2 rounded-xl bg-[hsl(var(--cph-light-blue))] px-4 py-2 text-[14px] font-extrabold text-[hsl(var(--cph-onyx))] hover:bg-white"
+            className="h-auto gap-1.5 rounded-xl bg-[hsl(var(--cph-light-blue))] px-3 py-1.5 text-[12px] font-extrabold text-[hsl(var(--cph-onyx))] hover:bg-white"
           >
-            <ImagePlus className="h-4 w-4" />
+            <ImagePlus className="h-3.5 w-3.5" />
             Læg billeder op
           </Button>
         )}
       </div>
 
-      <div className="relative grid gap-3 md:grid-cols-4">
-        <div className="md:col-span-2 md:row-span-2 aspect-[16/10] md:aspect-auto md:min-h-[280px]">
+      <div className="relative grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
+        <div className="aspect-[4/3] md:aspect-[4/3]">
           <PhotoSlot
             photo={slots[0].photo}
             placeholder={slots[0].placeholder}
@@ -309,7 +309,7 @@ export function EventGallery() {
           />
         </div>
         {slots.slice(1).map((slot, index) => (
-          <div key={index} className="aspect-[4/3] md:aspect-auto md:min-h-[134px]">
+          <div key={index} className="aspect-[4/3]">
             <PhotoSlot
               photo={slot.photo}
               placeholder={slot.placeholder}
