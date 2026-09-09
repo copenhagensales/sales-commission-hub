@@ -128,7 +128,38 @@ export function EmployeeFormDialog({
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [duplicateMatch, setDuplicateMatch] = useState<ExistingEmployeeMatch | null>(null);
+  const [reactivating, setReactivating] = useState(false);
   const [openSections, setOpenSections] = useState<string[]>(["identity"]);
+
+  const handleReactivate = async () => {
+    if (!duplicateMatch) return;
+    setReactivating(true);
+    try {
+      const { date } = await resolveActivationStartDate(
+        duplicateMatch.id,
+        duplicateMatch.employment_start_date
+      );
+      await activateEmployee({ employeeId: duplicateMatch.id, startDate: date });
+      queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
+      toast({
+        title: "Medarbejder genaktiveret",
+        description: `${duplicateMatch.first_name} ${duplicateMatch.last_name} er aktiv igen på sit eksisterende stamkort.`,
+      });
+      setDuplicateMatch(null);
+      onSuccess();
+      onOpenChange(false);
+    } catch (error) {
+      toast({
+        title: t("employees.toast.error"),
+        description: (error as Error).message,
+        variant: "destructive",
+      });
+    } finally {
+      setReactivating(false);
+    }
+  };
+
 
   // Initialize form data when editing employee changes
   useEffect(() => {
