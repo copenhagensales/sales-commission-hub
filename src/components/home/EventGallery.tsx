@@ -320,6 +320,8 @@ export function EventGallery() {
               onAdd={openDialog}
               onEdit={openEdit}
               onMove={handleMove}
+              like={slot.photo ? likes[slot.photo.id] : undefined}
+              onToggleLike={handleToggleLike}
             />
           </div>
         ))}
