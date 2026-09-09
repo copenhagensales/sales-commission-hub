@@ -85,7 +85,7 @@ export default function Auth() {
           <h1 className="text-[clamp(34px,4.2vw,52px)] font-extrabold leading-[1.04] tracking-[-0.02em] text-white">
             Dine tal. Opdateret hver dag.
           </h1>
-          <p className="max-w-[400px] text-[17px] leading-relaxed text-[#a8b4ca]">
+          <p className="max-w-[400px] text-[20px] leading-relaxed text-[#a8b4ca]">
             Provisionssystemet for Copenhagen Sales. Se optjening, bonus og udbetalinger — samlet ét
             sted.
           </p>
@@ -95,7 +95,7 @@ export default function Auth() {
               "Dashboards med dine resultater",
               "Følg Ligaen og konkurrencerne",
             ].map((t) => (
-              <li key={t} className="flex items-center gap-3 text-[15px] font-medium text-[#c8d2e4]">
+              <li key={t} className="flex items-center gap-3 text-[18px] font-medium text-[#c8d2e4]">
                 <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-[#E8B23A]" />
                 {t}
               </li>
