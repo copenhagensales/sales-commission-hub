@@ -602,26 +602,31 @@ Deno.serve(async (req) => {
     log("INFO", `GDPR cleanup complete. Fields: ${totalFieldsCleaned}, Campaign anon: ${campaignSalesAnonymized}, Campaign del: ${campaignSalesDeleted}, Candidates: ${candidatesProcessed}, Inquiries del/anon: ${customerInquiriesDeleted}/${customerInquiriesAnonymized}, Comm logs anon: ${communicationLogsAnonymized}, Login events anon: ${loginEventsAnonymized}, Employees del/anon: ${inactiveEmployeesDeleted}/${inactiveEmployeesAnonymized}`);
 
     if (totalActions > 0) {
-      await supabase.from("audit_logs").insert({
-        action: "gdpr_data_cleanup",
-        details: {
-          fields_cleaned: totalFieldsCleaned,
-          field_results: fieldCleanupResults,
-          campaign_sales_anonymized: campaignSalesAnonymized,
-          campaign_sales_deleted: campaignSalesDeleted,
-          campaign_results: campaignResults,
-          candidates_processed: candidatesProcessed,
-          customer_inquiries_deleted: customerInquiriesDeleted,
-          customer_inquiries_anonymized: customerInquiriesAnonymized,
-          communication_logs_anonymized: communicationLogsAnonymized,
-          login_events_anonymized: loginEventsAnonymized,
-          inactive_employees_deleted: inactiveEmployeesDeleted,
-          inactive_employees_anonymized: inactiveEmployeesAnonymized,
-          timestamp: new Date().toISOString(),
-        },
-      }).catch(() => {
+      try {
+        const { error: auditError } = await supabase.from("audit_logs").insert({
+          action: "gdpr_data_cleanup",
+          details: {
+            fields_cleaned: totalFieldsCleaned,
+            field_results: fieldCleanupResults,
+            campaign_sales_anonymized: campaignSalesAnonymized,
+            campaign_sales_deleted: campaignSalesDeleted,
+            campaign_results: campaignResults,
+            candidates_processed: candidatesProcessed,
+            customer_inquiries_deleted: customerInquiriesDeleted,
+            customer_inquiries_anonymized: customerInquiriesAnonymized,
+            communication_logs_anonymized: communicationLogsAnonymized,
+            login_events_anonymized: loginEventsAnonymized,
+            inactive_employees_deleted: inactiveEmployeesDeleted,
+            inactive_employees_anonymized: inactiveEmployeesAnonymized,
+            timestamp: new Date().toISOString(),
+          },
+        });
+        if (auditError) {
+          log("WARN", "Could not write to audit_logs table", auditError.message);
+        }
+      } catch (_e) {
         log("WARN", "Could not write to audit_logs table (table may not exist)");
-      });
+      }
     }
 
     return new Response(
