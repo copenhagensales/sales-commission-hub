@@ -16,6 +16,16 @@
 
 const NOTE_REGEX = /note|bemærk|kommentar/i;
 
+/**
+ * GDPR (Kaspers beslutning): CVR-berigelsesfelter der aldrig må persisteres.
+ * Fjernes både som labels i masterData-arrays og som nøgler i masterDataFields-objekter.
+ */
+const BLOCKED_FIELD_LABELS = new Set(["antal ansatte", "reklamebeskyttet"]);
+
+function isBlockedLabel(label: string): boolean {
+  return BLOCKED_FIELD_LABELS.has(label.trim().toLowerCase());
+}
+
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
@@ -23,6 +33,7 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 function isLabelValueItem(v: unknown): v is { label: unknown; value?: unknown } {
   return isPlainObject(v) && "label" in v;
 }
+
 
 export function stripNoteFields<T>(input: T): T {
   if (input === null || input === undefined) return input;
