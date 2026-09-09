@@ -468,11 +468,15 @@ export default function LocationProfitabilityContent() {
         const totalSales = Object.values(loc.dailyBreakdown).reduce((s, d) => s + d.sales, 0);
         const sellerCost = totalCommission * (1 + VACATION_PAY_RATES.SELLER);
         const locationCost = loc.dailyRate * loc.bookedDays.length;
+        const cost = costByRow.get(key);
+        const locationCostGross = cost?.gross ?? locationCost;
+        const locationCostNet = cost?.net ?? locationCost;
+        const missingLockedDiscount = cost?.missingLocked ?? false;
         const hotelCost = hotelCostByLocation.get(key) || 0;
         const dietCost = dietCostByLocation.get(key) || 0;
         const db = totalRevenue - sellerCost - locationCost - hotelCost - dietCost;
         const dbPerDay = loc.bookedDays.length > 0 ? db / loc.bookedDays.length : 0;
-        return { ...loc, rowKey: key, totalRevenue, totalCommission, totalSales, sellerCost, locationCost, hotelCost, dietCost, db, dbPerDay };
+        return { ...loc, rowKey: key, totalRevenue, totalCommission, totalSales, sellerCost, locationCost, locationCostGross, locationCostNet, missingLockedDiscount, hotelCost, dietCost, db, dbPerDay };
       })
       .sort((a, b) => b.db - a.db);
   }, [bookings, salesData, placements, hotelCostByLocation, dietCostByLocation]);
