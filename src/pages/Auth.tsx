@@ -174,7 +174,7 @@ export default function Auth() {
               .
             </p>
             <p className="mt-4 text-[14px] font-extrabold text-[hsl(var(--cph-onyx))]">
-              Stork · Copenhagen Sales
+              {"\n"}
             </p>
           </div>
         </div>
