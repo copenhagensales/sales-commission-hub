@@ -225,7 +225,7 @@ export default function SalesOverviewAll() {
 
   // Normal dashboard content
   const normalContent = (
-    <div className="space-y-6">
+    <div className="cph-board space-y-6 rounded-[20px] p-6">
       {/* Unified header with clock */}
       <div className="flex items-center justify-between">
         <div>
@@ -288,7 +288,7 @@ export default function SalesOverviewAll() {
 
   if (tvMode) {
     return (
-      <div className="fixed inset-0 overflow-auto p-4" style={{ backgroundColor: '#0f1729' }}>
+      <div className="cph-board fixed inset-0 overflow-auto p-4">
         {tvContent}
       </div>
     );

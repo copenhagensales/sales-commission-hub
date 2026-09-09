@@ -20,7 +20,7 @@ export default function TdcMonthlyGoalBoard() {
 
 
   const content = (
-    <div className="min-h-screen w-full bg-slate-950 text-white p-6 md:p-10">
+    <div className="cph-board min-h-screen w-full bg-slate-950 text-white p-6 md:p-10">
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">TDC Månedsmål</h1>

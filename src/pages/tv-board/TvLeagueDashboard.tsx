@@ -689,7 +689,7 @@ export default function TvLeagueDashboard() {
   if (isLoading) {
     return (
       <DashboardShell>
-        <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="cph-board min-h-screen bg-slate-900 flex items-center justify-center">
           <Loader2 className="h-12 w-12 animate-spin text-yellow-400" />
         </div>
       </DashboardShell>
@@ -699,7 +699,7 @@ export default function TvLeagueDashboard() {
   if (error || !data) {
     return (
       <DashboardShell>
-        <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="cph-board min-h-screen bg-slate-900 flex items-center justify-center">
           <p className="text-red-400">Kunne ikke hente liga-data</p>
         </div>
       </DashboardShell>
@@ -714,7 +714,7 @@ export default function TvLeagueDashboard() {
   if (isMobile) {
     return (
       <DashboardShell>
-        <div className="bg-slate-900 text-white h-screen flex flex-col overflow-hidden">
+        <div className="cph-board bg-slate-900 text-white h-screen flex flex-col overflow-hidden">
           {/* Mobile header */}
           <div className="px-4 pt-4 pb-2">
             <h1 className="text-lg font-black tracking-tight">
@@ -852,7 +852,7 @@ export default function TvLeagueDashboard() {
           subtitle={`${data.totalPlayers} spillere · ${data.totalDivisions} divisioner`}
         />
       )}
-      <div className={`bg-slate-900 text-white overflow-hidden flex ${tvMode ? "w-screen h-screen" : "h-[calc(100vh-120px)] rounded-xl"}`}>
+      <div className={`cph-board bg-slate-900 text-white overflow-hidden flex ${tvMode ? "w-screen h-screen" : "h-[calc(100vh-120px)] rounded-xl"}`}>
         {/* ─── LEFT ZONE (40%) – rotates overview / movements / records / league overview ─── */}
         <div className={`w-[40%] border-r border-slate-800 flex flex-col ${tvMode ? "p-4 pt-3" : "p-3 2xl:p-6"}`}>
           {tvMode && (

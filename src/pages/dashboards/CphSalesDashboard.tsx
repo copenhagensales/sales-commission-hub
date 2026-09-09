@@ -1024,7 +1024,7 @@ export default function CphSalesDashboard() {
 
   // Skip layout wrapper in TV mode to avoid lock checks
   const content = (
-    <div className="space-y-6">
+    <div className="cph-board space-y-6 rounded-[20px] p-6">
       <DashboardHeader 
         title="Dagsboard CPH Sales" 
         subtitle={format(today, "EEEE d. MMMM yyyy", { locale: da })}
@@ -1286,7 +1286,7 @@ export default function CphSalesDashboard() {
   // In TV mode, render without layout to skip lock checks
   if (tvMode) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 p-4">
+      <div className="cph-board min-h-screen p-4">
         {content}
       </div>
     );

@@ -763,3 +763,172 @@
     padding: 0 !important;
   }
 }
+
+
+/* ==========================================================================
+   Copenhagen Sales board-tema (rent visuelt lag)
+   Bruges ved at give board-roden klassen `cph-board`. Ingen datalogik
+   påvirkes - kun farver, radius, typografi og fjernelse af gradients/shadows,
+   så de øvrige boards matcher Eesy TM - Overblik.
+   ========================================================================== */
+.cph-board {
+  background: hsl(var(--cph-onyx)) !important;
+  color: hsl(var(--cph-light-blue)) !important;
+  font-variant-numeric: tabular-nums;
+
+  /* Semantiske tokens re-themes lokalt, så shadcn-kort m.m. følger stilen */
+  --background: var(--cph-onyx);
+  --foreground: var(--cph-light-blue);
+  --card: 218 8% 24%;
+  --card-foreground: var(--cph-light-blue);
+  --popover: 218 8% 24%;
+  --popover-foreground: var(--cph-light-blue);
+  --primary: var(--cph-emerald);
+  --primary-foreground: var(--cph-onyx);
+  --secondary: 218 8% 26%;
+  --secondary-foreground: var(--cph-light-blue);
+  --muted: 218 8% 26%;
+  --muted-foreground: 186 18% 78%;
+  --accent: var(--cph-emerald);
+  --accent-foreground: var(--cph-onyx);
+  --border: 186 14% 34%;
+  --input: 186 14% 34%;
+  --ring: var(--cph-emerald);
+}
+
+/* Baggrundsflader */
+.cph-board .bg-slate-950,
+.cph-board .bg-slate-900,
+.cph-board .bg-slate-900\/70,
+.cph-board .bg-slate-900\/60,
+.cph-board .bg-slate-900\/50,
+.cph-board .bg-slate-800,
+.cph-board .bg-slate-800\/50,
+.cph-board .bg-zinc-900,
+.cph-board .bg-gray-900,
+.cph-board .bg-neutral-900,
+.cph-board .bg-white\/5,
+.cph-board .bg-white\/10 {
+  background-color: hsl(var(--cph-light-blue) / 0.07) !important;
+}
+
+.cph-board .bg-white,
+.cph-board .bg-slate-100,
+.cph-board .bg-slate-200,
+.cph-board .bg-slate-300 {
+  background-color: hsl(var(--cph-light-blue)) !important;
+  color: hsl(var(--cph-onyx)) !important;
+}
+
+/* Accentflader -> emerald */
+.cph-board .bg-sky-400,
+.cph-board .bg-sky-500,
+.cph-board .bg-blue-500,
+.cph-board .bg-blue-600,
+.cph-board .bg-cyan-500,
+.cph-board .bg-indigo-500,
+.cph-board .bg-violet-500,
+.cph-board .bg-purple-500,
+.cph-board .bg-amber-500,
+.cph-board .bg-yellow-400,
+.cph-board .bg-yellow-500,
+.cph-board .bg-orange-400,
+.cph-board .bg-orange-500,
+.cph-board .bg-green-500,
+.cph-board .bg-emerald-400,
+.cph-board .bg-emerald-500,
+.cph-board .bg-emerald-600 {
+  background-color: hsl(var(--cph-emerald)) !important;
+  color: hsl(var(--cph-onyx)) !important;
+}
+
+/* Tekstfarver */
+.cph-board .text-white,
+.cph-board .text-slate-100,
+.cph-board .text-slate-200,
+.cph-board .text-slate-300 {
+  color: hsl(var(--cph-light-blue)) !important;
+}
+
+.cph-board .text-slate-400,
+.cph-board .text-slate-500,
+.cph-board .text-slate-600,
+.cph-board .text-gray-400,
+.cph-board .text-zinc-400,
+.cph-board .text-muted-foreground,
+.cph-board .text-white\/40,
+.cph-board .text-white\/30 {
+  color: hsl(var(--cph-light-blue) / 0.72) !important;
+}
+
+.cph-board .text-slate-700,
+.cph-board .text-slate-800,
+.cph-board .text-slate-900,
+.cph-board .text-black {
+  color: hsl(var(--cph-onyx)) !important;
+}
+
+.cph-board .text-sky-400,
+.cph-board .text-sky-500,
+.cph-board .text-blue-400,
+.cph-board .text-blue-500,
+.cph-board .text-cyan-400,
+.cph-board .text-indigo-400,
+.cph-board .text-violet-400,
+.cph-board .text-purple-400,
+.cph-board .text-purple-500,
+.cph-board .text-amber-400,
+.cph-board .text-amber-500,
+.cph-board .text-amber-600,
+.cph-board .text-yellow-400,
+.cph-board .text-yellow-500,
+.cph-board .text-green-400,
+.cph-board .text-emerald-400,
+.cph-board .text-emerald-500,
+.cph-board .text-emerald-600 {
+  color: hsl(var(--cph-emerald)) !important;
+}
+
+.cph-board .fill-yellow-400,
+.cph-board .fill-amber-400,
+.cph-board .fill-sky-400 {
+  fill: hsl(var(--cph-emerald)) !important;
+}
+
+/* Kanter */
+.cph-board [class*="border-white/"],
+.cph-board [class*="border-slate-"],
+.cph-board [class*="border-zinc-"],
+.cph-board [class*="border-gray-"] {
+  border-color: hsl(var(--cph-light-blue) / 0.18) !important;
+}
+
+.cph-board [class*="border-sky-"],
+.cph-board [class*="border-blue-"],
+.cph-board [class*="border-cyan-"],
+.cph-board [class*="border-indigo-"],
+.cph-board [class*="border-violet-"],
+.cph-board [class*="border-purple-"],
+.cph-board [class*="border-amber-"],
+.cph-board [class*="border-yellow-"],
+.cph-board [class*="border-orange-"],
+.cph-board [class*="border-emerald-"],
+.cph-board [class*="border-green-"] {
+  border-color: hsl(var(--cph-emerald) / 0.45) !important;
+}
+
+/* Ingen gradients og ingen shadows */
+.cph-board [class*="bg-gradient-"] {
+  background-image: none !important;
+}
+.cph-board [class*="shadow"] {
+  box-shadow: none !important;
+}
+
+/* Blødere hjørner som på Eesy TM-boardet */
+.cph-board .rounded-lg,
+.cph-board .rounded-xl,
+.cph-board .rounded-2xl,
+.cph-board .rounded-3xl {
+  border-radius: 20px !important;
+}

@@ -355,8 +355,8 @@ export default function CsTop20Dashboard() {
 
   return (
     <div className={tvMode 
-      ? 'w-screen h-screen bg-slate-900 p-1.5 flex flex-col overflow-hidden' 
-      : 'min-h-screen bg-background p-6'
+      ? 'cph-board w-screen h-screen bg-slate-900 p-1.5 flex flex-col overflow-hidden' 
+      : 'cph-board min-h-screen bg-background p-6'
     }>
       {/* TV Mode Header */}
       {tvMode ? (
