@@ -11,7 +11,8 @@ export default function BackupPolicy() {
         title="Backup- og gendannelsespolitik (GDPR)"
         version="1.0"
         documentDate="9. september 2026"
-        statusLabel="GODKENDT — 9. september 2026 af Mathias Dandanel Grubak og Lone Mikkelsen"
+        statusLabel="GODKENDT - 9. september 2026 af Mathias Dandanel Grubak og Lone Mikkelsen"
+        statusTone="approved"
       >
         <DocSection heading="1. Formål">
           <p>
