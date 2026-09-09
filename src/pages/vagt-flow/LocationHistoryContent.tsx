@@ -483,6 +483,9 @@ export default function LocationHistoryContent() {
           totalSales += wb.sales;
           totalDays += wb.days;
           totalLocCost += wb.locationCost;
+          totalLocCostGross += wb.locationCostGross;
+          totalLocCostNet += wb.locationCostNet;
+          if (wb.missingLockedDiscount) anyMissingLocked = true;
           totalHotelCost += wb.hotelCost;
           totalDietCost += wb.dietCost;
           const salesPerDay = wb.days > 0 ? wb.sales / wb.days : 0;
