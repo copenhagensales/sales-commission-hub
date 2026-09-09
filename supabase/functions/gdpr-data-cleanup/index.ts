@@ -235,9 +235,18 @@ Deno.serve(async (req) => {
     }
 
     // ===== PART 3: General data type cleanup =====
+    // cleanup_mode:
+    //   "delete_all"  -> rows are removed permanently
+    //   "anonymize"   -> personal fields are wiped, statistical fields are kept
     let candidatesProcessed = 0;
     let customerInquiriesDeleted = 0;
+    let customerInquiriesAnonymized = 0;
+    let communicationLogsAnonymized = 0;
+    let loginEventsAnonymized = 0;
     let inactiveEmployeesDeleted = 0;
+    let inactiveEmployeesAnonymized = 0;
+
+    const ANON_EMAIL = "anonymiseret@slettet.local";
 
     try {
       const { data: dataPolicies, error: dpError } = await supabase
@@ -256,11 +265,47 @@ Deno.serve(async (req) => {
           const cutoff = new Date();
           cutoff.setDate(cutoff.getDate() - policy.retention_days);
           const cutoffISO = cutoff.toISOString();
+          const anonymize = policy.cleanup_mode === "anonymize";
 
           log("INFO", `Data type "${policy.data_type}": mode=${policy.cleanup_mode}, cutoff=${cutoffISO}`);
 
           switch (policy.data_type) {
             case "customer_inquiries": {
+              if (anonymize) {
+                // Keep created_at / is_read / company for statistics, wipe person data.
+                const { data: rows, error: selErr } = await supabase
+                  .from("customer_inquiries")
+                  .select("id")
+                  .lt("created_at", cutoffISO)
+                  .neq("name", "Anonymiseret");
+
+                if (selErr) {
+                  log("WARN", `Error selecting customer_inquiries for anonymization: ${selErr.message}`);
+                  break;
+                }
+
+                for (const row of rows ?? []) {
+                  const { error: updErr } = await supabase
+                    .from("customer_inquiries")
+                    .update({
+                      name: "Anonymiseret",
+                      email: null,
+                      phone: null,
+                      message: null,
+                      fbclid: null,
+                    })
+                    .eq("id", row.id);
+
+                  if (updErr) {
+                    log("WARN", `Failed to anonymize customer inquiry ${row.id}: ${updErr.message}`);
+                  } else {
+                    customerInquiriesAnonymized++;
+                  }
+                }
+                log("INFO", `Anonymized ${customerInquiriesAnonymized} expired customer inquiries`);
+                break;
+              }
+
               const { error: delErr, count } = await supabase
                 .from("customer_inquiries")
                 .delete({ count: "exact" })
@@ -276,12 +321,17 @@ Deno.serve(async (req) => {
             }
 
             case "candidates": {
-              const { data: expiredCandidates, error: candErr } = await supabase
+              const candidateQuery = supabase
                 .from("candidates")
                 .select("id, status, updated_at")
                 .in("status", ["rejected", "withdrawn", "no_show"])
-                .lt("updated_at", cutoffISO)
-                .not("email", "is", null);
+                .lt("updated_at", cutoffISO);
+
+              // Anonymised rows have no email/phone/notes left — skip them so the job
+              // is safe to run repeatedly.
+              const { data: expiredCandidates, error: candErr } = anonymize
+                ? await candidateQuery.neq("first_name", "Anonymiseret")
+                : await candidateQuery.not("email", "is", null);
 
               if (candErr) {
                 log("WARN", `Error querying expired candidates: ${candErr.message}`);
@@ -309,7 +359,8 @@ Deno.serve(async (req) => {
                       candidatesProcessed++;
                     }
                   } else {
-                    // Default: anonymize
+                    // Default: anonymize. created_at, status, source, heard_about_us,
+                    // applied_position and team_id are kept for recruitment statistics.
                     const { error: updateError } = await supabase
                       .from("candidates")
                       .update({
@@ -353,6 +404,28 @@ Deno.serve(async (req) => {
                 log("INFO", `Found ${expiredEmployees.length} inactive employees past retention`);
 
                 for (const emp of expiredEmployees) {
+                  if (anonymize) {
+                    // Already anonymised? skip (idempotent)
+                    if (
+                      emp.first_name === EMPLOYEE_ANONYMIZED_FIRST_NAME &&
+                      emp.last_name === EMPLOYEE_ANONYMIZED_LAST_NAME
+                    ) {
+                      continue;
+                    }
+
+                    const { error: updErr } = await supabase
+                      .from("employee_master_data")
+                      .update(employeeAnonymizationPatch)
+                      .eq("id", emp.id);
+
+                    if (updErr) {
+                      log("WARN", `Failed to anonymize inactive employee ${emp.id}: ${updErr.message}`);
+                    } else {
+                      inactiveEmployeesAnonymized++;
+                    }
+                    continue;
+                  }
+
                   const { error: delErr } = await supabase
                     .from("employee_master_data")
                     .delete()
@@ -364,7 +437,7 @@ Deno.serve(async (req) => {
                     inactiveEmployeesDeleted++;
                   }
                 }
-                log("INFO", `Deleted ${inactiveEmployeesDeleted} inactive employees`);
+                log("INFO", `Inactive employees — deleted: ${inactiveEmployeesDeleted}, anonymized: ${inactiveEmployeesAnonymized}`);
               } else {
                 log("INFO", "No inactive employees past retention found");
               }
@@ -387,10 +460,46 @@ Deno.serve(async (req) => {
             }
 
             case "login_events": {
+              if (anonymize) {
+                // Keep logged_in_at + user_id so login statistics survive; wipe email,
+                // name, IP, user agent and session id.
+                const { data: rows, error: selErr } = await supabase
+                  .from("login_events")
+                  .select("id")
+                  .lt("logged_in_at", cutoffISO)
+                  .neq("user_email", ANON_EMAIL);
+
+                if (selErr) {
+                  log("WARN", `Error selecting login_events for anonymization: ${selErr.message}`);
+                  break;
+                }
+
+                for (const row of rows ?? []) {
+                  const { error: updErr } = await supabase
+                    .from("login_events")
+                    .update({
+                      user_email: ANON_EMAIL,
+                      user_name: null,
+                      ip_address: null,
+                      user_agent: null,
+                      session_id: null,
+                    })
+                    .eq("id", row.id);
+
+                  if (updErr) {
+                    log("WARN", `Failed to anonymize login event ${row.id}: ${updErr.message}`);
+                  } else {
+                    loginEventsAnonymized++;
+                  }
+                }
+                log("INFO", `Anonymized ${loginEventsAnonymized} expired login events`);
+                break;
+              }
+
               const { error: delErr, count } = await supabase
                 .from("login_events")
                 .delete({ count: "exact" })
-                .lt("created_at", cutoffISO);
+                .lt("logged_in_at", cutoffISO);
 
               if (delErr) {
                 log("WARN", `Error deleting login_events: ${delErr.message}`);
@@ -417,6 +526,35 @@ Deno.serve(async (req) => {
             }
 
             case "communication_logs": {
+              if (anonymize) {
+                // Keep created_at, type, direction, outcome, delivery_status for statistics.
+                const { data: rows, error: selErr } = await supabase
+                  .from("communication_logs")
+                  .select("id")
+                  .lt("created_at", cutoffISO)
+                  .or("content.not.is.null,phone_number.not.is.null");
+
+                if (selErr) {
+                  log("WARN", `Error selecting communication_logs for anonymization: ${selErr.message}`);
+                  break;
+                }
+
+                for (const row of rows ?? []) {
+                  const { error: updErr } = await supabase
+                    .from("communication_logs")
+                    .update({ content: null, phone_number: null })
+                    .eq("id", row.id);
+
+                  if (updErr) {
+                    log("WARN", `Failed to anonymize communication log ${row.id}: ${updErr.message}`);
+                  } else {
+                    communicationLogsAnonymized++;
+                  }
+                }
+                log("INFO", `Anonymized ${communicationLogsAnonymized} expired communication logs`);
+                break;
+              }
+
               const { error: delErr, count } = await supabase
                 .from("communication_logs")
                 .delete({ count: "exact" })
@@ -441,6 +579,7 @@ Deno.serve(async (req) => {
     } catch (dpErr) {
       log("WARN", `Data retention cleanup error: ${dpErr instanceof Error ? dpErr.message : String(dpErr)}`);
     }
+
 
     // ===== PART 4: Summary and audit log =====
     const totalActions = totalFieldsCleaned + campaignSalesAnonymized + campaignSalesDeleted + candidatesProcessed + customerInquiriesDeleted + inactiveEmployeesDeleted;
