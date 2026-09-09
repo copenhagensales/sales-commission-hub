@@ -1503,6 +1503,13 @@ export function EditBookingDialog({
               </div>
             </div>
 
+            {/* Brutto, låst rabatsats og netto */}
+            <div className="pt-3 border-t">
+              <BookingEconomySummary bookingId={booking?.id} />
+            </div>
+
+
+
             {/* Comment field */}
             <div className="space-y-2 pt-3 border-t">
               <Label htmlFor="booking-comment">Bemærkning til sælger</Label>
