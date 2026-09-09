@@ -1318,6 +1318,10 @@ export type Database = {
           comment: string | null
           created_at: string | null
           daily_rate_override: number | null
+          discount_basis: number | null
+          discount_locked_at: string | null
+          discount_percent_locked: number | null
+          discount_rule_id: string | null
           end_date: string
           expected_staff_count: number | null
           id: string
@@ -1338,6 +1342,10 @@ export type Database = {
           comment?: string | null
           created_at?: string | null
           daily_rate_override?: number | null
+          discount_basis?: number | null
+          discount_locked_at?: string | null
+          discount_percent_locked?: number | null
+          discount_rule_id?: string | null
           end_date: string
           expected_staff_count?: number | null
           id?: string
@@ -1358,6 +1366,10 @@ export type Database = {
           comment?: string | null
           created_at?: string | null
           daily_rate_override?: number | null
+          discount_basis?: number | null
+          discount_locked_at?: string | null
+          discount_percent_locked?: number | null
+          discount_rule_id?: string | null
           end_date?: string
           expected_staff_count?: number | null
           id?: string
@@ -1390,6 +1402,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_discount_rule_id_fkey"
+            columns: ["discount_rule_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_discount_rules"
             referencedColumns: ["id"]
           },
           {
@@ -15240,6 +15259,19 @@ export type Database = {
         Returns: undefined
       }
       auto_suggest_konto_mapping: { Args: never; Returns: number }
+      booking_gross_amount: { Args: { p_booking_id: string }; Returns: number }
+      calc_supplier_discount_at: {
+        Args: {
+          p_at: string
+          p_exclude_booking_id?: string
+          p_location_id: string
+        }
+        Returns: {
+          basis: number
+          discount_percent: number
+          rule_id: string
+        }[]
+      }
       can_access_confidential_contract: {
         Args: { _user_id: string }
         Returns: boolean
@@ -15735,6 +15767,17 @@ export type Database = {
           source_name: string
         }[]
       }
+      get_supplier_discount_status: {
+        Args: { p_at?: string; p_location_type: string }
+        Returns: {
+          basis: number
+          current_percent: number
+          current_rule_id: string
+          next_min_revenue: number
+          next_percent: number
+          remaining_to_next: number
+        }[]
+      }
       get_team_employees_basic_info: {
         Args: never
         Returns: {
@@ -15890,6 +15933,10 @@ export type Database = {
         Returns: number
       }
       record_tv_board_heartbeat: { Args: { p_id: string }; Returns: undefined }
+      relock_booking_discount: {
+        Args: { p_booking_id: string }
+        Returns: undefined
+      }
       remove_role_by_email: { Args: { _email: string }; Returns: undefined }
       rollback_cancellation_import: {
         Args: { p_import_id: string }
