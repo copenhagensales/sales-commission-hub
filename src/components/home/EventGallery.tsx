@@ -167,6 +167,15 @@ export function EventGallery() {
   const deleteMutation = useDeleteEventPhoto();
   const updateMutation = useUpdateEventPhoto();
   const reorderMutation = useReorderEventPhotos();
+  const { data: likes = {} } = useEventPhotoLikes(photos.map((p) => p.id));
+  const toggleLikeMutation = useToggleEventPhotoLike();
+
+  const handleToggleLike = (photo: EventGalleryPhoto, liked: boolean) => {
+    toggleLikeMutation.mutate(
+      { photoId: photo.id, liked },
+      { onError: () => toast.error("Kunne ikke gemme dit like") }
+    );
+  };
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
