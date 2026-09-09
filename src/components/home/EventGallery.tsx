@@ -292,7 +292,7 @@ export function EventGallery() {
         )}
       </div>
 
-      <div className="relative grid grid-cols-2 gap-2.5 sm:grid-cols-4 md:auto-rows-[104px] md:grid-cols-4">
+      <div className="relative grid grid-cols-2 gap-2.5 sm:auto-rows-[104px] sm:grid-cols-4 md:auto-rows-[120px]">
         <div className="col-span-2 row-span-2 aspect-[16/10] sm:aspect-auto">
           <PhotoSlot
             photo={slots[0].photo}
