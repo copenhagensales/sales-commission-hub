@@ -1,7 +1,7 @@
 import React from "react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
-import cphLogo from "@/assets/cphsales-logo.png.asset.json";
+import cphLogo from "@/assets/cph-sales-logo-dark.png";
 import { formatNumber } from "@/lib/calculations";
 import type { LeaderboardSeller } from "@/components/dashboard/TvDashboardComponents";
 
@@ -340,7 +340,7 @@ export function CphBoardFrame({
         style={{ paddingBottom: tvMode ? 20 : 12 }}
       >
         <div className="flex items-center gap-6">
-          <img src={cphLogo.url} alt="Copenhagen Sales" style={{ width: tvMode ? 132 : 92, height: "auto" }} />
+          <img src={cphLogo} alt="Copenhagen Sales" style={{ width: tvMode ? 132 : 92, height: "auto" }} />
           <div>
             <div
               className="font-extrabold"
