@@ -807,6 +807,33 @@ export function EmployeeFormDialog({
           </Button>
         </div>
       </DialogContent>
+
+      <AlertDialog open={!!duplicateMatch} onOpenChange={(o) => !o && setDuplicateMatch(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Medarbejderen findes allerede</AlertDialogTitle>
+            <AlertDialogDescription>
+              {duplicateMatch?.is_active
+                ? `${duplicateMatch?.first_name} ${duplicateMatch?.last_name} er allerede oprettet og aktiv. Ret det eksisterende stamkort i stedet for at oprette en ny medarbejder.`
+                : `${duplicateMatch?.first_name} ${duplicateMatch?.last_name} findes allerede som inaktiv. Genaktivér det eksisterende stamkort, så løn, kontrakter, teamhistorik og login bevares.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Luk</AlertDialogCancel>
+            {duplicateMatch && !duplicateMatch.is_active && (
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleReactivate();
+                }}
+                disabled={reactivating}
+              >
+                {reactivating ? "Genaktiverer..." : "Genaktivér medarbejder"}
+              </AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }
