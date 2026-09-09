@@ -128,7 +128,7 @@ export function CompactLeagueView() {
                       {isMe && <span className="ml-1 font-normal text-foreground/70">(dig)</span>}
                     </p>
                     <p className="text-[13px] text-foreground/70">
-                      {standing.sales_count ? `${standing.sales_count} salg` : "Ingen salg endnu"}
+                      {standing.deals_count ? `${standing.deals_count} salg` : "Ingen salg endnu"}
                     </p>
                   </div>
                   <span className="text-[20px] font-extrabold tracking-[-0.02em] tabular-nums text-foreground">
