@@ -173,7 +173,7 @@ export default function LocationHistoryContent() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("booking")
-        .select("id, location_id, booked_days, daily_rate_override, placement_id, week_number, year, start_date, end_date, client_id, client:clients!client_id(name), location:location!booking_location_id_fkey(id, name, daily_rate, type)")
+        .select("id, location_id, booked_days, daily_rate_override, placement_id, week_number, year, start_date, end_date, client_id, total_price, discount_percent_locked, client:clients!client_id(name), location:location!booking_location_id_fkey(id, name, daily_rate, type), location_placements(daily_rate)")
         .gte("start_date", startStr)
         .lte("end_date", endStr);
       if (error) throw error;
