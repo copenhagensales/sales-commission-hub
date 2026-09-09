@@ -15749,6 +15749,10 @@ export type Database = {
         Args: { p_conversation_id: string; p_employee_id: string }
         Returns: boolean
       }
+      is_fieldmarketing_employee: {
+        Args: { _user_id: string }
+        Returns: boolean
+      }
       is_fieldmarketing_leder: { Args: { _user_id: string }; Returns: boolean }
       is_in_my_team: {
         Args: { _employee_id: string; _user_id: string }
