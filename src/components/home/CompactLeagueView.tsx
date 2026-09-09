@@ -10,6 +10,7 @@ import {
   type QualificationStanding 
 } from "@/hooks/useLeagueData";
 import { useCurrentEmployeeId } from "@/hooks/useOnboarding";
+import { useAvatarLookup } from "@/hooks/useAvatarLookup";
 import { formatPlayerName } from "@/lib/formatPlayerName";
 
 function getNeighborStandings(
