@@ -102,7 +102,7 @@ export default function PowerdagBoard() {
 
   return (
     <DashboardShell>
-      <div className={`${tv ? "p-8" : "p-4 md:p-8"} max-w-[1600px] mx-auto`}>
+      <div className={`cph-board ${tv ? "p-8" : "p-4 md:p-8"} max-w-[1600px] mx-auto`}>
         {/* Header */}
         <div className="flex items-start justify-between gap-4 mb-8">
           <div className="flex items-start gap-4 min-w-0">
