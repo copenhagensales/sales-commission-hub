@@ -197,6 +197,8 @@ export default function MyProfile() {
   const defaultTab = searchParams.get("tab") || "stamdata";
   const [absencePeriod, setAbsencePeriod] = useState<"2" | "6" | "12">("2");
   const { isPreviewMode, previewEmployee } = useRolePreview();
+  const uploadMyAvatar = useUploadMyAvatar();
+  const removeMyAvatar = useRemoveMyAvatar();
 
   // Fetch current user's employee data (or preview employee if in preview mode)
   const { data: employee, isLoading } = useQuery({
