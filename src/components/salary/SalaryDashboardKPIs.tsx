@@ -14,23 +14,25 @@ interface KpiCardProps {
 
 function KpiCard({ title, value, icon, subtitle, isLoading }: KpiCardProps) {
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden border-border/80 bg-card shadow-sm ring-1 ring-foreground/5">
       <CardContent className="p-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
             {icon}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
               {title}
             </p>
             {isLoading ? (
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground mt-1" />
             ) : (
               <>
-                <p className="text-base sm:text-xl font-bold truncate">{value}</p>
+                <p className="text-lg sm:text-2xl font-bold tabular-nums truncate leading-tight">
+                  {value}
+                </p>
                 {subtitle && (
-                  <p className="text-xs text-muted-foreground">{subtitle}</p>
+                  <p className="text-xs text-muted-foreground truncate">{subtitle}</p>
                 )}
               </>
             )}
