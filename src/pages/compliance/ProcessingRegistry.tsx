@@ -11,9 +11,10 @@ export default function ProcessingRegistry() {
     <MainLayout>
       <ComplianceDocument
         title="Fortegnelse over behandlingsaktiviteter (GDPR art. 30) og risikovurdering — Stork"
-        version="0.1"
+        version="1.0"
         documentDate="9. september 2026"
-        statusLabel="UDKAST — til godkendelse af Mathias og Lone"
+        statusLabel="GODKENDT - 9. september 2026 af Mathias Dandanel Grubak og Lone Mikkelsen"
+        statusTone="approved"
       >
         <DocSection heading="A. Dataansvarlig">
           <p>
@@ -131,7 +132,7 @@ export default function ProcessingRegistry() {
           <ul className="list-disc pl-6 space-y-1 text-muted-foreground">
             <li>
               Lovable — udviklings- og driftsplatform. Se DPA-oversigten; status:
-              mangler arkivering.
+              aktiveret.
             </li>
             <li>
               Supabase — hosting, database og auth. Region: eu-west-3 (Paris, EU),

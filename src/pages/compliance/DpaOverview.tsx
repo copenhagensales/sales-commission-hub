@@ -33,7 +33,7 @@ const rows: DpaRow[] = [
     linkNote:
       "DPA indgår automatisk i Business-planen. Signeret PDF (Lovable_DPA, nov. 2025) kan downloades fra siden.",
     archive: "PDF",
-    status: "Mangler arkivering",
+    status: "Aktiveret 9. september 2026",
   },
   {
     vendor: "Supabase",
