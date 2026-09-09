@@ -135,8 +135,8 @@ export default function ComplianceOverview() {
       description:
         "Backup-retention, hvornår anonymisering er fuldt irreversibel, og hvem der må gendanne data.",
       icon: Database,
-      badge: "Udkast 0.1",
-      badgeColor: "bg-amber-500/10 text-amber-700 border-amber-500/30",
+      badge: "Godkendt 1.0",
+      badgeColor: "bg-emerald-500/10 text-emerald-700 border-emerald-500/30",
       href: "/compliance/documents/backup-policy",
       permKey: "menu_compliance_admin",
     },
@@ -145,8 +145,8 @@ export default function ComplianceOverview() {
       description:
         "Roller, behandlingsaktiviteter, databehandlere, sikkerhedsforanstaltninger og åbne punkter.",
       icon: ClipboardList,
-      badge: "Udkast 0.1",
-      badgeColor: "bg-amber-500/10 text-amber-700 border-amber-500/30",
+      badge: "Godkendt 1.0",
+      badgeColor: "bg-emerald-500/10 text-emerald-700 border-emerald-500/30",
       href: "/compliance/documents/processing-registry",
       permKey: "menu_compliance_admin",
     },
@@ -155,8 +155,8 @@ export default function ComplianceOverview() {
       description:
         "Oversigt pr. leverandør med DPA-link, hvad der skal arkiveres, og status på arkivering.",
       icon: FileText,
-      badge: "Udkast 0.1",
-      badgeColor: "bg-amber-500/10 text-amber-700 border-amber-500/30",
+      badge: "Godkendt 1.0",
+      badgeColor: "bg-emerald-500/10 text-emerald-700 border-emerald-500/30",
       href: "/compliance/documents/dpa-overview",
       permKey: "menu_compliance_admin",
     },
