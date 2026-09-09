@@ -520,8 +520,18 @@ export default function EmployeeMasterData() {
       setDeleteEmployeeId(null);
     },
     onError: (error) => {
-      toast({ title: t("employees.toast.error"), description: error.message, variant: "destructive" });
+      const raw = error.message || "";
+      let description = raw;
+      if (raw.includes("contract_signatures")) {
+        description =
+          "Medarbejderen kan ikke slettes, fordi der ligger en kontrakt til underskrift. Annullér kontrakten først, eller deaktivér medarbejderen i stedet.";
+      } else if (raw.includes("violates foreign key constraint")) {
+        description =
+          "Medarbejderen kan ikke slettes, fordi der findes historik knyttet til personen (fx salg, løn eller kontrakter). Deaktivér medarbejderen i stedet.";
+      }
+      toast({ title: t("employees.toast.error"), description, variant: "destructive" });
     },
+
   });
 
   const moveToStaffMutation = useMutation({
