@@ -163,6 +163,8 @@ import {
   ComplianceAiGovernance,
   ComplianceSensitiveAccessLog,
   ComplianceContractAccessLog,
+  ComplianceBackupPolicy,
+  ComplianceProcessingRegistry,
   ShortLinkRedirect,
   PublicUnsubscribe,
   MenuEditor,

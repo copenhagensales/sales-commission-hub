@@ -129,6 +129,31 @@ export default function ComplianceOverview() {
     },
   ];
 
+  const documents = [
+    {
+      title: "Backup- og gendannelsespolitik (GDPR)",
+      description:
+        "Backup-retention, hvornår anonymisering er fuldt irreversibel, og hvem der må gendanne data.",
+      icon: Database,
+      badge: "Udkast 0.1",
+      badgeColor: "bg-amber-500/10 text-amber-700 border-amber-500/30",
+      href: "/compliance/documents/backup-policy",
+      permKey: "menu_compliance_admin",
+    },
+    {
+      title: "Fortegnelse over behandlingsaktiviteter (art. 30) og risikovurdering",
+      description:
+        "Roller, behandlingsaktiviteter, databehandlere, sikkerhedsforanstaltninger og åbne punkter.",
+      icon: ClipboardList,
+      badge: "Udkast 0.1",
+      badgeColor: "bg-amber-500/10 text-amber-700 border-amber-500/30",
+      href: "/compliance/documents/processing-registry",
+      permKey: "menu_compliance_admin",
+    },
+  ];
+
+  const visibleDocuments = documents.filter((doc) => p.canView(doc.permKey));
+
   return (
     <MainLayout>
       <div className="max-w-4xl mx-auto space-y-8 p-6">
