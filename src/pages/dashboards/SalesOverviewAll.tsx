@@ -288,7 +288,7 @@ export default function SalesOverviewAll() {
 
   if (tvMode) {
     return (
-      <div className="fixed inset-0 overflow-auto p-4" style={{ backgroundColor: '#0f1729' }}>
+      <div className="cph-board fixed inset-0 overflow-auto p-4">
         {tvContent}
       </div>
     );
