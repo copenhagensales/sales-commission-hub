@@ -134,6 +134,9 @@ interface AggregatedLocation {
   totalCommission: number;
   sellerCost: number;
   locationCost: number;
+  locationCostGross: number;
+  locationCostNet: number;
+  missingLockedDiscount: boolean;
   hotelCost: number;
   dietCost: number;
   db: number;
