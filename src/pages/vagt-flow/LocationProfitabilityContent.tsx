@@ -20,6 +20,7 @@ import {
 import { format, addDays } from "date-fns";
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
+import { bookingGross } from "@/utils/bookingGross";
 
 interface Placement {
   id: string;
