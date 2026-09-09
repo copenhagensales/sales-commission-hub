@@ -1,6 +1,6 @@
 import { format, parseISO } from "date-fns";
 import { da } from "date-fns/locale";
-import { Calendar, Clock, MapPin, Users, ThumbsUp, ThumbsDown, UserPlus, UserMinus } from "lucide-react";
+import { Calendar, Clock, MapPin, Users, ThumbsUp, ThumbsDown, UserPlus, UserMinus, HelpCircle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -43,8 +43,8 @@ interface EventDetailDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   attendees: EventAttendee[];
-  myStatus: 'attending' | 'not_attending' | null;
-  onToggleAttendance: (status: 'attending' | 'not_attending') => void;
+  myStatus: 'attending' | 'maybe' | 'not_attending' | null;
+  onToggleAttendance: (status: 'attending' | 'maybe' | 'not_attending') => void;
   isLoading?: boolean;
 }
 
@@ -151,6 +151,15 @@ export function EventDetailDialog({
                   {myStatus === 'attending' ? 'Tilmeldt' : 'Tilmeld mig'}
                 </Button>
                 <Button
+                  variant={myStatus === 'maybe' ? "secondary" : "outline"}
+                  className="flex-1 gap-2"
+                  onClick={() => onToggleAttendance('maybe')}
+                  disabled={isLoading}
+                >
+                  <HelpCircle className="w-4 h-4" />
+                  Måske
+                </Button>
+                <Button
                   variant={myStatus === 'not_attending' ? "secondary" : "outline"}
                   className="flex-1 gap-2"
                   onClick={() => onToggleAttendance('not_attending')}
@@ -170,6 +179,15 @@ export function EventDetailDialog({
                 >
                   <ThumbsUp className="w-4 h-4" />
                   Jeg deltager
+                </Button>
+                <Button
+                  variant={myStatus === 'maybe' ? "secondary" : "outline"}
+                  className="flex-1 gap-2"
+                  onClick={() => onToggleAttendance('maybe')}
+                  disabled={isLoading}
+                >
+                  <HelpCircle className="w-4 h-4" />
+                  Måske
                 </Button>
                 <Button
                   variant={myStatus === 'not_attending' ? "secondary" : "outline"}

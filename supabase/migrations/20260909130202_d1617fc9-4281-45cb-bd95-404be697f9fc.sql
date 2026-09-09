@@ -1,0 +1,2 @@
+ALTER TABLE public.event_attendees DROP CONSTRAINT event_attendees_status_check;
+ALTER TABLE public.event_attendees ADD CONSTRAINT event_attendees_status_check CHECK (status = ANY (ARRAY['attending'::text, 'maybe'::text, 'not_attending'::text]));
