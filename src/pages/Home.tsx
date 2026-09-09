@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useAvatarLookup } from "@/hooks/useAvatarLookup";
 
 import { 
   Cake, 
@@ -83,6 +84,7 @@ const Home = () => {
   const [editingEvent, setEditingEvent] = useState<string | null>(null);
   
   const { isOwner } = usePermissions();
+  const lookupAvatar = useAvatarLookup();
 
   const handleLogout = async () => {
     queryClient.clear();
@@ -788,18 +790,32 @@ const Home = () => {
                         <HoverCardTrigger asChild>
                           <div className="flex cursor-pointer items-center gap-2.5">
                             <div className="flex">
-                              {attendees.slice(0, 3).map((a, i) => (
-                                <span
-                                  key={a.id}
-                                  className={`flex h-7 w-7 items-center justify-center rounded-full border-2 border-card text-[10px] font-extrabold ${
-                                    i % 2 === 0
-                                      ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]"
-                                      : "bg-[hsl(var(--cph-light-blue))] text-[hsl(var(--cph-onyx))]"
-                                  } ${i > 0 ? "-ml-2" : ""}`}
-                                >
-                                  {initials(a)}
-                                </span>
-                              ))}
+                              {attendees.slice(0, 3).map((a, i) => {
+                                const attendeeAvatar = lookupAvatar({
+                                  employeeId: (a.employee as any)?.id ?? a.employee_id,
+                                  name: `${(a.employee as any)?.first_name ?? ""} ${(a.employee as any)?.last_name ?? ""}`,
+                                });
+                                return (
+                                  <span
+                                    key={a.id}
+                                    className={`flex h-7 w-7 items-center justify-center overflow-hidden rounded-full border-2 border-card text-[10px] font-extrabold ${
+                                      i % 2 === 0
+                                        ? "bg-[hsl(var(--cph-onyx))] text-[hsl(var(--cph-light-blue))]"
+                                        : "bg-[hsl(var(--cph-light-blue))] text-[hsl(var(--cph-onyx))]"
+                                    } ${i > 0 ? "-ml-2" : ""}`}
+                                  >
+                                    {attendeeAvatar ? (
+                                      <img
+                                        src={attendeeAvatar}
+                                        alt={initials(a)}
+                                        className="h-full w-full rounded-full object-cover"
+                                      />
+                                    ) : (
+                                      initials(a)
+                                    )}
+                                  </span>
+                                );
+                              })}
                               {attendees.length > 3 && (
                                 <span className="-ml-2 flex h-7 w-7 items-center justify-center rounded-full border-2 border-card bg-[hsl(var(--cph-light-blue))] text-[10px] font-extrabold text-[hsl(var(--cph-onyx))]">
                                   +{attendees.length - 3}
@@ -817,6 +833,15 @@ const Home = () => {
                             {attendees.map((a) => (
                               <div key={a.id} className="flex items-center gap-2 text-sm">
                                 <Avatar className="h-5 w-5">
+                                  <AvatarImage
+                                    src={
+                                      lookupAvatar({
+                                        employeeId: (a.employee as any)?.id ?? a.employee_id,
+                                        name: `${(a.employee as any)?.first_name ?? ""} ${(a.employee as any)?.last_name ?? ""}`,
+                                      }) || undefined
+                                    }
+                                    alt={initials(a)}
+                                  />
                                   <AvatarFallback className="text-[10px]">
                                     {initials(a)}
                                   </AvatarFallback>

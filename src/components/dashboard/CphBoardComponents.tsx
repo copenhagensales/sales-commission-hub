@@ -220,7 +220,7 @@ export function CphLeaderboard({
                   {index + 1}
                 </span>
                 <span
-                  className="flex items-center justify-center font-extrabold"
+                  className="flex items-center justify-center overflow-hidden font-extrabold"
                   style={{
                     width: tvMode ? 46 : 30,
                     height: tvMode ? 46 : 30,
@@ -238,7 +238,15 @@ export function CphLeaderboard({
                     color: isTop ? ONYX : index < 3 && light ? LIGHT : undefined,
                   }}
                 >
-                  {getInitials(seller.displayName || seller.name)}
+                  {seller.avatarUrl ? (
+                    <img
+                      src={seller.avatarUrl}
+                      alt={seller.displayName || seller.name}
+                      style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
+                    />
+                  ) : (
+                    getInitials(seller.displayName || seller.name)
+                  )}
                 </span>
                 <span
                   className={index < 3 ? "truncate font-extrabold" : "truncate"}

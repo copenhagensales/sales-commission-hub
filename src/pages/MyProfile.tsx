@@ -10,7 +10,9 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, FileText, CalendarX, Thermometer, AlertTriangle, AlarmClock, Pencil, Save, X, Check, Phone, Mail, Shield, History, ChevronDown, Star, TrendingUp, TrendingDown, Calendar, Target, Sparkles, Download, BookOpen } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useUploadMyAvatar, useRemoveMyAvatar } from "@/hooks/useMyAvatar";
+import { User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, FileText, CalendarX, Thermometer, AlertTriangle, AlarmClock, Pencil, Save, X, Check, Phone, Mail, Shield, History, ChevronDown, Star, TrendingUp, TrendingDown, Calendar, Target, Sparkles, Download, BookOpen, Camera, Loader2 } from "lucide-react";
 import { downloadContractAsPdf } from "@/utils/contractPdfGenerator";
 import { GdprSettingsCard } from "@/components/gdpr/GdprSettingsCard";
 import { EmployeeCalendar } from "@/components/employee/EmployeeCalendar";
@@ -195,6 +197,8 @@ export default function MyProfile() {
   const defaultTab = searchParams.get("tab") || "stamdata";
   const [absencePeriod, setAbsencePeriod] = useState<"2" | "6" | "12">("2");
   const { isPreviewMode, previewEmployee } = useRolePreview();
+  const uploadMyAvatar = useUploadMyAvatar();
+  const removeMyAvatar = useRemoveMyAvatar();
 
   // Fetch current user's employee data (or preview employee if in preview mode)
   const { data: employee, isLoading } = useQuery({
@@ -1099,11 +1103,76 @@ export default function MyProfile() {
     <MainLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold">Min profil</h1>
-          <p className="text-muted-foreground">
-            {employee.first_name} {employee.last_name} {employee.job_title && `· ${employee.job_title}`}
-          </p>
+        <div className="flex items-center gap-4">
+          <div className="relative group">
+            <Avatar className="h-20 w-20 border-2 border-border">
+              <AvatarImage src={employee.avatar_url || undefined} alt="Profilbillede" />
+              <AvatarFallback className="bg-muted text-muted-foreground text-lg">
+                {employee.first_name?.[0]?.toUpperCase() || ""}
+                {employee.last_name?.[0]?.toUpperCase() || ""}
+              </AvatarFallback>
+            </Avatar>
+            {!isPreviewMode && (
+              <>
+                <label
+                  htmlFor="my-avatar-upload"
+                  className="absolute inset-0 flex items-center justify-center rounded-full bg-background/80 opacity-0 transition-opacity group-hover:opacity-100 cursor-pointer"
+                  title="Skift profilbillede"
+                >
+                  {uploadMyAvatar.isPending ? (
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  ) : (
+                    <Camera className="h-5 w-5 text-muted-foreground" />
+                  )}
+                </label>
+                <input
+                  id="my-avatar-upload"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={uploadMyAvatar.isPending}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    if (!file) return;
+                    if (file.size > 5 * 1024 * 1024) {
+                      toast.error("Billedet må højst være 5 MB");
+                      return;
+                    }
+                    uploadMyAvatar.mutate(
+                      { employeeId: employee.id, file },
+                      {
+                        onSuccess: () => toast.success("Profilbillede opdateret"),
+                        onError: () => toast.error("Kunne ikke uploade profilbillede"),
+                      }
+                    );
+                  }}
+                />
+              </>
+            )}
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold">Min profil</h1>
+            <p className="text-muted-foreground">
+              {employee.first_name} {employee.last_name} {employee.job_title && `· ${employee.job_title}`}
+            </p>
+            {!isPreviewMode && employee.avatar_url && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="mt-1 h-7 px-2 text-xs text-muted-foreground"
+                disabled={removeMyAvatar.isPending}
+                onClick={() =>
+                  removeMyAvatar.mutate(employee.id, {
+                    onSuccess: () => toast.success("Profilbillede fjernet"),
+                    onError: () => toast.error("Kunne ikke fjerne profilbillede"),
+                  })
+                }
+              >
+                Fjern billede
+              </Button>
+            )}
+          </div>
         </div>
 
         <Tabs defaultValue={defaultTab} className="w-full">

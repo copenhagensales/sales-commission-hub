@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useAvatarLookup } from "@/hooks/useAvatarLookup";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -445,6 +446,8 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
     toast.success("Telefonnummer kopieret");
     setTimeout(() => setCopiedId(null), 2000);
   }, []);
+
+  const lookupAvatar = useAvatarLookup();
 
   // Get initials from agent name
   const getInitials = (name: string | null) => {
@@ -1016,6 +1019,10 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
                           <div className="col-span-3 min-w-0">
                             <div className="flex items-center gap-3">
                               <Avatar className="h-9 w-9 shrink-0">
+                                <AvatarImage
+                                  src={lookupAvatar({ name: sale.agent_name }) || undefined}
+                                  alt={sale.agent_name || "Agent"}
+                                />
                                 <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
                                   {getInitials(sale.agent_name)}
                                 </AvatarFallback>
