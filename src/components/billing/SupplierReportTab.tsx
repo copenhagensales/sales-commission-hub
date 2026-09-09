@@ -27,6 +27,8 @@ import {
 } from "@/components/ui/table";
 import { toast } from "sonner";
 import { downloadSupplierReportPdf } from "@/utils/supplierReportPdfGenerator";
+import { bookingGross, countBookedDays as countBookedDaysShared } from "@/utils/bookingGross";
+import { useSupplierDiscountStatus } from "@/hooks/useSupplierDiscountStatus";
 
 interface DiscountRule {
   id: string;
