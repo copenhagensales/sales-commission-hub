@@ -40,23 +40,7 @@ Deno.serve(async (req) => {
       // 1. Anonymize employee_master_data (keep record but strip PII)
       const { error: anonError } = await supabase
         .from("employee_master_data")
-        .update({
-          first_name: "Slettet",
-          last_name: "Bruger",
-          private_email: null,
-          work_email: null,
-          phone: null,
-          cpr_number: null,
-          address: null,
-          city: null,
-          zip_code: null,
-          emergency_contact_name: null,
-          emergency_contact_phone: null,
-          avatar_url: null,
-          bank_reg_number: null,
-          bank_account_number: null,
-          notes: null,
-        })
+        .update(employeeAnonymizationPatch)
         .eq("id", employeeId);
 
       if (!anonError) deletedItems.employee_anonymized = 1;
