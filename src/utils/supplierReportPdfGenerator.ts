@@ -160,7 +160,9 @@ export function downloadSupplierReportPdf(config: SupplierReportPdfConfig) {
           ${config.discountInfo.staircaseSteps
             .map(
               (s) => {
-                const lookupValue = isMonthlyRevenue ? (config.discountInfo.monthlyRevenue ?? config.totals.subtotal) : (config.discountInfo.ytdRevenue ?? 0);
+                const lookupValue = isMonthlyRevenue
+                  ? (config.discountInfo.monthlyRevenue ?? config.totals.subtotal)
+                  : (config.discountInfo.currentBasis ?? config.discountInfo.ytdRevenue ?? 0);
                 return `<div class="staircase-step ${lookupValue >= s.minRevenue ? "active" : ""}">${s.discountPercent}%<br><span class="step-label">${fmtKr(s.minRevenue)}+</span></div>`;
               }
             )
