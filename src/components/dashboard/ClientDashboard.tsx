@@ -9,6 +9,8 @@ import { useCachedLeaderboards, type LeaderboardEntry } from "@/hooks/useCachedL
 import { DashboardPeriodSelector, getDefaultPeriod, canUseCachedKpis, type PeriodSelection } from "@/components/dashboard/DashboardPeriodSelector";
 import { useRequireDashboardAccess } from "@/hooks/useRequireDashboardAccess";
 import { TvKpiCard, TvLeaderboardTable, type LeaderboardSeller } from "@/components/dashboard/TvDashboardComponents";
+import { CphBoardFrame, CphLeaderboard, type CphKpi } from "@/components/dashboard/CphBoardComponents";
+
 import { isTvMode, useAutoReload } from "@/utils/tvMode";
 import { calculatePayrollPeriod } from "@/lib/calculations";
 import { getDisplayName } from "@/utils/formatting";

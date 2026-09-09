@@ -10,6 +10,8 @@ export default function EesyTmDashboard() {
         clientId: getClientId("Eesy TM"),
         title: "Eesy TM – Overblik",
         features: {
+          theme: "cph",
+
           salesPerHour: true,
           showMonth: true,
           secondaryClientIds: hiperId ? [hiperId] : undefined,
