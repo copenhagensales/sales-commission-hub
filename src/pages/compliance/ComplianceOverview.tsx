@@ -1,6 +1,6 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Shield, Users, FileText, Lock, ArrowRight, Bell, ClipboardList, AlertTriangle, Globe, Clock, Search, GraduationCap, Brain, Eye } from "lucide-react";
+import { Shield, Users, FileText, Lock, ArrowRight, Bell, ClipboardList, AlertTriangle, Globe, Clock, Search, GraduationCap, Brain, Eye, Database } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { usePermissions } from "@/hooks/usePositionPermissions";
