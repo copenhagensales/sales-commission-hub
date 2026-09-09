@@ -145,8 +145,8 @@ export default function ComplianceOverview() {
       description:
         "Roller, behandlingsaktiviteter, databehandlere, sikkerhedsforanstaltninger og åbne punkter.",
       icon: ClipboardList,
-      badge: "Udkast 0.1",
-      badgeColor: "bg-amber-500/10 text-amber-700 border-amber-500/30",
+      badge: "Godkendt 1.0",
+      badgeColor: "bg-emerald-500/10 text-emerald-700 border-emerald-500/30",
       href: "/compliance/documents/processing-registry",
       permKey: "menu_compliance_admin",
     },
