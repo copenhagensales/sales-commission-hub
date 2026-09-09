@@ -294,6 +294,7 @@ interface CphBoardFrameProps {
   rightContent?: React.ReactNode;
   primaryKpis: CphKpi[];
   secondaryKpis?: CphKpi[];
+  extraContent?: React.ReactNode;
   children: React.ReactNode;
 }
 
@@ -304,8 +305,10 @@ export function CphBoardFrame({
   rightContent,
   primaryKpis,
   secondaryKpis,
+  extraContent,
   children,
 }: CphBoardFrameProps) {
+
   const now = new Date();
   const kpiCols = tvMode
     ? `1.35fr ${primaryKpis.slice(1).map(() => "1fr").join(" ")}`
