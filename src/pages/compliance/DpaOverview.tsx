@@ -238,20 +238,25 @@ export default function DpaOverview() {
                     <TableCell>
                       <ArchiveCell
                         vendor={row.vendor}
-                        documents={byVendor(row.vendor)}
+                        documents={vendorDocs}
                         canManage={!!canManage}
                       />
                     </TableCell>
                     <TableCell>
                       <Badge
                         variant="outline"
-                        className="bg-amber-500/10 text-amber-700 border-amber-500/30 whitespace-normal text-left"
+                        className={
+                          isArchived
+                            ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/30 whitespace-normal text-left"
+                            : "bg-amber-500/10 text-amber-700 border-amber-500/30 whitespace-normal text-left"
+                        }
                       >
-                        {row.status}
+                        {isArchived ? "Arkiveret" : row.status}
                       </Badge>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
