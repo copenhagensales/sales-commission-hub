@@ -52,20 +52,20 @@ export default function Auth() {
     >
       {/* Brandpanel */}
       <div className="relative flex flex-col justify-between gap-12 overflow-hidden px-8 py-14 sm:px-14 bg-[radial-gradient(120%_100%_at_0%_0%,#16233d_0%,#0d1526_55%,#0a1120_100%)]">
-        <div className="pointer-events-none absolute -left-40 top-1/4 h-[720px] w-[720px] rounded-full bg-[radial-gradient(closest-side,rgba(90,140,255,0.16),rgba(90,140,255,0))] blur-[10px]" />
-        <div className="pointer-events-none absolute -left-24 -top-40 h-[460px] w-[460px] rounded-full bg-[radial-gradient(closest-side,rgba(232,178,58,0.13),rgba(232,178,58,0))]" />
+        <div className="pointer-events-none absolute -left-32 -top-36 h-[520px] w-[520px] animate-pulse rounded-full bg-[radial-gradient(closest-side,rgba(232,178,58,0.20),rgba(232,178,58,0))]" />
+        <div className="pointer-events-none absolute -bottom-44 -right-36 h-[480px] w-[480px] rounded-full bg-[radial-gradient(closest-side,rgba(90,140,255,0.16),rgba(90,140,255,0))]" />
         <div
           className="pointer-events-none absolute inset-0"
           style={{
             backgroundImage:
-              "linear-gradient(rgba(255,255,255,.022) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.022) 1px,transparent 1px)",
-            backgroundSize: "64px 64px",
-            maskImage: "radial-gradient(70% 60% at 26% 34%, #000, transparent)",
-            WebkitMaskImage: "radial-gradient(70% 60% at 26% 34%, #000, transparent)",
+              "linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px)",
+            backgroundSize: "56px 56px",
+            maskImage: "radial-gradient(80% 70% at 30% 30%, #000, transparent)",
+            WebkitMaskImage: "radial-gradient(80% 70% at 30% 30%, #000, transparent)",
           }}
         />
 
-        <div className="relative flex items-center gap-4 duration-700 animate-in fade-in">
+        <div className="relative flex items-center gap-4">
           <img
             src={cphSalesLogo}
             alt="Copenhagen Sales"
@@ -78,28 +78,25 @@ export default function Auth() {
           </span>
         </div>
 
-        <div className="relative flex max-w-[460px] flex-col gap-7">
-          <div className="text-[13px] font-extrabold uppercase tracking-[0.18em] text-[#E8B23A] duration-700 animate-in fade-in slide-in-from-bottom-3">
+        <div className="relative flex max-w-[460px] flex-col gap-6">
+          <div className="text-[13px] font-extrabold uppercase tracking-[0.18em] text-[#E8B23A]">
             Stork
           </div>
-          <h1 className="text-[clamp(34px,4.2vw,52px)] font-extrabold leading-[1.04] tracking-[-0.02em] text-white duration-700 animate-in fade-in slide-in-from-bottom-4">
+          <h1 className="text-[clamp(34px,4.2vw,52px)] font-extrabold leading-[1.04] tracking-[-0.02em] text-white">
             Dine tal. Opdateret hver dag.
           </h1>
-          <p className="max-w-[420px] text-[19px] font-light leading-[1.65] text-[#9dabc4] delay-100 duration-700 animate-in fade-in slide-in-from-bottom-4 fill-mode-backwards">
+          <p className="max-w-[400px] text-[20px] leading-relaxed text-[#a8b4ca]">
             Provisionssystemet for Copenhagen Sales. Se optjening, bonus og udbetalinger — samlet ét
             sted.
           </p>
-          <ul className="mt-2 flex flex-col gap-3.5 delay-200 duration-700 animate-in fade-in slide-in-from-bottom-4 fill-mode-backwards">
+          <ul className="mt-1 flex flex-col gap-3">
             {[
               "Provision og bonus i realtid",
               "Dashboards med dine resultater",
               "Følg Ligaen og konkurrencerne",
             ].map((t) => (
-              <li
-                key={t}
-                className="flex items-center gap-3.5 text-[15px] font-medium tracking-[0.005em] text-[#8e9cb5]"
-              >
-                <span className="h-px w-4 shrink-0 bg-white/25" />
+              <li key={t} className="flex items-center gap-3 text-[18px] font-medium text-[#c8d2e4]">
+                <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-[#E8B23A]" />
                 {t}
               </li>
             ))}
@@ -112,10 +109,10 @@ export default function Auth() {
       </div>
 
       {/* Login */}
-      <div className="flex flex-col justify-center border-t border-white/[0.07] bg-[#0f1a2e] px-8 py-16 sm:px-20 lg:border-l lg:border-t-0 lg:py-20">
-        <div className="mx-auto w-full max-w-[400px] delay-150 duration-700 animate-in fade-in slide-in-from-bottom-4 fill-mode-backwards">
+      <div className="flex flex-col justify-center border-t border-white/[0.07] bg-[#0f1a2e] px-8 py-14 sm:px-14 lg:border-l lg:border-t-0">
+        <div className="mx-auto w-full max-w-[420px]">
           <h2 className="text-[30px] font-extrabold tracking-[-0.01em] text-white">{greeting}</h2>
-          <p className="mt-3 text-[16px] leading-relaxed text-[#8a97b1]">
+          <p className="mt-2 text-[16px] leading-relaxed text-[#8a97b1]">
             Log ind med din arbejdsmail for at fortsætte.
           </p>
 
@@ -123,7 +120,7 @@ export default function Auth() {
             type="button"
             onClick={handleMicrosoftSignIn}
             disabled={msLoading}
-            className="mt-12 flex w-full items-center justify-center gap-3.5 rounded-xl border border-white/[0.14] bg-white px-5 py-[19px] text-[16px] font-bold text-[#101828] shadow-[0_10px_30px_-14px_rgba(0,0,0,0.6)] transition-all duration-200 hover:-translate-y-px hover:shadow-[0_16px_38px_-12px_rgba(232,178,58,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E8B23A] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0f1a2e] disabled:opacity-70"
+            className="mt-8 flex w-full items-center justify-center gap-3.5 rounded-xl border border-white/[0.14] bg-white px-5 py-[17px] text-[16px] font-bold text-[#101828] transition hover:-translate-y-px hover:shadow-[0_12px_30px_rgba(0,0,0,0.45)] disabled:opacity-70"
           >
             <span className="grid shrink-0 grid-cols-2 grid-rows-2 gap-[2px]">
               <span className="h-[9px] w-[9px] bg-[#F25022]" />
@@ -134,7 +131,7 @@ export default function Auth() {
             {msLoading ? "Sender dig til Microsoft…" : "Fortsæt med Microsoft"}
           </button>
 
-          <div className="mt-5 flex items-center justify-center gap-2.5 text-[13px] font-medium text-[#7c8aa3]">
+          <div className="mt-4 flex items-center gap-2.5 text-[13px] font-medium text-[#7c8aa3]">
             <svg
               width="14"
               height="14"
@@ -151,18 +148,17 @@ export default function Auth() {
             Single sign-on via Microsoft Entra ID
           </div>
 
-          <div className="my-12 h-px bg-white/[0.08]" />
+          <div className="my-8 h-px bg-white/[0.08]" />
 
           <p className="text-[14px] leading-relaxed text-[#8a97b1]">
             Kun for medarbejdere hos Copenhagen Sales. Kan du ikke logge ind, så kontakt din
             teamleder.
           </p>
-          <p className="mt-3 text-[12px] font-semibold tracking-wide text-[#5d6a81]">
+          <p className="mt-2.5 text-[12px] font-semibold tracking-wide text-[#5d6a81]">
             Stork · Copenhagen Sales
           </p>
         </div>
       </div>
-
     </div>
   );
 }
