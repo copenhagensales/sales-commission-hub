@@ -45,6 +45,7 @@ import { da } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CapacityPanel } from "@/components/vagt-flow/CapacityPanel";
+import { SupplierDiscountPanel } from "@/components/vagt-flow/SupplierDiscountPanel";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
