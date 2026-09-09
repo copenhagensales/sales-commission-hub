@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Trophy, ArrowRight, Users } from "lucide-react";
+import { Trophy, ArrowRight, Users, Medal } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -68,14 +68,7 @@ export function CompactLeagueView() {
     }).format(amount) + " kr";
   };
 
-  const getMedalEmoji = (rank: number) => {
-    switch (rank) {
-      case 1: return "🥇";
-      case 2: return "🥈";
-      case 3: return "🥉";
-      default: return null;
-    }
-  };
+  const isPodium = (rank: number) => rank >= 1 && rank <= 3;
 
   if (!season) return null;
 
@@ -84,11 +77,11 @@ export function CompactLeagueView() {
     : { visibleStandings: allStandings.slice(0, 3), myIndex: -1 };
 
   return (
-    <Card className="border-0 shadow-lg bg-card/80 backdrop-blur-sm">
+    <Card className="border border-border bg-card rounded-3xl">
       <CardHeader className="pb-2 px-3 md:px-6 pt-3 md:pt-6">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-1.5 md:gap-2 text-sm md:text-base font-semibold">
-            <Trophy className="w-3.5 h-3.5 md:w-4 md:h-4 text-yellow-500" />
+            <Trophy className="w-3.5 h-3.5 md:w-4 md:h-4 text-[hsl(var(--cph-emerald))]" />
             Din liga-position
           </CardTitle>
           <div className="flex items-center gap-1 text-[10px] md:text-xs text-muted-foreground">
@@ -104,7 +97,7 @@ export function CompactLeagueView() {
             {visibleStandings.map((standing, index) => {
               const isMe = standing.employee_id === currentEmployeeId;
               const rank = standing.overall_rank || (index + 1);
-              const medal = getMedalEmoji(rank);
+              const medal = isPodium(rank);
               
               return (
                 <div 
@@ -117,7 +110,9 @@ export function CompactLeagueView() {
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     {medal ? (
-                      <span className="text-sm md:text-base w-5 text-center flex-shrink-0">{medal}</span>
+                      <span className="w-5 flex-shrink-0 flex items-center justify-center">
+                        <Medal className={`w-4 h-4 ${rank === 1 ? "text-[hsl(var(--cph-emerald))]" : "text-foreground/60"}`} />
+                      </span>
                     ) : (
                       <span className="text-[10px] md:text-xs font-medium w-5 text-center flex-shrink-0">
                         #{rank}

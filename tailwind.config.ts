@@ -16,7 +16,7 @@ export default {
   	extend: {
   		fontFamily: {
   			sans: [
-  				'Work Sans',
+  				'Figtree',
   				'ui-sans-serif',
   				'system-ui',
   				'-apple-system',
@@ -29,7 +29,7 @@ export default {
   				'sans-serif'
   			],
   			serif: [
-  				'Lora',
+  				'Figtree',
   				'ui-serif',
   				'Georgia',
   				'Cambria',
