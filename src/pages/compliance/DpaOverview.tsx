@@ -160,14 +160,24 @@ function ArchiveCell({
       )}
       {documents.map((doc) => (
         <div key={doc.id} className="flex items-start gap-1">
-          <button
-            type="button"
-            onClick={() => openMut.mutate(doc.storage_path)}
-            className="flex items-start gap-1 text-left text-primary underline break-all"
-          >
-            <FileText className="h-4 w-4 shrink-0" />
-            <span>{doc.file_name}</span>
-          </button>
+          <div className="min-w-0">
+            <button
+              type="button"
+              onClick={() => openMut.mutate(doc.storage_path)}
+              className="flex items-start gap-1 text-left text-primary underline break-all"
+            >
+              <FileText className="h-4 w-4 shrink-0" />
+              <span>{doc.file_name}</span>
+            </button>
+            <p className="text-muted-foreground">
+              Arkiveret{" "}
+              {new Date(doc.created_at).toLocaleDateString("da-DK", {
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              })}
+            </p>
+          </div>
           {canManage && (
             <Button
               variant="ghost"
