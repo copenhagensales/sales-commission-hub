@@ -196,7 +196,7 @@ export default function DpaOverview() {
         title="Databehandleraftaler (DPA) — oversigt og status"
         version="1.0"
         documentDate="9. september 2026"
-        statusLabel="GODKENDT - 9. september 2026 af Mathias Dandanel Grubak og Lone Mikkelsen"
+        statusLabel="GODKENDT - 9. september 2026 af Mathias Dandanel Grubak"
         statusTone="approved"
       >
         <DocSection heading="Oversigt over databehandlere">
@@ -276,7 +276,7 @@ export default function DpaOverview() {
             Status opdateres pr. leverandør, når aftalen er arkiveret.
           </p>
           <p className="font-medium text-foreground">
-            Gennemgås juridisk af Mathias/Lone før markering som komplet.
+            Gennemgås juridisk af Mathias før markering som komplet.
           </p>
         </DocSection>
       </ComplianceDocument>
